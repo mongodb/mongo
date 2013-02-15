@@ -355,12 +355,12 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            if( theReplSet->box.getState().primary() ) {
+
+            if (!theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue())) {
                 errmsg = "primaries can't modify maintenance mode";
                 return false;
             }
 
-            theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue());
             return true;
         }
     } cmdReplSetMaintenance;
@@ -379,7 +379,15 @@ namespace mongo {
             out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
         }
         CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string&, 
+                         BSONObj& cmdObj, 
+                         int, 
+                         string& errmsg, 
+                         BSONObjBuilder& result, 
+                         bool fromRepl) {
+            if (!check(errmsg, result)) {
+                return false;
+            }
             string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
             result.append("syncFromRequested", newTarget);
             return theReplSet->forceSyncFrom(newTarget, errmsg, result);

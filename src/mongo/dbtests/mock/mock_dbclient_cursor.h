@@ -32,6 +32,11 @@ namespace mongo {
                 const mongo::BSONArray& mockCollection);
 
         bool more();
+
+        /**
+         * Note: has the same contract as DBClientCursor - returned BSONObj will
+         * become invalid when this cursor is destroyed.
+         */
         mongo::BSONObj next();
 
     private:

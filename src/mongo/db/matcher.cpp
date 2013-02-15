@@ -112,7 +112,7 @@ namespace mongo {
                 uassert( 10072 , "unknown error in invocation of $where function", false);
             }
             
-            return _scope->getBoolean( "return" ) != 0;
+            return _scope->getBoolean( "__returnValue" ) != 0;
         }
         
     private:
@@ -1166,7 +1166,7 @@ namespace mongo {
                 u_assert( 10072 , "unknown error in invocation of $where function", false);
                 return false;
             }
-            return _where->scope->getBoolean( "return" ) != 0;
+            return _where->scope->getBoolean( "__returnValue" ) != 0;
 
         }
     }

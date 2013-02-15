@@ -194,10 +194,6 @@ namespace mongo {
                 return ChunkVersion( el._numberLong(), OID() );
             }
 
-            // Note - we used to throw here, we can't anymore b/c debug builds will be unhappy
-            warning() << "can't load version from element type (" << (int)(el.type()) << ") "
-                      << el << endl;
-
             *canParse = false;
 
             return ChunkVersion( 0, OID() );

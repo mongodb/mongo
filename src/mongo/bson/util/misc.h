@@ -23,6 +23,7 @@
 #include <limits>
 #include <string>
 
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -96,6 +97,9 @@ namespace mongo {
             verify((long long)millis >= 0); // TODO when millis is signed, delete 
             verify(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
             return millis / 1000;
+        }
+        int64_t asInt64() {
+            return static_cast<int64_t>(millis);
         }
     };
 

@@ -162,19 +162,27 @@ namespace mongo {
     namespace {
         ExportedServerParameter<int> LogLevelSetting( ServerParameterSet::getGlobal(),
                                                       "logLevel",
-                                                      &logLevel );
+                                                      &logLevel,
+                                                      true,
+                                                      true );
 
         ExportedServerParameter<bool> NoTableScanSetting( ServerParameterSet::getGlobal(),
                                                           "notablescan",
-                                                          &cmdLine.noTableScan );
+                                                          &cmdLine.noTableScan,
+                                                          true,
+                                                          true );
 
         ExportedServerParameter<bool> QuietSetting( ServerParameterSet::getGlobal(),
                                                     "quiet",
-                                                    &cmdLine.quiet );
+                                                    &cmdLine.quiet,
+                                                    true,
+                                                    true );
 
         ExportedServerParameter<double> SyncdelaySetting( ServerParameterSet::getGlobal(),
                                                           "syncdelay",
-                                                          &cmdLine.syncdelay );
+                                                          &cmdLine.syncdelay,
+                                                          true,
+                                                          true );
     }
 
 }

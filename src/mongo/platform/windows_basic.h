@@ -27,6 +27,11 @@
 // tell windows.h not to include a bunch of headers we don't need:
 # define WIN32_LEAN_AND_MEAN
 # include "mongo/targetver.h"
+
+// Override the default of 64, to match Linux
+// fd_set is defined in winsock2.h
+# define FD_SETSIZE 1024
+
 # include <winsock2.h> //this must be included before the first windows.h include
 # include <ws2tcpip.h>
 # include <wspiapi.h>

@@ -68,7 +68,7 @@ meridianCrossingPoly = {
     ]
 };
 
-result = t.find({geo: {$within: {$geometry: meridianCrossingPoly}}});
+result = t.find({geo: {$geoWithin: {$geometry: meridianCrossingPoly}}});
 assert.eq(result.count(), 3);
 
 t.drop();
@@ -102,7 +102,7 @@ pointOnPositiveSideOfMeridian = {
     coordinates: [179.0, 0.0]
 };
 
-result = t.find({geo: {$near: pointOnPositiveSideOfMeridian}});
+result = t.find({geo: {$geoNear: pointOnPositiveSideOfMeridian}});
 assert.eq(result.count(), 2);
 assert.eq(result[0].name, "closer");
 assert.eq(result[1].name, "farther");

@@ -228,15 +228,25 @@ Object.keySet = function(o) {
 }
 
 // String
-String.prototype.trim = function() {
-    return this.replace(/^\s+|\s+$/g,"");
+if (String.prototype.trim === undefined) {
+    String.prototype.trim = function() {
+        return this.replace(/^\s+|\s+$/g,"");
+    }
 }
-String.prototype.ltrim = function() {
-    return this.replace(/^\s+/,"");
+if (String.prototype.trimLeft === undefined) {
+    String.prototype.trimLeft = function() {
+        return this.replace(/^\s+/,"");
+    }
 }
-String.prototype.rtrim = function() {
-    return this.replace(/\s+$/,"");
+if (String.prototype.trimRight === undefined) {
+    String.prototype.trimRight = function() {
+        return this.replace(/\s+$/,"");
+    }
 }
+
+// always provide ltrim and rtrim for backwards compatibility
+String.prototype.ltrim = String.prototype.trimLeft;
+String.prototype.rtrim = String.prototype.trimRight;
 
 String.prototype.startsWith = function(str){
     return this.indexOf(str) == 0

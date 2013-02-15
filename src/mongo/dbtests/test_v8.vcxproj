@@ -585,6 +585,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\parallel.h" />
     <ClInclude Include="..\client\redef_macros.h" />
+    <ClInclude Include="..\client\sasl_client_authenticate.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
     <ClInclude Include="..\client\undef_macros.h" />
     <ClInclude Include="..\db\auth\action_set.h" />
@@ -661,6 +662,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\indexkey.h" />
     <ClInclude Include="..\db\index_insertion_continuation.h" />
     <ClInclude Include="..\db\index_rebuilder.h" />
+    <ClInclude Include="..\db\index_set.h" />
     <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />
     <ClInclude Include="..\db\instance.h" />
@@ -2026,6 +2028,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\client\gridfs.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp" />
     <ClCompile Include="..\db\auth\action_set.cpp" />
     <ClCompile Include="..\db\auth\action_type.cpp" />
     <ClCompile Include="..\db\auth\authorization_manager.cpp" />
@@ -2508,6 +2511,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\geo\shapes.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
+    <ClCompile Include="..\db\index_set.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\interrupt_status_mongod.cpp" />
     <ClCompile Include="..\db\intervalbtreecursor.cpp" />

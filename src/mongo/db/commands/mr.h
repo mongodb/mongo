@@ -120,7 +120,7 @@ namespace mongo {
         private:
 
             /**
-             * result in "return"
+             * result in "__returnValue"
              * @param key OUT
              * @param endSizeEstimate OUT
             */
@@ -268,6 +268,11 @@ namespace mongo {
             // ------- cleanup/data positioning ----------
 
             /**
+             * Clean up the temporary and incremental collections
+             */
+            void dropTempCollections();
+
+            /**
                @return number objects in collection
              */
             long long postProcessCollection( CurOp* op , ProgressMeterHolder& pm );
@@ -305,6 +310,7 @@ namespace mongo {
 
             const Config& _config;
             DBDirectClient _db;
+            bool _useIncremental;   // use an incremental collection
 
         protected:
 

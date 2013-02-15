@@ -176,8 +176,6 @@ namespace mongo {
         manager->_key.getOwned();
         manager->_chunksMap = this->_chunksMap;
         manager->_maxShardVersion = newShardVersion; // will increment 2nd, 3rd,... chunks below
-        manager->_maxCollVersion = newShardVersion > _maxCollVersion ?
-                                   newShardVersion : this->_maxCollVersion;
 
         BSONObj startKey = chunk.getMin();
         for (vector<BSONObj>::const_iterator it = splitKeys.begin();
@@ -189,10 +187,12 @@ namespace mongo {
             manager->_maxShardVersion.incMinor();
             startKey = split;
         }
+
+        manager->_maxCollVersion = manager->_maxShardVersion > _maxCollVersion ?
+                        manager->_maxShardVersion : this->_maxCollVersion;
         manager->fillRanges();
 
         dassert(manager->isValid());
-
         return manager.release();
     }
 
@@ -271,7 +271,7 @@ namespace mongo {
             return false;
         }
 
-        if (_maxShardVersion.majorVersion() == 0 || _maxCollVersion.majorVersion() == 0)
+        if (_maxCollVersion.majorVersion() == 0)
             return false;
 
         return true;

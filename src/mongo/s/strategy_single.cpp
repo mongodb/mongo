@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/request.h"
 #include "mongo/s/cursors.h"
@@ -54,7 +55,7 @@ namespace mongo {
                                                      : str::equals("query", e.fieldName()))) {
                             // Extract the embedded query object.
 
-                            if (cmdObj.hasField("$readPreference")) {
+                            if (cmdObj.hasField(Query::ReadPrefField.name())) {
                                 // The command has a read preference setting. We don't want
                                 // to lose this information so we copy this to a new field
                                 // called $queryOptions.$readPreference
@@ -63,7 +64,7 @@ namespace mongo {
 
                                 BSONObjBuilder queryOptionsBuilder(
                                         finalCmdObjBuilder.subobjStart("$queryOptions"));
-                                queryOptionsBuilder.append(cmdObj["$readPreference"]);
+                                queryOptionsBuilder.append(cmdObj[Query::ReadPrefField.name()]);
                                 queryOptionsBuilder.done();
 
                                 cmdObj = finalCmdObjBuilder.obj();

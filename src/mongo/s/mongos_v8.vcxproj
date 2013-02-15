@@ -1845,6 +1845,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp" />
     <ClCompile Include="..\db\auth\action_set.cpp" />
     <ClCompile Include="..\db\auth\action_type.cpp" />
     <ClCompile Include="..\db\auth\authorization_manager.cpp" />
@@ -3067,6 +3068,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\parallel.h" />
     <ClInclude Include="..\client\redef_macros.h" />
+    <ClInclude Include="..\client\sasl_client_authenticate.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
     <ClInclude Include="..\client\undef_macros.h" />
     <ClInclude Include="..\db\auth\action_set.h" />

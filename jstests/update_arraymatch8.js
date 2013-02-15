@@ -111,3 +111,48 @@ t.update( {'array.123a.name': 'old'}, {$set: {'array.0.123a': {'name': 'new'}}} 
 assert( t.findOne({'array.123a.name': 'new'}) );
 assert( !t.findOne({'array.123a.name': 'old'}) );
 
+// a.0.b
+t = db.jstests_update_arraymatch8;
+t.drop();
+t.ensureIndex( {'a.0.b': 1} );
+t.insert( {'a': [ [ { b:'old' } ] ] } );
+assert( t.findOne({'a.0.0.b': 'old'}) );
+assert( t.findOne({'a.0.b': 'old'}) );
+t.update( {}, {$set: {'a.0.0.b': 'new'}} );
+assert( t.findOne({'a.0.b': 'new'}) );
+assert( !t.findOne({'a.0.b': 'old'}) );
+
+// a.0.b.c
+t = db.jstests_update_arraymatch8;
+t.drop();
+t.ensureIndex( {'a.0.b.c': 1} );
+t.insert( {'a': [ { b:[ { c:'old' } ] } ] } );
+assert( t.findOne({'a.0.b.0.c': 'old'}) );
+assert( t.findOne({'a.b.0.c': 'old'}) );
+assert( t.findOne({'a.0.b.c': 'old'}) );
+assert( t.findOne({'a.b.c': 'old'}) );
+t.update( {}, {$set: {'a.0.b.0.c': 'new'}} );
+assert( t.findOne({'a.0.b.c': 'new'}) );
+assert( !t.findOne({'a.0.b.c': 'old'}) );
+
+// a.b.$ref
+t = db.jstests_update_arraymatch8;
+t.drop();
+t.ensureIndex( {'a.b.$ref': 1} );
+t.insert( {'a': [ { 'b':{ '$ref':'old', '$id':0 } } ] } );
+assert( t.findOne({'a.b.$ref': 'old'}) );
+assert( t.findOne({'a.0.b.$ref': 'old'}) );
+t.update( {}, {$set: {'a.0.b.$ref': 'new'}} );
+assert( t.findOne({'a.b.$ref': 'new'}) );
+assert( !t.findOne({'a.b.$ref': 'old'}) );
+
+// a.b and a-b
+t = db.jstests_update_arraymatch8;
+t.drop();
+t.ensureIndex( {'a.b': 1} );
+t.ensureIndex( {'a-b': 1} );
+t.insert( {'a':{'b':'old'}} );
+assert( t.findOne({'a.b': 'old'}) );
+t.update( {}, {$set: {'a': {'b': 'new'}}} );
+assert( t.findOne({'a.b': 'new'}) );
+assert( !t.findOne({'a.b': 'old'}) );

@@ -80,7 +80,7 @@ namespace mongo {
                     log() << "stale mongos detected " << quietIntervalMins << " minutes ago,"
                           << " network location is " << pingDoc["_id"].String()
                           << ", not checking version" << endl;
-	}
+            	}
                 else {
                     if (versionCmp(mongoVersion, minMongoVersion) < 0) {
                         return Status(ErrorCodes::RemoteValidationError,
@@ -122,7 +122,15 @@ namespace mongo {
                                            << " read from the config server" << causedBy(errMsg));
                 }
 
-                shardLocs.push_back(ConnectionString(shard.getHost()));
+                ConnectionString shardLoc = ConnectionString::parse(shard.getHost(), errMsg);
+                if (shardLoc.type() == ConnectionString::INVALID) {
+                    connPtr->done();
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  stream() << "invalid shard host " << shard.getHost()
+                                           << " read from the config server" << causedBy(errMsg));
+                }
+
+                shardLocs.push_back(shardLoc);
             }
         }
         catch (const DBException& e) {
@@ -145,7 +153,11 @@ namespace mongo {
             for (vector<HostAndPort>::iterator serverIt = servers.begin();
                     serverIt != servers.end(); ++serverIt)
             {
-                ConnectionString serverLoc(serverIt->toString(true));
+                // Note: This will *always* be a single-host connection
+                ConnectionString serverLoc(*serverIt);
+
+                log() << "checking that version of host " << serverLoc << " is compatible with " 
+                      << minMongoVersion << endl;
 
                 scoped_ptr<ScopedDbConnection> serverConnPtr;
 

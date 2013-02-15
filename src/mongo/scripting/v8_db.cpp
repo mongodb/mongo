@@ -21,6 +21,7 @@
 #include <boost/scoped_array.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/s/d_logic.h"
@@ -102,11 +103,6 @@ namespace mongo {
         return mongo;
     }
 
-    void destroyConnection(v8::Persistent<v8::Value> self, void* parameter) {
-        delete static_cast<DBClientBase*>(parameter);
-        self.Dispose();
-        self.Clear();
-    }
 
     v8::Handle<v8::Value> mongoConsExternal(V8Scope* scope, const v8::Arguments& args) {
         char host[255];
@@ -131,7 +127,7 @@ namespace mongo {
         }
 
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.Holder());
-        self.MakeWeak(conn, destroyConnection);
+        self.MakeWeak(conn, deleteOnCollect<DBClientWithCommands>);
 
         ScriptEngine::runConnectCallback(*conn);
 
@@ -147,7 +143,7 @@ namespace mongo {
 
         DBClientBase* conn = createDirectClient();
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
-        self.MakeWeak(conn, destroyConnection);
+        self.MakeWeak(conn, deleteOnCollect<DBClientBase>);
 
         args.This()->SetInternalField(0, v8::External::New(conn));
         args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
@@ -161,12 +157,6 @@ namespace mongo {
         DBClientBase* conn = (DBClientBase*)(c->Value());
         massert(16667, "Unable to get db client connection", conn);
         return conn;
-    }
-
-    void destroyCursor(v8::Persistent<v8::Value> self, void* parameter) {
-        delete static_cast<mongo::DBClientCursor*>(parameter);
-        self.Dispose();
-        self.Clear();
     }
 
     /**
@@ -203,8 +193,8 @@ namespace mongo {
         }
 
         v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
-        c.MakeWeak(cursor.get(), destroyCursor);
-        c->SetInternalField(0, v8::External::New(cursor.release()));
+        c->SetInternalField(0, v8::External::New(cursor.get()));
+        c.MakeWeak(cursor.release(), deleteOnCollect<DBClientCursor>);
         return c;
     }
 
@@ -302,16 +292,31 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> mongoAuth(V8Scope* scope, const v8::Arguments& args) {
-        argumentCheck(args.Length() == 3, "mongoAuth needs 3 args")
-        DBClientBase* conn = getConnection(args);
-        string db       = toSTLString(args[0]);
-        string username = toSTLString(args[1]);
-        string password = toSTLString(args[2]);
-        string errmsg;
-        if (conn->auth(db, username, password, errmsg)) {
-            return v8::Boolean::New(true);
+        DBClientWithCommands* conn = getConnection(args);
+        if (NULL == conn)
+            return v8AssertionException("no connection");
+
+        BSONObj params;
+        switch (args.Length()) {
+        case 1:
+            params = scope->v8ToMongo(args[0]->ToObject());
+            break;
+        case 3:
+            params = BSON(saslCommandMechanismFieldName << "MONGO-CR" <<
+                          saslCommandPrincipalSourceFieldName << toSTLString(args[0]) <<
+                          saslCommandPrincipalFieldName << toSTLString(args[1]) <<
+                          saslCommandPasswordFieldName << toSTLString(args[2]));
+            break;
+        default:
+            return v8AssertionException("mongoAuth takes 1 object or 3 string arguments");
         }
-        return v8AssertionException(errmsg);
+        try {
+            conn->auth(params);
+        }
+        catch (const DBException& ex) {
+            return v8AssertionException(ex.toString());
+        }
+        return v8::Boolean::New(true);
     }
 
     v8::Handle<v8::Value> mongoLogout(V8Scope* scope, const v8::Arguments& args) {
@@ -636,17 +641,7 @@ namespace mongo {
         v8::Handle<v8::Value> len;
         int rlen;
         char* data;
-        if (args.Length() == 3) {
-            // 3 args: len, type, data
-            len = args[0];
-            rlen = len->IntegerValue();
-            type = args[1];
-            v8::String::Utf8Value utf(args[2]);
-            char* tmp = *utf;
-            data = new char[rlen];
-            memcpy(data, tmp, rlen);
-        }
-        else if (args.Length() == 2) {
+        if (args.Length() == 2) {
             // 2 args: type, base64 string
             type = args[0];
             v8::String::Utf8Value utf(args[1]);
@@ -662,7 +657,7 @@ namespace mongo {
             return it;
         }
         else {
-            return v8AssertionException("BinData needs 2 or 3 arguments");
+            return v8AssertionException("BinData takes 2 arguments -- BinData(subtype,data)");
         }
 
         it->ForceSet(scope->v8StringData("len"), len);

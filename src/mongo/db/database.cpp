@@ -31,8 +31,6 @@
 
 namespace mongo {
 
-    bool Database::_openAllFiles = true;
-
     void assertDbAtLeastReadLocked(const Database *db) { 
         if( db ) { 
             Lock::assertAtLeastReadLocked(db->name);
@@ -97,8 +95,7 @@ namespace mongo {
             // there's a write, then open.
             if (!newDb) {
                 namespaceIndex.init();
-                if( _openAllFiles )
-                    openAllFiles();
+                openAllFiles();
             }
             magic = 781231;
         } catch(std::exception& e) {
@@ -234,6 +231,32 @@ namespace mongo {
         }
     }
 
+    void Database::clearTmpCollections() {
+
+        Lock::assertWriteLocked( name );
+        Client::Context ctx( name );
+
+        shared_ptr<Cursor> cursor = theDataFileMgr.findAll( name + ".system.namespaces" );
+        while ( cursor && cursor->ok() ) {
+            BSONObj x = cursor->current();
+            cursor->advance();
+
+            BSONElement e = x.getFieldDotted( "options.temp" );
+            if ( !e.trueValue() )
+                continue;
+
+            string errmsg;
+            BSONObjBuilder result;
+            dropCollection( x["name"].String(), errmsg, result );
+
+            if ( errmsg.size() > 0 ) {
+                warning() << "could not delete temp collection: " << x
+                          << " because of: " << errmsg << endl;
+            }
+
+        }
+    }
+
     // todo: this is called a lot. streamline the common case
     MongoDataFile* Database::getFile( int n, int sizeNeeded , bool preallocateOnly) {
         verify(this);
@@ -256,7 +279,7 @@ namespace mongo {
                 if( !Lock::isWriteLocked(this->name) ) {
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
                     log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
-                    log() << "       context ns: " << cc().ns() << " openallfiles:" << _openAllFiles << endl;
+                    log() << "       context ns: " << cc().ns() << endl;
                     verify(false);
                 }
                 _files.push_back(0);
@@ -453,6 +476,8 @@ namespace mongo {
         }
 
         authindex::configureSystemIndexes(dbname);
+
+        db->clearTmpCollections();
 
         return db;
     }

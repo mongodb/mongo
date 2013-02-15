@@ -391,34 +391,13 @@ namespace mongo {
      *          --replset.
      */
     unsigned long long checkIfReplMissingFromCommandLine() {
-        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // this is helpful for the query below to work as you can't open files when readlocked
         if( !cmdLine.usingReplSets() ) {
             Client::GodScope gs;
             DBDirectClient c;
             return c.count("local.system.replset");
         }
         return 0;
-    }
-
-    void clearTmpCollections() {
-        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
-        Client::GodScope gs;
-        vector< string > toDelete;
-        DBDirectClient cli;
-        vector< string > dbNames;
-        getDatabaseNames( dbNames );
-        for (vector<string>::const_iterator it(dbNames.begin()), end(dbNames.end()); it != end; ++it){
-            const string coll = *it + ".system.namespaces";
-            scoped_ptr< DBClientCursor > c (cli.query(coll, Query( fromjson( "{'options.temp': {$in: [true, 1]}}" ) ) ));
-            while( c->more() ) {
-                BSONObj o = c->next();
-                toDelete.push_back( o.getStringField( "name" ) );
-            }
-        }
-        for( vector< string >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-            log() << "Dropping old temporary collection: " << *i << endl;
-            cli.dropCollection( *i );
-        }
     }
 
     /**
@@ -570,8 +549,6 @@ namespace mongo {
 
         Client::initThread("initandlisten");
 
-        Database::_openAllFiles = false;
-
         Logstream::get().addGlobalTee( new RamLog("global") );
 
         bool is32bit = sizeof(int*) == 4;
@@ -627,9 +604,6 @@ namespace mongo {
         if( cmdLine.durOptions & CmdLine::DurRecoverOnly )
             return;
 
-        // comes after getDur().startup() because this reads from the database
-        clearTmpCollections();
-
         unsigned long long missingRepl = checkIfReplMissingFromCommandLine();
         if (missingRepl) {
             log() << startupWarningsLog;
@@ -652,18 +626,11 @@ namespace mongo {
 
         repairDatabasesAndCheckVersion();
 
-        /* we didn't want to pre-open all files for the repair check above. for regular
-           operation we do for read/write lock concurrency reasons.
-        */
-        Database::_openAllFiles = true;
-
         if ( shouldRepairDatabases )
             return;
 
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
-
-        indexRebuilder.go();
 
         snapshotThread.go();
         d.clientCursorMonitor.go();
@@ -1137,7 +1104,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             if ( params.count( "dbpath" ) == 0 )
                 dbpath = "/data/configdb";
             replSettings.master = true;
-            if ( params.count( "oplogsize" ) == 0 )
+            if ( params.count( "oplogSize" ) == 0 )
                 cmdLine.oplogSize = 5 * 1024 * 1024;
         }
         if ( params.count( "profile" ) ) {

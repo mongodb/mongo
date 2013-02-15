@@ -31,6 +31,7 @@ namespace mongo {
 
     class ReplicaSetMonitor;
     class TagSet;
+    struct ReadPreferenceSetting;
     typedef shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
     typedef pair<set<string>,set<int> > NodeDiff;
 
@@ -431,10 +432,6 @@ namespace mongo {
          */
         bool connect();
 
-        /** Authorize.  Authorizes all nodes as needed
-        */
-        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true, Auth::Level * level = NULL);
-
         /**
          * Logs out the connection for the given database.
          *
@@ -474,6 +471,14 @@ namespace mongo {
          * @return the reference to the address that points to the master connection.
          */
         DBClientConnection& masterConn();
+
+        /**
+         * WARNING: this method is very dangerous - this object can decide to free the
+         *     returned master connection any time. This can also unpin the cached
+         *     slaveOk/read preference connection.
+         *
+         * @return the reference to the address that points to a secondary connection.
+         */
         DBClientConnection& slaveConn();
 
         // ---- callback pieces -------
@@ -512,6 +517,10 @@ namespace mongo {
 
 
     protected:
+        /** Authorize.  Authorizes all nodes as needed
+        */
+        virtual void _auth(const BSONObj& params);
+
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
@@ -530,8 +539,7 @@ namespace mongo {
          * Helper method for selecting a node based on the read preference. Will advance
          * the tag tags object if it cannot find a node that matches the current tag.
          *
-         * @param preference the preference to use for selecting a node
-         * @param tags pointer to the list of tags.
+         * @param readPref the preference to use for selecting a node.
          *
          * @return a pointer to the new connection object if it can find a good connection.
          *     Otherwise it returns NULL.
@@ -539,14 +547,13 @@ namespace mongo {
          * @throws DBException when an error occurred either when trying to connect to
          *     a node that was thought to be ok or when an assertion happened.
          */
-        DBClientConnection* selectNodeUsingTags(ReadPreference preference,
-                                                TagSet* tags);
+        DBClientConnection* selectNodeUsingTags(shared_ptr<ReadPreferenceSetting> readPref);
 
         /**
          * @return true if the last host used in the last slaveOk query is still in the
          * set and can be used for the given read preference.
          */
-        bool checkLastHost( ReadPreference preference, const TagSet* tags );
+        bool checkLastHost(const ReadPreferenceSetting* readPref);
 
         /**
          * Destroys all cached information about the last slaveOk operation.
@@ -579,29 +586,15 @@ namespace mongo {
         HostAndPort _lastSlaveOkHost;
         // Last used connection in a slaveOk query (can be a primary)
         boost::shared_ptr<DBClientConnection> _lastSlaveOkConn;
+        boost::shared_ptr<ReadPreferenceSetting> _lastReadPref;
         
         double _so_timeout;
-
-        /**
-         * for storing authentication info
-         * fields are exactly for DBClientConnection::auth
-         */
-        struct AuthInfo {
-            // Default constructor provided only to make it compatible with std::map::operator[]
-            AuthInfo(): digestPassword(false) { }
-            AuthInfo( string d , string u , string p , bool di )
-                : dbname( d ) , username( u ) , pwd( p ) , digestPassword( di ) {}
-            string dbname;
-            string username;
-            string pwd;
-            bool digestPassword;
-        };
 
         // we need to store so that when we connect to a new node on failure
         // we can re-auth
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
-        std::map<string, AuthInfo> _auths; // dbName -> AuthInfo
+        std::map<string, BSONObj> _auths; // dbName -> auth parameters
 
     protected:
 
@@ -667,6 +660,18 @@ namespace mongo {
          */
         BSONObjIterator* getIterator() const;
 
+        /**
+         * Create a new copy of this tag set and wuth the iterator pointing at the
+         * head.
+         */
+        TagSet* clone() const;
+
+        /**
+         * @returns true if the other TagSet has the same tag set specification with
+         *     this tag set, disregarding where the current iterator is pointing to.
+         */
+        bool equals(const TagSet& other) const;
+
     private:
         BSONObj _currentTag;
         bool _isExhausted;
@@ -674,5 +679,29 @@ namespace mongo {
         // Important: do not re-order _tags & _tagIterator
         BSONArray _tags;
         BSONArrayIteratorSorted _tagIterator;
+    };
+
+    struct ReadPreferenceSetting {
+        /**
+         * @param tag cannot be NULL.
+         */
+        ReadPreferenceSetting(ReadPreference pref, TagSet* tag):
+            pref(pref), tags(tag->clone()) {
+        }
+
+        ~ReadPreferenceSetting() {
+            delete tags;
+        }
+
+        inline bool equals(const ReadPreferenceSetting& other) const {
+            return pref == other.pref && tags->equals(*other.tags);
+        }
+
+        const ReadPreference pref;
+
+        /**
+         * Note: This object owns this memory.
+         */
+        TagSet* tags;
     };
 }

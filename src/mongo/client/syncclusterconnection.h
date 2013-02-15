@@ -108,9 +108,12 @@ namespace mongo {
         void setAllSoTimeouts( double socketTimeout );
         double getSoTimeout() const { return _socketTimeout; }
 
-        virtual bool auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level* level=NULL);
 
         virtual bool lazySupported() const { return false; }
+
+    protected:
+        virtual void _auth(const BSONObj& params);
+
     private:
         SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout = 0 );
         string _toString() const;

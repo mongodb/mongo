@@ -25,7 +25,7 @@
 namespace mongo {
 
 namespace {
-    MONGO_EXPORT_SERVER_PARAMETER(enableLocalhostAuthBypass, bool, true);
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableLocalhostAuthBypass, bool, true);
 } // namespace
 
     // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost

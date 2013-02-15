@@ -62,6 +62,9 @@ namespace mongo {
            on an error at the remote server, you will get back:
              { $err: <string> }
            if you do not want to handle that yourself, call nextSafe().
+
+           Warning: The returned BSONObj will become invalid after the next batch
+               is fetched or when this cursor is destroyed.
         */
         BSONObj next();
 

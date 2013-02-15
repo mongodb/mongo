@@ -639,6 +639,8 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             // Will fail if source instance has auth on.
             string collection = cmdObj.getStringField("cloneCollection");
+            uassert(16709, "bad 'cloneCollection' value", !collection.empty());
+
             ActionSet actions;
             actions.addAction(ActionType::cloneCollectionTarget);
             out->push_back(Privilege(collection, actions));

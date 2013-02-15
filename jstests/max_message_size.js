@@ -74,9 +74,13 @@ function go() { // using a function to ensure that all resources can be freed af
     works(maxMessageSize - 1024*1024);
     works(maxMessageSize - 1);
     works(maxMessageSize);
-    fails(maxMessageSize + 1);
-    works(maxMessageSize); // make sure we still work after failure
-    fails(maxMessageSize + 1024*1024);
-    works(maxMessageSize);
+
+    // Don't test failing because it forces a reconnect which is currently broken on some platforms
+    if (0) { // reenable when SERVER-8532 is fixed
+        fails(maxMessageSize + 1);
+        works(maxMessageSize); // make sure we still work after failure
+        fails(maxMessageSize + 1024*1024);
+        works(maxMessageSize);
+    }
 }
 go();

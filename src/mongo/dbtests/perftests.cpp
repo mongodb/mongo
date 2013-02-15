@@ -40,6 +40,7 @@
 #include "../db/key.h"
 #include "../util/compress.h"
 #include "../util/concurrency/qlock.h"
+#include "../util/fail_point.h"
 #include <boost/filesystem/operations.hpp>
 
 using namespace bson;
@@ -194,9 +195,12 @@ namespace PerfTests {
 
         virtual void timed() = 0;
 
-        // optional 2nd test phase to be timed separately
-        // return name of it
-        virtual string timed2(DBClientBase&) { return ""; }
+        // optional 2nd test phase to be timed separately. You must provide it with a unique
+        // name in order for it to run by overloading 'name2'.
+        virtual void timed2(DBClientBase&) {}
+
+        // return name of second test.
+        virtual string name2() { return name(); }
 
         virtual void post() { }
 
@@ -289,12 +293,9 @@ namespace PerfTests {
             }
         }
 
-        /** if true runs timed2() again with several threads (8 at time of this writing 
-            shouldn't be just timed2, that is legacy and can be cleaned up one day
+        /** if true runs timed2() again with several threads (8 at time of this writing).
         */
         virtual bool testThreaded() { return false; }
-
-        unsigned long long n;
 
         int howLong() { 
             int hlm = howLongMillis();
@@ -306,6 +307,9 @@ namespace PerfTests {
         }
 
         void run() {
+
+            unsigned long long n = 0;
+
             _ns = string("perftest.") + name();
             client().dropCollection(ns());
             prep();
@@ -314,7 +318,7 @@ namespace PerfTests {
             dur::stats.curr->reset();
             mongo::Timer t;
             n = 0;
-            const unsigned Batch = batchSize();
+            const unsigned int Batch = batchSize();
 
             if( hlm == 0 ) {
                 // means just do once
@@ -322,7 +326,7 @@ namespace PerfTests {
             }
             else {
                 do {
-                    unsigned i;
+                    unsigned int i;
                     for( i = 0; i < Batch; i++ )
                         timed();
                     n += i;
@@ -336,14 +340,14 @@ namespace PerfTests {
 
             post();
 
-            string test2name = timed2(client());
+            string test2name = name2();
             {
-                if( test2name.size() != 0 ) {
+                if( test2name != name() ) {
                     dur::stats.curr->reset();
                     mongo::Timer t;
                     unsigned long long n = 0;
                     while( 1 ) {
-                        unsigned i;
+                        unsigned int i;
                         for( i = 0; i < Batch; i++ )
                             timed2(client());
                         n += i;
@@ -359,40 +363,47 @@ namespace PerfTests {
                 const int nThreads = 8;
                 //cout << "testThreaded nThreads:" << nThreads << endl;
                 mongo::Timer t;
-                launchThreads(nThreads);
-                say(n, t.millis(), test2name+"-threaded");
+                const unsigned long long result = launchThreads(nThreads);
+                const int ms = t.millis();
+                say(result/nThreads, ms, test2name+"-threaded");
             }
         }
 
         bool stop;
 
-        void thread() {
+        void thread(unsigned long long* counter) {
 #if defined(_WIN32)
             static int z;
             srand( ++z ^ (unsigned) time(0));
 #endif
             DBClientType c;
             Client::initThreadIfNotAlready("perftestthr");
+            const unsigned int Batch = batchSize();
             while( 1 ) {
-                for( int i = 0; i < 8; i++ )
+                unsigned int i = 0;
+                for( i = 0; i < Batch; i++ )
                     timed2(c);
+                *counter += i;
                 if( stop ) 
                     break;
             }
             cc().shutdown();
         }
 
-        void launchThreads(int remaining) {
+        unsigned long long launchThreads(int remaining) {
             stop = false;
             if (!remaining) {
                 int hlm = howLong();
                 sleepmillis(hlm);
                 stop = true;
-                return;
+                return 0;
             }
-            boost::thread athread(boost::bind(&B::thread, this));
-            launchThreads(remaining - 1);
+            unsigned long long counter = 0;
+            boost::thread athread(boost::bind(&B::thread, this, &counter));
+            unsigned long long child = launchThreads(remaining - 1);
             athread.join();
+            unsigned long long accum = child + counter;
+            return accum;
         }
     };
 
@@ -983,10 +994,13 @@ namespace PerfTests {
                 return false;
             return true; 
         }
-        string timed2(DBClientBase& c) {
+        string name2() {
+            return "findOne_by_id";
+        }
+
+        void timed2(DBClientBase& c) {
             Query q = QUERY( "_id" << (unsigned) (rand() % i) );
             c.findOne(ns(), q);
-            return "findOne_by_id";
         }
         void post() {
 #if !defined(_DEBUG)
@@ -1051,13 +1065,16 @@ namespace PerfTests {
             client().update(ns(), q, y, /*upsert*/true);
         }
         virtual bool testThreaded() { return true; }
-        virtual string timed2(DBClientBase& c) {
+        virtual string name2() {
+            return name()+"-inc";
+        }
+
+        virtual void timed2(DBClientBase& c) {
             static BSONObj I = BSON( "$inc" << BSON( "y" << 1 ) );
             // test some $inc's
             int x = rand();
             BSONObj q = BSON("x" << x);
             c.update(ns(), q, I);
-            return name()+"-inc";
         }
     };
 
@@ -1070,6 +1087,78 @@ namespace PerfTests {
             this->client().ensureIndex(this->ns(), BSON("y"<<1));
             this->client().ensureIndex(this->ns(), BSON("z"<<1));
         }
+    };
+
+    // Tests what the worst case is for the overhead of enabling a fail point. If 'fpInjected'
+    // is false, then the fail point will be compiled out. If 'fpInjected' is true, then the
+    // fail point will be compiled in. Since the conditioned block is more or less trivial, any
+    // difference in performance is almost entirely attributable to the cost of checking
+    // whether the failpoint is enabled.
+    //
+    // If fpEnabled is true, then the failpoint will be enabled, using the 'nTimes' model since
+    // this looks to be the most expensive code path through the fail point enable detection
+    // logic.
+    //
+    // It makes no sense to trigger the slow path if the fp is not injected, so that will fail
+    // to compile.
+    template <bool fpInjected, bool fpEnabled>
+    class FailPointTest : public B {
+    public:
+
+        BOOST_STATIC_ASSERT(fpInjected || !fpEnabled);
+
+        FailPointTest()
+            : B()
+            , _value(0) {
+            if (fpEnabled) {
+                _fp.setMode(
+                    FailPoint::nTimes,
+                    std::numeric_limits<FailPoint::ValType>::max());
+                verify(_fp.shouldFail());
+            } else {
+                verify(!_fp.shouldFail());
+            }
+        }
+
+        virtual string name() {
+            return std::string("failpoint")
+                + (fpInjected ? "-present" : "-absent")
+                + (fpInjected ? (fpEnabled ? "-enabled" : "-disabled") : "");
+        }
+
+        virtual int howLongMillis() { return 5000; }
+        virtual bool showDurStats() { return false; }
+
+        virtual void timed() {
+            if (MONGO_unlikely(_value != 0) || (fpInjected && MONGO_FAIL_POINT(_fp))) {
+                // We should only get here if the failpoint is enabled.
+                verify(fpEnabled);
+            }
+        }
+
+        virtual string name2() {
+            // Will inhibit running 'timed2' as its own test, but will cause it to be run as a
+            // threaded test.
+            return name();
+        }
+
+        virtual void timed2(DBClientBase&) {
+            // We just want to re-run 'timed' when timed2 is invoked as a threaded test, so it
+            // invoke 'timed' statically to avoid overhead of virtual function call.
+            this->FailPointTest::timed();
+        }
+
+        virtual bool testThreaded() {
+            return true;
+        }
+
+    private:
+        // The failpoint under test.
+        FailPoint _fp;
+
+        // _value should always be zero for this test to behave as expected, but we don't want
+        // the compiler exploiting this fact to compile out our check, so mark it volatile.
+        const volatile int _value;
     };
 
     void t() {
@@ -1159,6 +1248,9 @@ namespace PerfTests {
                 add< Update1 >();
                 add< MoreIndexes<Update1> >();
                 add< InsertBig >();
+                add< FailPointTest<false, false> >();
+                add< FailPointTest<true, false> >();
+                add< FailPointTest<true, true> >();
             }
         }
     } myall;

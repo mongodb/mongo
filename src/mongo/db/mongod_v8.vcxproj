@@ -1936,6 +1936,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\distlock_test.cpp" />
     <ClCompile Include="..\client\model.cpp" />
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp" />
     <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator_test.cpp">
@@ -2509,6 +2510,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="geo\shapes.cpp" />
     <ClCompile Include="index_rebuilder.cpp" />
+    <ClCompile Include="index_set.cpp" />
     <ClCompile Include="initialize_server_global_state.cpp" />
     <ClCompile Include="intervalbtreecursor.cpp" />
     <ClCompile Include="keypattern.cpp" />
@@ -3022,6 +3024,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\constants.h" />
     <ClInclude Include="..\client\dbclientinterface.h" />
     <ClInclude Include="..\client\dbclient_rs.h" />
+    <ClInclude Include="..\client\sasl_client_authenticate.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
     <ClInclude Include="..\platform\atomic_word.h" />
@@ -3182,6 +3185,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="hashindex.h" />
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="index_rebuilder.h" />
+    <ClInclude Include="index_set.h" />
     <ClInclude Include="index_update.h" />
     <ClInclude Include="initialize_server_global_state.h" />
     <ClInclude Include="intervalbtreecursor.h" />

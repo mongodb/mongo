@@ -728,13 +728,22 @@ namespace mongo {
 
 
     void NamespaceDetailsTransient::computeIndexKeys() {
-        _indexKeys.clear();
+        _indexedPaths.clear();
+
         NamespaceDetails *d = nsdetails(_ns);
         if ( ! d )
             return;
-        NamespaceDetails::IndexIterator i = d->ii();
-        while( i.more() )
-            i.next().keyPattern().getFieldNames(_indexKeys);
+
+        NamespaceDetails::IndexIterator i = d->ii( true );
+        while( i.more() ) {
+            BSONObj key = i.next().keyPattern();
+            BSONObjIterator j( key );
+            while ( j.more() ) {
+                BSONElement e = j.next();
+                _indexedPaths.addPath( e.fieldName() );
+            }
+        }
+
         _keysComputed = true;
     }
 

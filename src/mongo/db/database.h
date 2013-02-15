@@ -35,8 +35,6 @@ namespace mongo {
     */
     class Database {
     public:
-        static bool _openAllFiles;
-
         // you probably need to be in dbHolderMutex when constructing this
         Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
     private:
@@ -48,6 +46,7 @@ namespace mongo {
         static void closeDatabase( const char *db, const string& path );
 
         void openAllFiles();
+        void clearTmpCollections();
 
         /**
          * tries to make sure that this hasn't been deleted

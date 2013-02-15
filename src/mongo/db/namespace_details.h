@@ -22,6 +22,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index.h"
+#include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongommf.h"
 #include "mongo/db/namespace.h"
@@ -206,10 +207,12 @@ namespace mongo {
             friend class NamespaceDetails;
             int i, n;
             NamespaceDetails *d;
-            IndexIterator(NamespaceDetails *_d);
+            IndexIterator(NamespaceDetails *_d, bool includeBackgroundInProgress);
         };
 
-        IndexIterator ii() { return IndexIterator(this); }
+        IndexIterator ii( bool includeBackgroundInProgress = false ) {
+            return IndexIterator(this, includeBackgroundInProgress);
+        }
 
         /* hackish - find our index # in the indexes array */
         int idxNo(const IndexDetails& idx);
@@ -533,17 +536,17 @@ namespace mongo {
         /* assumed to be in write lock for this */
     private:
         bool _keysComputed;
-        set<string> _indexKeys;
+        IndexPathSet _indexedPaths;
         void computeIndexKeys();
     public:
         /* get set of index keys for this namespace.  handy to quickly check if a given
            field is indexed (Note it might be a secondary component of a compound index.)
         */
-        set<string>& indexKeys() {
+        const IndexPathSet& indexKeys() {
             DEV Lock::assertWriteLocked(_ns);
             if ( !_keysComputed )
                 computeIndexKeys();
-            return _indexKeys;
+            return _indexedPaths;
         }
 
         /* IndexSpec caching */

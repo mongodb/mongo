@@ -32,7 +32,7 @@ var secondPointCount = 100
 // Insert points between 0.01 and 1.0 away.
 insertRandomPoints(initialPointCount, 0.01, 1.0);
 
-var cursor = t.find({geo: {$near : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).batchSize(4);
+var cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).batchSize(4);
 assert.eq(cursor.count(), initialPointCount);
 
 for(var j = 0; j < smallBit; j++){
@@ -55,14 +55,14 @@ assert(!cursor.hasNext())
 
 var someLimit = 23;
 // Make sure limit does something.
-cursor = t.find({geo: {$near : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit)
+cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit)
 // Count doesn't work here -- ignores limit/skip, so we use itcount.
 assert.eq(cursor.itcount(), someLimit)
 // Make sure skip works by skipping some stuff ourselves.
 var someSkip = 3;
-cursor = t.find({geo: {$near : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit + someSkip)
+cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit + someSkip)
 for (var i = 0; i < someSkip; ++i) { cursor.next(); }
-var cursor2 = t.find({geo: {$near : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).skip(someSkip).limit(someLimit)
+var cursor2 = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).skip(someSkip).limit(someLimit)
 while (cursor.hasNext()) {
     assert(cursor2.hasNext());
     assert.eq(cursor.next(), cursor2.next());

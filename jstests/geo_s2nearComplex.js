@@ -110,7 +110,7 @@ function uniformPointsWithClusters(origin, count, minDist, maxDist, numberOfClus
  * geo objects to the specified `point`.
  */
 function removeNearest(point, number){
-    var pointsToRemove = t.find({geo: {$near: {$geometry: point['geo']}}}).limit(number);
+    var pointsToRemove = t.find({geo: {$geoNear: {$geometry: point['geo']}}}).limit(number);
     var idsToRemove = [];
     while(pointsToRemove.hasNext()){
         point = pointsToRemove.next();
@@ -147,12 +147,12 @@ function validateOrdering(query){
     }
 }
 
-var query = {geo: {$near: {$geometry: originGeo}}};
+var query = {geo: {$geoNear: {$geometry: originGeo}}};
 
 // Test a uniform distribution of 10000 points.
 uniformPoints(origin, 10000, 0.5, 1.5);
 
-validateOrdering({geo: {$near: {$geometry: originGeo}}})
+validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform:")
 print(t.find(query).explain().millis)
@@ -164,7 +164,7 @@ t.ensureIndex({geo: "2dsphere"})
 // Test a uniform distribution with 5 gaps each with 10 points missing.
 uniformPointsWithGaps(origin, 10000, 1, 10.0, 5, 10);
 
-validateOrdering({geo: {$near: {$geometry: originGeo}}})
+validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform with gaps:")
 print(t.find(query).explain().millis)
@@ -177,7 +177,7 @@ t.ensureIndex({geo: "2dsphere"})
 // Test a uniform distribution with 5 clusters each with between 10 and 100 points.
 uniformPointsWithClusters(origin, 10000, 1, 10.0, 5, 10, 100);
 
-validateOrdering({geo: {$near: {$geometry: originGeo}}})
+validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform with clusters:");
 print(t.find(query).explain().millis);
@@ -197,11 +197,11 @@ origin = {
 }
 uniformPoints(origin, 50, 0.5, 1.5);
 
-validateOrdering({geo: {$near: {$geometry: originGeo}}})
+validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform near pole:")
-print(t.find({geo: {$near: {$geometry: originGeo}}}).explain().millis)
-assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).count(), 50);
+print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain().millis)
+assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).count(), 50);
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
@@ -214,11 +214,11 @@ origin = {
 }
 uniformPoints(origin, 50, 0.5, 1.5);
 
-validateOrdering({geo: {$near: {$geometry: originGeo}}})
+validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform on meridian:")
 print(t.find({geo: {$near: {$geometry: originGeo}}}).explain().millis)
-assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).count(), 50);
+assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).count(), 50);
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})

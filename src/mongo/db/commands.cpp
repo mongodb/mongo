@@ -42,10 +42,11 @@ namespace mongo {
     int Command::testCommandsEnabled = 0;
 
     namespace {
-        // TODO: This should only be settable at the command line, not at runtime. Need SERVER-7778
         ExportedServerParameter<int> testCommandsParameter(ServerParameterSet::getGlobal(),
                                                            "enableTestCommands",
-                                                           &Command::testCommandsEnabled);
+                                                           &Command::testCommandsEnabled,
+                                                           true,
+                                                           false);
     }
 
     string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const { 

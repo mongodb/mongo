@@ -139,6 +139,8 @@ namespace mongo {
         /** gets the number of times a scope was used */
         int getTimeUsed() { return _numTimeUsed; }
 
+        /** return true if last invoke() return'd native code */
+        virtual bool isLastRetNativeCode() { return _lastRetIsNativeCode; }
 
         class NoDBAccess {
             Scope* _s;
@@ -163,6 +165,7 @@ namespace mongo {
         static long long _lastVersion;
         map<string, ScriptingFunction> _cachedFunctions;
         int _numTimeUsed;
+        bool _lastRetIsNativeCode; // v8 only: set to true if eval'd script returns a native func
     };
 
     class ScriptEngine : boost::noncopyable {

@@ -83,7 +83,13 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, bool& exhaust ) {
+    QueryResult* processGetMore(const char* ns,
+                                int ntoreturn,
+                                long long cursorid,
+                                CurOp& curop,
+                                int pass,
+                                bool& exhaust,
+                                bool* isCursorAuthorized ) {
         exhaust = false;
 
         int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
@@ -110,6 +116,8 @@ namespace mongo {
         else {
             // check for spoofing of the ns such that it does not match the one originally there for the cursor
             uassert(14833, "auth error", str::equals(ns, cc->ns().c_str()));
+
+            *isCursorAuthorized = true;
 
             if ( pass == 0 )
                 cc->updateSlaveLocation( curop );

@@ -132,6 +132,13 @@ namespace mongo {
          * see SERVER-7940
          */
         int _ssl_connect(SSL* ssl);
+
+        /*
+         * Initialize the SSL Library.
+         * This function can be called multiple times; it ensures it only
+         * does the SSL initialization once per process.
+         */
+        void _initializeSSL(const SSLParams& params);
     };
 }
 #endif

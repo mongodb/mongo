@@ -1186,8 +1186,7 @@ namespace mongo {
     */
     ModSet::ModSet(
         const BSONObj& from ,
-        const set<string>& idxKeys,
-        const set<string>* backgroundKeys,
+        const IndexPathSet& idxKeys,
         bool forReplication)
         : _isIndexed(0) , _hasDynamicArray( false ) {
 
@@ -1373,13 +1372,13 @@ namespace mongo {
                     Mod from;
                     from.init( Mod::RENAME_FROM, f , forReplication );
                     from.setFieldName( fieldName );
-                    updateIsIndexed( from, idxKeys, backgroundKeys );
+                    updateIsIndexed( from, idxKeys );
                     _mods[ from.fieldName ] = from;
 
                     Mod to;
                     to.init( Mod::RENAME_TO, f , forReplication );
                     to.setFieldName( target );
-                    updateIsIndexed( to, idxKeys, backgroundKeys );
+                    updateIsIndexed( to, idxKeys );
                     _mods[ to.fieldName ] = to;
 
                     DEBUGUPDATE( "\t\t " << fieldName << "\t" << from.fieldName << "\t" << to.fieldName );
@@ -1391,7 +1390,7 @@ namespace mongo {
                 Mod m;
                 m.init( op , f , forReplication );
                 m.setFieldName( f.fieldName() );
-                updateIsIndexed( m, idxKeys, backgroundKeys );
+                updateIsIndexed( m, idxKeys );
                 _mods[m.fieldName] = m;
 
                 DEBUGUPDATE( "\t\t " << fieldName << "\t" << m.fieldName << "\t" << _hasDynamicArray );
@@ -1422,59 +1421,11 @@ namespace mongo {
         return n;
     }
 
-    void ModSet::updateIsIndexed( const set<string>& idxKeys, const set<string>* backgroundKeys ) {
+    void ModSet::updateIsIndexed( const IndexPathSet& idxKeys ) {
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i )
-            updateIsIndexed( i->second, idxKeys , backgroundKeys );
+            updateIsIndexed( i->second, idxKeys );
     }
 
-    bool getCanonicalIndexField( const StringData& fullName, string* out ) {
-        // check if fieldName contains ".$" or ".###" substrings (#=digit) and skip them
-        if ( fullName.find( '.' ) == string::npos )
-            return false;
-
-        bool modified = false;
-
-        StringBuilder buf;
-        for ( size_t i=0; i<fullName.size(); i++ ) {
-
-            char c = fullName[i];
-
-            if ( c != '.' ) {
-                buf << c;
-                continue;
-            }
-
-            // check for ".$", skip if present
-            if ( fullName[i+1] == '$' ) {
-                i++;
-                modified = true;
-                continue;
-            }
-
-            // check for ".###" for any number of digits (no letters)
-            if ( isdigit( fullName[i+1] ) ) {
-                size_t j = i;
-                // skip digits
-                while ( j+1 < fullName.size() && isdigit( fullName[j+1] ) )
-                    j++;
-
-                if ( j+1 == fullName.size() || fullName[j+1] == '.' ) {
-                    // only digits found, skip forward
-                    i = j;
-                    modified = true;
-                    continue;
-                }
-            }
-
-            buf << c;
-        }
-
-        if ( !modified )
-            return false;
-
-        *out = buf.str();
-        return true;
-    }
 
 
 } // namespace mongo

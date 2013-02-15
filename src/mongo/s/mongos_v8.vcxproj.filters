@@ -1620,6 +1620,9 @@
     <ClCompile Include="..\..\third_party\v8\src\zone.cc">
       <Filter>third_party\v8\src\Source Files\o to z</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3194,6 +3197,9 @@
     </ClInclude>
     <ClInclude Include="..\..\third_party\v8\src\zone-inl.h">
       <Filter>third_party\v8\src\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\sasl_client_authenticate.h">
+      <Filter>client</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

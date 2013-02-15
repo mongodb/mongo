@@ -109,11 +109,19 @@ env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
 env.CppUnitTest('namespacestring_test', ['db/namespacestring_test.cpp'],
                 LIBDEPS=['bson'])
 
+env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
+                LIBDEPS=['bson','index_set'])
+
+
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 
 env.CppUnitTest('descriptive_stats_test',
                 ['util/descriptive_stats_test.cpp'],
                 LIBDEPS=['foundation', 'bson']);
+
+env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
+                LIBDEPS=['mongocommon', 'notmongodormongos'],
+                NO_CRUTCH=True)
 
 env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
 
@@ -152,6 +160,7 @@ commonFiles = [ "pch.cpp",
                 "client/dbclient_rs.cpp",
                 "client/dbclientcursor.cpp",
                 "client/model.cpp",
+                'client/sasl_client_authenticate.cpp',
                 "client/syncclusterconnection.cpp",
                 "db/dbmessage.cpp"
                 ]
@@ -159,7 +168,7 @@ commonFiles = [ "pch.cpp",
 commonSysLibdeps = []
 
 if env['MONGO_BUILD_SASL_CLIENT']:
-    commonFiles.extend(['client/sasl_client_authenticate.cpp',
+    commonFiles.extend(['client/sasl_client_authenticate_impl.cpp',
                         'util/gsasl_session.cpp'])
     commonSysLibdeps.append('gsasl')
 
@@ -330,6 +339,8 @@ coreServerFiles.append( systemInfoPlatformFile )
 if has_option( "asio" ):
     coreServerFiles += [ "util/net/message_server_asio.cpp" ]
 
+env.StaticLibrary('index_set', [ 'db/index_set.cpp' ] )
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
 serverOnlyFiles = [ "db/curop.cpp",
                     "db/kill_current_op.cpp",
@@ -482,6 +493,18 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard", "mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
 
+env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
+                 LIBDEPS=[
+                    "coredb",
+                    "coreserver",
+                    "coreshard",
+                    "dbcmdline",
+                    "mocklib",
+                    "mongocommon",
+                    "mongodandmongos",
+                    "mongoscore"],
+                 NO_CRUTCH=True)
+
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
                     "coredb",
@@ -554,6 +577,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "defaultversion",
                            "geoparser",
                            "geoquery",
+                           "index_set",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.

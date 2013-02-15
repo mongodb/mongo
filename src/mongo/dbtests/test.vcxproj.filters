@@ -1701,6 +1701,12 @@
     <ClInclude Include="..\db\field_ref.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
+    <ClInclude Include="..\client\sasl_client_authenticate.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_set.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3347,6 +3353,12 @@
       <Filter>scripting</Filter>
     </ClCompile>
     <ClCompile Include="..\db\field_ref.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_set.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>

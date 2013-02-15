@@ -19,6 +19,7 @@
 
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
@@ -51,22 +52,11 @@ namespace mongo {
       return (BSONHolder*)ptr;
     }
 
-    static void weakRefBSONCallback(v8::Persistent<v8::Value> p, void* scope) {
-        v8::HandleScope handle_scope;
-        if (!p.IsNearDeath())
-            return;
-        v8::Handle<v8::External> field =
-                v8::Handle<v8::External>::Cast(p->ToObject()->GetInternalField(0));
-        BSONHolder* data = (BSONHolder*) field->Value();
-        delete data;
-        p.Dispose();
-    }
-
     v8::Persistent<v8::Object> V8Scope::wrapBSONObject(v8::Local<v8::Object> obj,
                                                        BSONHolder* data) {
         obj->SetInternalField(0, v8::External::New(data));
         v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
-        p.MakeWeak(this, weakRefBSONCallback);
+        p.MakeWeak(data, deleteOnCollect<BSONHolder>);
         return p;
     }
 
@@ -91,30 +81,39 @@ namespace mongo {
     static v8::Handle<v8::Value> namedGet(v8::Local<v8::String> name,
                                           const v8::AccessorInfo& info) {
         v8::HandleScope handle_scope;
-        if (info.This()->HasRealNamedProperty(name)) {
-            // value already cached
-            return handle_scope.Close(info.This()->GetRealNamedProperty(name));
+        v8::Handle<v8::Value> val;
+        try {
+            if (info.This()->HasRealNamedProperty(name)) {
+                // value already cached
+                return handle_scope.Close(info.This()->GetRealNamedProperty(name));
+            }
+
+            string key = toSTLString(name);
+            BSONHolder* holder = unwrapHolder(info.Holder());
+            if (holder->_removed.count(key))
+                return handle_scope.Close(v8::Handle<v8::Value>());
+
+            BSONObj obj = holder->_obj;
+            BSONElement elmt = obj.getField(key.c_str());
+            if (elmt.eoo())
+                return handle_scope.Close(v8::Handle<v8::Value>());
+
+            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
+            V8Scope* scope = (V8Scope*)(scp->Value());
+            val = scope->mongoToV8Element(elmt, false);
+            info.This()->ForceSet(name, val, v8::DontEnum);
+
+            if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+              // if accessing a subobject, it may get modified and base obj would not know
+              // have to set base as modified, which means some optim is lost
+              unwrapHolder(info.Holder())->_modified = true;
+            }
         }
-
-        string key = toSTLString(name);
-        BSONHolder* holder = unwrapHolder(info.Holder());
-        if (holder->_removed.count(key))
-            return handle_scope.Close(v8::Handle<v8::Value>());
-
-        BSONObj obj = holder->_obj;
-        BSONElement elmt = obj.getField(key.c_str());
-        if (elmt.eoo())
-            return handle_scope.Close(v8::Handle<v8::Value>());
-
-        v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        v8::Handle<v8::Value> val = scope->mongoToV8Element(elmt, false);
-        info.This()->ForceSet(name, val, v8::DontEnum);
-
-        if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
-          // if accessing a subobject, it may get modified and base obj would not know
-          // have to set base as modified, which means some optim is lost
-          unwrapHolder(info.Holder())->_modified = true;
+        catch (const DBException &dbEx) {
+            return v8AssertionException(dbEx.toString());
+        }
+        catch (...) {
+            return v8AssertionException(string("error getting property ") + toSTLString(name));
         }
         return handle_scope.Close(val);
     }
@@ -122,14 +121,23 @@ namespace mongo {
     static v8::Handle<v8::Value> namedGetRO(v8::Local<v8::String> name,
                                             const v8::AccessorInfo &info) {
         v8::HandleScope handle_scope;
+        v8::Handle<v8::Value> val;
         string key = toSTLString(name);
-        BSONObj obj = unwrapBSONObj(info.Holder());
-        BSONElement elmt = obj.getField(key.c_str());
-        if (elmt.eoo())
-          return handle_scope.Close(v8::Handle<v8::Value>());
-        v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        v8::Handle<v8::Value> val = scope->mongoToV8Element(elmt, true);
+        try {
+            BSONObj obj = unwrapBSONObj(info.Holder());
+            BSONElement elmt = obj.getField(key.c_str());
+            if (elmt.eoo())
+                return handle_scope.Close(v8::Handle<v8::Value>());
+            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
+            V8Scope* scope = (V8Scope*)(scp->Value());
+            val = scope->mongoToV8Element(elmt, true);
+        }
+        catch (const DBException &dbEx) {
+            return v8AssertionException(dbEx.toString());
+        }
+        catch (...) {
+            return v8AssertionException(string("error getting read-only property ") + key);
+        }
         return handle_scope.Close(val);
     }
 
@@ -192,31 +200,41 @@ namespace mongo {
 
     static v8::Handle<v8::Value> indexedGet(uint32_t index, const v8::AccessorInfo &info) {
         v8::HandleScope handle_scope;
-        string key = str::stream() << index;
-        v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        v8::Handle<v8::String> name = scope->v8StringData(key);
+        v8::Handle<v8::Value> val;
+        try {
+            string key = str::stream() << index;
+            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
+            V8Scope* scope = (V8Scope*)(scp->Value());
+            v8::Handle<v8::String> name = scope->v8StringData(key);
 
-        if (info.This()->HasRealIndexedProperty(index)) {
-            // value already cached
-            return handle_scope.Close(info.This()->GetRealNamedProperty(name));
+            if (info.This()->HasRealIndexedProperty(index)) {
+                // value already cached
+                return handle_scope.Close(info.This()->GetRealNamedProperty(name));
+            }
+
+            BSONHolder* holder = unwrapHolder(info.Holder());
+            if (holder->_removed.count(key))
+                return handle_scope.Close(v8::Handle<v8::Value>());
+
+            BSONObj obj = holder->_obj;
+            BSONElement elmt = obj.getField(key);
+            if (elmt.eoo())
+                return handle_scope.Close(v8::Handle<v8::Value>());
+            val = scope->mongoToV8Element(elmt, false);
+            info.This()->ForceSet(name, val, v8::DontEnum);
+
+            if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+                // if accessing a subobject, it may get modified and base obj would not know
+                // have to set base as modified, which means some optim is lost
+                unwrapHolder(info.Holder())->_modified = true;
+            }
         }
-
-        BSONHolder* holder = unwrapHolder(info.Holder());
-        if (holder->_removed.count(key))
-            return handle_scope.Close(v8::Handle<v8::Value>());
-
-        BSONObj obj = holder->_obj;
-        BSONElement elmt = obj.getField(key);
-        if (elmt.eoo())
-            return handle_scope.Close(v8::Handle<v8::Value>());
-        v8::Handle<v8::Value> val = scope->mongoToV8Element(elmt, false);
-        info.This()->ForceSet(name, val, v8::DontEnum);
-
-        if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
-            // if accessing a subobject, it may get modified and base obj would not know
-            // have to set base as modified, which means some optim is lost
-            unwrapHolder(info.Holder())->_modified = true;
+        catch (const DBException &dbEx) {
+            return v8AssertionException(dbEx.toString());
+        }
+        catch (...) {
+            return v8AssertionException(str::stream() << "error getting indexed property "
+                                                      << index);
         }
         return handle_scope.Close(val);
     }
@@ -234,17 +252,28 @@ namespace mongo {
 
     static v8::Handle<v8::Value> indexedGetRO(uint32_t index, const v8::AccessorInfo &info) {
         v8::HandleScope handle_scope;
-        string key = str::stream() << index;
-        v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-        V8Scope* scope = (V8Scope*)(scp->Value());
+        v8::Handle<v8::Value> val;
+        try {
+            string key = str::stream() << index;
+            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
+            V8Scope* scope = (V8Scope*)(scp->Value());
 
-        BSONObj obj = unwrapBSONObj(info.Holder());
-        BSONElement elmt = obj.getField(key);
+            BSONObj obj = unwrapBSONObj(info.Holder());
+            BSONElement elmt = obj.getField(key);
 
-        if (elmt.eoo())
-            return handle_scope.Close(v8::Handle<v8::Value>());
+            if (elmt.eoo())
+                return handle_scope.Close(v8::Handle<v8::Value>());
 
-        v8::Handle<v8::Value> val = scope->mongoToV8Element(elmt, true);
+            val = scope->mongoToV8Element(elmt, true);
+        }
+        catch (const DBException &dbEx) {
+            return v8AssertionException(dbEx.toString());
+        }
+        catch (...) {
+            return v8AssertionException(str::stream()
+                                            << "error getting read-only indexed property "
+                                            << index);
+        }
         return handle_scope.Close(val);
     }
 
@@ -779,8 +808,9 @@ namespace mongo {
         return code[8] == ' ' || code[8] == '(';
     }
 
-    v8::Local<v8:: Function > V8Scope::__createFunction(const char * raw) {
+    v8::Local<v8::Function> V8Scope::__createFunction(const char * raw) {
         v8::HandleScope handle_scope;
+        v8::TryCatch try_catch;
         raw = jsSkipWhiteSpace(raw);
         string code = raw;
         if (!hasFunctionIdentifier(code)) {
@@ -792,51 +822,27 @@ namespace mongo {
             code = "function(){ " + code + "}";
         }
 
-        int num = _funcs.size() + 1;
+        string fn = str::stream() << "_funcs" << (_funcs.size() + 1);
+        code = str::stream() << fn << " = " << code;
 
-        string fn;
-        stringstream ss;
-        ss << "_funcs" << num;
-        fn = ss.str();
+        v8::Handle<v8::Script> script = v8::Script::Compile(v8::String::New(code.c_str()),
+                                        v8::String::New(fn.c_str()));
 
-        code = fn + " = " + code;
-
-        v8::TryCatch try_catch;
-        v8::Handle<v8::Script> script = v8::Script::Compile(v8::String::New(code.c_str()) ,
-                                v8::String::New(fn.c_str()));
-        if (script.IsEmpty()) {
-            _error = (string)"compile error: " + toSTLString(&try_catch);
-            log() << _error << endl;
-            return handle_scope.Close(v8::Local<v8::Function>());
-        }
-
-        if (!nativeEpilogue()) {
-            _error = "JavaScript execution terminated";
-            return handle_scope.Close(v8::Handle<v8::Function>());
-        }
+        // throw on error
+        checkV8ErrorState(script, try_catch);
 
         v8::Local<v8::Value> result = script->Run();
 
-        if (!nativePrologue()) {
-            _error = "JavaScript execution terminated";
-            return handle_scope.Close(v8::Handle<v8::Function>());
-        }
-
-        if (result.IsEmpty()) {
-            _error = (string)"compile error: " + toSTLString(&try_catch);
-            log() << _error << endl;
-            return handle_scope.Close(v8::Local<v8::Function>());
-        }
+        // throw on error
+        checkV8ErrorState(result, try_catch);
 
         return handle_scope.Close(v8::Handle<v8::Function>(
                 v8::Function::Cast(*_global->Get(v8::String::New(fn.c_str())))));
     }
 
-    ScriptingFunction V8Scope::_createFunction(const char * raw) {
+    ScriptingFunction V8Scope::_createFunction(const char* raw) {
         V8_SIMPLE_HEADER
         v8::Local<v8::Value> ret = __createFunction(raw);
-        if (ret.IsEmpty())
-            return 0;
         v8::Persistent<v8::Value> f = v8::Persistent<v8::Value>::New(ret);
         uassert(10232, "not a function", f->IsFunction());
         int num = _funcs.size() + 1;
@@ -844,11 +850,10 @@ namespace mongo {
         return num;
     }
 
-    void V8Scope::setFunction(const char *field, const char * code) {
+    void V8Scope::setFunction(const char* field, const char* code) {
         V8_SIMPLE_HEADER
         _global->ForceSet(v8StringData(field), __createFunction(code));
     }
-
 
     void V8Scope::rename(const char * from, const char * to) {
         V8_SIMPLE_HEADER;
@@ -889,7 +894,7 @@ namespace mongo {
         if (!nativeEpilogue()) {
             _error = "JavaScript execution terminated";
             log() << _error << endl;
-            return 1;
+            uasserted(16711, _error);
         }
 
         if (timeoutMs)
@@ -903,27 +908,26 @@ namespace mongo {
             _engine->getDeadlineMonitor()->stopDeadline(this);
 
         if (!nativePrologue()) {
-            _error = "JavaScript execution interrupted";
+            _error = "JavaScript execution terminated";
             log() << _error << endl;
-            return 1;
+            uasserted(16712, _error);
         }
 
-        if (result.IsEmpty()) {
-            if (try_catch.HasCaught() && try_catch.CanContinue()) {
-                _error = toSTLString(&try_catch);
+        // throw on error
+        checkV8ErrorState(result, try_catch);
+
+        if (!ignoreReturn) {
+            v8::Handle<v8::Object> resultObject = result->ToObject();
+            // must validate the handle because TerminateExecution may have
+            // been thrown after the above checks
+            if (!resultObject.IsEmpty() && resultObject->Has(v8StringData("_v8_function"))) {
+                log() << "storing native function as return value" << endl;
+                _lastRetIsNativeCode = true;
             }
             else {
-                _error = "JavaScript execution failed";
+                _lastRetIsNativeCode = false;
             }
-            if (hasOutOfMemoryException()) {
-                _error += " -- v8 is out of memory";
-            }
-            log() << _error << endl;
-            return 1;
-        }
-
-        if (! ignoreReturn) {
-            _global->ForceSet(v8::String::New("return"), result);
+            _global->ForceSet(v8::String::New("__returnValue"), result);
         }
 
         return 0;
@@ -937,16 +941,9 @@ namespace mongo {
         v8::Handle<v8::Script> script =
                 v8::Script::Compile(v8::String::New(code.rawData(), code.size()),
                                     v8::String::New(name.c_str()));
-        if (script.IsEmpty()) {
-            stringstream ss;
-            ss << "compile error: " << toSTLString(&try_catch);
-            _error = ss.str();
-            if (reportError)
-                log() << _error << endl;
-            if (assertOnError)
-                uasserted(10233, _error);
+
+        if (checkV8ErrorState(script, try_catch, reportError, assertOnError))
             return false;
-        }
 
         if (!nativeEpilogue()) {
             _error = "JavaScript execution terminated";
@@ -967,37 +964,22 @@ namespace mongo {
             // stopt the deadline timer for this script
             _engine->getDeadlineMonitor()->stopDeadline(this);
 
-        bool resultSuccess = true;
         if (!nativePrologue()) {
-            resultSuccess = false;
-            _error = str::stream() << "JavaScript execution interrupted "
-                                   << (try_catch.HasCaught() && try_catch.CanContinue() ?
-                                            toSTLString(&try_catch) : "");
-        }
-        else if (result.IsEmpty()) {
-            resultSuccess = false;
-            if (try_catch.HasCaught() && try_catch.CanContinue()) {
-                _error = toSTLString(&try_catch);
-            }
-            else {
-                _error = "JavaScript execution failed";
-            }
-            if (hasOutOfMemoryException()) {
-                _error += " -- v8 is out of memory";
-            }
-        }
-
-        if (!resultSuccess) {
+            _error = "JavaScript execution terminated";
             if (reportError)
                 log() << _error << endl;
             if (assertOnError)
-                uasserted(10234, _error);
+                uasserted(16721, _error);
             return false;
         }
 
+        if (checkV8ErrorState(result, try_catch, reportError, assertOnError))
+            return false;
+
         _global->ForceSet(v8StringData("__lastres__"), result);
 
-        if (printResult && ! result->IsUndefined()) {
+        if (printResult && !result->IsUndefined()) {
+            // appears to only be used by shell
             cout << toSTLString(result) << endl;
         }
 
@@ -1172,28 +1154,19 @@ namespace mongo {
 
     v8::Local<v8::Value> V8Scope::newFunction(const char *code) {
         v8::HandleScope handle_scope;
-        stringstream codeSS;
-        codeSS << "____MongoToV8_newFunction_temp = " << code;
-        string codeStr = codeSS.str();
-        string errStr = str::stream() << "could not compile function: " << codeStr;
+        v8::TryCatch try_catch;
+        string codeStr = str::stream() << "____MongoToV8_newFunction_temp = " << code;
 
         v8::Local<v8::Script> compiled = v8::Script::New(v8::String::New(codeStr.c_str()));
-        uassert(16670, errStr, !compiled.IsEmpty());
 
-        if (!nativeEpilogue()) {
-            _error = "JavaScript execution terminated";
-            return handle_scope.Close(v8::Handle<v8::Value>());
-        }
+        // throw on compile error
+        checkV8ErrorState(compiled, try_catch);
 
         v8::Local<v8::Value> ret = compiled->Run();
 
-        if (!nativePrologue()) {
-            _error = "JavaScript execution terminated";
-            if (!ret.IsEmpty())
-                return handle_scope.Close(ret);
-            return handle_scope.Close(v8::Handle<v8::Value>());
-        }
-        uassert(16671, errStr, !ret.IsEmpty());
+        // throw on run/assignment error
+        checkV8ErrorState(ret, try_catch);
+
         return handle_scope.Close(ret);
     }
 
@@ -1314,11 +1287,11 @@ namespace mongo {
             case mongo::BinData: {
                 int len;
                 const char *data = f.binData(len);
-                v8::Function* binData = getNamedCons("BinData");
-                argv[0] = v8::Number::New(len);
-                argv[1] = v8::Number::New(f.binDataType());
-                argv[2] = v8::String::New(data, len);
-                o->ForceSet(name, binData->NewInstance(3, argv));
+                stringstream ss;
+                base64::encode(ss, data, len);
+                argv[0] = v8::Number::New(f.binDataType());
+                argv[1] = v8::String::New(ss.str().c_str());
+                o->ForceSet(name, getNamedCons("BinData")->NewInstance(2, argv));
                 break;
             }
             case mongo::Timestamp: {
@@ -1506,10 +1479,11 @@ namespace mongo {
         case mongo::BinData: {
             int len;
             const char *data = elem.binData(len);
-            argv[0] = v8::Number::New(len);
-            argv[1] = v8::Number::New(elem.binDataType());
-            argv[2] = v8::String::New(data, len);
-            return getNamedCons("BinData")->NewInstance(3, argv);
+            stringstream ss;
+            base64::encode(ss, data, len);
+            argv[0] = v8::Number::New(elem.binDataType());
+            argv[1] = v8::String::New(ss.str().c_str());
+            return getNamedCons("BinData")->NewInstance(2, argv);
         }
         case mongo::Timestamp:
             instance = internalFieldObjects->NewInstance();
@@ -1687,10 +1661,12 @@ namespace mongo {
                                    v8::Handle<v8::Value> value, int depth,
                                    BSONObj* originalParent) {
         if (value->IsString()) {
-            b.append(sname, toSTLString(value).c_str());
+            b.append(sname, toSTLString(value));
             return;
         }
         if (value->IsFunction()) {
+            uassert(16716, "cannot convert native function to BSON",
+                    !value->ToObject()->Has(v8StringData("_v8_function")));
             b.appendCode(sname, toSTLString(value));
             return;
         }

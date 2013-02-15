@@ -52,7 +52,8 @@ namespace mongo {
             BSONElement e = it.next();
             bool isNearSphere = mongoutils::str::equals(e.fieldName(), "$nearSphere");
             bool isMaxDistance = mongoutils::str::equals(e.fieldName(), "$maxDistance");
-            bool isNear = mongoutils::str::equals(e.fieldName(), "$near");
+            bool isNear = mongoutils::str::equals(e.fieldName(), "$near")
+                          || mongoutils::str::equals(e.fieldName(), "$geoNear");
             if (isNearSphere || isNear) {
                 if (!e.isABSONObj()) { return false; }
                 BSONObj embeddedObj = e.embeddedObject();
@@ -65,13 +66,12 @@ namespace mongo {
                     hasGeometry = true;
                 }
             } else if (isMaxDistance) {
-                double distArg = e.Number();
-                if (fromRadians) {
-                    maxDistance = distArg * radius;
-                } else {
-                    maxDistance = distArg;
-                }
+                maxDistance = e.Number();
             }
+        }
+
+        if (fromRadians) {
+            maxDistance *= radius;
         }
 
         if (hasGeometry) { return true; }
@@ -119,7 +119,7 @@ namespace mongo {
         if (!e.isABSONObj()) { return false; }
         BSONObj embeddedObj = e.embeddedObject();
         // Legacy within #2 : t.find({ loc : { $within : { $box/etc : ...
-        bool contains = mongoutils::str::equals(e.fieldName(), "$within");
+        bool contains = (BSONObj::opWITHIN == static_cast<BSONObj::MatchType>(e.getGtLtOp()));
         if (contains && geoContainer.parseFrom(embeddedObj)) {
             predicate = GeoQuery::WITHIN;
             return true;

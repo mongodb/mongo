@@ -1,3 +1,5 @@
+
+if (0) { // SERVER-8536 / SERVER-8344
 // Check index rebuild when MongoDB is killed
 
 var ports = allocatePorts(1);
@@ -94,3 +96,4 @@ print("Index built");
 
 stopMongod(ports[0]);
 print("SUCCESS!");
+}
