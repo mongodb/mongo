@@ -1597,6 +1597,11 @@ struct __wt_compressor {
 	 * either the \c internal_page_max or \c leaf_page_max value specified
 	 * to WT_SESSION::create when the object was created.)
 	 *
+	 * On entry, \c split_pct is the configured Btree page split size for
+	 * this object.  (This value is provided for convenience, and will be
+	 * the \c split_pct value specified to WT_SESSION::create when the
+	 * object was created.)
+	 *
 	 * On entry, \c extra is a count of additional bytes that will be added
 	 * to the encoded representation before it is written.  In other words,
 	 * if the target write size is 8KB, the returned encoded representation
@@ -1662,6 +1667,7 @@ struct __wt_compressor {
 	 * applicable, the WT_COMPRESSOR::compress callback is used instead.
 	 *
 	 * @param[in] page_max the configured maximum page size for this object
+	 * @param[in] split_pct the configured page split size for this object
 	 * @param[in] extra the count of the additional bytes
 	 * @param[in] src the data to compress
 	 * @param[in] offsets the byte offsets of the byte strings in src
@@ -1674,7 +1680,7 @@ struct __wt_compressor {
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*compress_raw)(WT_COMPRESSOR *compressor, WT_SESSION *session,
-	    size_t page_max, size_t extra,
+	    size_t page_max, u_int split_pct, size_t extra,
 	    uint8_t *src, uint32_t *offsets, uint32_t slots,
 	    uint8_t *dst, size_t dst_len,
 	    int final,

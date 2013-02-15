@@ -1586,8 +1586,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 */
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	WT_ERR(compressor->compress_raw(compressor, wt_session,
-	    r->page_size_max, WT_BLOCK_COMPRESS_SKIP,
-	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
+	    r->page_size_max, btree->split_pct,
+	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
 	    result_len, final, &result_len, &result_slots));
