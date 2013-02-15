@@ -113,9 +113,9 @@ namespace mongo {
     public:
         DbMessage(const Message& _m) : 
             m(_m), 
-            mark(0), 
             data(_m.singleData()->_data+4),
-            theEnd(_m.singleData()->_data + _m.header()->dataLen())
+            theEnd(_m.singleData()->_data + _m.header()->dataLen()),
+            mark(0)
         {
             // for received messages, Message has only one buffer
             nextjsobj = data;
