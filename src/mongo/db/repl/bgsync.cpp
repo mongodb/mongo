@@ -24,7 +24,6 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/base/counter.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "rs.h"
 
 namespace mongo {
 namespace replset {
@@ -328,12 +327,6 @@ namespace replset {
             while (!inShutdown()) {
 
                 if (!r.moreInCurrentBatch()) {
-                    int bs = r.currentBatchMessageSize();
-                    if( bs > 0 && bs < BatchIsSmallish ) {
-                        SOMETIMES(zz, 1024) log() << "sleep before next batch bs:" << bs << endl;
-                        sleepmillis(SleepToAllowBatchingMillis);
-                    }
-
                     if (theReplSet->gotForceSync()) {
                         return;
                     }

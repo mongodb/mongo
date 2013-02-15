@@ -33,7 +33,6 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/server.h"
-#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
@@ -88,7 +87,6 @@ namespace mongo {
         exhaust = false;
 
         int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
-        RARELY RARELY log() << "bufSize " << bufSize << endl;
 
         BufBuilder b( bufSize );
         b.skip(sizeof(QueryResult));
@@ -103,10 +101,9 @@ namespace mongo {
         ClientCursor::Pin p(cursorid);
         ClientCursor *cc = p.c();
 
-        int queryOptions = 0;
 
         if ( unlikely(!cc) ) {
-            log() << "getMore: cursorid not found " << ns << " " << cursorid << endl;
+            LOGSOME << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;
         }
@@ -117,7 +114,7 @@ namespace mongo {
             if ( pass == 0 )
                 cc->updateSlaveLocation( curop );
 
-            queryOptions = cc->queryOptions();
+            int queryOptions = cc->queryOptions();
             
             curop.debug().query = cc->query();
             curop.setQuery( cc->query() );
@@ -141,14 +138,12 @@ namespace mongo {
                             continue;
 
                         if( n == 0 && (queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
-                            RARELY log() << "getmore @eof time to AwaitData" << endl;
-                            return 0; // 0 is sentinel indicating to calling function that waiting can/should occur
+                            return 0; // 0 is sentinel indicating to caller waiting can/should occur
                         }
 
                         break;
                     }
                     p.release();
-                    RARELY log() << "erase cursor " << cursorid << endl;
                     bool ok = ClientCursor::erase(cursorid);
                     verify(ok);
                     cursorid = 0;
@@ -159,7 +154,6 @@ namespace mongo {
                 MatchDetails details;
                 if ( cc->fields && cc->fields->getArrayOpType() == Projection::ARRAY_OP_POSITIONAL ) {
                     // field projection specified, and contains an array operator
-                    RARELY log() << "projection" << endl;
                     details.requestElemMatchKey();
                 }
 
@@ -167,11 +161,10 @@ namespace mongo {
                 if ( !c->currentMatches( &details ) ) {
                 }
                 else if ( manager && ! manager->belongsToMe( cc ) ){
-                    RARELY log() << "cursor skipping document in un-owned chunk: " << c->current() << endl;
+                    LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
                 }
                 else {
                     if( c->getsetdup(c->currLoc()) ) {
-                        RARELY log() << "dup" << endl;
                         //out() << "  but it's a dup \n";
                     }
                     else {
@@ -181,7 +174,6 @@ namespace mongo {
                         cc->fillQueryResultFromObj( b, &details );
 
                         if ( ( ntoreturn && n >= ntoreturn ) || b.len() > MaxBytesToReturnToClientAtOnce ) {
-                            RARELY log() << "full block " << n << ' ' << ntoreturn << ' ' << b.len() << endl;
                             c->advance();
                             cc->incPos( n );
                             break;
@@ -192,7 +184,6 @@ namespace mongo {
 
                 if ( ! cc->yieldSometimes( ( c->ok() && c->keyFieldsOnly() ) ?
                                           ClientCursor::DontNeed : ClientCursor::WillNeed ) ) {
-                    RARELY log() << "yield()" << endl;
                     ClientCursor::erase(cursorid);
                     cursorid = 0;
                     cc = 0;
@@ -211,8 +202,6 @@ namespace mongo {
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
                 exhaust = cc->queryOptions() & QueryOption_Exhaust;
-                if( exhaust ) 
-                    log() << "exhaust: " << exhaust << endl;
             }
         }
 
@@ -224,9 +213,7 @@ namespace mongo {
         qr->startingFrom = start;
         qr->nReturned = n;
         b.decouple();
-        {
-            SOMETIMES( zzz, 1024 ) log() << "getmore n:" << n << " size:" << qr->len << endl;
-        }
+
         return qr;
     }
 
