@@ -16,26 +16,6 @@ static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
 
 /*
- * __wt_btree_create --
- *	Create a Btree.
- */
-int
-__wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
-{
-	return (__wt_block_manager_create(session, filename));
-}
-
-/*
- * __wt_btree_truncate --
- *	Truncate a Btree.
- */
-int
-__wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
-{
-	return (__wt_block_manager_truncate(session, filename));
-}
-
-/*
  * __wt_btree_open --
  *	Open a Btree.
  */

@@ -257,8 +257,6 @@ extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_sync_file(WT_SESSION_IMPL *session, int syncop);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
-extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
-extern int __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session,

@@ -25,7 +25,7 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 
 	/* Delete the root address and truncate the file. */
 	WT_RET(__wt_meta_checkpoint_clear(session, name));
-	WT_RET(__wt_btree_truncate(session, filename));
+	WT_RET(__wt_block_manager_truncate(session, filename));
 
 	return (0);
 }
