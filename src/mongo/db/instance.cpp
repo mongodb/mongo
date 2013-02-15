@@ -712,6 +712,9 @@ namespace mongo {
                         pass = 10000;
                     }
                 }
+                // we want to sleep some on an awaitdata at the end of a tailable cursor 
+                // (for the oplog that is) as we don't want to immediately send a batch after 
+                // just one write op has occurred.  rather we want a little bit of batching to occur.
                 pass++;
                 if (debug)
                     sleepmillis(20);
