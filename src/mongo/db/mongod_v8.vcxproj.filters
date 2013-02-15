@@ -1811,6 +1811,9 @@
     <ClCompile Include="..\client\sasl_client_authenticate.cpp">
       <Filter>client\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="index_set.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -3821,6 +3824,9 @@
     </ClInclude>
     <ClInclude Include="..\client\sasl_client_authenticate.h">
       <Filter>client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="index_set.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
