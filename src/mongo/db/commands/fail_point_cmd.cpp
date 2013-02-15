@@ -29,7 +29,7 @@ namespace mongo {
      *
      * Format
      * {
-     *    injectFault: <string>, // name of the fail point.
+     *    configureFailPoint: <string>, // name of the fail point.
      *    mode: <string|Object>, // the new mode to set. Can have one of the
      *        following format:
      *
