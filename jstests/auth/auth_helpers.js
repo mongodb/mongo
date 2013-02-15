@@ -40,8 +40,8 @@ if (hasMongoCR) {
     admin.logout();
 }
 
-// If the server supports CRAM-MD5 and the shell supports sasl, try it out.
-if (hasCramMd5 && conn.saslAuthenticate) {
+// If the server supports CRAM-MD5, try it out.
+if (hasCramMd5) {
     testedSomething = true;
     assert(admin.auth({mechanism: 'CRAM-MD5', user: 'andy', pwd: 'a'}));
     admin.logout();
@@ -50,8 +50,5 @@ if (hasCramMd5 && conn.saslAuthenticate) {
 // Sanity check that we tested at least one of MONGODB-CR and CRAM-MD5.
 assert(testedSomething, "No candidate authentication mechanisms matched.");
 
-// If the shell doesn't support sasl authentication, it shouldn't be able to do CRAM-MD5,
-// but shouldn't crash.
-if (!conn.saslAuthenticate) {
-    assert(!admin.auth({mechanism: 'CRAM-MD5', user: 'andy', pwd: 'a'}));
-}
+// Invalid mechanisms shouldn't lead to authentication, but also shouldn't crash.
+assert(!admin.auth({mechanism: 'this-mechanism-is-fake', user: 'andy', pwd: 'a'}));
