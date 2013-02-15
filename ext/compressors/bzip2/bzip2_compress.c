@@ -43,8 +43,8 @@ bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 #ifdef WIREDTIGER_TEST_COMPRESS_RAW
 static int
-bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *,
-    size_t, size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
+bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, u_int,
+    size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
     size_t *, uint32_t *);
 #endif
 
@@ -209,7 +209,7 @@ __bzip2_compress_raw_random(void)
  */
 static int
 bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    size_t page_max, size_t extra,
+    size_t page_max, u_int split_pct, size_t extra,
     uint8_t *src, uint32_t *offsets, uint32_t slots,
     uint8_t *dst, size_t dst_len, int final,
     size_t *result_lenp, uint32_t *result_slotsp)
@@ -218,6 +218,7 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	int compression_failed, ret;
 
 	__UNUSED(page_max);
+	__UNUSED(split_pct);
 	__UNUSED(extra);
 	__UNUSED(final);
 
@@ -264,14 +265,14 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 #if 0
 	fprintf(stderr,
-	    "bzip2_compress_raw (%s): page_max %" PRIuMAX ", extra %" PRIuMAX
+	    "bzip2_compress_raw (%s): page_max %" PRIuMAX
+	    ", split_pct %u, extra %" PRIuMAX
 	    ", slots %" PRIu32 ", take %" PRIu32 ": %" PRIu32 " -> %"
 	    PRIuMAX "\n",
 	    final ? "final" : "not final",
-	    (uintmax_t)page_max, (uintmax_t)extra,
+	    (uintmax_t)page_max, split_pct, (uintmax_t)extra,
 	    slots, take, offsets[take], (uintmax_t)*result_lenp);
 #endif
-
 	return (0);
 }
 #endif

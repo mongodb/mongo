@@ -302,7 +302,7 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session,
 
 		/*
 		 * If we find a buffer that's not in-use, check its size: we
-		 * want the the smallest buffer larger than the requested size,
+		 * want the smallest buffer larger than the requested size,
 		 * or the largest buffer if none are large enough.
 		 */
 		if (best == NULL ||

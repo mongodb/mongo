@@ -376,7 +376,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * checksum and still be broken, but paranoia is healthy in
 		 * salvage.  Regardless, verify does return failure because
 		 * it detects failures we'd expect to see in a corrupted file,
-		 * like overflow references past the the end of the file or
+		 * like overflow references past the end of the file or
 		 * overflow references to non-existent pages, might as well
 		 * discard these pages now.
 		 */

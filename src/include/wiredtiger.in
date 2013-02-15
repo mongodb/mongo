@@ -537,17 +537,18 @@ struct __wt_session {
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for cursors with record number keys.,a
 	 * boolean flag; default \c false.}
-	 * @config{bulk, configure the cursor for bulk loads\, a fast\, initial
-	 * load path.  Bulk load may only be used for newly created objects\,
-	 * and in the case of row-store objects\, key/value items must be loaded
-	 * in sorted order.  Cursors configured for bulk load only support the
-	 * WT_CURSOR::insert and WT_CURSOR::close methods.  The value is usually
-	 * a true/false flag\, but the the special value \c "bitmap" is for use
-	 * with fixed-length column stores\, and allows chunks of a memory
-	 * resident bitmap to be loaded directly into a file by passing a \c
-	 * WT_ITEM to WT_CURSOR::set_value where the \c size field indicates the
-	 * number of records in the bitmap (as specified by the file's \c
-	 * value_format). Bulk load bitmap values must end on a byte boundary
+	 * @config{bulk, configure the cursor for bulk-loading\, a fast\,
+	 * initial load path (see @ref bulk_load for more information).
+	 * Bulk-load may only be used for newly created objects and cursors
+	 * configured for bulk-load only support the WT_CURSOR::insert and
+	 * WT_CURSOR::close methods.  When bulk-loading row-store objects\, keys
+	 * must be loaded in sorted order.  The value is usually a true/false
+	 * flag; when bulk-loading fixed-length column store objects\, the
+	 * special value \c bitmap allows chunks of a memory resident bitmap to
+	 * be loaded directly into a file by passing a \c WT_ITEM to
+	 * WT_CURSOR::set_value where the \c size field indicates the number of
+	 * records in the bitmap (as specified by the object's \c value_format
+	 * configuration). Bulk-loaded bitmap values must end on a byte boundary
 	 * relative to the bit count (except for the last set of values
 	 * loaded).,a string; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved
@@ -1391,7 +1392,7 @@ int wiredtiger_struct_pack(
  * @snippet ex_all.c Get the packed size
  *
  * @param session the session handle
- * @param sizep a location where the the number of bytes needed for the
+ * @param sizep a location where the number of bytes needed for the
  * matching call to ::wiredtiger_struct_pack is returned
  * @param format the data format, see @ref packing
  * @errors
@@ -1596,6 +1597,11 @@ struct __wt_compressor {
 	 * either the \c internal_page_max or \c leaf_page_max value specified
 	 * to WT_SESSION::create when the object was created.)
 	 *
+	 * On entry, \c split_pct is the configured Btree page split size for
+	 * this object.  (This value is provided for convenience, and will be
+	 * the \c split_pct value specified to WT_SESSION::create when the
+	 * object was created.)
+	 *
 	 * On entry, \c extra is a count of additional bytes that will be added
 	 * to the encoded representation before it is written.  In other words,
 	 * if the target write size is 8KB, the returned encoded representation
@@ -1661,6 +1667,7 @@ struct __wt_compressor {
 	 * applicable, the WT_COMPRESSOR::compress callback is used instead.
 	 *
 	 * @param[in] page_max the configured maximum page size for this object
+	 * @param[in] split_pct the configured page split size for this object
 	 * @param[in] extra the count of the additional bytes
 	 * @param[in] src the data to compress
 	 * @param[in] offsets the byte offsets of the byte strings in src
@@ -1673,7 +1680,7 @@ struct __wt_compressor {
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*compress_raw)(WT_COMPRESSOR *compressor, WT_SESSION *session,
-	    size_t page_max, size_t extra,
+	    size_t page_max, u_int split_pct, size_t extra,
 	    uint8_t *src, uint32_t *offsets, uint32_t slots,
 	    uint8_t *dst, size_t dst_len,
 	    int final,
@@ -2096,18 +2103,20 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_REC_PAGES				72
 /*! page reconciliation calls for eviction */
 #define	WT_STAT_DSRC_REC_PAGES_EVICTION			73
-/*! page reconciliation failed when an update could not be included */
+/*! reconciliation failed because an update could not be included */
 #define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			74
 /*! reconciliation internal pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_INTL			75
 /*! reconciliation leaf pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_LEAF			76
+/*! reconciliation maximum number of splits created by for a page */
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			77
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			77
+#define	WT_STAT_DSRC_SESSION_COMPACT			78
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		78
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		79
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			79
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			80
 /*! @} */
 /*
  * Statistics section: END

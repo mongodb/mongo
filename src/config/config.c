@@ -547,10 +547,10 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 			}
 
 		/*
-		 * If we parsed the the whole string but the number is out of
-		 * range, report an error.  Don't report an error for strings
-		 * that aren't well-formed integers: if an integer is expected,
-		 * that will be caught by __wt_config_check.
+		 * If we parsed the whole string but the number is out of range,
+		 * report an error.  Don't report an error for strings that
+		 * aren't well-formed integers: if an integer is expected, that
+		 * will be caught by __wt_config_check.
 		 */
 		if (value->type == ITEM_NUM && errno == ERANGE)
 			goto range;

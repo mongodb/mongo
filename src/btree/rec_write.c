@@ -133,6 +133,7 @@ typedef struct {
 		int already_compressed;
 	} *bnd;				/* Saved boundaries */
 	uint32_t bnd_next;		/* Next boundary slot */
+	uint32_t bnd_next_max;		/* Maximum boundary slots used */
 	uint32_t bnd_entries;		/* Total boundary slots */
 	size_t   bnd_allocated;		/* Bytes allocated */
 
@@ -992,16 +993,22 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 static int
 __rec_split_bnd_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
+	uint32_t incr;
+
 	/*
 	 * Make sure there's enough room in which to save another boundary.
 	 *
 	 * The calculation is actually +1, because we save the start point one
-	 * past the current entry -- make it +20 so we don't grow slot-by-slot.
+	 * past the current entry; normal reconciliation generally doesn't use
+	 * a lot of buffers, but we grow aggressively anyway, bulk load eats up
+	 * a lot of these entries because we have an entry for each page that's
+	 * created by the bulk load.
 	 */
 	if (r->bnd_next + 1 >= r->bnd_entries) {
-		WT_RET(__wt_realloc(session, &r->bnd_allocated,
-		    (r->bnd_entries + 20) * sizeof(*r->bnd), &r->bnd));
-		r->bnd_entries += 20;
+		incr = r->bnd_entries + r->bnd_entries / 2 + 20;
+		WT_RET(__wt_realloc(session,
+		    &r->bnd_allocated, incr * sizeof(*r->bnd), &r->bnd));
+		r->bnd_entries = incr;
 	}
 	return (0);
 }
@@ -1579,8 +1586,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 */
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	WT_ERR(compressor->compress_raw(compressor, wt_session,
-	    r->page_size_max, WT_BLOCK_COMPRESS_SKIP,
-	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
+	    r->page_size_max, btree->split_pct,
+	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
 	    result_len, final, &result_len, &result_slots));
@@ -3926,6 +3933,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				}
 err:			__wt_scr_free(&tkey);
 			WT_RET(ret);
+		}
+
+		if (r->bnd_next > r->bnd_next_max) {
+			r->bnd_next_max = r->bnd_next;
+			WT_DSTAT_SET(session, rec_split_max, r->bnd_next_max);
 		}
 
 		switch (page->type) {

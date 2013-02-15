@@ -30,17 +30,26 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t
 	fi
+
 	if egrep '%l[diouxXn]|%[diouxXn]l' $f > $t; then
 		echo "$f: incorrect or dangerous printf format: %l[diouxXn]"
 		cat $t
 	fi
+
 	if grep "(unsigned)" $f > $t; then
 		echo "$f: (unsigned) cast is wrong"
 		cat $t
 	fi
+
 	egrep 'u_quad' $f | sed '/@u_quad_decl@/d' > $t
 	test -s $t && {
 		echo "$f: old-style type declaration: u_XXX_t or u_quad"
+		cat $t
+	}
+
+	egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' $f > $t
+	test -s $t && {
+		echo "$f: paired typo"
 		cat $t
 	}
 

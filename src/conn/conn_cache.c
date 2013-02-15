@@ -32,7 +32,7 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL) &&
 	    (ret = __wt_config_gets(session, cfg,
-	    "shared_cache.reserved", &cval)) == 0)
+	    "shared_cache.reserve", &cval)) == 0)
 		cache->cp_reserved = (uint64_t)cval.val;
 	else if ((ret = __wt_config_gets(session, cfg,
 	    "shared_cache.chunk", &cval)) == 0)
