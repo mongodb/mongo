@@ -663,7 +663,7 @@ namespace mongo {
         curop.debug().ntoreturn = ntoreturn;
         curop.debug().cursorid = cursorid;
 
-        shared_ptr<AssertionException> ex;
+        scoped_ptr<AssertionException> ex;
         scoped_ptr<Timer> timer;
         int pass = 0;
         bool exhaust = false;
