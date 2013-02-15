@@ -5,21 +5,20 @@ WiredTiger applications:
 
 - @subpage basic_api
 - @subpage config_strings
+- @subpage cursors
+- @subpage transactions
 - @subpage error_handling
 
-- @subpage cursors
-- @subpage threads
-- @subpage transactions
-- @subpage checkpoints
-
 - @subpage schema
-- @subpage file_formats
 - @subpage lsm
+- @subpage file_formats
 
 - @subpage bulk_load
 - @subpage cache_configuration
+- @subpage checkpoints
 - @subpage compression
 - @subpage hot_backup
+- @subpage threads
 
 - @subpage home
 - @subpage database_config
