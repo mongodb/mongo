@@ -6,12 +6,13 @@
 var coll = db.getCollection("covered_negative_1")
 coll.drop()
 for (i=0;i<100;i++) {
-    coll.insert({a:i, b:"strvar_"+(i%13), c:NumberInt(i%10), d: i*10, e: [i, i%10]})
+    coll.insert({a:i, b:"strvar_"+(i%13), c:NumberInt(i%10), d: i*10, e: [i, i%10],
+        f:i})
 }
-coll.insert
 coll.ensureIndex({a:1,b:-1,c:1})
 coll.ensureIndex({e:1})
 coll.ensureIndex({d:1})
+coll.ensureIndex({f:"hashed"})
 
 // Test no projection
 var plan = coll.find({a:10, b:"strvar_10", c:0}).hint({a:1, b:-1, c:1}).explain()
@@ -50,5 +51,10 @@ var plan = coll.find({d:{$lt:1000}},{a:1, b:1, c:1, _id:0}).hint({a:1, b:-1, c:1
 //indexOnly should be false but is not due to bug https://jira.mongodb.org/browse/SERVER-8562
 assert.eq(true, plan.indexOnly, "negative.1.7 - indexOnly should be false on a non covered query")
 assert.neq(0, plan.nscannedObjects, "negative.1.7 - nscannedObjects should not be 0 for a non covered query")
+
+// Test query on hashed indexed field
+var plan = coll.find({f:10},{f:1, _id:0}).hint({f:"hashed"}).explain()
+assert.eq(false, plan.indexOnly, "negative.1.8 - indexOnly should be false on a non covered query")
+assert.neq(0, plan.nscannedObjects, "negative.1.8 - nscannedObjects should not be 0 for a non covered query")
 
 print('all tests passed')
