@@ -5,22 +5,22 @@ var conn = MongoRunner.runMongod({ smallfiles: "", auth: "" });
 var mechanisms, hasMongoCR, hasCramMd5;
 
 // Find out if this build supports the authenticationMechanisms startup parameter.  If it does,
-// restart with MONGO-CR and CRAM-MD5 mechanisms enabled.
+// restart with MONGODB-CR and CRAM-MD5 mechanisms enabled.
 var cmdOut = conn.getDB('admin').runCommand({getParameter: 1, authenticationMechanisms: 1})
 if (cmdOut.ok) {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({ restart: conn,
-                                   setParameter: "authenticationMechanisms=MONGO-CR,CRAM-MD5" });
-    mechanisms = [ "MONGO-CR", "CRAM-MD5" ];
+                                   setParameter: "authenticationMechanisms=MONGODB-CR,CRAM-MD5" });
+    mechanisms = [ "MONGODB-CR", "CRAM-MD5" ];
     hasMongoCR = true;
     hasCramMd5 = true;
     print("test info: Enabling non-default authentication mechanisms.");
 }
 else {
-    mechanisms = [ "MONGO-CR" ];
+    mechanisms = [ "MONGODB-CR" ];
     hasMongoCR = true;
     hasCramMd5 = false;
-    print("test info: Using only default authentication mechanism, MONGO-CR.");
+    print("test info: Using only default authentication mechanism, MONGODB-CR.");
 }
 
 var admin = conn.getDB('admin');
@@ -29,14 +29,14 @@ var testedSomething = false;
 
 admin.addUser('andy', 'a');
 
-// If the server supports them MONGO-CR, try all the ways to call db.auth that use MONGO-CR.
+// If the server supports them MONGODB-CR, try all the ways to call db.auth that use MONGODB-CR.
 if (hasMongoCR) {
     testedSomething = true;
     assert(admin.auth('andy', 'a'));
     admin.logout();
     assert(admin.auth({user: 'andy', pwd: 'a'}));
     admin.logout();
-    assert(admin.auth({mechanism: 'MONGO-CR', user: 'andy', pwd: 'a'}));
+    assert(admin.auth({mechanism: 'MONGODB-CR', user: 'andy', pwd: 'a'}));
     admin.logout();
 }
 
@@ -47,7 +47,7 @@ if (hasCramMd5 && conn.saslAuthenticate) {
     admin.logout();
 }
 
-// Sanity check that we tested at least one of MONGO-CR and CRAM-MD5.
+// Sanity check that we tested at least one of MONGODB-CR and CRAM-MD5.
 assert(testedSomething, "No candidate authentication mechanisms matched.");
 
 // If the shell doesn't support sasl authentication, it shouldn't be able to do CRAM-MD5,
