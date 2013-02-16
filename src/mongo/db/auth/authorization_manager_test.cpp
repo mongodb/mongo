@@ -131,68 +131,81 @@ namespace {
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyRejectionOfInvalidRoleNames) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+    TEST_F(PrivilegeDocumentParsing, VerifyInvalidRoleGrantsNoPrivileges) {
+        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+                              "test",
+                              user,
+                              BSON("user" << "spencer" << "pwd" << "" <<
+                                   "roles" << BSON_ARRAY("frim")),
+                              &privilegeSet));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
+    }
+
+    TEST_F(PrivilegeDocumentParsing, VerifyInvalidRoleStillAllowsOtherRoles) {
+        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
                                    "roles" << BSON_ARRAY("read" << "frim")),
                               &privilegeSet));
-        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterAdminRoleFromNonAdminDatabase) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
                                    "roles" << BSON_ARRAY("read" << "clusterAdmin")),
                               &privilegeSet));
-        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::shutdown)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::dropDatabase)));
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterReadFromNonAdminDatabase) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
                                    "roles" << BSON_ARRAY("read" << "readAnyDatabase")),
                               &privilegeSet));
-        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test2", ActionType::find)));
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterReadWriteFromNonAdminDatabase) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
                                    "roles" << BSON_ARRAY("read" << "readWriteAnyDatabase")),
                               &privilegeSet));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::insert)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test2", ActionType::insert)));
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterUserAdminFromNonAdminDatabase) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
                                    "roles" << BSON_ARRAY("read" << "userAdminAnyDatabase")),
                               &privilegeSet));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::userAdmin)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test2", ActionType::userAdmin)));
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterDBAdminFromNonAdminDatabase) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
                                    "roles" << BSON_ARRAY("read" << "dbAdminAnyDatabase")),
                               &privilegeSet));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::clean)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test2", ActionType::clean)));
     }
