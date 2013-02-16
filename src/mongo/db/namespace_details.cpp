@@ -300,6 +300,11 @@ namespace mongo {
             lenToAlloc = std::min( r->lengthWithHeaders(),
                                    NamespaceDetails::quantizeAllocationSpace( lenToAlloc ) );
             left = regionlen - lenToAlloc;
+
+            if ( left < 24 ) {
+                // you get the whole thing.
+                return loc;
+            }
         }
 
         /* split off some for further use. */
