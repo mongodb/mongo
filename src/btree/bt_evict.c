@@ -808,20 +808,20 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 	qsort(cache->evict,
 	    candidates, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 
-	/* Find the bottom 25% */
 	while (candidates > 0 && cache->evict[candidates - 1].page == NULL)
 		--candidates;
 
+	/* Find the bottom 25% of read generations. */
 	cutoff = (3 * __evict_read_gen(&cache->evict[0]) +
 	    __evict_read_gen(&cache->evict[candidates - 1])) / 4;
 
 	/*
-	 * Don't take more than half, regardless.  That said, if there is only
-	 * one candidate page, which is normal when populating an empty file,
-	 * don't exclude it.
+	 * Don't take less than 10% or more than 50% of candidates, regardless.
+	 * That said, if there is only one candidate page, which is normal when
+	 * populating an empty file, don't exclude it.
 	 */
-	for (i = 0; i < candidates / 2; i++)
-		if (cache->evict[i].page->read_gen > cutoff)
+	for (i = candidates / 10; i < candidates / 2; i++)
+		if (__evict_read_gen(&cache->evict[i]) > cutoff)
 			break;
 	cache->evict_candidates = i + 1;
 
