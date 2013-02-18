@@ -169,7 +169,7 @@
  * default config is always the first entry in the array, and the array always
  * has an explicit NULL terminator, so this is safe.
  */
-#define WT_SKIP_DEFAULT_CONFIG(c) &(c)[1]
+#define	WT_SKIP_DEFAULT_CONFIG(c) &(c)[1]
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and
