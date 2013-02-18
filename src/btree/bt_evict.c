@@ -52,13 +52,12 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 	read_gen = page->read_gen + entry->btree->evict_priority;
 
 	/*
-	 * Skew the read generation for internal pages, but not split merge
-	 * pages.  We want to consider leaf pages in preference to real
+	 * Skew the read generation a for internal pages that are not split
+	 * merge pages.  We want to consider leaf pages in preference to real
 	 * internal pages, but merges are relatively cheap in-memory operations
-	 * that make reads faster, so don't make them unlikely.
+	 * that make reads faster, so don't make them too unlikely.
 	 */
-	if ((page->type == WT_PAGE_ROW_INT ||
-	    page->type == WT_PAGE_COL_INT) &&
+	if ((page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) &&
 	    (page->modify == NULL ||
 	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 		read_gen += WT_EVICT_INT_SKEW;
@@ -896,9 +895,8 @@ retry:	file_count = 0;
 	}
 	cache->evict_file_next = (btree == NULL) ? 0 : file_count;
 
-	/* In the extreme case, all of the pages have to come from one file. */
-	if (ret == 0 && i < cache->evict_entries &&
-	    retries++ < WT_EVICT_WALK_INCR / WT_EVICT_WALK_PER_FILE)
+	/* Walk the files a few times if we don't find enough pages. */
+	if (ret == 0 && i < cache->evict_entries && retries++ < 3)
 		goto retry;
 
 	*entriesp = i;
@@ -933,8 +931,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
-	WT_PAGE *page;
-	int modified, restarts;
+	WT_PAGE *page, *parent;
+	int modified, restarts, splits;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -946,7 +944,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	/*
 	 * Get some more eviction candidate pages.
 	 */
-	for (evict = start, restarts = 0;
+	for (evict = start, restarts = splits = 0;
 	    evict < end && ret == 0;
 	    ret = __wt_tree_walk(session, &btree->evict_page, WT_TREE_EVICT)) {
 		if ((page = btree->evict_page) == NULL) {
@@ -973,7 +971,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		/*
 		 * Skip root pages, and split-merge pages that have split-merge
 		 * pages as their parents (we're only interested in the top-most
-		 * split-merge page).
+		 * split-merge page of deep trees).
 		 *
 		 * Don't skip empty or split pages: updates after their last
 		 * reconciliation may have changed their state and only the
@@ -982,11 +980,16 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 */
 		if (WT_PAGE_IS_ROOT(page))
 			continue;
+
 		if (page->modify != NULL &&
-		    (F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE) &&
-		    page->parent->modify != NULL &&
-		    F_ISSET(page->parent->modify, WT_PM_REC_SPLIT_MERGE)))
-			continue;
+		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) {
+			parent = page->parent;
+			if (++splits < WT_MERGE_STACK_MIN ||
+			    (parent->modify != NULL &&
+			    F_ISSET(parent->modify, WT_PM_REC_SPLIT_MERGE)))
+				continue;
+		} else
+			splits = 0;
 
 		/*
 		 * If the file is being checkpointed, there's a period of time

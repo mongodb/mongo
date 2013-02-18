@@ -167,7 +167,9 @@ __merge_unlock(WT_PAGE *page)
 
 	WT_REF_FOREACH(page, ref, i)
 		if (ref->state == WT_REF_LOCKED) {
-			__merge_unlock(ref->page);
+			if (ref->page->type == WT_PAGE_ROW_INT ||
+			    ref->page->type == WT_PAGE_COL_INT)
+				__merge_unlock(ref->page);
 			WT_PUBLISH(ref->state, WT_REF_MEM);
 		}
 }
