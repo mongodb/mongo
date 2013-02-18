@@ -249,6 +249,11 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
 	stats->read_io.desc = "total read I/Os";
+	stats->rec_pages.desc = "page reconciliation calls";
+	stats->rec_pages_eviction.desc =
+	    "page reconciliation calls for eviction";
+	stats->rec_skipped_update.desc =
+	    "reconciliation failed because an update could not be included";
 	stats->rwlock_read.desc = "pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
@@ -297,6 +302,9 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
 	stats->read_io.v = 0;
+	stats->rec_pages.v = 0;
+	stats->rec_pages_eviction.v = 0;
+	stats->rec_skipped_update.v = 0;
 	stats->rwlock_read.v = 0;
 	stats->rwlock_write.v = 0;
 	stats->txn_ancient.v = 0;

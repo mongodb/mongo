@@ -1929,24 +1929,30 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_MEMORY_FREE			27
 /*! total read I/Os */
 #define	WT_STAT_CONN_READ_IO				28
+/*! page reconciliation calls */
+#define	WT_STAT_CONN_REC_PAGES				29
+/*! page reconciliation calls for eviction */
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			30
+/*! reconciliation failed because an update could not be included */
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			31
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			29
+#define	WT_STAT_CONN_RWLOCK_READ			32
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			30
+#define	WT_STAT_CONN_RWLOCK_WRITE			33
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			31
+#define	WT_STAT_CONN_TXN_ANCIENT			34
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				32
+#define	WT_STAT_CONN_TXN_BEGIN				35
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			33
+#define	WT_STAT_CONN_TXN_CHECKPOINT			36
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				34
+#define	WT_STAT_CONN_TXN_COMMIT				37
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			35
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			38
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			36
+#define	WT_STAT_CONN_TXN_ROLLBACK			39
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				37
+#define	WT_STAT_CONN_WRITE_IO				40
 
 /*!
  * @}

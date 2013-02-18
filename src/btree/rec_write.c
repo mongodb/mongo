@@ -290,9 +290,12 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 
 	WT_VERBOSE_RET(
 	    session, reconcile, "%s", __wt_page_type_string(page->type));
+	WT_CSTAT_INCR(session, rec_pages);
 	WT_DSTAT_INCR(session, rec_pages);
-	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED))
+	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED)) {
+		WT_CSTAT_INCR(session, rec_pages_eviction);
 		WT_DSTAT_INCR(session, rec_pages_eviction);
+	}
 
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
@@ -575,6 +578,7 @@ __rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		WT_PANIC_RETX(
 		    session, "reconciliation illegally skipped an update");
 	case WT_SKIP_UPDATE_QUIT:
+		WT_CSTAT_INCR(session, rec_skipped_update);
 		WT_DSTAT_INCR(session, rec_skipped_update);
 		return (EBUSY);
 	case 0:

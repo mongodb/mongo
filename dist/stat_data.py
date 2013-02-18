@@ -73,6 +73,14 @@ connection_stats = [
 	Stat('cache_write', 'cache: pages written from cache'),
 
 	##########################################
+	# Reconciliation statistics
+	##########################################
+	Stat('rec_pages', 'page reconciliation calls'),
+	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
+	Stat('rec_skipped_update',
+	    'reconciliation failed because an update could not be included'),
+
+	##########################################
 	# Transaction statistics
 	##########################################
 	Stat('txn_ancient', 'ancient transactions'),
