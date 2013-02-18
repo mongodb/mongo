@@ -641,6 +641,7 @@ namespace mongo {
     }
 
     QueryResult* emptyMoreResult(long long);
+    QueryResult* emptyMoreResultWithCursor(long long);
 
     void OpTime::waitForDifferent(unsigned millis){
         mutex::scoped_lock lk(m);
@@ -761,7 +762,12 @@ namespace mongo {
                 return ok;
             }
 
-            msgdata = emptyMoreResult(cursorid);
+            if (ex->getCode() == 12051 ) { // Cursor was already locked.
+            	msgdata = emptyMoreResultWithCursor(cursorid);
+            }
+            else {
+                msgdata = emptyMoreResult(cursorid);
+            }
         }
 
         Message *resp = new Message();
