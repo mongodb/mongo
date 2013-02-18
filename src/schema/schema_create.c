@@ -34,7 +34,7 @@ __create_file(WT_SESSION_IMPL *session,
 	}
 
 	/* Create the file. */
-	WT_ERR(__wt_btree_create(session, filename));
+	WT_ERR(__wt_block_manager_create(session, filename));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 

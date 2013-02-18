@@ -47,10 +47,12 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
 	else {
+		/* Only setup if a shared cache was explicitly configured. */
+		if (__wt_config_gets(session, WT_SKIP_DEFAULT_CONFIG(cfg),
+		    "shared_cache", &cval) == WT_NOTFOUND)
+			return (0);
 		WT_RET_NOTFOUND_OK(
 		    __wt_config_gets(session, cfg, "shared_cache.name", &cval));
-		if (cval.len == 0)
-			return (0);
 		/*
 		 * NOTE: The allocations made when configuring and opening a
 		 * cache pool don't really belong to the connection that

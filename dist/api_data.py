@@ -262,8 +262,8 @@ connection_runtime_config = [
 		Config('reserve', '0', r'''
 			amount of cache this database is guaranteed to have available
 			from the shared cache. This setting is per database. Defaults
-			to the chunk size'''),
-		Config('name', '', r'''
+			to the chunk size''', type='int'),
+		Config('name', 'pool', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''
 			maximum memory to allocate for the shared cache. Setting this
