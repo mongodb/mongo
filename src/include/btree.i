@@ -472,7 +472,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * No lock is required because the session array is fixed size, but it
-	 * it may contain inactive entries.  We must review any active session
+	 * may contain inactive entries.  We must review any active session
 	 * that might contain a hazard pointer, so insert a barrier before
 	 * reading the active session count.  That way, no matter what sessions
 	 * come or go, we'll check the slots for all of the sessions that could
