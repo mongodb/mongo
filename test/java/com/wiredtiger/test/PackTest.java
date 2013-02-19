@@ -47,13 +47,13 @@ public class PackTest {
     throws WiredTigerPackingException {
         String format = "b";
         PackOutputStream packer = new PackOutputStream(format);
-        packer.addFieldByte((byte)8);
+        packer.addByte((byte)8);
 
         Assert.assertEquals(format, packer.getFormat());
         byte[] packed = packer.getValue();
 
         PackInputStream unpacker = new PackInputStream(format, packed);
-        Assert.assertEquals(unpacker.getFieldByte(), (byte)8);
+        Assert.assertEquals(unpacker.getByte(), (byte)8);
     }
 
     @Test
@@ -61,23 +61,23 @@ public class PackTest {
     throws WiredTigerPackingException {
         String format = "biqrhS";
         PackOutputStream packer = new PackOutputStream(format);
-        packer.addFieldByte((byte)8);
-        packer.addFieldInt(124);
-        packer.addFieldLong(1240978);
-        packer.addFieldRecord(5680234);
-        packer.addFieldShort((short)8576);
-        packer.addFieldString("Hello string");
+        packer.addByte((byte)8);
+        packer.addInt(124);
+        packer.addLong(1240978);
+        packer.addRecord(5680234);
+        packer.addShort((short)8576);
+        packer.addString("Hello string");
 
         Assert.assertEquals(format, packer.getFormat());
         byte[] packed = packer.getValue();
 
         PackInputStream unpacker = new PackInputStream(format, packed);
-        Assert.assertEquals(unpacker.getFieldByte(), (byte)8);
-        Assert.assertEquals(unpacker.getFieldInt(), 124);
-        Assert.assertEquals(unpacker.getFieldLong(), 1240978);
-        Assert.assertEquals(unpacker.getFieldRecord(), 5680234);
-        Assert.assertEquals(unpacker.getFieldShort(), 8576);
-        Assert.assertEquals(unpacker.getFieldString(), "Hello string");
+        Assert.assertEquals(unpacker.getByte(), (byte)8);
+        Assert.assertEquals(unpacker.getInt(), 124);
+        Assert.assertEquals(unpacker.getLong(), 1240978);
+        Assert.assertEquals(unpacker.getRecord(), 5680234);
+        Assert.assertEquals(unpacker.getShort(), 8576);
+        Assert.assertEquals(unpacker.getString(), "Hello string");
     }
 
     @Test
@@ -85,13 +85,13 @@ public class PackTest {
     throws WiredTigerPackingException {
         String format = "SS";
         PackOutputStream packer = new PackOutputStream(format);
-        packer.addFieldString("Hello 1");
-        packer.addFieldString("Hello 2");
+        packer.addString("Hello 1");
+        packer.addString("Hello 2");
 
         byte[] packed = packer.getValue();
         PackInputStream unpacker = new PackInputStream(format, packed);
-        Assert.assertEquals(unpacker.getFieldString(), "Hello 1");
-        Assert.assertEquals(unpacker.getFieldString(), "Hello 2");
+        Assert.assertEquals(unpacker.getString(), "Hello 1");
+        Assert.assertEquals(unpacker.getString(), "Hello 2");
     }
 
     @Test
@@ -99,12 +99,12 @@ public class PackTest {
     throws WiredTigerPackingException {
         String format = "U";
         PackOutputStream packer = new PackOutputStream(format);
-        packer.addFieldByteArray("Hello 1".getBytes());
+        packer.addByteArray("Hello 1".getBytes());
 
         byte[] packed = packer.getValue();
         PackInputStream unpacker = new PackInputStream(format, packed);
         Assert.assertTrue(java.util.Arrays.equals(
-                              unpacker.getFieldByteArray(), "Hello 1".getBytes()));
+                              unpacker.getByteArray(), "Hello 1".getBytes()));
     }
 
     @Test
@@ -112,19 +112,19 @@ public class PackTest {
     throws WiredTigerPackingException {
         String format = "uuu";
         PackOutputStream packer = new PackOutputStream(format);
-        packer.addFieldByteArray("Hello 1".getBytes());
-        packer.addFieldByteArray("Hello 2".getBytes());
-        packer.addFieldByteArray("Hello 3".getBytes());
+        packer.addByteArray("Hello 1".getBytes());
+        packer.addByteArray("Hello 2".getBytes());
+        packer.addByteArray("Hello 3".getBytes());
 
         byte[] packed = packer.getValue();
         //printByteArray(packed, packed.length);
         PackInputStream unpacker = new PackInputStream(format, packed);
         Assert.assertTrue(java.util.Arrays.equals(
-                              unpacker.getFieldByteArray(), "Hello 1".getBytes()));
+                              unpacker.getByteArray(), "Hello 1".getBytes()));
         Assert.assertTrue(java.util.Arrays.equals(
-                              unpacker.getFieldByteArray(), "Hello 2".getBytes()));
+                              unpacker.getByteArray(), "Hello 2".getBytes()));
         Assert.assertTrue(java.util.Arrays.equals(
-                              unpacker.getFieldByteArray(), "Hello 3".getBytes()));
+                              unpacker.getByteArray(), "Hello 3".getBytes()));
     }
 
     @Test
@@ -132,16 +132,16 @@ public class PackTest {
     throws WiredTigerPackingException {
         String format = "uiS";
         PackOutputStream packer = new PackOutputStream(format);
-        packer.addFieldByteArray("Hello 1".getBytes());
-        packer.addFieldInt(12);
-        packer.addFieldString("Hello 3");
+        packer.addByteArray("Hello 1".getBytes());
+        packer.addInt(12);
+        packer.addString("Hello 3");
 
         byte[] packed = packer.getValue();
         PackInputStream unpacker = new PackInputStream(format, packed);
         Assert.assertTrue(java.util.Arrays.equals(
-                              unpacker.getFieldByteArray(), "Hello 1".getBytes()));
-        Assert.assertEquals(unpacker.getFieldInt(), 12);
-        Assert.assertEquals(unpacker.getFieldString(), "Hello 3");
+                              unpacker.getByteArray(), "Hello 1".getBytes()));
+        Assert.assertEquals(unpacker.getInt(), 12);
+        Assert.assertEquals(unpacker.getString(), "Hello 3");
     }
 
     @Test
@@ -149,11 +149,11 @@ public class PackTest {
     throws WiredTigerPackingException {
         String format = "4s";
         PackOutputStream packer = new PackOutputStream(format);
-        packer.addFieldString("Hello 1");
+        packer.addString("Hello 1");
 
         byte[] packed = packer.getValue();
         PackInputStream unpacker = new PackInputStream(format, packed);
-        Assert.assertEquals(unpacker.getFieldString(), "Hell");
+        Assert.assertEquals(unpacker.getString(), "Hell");
     }
 
     @Test
@@ -162,10 +162,10 @@ public class PackTest {
         // Verify that we can pack and unpack single signed longs.
         for (long i:testers) {
             PackOutputStream packer = new PackOutputStream("Q");
-            packer.addFieldLong(i);
+            packer.addLong(i);
             PackInputStream unpacker =
                 new PackInputStream("Q", packer.getValue());
-            long unpacked = unpacker.getFieldLong();
+            long unpacked = unpacker.getLong();
             if (i != unpacked)
                 System.out.println(
                     i + " did not match " + unpacked);
@@ -183,14 +183,14 @@ public class PackTest {
             long val2 = testers[i+1];
 
             PackOutputStream packer = new PackOutputStream("QQ");
-            packer.addFieldLong(val1);
-            packer.addFieldLong(val2);
+            packer.addLong(val1);
+            packer.addLong(val2);
             PackInputStream unpacker =
                 new PackInputStream("QQ", packer.getValue());
-            long unpacked = unpacker.getFieldLong();
+            long unpacked = unpacker.getLong();
             if (val1 != unpacked)
                 System.out.println(i + " did not match " + unpacked);
-            unpacked = unpacker.getFieldLong();
+            unpacked = unpacker.getLong();
             if (val2 != unpacked)
                 System.out.println(i + " did not match " + unpacked);
         }

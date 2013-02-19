@@ -2,8 +2,10 @@ package com.wiredtiger.db;
 
 import java.lang.String;
 
-/*
- * Package-private - not part of the public API.
+/**
+ * An internal helper class with utilities for packing and unpacking values.
+ *
+ * Applications should not need to use this class.
  */
 class PackUtil {
     /* Contants. */
@@ -26,8 +28,12 @@ class PackUtil {
 
     final static int SIZEOF_LONG = 8;
 
-    /*
-     * Extract bits <start> to <end> from a value (counting from LSB == 0).
+    /**
+     * Extract bits from a value, counting from LSB == 0.
+     * 
+     * \param x The value to extract bits from.
+     * \param start The first bit to extract.
+     * \param end The last bit to extract.
      */
     public static byte GET_BITS(long x, int start, int end) {
         return (byte)((x & ((1 << start) - 1)) >> end);

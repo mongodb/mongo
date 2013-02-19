@@ -4,6 +4,11 @@ import java.io.ByteArrayOutputStream;
 import java.lang.StringBuffer;
 import com.wiredtiger.db.WiredTigerPackingException;
 
+/**
+ * An internal helper class for encoding WiredTiger packed values.
+ *
+ * Applications should not need to use this class.
+ */
 public class PackOutputStream {
 
     final static int MAX_INT_BYTES = 21;
@@ -11,41 +16,73 @@ public class PackOutputStream {
     protected ByteArrayOutputStream packed;
     protected byte[] intBuf;
 
+    /**
+     * Constructor.
+     *
+     * \param format A String that contains the WiredTiger format that
+     *               defines the layout of this packed value.
+     */
     public PackOutputStream(String format) {
         this.format = new PackFormatInputStream(format);
         intBuf = new byte[MAX_INT_BYTES];
         packed = new ByteArrayOutputStream(100);
     }
 
+    /**
+     * Returns the raw packing format string.
+     */
     public String getFormat() {
         return format.toString();
     }
 
+    /**
+     * Returns the current packed value.
+     */
     public byte[] getValue() {
         return packed.toByteArray();
     }
 
+    /**
+     * Reset the stream position.
+     */
     public void reset() {
         format.reset();
         packed.reset();
     }
 
-    public void addFieldByte(byte value)
+    /**
+     * Add a byte field to the stream.
+     *
+     * \param value The byte value to be added.
+     */
+    public void addByte(byte value)
     throws WiredTigerPackingException {
-        format.checkFieldType('b', true);
+        format.checkType('b', true);
         /* Translate to maintain ordering with the sign bit. */
         byte input = (byte)(value + 0x80);
         packed.write(input);
     }
 
-    public void addFieldByteArray(byte[] value)
+    /**
+     * Add a byte array field to the stream.
+     *
+     * \param value The byte array value to be added.
+     */
+    public void addByteArray(byte[] value)
     throws WiredTigerPackingException {
-        this.addFieldByteArray(value, 0, value.length);
+        this.addByteArray(value, 0, value.length);
     }
 
-    public void addFieldByteArray(byte[] value, int off, int len)
+    /**
+     * Add a byte array field to the stream.
+     *
+     * \param value The byte array value to be added.
+     * \param off The offset from the start of value to begin using the array.
+     * \param len The length of the value to encode.
+     */
+    public void addByteArray(byte[] value, int off, int len)
     throws WiredTigerPackingException {
-        format.checkFieldType('U', true);
+        format.checkType('U', true);
         // If this is not the last item, store the size.
         if (format.available() > 0)
             packLong(len, false);
@@ -54,40 +91,64 @@ public class PackOutputStream {
         /* TODO: padding. */
     }
 
-    public void addFieldInt(int value)
+    /**
+     * Add an integer field to the stream.
+     *
+     * \param value The integer value to be added.
+     */
+    public void addInt(int value)
     throws WiredTigerPackingException {
-        format.checkFieldType('i', true);
+        format.checkType('i', true);
         packLong(value, true);
     }
 
-    public void addFieldLong(long value)
+    /**
+     * Add a long field to the stream.
+     *
+     * \param value The long value to be added.
+     */
+    public void addLong(long value)
     throws WiredTigerPackingException {
-        format.checkFieldType('q', true);
+        format.checkType('q', true);
         packLong(value, true);
     }
 
-    public void addFieldRecord(long value)
+    /**
+     * Add a record field to the stream.
+     *
+     * \param value The record value to be added.
+     */
+    public void addRecord(long value)
     throws WiredTigerPackingException {
-        format.checkFieldType('r', true);
+        format.checkType('r', true);
         packLong(value, true);
     }
 
-    public void addFieldShort(short value)
+    /**
+     * Add a short field to the stream.
+     *
+     * \param value The short value to be added.
+     */
+    public void addShort(short value)
     throws WiredTigerPackingException {
-        format.checkFieldType('h', true);
+        format.checkType('h', true);
         packLong(value, true);
     }
 
-    //
-    // Strings have two possible encodings. A lower case 's' is not null
-    // terminated, and has a length define in the format (default 1). An
-    // upper case 'S' is variable length and has a null terminator.
-    public void addFieldString(String value)
+    /**
+     * Add a string field to the stream.
+     *
+     * \param value The string value to be added.
+     */
+    public void addString(String value)
     throws WiredTigerPackingException {
-        format.checkFieldType('s', false);
-        char fieldFormat = format.getFieldType();
+        format.checkType('s', false);
+        char fieldFormat = format.getType();
         int stringLen = 0;
         int padBytes = 0;
+        // Strings have two possible encodings. A lower case 's' is not null
+        // terminated, and has a length define in the format (default 1). An
+        // upper case 'S' is variable length and has a null terminator.
         if (fieldFormat == 's') {
             stringLen = format.getLengthFromFormat(true);
             if (stringLen > value.length())
@@ -97,7 +158,7 @@ public class PackOutputStream {
             padBytes = 1; // Null terminator
         }
         // We're done pulling information from the field now.
-        format.consumeField();
+        format.consume();
 
         // Use the default Charset.
         packed.write(value.getBytes(), 0, stringLen);
@@ -105,6 +166,14 @@ public class PackOutputStream {
             packed.write(0);
     }
 
+    /**
+     * Add a long field to the stream.
+     * The packing format is defined in the WiredTiger C integer packing
+     * implementation, which is at src/include/intpack.i
+     *
+     * \param x The long value to be added.
+     * \param signed Whether the value is signed or unsigned.
+     */
     private void packLong(long x, boolean signed)
     throws WiredTigerPackingException {
         int offset = 0;

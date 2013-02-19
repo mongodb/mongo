@@ -1,9 +1,13 @@
 /**
  */
-
 package com.wiredtiger.examples.ycsb;
 
-import com.yahoo.ycsb;
+import com.yahoo.ycsb.DB;
+import com.yahoo.ycsb.DBException;
+import com.yahoo.ycsb.ByteIterator;
+import com.yahoo.ycsb.StringByteIterator;
+import com.yahoo.ycsb.Utils;
+
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.Set;
@@ -51,7 +55,7 @@ public class WiredTigerYCSB extends DB
 	public void init()
 	{
 		verbose=Boolean.parseBoolean(getProperties().getProperty(VERBOSE, VERBOSE_DEFAULT));
-		todelay=Integer.parseInt(getProperties().getProperty(SIMULATE_DELAY, SIMULATE_DELAY_DEFAULT));
+		todelay=0;
 		
 		if (verbose)
 		{

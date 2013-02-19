@@ -54,6 +54,7 @@ run "python flags.py" "building flags"
 run "python log.py" "building logging layer"
 run "python serial.py" "building serial function support"
 run "python stat.py" "building statistics support"
+run "python java_doc.py" "building Java documentation index"
 
 run "sh ./s_typedef -b" "building standard typedefs"
 run "sh ./s_prototypes" "building function prototypes"

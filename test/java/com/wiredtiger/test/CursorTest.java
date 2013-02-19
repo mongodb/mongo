@@ -25,8 +25,8 @@ public class CursorTest {
         setup(keyFormat, valueFormat);
 
         Cursor c = s.open_cursor("table:t", null, null);
-        c.addKeyFieldString("bar");
-        c.addValueFieldByteArray("foo".getBytes());
+        c.putKeyString("bar");
+        c.putValueByteArray("foo".getBytes());
         c.insert();
         c.close();
         teardown();
@@ -40,13 +40,13 @@ public class CursorTest {
         setup(keyFormat, valueFormat);
 
         Cursor c = s.open_cursor("table:t", null, null);
-        c.addKeyFieldString("bar");
-        c.addValueFieldByteArray("foo".getBytes());
+        c.putKeyString("bar");
+        c.putValueByteArray("foo".getBytes());
         c.insert();
-        c.addKeyFieldString("bar");
+        c.putKeyString("bar");
         c.search();
-        Assert.assertEquals(c.getKeyFieldString(), "bar");
-        Assert.assertEquals(new String(c.getValueFieldByteArray()), "foo");
+        Assert.assertEquals(c.getKeyString(), "bar");
+        Assert.assertEquals(new String(c.getValueByteArray()), "foo");
         c.close();
         teardown();
     }
@@ -59,19 +59,18 @@ public class CursorTest {
         setup(keyFormat, valueFormat);
 
         Cursor c = s.open_cursor("table:t", null, null);
-        c.addKeyFieldString("bar");
-        c.addValueFieldByteArray("aaaaa".getBytes());
-        c.addValueFieldInt(123);
-        c.addValueFieldString("eeeee");
-        c.addValueFieldByteArray("iiiii".getBytes());
+        c.putKeyString("bar");
+        c.putValueByteArray("aaaaa".getBytes()).putValueInt(123);
+        c.putValueString("eeeee").putValueByteArray("iiiii".getBytes());
+
         c.insert();
-        c.addKeyFieldString("bar");
+        c.putKeyString("bar");
         c.search();
-        Assert.assertEquals(c.getKeyFieldString(), "bar");
-        Assert.assertEquals(new String(c.getValueFieldByteArray()), "aaaaa");
-        Assert.assertEquals(c.getValueFieldInt(), 123);
-        Assert.assertEquals(c.getValueFieldString(), "eeeee");
-        Assert.assertEquals(new String(c.getValueFieldByteArray()), "iiiii");
+        Assert.assertEquals(c.getKeyString(), "bar");
+        Assert.assertEquals(new String(c.getValueByteArray()), "aaaaa");
+        Assert.assertEquals(c.getValueInt(), 123);
+        Assert.assertEquals(c.getValueString(), "eeeee");
+        Assert.assertEquals(new String(c.getValueByteArray()), "iiiii");
         c.close();
         teardown();
     }

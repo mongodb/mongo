@@ -113,6 +113,16 @@ SELFHELPER(struct __wt_connection, connection)
 SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
 
+%define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
+%javamethodmodifiers SIGNATURE_CLASS::METHOD
+"/**
+   * @copydoc CLASS::METHOD
+   */
+  public ";
+%enddef
+%include "java_doc.i"
+
+
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Java equivalents. */
 %ignore __wt_cursor::get_key;
@@ -249,156 +259,171 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
         }
 
         // Key/value accessors that decode based on format.
-        public void addKeyFieldByte(byte value)
+        public Cursor putKeyByte(byte value)
         throws WiredTigerPackingException {
-                keyPacker.addFieldByte(value);
+                keyPacker.addByte(value);
+                return this;
         }
 
-        public void addKeyFieldByteArray(byte[] value)
+        public Cursor putKeyByteArray(byte[] value)
         throws WiredTigerPackingException {
-                this.addKeyFieldByteArray(value, 0, value.length);
+                this.putKeyByteArray(value, 0, value.length);
+                return this;
         }
 
-        public void addKeyFieldByteArray(byte[] value, int off, int len)
+        public Cursor putKeyByteArray(byte[] value, int off, int len)
         throws WiredTigerPackingException {
-                keyPacker.addFieldByteArray(value, off, len);
+                keyPacker.addByteArray(value, off, len);
+                return this;
         }
 
-        public void addKeyFieldInt(int value)
+        public Cursor putKeyInt(int value)
         throws WiredTigerPackingException {
-                keyPacker.addFieldInt(value);
+                keyPacker.addInt(value);
+                return this;
         }
 
-        public void addKeyFieldLong(long value)
+        public Cursor putKeyLong(long value)
         throws WiredTigerPackingException {
-                keyPacker.addFieldLong(value);
+                keyPacker.addLong(value);
+                return this;
         }
 
-        public void addKeyFieldShort(short value)
+        public Cursor putKeyShort(short value)
         throws WiredTigerPackingException {
-                keyPacker.addFieldShort(value);
+                keyPacker.addShort(value);
+                return this;
         }
 
-        public void addKeyFieldString(String value)
+        public Cursor putKeyString(String value)
         throws WiredTigerPackingException {
-                keyPacker.addFieldString(value);
+                keyPacker.addString(value);
+                return this;
         }
 
-        public void addValueFieldByte(byte value)
+        public Cursor putValueByte(byte value)
         throws WiredTigerPackingException {
-                valuePacker.addFieldByte(value);
+                valuePacker.addByte(value);
+                return this;
         }
 
-        public void addValueFieldByteArray(byte[] value)
+        public Cursor putValueByteArray(byte[] value)
         throws WiredTigerPackingException {
-                this.addValueFieldByteArray(value, 0, value.length);
+                this.putValueByteArray(value, 0, value.length);
+                return this;
         }
 
-        public void addValueFieldByteArray(byte[] value, int off, int len)
+        public Cursor putValueByteArray(byte[] value, int off, int len)
         throws WiredTigerPackingException {
-                valuePacker.addFieldByteArray(value, off, len);
+                valuePacker.addByteArray(value, off, len);
+                return this;
         }
 
-        public void addValueFieldInt(int value)
+        public Cursor putValueInt(int value)
         throws WiredTigerPackingException {
-                valuePacker.addFieldInt(value);
+                valuePacker.addInt(value);
+                return this;
         }
 
-        public void addValueFieldLong(long value)
+        public Cursor putValueLong(long value)
         throws WiredTigerPackingException {
-                valuePacker.addFieldLong(value);
+                valuePacker.addLong(value);
+                return this;
         }
 
-        public void addValueFieldShort(short value)
+        public Cursor putValueShort(short value)
         throws WiredTigerPackingException {
-                valuePacker.addFieldShort(value);
+                valuePacker.addShort(value);
+                return this;
         }
 
-        public void addValueFieldString(String value)
+        public Cursor putValueString(String value)
         throws WiredTigerPackingException {
-                valuePacker.addFieldString(value);
+                valuePacker.addString(value);
+                return this;
         }
 
         // TODO: Verify that there is an unpacker available.
-        public byte getKeyFieldByte()
+        public byte getKeyByte()
         throws WiredTigerPackingException {
-                return keyUnpacker.getFieldByte();
+                return keyUnpacker.getByte();
         }
 
-        public void getKeyFieldByteArray(byte[] output)
+        public void getKeyByteArray(byte[] output)
         throws WiredTigerPackingException {
-                this.getKeyFieldByteArray(output, 0, output.length);
+                this.getKeyByteArray(output, 0, output.length);
         }
 
-        public void getKeyFieldByteArray(byte[] output, int off, int len)
+        public void getKeyByteArray(byte[] output, int off, int len)
         throws WiredTigerPackingException {
-                keyUnpacker.getFieldByteArray(output, off, len);
+                keyUnpacker.getByteArray(output, off, len);
         }
 
-        public byte[] getKeyFieldByteArray()
+        public byte[] getKeyByteArray()
         throws WiredTigerPackingException {
-                return keyUnpacker.getFieldByteArray();
+                return keyUnpacker.getByteArray();
         }
 
-        public int getKeyFieldInt()
+        public int getKeyInt()
         throws WiredTigerPackingException {
-                return keyUnpacker.getFieldInt();
+                return keyUnpacker.getInt();
         }
 
-        public long getKeyFieldLong()
+        public long getKeyLong()
         throws WiredTigerPackingException {
-                return keyUnpacker.getFieldLong();
+                return keyUnpacker.getLong();
         }
 
-        public short getKeyFieldShort()
+        public short getKeyShort()
         throws WiredTigerPackingException {
-                return keyUnpacker.getFieldShort();
+                return keyUnpacker.getShort();
         }
 
-        public String getKeyFieldString()
+        public String getKeyString()
         throws WiredTigerPackingException {
-                return keyUnpacker.getFieldString();
+                return keyUnpacker.getString();
         }
 
-        public byte getValueFieldByte()
+        public byte getValueByte()
         throws WiredTigerPackingException {
-                return valueUnpacker.getFieldByte();
+                return valueUnpacker.getByte();
         }
 
-        public void getValueFieldByteArray(byte[] output)
+        public void getValueByteArray(byte[] output)
         throws WiredTigerPackingException {
-                this.getValueFieldByteArray(output, 0, output.length);
+                this.getValueByteArray(output, 0, output.length);
         }
 
-        public void getValueFieldByteArray(byte[] output, int off, int len)
+        public void getValueByteArray(byte[] output, int off, int len)
         throws WiredTigerPackingException {
-                valueUnpacker.getFieldByteArray(output, off, len);
+                valueUnpacker.getByteArray(output, off, len);
         }
 
-        public byte[] getValueFieldByteArray()
+        public byte[] getValueByteArray()
         throws WiredTigerPackingException {
-                return valueUnpacker.getFieldByteArray();
+                return valueUnpacker.getByteArray();
         }
 
-        public int getValueFieldInt()
+        public int getValueInt()
         throws WiredTigerPackingException {
-                return valueUnpacker.getFieldInt();
+                return valueUnpacker.getInt();
         }
 
-        public long getValueFieldLong()
+        public long getValueLong()
         throws WiredTigerPackingException {
-                return valueUnpacker.getFieldLong();
+                return valueUnpacker.getLong();
         }
 
-        public short getValueFieldShort()
+        public short getValueShort()
         throws WiredTigerPackingException {
-                return valueUnpacker.getFieldShort();
+                return valueUnpacker.getShort();
         }
 
-        public String getValueFieldString()
+        public String getValueString()
         throws WiredTigerPackingException {
-                return valueUnpacker.getFieldString();
+                return valueUnpacker.getString();
         }
+
 
 	public int insert() {
                 byte[] key = keyPacker.getValue();
@@ -428,6 +453,8 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 	public int next() {
 		int ret = next_wrap();
+                keyPacker.reset();
+                valuePacker.reset();
 		keyUnpacker = (ret == 0) ?
                     new PackInputStream(keyFormat, get_key_wrap()) : null;
 		valueUnpacker = (ret == 0) ?
@@ -437,6 +464,8 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 	public int prev() {
 		int ret = prev_wrap();
+                keyPacker.reset();
+                valuePacker.reset();
 		keyUnpacker = (ret == 0) ?
                     new PackInputStream(keyFormat, get_key_wrap()) : null;
 		valueUnpacker = (ret == 0) ?
@@ -445,6 +474,8 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 	}
 	public int search() {
 		int ret = search_wrap(keyPacker.getValue());
+                keyPacker.reset();
+                valuePacker.reset();
 		keyUnpacker = (ret == 0) ?
                     new PackInputStream(keyFormat, get_key_wrap()) : null;
 		valueUnpacker = (ret == 0) ?
@@ -454,6 +485,8 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 	public SearchStatus search_near() {
 		SearchStatus ret = search_near_wrap(keyPacker.getValue());
+                keyPacker.reset();
+                valuePacker.reset();
 		keyUnpacker = (ret != SearchStatus.NOTFOUND) ?
                     new PackInputStream(keyFormat, get_key_wrap()) : null;
 		valueUnpacker = (ret != SearchStatus.NOTFOUND) ?

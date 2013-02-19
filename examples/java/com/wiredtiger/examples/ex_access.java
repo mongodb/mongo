@@ -10,12 +10,12 @@ public class ex_access {
         System.out.println("Key format: " + c.getKeyFormat());
         System.out.println("Value format: " + c.getValueFormat());
         try {
-            c.addKeyFieldString("foo");
-            c.addValueFieldByteArray("bar".getBytes());
+            c.putKeyString("foo");
+            c.putValueByteArray("bar".getBytes());
             c.insert();
             c.reset();
             while (c.next() == 0)
-                System.out.println("Got: " + c.getKeyFieldString());
+                System.out.println("Got: " + c.getKeyString());
         } catch (WiredTigerPackingException wtpe) {
         }
         conn.close(null);

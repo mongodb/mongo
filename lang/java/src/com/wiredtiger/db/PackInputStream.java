@@ -5,6 +5,11 @@ import java.lang.StringBuffer;
 import com.wiredtiger.db.PackUtil;
 import com.wiredtiger.db.WiredTigerPackingException;
 
+/**
+ * An internal helper class for decoding WiredTiger packed values.
+ *
+ * Applications should not need to use this class.
+ */
 public class PackInputStream {
 
     protected PackFormatInputStream format;
@@ -12,10 +17,26 @@ public class PackInputStream {
     protected int valueOff;
     protected int valueLen;
 
+    /**
+     * Constructor.
+     *
+     * \param format A String that contains the WiredTiger format that
+     *               defines the layout of this packed value.
+     * \param value The raw bytes that back the stream.
+     */
     public PackInputStream(String format, byte[] value) {
         this(format, value, 0, value.length);
     }
 
+    /**
+     * Constructor.
+     *
+     * \param format A String that contains the WiredTiger format that
+     *               defines the layout of this packed value.
+     * \param value The raw bytes that back the stream.
+     * \param off Offset into the value array at which the stream begins.
+     * \param len Length of the value array that forms the stream.
+     */
     public PackInputStream(String format, byte[] value, int off, int len) {
         this.format = new PackFormatInputStream(format);
         this.value = value;
@@ -23,46 +44,74 @@ public class PackInputStream {
         this.valueLen = len;
     }
 
+    /**
+     * Returns the raw packing format string.
+     */
     public String getFormat() {
         return format.toString();
     }
 
+    /**
+     * Returns the raw value byte array.
+     */
     public byte[] getValue() {
         return value;
     }
 
-    public byte getFieldByte()
+    /**
+     * Retrieves a byte field from the stream.
+     */
+    public byte getByte()
     throws WiredTigerPackingException {
-        format.checkFieldType('b', false);
-        format.consumeField();
+        format.checkType('b', false);
+        format.consume();
         return (byte)(value[valueOff++] - 0x80);
     }
 
-    // Adds a byte array as part of a complex format (which stores the size in
-    // the encoding).
-    // Format strings that consist solely of a byte array should use the
-    // addFieldByteArrayRaw method.
-    public void getFieldByteArray(byte[] dest)
+    /**
+     * Retrieves a byte array field from the stream.
+     *
+     * \param dest The byte array where the returned value will be stored. The
+     *             array should be large enough to store the entire data item,
+     *             if it is not, a truncated value will be returned.
+     */
+    public void getByteArray(byte[] dest)
     throws WiredTigerPackingException {
-        this.getFieldByteArray(dest, 0, dest.length);
+        this.getByteArray(dest, 0, dest.length);
     }
 
-    public void getFieldByteArray(byte[] dest, int off, int len)
+    /**
+     * Retrieves a byte array field from the stream.
+     *
+     * \param dest The byte array where the returned value will be stored.
+     * \param off Offset into the destination buffer to start copying into.
+     * \param len The length should be large enough to store the entire data
+     *            item, if it is not, a truncated value will be returned.
+     */
+    public void getByteArray(byte[] dest, int off, int len)
     throws WiredTigerPackingException {
-        format.checkFieldType('U', false);
-        getFieldByteArrayInternal(getFieldByteArrayLength(), dest, off, len);
+        format.checkType('U', false);
+        getByteArrayInternal(getByteArrayLength(), dest, off, len);
 
     }
 
-    public byte[] getFieldByteArray()
+    /**
+     * Retrieves a byte array field from the stream. Creates a new byte array
+     * that is the size of the object being retrieved.
+     */
+    public byte[] getByteArray()
     throws WiredTigerPackingException {
-        int itemLen = getFieldByteArrayLength();
+        int itemLen = getByteArrayLength();
         byte[] unpacked = new byte[itemLen];
-        getFieldByteArrayInternal(itemLen, unpacked, 0, itemLen);
+        getByteArrayInternal(itemLen, unpacked, 0, itemLen);
         return unpacked;
     }
 
-    private int getFieldByteArrayLength()
+    /**
+     * Finds the length of a byte array. Either by decoding the length from
+     * the format or using the remaining size of the stream.
+     */
+    private int getByteArrayLength()
     throws WiredTigerPackingException {
         int itemLen = 0;
         /* The rest of the buffer is a byte array. */
@@ -74,62 +123,80 @@ public class PackInputStream {
         return itemLen;
     }
 
-    private void getFieldByteArrayInternal(
+    /**
+     * Do the work of retrieving a byte array.
+     */
+    private void getByteArrayInternal(
         int itemLen, byte[] dest, int off, int destLen)
     throws WiredTigerPackingException {
         /* TODO: padding. */
         int copyLen = itemLen;
         if (itemLen > destLen)
             copyLen = destLen;
-        format.consumeField();
+        format.consume();
         System.arraycopy(value, valueOff, dest, off, copyLen);
         valueOff += itemLen;
     }
 
-    public int getFieldInt()
+    /**
+     * Retrieves an integer field from the stream.
+     */
+    public int getInt()
     throws WiredTigerPackingException {
         boolean signed = false;
-        format.checkFieldType('i', false);
-        if (format.getFieldType() == 'I' ||
-                format.getFieldType() == 'L')
+        format.checkType('i', false);
+        if (format.getType() == 'I' ||
+                format.getType() == 'L')
             signed = true;
-        format.consumeField();
+        format.consume();
         return unpackInt(signed);
     }
 
-    public long getFieldLong()
+    /**
+     * Retrieves a long field from the stream.
+     */
+    public long getLong()
     throws WiredTigerPackingException {
         boolean signed = false;
-        format.checkFieldType('q', false);
-        if (format.getFieldType() == 'Q')
+        format.checkType('q', false);
+        if (format.getType() == 'Q')
             signed = true;
-        format.consumeField();
+        format.consume();
         return unpackLong(signed);
     }
 
-    public long getFieldRecord()
+    /**
+     * Retrieves a record field from the stream.
+     */
+    public long getRecord()
     throws WiredTigerPackingException {
-        format.checkFieldType('r', false);
-        format.consumeField();
+        format.checkType('r', false);
+        format.consume();
         return unpackLong(false);
     }
 
-    public short getFieldShort()
+    /**
+     * Retrieves a short field from the stream.
+     */
+    public short getShort()
     throws WiredTigerPackingException {
         boolean signed = false;
-        format.checkFieldType('h', false);
-        if (format.getFieldType() == 'H')
+        format.checkType('h', false);
+        if (format.getType() == 'H')
             signed = true;
-        format.consumeField();
+        format.consume();
         return unpackShort(signed);
     }
 
-    public String getFieldString()
+    /**
+     * Retrieves a string field from the stream.
+     */
+    public String getString()
     throws WiredTigerPackingException {
         int stringLength = 0;
-        format.checkFieldType('S', false);
+        format.checkType('S', false);
         // Get the length for a fixed length string
-        if (format.getFieldType() != 'S') {
+        if (format.getType() != 'S') {
             stringLength = format.getLengthFromFormat(true);
         } else {
             // The string is null terminated, but we need to know how many
@@ -138,12 +205,17 @@ public class PackInputStream {
             for (; valueOff + stringLength < value.length &&
                     value[valueOff + stringLength] != 0; stringLength++) {}
         }
-        format.consumeField();
+        format.consume();
         String result = new String(value, valueOff, stringLength);
         valueOff += stringLength + 1;
         return result;
     }
 
+    /**
+     * Decodes an encoded short from the stream. This method does bounds
+     * checking, to ensure values fit, since some values may be encoded as
+     * unsigned values, and Java types are all signed.
+     */
     private short unpackShort(boolean signed)
     throws WiredTigerPackingException {
         long ret = unpackLong(true);
@@ -153,6 +225,11 @@ public class PackInputStream {
         return (short)ret;
     }
 
+    /**
+     * Decodes an encoded integer from the stream. This method does bounds
+     * checking, to ensure values fit, since some values may be encoded as
+     * unsigned values, and Java types are all signed.
+     */
     private int unpackInt(boolean signed)
     throws WiredTigerPackingException {
         long ret = unpackLong(true);
@@ -162,6 +239,13 @@ public class PackInputStream {
         return (int)ret;
     }
 
+    /**
+     * Decodes an encoded long from the stream. This method does bounds
+     * checking, to ensure values fit, since some values may be encoded as
+     * unsigned values, and Java types are all signed.
+     * The packing format is defined in the WiredTiger C integer packing
+     * implementation, which is at src/include/intpack.i
+     */
     private long unpackLong(boolean signed)
     throws WiredTigerPackingException {
         int len;

@@ -5,36 +5,63 @@ import java.lang.StringBuffer;
 import com.wiredtiger.db.PackUtil;
 import com.wiredtiger.db.WiredTigerPackingException;
 
+/**
+ * An internal helper class for consuming pack format strings.
+ *
+ * Applications should not need to use this class.
+ */
 public class PackFormatInputStream {
 
     protected String format;
     protected int formatOff;
     protected int formatRepeatCount;
 
+    /**
+     * Constructor for a format stream.
+     *
+     * \param format the encoded format backing string.
+     */
     protected PackFormatInputStream(String format) {
         this.format = format;
         formatOff = 0;
         formatRepeatCount = 0;
     }
 
+    /**
+     * Standard toString - returns the string used during construction.
+     */
     public String toString() {
         return format;
     }
 
+    /**
+     * Returns the approximate count of elements left in the format.
+     * This method does not account for repeat counts or string length
+     * encodings - so should be used as a guide only.
+     */
     public int available() {
         return format.length() - formatOff + formatRepeatCount;
     }
 
+    /**
+     * Reset the current stream position.
+     */
     public void reset() {
         formatOff = 0;
         formatRepeatCount = 0;
     }
 
-    protected char getFieldType()
+    /**
+     * Return the decoded type for the next entry in the format stream. Does
+     * not adjust the position of the stream.
+     */
+    protected char getType()
     throws WiredTigerPackingException {
-        if (formatOff > format.length())
+        if (formatOff >= format.length()) {
+            System.err.println("Raw format is: " + format);
             throw new WiredTigerPackingException(
                 "No more fields in format.");
+        }
 
         String fieldName;
         boolean lenOK = false;
@@ -49,19 +76,27 @@ public class PackFormatInputStream {
         return format.charAt(formatOff + countOff);
     }
 
-    protected void checkFieldType(char asking, boolean consume)
+    /**
+     * Check to see if the next entry is compatible with the requested type.
+     * 
+     * \param asking the format type to match.
+     * \param consume indicates whether to update the stream position.
+     */
+    protected void checkType(char asking, boolean consume)
     throws WiredTigerPackingException {
 
-        char expected = getFieldType();
+        char expected = getType();
         if (Character.toLowerCase(expected) != Character.toLowerCase(asking))
             throw new WiredTigerPackingException(
                 "Format mismatch. Wanted: " + asking + ", got: " + expected);
         if (consume)
-            consumeField();
+            consume();
     }
 
-    // Move the format tracker ahead one slot.
-    protected void consumeField() {
+    /**
+     * Move the format stream position ahead one position.
+     */
+    protected void consume() {
         if (formatRepeatCount > 1)
             --formatRepeatCount;
         else if (formatRepeatCount == 1) {
@@ -74,14 +109,19 @@ public class PackFormatInputStream {
 
             // Don't need to worry about String or byte array size counts
             // since they have already been consumed.
-            formatRepeatCount = getLengthFromFormatInternal(true);
+            formatRepeatCount = getIntFromFormat(true);
             if (formatRepeatCount == 0)
                 ++formatOff;
         }
     }
 
-    // The public version expects a default of 1, protected a default of 0
-    private int getLengthFromFormatInternal(boolean advance) {
+    /**
+     * Decode an integer from the format string, return zero if not starting
+     * on a digit.
+     *
+     * \param advance whether to move the stream position.
+     */
+    private int getIntFromFormat(boolean advance) {
         int valueLen = 0;
         int countOff;
         for (countOff = 0;
@@ -95,8 +135,14 @@ public class PackFormatInputStream {
         return valueLen;
     }
 
+    /**
+     * Retrieve a length from the format string. Either for a repeat count
+     * or a string length. Return one if no explicit repeat count.
+     *
+     * \param advance whether to move the stream position.
+     */
     protected int getLengthFromFormat(boolean advance) {
-        int valueLen = getLengthFromFormatInternal(advance);
+        int valueLen = getIntFromFormat(advance);
         if (valueLen == 0)
             valueLen = 1;
         return valueLen;
