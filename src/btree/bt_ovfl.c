@@ -275,7 +275,7 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	 * a snapshot transaction after the item was deleted from a page that's
 	 * subsequently been checkpointed, where the checkpoint must know about
 	 * the freed blocks.  We don't have any way to delay a free of the
-	 * underlying blocks until a particular set of transactions exit(and
+	 * underlying blocks until a particular set of transactions exit (and
 	 * this isn't a common scenario), so cache the overflow value in memory.
 	 *
 	 * This gets hard because the snapshot transaction reader might:
