@@ -246,7 +246,7 @@ var doTest = function(conn1, conn2) {
     })();
 };
 
-var mongo = MongoRunner.runMongod({ port: 27017, verbose: 5, setParameter: 'logUserIds=1' });
+var mongo = MongoRunner.runMongod({ verbose: 5, setParameter: 'logUserIds=1' });
 doTest(mongo, new Mongo(mongo.host));
 MongoRunner.stopMongod(mongo.port);
 
