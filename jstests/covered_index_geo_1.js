@@ -13,6 +13,6 @@ assert.neq(0, plan.nscannedObjects, "geo.1.1 - nscannedObjects should not be 0 f
 
 var plan = coll.find({loc : [ 6 , 6 ]}, {type:1, _id:0}).hint({loc:"2d", type:1}).explain();
 assert.eq(false, plan.indexOnly, "geo.1.2 - indexOnly should be true on a non covered query")
-assert.neq(0, plan.nscannedObjects, "geo.1.2 - nscannedObjects should be 0 for a non covered query")
+assert.neq(0, plan.nscannedObjects, "geo.1.2 - nscannedObjects should not be 0 for a non covered query")
 
 print("all tests passed")

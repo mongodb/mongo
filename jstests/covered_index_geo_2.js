@@ -16,9 +16,10 @@ assert.eq(false, plan.indexOnly, "geo.2.1 - indexOnly should be false on a non c
 assert.neq(0, plan.nscannedObjects, "geo.2.1 - nscannedObjects should not be 0 for a non covered query")
 
 var plan = coll.find({loc1 : [ 6 , 6 ]}, {type1:1, _id:0}).hint({loc1:"2dsphere", type1:1}).explain();
-assert.eq(false, plan.indexOnly, "geo.2.2 - indexOnly should be true on a non covered query")
+assert.eq(false, plan.indexOnly, "geo.2.2 - indexOnly should be false for a non covered query")
 assert.neq(0, plan.nscannedObjects, "geo.2.2 - nscannedObjects should not be 0 for a non covered query")
 
+// The test below should not be covered but is due to https://jira.mongodb.org/browse/SERVER-8621
 var plan = coll.find({type2 : {$lt:3}}, {type2:1, loc2:1, _id:0}).hint({type2: 1, loc2:"2dsphere"}).explain();
 assert.eq(true, plan.indexOnly, "geo.2.3 - indexOnly should be true for a covered query")
 assert.eq(0, plan.nscannedObjects, "geo.2.3 - nscannedObjects should be 0 for a covered query")
