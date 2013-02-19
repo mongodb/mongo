@@ -77,7 +77,7 @@ __conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
  * __conn_btree_get --
  *	Find an open btree file handle, otherwise create a new one and link it
  *	into the connection's list.  If successful, it returns with either
- *	(a) an open handle, read locked (if WT_BTREE_EXCLUSIVE is set); or
+ *	(a) an open handle, read locked (if WT_BTREE_EXCLUSIVE is not set); or
  *	(b) an open handle, write locked (if WT_BTREE_EXCLUSIVE is set), or
  *	(c) a closed handle, write locked.
  */
