@@ -526,7 +526,6 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 
 #if 0
 	fprintf(stderr, "file config: {%s}\n", (const char *)cbuf->data);
-	exit(0);
 #endif
 
 	/* Check the configuration string. */
