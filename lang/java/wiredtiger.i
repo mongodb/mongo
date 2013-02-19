@@ -251,180 +251,367 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 %typemap(javacode) struct __wt_cursor %{
 
+        /**
+         * Retrieve the format string for this cursor's key.
+         */
         public String getKeyFormat() {
                 return keyFormat;
         }
+
+        /**
+         * Retrieve the format string for this cursor's value.
+         */
         public String getValueFormat() {
                 return valueFormat;
         }
 
-        // Key/value accessors that decode based on format.
+        /**
+         * Append a byte to the cursor's key.
+         *
+         * \param value The value to append.
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putKeyByte(byte value)
         throws WiredTigerPackingException {
                 keyPacker.addByte(value);
                 return this;
         }
 
+        /**
+         * Append a byte array to the cursor's key.
+         *
+         * \param value The value to append.
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putKeyByteArray(byte[] value)
         throws WiredTigerPackingException {
                 this.putKeyByteArray(value, 0, value.length);
                 return this;
         }
 
+        /**
+         * Append a byte array to the cursor's key.
+         *
+         * \param value The value to append.
+         * \param off The offset into value at which to start.
+         * \param len The length of the byte array.
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putKeyByteArray(byte[] value, int off, int len)
         throws WiredTigerPackingException {
                 keyPacker.addByteArray(value, off, len);
                 return this;
         }
 
+        /**
+         * Append an integer to the cursor's key.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putKeyInt(int value)
         throws WiredTigerPackingException {
                 keyPacker.addInt(value);
                 return this;
         }
 
+        /**
+         * Append a long to the cursor's key.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putKeyLong(long value)
         throws WiredTigerPackingException {
                 keyPacker.addLong(value);
                 return this;
         }
 
+        /**
+         * Append a short integer to the cursor's key.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putKeyShort(short value)
         throws WiredTigerPackingException {
                 keyPacker.addShort(value);
                 return this;
         }
 
+        /**
+         * Append a string to the cursor's key.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putKeyString(String value)
         throws WiredTigerPackingException {
                 keyPacker.addString(value);
                 return this;
         }
 
+        /**
+         * Append a byte to the cursor's value.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putValueByte(byte value)
         throws WiredTigerPackingException {
                 valuePacker.addByte(value);
                 return this;
         }
 
+        /**
+         * Append a byte array to the cursor's value.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putValueByteArray(byte[] value)
         throws WiredTigerPackingException {
                 this.putValueByteArray(value, 0, value.length);
                 return this;
         }
 
+        /**
+         * Append a byte array to the cursor's value.
+         *
+         * \param value The value to append
+         * \param off The offset into value at which to start.
+         * \param len The length of the byte array.
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putValueByteArray(byte[] value, int off, int len)
         throws WiredTigerPackingException {
                 valuePacker.addByteArray(value, off, len);
                 return this;
         }
 
+        /**
+         * Append an integer to the cursor's value.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putValueInt(int value)
         throws WiredTigerPackingException {
                 valuePacker.addInt(value);
                 return this;
         }
 
+        /**
+         * Append a long to the cursor's value.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putValueLong(long value)
         throws WiredTigerPackingException {
                 valuePacker.addLong(value);
                 return this;
         }
 
+        /**
+         * Append a short integer to the cursor's value.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putValueShort(short value)
         throws WiredTigerPackingException {
                 valuePacker.addShort(value);
                 return this;
         }
 
+        /**
+         * Append a string to the cursor's value.
+         *
+         * \param value The value to append
+         * \return This cursor object, so put calls can be chained.
+         */
         public Cursor putValueString(String value)
         throws WiredTigerPackingException {
                 valuePacker.addString(value);
                 return this;
         }
 
-        // TODO: Verify that there is an unpacker available.
+        /**
+         * Retrieve a byte from the cursor's key.
+         *
+         * \return The requested value.
+         */
         public byte getKeyByte()
         throws WiredTigerPackingException {
                 return keyUnpacker.getByte();
         }
 
+        /**
+         * Retrieve a byte array from the cursor's key.
+         *
+         * \param output The byte array where the returned value will be stored.
+         *             The array should be large enough to store the entire
+         *             data item, if not a truncated value will be returned.
+         */
         public void getKeyByteArray(byte[] output)
         throws WiredTigerPackingException {
                 this.getKeyByteArray(output, 0, output.length);
         }
 
+        /**
+         * Retrieve a byte array from the cursor's key.
+         *
+         * \param output The byte array where the returned value will be stored.
+         * \param off Offset into the destination buffer to start copying into.
+         * \param len The length should be large enough to store the entire
+         *            data item, if not a truncated value will be returned.
+         */
         public void getKeyByteArray(byte[] output, int off, int len)
         throws WiredTigerPackingException {
                 keyUnpacker.getByteArray(output, off, len);
         }
 
+        /**
+         * Retrieve a byte array from the cursor's key.
+         *
+         * \return The requested value.
+         */
         public byte[] getKeyByteArray()
         throws WiredTigerPackingException {
                 return keyUnpacker.getByteArray();
         }
 
+        /**
+         * Retrieve an integer from the cursor's key.
+         *
+         * \return The requested value.
+         */
         public int getKeyInt()
         throws WiredTigerPackingException {
                 return keyUnpacker.getInt();
         }
 
+        /**
+         * Retrieve a long from the cursor's key.
+         *
+         * \return The requested value.
+         */
         public long getKeyLong()
         throws WiredTigerPackingException {
                 return keyUnpacker.getLong();
         }
 
+        /**
+         * Retrieve a short integer from the cursor's key.
+         *
+         * \return The requested value.
+         */
         public short getKeyShort()
         throws WiredTigerPackingException {
                 return keyUnpacker.getShort();
         }
 
+        /**
+         * Retrieve a string from the cursor's key.
+         *
+         * \return The requested value.
+         */
         public String getKeyString()
         throws WiredTigerPackingException {
                 return keyUnpacker.getString();
         }
 
+        /**
+         * Retrieve a byte from the cursor's value.
+         *
+         * \return The requested value.
+         */
         public byte getValueByte()
         throws WiredTigerPackingException {
                 return valueUnpacker.getByte();
         }
 
+        /**
+         * Retrieve a byte array from the cursor's value.
+         *
+         * \param output The byte array where the returned value will be stored.
+         *             The array should be large enough to store the entire
+         *             data item, if not a truncated value will be returned.
+         */
         public void getValueByteArray(byte[] output)
         throws WiredTigerPackingException {
                 this.getValueByteArray(output, 0, output.length);
         }
 
+        /**
+         * Retrieve a byte array from the cursor's value.
+         *
+         * \param output The byte array where the returned value will be stored.
+         * \param off Offset into the destination buffer to start copying into.
+         * \param len The length should be large enough to store the entire
+         *            data item, if not a truncated value will be returned.
+         */
         public void getValueByteArray(byte[] output, int off, int len)
         throws WiredTigerPackingException {
                 valueUnpacker.getByteArray(output, off, len);
         }
 
+        /**
+         * Retrieve a byte array from the cursor's value.
+         *
+         * \return The requested value.
+         */
         public byte[] getValueByteArray()
         throws WiredTigerPackingException {
                 return valueUnpacker.getByteArray();
         }
 
+        /**
+         * Retrieve an integer from the cursor's value.
+         *
+         * \return The requested value.
+         */
         public int getValueInt()
         throws WiredTigerPackingException {
                 return valueUnpacker.getInt();
         }
 
+        /**
+         * Retrieve a long from the cursor's value.
+         *
+         * \return The requested value.
+         */
         public long getValueLong()
         throws WiredTigerPackingException {
                 return valueUnpacker.getLong();
         }
 
+        /**
+         * Retrieve a short integer from the cursor's value.
+         *
+         * \return The requested value.
+         */
         public short getValueShort()
         throws WiredTigerPackingException {
                 return valueUnpacker.getShort();
         }
 
+        /**
+         * Retrieve a string from the cursor's value.
+         *
+         * \return The requested value.
+         */
         public String getValueString()
         throws WiredTigerPackingException {
                 return valueUnpacker.getString();
         }
 
-
+        /**
+         * Insert the cursor's current key/value into the table.
+         *
+         * \return The status of the operation.
+         */
 	public int insert() {
                 byte[] key = keyPacker.getValue();
                 byte[] value = valuePacker.getValue();
@@ -433,6 +620,11 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		return insert_wrap(key, value);
 	}
 
+        /**
+         * Update the cursor's current key/value into the table.
+         *
+         * \return The status of the operation.
+         */
 	public int update() {
                 byte[] key = keyPacker.getValue();
                 byte[] value = valuePacker.getValue();
@@ -441,16 +633,31 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		return update_wrap(key, value);
 	}
 
+        /**
+         * Remove the cursor's current key/value into the table.
+         *
+         * \return The status of the operation.
+         */
 	public int remove() {
                 byte[] key = keyPacker.getValue();
                 keyPacker.reset();
 		return remove_wrap(key);
 	}
 
+        /**
+         * Compare this cursor's position to another Cursor.
+         *
+         * \return The result of the comparison.
+         */
 	public int compare(Cursor other) {
 		return compare_wrap(other);
 	}
 
+        /**
+         * Retrieve the next item in the table.
+         *
+         * \return The result of the comparison.
+         */
 	public int next() {
 		int ret = next_wrap();
                 keyPacker.reset();
@@ -462,6 +669,11 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		return ret;
 	}
 
+        /**
+         * Retrieve the previous item in the table.
+         *
+         * \return The result of the comparison.
+         */
 	public int prev() {
 		int ret = prev_wrap();
                 keyPacker.reset();
@@ -472,6 +684,12 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
                     new PackInputStream(valueFormat, get_value_wrap()) : null;
 		return ret;
 	}
+
+        /**
+         * Search for an item in the table.
+         *
+         * \return The result of the comparison.
+         */
 	public int search() {
 		int ret = search_wrap(keyPacker.getValue());
                 keyPacker.reset();
@@ -483,6 +701,11 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		return ret;
 	}
 
+        /**
+         * Search for an item in the table.
+         *
+         * \return The result of the comparison.
+         */
 	public SearchStatus search_near() {
 		SearchStatus ret = search_near_wrap(keyPacker.getValue());
                 keyPacker.reset();
