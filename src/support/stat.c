@@ -248,6 +248,7 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->file_open.desc = "files currently open";
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
+	stats->memory_grow.desc = "total heap memory re-allocations";
 	stats->read_io.desc = "total read I/Os";
 	stats->rec_pages.desc = "page reconciliation calls";
 	stats->rec_pages_eviction.desc =
@@ -301,6 +302,7 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->file_open.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
+	stats->memory_grow.v = 0;
 	stats->read_io.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;

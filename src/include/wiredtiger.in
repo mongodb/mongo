@@ -1927,32 +1927,34 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_MEMORY_ALLOCATION			26
 /*! total heap memory frees */
 #define	WT_STAT_CONN_MEMORY_FREE			27
+/*! total heap memory re-allocations */
+#define	WT_STAT_CONN_MEMORY_GROW			28
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				28
+#define	WT_STAT_CONN_READ_IO				29
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				29
+#define	WT_STAT_CONN_REC_PAGES				30
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			30
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			31
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			31
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			32
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			32
+#define	WT_STAT_CONN_RWLOCK_READ			33
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			33
+#define	WT_STAT_CONN_RWLOCK_WRITE			34
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			34
+#define	WT_STAT_CONN_TXN_ANCIENT			35
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				35
+#define	WT_STAT_CONN_TXN_BEGIN				36
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			36
+#define	WT_STAT_CONN_TXN_CHECKPOINT			37
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				37
+#define	WT_STAT_CONN_TXN_COMMIT				38
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			38
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			39
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			39
+#define	WT_STAT_CONN_TXN_ROLLBACK			40
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				40
+#define	WT_STAT_CONN_WRITE_IO				41
 
 /*!
  * @}

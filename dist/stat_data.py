@@ -27,6 +27,7 @@ connection_stats = [
 	Stat('file_open', 'files currently open'),
 	Stat('memory_allocation', 'total heap memory allocations'),
 	Stat('memory_free', 'total heap memory frees'),
+	Stat('memory_grow', 'total heap memory re-allocations'),
 	Stat('read_io', 'total read I/Os'),
 	Stat('rwlock_read', 'pthread mutex shared lock read-lock calls'),
 	Stat('rwlock_write', 'pthread mutex shared lock write-lock calls'),
