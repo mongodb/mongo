@@ -75,7 +75,8 @@ wts_open(void)
 	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
+	    "create,buffer_alignment=1024,direct_io=(data),"
+	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
 	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
 	    g.progname, g.c_cache,
 	    REVERSE_PATH,
