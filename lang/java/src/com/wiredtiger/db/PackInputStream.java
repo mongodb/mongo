@@ -1,3 +1,9 @@
+/*-
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
 package com.wiredtiger.db;
 
 import java.io.ByteArrayInputStream;
@@ -131,8 +137,9 @@ public class PackInputStream {
     throws WiredTigerPackingException {
         /* TODO: padding. */
         int copyLen = itemLen;
-        if (itemLen > destLen)
+        if (itemLen > destLen) {
             copyLen = destLen;
+        }
         format.consume();
         System.arraycopy(value, valueOff, dest, off, copyLen);
         valueOff += itemLen;
@@ -146,8 +153,9 @@ public class PackInputStream {
         boolean signed = false;
         format.checkType('i', false);
         if (format.getType() == 'I' ||
-                format.getType() == 'L')
+                format.getType() == 'L') {
             signed = true;
+        }
         format.consume();
         return unpackInt(signed);
     }
@@ -159,8 +167,9 @@ public class PackInputStream {
     throws WiredTigerPackingException {
         boolean signed = false;
         format.checkType('q', false);
-        if (format.getType() == 'Q')
+        if (format.getType() == 'Q') {
             signed = true;
+        }
         format.consume();
         return unpackLong(signed);
     }
@@ -182,8 +191,9 @@ public class PackInputStream {
     throws WiredTigerPackingException {
         boolean signed = false;
         format.checkType('h', false);
-        if (format.getType() == 'H')
+        if (format.getType() == 'H') {
             signed = true;
+        }
         format.consume();
         return unpackShort(signed);
     }
@@ -220,8 +230,9 @@ public class PackInputStream {
     throws WiredTigerPackingException {
         long ret = unpackLong(true);
         if ((signed && (ret > Short.MAX_VALUE || ret > Short.MIN_VALUE)) ||
-                (!signed && (short)ret < 0))
+                (!signed && (short)ret < 0)) {
             throw new WiredTigerPackingException("Overflow unpacking short.");
+        }
         return (short)ret;
     }
 
@@ -234,8 +245,9 @@ public class PackInputStream {
     throws WiredTigerPackingException {
         long ret = unpackLong(true);
         if ((signed && (ret > Integer.MAX_VALUE || ret > Integer.MIN_VALUE)) ||
-                (!signed && (int)ret < 0))
+                (!signed && (int)ret < 0)) {
             throw new WiredTigerPackingException("Overflow unpacking integer.");
+        }
         return (int)ret;
     }
 
@@ -254,8 +266,9 @@ public class PackInputStream {
         case PackUtil.NEG_MULTI_MARKER & 0xff:
             len = (int)PackUtil.SIZEOF_LONG - (value[valueOff++] & 0xf);
 
-            for (unpacked = 0xffffffff; len != 0; --len)
+            for (unpacked = 0xffffffff; len != 0; --len) {
                 unpacked = (unpacked << 8) | value[valueOff++] & 0xff;
+            }
             break;
         case PackUtil.NEG_2BYTE_MARKER & 0xff:
         case (PackUtil.NEG_2BYTE_MARKER | 0x10) & 0xff:
@@ -286,8 +299,9 @@ public class PackInputStream {
             // There are four length bits in the first byte.
             len = (value[valueOff++] & 0xf);
 
-            for (unpacked = 0; len != 0; --len)
+            for (unpacked = 0; len != 0; --len) {
                 unpacked = (unpacked << 8) | value[valueOff++] & 0xff;
+            }
             unpacked += PackUtil.POS_2BYTE_MAX + 1;
             break;
         default:
@@ -296,8 +310,9 @@ public class PackInputStream {
         }
         // Check for overflow if decoding an unsigned value - since Java only
         // supports signed values.
-        if (!signed && unpacked < 0)
+        if (!signed && unpacked < 0) {
             throw new WiredTigerPackingException("Overflow unpacking long.");
+        }
 
         return (unpacked);
     }

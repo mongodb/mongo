@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -120,8 +120,8 @@ SELFHELPER(struct __wt_cursor, cursor)
    */
   public ";
 %enddef
-%include "java_doc.i"
 
+%include "java_doc.i"
 
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Java equivalents. */

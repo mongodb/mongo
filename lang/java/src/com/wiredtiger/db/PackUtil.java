@@ -1,3 +1,9 @@
+/*-
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
 package com.wiredtiger.db;
 
 import java.lang.String;
@@ -30,7 +36,7 @@ class PackUtil {
 
     /**
      * Extract bits from a value, counting from LSB == 0.
-     * 
+     *
      * \param x The value to extract bits from.
      * \param start The first bit to extract.
      * \param end The last bit to extract.

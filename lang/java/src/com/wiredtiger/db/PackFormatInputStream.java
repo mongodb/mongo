@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
 package com.wiredtiger.db;
 
 import java.io.ByteArrayInputStream;
@@ -68,17 +75,19 @@ public class PackFormatInputStream {
         int countOff = 0;
 
         while (PackUtil.PackSpecialCharacters.indexOf(
-                    format.charAt(formatOff + countOff)) != -1)
+                    format.charAt(formatOff + countOff)) != -1) {
             countOff++;
+        }
         // Skip repeat counts and sizes
-        while (Character.isDigit(format.charAt(formatOff + countOff)))
+        while (Character.isDigit(format.charAt(formatOff + countOff))) {
             countOff++;
+        }
         return format.charAt(formatOff + countOff);
     }
 
     /**
      * Check to see if the next entry is compatible with the requested type.
-     * 
+     *
      * \param asking the format type to match.
      * \param consume indicates whether to update the stream position.
      */
@@ -89,29 +98,32 @@ public class PackFormatInputStream {
         if (Character.toLowerCase(expected) != Character.toLowerCase(asking))
             throw new WiredTigerPackingException(
                 "Format mismatch. Wanted: " + asking + ", got: " + expected);
-        if (consume)
+        if (consume) {
             consume();
+        }
     }
 
     /**
      * Move the format stream position ahead one position.
      */
     protected void consume() {
-        if (formatRepeatCount > 1)
+        if (formatRepeatCount > 1) {
             --formatRepeatCount;
-        else if (formatRepeatCount == 1) {
+        } else if (formatRepeatCount == 1) {
             formatRepeatCount = 0;
             ++formatOff;
         } else {
             while (PackUtil.PackSpecialCharacters.indexOf(
-                        format.charAt(formatOff)) != -1)
+                        format.charAt(formatOff)) != -1) {
                 ++formatOff;
+            }
 
             // Don't need to worry about String or byte array size counts
             // since they have already been consumed.
             formatRepeatCount = getIntFromFormat(true);
-            if (formatRepeatCount == 0)
+            if (formatRepeatCount == 0) {
                 ++formatOff;
+            }
         }
     }
 
@@ -130,8 +142,9 @@ public class PackFormatInputStream {
             valueLen *= 10;
             valueLen += Character.digit(format.charAt(formatOff + countOff), 10);
         }
-        if (advance)
+        if (advance) {
             formatOff += countOff;
+        }
         return valueLen;
     }
 
@@ -143,8 +156,9 @@ public class PackFormatInputStream {
      */
     protected int getLengthFromFormat(boolean advance) {
         int valueLen = getIntFromFormat(advance);
-        if (valueLen == 0)
+        if (valueLen == 0) {
             valueLen = 1;
+        }
         return valueLen;
     }
 }

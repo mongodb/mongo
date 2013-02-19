@@ -1,3 +1,9 @@
+/*-
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
 package com.wiredtiger.db;
 
 /**

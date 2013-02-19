@@ -1,3 +1,9 @@
+/*-
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
 package com.wiredtiger.db;
 
 import java.io.ByteArrayOutputStream;
@@ -84,8 +90,9 @@ public class PackOutputStream {
     throws WiredTigerPackingException {
         format.checkType('U', true);
         // If this is not the last item, store the size.
-        if (format.available() > 0)
+        if (format.available() > 0) {
             packLong(len, false);
+        }
 
         packed.write(value, off, len);
         /* TODO: padding. */
@@ -151,8 +158,9 @@ public class PackOutputStream {
         // upper case 'S' is variable length and has a null terminator.
         if (fieldFormat == 's') {
             stringLen = format.getLengthFromFormat(true);
-            if (stringLen > value.length())
+            if (stringLen > value.length()) {
                 padBytes = stringLen - value.length();
+            }
         } else {
             stringLen = value.length();
             padBytes = 1; // Null terminator
@@ -162,8 +170,9 @@ public class PackOutputStream {
 
         // Use the default Charset.
         packed.write(value.getBytes(), 0, stringLen);
-        while(padBytes-- > 0)
+        while(padBytes-- > 0) {
             packed.write(0);
+        }
     }
 
     /**
@@ -178,8 +187,9 @@ public class PackOutputStream {
     throws WiredTigerPackingException {
         int offset = 0;
 
-        if (!signed && x < 0)
+        if (!signed && x < 0) {
             throw new WiredTigerPackingException("Overflow packing long.");
+        }
 
         if (x < PackUtil.NEG_2BYTE_MIN) {
             intBuf[offset] = PackUtil.NEG_MULTI_MARKER;
@@ -195,8 +205,9 @@ public class PackOutputStream {
             intBuf[offset++] |= (lz & 0xf);
 
             for (int shift = (len - 1) << 3;
-                    len != 0; shift -= 8, --len)
+                    len != 0; shift -= 8, --len) {
                 intBuf[offset++] = (byte)(x >> shift);
+            }
         } else if (x < PackUtil.NEG_1BYTE_MIN) {
             x -= PackUtil.NEG_2BYTE_MIN;
             intBuf[offset++] =
@@ -224,8 +235,9 @@ public class PackOutputStream {
             intBuf[offset++] |= (len & 0xf);
 
             for (int shift = (len - 1) << 3;
-                    len != 0; --len, shift -= 8)
+                    len != 0; --len, shift -= 8) {
                 intBuf[offset++] = (byte)(x >> shift);
+            }
         }
         packed.write(intBuf, 0, offset);
     }
