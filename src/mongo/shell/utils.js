@@ -835,6 +835,9 @@ shellHelper.show = function (what) {
                     print( res.log[i] )
                 }
                 return "";
+            } else if (res.errmsg == "unauthorized") {
+                // Don't print of startupWarnings command failed due to auth
+                return "";
             } else {
                 print("Error while trying to show server startup warnings: " + res.errmsg);
                 return "";
