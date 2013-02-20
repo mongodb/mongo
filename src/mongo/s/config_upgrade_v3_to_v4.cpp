@@ -640,8 +640,8 @@ namespace mongo {
         newVersionInfo.setClusterId(newClusterId);
 
         // Leave critical section
-        newVersionInfo.setUpgradeId(OID());
-        newVersionInfo.setUpgradeState(BSONObj());
+        newVersionInfo.unsetUpgradeId();
+        newVersionInfo.unsetUpgradeState();
 
         log() << "writing new version info and clusterId " << newClusterId << "..." << endl;
 
