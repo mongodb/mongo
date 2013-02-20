@@ -872,12 +872,11 @@ namespace mongo {
             }
         }
         else if (resourceNameString.find("(shell") == 0) {
-            // script loaded from shell input
-            ss << try_catch;
+            // script loaded from shell input -- simply print the error
         }
         else {
             // script loaded from file
-            ss << " in " << *resourceName;
+            ss << " at " << *resourceName;
             const int linenum = message->GetLineNumber();
             if (linenum != 1) ss << ":L" << linenum;
         }
