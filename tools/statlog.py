@@ -80,12 +80,11 @@ shutil.rmtree("reports", True)
 os.mkdir("reports")
 
 # Read the input into a dictionary of lists.
-ifile = sys.argv[1:]
-if ifile == []:
-    print "usage: rp file"
+if sys.argv[1:] == []:
+    print "usage: " + sys.argv[0] + " file ..."
     sys.exit(1)
 d = defaultdict(list)
-for line in fileinput.input(ifile):
+for line in fileinput.input(sys.argv[1:]):
     s = line.strip('\n').split(" ", 4)
     d[s[4]].append([" ".join([s[0], s[1], s[2]]), s[3]])
 
