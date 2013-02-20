@@ -72,7 +72,7 @@
 #if defined(_lint)
 #define	WT_ATOMIC_ADD(v, val)	((v) += (val), (v))
 #define	WT_ATOMIC_CAS(v, oldv, newv)					\
-	((v) == (oldv) || (v) == (newv) ? 1 : 0)
+	((v) == (oldv) && (v) = (newv) ? 1 : 0)
 #define	WT_ATOMIC_SUB(v, val)	((v) -= (val), (v))
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
