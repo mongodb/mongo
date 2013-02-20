@@ -25,7 +25,7 @@ static int  __cache_pool_balance(void);
 
 /*
  * __wt_conn_cache_pool_config --
- *	Parse and setup and cache pool options.
+ *	Parse and setup the cache pool options.
  */
 int
 __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
