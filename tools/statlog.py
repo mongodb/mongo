@@ -47,7 +47,7 @@ def plot(title, entries, num):
 
     # Write the raw data into a file for processing.
     of = open("reports/report." + num + ".raw", "w")
-    for entry in entries:
+    for entry in sorted(entries):
         of.write(" ".join(entry) + "\n")
     of.close()
 
