@@ -1,0 +1,92 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongod", "mongo\db\mongod.vcxproj", "{215B2D68-0A70-4D10-8E75-B31010C62A91}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongos", "mongo\s\mongos.vcxproj", "{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "mongo\dbtests\test.vcxproj", "{215B2D68-0A70-4D10-8E75-B33010C62A91}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongo", "mongo\shell\mongo.vcxproj", "{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+		Win2008PlusDebug|Win32 = Win2008PlusDebug|Win32
+		Win2008PlusDebug|x64 = Win2008PlusDebug|x64
+		Win2008PlusRelease|Win32 = Win2008PlusRelease|Win32
+		Win2008PlusRelease|x64 = Win2008PlusRelease|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug|Win32.ActiveCfg = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug|Win32.Build.0 = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug|x64.ActiveCfg = Debug|x64
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug|x64.Build.0 = Debug|x64
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Release|Win32.ActiveCfg = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Release|Win32.Build.0 = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Release|x64.ActiveCfg = Release|x64
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Release|x64.Build.0 = Release|x64
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusDebug|Win32.ActiveCfg = Win2008PlusDebug|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusDebug|Win32.Build.0 = Win2008PlusDebug|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusDebug|x64.ActiveCfg = Win2008PlusDebug|x64
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusDebug|x64.Build.0 = Win2008PlusDebug|x64
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusRelease|Win32.ActiveCfg = Win2008PlusRelease|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusRelease|Win32.Build.0 = Win2008PlusRelease|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|x64
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusRelease|x64.Build.0 = Win2008PlusRelease|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug|Win32.Build.0 = Debug|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug|x64.ActiveCfg = Debug|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug|x64.Build.0 = Debug|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.ActiveCfg = Release|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.Build.0 = Release|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|x64.ActiveCfg = Release|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|x64.Build.0 = Release|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusDebug|Win32.ActiveCfg = Win2008PlusDebug|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusDebug|Win32.Build.0 = Win2008PlusDebug|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusDebug|x64.ActiveCfg = Win2008PlusDebug|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusDebug|x64.Build.0 = Win2008PlusDebug|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusRelease|Win32.ActiveCfg = Win2008PlusRelease|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusRelease|Win32.Build.0 = Win2008PlusRelease|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|x64
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Win2008PlusRelease|x64.Build.0 = Win2008PlusRelease|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug|Win32.ActiveCfg = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug|Win32.Build.0 = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug|x64.ActiveCfg = Debug|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug|x64.Build.0 = Debug|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|Win32.ActiveCfg = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|Win32.Build.0 = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|x64.ActiveCfg = Release|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|x64.Build.0 = Release|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusDebug|Win32.ActiveCfg = Win2008PlusDebug|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusDebug|Win32.Build.0 = Win2008PlusDebug|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusDebug|x64.ActiveCfg = Win2008PlusDebug|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusDebug|x64.Build.0 = Win2008PlusDebug|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusRelease|Win32.ActiveCfg = Win2008PlusRelease|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusRelease|Win32.Build.0 = Win2008PlusRelease|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|x64
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Win2008PlusRelease|x64.Build.0 = Win2008PlusRelease|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|Win32.Build.0 = Debug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|x64.ActiveCfg = Debug|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Debug|x64.Build.0 = Debug|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|Win32.ActiveCfg = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|Win32.Build.0 = Release|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|x64.ActiveCfg = Release|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Release|x64.Build.0 = Release|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusDebug|Win32.ActiveCfg = Win2008PlusDebug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusDebug|Win32.Build.0 = Win2008PlusDebug|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusDebug|x64.ActiveCfg = Win2008PlusDebug|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusDebug|x64.Build.0 = Win2008PlusDebug|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusRelease|Win32.ActiveCfg = Win2008PlusRelease|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusRelease|Win32.Build.0 = Win2008PlusRelease|Win32
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|x64
+		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusRelease|x64.Build.0 = Win2008PlusRelease|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

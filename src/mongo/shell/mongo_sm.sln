@@ -1,7 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongo_v8", "mongo_v8.vcxproj", "{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongo_sm", "mongo_sm.vcxproj", "{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A} = {7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SpiderMonkey pre-build step", "..\..\third_party\js-1.7\SpiderMonkey-prebuild.vcxproj", "{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
