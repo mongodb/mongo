@@ -50,6 +50,10 @@ namespace mongo {
         // to off would not throw errors.
         bool strictApply;
 
+        // Determines if an index is going to be updated as part of the application of this
+        // mod.
+        bool isIndexed;
+
         BSONElement elt; // x:5 note: this is the actual element from the updateobj
         boost::shared_ptr<Matcher> matcher;
         bool matcherOnPrimitive;
@@ -58,6 +62,7 @@ namespace mongo {
             op = o;
             elt = e;
             strictApply = !forReplication;
+            isIndexed = false;
             if ( op == PULL && e.type() == Object ) {
                 BSONObj t = e.embeddedObject();
                 if ( t.firstElement().getGtLtOp() == 0 ) {
@@ -261,7 +266,8 @@ namespace mongo {
     class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
-        int _isIndexed;
+        int _numIndexMaybeUpdated;
+        int _numIndexAlwaysUpdated;
         bool _hasDynamicArray;
 
         static Mod::Op opFromStr( const char* fn ) {
@@ -343,11 +349,11 @@ namespace mongo {
 
         ModSet() {}
 
-        void updateIsIndexed( const Mod& m, const IndexPathSet& idxKeys ) {
-            if ( idxKeys.mightBeIndexed( m.fieldName ) ) {
-                _isIndexed++;
-            }
-        }
+        /**
+         * if if applying this mod would require updating an index, set such condition in 'm',
+         * and update the number of indices touched in 'this' ModSet.
+         */
+        void setIndexedStatus( Mod& m, const IndexPathSet& idxKeys );
 
     public:
 
@@ -358,9 +364,7 @@ namespace mongo {
         /**
          * re-check if this mod is impacted by indexes
          */
-        void updateIsIndexed( const IndexPathSet& idxKeys );
-
-
+        void setIndexedStatus( const IndexPathSet& idxKeys );
 
         // TODO: this is inefficient - should probably just handle when iterating
         ModSet * fixDynamicArray( const string& elemMatchKey ) const;
@@ -381,7 +385,7 @@ namespace mongo {
          */
         BSONObj createNewFromQuery( const BSONObj& query );
 
-        int isIndexed() const { return _isIndexed; }
+        int maxNumIndexUpdated() const { return _numIndexMaybeUpdated + _numIndexAlwaysUpdated; }
 
         unsigned size() const { return _mods.size(); }
 
@@ -529,9 +533,15 @@ namespace mongo {
         ModStateHolder _mods;
         bool _inPlacePossible;
         BSONObj _newFromMods; // keep this data alive, as oplog generation may depend on it
+        int _numIndexAlwaysUpdated;
+        int _numIndexMaybeUpdated;
 
-        ModSetState( const BSONObj& obj )
-            : _obj( obj ) , _mods( LexNumCmp( true ) ) , _inPlacePossible(true) {
+        ModSetState( const BSONObj& obj , int numIndexAlwaysUpdated , int numIndexMaybeUpdated )
+            : _obj( obj )
+            , _mods( LexNumCmp( true ) )
+            , _inPlacePossible(true)
+            , _numIndexAlwaysUpdated( numIndexAlwaysUpdated )
+            , _numIndexMaybeUpdated( numIndexMaybeUpdated ) {
         }
 
         /**
@@ -713,6 +723,16 @@ namespace mongo {
         bool canApplyInPlace() const {
             return _inPlacePossible;
         }
+
+        bool isUpdateIndexed() const {
+            if ( _numIndexAlwaysUpdated != 0 ) {
+                return true;
+            }
+
+            return isUpdateIndexedSlow();
+        }
+
+        bool isUpdateIndexedSlow() const;
 
         /**
          * modified underlying _obj

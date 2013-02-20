@@ -530,7 +530,9 @@ namespace mongo {
 
     auto_ptr<ModSetState> ModSet::prepare(const BSONObj& obj, bool insertion) const {
         DEBUGUPDATE( "\t start prepare" );
-        auto_ptr<ModSetState> mss( new ModSetState( obj ) );
+        auto_ptr<ModSetState> mss( new ModSetState( obj,
+                                                    _numIndexAlwaysUpdated,
+                                                    _numIndexMaybeUpdated ) );
 
 
         // Perform this check first, so that we don't leave a partially modified object on uassert.
@@ -1128,6 +1130,40 @@ namespace mongo {
         return ss.str();
     }
 
+    bool ModSetState::isUpdateIndexedSlow() const {
+        // There may be indices over fields for which Mods are no-ops. In other words, if a
+        // Mod touches an index field but that Mod is a no-op, this update may be
+        // considered one that does not update indices.
+        if ( _numIndexMaybeUpdated == 0 ) {
+            return false;
+        }
+        else {
+            for ( ModStateHolder::const_iterator it = _mods.begin();
+                  it != _mods.end();
+                  ++it ) {
+                const Mod* m = it->second->m;
+                shared_ptr<ModState> ms = it->second;
+
+                switch ( m->op ) {
+                case Mod::SET_ON_INSERT:
+                case Mod::RENAME_FROM:
+                case Mod::RENAME_TO:
+                    if ( m->isIndexed && !ms->dontApply ) {
+                        return true;
+                    }
+                    break;
+
+                default:
+                    // no-op
+                    break;
+                }
+            }
+
+            return false;
+        }
+    }
+
+
     BSONObj ModSet::createNewFromQuery( const BSONObj& query ) {
         BSONObj newObj;
 
@@ -1184,11 +1220,12 @@ namespace mongo {
        { $pullAll : { a:[99,1010] } }
        NOTE: MODIFIES source from object!
     */
-    ModSet::ModSet(
-        const BSONObj& from ,
-        const IndexPathSet& idxKeys,
-        bool forReplication)
-        : _isIndexed(0) , _hasDynamicArray( false ) {
+    ModSet::ModSet( const BSONObj& from ,
+                    const IndexPathSet& idxKeys,
+                    bool forReplication )
+        : _numIndexMaybeUpdated( 0 )
+        , _numIndexAlwaysUpdated( 0 )
+        , _hasDynamicArray( false ) {
 
         BSONObjIterator it(from);
 
@@ -1372,13 +1409,13 @@ namespace mongo {
                     Mod from;
                     from.init( Mod::RENAME_FROM, f , forReplication );
                     from.setFieldName( fieldName );
-                    updateIsIndexed( from, idxKeys );
+                    setIndexedStatus( from, idxKeys );
                     _mods[ from.fieldName ] = from;
 
                     Mod to;
                     to.init( Mod::RENAME_TO, f , forReplication );
                     to.setFieldName( target );
-                    updateIsIndexed( to, idxKeys );
+                    setIndexedStatus( to, idxKeys );
                     _mods[ to.fieldName ] = to;
 
                     DEBUGUPDATE( "\t\t " << fieldName << "\t" << from.fieldName << "\t" << to.fieldName );
@@ -1390,7 +1427,7 @@ namespace mongo {
                 Mod m;
                 m.init( op , f , forReplication );
                 m.setFieldName( f.fieldName() );
-                updateIsIndexed( m, idxKeys );
+                setIndexedStatus( m, idxKeys );
                 _mods[m.fieldName] = m;
 
                 DEBUGUPDATE( "\t\t " << fieldName << "\t" << m.fieldName << "\t" << _hasDynamicArray );
@@ -1401,7 +1438,8 @@ namespace mongo {
 
     ModSet* ModSet::fixDynamicArray( const string& elemMatchKey ) const {
         ModSet* n = new ModSet();
-        n->_isIndexed = _isIndexed;
+        n->_numIndexMaybeUpdated = _numIndexMaybeUpdated;
+        n->_numIndexAlwaysUpdated = _numIndexAlwaysUpdated;
         n->_hasDynamicArray = _hasDynamicArray;
         for ( ModHolder::const_iterator i=_mods.begin(); i!=_mods.end(); i++ ) {
             string s = i->first;
@@ -1421,11 +1459,35 @@ namespace mongo {
         return n;
     }
 
-    void ModSet::updateIsIndexed( const IndexPathSet& idxKeys ) {
-        for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i )
-            updateIsIndexed( i->second, idxKeys );
+    void ModSet::setIndexedStatus( const IndexPathSet& idxKeys ) {
+        for ( ModHolder::iterator i = _mods.begin(); i != _mods.end(); ++i )
+            setIndexedStatus( i->second, idxKeys );
     }
 
+    void ModSet::setIndexedStatus( Mod& m, const IndexPathSet& idxKeys ) {
+        if ( idxKeys.mightBeIndexed( m.fieldName ) ) {
+            m.isIndexed = true;
+
+            // Some mods may be no-ops depending on the document they are applied
+            // on. Determining how many indices will actually be used can only be
+            // determined for sure after looking at that target document.
+            switch ( m.op ) {
+
+            case Mod::SET_ON_INSERT:
+            case Mod::RENAME_FROM:
+            case Mod::RENAME_TO:
+                _numIndexMaybeUpdated++;
+                break;
+
+            default:
+                _numIndexAlwaysUpdated++;
+
+            }
+        }
+        else {
+            m.isIndexed = false;
+        }
+    }
 
 
 } // namespace mongo

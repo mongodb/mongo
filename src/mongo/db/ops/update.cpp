@@ -161,7 +161,7 @@ namespace mongo {
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ) {
             mods.reset( new ModSet(updateobj, nsdt->indexKeys(), forReplication) );
-            modsIsIndexed = mods->isIndexed();
+            modsIsIndexed = mods->maxNumIndexUpdated();
         }
 
         if( planPolicy.permitOptimalIdPlan() && !multi && isSimpleIdQuery(patternOrig) && d &&
@@ -243,14 +243,14 @@ namespace mongo {
                         if ( ! d )
                             break;
                         nsdt = &NamespaceDetailsTransient::get(ns);
-                        if ( mods.get() && ! mods->isIndexed() ) {
+                        if ( mods.get() ) {
                             set<string> bgKeys;
                             for (int i = 0; i < d->indexBuildsInProgress; i++) {
                                 // we need to re-check indexes
                                 d->idx(d->nIndexes+i).keyPattern().getFieldNames(bgKeys);
                             }
-                            mods->updateIsIndexed( nsdt->indexKeys() );
-                            modsIsIndexed = mods->isIndexed();
+                            mods->setIndexedStatus( nsdt->indexKeys() );
+                            modsIsIndexed = mods->maxNumIndexUpdated();
                         }
 
                     }
@@ -348,7 +348,7 @@ namespace mongo {
                     // order to ensure that they are validated inside DataFileMgr::updateRecord(.).
                     bool isSystemUsersMod = (NamespaceString(ns).coll == "system.users");
 
-                    if ( modsIsIndexed <= 0 && mss->canApplyInPlace() && !isSystemUsersMod ) {
+                    if ( !mss->isUpdateIndexed() && mss->canApplyInPlace() && !isSystemUsersMod ) {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );
