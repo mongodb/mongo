@@ -1,6 +1,11 @@
 // Test handling of messages up to and over isMaster().maxMessageSizeBytes
 
 function go() { // using a function to ensure that all resources can be freed after test
+    if (db.serverStatus().mem.bits == 32) {
+        print("skipping max_message_size.js on 32bit system");
+        return;
+    }
+
     var t = db.max_message_size;
 
     var maxMessageSize = db.isMaster().maxMessageSizeBytes;
