@@ -763,7 +763,7 @@ namespace {
             newActions.removeAction(ActionType::update);
             newActions.removeAction(ActionType::remove);
             newActions.addAction(ActionType::userAdmin);
-        } else if (collectionName == "system.profile" && newActions.contains(ActionType::find)) {
+        } else if (collectionName == "system.profile") {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::profileRead);
         } else if (collectionName == "system.indexes" && newActions.contains(ActionType::find)) {
