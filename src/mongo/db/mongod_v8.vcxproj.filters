@@ -3977,6 +3977,48 @@
     <None Include="SConscript">
       <Filter>db</Filter>
     </None>
+    <None Include="..\shell\assert.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\collection.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\db.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\mongo.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\mr.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\query.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\types.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\utils.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\utils_sh.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\replsetbridge.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\shardingtest.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\replsettest.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\servers.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\servers_misc.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="db">
@@ -4215,6 +4257,15 @@
     </Filter>
     <Filter Include="db\fts\stop_words">
       <UniqueIdentifier>{4f303fe1-34cb-4cf1-bc37-3b63b1b923d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="JavaScript source files">
+      <UniqueIdentifier>{d7f991c2-f7ac-47e7-9fa2-5efcabbfe390}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="JavaScript source files\Included in all executables">
+      <UniqueIdentifier>{eb2ce860-4ff1-45b9-84d3-acb9e2b8403b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="JavaScript source files\Included in shell only">
+      <UniqueIdentifier>{023400bc-92fc-4d80-849e-ee5c8c6ca478}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

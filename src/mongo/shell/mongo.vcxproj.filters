@@ -98,6 +98,12 @@
     <Filter Include="bson\mutable">
       <UniqueIdentifier>{8fc8632d-6c44-4b00-be6a-f0bcc6face8e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="JavaScript source files\Included in all executables">
+      <UniqueIdentifier>{4f8bc774-92ab-415a-b88e-93c2df822b3b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="JavaScript source files\Included in shell only">
+      <UniqueIdentifier>{283d932c-5594-47a6-9b1b-8f5af53c0337}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\scripting\engine.cpp">
@@ -619,42 +625,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="collection.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="db.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="mongo.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="mr.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="query.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="servers.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="utils.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="utils_sh.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="servers_misc.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="replsetbridge.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="replsettest.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
-    <None Include="shardingtest.js">
-      <Filter>JavaScript source files</Filter>
-    </None>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">
       <Filter>third_party\SpiderMonkey\Header Files</Filter>
     </None>
@@ -666,6 +636,48 @@
     </None>
     <None Include="..\base\generate_error_codes.py">
       <Filter>base</Filter>
+    </None>
+    <None Include="servers.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="shardingtest.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="servers_misc.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="replsettest.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="replsetbridge.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="assert.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="utils_sh.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="collection.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="db.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="mongo.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="mr.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="query.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="types.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="utils.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

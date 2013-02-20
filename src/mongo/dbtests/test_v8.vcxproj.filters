@@ -242,6 +242,15 @@
     <Filter Include="db\fts\stop_words">
       <UniqueIdentifier>{26332f66-8d18-4286-b951-815df0628c8b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="JavaScript source files">
+      <UniqueIdentifier>{e6c15df4-b942-49a9-b3fa-d3828d2dd951}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="JavaScript source files\Included in all executables">
+      <UniqueIdentifier>{f8c33c52-7032-4cb8-b5eb-3666658f932f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="JavaScript source files\Included in shell only">
+      <UniqueIdentifier>{fccb174d-464d-4ec9-b0fc-630a294c75c0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -4331,6 +4340,48 @@
     </None>
     <None Include="..\..\third_party\v8\ChangeLog_10gen">
       <Filter>third_party\v8\src\Python Files</Filter>
+    </None>
+    <None Include="..\shell\assert.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\collection.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\db.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\mongo.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\mr.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\query.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\types.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\utils.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\utils_sh.js">
+      <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\shell\replsetbridge.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\shardingtest.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\replsettest.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\servers.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\shell\servers_misc.js">
+      <Filter>JavaScript source files\Included in shell only</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -1276,6 +1276,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="..\..\third_party\v8\src\v8natives.js" />
     <None Include="..\base\error_codes.err" />
     <None Include="..\base\generate_error_codes.py" />
+    <None Include="assert.js" />
     <None Include="collection.js" />
     <None Include="db.js" />
     <None Include="mongo.js" />
@@ -1286,6 +1287,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="servers.js" />
     <None Include="servers_misc.js" />
     <None Include="shardingtest.js" />
+    <None Include="types.js" />
     <None Include="utils.js" />
     <None Include="utils_sh.js" />
   </ItemGroup>
