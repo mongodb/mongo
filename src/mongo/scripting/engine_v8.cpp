@@ -1109,7 +1109,7 @@ namespace mongo {
         v8::Handle<v8::FunctionTemplate> ft = v8::FunctionTemplate::New(v8Callback,
                                                                         v8::External::New(this));
         ft->Set(v8::String::New("_v8_function"), v8::External::New(reinterpret_cast<void*>(func)),
-                                                       v8::DontEnum);
+                static_cast<v8::PropertyAttribute>(v8::DontEnum | v8::ReadOnly));
         return ft;
     }
 
