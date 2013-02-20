@@ -605,7 +605,7 @@ namespace mongo {
         BSONObj info;
         string nonce;
         if( !runCommand(dbname, getnoncecmdobj, info) ) {
-            errmsg = "getnonce fails - connection problem?";
+            errmsg = "getnonce failed: " + info.toString();
             return false;
         }
         {
