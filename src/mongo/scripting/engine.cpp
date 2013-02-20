@@ -216,8 +216,12 @@ namespace mongo {
         map<string, ScriptingFunction>::iterator i = _cachedFunctions.find(code);
         if (i != _cachedFunctions.end())
             return i->second;
-        ScriptingFunction f = _createFunction(code);
-        _cachedFunctions[code] = f;
+        // NB: we calculate the function number for v8 so the cache can be utilized to
+        //     lookup the source on an exception, but SpiderMonkey uses the value
+        //     returned by JS_CompileFunction.
+        ScriptingFunction functionNumber = getFunctionCache().size() + 1;
+        _cachedFunctions[code] = functionNumber;
+        ScriptingFunction f = _createFunction(code, functionNumber);
         return f;
     }
 
@@ -363,7 +367,6 @@ namespace mongo {
         void setBoolean(const char* field, bool val) { _real->setBoolean(field, val); }
         void setFunction(const char* field, const char* code) { _real->setFunction(field, code); }
         ScriptingFunction createFunction(const char* code) { return _real->createFunction(code); }
-        ScriptingFunction _createFunction(const char* code) { return _real->createFunction(code); }
         int invoke(ScriptingFunction func, const BSONObj* args, const BSONObj* recv,
                    int timeoutMs, bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv) {
             return _real->invoke(func, args, recv, timeoutMs, ignoreReturn,
@@ -382,6 +385,13 @@ namespace mongo {
         }
         void append(BSONObjBuilder& builder, const char* fieldName, const char* scopeName) {
             _real->append(builder, fieldName, scopeName);
+        }
+
+    protected:
+        FunctionCacheMap& getFunctionCache() { return _real->getFunctionCache(); }
+
+        ScriptingFunction _createFunction(const char* code, ScriptingFunction functionNumber = 0) {
+            return _real->_createFunction(code, functionNumber);
         }
 
     private:

@@ -41,27 +41,12 @@ namespace mongo {
         return s;
     }
 
-    /** Get the properties of an object (and it's prototype) as a comma-delimited string */
+    /** Get the properties of an object (and its prototype) as a comma-delimited string */
     std::string v8ObjectToString(const v8::Handle<v8::Object>& o) {
         v8::Local<v8::Array> properties = o->GetPropertyNames();
         v8::String::Utf8Value str(properties);
         massert(16696 , "error converting js type to Utf8Value", *str);
         return std::string(*str, str.length());
-    }
-
-    std::string toSTLString(const v8::TryCatch* try_catch) {
-        stringstream ss;
-        v8::String::Utf8Value exceptionText(try_catch->Exception());
-        ss << *exceptionText;
-        v8::Handle<v8::Message> message = try_catch->Message();
-        if (!message.IsEmpty()) {
-            v8::String::Utf8Value filename(message->GetScriptResourceName());
-            if (*filename) {
-                int linenum = message->GetLineNumber();
-                ss << " " << *filename << ":" << linenum;
-            }
-        }
-        return ss.str();
     }
 
     std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::Value>& o) {
@@ -167,7 +152,7 @@ namespace mongo {
                 v8::Handle<v8::Value> ret =
                         f->Call(_config._scope->getContext()->Global(), argc, argv);
                 if (ret.IsEmpty() || try_catch.HasCaught()) {
-                    string e = toSTLString(&try_catch);
+                    string e = _config._scope->v8ExceptionToSTLString(&try_catch);
                     log() << "js thread raised exception: " << e << endl;
                     ret = v8::Undefined();
                 }

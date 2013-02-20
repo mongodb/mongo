@@ -79,8 +79,8 @@ namespace mongo {
 
             s->setObject( "$initial" , initial , true );
 
-            s->exec( "$reduce = " + reduceCode , "reduce setup" , false , true , true , 100 );
-            s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
+            s->exec( "$reduce = " + reduceCode , "$group reduce setup" , false , true , true , 100 );
+            s->exec( "$arr = [];" , "$group reduce setup 2" , false , true , true , 100 );
             ScriptingFunction f = s->createFunction(
                                       "function(){ "
                                       "  if ( $arr[n] == null ){ "
@@ -150,7 +150,7 @@ namespace mongo {
             ccPointer.reset();
 
             if (!finalize.empty()) {
-                s->exec( "$finalize = " + finalize , "finalize define" , false , true , true , 100 );
+                s->exec( "$finalize = " + finalize , "$group finalize define" , false , true , true , 100 );
                 ScriptingFunction g = s->createFunction(
                                           "function(){ "
                                           "  for(var i=0; i < $arr.length; i++){ "
@@ -165,7 +165,7 @@ namespace mongo {
             result.appendArray( "retval" , s->getObject( "$arr" ) );
             result.append( "count" , keynum - 1 );
             result.append( "keys" , (int)(map.size()) );
-            s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
+            s->exec( "$arr = [];" , "$group reduce setup 2" , false , true , true , 100 );
             s->gc();
 
             return true;

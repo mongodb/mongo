@@ -225,7 +225,7 @@ namespace spidermonkey {
 
         // ---- functions -----
 
-        ScriptingFunction _createFunction( const char * code );
+        ScriptingFunction _createFunction(const char* code, ScriptingFunction functionNumber);
 
         struct TimeoutSpec {
             boost::posix_time::ptime start;

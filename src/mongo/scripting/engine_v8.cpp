@@ -799,6 +799,91 @@ namespace mongo {
         return ts;
     }
 
+    std::string V8Scope::v8ExceptionToSTLString(const v8::TryCatch* try_catch) {
+        stringstream ss;
+        v8::String::Utf8Value exceptionText(try_catch->Exception());
+        ss << *exceptionText;
+
+        // get the exception message
+        v8::Handle<v8::Message> message = try_catch->Message();
+        if (message.IsEmpty())
+            return ss.str();
+
+        // get the resource (e.g. file or internal call)
+        v8::String::Utf8Value resourceName(message->GetScriptResourceName());
+        if (!*resourceName)
+            return ss.str();
+
+        string resourceNameString = *resourceName;
+        if (resourceNameString.find("_funcs") == 0) {
+            // script loaded from __createFunction
+            string code;
+            // find the source script based on the resource name supplied to v8::Script::Compile().
+            // this is accomplished by converting the integer after the '_funcs' prefix.
+            unsigned int funcNum = str::toUnsigned(resourceNameString.substr(6));
+            for (map<string, ScriptingFunction>::iterator it = getFunctionCache().begin();
+                 it != getFunctionCache().end();
+                 ++it) {
+                if (it->second == funcNum) {
+                    code = it->first;
+                    break;
+                }
+            }
+            if (!code.empty()) {
+                // append surrounding code (padded with up to 20 characters on each side)
+                int startPos = message->GetStartPosition();
+                const int kPadding = 20;
+                if (startPos - kPadding < 0)
+                    // lower bound exceeded
+                    startPos = 0;
+                else
+                    startPos -= kPadding;
+
+                int displayRange = message->GetEndPosition();
+                if (displayRange + kPadding > static_cast<int>(code.length()))
+                    // upper bound exceeded
+                    displayRange -= startPos;
+                else
+                    // compensate for startPos padding
+                    displayRange = (displayRange - startPos) + kPadding;
+
+                if (startPos > static_cast<int>(code.length()) ||
+                    displayRange > static_cast<int>(code.length()))
+                    return ss.str();
+
+                string near = code.substr(startPos, displayRange);
+                for (size_t newLine = near.find('\n');
+                     newLine != string::npos;
+                     newLine = near.find('\n')) {
+                    if (static_cast<int>(newLine) > displayRange - kPadding) {
+                        // truncate at first newline past the reported end position
+                        near = near.substr(0, newLine - 1);
+                        break;
+                    }
+                    // convert newlines to spaces
+                    near.replace(newLine, 1, " ");
+                }
+                // trim leading chars
+                near = str::ltrim(near);
+                ss << " near '" << near << "' ";
+                const int linenum = message->GetLineNumber();
+                if (linenum != 1)
+                    ss << " (line " << linenum << ")";
+            }
+        }
+        else if (resourceNameString.find("(shell") == 0) {
+            // script loaded from shell input
+            ss << try_catch;
+        }
+        else {
+            // script loaded from file
+            ss << " in " << *resourceName;
+            const int linenum = message->GetLineNumber();
+            if (linenum != 1) ss << ":L" << linenum;
+        }
+        return ss.str();
+    }
+
     // --- functions -----
 
     bool hasFunctionIdentifier(const string& code) {
@@ -808,7 +893,8 @@ namespace mongo {
         return code[8] == ' ' || code[8] == '(';
     }
 
-    v8::Local<v8::Function> V8Scope::__createFunction(const char * raw) {
+    v8::Local<v8::Function> V8Scope::__createFunction(const char* raw,
+                                                      ScriptingFunction functionNumber) {
         v8::HandleScope handle_scope;
         v8::TryCatch try_catch;
         raw = jsSkipWhiteSpace(raw);
@@ -822,7 +908,7 @@ namespace mongo {
             code = "function(){ " + code + "}";
         }
 
-        string fn = str::stream() << "_funcs" << (_funcs.size() + 1);
+        string fn = str::stream() << "_funcs" << functionNumber;
         code = str::stream() << fn << " = " << code;
 
         v8::Handle<v8::Script> script = v8::Script::Compile(v8::String::New(code.c_str()),
@@ -840,19 +926,19 @@ namespace mongo {
                 v8::Function::Cast(*_global->Get(v8::String::New(fn.c_str())))));
     }
 
-    ScriptingFunction V8Scope::_createFunction(const char* raw) {
+    ScriptingFunction V8Scope::_createFunction(const char* raw, ScriptingFunction functionNumber) {
         V8_SIMPLE_HEADER
-        v8::Local<v8::Value> ret = __createFunction(raw);
+        v8::Local<v8::Value> ret = __createFunction(raw, functionNumber);
         v8::Persistent<v8::Value> f = v8::Persistent<v8::Value>::New(ret);
         uassert(10232, "not a function", f->IsFunction());
-        int num = _funcs.size() + 1;
         _funcs.push_back(f);
-        return num;
+        return functionNumber;
     }
 
     void V8Scope::setFunction(const char* field, const char* code) {
         V8_SIMPLE_HEADER
-        _global->ForceSet(v8StringData(field), __createFunction(code));
+        _global->ForceSet(v8StringData(field),
+                          __createFunction(code, getFunctionCache().size() + 1));
     }
 
     void V8Scope::rename(const char * from, const char * to) {

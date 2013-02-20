@@ -1540,7 +1540,7 @@ namespace spidermonkey {
             verify( JS_SetProperty( _context , _global , from , &v ) );
     }
 
-    ScriptingFunction SMScope::_createFunction( const char * code ) {
+    ScriptingFunction SMScope::_createFunction(const char* code, ScriptingFunction functionNumber) {
             smlock;
             precall();
             return (ScriptingFunction)_convertor->compileFunction( code );

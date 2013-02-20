@@ -22,6 +22,7 @@
 namespace mongo {
     typedef unsigned long long ScriptingFunction;
     typedef BSONObj (*NativeFunction)(const BSONObj& args, void* data);
+    typedef map<string, ScriptingFunction> FunctionCacheMap;
 
     class DBClientWithCommands;
 
@@ -157,13 +158,16 @@ namespace mongo {
         }
 
     protected:
-        virtual ScriptingFunction _createFunction(const char* code) = 0;
+        friend class PooledScope;
+        virtual FunctionCacheMap& getFunctionCache() { return _cachedFunctions; }
+        virtual ScriptingFunction _createFunction(const char* code,
+                                                  ScriptingFunction functionNumber = 0) = 0;
 
         string _localDBName;
         long long _loadedVersion;
         set<string> _storedNames;
         static long long _lastVersion;
-        map<string, ScriptingFunction> _cachedFunctions;
+        FunctionCacheMap _cachedFunctions;
         int _numTimeUsed;
         bool _lastRetIsNativeCode; // v8 only: set to true if eval'd script returns a native func
     };

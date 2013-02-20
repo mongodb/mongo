@@ -39,8 +39,6 @@ namespace mongo {
 
     class V8ScriptEngine;
     class V8Scope;
-    std::string toSTLString(const v8::TryCatch* try_catch);
-
 
     typedef v8::Handle<v8::Value> (*v8Function)(V8Scope* scope, const v8::Arguments& args);
 
@@ -164,8 +162,10 @@ namespace mongo {
         void injectV8Function(const char* field, v8Function func, v8::Handle<v8::Object>& obj);
         void injectV8Function(const char* field, v8Function func, v8::Handle<v8::Template>& t);
         v8::Handle<v8::FunctionTemplate> createV8Function(v8Function func);
-        virtual ScriptingFunction _createFunction(const char* code);
-        v8::Local<v8::Function> __createFunction(const char* code);
+        virtual ScriptingFunction _createFunction(const char* code,
+                                                  ScriptingFunction functionNumber = 0);
+        v8::Local<v8::Function> __createFunction(const char* code,
+                                                 ScriptingFunction functionNumber = 0);
 
         /**
          * Convert BSON types to v8 Javascript types
@@ -217,6 +217,12 @@ namespace mongo {
         v8::Function* getObjectIdCons();
 
         v8::Local<v8::Value> newId(const OID& id);
+
+        /**
+         * Convert a JavaScript exception to a stl string.  Requires
+         * access to the V8Scope instance to report source context information.
+         */
+        std::string v8ExceptionToSTLString(const v8::TryCatch* try_catch);
 
         /**
          * GC callback for weak references to BSON objects (via BSONHolder)
@@ -396,7 +402,7 @@ namespace mongo {
 
         if (try_catch.HasCaught() && try_catch.CanContinue()) {
             // normal JS exception
-            _error = string("JavaScript execution failed: ") + toSTLString(&try_catch);
+            _error = string("JavaScript execution failed: ") + v8ExceptionToSTLString(&try_catch);
             haveError = true;
         }
         else if (hasOutOfMemoryException()) {
