@@ -114,7 +114,14 @@ __stat_server(void *arg)
 		WT_ERR(__wt_epoch(session, &ts));
 		tm = localtime(&ts.tv_sec);
 
-		/* Create the logging path name for this time of day. */
+		/*
+		 * Create the logging path name for this time of day.
+		 *
+		 * !!!
+		 * The gcc compiler with the -Wformat-nonliteral flag complains
+		 * about this call to strftime.   There's nothing wrong, but I
+		 * know of no way to make the warning go away.
+		 */
 		if (strftime(tmp.mem, tmp.memsize, conn->stat_path, tm) == 0)
 			WT_ERR_MSG(
 			    session, ENOMEM, "strftime path conversion");
@@ -131,7 +138,13 @@ __stat_server(void *arg)
 			    (fp = fopen(path.mem, "a")) == NULL, __wt_errno());
 		}
 
-		/* Create the entry prefix for this time of day. */
+		/*
+		 * Create the entry prefix for this time of day.
+		 * !!!
+		 * The gcc compiler with the -Wformat-nonliteral flag complains
+		 * about this call to strftime.   There's nothing wrong, but I
+		 * know of no way to make the warning go away.
+		 */
 		if (strftime(tmp.mem, tmp.memsize, conn->stat_stamp, tm) == 0)
 			WT_ERR_MSG(
 			    session, ENOMEM, "strftime timestamp conversion");
