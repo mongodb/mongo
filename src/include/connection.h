@@ -132,6 +132,13 @@ struct __wt_connection_impl {
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state. */
 
 	WT_CONNECTION_STATS *stats;	/* Connection statistics */
+	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
+	pthread_t	 stat_tid;	/* Statistics log thread */
+	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
+	int		 stat_clear;	/* Statistics log clear */
+	const char	*stat_path;	/* Statistics log path format */
+	const char	*stat_stamp;	/* Statistics log timestamp format */
+	long		 stat_usecs;	/* Statistics log period */
 
 	WT_FH	   *log_fh;		/* Logging file handle */
 

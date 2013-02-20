@@ -136,6 +136,7 @@ getopt
 getter
 gid
 github
+gnuplot
 hb
 hotbackup
 href
@@ -239,6 +240,7 @@ printvalue
 priv
 pthread
 pthreads
+py
 qnx
 rdbms
 rdlock
@@ -271,8 +273,10 @@ spinlocks
 sql
 src
 startsync
+statlog
 str
 strerror
+strftime
 struct
 structs
 subdatabases

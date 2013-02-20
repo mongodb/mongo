@@ -500,9 +500,10 @@ methods = {
 
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
-		in-memory alignment (in bytes) for buffers used for I/O.  The default
-		value of -1 indicates that a platform-specific alignment value should
-		be used (512 bytes on Linux systems, zero elsewhere)''',
+		in-memory alignment (in bytes) for buffers used for I/O.  The
+		default value of -1 indicates that a platform-specific
+		alignment value should be used (512 bytes on Linux systems,
+		zero elsewhere)''',
 		min='-1', max='1MB'),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
@@ -540,6 +541,28 @@ methods = {
 		maximum expected number of sessions (including server
 		threads)''',
 		min='1'),
+	Config('statistics_log', '', r'''
+		log database connection statistics into a file.
+		See @ref statistics_log for more information''',
+		type='category', subconfig=[
+		Config('clear', 'true', r'''
+		clear the statistics values after each set of log records
+		are written''', type='boolean'),
+		Config('log', 'false', r'''
+		log database connection statistics into a file''',
+		type='boolean'),
+		Config('path', '"wtsl.%H"', r'''
+		the pathname to a file into which the log records are written,
+		may contain strftime conversion specifications.  If the value
+		is not an absolute path name, the file is created relative to
+		the database home'''),
+		Config('timestamp', '"%b %d %k:%M:%S"', r'''
+		a timestamp prepended to each log record, may contain strftime
+		conversion specifications'''),
+		Config('wait', '120', r'''
+		seconds to wait between each write of the log records''',
+		min='5', max='100000'),
+		]),
 	Config('sync', 'true', r'''
 		flush files to stable storage when closing or writing
 		checkpoints''',

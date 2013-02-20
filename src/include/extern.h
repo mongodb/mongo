@@ -449,9 +449,6 @@ extern int __wt_config_subinit( WT_SESSION_IMPL *session,
 extern int __wt_config_next(WT_CONFIG *conf,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_config_getraw( WT_CONFIG *cparser,
-    WT_CONFIG_ITEM *key,
-    WT_CONFIG_ITEM *value);
 extern int __wt_config_get(WT_SESSION_IMPL *session,
     const char **cfg,
     WT_CONFIG_ITEM *key,
@@ -550,6 +547,7 @@ extern WT_CONFIG_CHECK __wt_confchk_session_verify[];
 extern const char *__wt_confdfl_table_meta;
 extern WT_CONFIG_CHECK __wt_confchk_table_meta[];
 extern const char *__wt_confdfl_wiredtiger_open;
+extern WT_CONFIG_CHECK __wt_confchk_statistics_log_subconfigs[];
 extern WT_CONFIG_CHECK __wt_confchk_wiredtiger_open[];
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
@@ -586,6 +584,11 @@ extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags);
+extern int __wt_statlog_config(WT_SESSION_IMPL *session,
+    const char **cfg,
+    int *runp);
+extern int __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_statlog_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
@@ -1116,6 +1119,7 @@ extern void __wt_assert(WT_SESSION_IMPL *session,
 extern int __wt_panic(WT_SESSION_IMPL *session);
 extern int __wt_illegal_value(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri);
+extern int __wt_absolute_path(const char *path);
 extern int __wt_filename(WT_SESSION_IMPL *session,
     const char *name,
     const char **path);

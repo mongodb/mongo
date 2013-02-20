@@ -557,6 +557,7 @@ os
 ovfl
 packv
 patchp
+pathname
 pathnames
 perf
 pfx
@@ -625,6 +626,7 @@ sizep
 sizev
 skiplist
 skiplists
+sl
 slotsp
 slvg
 snaplen
@@ -637,6 +639,7 @@ srch
 srvr
 sset
 startup
+statlog
 stbar
 stdarg
 stderr
@@ -646,6 +649,7 @@ str
 strcmp
 strdup
 strerror
+strftime
 stringin
 strncpy
 strndup
@@ -762,6 +766,7 @@ writelock
 wrlock
 wti
 wts
+wtsl
 xff
 xxxx
 xxxxx

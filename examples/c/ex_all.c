@@ -1030,10 +1030,20 @@ main(void)
 	 * We're not allowed to open multiple connections, don't run more than
 	 * one wiredtiger_open call.
 	 */
-	{
 	/*! [Configure direct_io for data files] */
 	ret = wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn);
 	/*! [Configure direct_io for data files] */
+
+	/*! [Statistics logging] */
+	ret = wiredtiger_open(
+	    home, NULL, "create,statistics_log=(log=true,wait=30)", &conn);
+	/*! [Statistics logging] */
+
+	/*! [Statistics logging with path] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "statistics_log=(log=true,path=\"/log/log.%m.%d.%y\")", &conn);
+	/*! [Statistics logging with path] */
 #endif
 
 	/*! [Get the WiredTiger library version #1] */
