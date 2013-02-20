@@ -851,21 +851,21 @@ namespace mongo {
                     displayRange > static_cast<int>(code.length()))
                     return ss.str();
 
-                string near = code.substr(startPos, displayRange);
-                for (size_t newLine = near.find('\n');
+                string codeNear = code.substr(startPos, displayRange);
+                for (size_t newLine = codeNear.find('\n');
                      newLine != string::npos;
-                     newLine = near.find('\n')) {
+                     newLine = codeNear.find('\n')) {
                     if (static_cast<int>(newLine) > displayRange - kPadding) {
                         // truncate at first newline past the reported end position
-                        near = near.substr(0, newLine - 1);
+                        codeNear = codeNear.substr(0, newLine - 1);
                         break;
                     }
                     // convert newlines to spaces
-                    near.replace(newLine, 1, " ");
+                    codeNear.replace(newLine, 1, " ");
                 }
                 // trim leading chars
-                near = str::ltrim(near);
-                ss << " near '" << near << "' ";
+                codeNear = str::ltrim(codeNear);
+                ss << " near '" << codeNear << "' ";
                 const int linenum = message->GetLineNumber();
                 if (linenum != 1)
                     ss << " (line " << linenum << ")";
