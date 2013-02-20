@@ -216,6 +216,7 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerHome
+WiredTigerStat
 WithSeeds
 Wuninitialized
 XP
@@ -768,7 +769,6 @@ writelock
 wrlock
 wti
 wts
-wtsl
 xff
 xxxx
 xxxxx

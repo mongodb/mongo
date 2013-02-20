@@ -1282,11 +1282,12 @@ struct __wt_connection {
  * which the log records are written\, may contain strftime conversion
  * specifications.  If the value is not an absolute path name\, the file is
  * created relative to the database home.,a string; default \c
- * "wtsl.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended
- * to each log record\, may contain strftime conversion specifications.,a
- * string; default \c "%b %d %k:%M:%S".}@config{&nbsp;&nbsp;&nbsp;&nbsp;wait,
- * seconds to wait between each write of the log records.,an integer between 5
- * and 100000; default \c 120.}@config{ ),,}
+ * "WiredTigerStat.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp
+ * prepended to each log record\, may contain strftime conversion
+ * specifications.,a string; default \c "%b %d
+ * %k:%M:%S".}@config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
+ * write of the log records.,an integer between 5 and 100000; default \c
+ * 120.}@config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
  * checkpoints.,a boolean flag; default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;

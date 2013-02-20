@@ -551,7 +551,7 @@ methods = {
 		Config('log', 'false', r'''
 		log database connection statistics into a file''',
 		type='boolean'),
-		Config('path', '"wtsl.%H"', r'''
+		Config('path', '"WiredTigerStat.%H"', r'''
 		the pathname to a file into which the log records are written,
 		may contain strftime conversion specifications.  If the value
 		is not an absolute path name, the file is created relative to
