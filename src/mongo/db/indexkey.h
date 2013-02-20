@@ -109,15 +109,6 @@ namespace mongo {
          */
         virtual BSONObj adjustIndexSpec( const BSONObj& spec ) const { return spec; }
 
-        /**
-         * Hook function to run after an index that uses this plugin is built.
-         *
-         * This will be called with an active write context (and lock) on the database.
-         *
-         * @param spec The IndexSpec of the newly built index.
-         */
-        virtual void postBuildHook( const IndexSpec& spec ) const { }
-
         // ------- static below -------
 
         static IndexPlugin* get( const string& name ) {

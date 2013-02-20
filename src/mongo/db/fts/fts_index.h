@@ -61,8 +61,6 @@ namespace mongo {
 
             BSONObj adjustIndexSpec( const BSONObj& spec ) const;
 
-            void postBuildHook( const IndexSpec& spec ) const;
-
         };
 
     } //namespace fts

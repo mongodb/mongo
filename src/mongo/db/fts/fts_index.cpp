@@ -26,7 +26,6 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/timer.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
@@ -85,13 +84,6 @@ namespace mongo {
             return new FTSIndex( this, spec );
         }
 
-        void FTSIndexPlugin::postBuildHook( const IndexSpec& spec ) const {
-            string ns = spec.getDetails()->parentNS();
-            NamespaceDetails* nsd = nsdetails( ns );
-            if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
-                nsd->syncUserFlags( ns );
-            }
-        }
 
         FTSIndexPlugin* ftsPlugin;
         MONGO_INITIALIZER(FTSIndexPlugin)(InitializerContext* context) {
