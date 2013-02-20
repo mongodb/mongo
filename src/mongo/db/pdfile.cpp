@@ -1538,6 +1538,13 @@ namespace mongo {
             // clear transient info caches so they refresh; increments nIndexes
             tableToIndex->addIndex(tabletoidxns.c_str());
             getDur().writingInt(tableToIndex->indexBuildsInProgress) -= 1;
+
+            IndexType* indexType = idx.getSpec().getType();
+            const IndexPlugin *plugin = indexType ? indexType->getPlugin() : NULL;
+            if (plugin) {
+                plugin->postBuildHook( idx.getSpec() );
+            }
+
         }
         catch (...) {
             // Generally, this will be called as an exception from building the index bubbles up.
