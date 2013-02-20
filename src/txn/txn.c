@@ -237,7 +237,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * If two threads race to allocate an ID, only the latest ID
 		 * will proceed.  The winning thread can be sure its snapshot
 		 * contains all of the earlier active IDs.  Threads that race
-		 * race and get an earlier ID may not appear in the snapshot,
+		 * and get an earlier ID may not appear in the snapshot,
 		 * but they will loop and allocate a new ID before proceeding
 		 * to make any updates.
 		 *
