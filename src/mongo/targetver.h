@@ -15,6 +15,15 @@
 */
 
 #pragma once
-#ifndef _WIN32_WINNT            // Allow use of features specific to Windows Vista or later.
-#define _WIN32_WINNT 0x0600     // Change this to the appropriate value to target other versions of Windows.
+#ifdef _WIN32
+#ifndef _WIN32_WINNT
+#if defined _WIN64
+// For 64 bit Windows we require at least Windows Vista or Windows Server 2008.
+#define _WIN32_WINNT 0x0600
+#else
+// For 32 bit Windows we allow Windows XP as well. See platform/atomic_intrinsics_win32.h for
+// an example of where this makes a difference.
+#define _WIN32_WINNT 0x0502
+#endif
+#endif
 #endif
