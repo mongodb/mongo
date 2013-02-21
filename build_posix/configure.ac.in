@@ -50,7 +50,26 @@ fi
 
 AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
 
-# Python API
+# Java and Python APIs
+if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
+	AX_PKG_SWIG(2.0.4, [],
+	    [ AC_MSG_ERROR([SWIG is required to build Java or Python APIs.]) ])
+fi
+
+if test "$wt_cv_enable_java" = "yes"; then
+	JAVAC=${JAVAC-javac}
+	AX_PROG_JAVAC
+	AX_PROG_JAR
+	AX_JNI_INCLUDE_DIR
+	if test "$wt_cv_enable_debug" = "yes"; then
+		AX_CHECK_JUNIT
+	fi
+	for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS ; do
+		JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JNI_INCLUDE_DIR"
+	done
+	AC_SUBST(JNI_CPPFLAGS)
+fi
+
 if test "$wt_cv_enable_python" = "yes"; then
 	AM_PATH_PYTHON([2.6])
         AX_PKG_SWIG(2.0.4, [],
