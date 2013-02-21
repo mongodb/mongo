@@ -229,6 +229,22 @@ namespace UpdateTests {
         }
     };
 
+    class SetOnInsertFromNonExistentWithQueryOverField : public SetBase {
+    public:
+        void run() {
+            Query q("{a:1}"); // same field that we'll setOnInsert on
+
+            // Try with upsert false first.
+            client().update( ns(), q, BSON( "$setOnInsert" << BSON( "a" << 2 ) ), false );
+            ASSERT( client().findOne( ns(), BSON( "a" << 1 ) ).isEmpty() );
+
+            // Then with upsert true.
+            client().update( ns(), q, BSON( "$setOnInsert" << BSON( "a" << 2 ) ), true );
+            ASSERT( !client().findOne( ns(), BSON( "a" << 2 ) ).isEmpty() );
+
+        }
+    };
+
     class SetOnInsertMissingField : public SetBase {
     public:
         void run() {
@@ -2649,6 +2665,7 @@ namespace UpdateTests {
             add< SetOnInsertFromEmpty >();
             add< SetOnInsertFromNonExistent >();
             add< SetOnInsertFromNonExistentWithQuery >();
+            add< SetOnInsertFromNonExistentWithQueryOverField >();
             add< SetOnInsertMissingField >();
             add< SetOnInsertExisting >();
             add< SetOnInsertMixed >();

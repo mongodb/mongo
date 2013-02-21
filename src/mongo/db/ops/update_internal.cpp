@@ -109,17 +109,19 @@ namespace mongo {
             break;
         }
 
+        case SET_ON_INSERT:
+            // There is a corner case that would land us here (making a change to an existing
+            // field with $setOnInsert). If we're in an upsert, and the query portion of the
+            // update creates a field, we can modify it with $setOnInsert. This degenerates
+            // into a $set, so we fall through to the next case.
+            ms.fixedOpName = "$set";
+            // Fall through.
+
         case SET: {
             _checkForAppending( elt );
             builder.appendAs( elt , shortFieldName );
             break;
         }
-
-        case SET_ON_INSERT:
-            // $setOnInsert on an existing field should be a no-op (e.g., dontApply should be
-            // set for it), so we should never get here.
-            verify(false);
-            break;
 
         case UNSET: {
             appendUnset( builder );
