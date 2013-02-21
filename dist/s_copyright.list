@@ -1,4 +1,5 @@
 skip	bench/tcbench/wttest.c
+skip	build_posix/Test.java
 skip	build_posix/wiredtiger_config.h
 skip	dist/api_config.py
 skip	dist/api_data.py
@@ -12,7 +13,6 @@ skip	dist/log_data.py
 skip	dist/serial.py
 skip	dist/stat.py
 skip	dist/stat_data.py
-skip	docs/tools/doxypy.py
 skip	lang/java/java_doc.i
 skip	lang/java/src/com/wiredtiger/db/Connection.java
 skip	lang/java/src/com/wiredtiger/db/Cursor.java
@@ -39,7 +39,6 @@ skip	src/include/queue.h
 skip	src/include/serial_funcs.i
 skip	src/log/log_desc.c
 skip	src/support/stat.c
-skip	test/config.i
 skip	test/packing/intpack-test.c
 skip	test/packing/intpack-test2.c
 skip	test/packing/packing-test.c
