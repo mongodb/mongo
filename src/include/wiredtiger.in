@@ -1415,6 +1415,28 @@ int wiredtiger_struct_size(
 int wiredtiger_struct_unpack(WT_SESSION *session,
     const void *buffer, size_t size, const char *format, ...);
 
+/*
+ * Streaming interface to packing.
+ *
+ * This allows applications to pack or unpack records one field at a time.
+ */
+typedef struct __wt_pack_stream WT_PACK_STREAM;
+
+int wiredtiger_pack_start(WT_SESSION *session, const char *format, void *buffer, size_t size, WT_PACK_STREAM **packp);
+int wiredtiger_unpack_start(WT_SESSION *session, const char *format, const void *buffer, size_t size, WT_PACK **packp);
+
+int wiredtiger_pack_item(WT_PACK_STREAM *, WT_ITEM *);
+int wiredtiger_pack_int(WT_PACK_STREAM *, int64_t v);
+int wiredtiger_pack_str(WT_PACK_STREAM *, const char *);
+int wiredtiger_pack_uint(WT_PACK_STREAM *, uint64_t v);
+
+int wiredtiger_unpack_item(WT_PACK_STREAM *, WT_ITEM *);
+int wiredtiger_unpack_int(WT_PACK_STREAM *, int64_t *);
+int wiredtiger_unpack_str(WT_PACK_STREAM *, const char **);
+int wiredtiger_unpack_uint(WT_PACK_STREAM *, uint64_t *);
+
+int wiredtiger_pack_close(WT_PACK_STREAM *pack);
+
 /*! Get version information.
  *
  * @snippet ex_all.c Get the WiredTiger library version #1
