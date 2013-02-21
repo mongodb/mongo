@@ -51,6 +51,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	evict_session->name = "eviction-server";
 	WT_ERR(__wt_thread_create(session,
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
+	conn->cache_evict_tid_set = 1;
 
 	/* Start the optional statistics thread. */
 	WT_ERR(__wt_statlog_create(conn, cfg));
@@ -91,9 +92,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Shut down the server threads. */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
-	if (conn->cache_evict_tid != 0) {
+	if (conn->cache_evict_tid_set) {
 		WT_TRET(__wt_evict_server_wake(session));
 		WT_TRET(__wt_thread_join(session, conn->cache_evict_tid));
+		conn->cache_evict_tid_set = 0;
 	}
 
 	/* Statistics log server. */

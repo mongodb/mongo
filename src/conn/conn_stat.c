@@ -208,6 +208,7 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_thread_create(
 	    session, &conn->stat_tid, __stat_server, conn->stat_session));
+	conn->stat_tid_set = 1;
 
 	return (0);
 }
@@ -224,9 +225,10 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 
 	session = conn->default_session;
 
-	if (conn->stat_tid != 0) {
+	if (conn->stat_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->stat_cond));
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
+		conn->stat_tid_set = 0;
 	}
 	if (conn->stat_cond != NULL)
 		WT_TRET(__wt_cond_destroy(session, conn->stat_cond));

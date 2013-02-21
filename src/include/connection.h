@@ -88,7 +88,8 @@ struct __wt_connection_impl {
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
-	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
+	pthread_t cache_evict_tid;	/* Eviction server thread ID */
+	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
@@ -134,6 +135,7 @@ struct __wt_connection_impl {
 	WT_CONNECTION_STATS *stats;	/* Connection statistics */
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */
+	int		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	int		 stat_clear;	/* Statistics log clear */
 	const char	*stat_path;	/* Statistics log path format */
