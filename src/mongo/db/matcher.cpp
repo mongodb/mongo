@@ -29,6 +29,7 @@
 #include "client.h"
 
 #include "pdfile.h"
+#include "server.h"
 
 namespace {
     inline pcrecpp::RE_Options flags2options(const char* flags) {
@@ -268,6 +269,12 @@ namespace mongo {
             if (purePrefix)
                 rm._prefix = prefix;
         }
+    }
+
+    string Matcher::toString() const { 
+        if( !_constrainIndexKey.isEmpty() ) 
+            return "info: constrainIndexKey matchers do not implement toString() yet";
+        return _jsobj.toString();
     }
 
     bool Matcher::addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags ) {
@@ -536,14 +543,67 @@ namespace mongo {
     Matcher::Matcher(const BSONObj &jsobj, bool nested) :
         _where(0), _jsobj(jsobj), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false) {
 
+        if( shortCircuit.init(jsobj) ) {
+            // we could return here, in particular if shortCircuit.selfTest is false, 
+            // but we fall through to let _basics populate so the visitor stuff can use that.
+        }
+
         BSONObjIterator i(_jsobj);
         while ( i.more() ) {
             parseMatchExpressionElement( i.next(), nested );
         }
     }
 
+    static const char tsGTEPattern[] =
+        {0x1c,0,0,0,0x3,0x74,0x73,0,0x13,0,0,0,0x11,0x24,0x67,0x74,0x65,0,0,0,0,0,0,0,0,0,0,0};
+    static const BSONElement tsNull = BSONObj(tsGTEPattern).getFieldDotted("ts.$gte");
+    bool Matcher::TsGTEShortCircuit::selfTest() const {
+        DEV {
+            OCCASIONALLY return true;
+        } 
+        return false;
+    }
+    bool Matcher::TsGTEShortCircuit::matches(const BSONObj& o) const {
+        // normally ts is the first field in the oplog, and firstElement is cheaper so we use it here:
+        BSONElement e = o.firstElement();
+        if( unlikely( !str::equals(e.fieldName(), "ts") )) { 
+            e = o["ts"];
+        }
+        if( unlikely(e.type() != Timestamp) ) {
+            // opt our to normal compare logic for nonmatching types with GTE
+            return e.woCompare(tsNull) >= 0;
+        }
+        return e.date() >= _ts;
+    }
+    bool Matcher::TsGTEShortCircuit::init(const BSONObj& d) { 
+        DEV ONCE {
+            const BSONObj x = BSON( "ts" << BSONObjBuilder().appendTimestamp("$gte",0,0).obj() );
+            dassert( x.objsize() == 0x1c );
+            dassert( x == BSONObj(tsGTEPattern) );
+        }
+        if( memcmp(tsGTEPattern, d.objdata(), 18) == 0 ) { // if( x has one field, "ts", of type Timestamp )
+            _ts = d.getFieldDotted("ts.$gte").date();
+            _ok = true;
+            return true;
+        }
+
+        return false;
+    }
+    Matcher::TsGTEShortCircuit::TsGTEShortCircuit() { 
+        _ok = false;
+    }
+
+    // (private) constructor for _constrainIndexKey case
     Matcher::Matcher( const Matcher &docMatcher, const BSONObj &key ) :
         _where(0), _constrainIndexKey( key ), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false) {
+
+        if( docMatcher.shortCircuit.ok() ) {
+            if( key.hasField("ts") ) { 
+                shortCircuit = docMatcher.shortCircuit;
+            }
+            // fall through to populate _basics for MatcherVisitor
+        }
+
         // Filter out match components that will provide an incorrect result
         // given a key from a single key index.
         for( vector< ElementMatcher >::const_iterator i = docMatcher._basics.begin(); i != docMatcher._basics.end(); ++i ) {
@@ -900,16 +960,33 @@ namespace mongo {
 
     extern int dump;
 
+    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) const {
+        LOG(5) << "Matcher::matches() " << jsobj.toString() << endl;
+
+        if( shortCircuit.ok() ) {
+            bool res = shortCircuit.matches(jsobj);
+            if( shortCircuit.selfTest() ) { 
+                bool res2 = _matches(jsobj,details);
+                if( res != res2 ) {
+                    log() << jsobj.toString() << endl;
+                    log() << res << ' ' << res2 << endl;
+                    dassert(false);
+                }
+            }
+            return res;
+        }
+
+        return _matches(jsobj, details);
+    }
+
     /* See if an object matches the query.
     */
-    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) const {
+    bool Matcher::_matches(const BSONObj& jsobj , MatchDetails * details ) const {
         /*
           NB:  if any modifications are made to how this operates, make sure
           they are reflected in visitReferences(), whose implementation
           parallels this.
          */
-
-        LOG(5) << "Matcher::matches() " << jsobj.toString() << endl;
 
         /* assuming there is usually only one thing to match.  if more this
            could be slow sometimes. */
