@@ -183,9 +183,15 @@ namespace mongo {
             uassert(10209, str::stream() << "name has to be a string: " << n, n.type() == String);
             uassert(10210, "value has to be set", v.type() != EOO);
 
-            setElement(n.valuestr(), v);
-            thisTime.insert(n.valuestr());
-            _storedNames.insert(n.valuestr());
+            try {
+                setElement(n.valuestr(), v);
+                thisTime.insert(n.valuestr());
+                _storedNames.insert(n.valuestr());
+            }
+            catch (const DBException& setElemEx) {
+                log() << "unable to load stored JavaScript function " << n.valuestr()
+                      << "(): " << setElemEx.what() << endl;
+            }
         }
 
         // remove things from scope that were removed from the system.js collection

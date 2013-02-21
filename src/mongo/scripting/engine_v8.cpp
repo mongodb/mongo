@@ -815,6 +815,8 @@ namespace mongo {
             return ss.str();
 
         string resourceNameString = *resourceName;
+        if (resourceNameString.compare("undefined") == 0)
+            return ss.str();
         if (resourceNameString.find("_funcs") == 0) {
             // script loaded from __createFunction
             string code;
