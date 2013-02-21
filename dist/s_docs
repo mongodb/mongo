@@ -83,8 +83,9 @@ EOF
 	}
 
         EXTRA_INPUT=""
-        if [ -f ../lang/python/wiredtiger.py ]; then
-                EXTRA_INPUT+=" ../../lang/python/wiredtiger.py"
+        f="../lang/python/wiredtiger.py"
+        if [ -f "$f" ]; then
+                EXTRA_INPUT+=" $f"
         fi
         if [ -f ../lang/java/wiredtiger_wrap.c ]; then
                 EXTRA_INPUT+=" ../../lang/java/src/com/wiredtiger/db"
