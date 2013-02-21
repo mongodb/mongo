@@ -1423,7 +1423,7 @@ int wiredtiger_struct_unpack(WT_SESSION *session,
 typedef struct __wt_pack_stream WT_PACK_STREAM;
 
 int wiredtiger_pack_start(WT_SESSION *session, const char *format, void *buffer, size_t size, WT_PACK_STREAM **psp);
-int wiredtiger_unpack_start(WT_SESSION *session, const char *format, const void *buffer, size_t size, WT_PACK_STEAM **psp);
+int wiredtiger_unpack_start(WT_SESSION *session, const char *format, const void *buffer, size_t size, WT_PACK_STREAM **psp);
 
 int wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
 int wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i);
