@@ -1422,20 +1422,20 @@ int wiredtiger_struct_unpack(WT_SESSION *session,
  */
 typedef struct __wt_pack_stream WT_PACK_STREAM;
 
-int wiredtiger_pack_start(WT_SESSION *session, const char *format, void *buffer, size_t size, WT_PACK_STREAM **packp);
-int wiredtiger_unpack_start(WT_SESSION *session, const char *format, const void *buffer, size_t size, WT_PACK **packp);
+int wiredtiger_pack_start(WT_SESSION *session, const char *format, void *buffer, size_t size, WT_PACK_STREAM **psp);
+int wiredtiger_unpack_start(WT_SESSION *session, const char *format, const void *buffer, size_t size, WT_PACK_STEAM **psp);
 
-int wiredtiger_pack_item(WT_PACK_STREAM *, WT_ITEM *);
-int wiredtiger_pack_int(WT_PACK_STREAM *, int64_t v);
-int wiredtiger_pack_str(WT_PACK_STREAM *, const char *);
-int wiredtiger_pack_uint(WT_PACK_STREAM *, uint64_t v);
+int wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+int wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i);
+int wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s);
+int wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u);
 
-int wiredtiger_unpack_item(WT_PACK_STREAM *, WT_ITEM *);
-int wiredtiger_unpack_int(WT_PACK_STREAM *, int64_t *);
-int wiredtiger_unpack_str(WT_PACK_STREAM *, const char **);
-int wiredtiger_unpack_uint(WT_PACK_STREAM *, uint64_t *);
+int wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+int wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip);
+int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
+int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 
-int wiredtiger_pack_close(WT_PACK_STREAM *pack);
+int wiredtiger_pack_close(WT_PACK_STREAM *ps);
 
 /*! Get version information.
  *
