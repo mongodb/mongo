@@ -272,7 +272,7 @@ namespace mongo {
             bool oom = s->hasOutOfMemoryException();
 
             // do not keep too many contexts, or use them for too long
-            if (l.size() > 10 || s->getTimeUsed() > 10 || oom) {
+            if (l.size() > 10 || s->getTimeUsed() > 10 || oom || !s->getError().empty()) {
                 delete s;
             }
             else {
