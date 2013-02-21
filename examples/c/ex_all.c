@@ -459,7 +459,7 @@ session_ops(WT_SESSION *session)
 	 * (string, signed 32-bit integer, unsigned 16-bit integer).
 	 */
 	ret = session->create(session, "table:mytable",
-	    "key_format=r,value_format=SiH"
+	    "key_format=r,value_format=SiH,"
 	    "columns=(id,department,salary,year-started)");
 	/*! [Create a table with columns] */
 
