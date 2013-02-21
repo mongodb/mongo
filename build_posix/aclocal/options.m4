@@ -48,7 +48,7 @@ AC_MSG_RESULT($wt_cv_enable_diagnostic)
 
 AC_MSG_CHECKING(if --enable-java option specified)
 AC_ARG_ENABLE(java,
-	[AC_HELP_STRING([--enable-java],
+	[AS_HELP_STRING([--enable-java],
 	    [Configure the Java API.])], r=$enableval, r=no)
 case "$r" in
 no)	wt_cv_enable_java=no;;
@@ -62,7 +62,7 @@ AM_CONDITIONAL([JAVA], [test x$wt_cv_enable_java = xyes])
 
 AC_MSG_CHECKING(if --enable-python option specified)
 AC_ARG_ENABLE(python,
-	[AC_HELP_STRING([--enable-python],
+	[AS_HELP_STRING([--enable-python],
 	    [Configure the python API.])], r=$enableval, r=no)
 case "$r" in
 no)	wt_cv_enable_python=no;;
