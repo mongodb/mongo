@@ -277,6 +277,41 @@ namespace mongo {
         return VersionStatus_NeedUpgrade;
     }
 
+    // Checks that all config servers are online
+    bool _checkConfigServersAlive(const ConnectionString& configLoc, string* errMsg) {
+        
+        scoped_ptr<ScopedDbConnection> connPtr;
+
+        bool resultOk;
+        BSONObj result;
+        try {
+            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            ScopedDbConnection& conn = *connPtr;
+            
+            if (conn->type() == ConnectionString::SYNC) {
+                // TODO: Dynamic cast is bad, we need a better way of managing this op
+                // via the heirarchy (or not)
+                return (dynamic_cast<SyncClusterConnection*>(conn.get()))->prepare(*errMsg);
+            }
+            else {
+                resultOk = conn->runCommand("admin", BSON( "fsync" << 1 ), result); 
+            }
+        }
+        catch (const DBException& e) {
+            *errMsg = e.toString();
+            return false;
+        }
+
+        connPtr->done();
+        
+        if (!resultOk) {
+            *errMsg = DBClientWithCommands::getLastErrorString(result);
+            return false;
+        }
+        
+        return true;            
+    }
+
     // Dispatches upgrades based on version to the upgrades registered in the upgrade registry
     bool _nextUpgrade(const ConnectionString& configLoc,
                       const ConfigUpgradeRegistry& registry,
@@ -400,6 +435,16 @@ namespace mongo {
                                << versionInfo->getCurrentVersion() << ", "
                                << "need to run mongos with --upgrade";
 
+            return false;
+        }
+
+        // Contact the config servers to make sure all are online - otherwise we wait a long time
+        // for locks.
+        if (!_checkConfigServersAlive(configLoc, errMsg)) {
+            
+            *errMsg = stream() << "all config servers must be reachable for config upgrade"
+                               << causedBy(errMsg);
+            
             return false;
         }
 
