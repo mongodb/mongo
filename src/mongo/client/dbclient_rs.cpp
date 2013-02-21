@@ -510,7 +510,7 @@ namespace mongo {
          * and tell it to use the internal credentials.
          */
         scoped_ptr<ScopedDbConnection> authenticatedConn(
-                ScopedDbConnection::getInternalScopedDbConnection( hostAddr ) );
+                ScopedDbConnection::getInternalScopedDbConnection( hostAddr, 5.0 ) );
 
         if ( !authenticatedConn->get()->runCommand( "admin",
                                                     BSON( "replSetGetStatus" << 1 ),
