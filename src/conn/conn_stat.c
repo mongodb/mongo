@@ -43,15 +43,15 @@ __wt_statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	conn = S2C(session);
 
 	/*
-	 * None of the statistics logging configuration values are required,
-	 * so we use a boolean flag that turns on logging.  Check to see if
-	 * we're running at all.
+	 * The statistics logging configuration requires a wait time -- if it's
+	 * not set, we're not running at all.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.log", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	if (cval.val == 0) {
 		*runp = 0;
 		return (0);
 	}
+	conn->stat_usecs = (long)cval.val * 1000000;
 	*runp = 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.clear", &cval));
@@ -63,9 +63,6 @@ __wt_statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.timestamp", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->stat_stamp));
-
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
-	conn->stat_usecs = (long)cval.val * 1000000;
 
 	return (0);
 }

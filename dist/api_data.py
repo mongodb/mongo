@@ -548,19 +548,17 @@ methods = {
 		Config('clear', 'true', r'''
 		clear the statistics values after each set of log records
 		are written''', type='boolean'),
-		Config('log', 'false', r'''
-		log database connection statistics into a file''',
-		type='boolean'),
 		Config('path', '"WiredTigerStat.%H"', r'''
 		the pathname to a file into which the log records are written,
 		may contain strftime conversion specifications.  If the value
 		is not an absolute path name, the file is created relative to
 		the database home'''),
-		Config('timestamp', '"%b %d %k:%M:%S"', r'''
+		Config('timestamp', '"%b %d %H:%M:%S"', r'''
 		a timestamp prepended to each log record, may contain strftime
 		conversion specifications'''),
-		Config('wait', '120', r'''
-		seconds to wait between each write of the log records''',
+		Config('wait', '0', r'''
+		seconds to wait between each write of the log records; setting
+		this value configures statistics logging''',
 		min='5', max='100000'),
 		]),
 	Config('sync', 'true', r'''

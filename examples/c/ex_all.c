@@ -1036,13 +1036,13 @@ main(void)
 
 	/*! [Statistics logging] */
 	ret = wiredtiger_open(
-	    home, NULL, "create,statistics_log=(log=true,wait=30)", &conn);
+	    home, NULL, "create,statistics_log=(wait=30)", &conn);
 	/*! [Statistics logging] */
 
 	/*! [Statistics logging with path] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "statistics_log=(log=true,path=\"/log/log.%m.%d.%y\")", &conn);
+	    "statistics_log=(wait=120,path=\"/log/log.%m.%d.%y\")", &conn);
 	/*! [Statistics logging with path] */
 #endif
 
