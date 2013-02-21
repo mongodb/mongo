@@ -7,6 +7,15 @@
 
 #include "wt_internal.h"
 
+#ifdef __GNUC__
+/*
+ * !!!
+ * GCC with -Wformat-nonliteral complains about calls to strftime in this file.
+ * There's nothing wrong, this makes the warning go away.
+ */
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#endif
+
 /*
  * __wt_conn_stat_init --
  *	Initialize the per-connection statistics.
@@ -114,14 +123,7 @@ __stat_server(void *arg)
 		WT_ERR(__wt_epoch(session, &ts));
 		tm = localtime(&ts.tv_sec);
 
-		/*
-		 * Create the logging path name for this time of day.
-		 *
-		 * !!!
-		 * The gcc compiler with the -Wformat-nonliteral flag complains
-		 * about this call to strftime.   There's nothing wrong, but I
-		 * know of no way to make the warning go away.
-		 */
+		/* Create the logging path name for this time of day. */
 		if (strftime(tmp.mem, tmp.memsize, conn->stat_path, tm) == 0)
 			WT_ERR_MSG(
 			    session, ENOMEM, "strftime path conversion");
@@ -138,13 +140,7 @@ __stat_server(void *arg)
 			    (fp = fopen(path.mem, "a")) == NULL, __wt_errno());
 		}
 
-		/*
-		 * Create the entry prefix for this time of day.
-		 * !!!
-		 * The gcc compiler with the -Wformat-nonliteral flag complains
-		 * about this call to strftime.   There's nothing wrong, but I
-		 * know of no way to make the warning go away.
-		 */
+		/* Create the entry prefix for this time of day. */
 		if (strftime(tmp.mem, tmp.memsize, conn->stat_stamp, tm) == 0)
 			WT_ERR_MSG(
 			    session, ENOMEM, "strftime timestamp conversion");
