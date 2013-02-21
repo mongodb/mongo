@@ -52,6 +52,9 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_ERR(__wt_thread_create(session,
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 
+	/* Start the optional statistics thread. */
+	WT_ERR(__wt_statlog_create(conn, cfg));
+
 	return (0);
 
 err:	WT_TRET(__wt_connection_close(conn));
@@ -92,6 +95,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_evict_server_wake(session));
 		WT_TRET(__wt_thread_join(session, conn->cache_evict_tid));
 	}
+
+	/* Statistics log server. */
+	WT_TRET(__wt_statlog_destroy(conn));
 
 	/* Disconnect from shared cache - must be before cache destroy. */
 	WT_TRET(__wt_conn_cache_pool_destroy(conn));

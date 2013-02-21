@@ -574,12 +574,12 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 }
 
 /*
- * __wt_config_getraw --
+ * __config_getraw --
  *	Given a config parser, find the final value for a given key.
  */
-int
-__wt_config_getraw(
-    WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+static int
+__config_getraw(
+    WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value, int top)
 {
 	WT_CONFIG sparser;
 	WT_CONFIG_ITEM k, v, subk;
@@ -601,14 +601,16 @@ __wt_config_getraw(
 			WT_RET(__wt_config_initn(
 			    cparser->session, &sparser, v.str, v.len));
 			if ((ret =
-			    __wt_config_getraw(&sparser, &subk, value)) == 0)
+			    __config_getraw(&sparser, &subk, value, 0)) == 0)
 				found = 1;
 			WT_RET_NOTFOUND_OK(ret);
 		}
 	}
+	WT_RET_NOTFOUND_OK(ret);
 
-	return ((found && ret == WT_NOTFOUND) ?
-	    __config_process_value(cparser, value) : ret);
+	if (!found)
+		return (WT_NOTFOUND);
+	return (top ? __config_process_value(cparser, value) : 0);
 }
 
 /*
@@ -626,7 +628,7 @@ __wt_config_get(WT_SESSION_IMPL *session,
 
 	for (found = 0; *cfg != NULL; cfg++) {
 		WT_RET(__wt_config_init(session, &cparser, *cfg));
-		if ((ret = __wt_config_getraw(&cparser, key, value)) == 0)
+		if ((ret = __config_getraw(&cparser, key, value, 1)) == 0)
 			found = 1;
 		else if (ret != WT_NOTFOUND)
 			return (ret);
@@ -660,7 +662,7 @@ __wt_config_getone(WT_SESSION_IMPL *session,
 	WT_CONFIG cparser;
 
 	WT_RET(__wt_config_init(session, &cparser, config));
-	return (__wt_config_getraw(&cparser, key, value));
+	return (__config_getraw(&cparser, key, value, 1));
 }
 
 /*
@@ -675,7 +677,7 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM key_item = { key, strlen(key), 0, ITEM_STRING };
 
 	WT_RET(__wt_config_init(session, &cparser, config));
-	return (__wt_config_getraw(&cparser, &key_item, value));
+	return (__config_getraw(&cparser, &key_item, value, 1));
 }
 
 /*
@@ -723,7 +725,7 @@ __wt_config_subgetraw(WT_SESSION_IMPL *session,
 	WT_CONFIG cparser;
 
 	WT_RET(__wt_config_initn(session, &cparser, cfg->str, cfg->len));
-	return (__wt_config_getraw(&cparser, key, value));
+	return (__config_getraw(&cparser, key, value, 1));
 }
 
 /*

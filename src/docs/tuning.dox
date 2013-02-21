@@ -194,9 +194,9 @@ throughput.  See @ref file_formats_compression for more information.
 
 @section tuning_statistics Performance monitoring with statistics
 
-WiredTiger maintains a variety of statistics that can be read with a
-cursor.  See @ref data_statistics for general information about accessing
-statistics.
+WiredTiger maintains a variety of statistics: see @ref data_statistics
+for general information about accessing those statistics, and @ref
+statistics_log for information about automatic logging of statistics.
 
 The statistics gathered by WiredTiger can be combined to derive information
 about the system's behavior.  For example, a cursor can be opened on the

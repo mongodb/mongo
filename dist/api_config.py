@@ -191,7 +191,7 @@ def get_default(c):
         return '(%s)' % (','.join('%s=%s' % (subc.name, get_default(subc))
             for subc in sorted(c.subconfig)))
     elif (c.default or t == 'int') and c.default != 'true':
-        return str(c.default)
+	return str(c.default).replace('"', '\\"')
     else:
         return ''
 

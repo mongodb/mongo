@@ -427,8 +427,19 @@ __wt_confdfl_wiredtiger_open =
 	"error_prefix=,eviction_dirty_target=80,eviction_target=80,"
 	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
 	",mmap=,multiprocess=0,session_max=50,shared_cache=(chunk=10MB,"
-	"name=pool,reserve=0,size=500MB),sync=,transactional=,"
-	"use_environment_priv=0,verbose=";
+	"name=pool,reserve=0,size=500MB),statistics_log=(clear=,log=0,"
+	"path=\"WiredTigerStat.%H\",timestamp=\"%b %d %k:%M:%S\",wait=120),"
+	"sync=,transactional=,use_environment_priv=0,verbose=";
+
+WT_CONFIG_CHECK
+__wt_confchk_statistics_log_subconfigs[] = {
+	{ "clear", "boolean", NULL, NULL },
+	{ "log", "boolean", NULL, NULL },
+	{ "path", "string", NULL, NULL },
+	{ "timestamp", "string", NULL, NULL },
+	{ "wait", "int", "min=5,max=100000", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
 
 WT_CONFIG_CHECK
 __wt_confchk_wiredtiger_open[] = {
@@ -449,6 +460,8 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "session_max", "int", "min=1", NULL},
 	{ "shared_cache", "category", NULL,
 	     __wt_confchk_shared_cache_subconfigs},
+	{ "statistics_log", "category", NULL,
+	     __wt_confchk_statistics_log_subconfigs},
 	{ "sync", "boolean", NULL, NULL},
 	{ "transactional", "boolean", NULL, NULL},
 	{ "use_environment_priv", "boolean", NULL, NULL},
