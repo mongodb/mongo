@@ -435,7 +435,7 @@ namespace mongo {
                 break;
             }
             
-            if (!networkEvents.lNetworkEvents & FD_ACCEPT) {
+            if (!(networkEvents.lNetworkEvents & FD_ACCEPT)) {
                 error() << "Unexpected network event: " << networkEvents.lNetworkEvents << endl;
                 continue;
             }
