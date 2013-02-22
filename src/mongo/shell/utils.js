@@ -222,7 +222,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/queryoptimizera.js",
                                    "jstests/loglong.js",// log might overflow before 
                                                         // this has a chance to see the message
-                                   "jstests/connections_opened.js" // counts connections, globally
+                                   "jstests/connections_opened.js", // counts connections, globally
                                    "jstests/currentop.js"// SERVER-8673, plus rwlock yielding issues
                                   ] );
         
