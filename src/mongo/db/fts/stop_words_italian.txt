@@ -4,6 +4,7 @@ abbiamo
 abbiano
 abbiate
 ad
+adesso
 agl
 agli
 ai
@@ -12,9 +13,15 @@ all
 alla
 alle
 allo
+allora
+altre
+altri
+altro
 anche
+ancora
 avemmo
 avendo
+avere
 avesse
 avessero
 avessi
@@ -71,6 +78,7 @@ dell
 della
 delle
 dello
+dentro
 di
 dov
 dove
@@ -78,6 +86,7 @@ e
 ebbe
 ebbero
 ebbi
+ecco
 ed
 era
 erano
@@ -109,6 +118,7 @@ fai
 fanno
 farai
 faranno
+fare
 farebbe
 farebbero
 farei
@@ -122,16 +132,19 @@ farò
 fece
 fecero
 feci
+fino
 fosse
 fossero
 fossi
 fossimo
 foste
 fosti
+fra
 fu
 fui
 fummo
 furono
+giù
 gli
 ha
 hai
@@ -150,6 +163,7 @@ lo
 loro
 lui
 ma
+me
 mi
 mia
 mie
@@ -164,6 +178,7 @@ nell
 nella
 nelle
 nello
+no
 noi
 non
 nostra
@@ -173,12 +188,17 @@ nostro
 o
 per
 perché
+però
 più
+pochi
+poco
+qua
 quale
 quanta
 quante
 quanti
 quanto
+quasi
 quella
 quelle
 quelli
@@ -187,6 +207,8 @@ questa
 queste
 questi
 questo
+qui
+quindi
 sarai
 saranno
 sarebbe
@@ -201,6 +223,7 @@ sarà
 sarò
 se
 sei
+senza
 si
 sia
 siamo
@@ -208,12 +231,15 @@ siano
 siate
 siete
 sono
+sopra
+sotto
 sta
 stai
 stando
 stanno
 starai
 staranno
+stare
 starebbe
 starebbero
 starei
@@ -224,6 +250,8 @@ staresti
 starete
 starà
 starò
+stati
+stato
 stava
 stavamo
 stavano
@@ -235,6 +263,7 @@ stesse
 stessero
 stessi
 stessimo
+stesso
 steste
 stesti
 stette
@@ -258,6 +287,7 @@ sulle
 sullo
 suo
 suoi
+te
 ti
 tra
 tu
@@ -270,6 +300,7 @@ tutto
 un
 una
 uno
+vai
 vi
 voi
 vostra
