@@ -581,7 +581,7 @@ struct __wt_session {
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source.,a list of strings; default empty.}
 	 * @configend
-	 * @param cursorp a pointer to the newly opened cursor
+	 * @param[out] cursorp a pointer to the newly opened cursor
 	 * @errors
 	 */
 	int __F(open_cursor)(WT_SESSION *session,
@@ -1109,7 +1109,7 @@ struct __wt_connection {
 	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
 	 * read-committed.}
 	 * @configend
-	 * @param sessionp the new session handle
+	 * @param[out] sessionp the new session handle
 	 * @errors
 	 */
 	int __F(open_session)(WT_CONNECTION *connection,
@@ -1292,7 +1292,7 @@ struct __wt_connection {
  * for details).  Configuration values specified in the \c config argument to
  * the ::wiredtiger_open function override configuration values specified in
  * the \c WiredTiger.config file.
- * @param connectionp A pointer to the newly opened connection handle
+ * @param[out] connectionp A pointer to the newly opened connection handle
  * @errors
  */
 int wiredtiger_open(const char *home,
@@ -1357,6 +1357,9 @@ struct __wt_event_handler {
 	    const char *operation, uint64_t progress);
 };
 
+/*! @name Data packing and unpacking
+ * @{
+ */
 /*! Pack a structure into a buffer.
  *
  * See @ref packing for a description of the permitted format strings.
@@ -1415,27 +1418,129 @@ int wiredtiger_struct_size(
 int wiredtiger_struct_unpack(WT_SESSION *session,
     const void *buffer, size_t size, const char *format, ...);
 
-/*
+/*!
  * Streaming interface to packing.
  *
  * This allows applications to pack or unpack records one field at a time.
+ * This is an opaque handle returned by ::wiredtiger_pack_start or
+ * ::wiredtiger_unpack_start.  It must be closed with ::wiredtiger_pack_close.
  */
 typedef struct __wt_pack_stream WT_PACK_STREAM;
 
+/*!
+ * Start a packing operation into a buffer with the given format string.  This
+ * should be followed by a series of calls to ::wiredtiger_pack_item,
+ * ::wiredtiger_pack_int, ::wiredtiger_pack_str or ::wiredtiger_pack_uint
+ * to fill in the values.
+ *
+ * @param session the session handle
+ * @param format the data format, see @ref packing
+ * @param buffer a pointer to memory to hold the packed data
+ * @param size the size of the buffer
+ * @param[out] psp the new packing stream handle
+ * @errors
+ */
 int wiredtiger_pack_start(WT_SESSION *session, const char *format, void *buffer, size_t size, WT_PACK_STREAM **psp);
+
+/*!
+ * Start an unpacking operation from a buffer with the given format string.  This
+ * should be followed by a series of calls to ::wiredtiger_unpack_item,
+ * ::wiredtiger_unpack_int, ::wiredtiger_unpack_str or ::wiredtiger_unpack_uint
+ * to retrieve the packed values.
+ *
+ * @param session the session handle
+ * @param format the data format, see @ref packing
+ * @param buffer a pointer to memory holding the packed data
+ * @param size the size of the buffer
+ * @param[out] psp the new packing stream handle
+ * @errors
+ */
 int wiredtiger_unpack_start(WT_SESSION *session, const char *format, const void *buffer, size_t size, WT_PACK_STREAM **psp);
 
+/*!
+ * Close a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] usedp the number of bytes in the buffer used by the stream
+ * @errors
+ */
+int wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp);
+
+/*!
+ * Pack an item into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param item an item to pack
+ * @errors
+ */
 int wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+
+/*!
+ * Pack a signed integer into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param i a signed integer to pack
+ * @errors
+ */
 int wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i);
+
+/*!
+ * Pack a string into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param s a string to pack
+ * @errors
+ */
 int wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s);
+
+/*!
+ * Pack an unsigned integer into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param u an unsigned integer to pack
+ * @errors
+ */
 int wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u);
 
+/*!
+ * Unpack an item from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param item an item to unpack
+ * @errors
+ */
 int wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+
+/*!
+ * Unpack a signed interger from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] ip the unpacked signed integer
+ * @errors
+ */
 int wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip);
+
+/*!
+ * Unpack a string from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] sp the unpacked string
+ * @errors
+ */
 int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
+
+/*!
+ * Unpack an unsigned interger from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] up the unpacked unsigned integer
+ * @errors
+ */
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 
-int wiredtiger_pack_close(WT_PACK_STREAM *ps);
+/*!
+ * @}
+ */
 
 /*! Get version information.
  *
