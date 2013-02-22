@@ -36,7 +36,6 @@ ayant
 ayez
 ayons
 bon
-c
 car
 ce
 ceci
@@ -176,7 +175,6 @@ quelle
 quelles
 quels
 qui
-s
 sa
 sans
 se
