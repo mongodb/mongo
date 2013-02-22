@@ -1512,7 +1512,7 @@ int wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u);
 int wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
 
 /*!
- * Unpack a signed interger from a packing stream.
+ * Unpack a signed integer from a packing stream.
  *
  * @param ps the packing stream handle
  * @param[out] ip the unpacked signed integer
@@ -1530,7 +1530,7 @@ int wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip);
 int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
 
 /*!
- * Unpack an unsigned interger from a packing stream.
+ * Unpack an unsigned integer from a packing stream.
  *
  * @param ps the packing stream handle
  * @param[out] up the unpacked unsigned integer
