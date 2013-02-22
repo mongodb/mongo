@@ -185,6 +185,9 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	if (ret == WT_NOTFOUND)
 		ret = force ? 0 : ENOENT;
 
+	/* Bump the schema generation so that stale data is ignored. */
+	++S2C(session)->schema_gen;
+
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	return (ret);
