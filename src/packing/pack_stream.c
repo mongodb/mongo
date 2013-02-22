@@ -58,11 +58,11 @@ wiredtiger_unpack_start(WT_SESSION *wt_session, const char *format, const void *
 int
 wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp)
 {
-	if (ps != NULL)
-		__wt_free(ps->pack.session, ps);
-
 	if (usedp != NULL)
 		*usedp = WT_PTRDIFF(ps->p, ps->start);
+
+	if (ps != NULL)
+		__wt_free(ps->pack.session, ps);
 
 	return (0);
 }
