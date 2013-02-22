@@ -4,6 +4,7 @@
 # programs.
 
 Import('env clientEnv')
+Import("has_option")
 
 env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
             ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
@@ -134,7 +135,13 @@ for path in clientHeaderDirectories:
     clientHeaders.extend(Glob('mongo/%s/*.h' % path))
     clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
-mongoclient_lib = env.Library('mongoclient', clientSource),
+if has_option( "sharedclient" ):
+    mongoclient_lib = env.SharedLibrary( "mongoclient", clientSource,
+            CPPFLAGS="-fPIC", LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs -shared ")
+else:
+    mongoclient_lib = env.Library('mongoclient', clientSource),
+
+
 mongoclient_install = env.Install('#/', [
         mongoclient_lib,
         #env.SharedLibrary('mongoclient', clientSource),
