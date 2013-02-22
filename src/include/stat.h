@@ -28,46 +28,40 @@ struct __wt_stats {
 	(stats)->fld.v = (uint64_t)(value);				\
 } while (0)
 
-#define	WT_STAT_CHECK_SESSION(session)					\
-	((session) != NULL && (session) != S2C(session)->default_session)
-
 /* Connection statistics. */
 #define	WT_CSTAT_DECR(session, fld) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_DECR(S2C(session)->stats, fld);			\
-	}								\
+	if (S2C(session)->statistics)					\
+		WT_STAT_DECR(&S2C(session)->stats, fld);		\
 } while (0)
 #define	WT_CSTAT_INCR(session, fld) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_INCR(S2C(session)->stats, fld);			\
-	}								\
+	if (S2C(session)->statistics)					\
+		WT_STAT_INCR(&S2C(session)->stats, fld);		\
 } while (0)
 #define	WT_CSTAT_INCRV(session, fld, v) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_INCRV(S2C(session)->stats, fld, v);		\
-	}								\
+	if (S2C(session)->statistics)					\
+		WT_STAT_INCRV(&S2C(session)->stats, fld, v);		\
+} while (0)
+#define	WT_CSTAT_SET(session, fld, v) do {				\
+	if (S2C(session)->statistics)					\
+		WT_STAT_SET(&S2C(session)->stats, fld, v);		\
 } while (0)
 
 /* Data-source statistics. */
+#define	WT_DSTAT_DECR(session, fld) do {				\
+	if (S2C(session)->statistics)					\
+		WT_STAT_DECR(&(session)->btree->stats, fld);		\
+} while (0)
 #define	WT_DSTAT_INCR(session, fld) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_INCR((session)->btree->stats, fld);		\
-	}								\
+	if (S2C(session)->statistics)					\
+		WT_STAT_INCR(&(session)->btree->stats, fld);		\
 } while (0)
 #define	WT_DSTAT_INCRV(session, fld, v) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_INCRV((session)->btree->stats, fld, v);		\
-	}								\
-} while (0)
-#define	WT_DSTAT_DECR(session, fld) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_DECR((session)->btree->stats, fld);		\
-	}								\
+	if (S2C(session)->statistics)					\
+		WT_STAT_INCRV(&(session)->btree->stats, fld, v);	\
 } while (0)
 #define	WT_DSTAT_SET(session, fld, v) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_SET((session)->btree->stats, fld, v);		\
-	}								\
+	if (S2C(session)->statistics)					\
+		WT_STAT_SET(&(session)->btree->stats, fld, v);		\
 } while (0)
 
 /* Flags used by statistics initialization. */

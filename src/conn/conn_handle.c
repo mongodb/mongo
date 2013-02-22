@@ -28,7 +28,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */
 
 	/* Statistics. */
-	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
+	__wt_stat_init_connection_stats(&conn->stats);
 
 	/* Locks. */
 	__wt_spin_init(session, &conn->api_lock);
@@ -91,7 +91,6 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->sessions);
-	__wt_free(session, conn->stats);
 
 	__wt_free(NULL, conn);
 	return (ret);

@@ -38,14 +38,15 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	if (cst->stats != NULL)
 		stats = (WT_DSRC_STATS *)cst->stats;
 	else {
-		WT_ERR(__wt_stat_alloc_dsrc_stats(session, &stats));
+		WT_ERR(__wt_calloc_def(session, 1, &stats));
+		__wt_stat_init_dsrc_stats(stats);
 		cst->stats_first = cst->stats = (WT_STATS *)stats;
 		cst->stats_count = sizeof(*stats) / sizeof(WT_STATS);
 	}
-	*stats = *lsm_tree->stats;
+	*stats = lsm_tree->stats;
 
 	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		__wt_stat_clear_dsrc_stats((WT_STATS *)lsm_tree->stats);
+		__wt_stat_clear_dsrc_stats(&lsm_tree->stats);
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	WT_ERR(__wt_readlock(session, lsm_tree->rwlock));

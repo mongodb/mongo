@@ -1060,6 +1060,8 @@ struct __wt_connection {
 	 * allocate for the shared cache. Setting this will update the value if
 	 * one is already set.,an integer between 1MB and 10TB; default \c
 	 * 500MB.}@config{ ),,}
+	 * @config{statistics, Maintain run-time statistics.,a boolean flag;
+	 * default \c false.}
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
@@ -1272,14 +1274,17 @@ struct __wt_connection {
  * pool.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
  * the shared cache. Setting this will update the value if one is already
  * set.,an integer between 1MB and 10TB; default \c 500MB.}@config{ ),,}
- * @config{statistics_log = (, log database connection statistics into a file.
- * See @ref statistics_log for more information.,a set of related configuration
- * options defined below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;clear, clear the
- * statistics values after each set of log records are written.,a boolean flag;
- * default \c true.}@config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file
- * into which the log records are written\, may contain strftime conversion
- * specifications.  If the value is not an absolute path name\, the file is
- * created relative to the database home.,a string; default \c
+ * @config{statistics, Maintain run-time statistics.,a boolean flag; default \c
+ * false.}
+ * @config{statistics_log = (, log database connection statistics into a file
+ * when the \c the \c statistics configuration value is set to true.  See @ref
+ * statistics_log for more information.,a set of related configuration options
+ * defined below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;clear, clear the statistics
+ * values after each set of log records are written.,a boolean flag; default \c
+ * true.}@config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into which
+ * the log records are written\, may contain strftime conversion specifications.
+ * If the value is not an absolute path name\, the file is created relative to
+ * the database home.,a string; default \c
  * "WiredTigerStat.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp
  * prepended to each log record\, may contain strftime conversion
  * specifications.,a string; default \c "%b %d

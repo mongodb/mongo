@@ -2,13 +2,9 @@
 
 #include "wt_internal.h"
 
-int
-__wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
+void
+__wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 {
-	WT_DSRC_STATS *stats;
-
-	WT_RET(__wt_calloc_def(session, 1, &stats));
-
 	stats->block_alloc.desc = "blocks allocated";
 	stats->block_allocsize.desc =
 	    "block manager file allocation unit size";
@@ -109,13 +105,10 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->session_compact.desc = "object compaction";
 	stats->txn_update_conflict.desc = "update conflicts";
 	stats->txn_write_conflict.desc = "write generation conflicts";
-
-	*statsp = stats;
-	return (0);
 }
 
 void
-__wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
+__wt_stat_clear_dsrc_stats(void *stats_arg)
 {
 	WT_DSRC_STATS *stats;
 
@@ -203,13 +196,9 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->txn_write_conflict.v = 0;
 }
 
-int
-__wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS **statsp)
+void
+__wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 {
-	WT_CONNECTION_STATS *stats;
-
-	WT_RET(__wt_calloc_def(session, 1, &stats));
-
 	stats->block_byte_map_read.desc =
 	    "mapped bytes read by the block manager";
 	stats->block_byte_read.desc = "bytes read by the block manager";
@@ -266,13 +255,10 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	    "transaction failures due to cache overflow";
 	stats->txn_rollback.desc = "transactions rolled-back";
 	stats->write_io.desc = "total write I/Os";
-
-	*statsp = stats;
-	return (0);
 }
 
 void
-__wt_stat_clear_connection_stats(WT_STATS *stats_arg)
+__wt_stat_clear_connection_stats(void *stats_arg)
 {
 	WT_CONNECTION_STATS *stats;
 

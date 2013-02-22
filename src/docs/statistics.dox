@@ -1,5 +1,17 @@
-/*! @page statistics_log Statistics logging
+/*! @page statistics Statistics
 
+WiredTiger can be configured to maintain a variety of run-time
+statistics.  The \c statistics configuration boolean must be set for
+statistics to be maintained; see @ref data_statistics for information
+about accessing the statistics.  The following example configures
+WiredTiger to maintain statistics:
+
+@snippet ex_all.c Statistics configuration
+
+Note that maintaining statistics involves updating shared-memory data
+structures and may decrease application performance.
+
+@section statistics_log Statistics logging
 WiredTiger will optionally log the current database statistics into a
 file when configured the \c statistics_log.log configuration string of
 the ::wiredtiger_open function is set.
@@ -35,8 +47,9 @@ day and year:
 
 @snippet ex_all.c Statistics logging with path
 
-A Python script that parses the default logging output and uses the gnuplot
-utility to generate Portable Network Graphics (PNG) format graphs is
-included in the WiredTiger distribution in the file \c tools/statlog.py.
+A Python script that parses the default logging output and uses the
+<a href="http://www.gnuplot.info/">gnuplot</a>, utility to generate
+Portable Network Graphics (PNG) format graphs is included in the
+WiredTiger distribution in the file \c tools/statlog.py.
 
 */

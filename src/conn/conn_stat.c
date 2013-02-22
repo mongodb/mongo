@@ -23,19 +23,17 @@
 void
 __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
 {
-	WT_CONNECTION_IMPL *conn;
+	WT_UNUSED(flags);
 
-	conn = S2C(session);
-
-	__wt_cache_stats_update(conn, flags);
+	__wt_cache_stats_update(session);
 }
 
 /*
  * __wt_statlog_config --
  *	Parse and setup the statistics server options.
  */
-int
-__wt_statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
+static int
+__statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -116,6 +114,16 @@ __stat_server(void *arg)
 	WT_ERR(__wt_buf_init(session, &tmp, strlen(conn->stat_path) + 128));
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
+		/*
+		 * If statistics are turned off, wait until it's time to output
+		 * statistics and check again.
+		 */
+		if (conn->statistics == 0) {
+			WT_ERR(__wt_cond_wait(
+			    session, conn->stat_cond, conn->stat_usecs));
+			continue;
+		}
+
 		/* Get the current local time of day. */
 		WT_ERR(__wt_epoch(session, &ts));
 		tm = localtime(&ts.tv_sec);
@@ -155,7 +163,7 @@ __stat_server(void *arg)
 		WT_ERR(cursor->close(cursor));
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
 
-		/* Wait... */
+		/* Wait until the next event. */
 		WT_ERR(
 		    __wt_cond_wait(session, conn->stat_cond, conn->stat_usecs));
 	}
@@ -183,7 +191,7 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 
 	/* Handle configuration. */
-	WT_RET(__wt_statlog_config(session, cfg, &run));
+	WT_RET(__statlog_config(session, cfg, &run));
 
 	/* If not configured, we're done. */
 	if (!run)

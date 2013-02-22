@@ -1,5 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_143 Upgrading to Version 1.4.3
+<dl>
+<dt>Statistics</dt>
+<dd>
+WiredTiger statistics are no longer maintained by default; to configure
+statistics, use the \c statistics configuration string to the
+::wiredtiger_open function.
+</dd>
+
+</dl>
+<hr>
 @section version_139 Upgrading to Version 1.3.9
 <dl>
 

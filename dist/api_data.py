@@ -289,6 +289,9 @@ connection_runtime_config = [
 		trigger eviction when the cache becomes this full (as a
 		percentage)''',
 		min=10, max=99),
+	Config('statistics', 'false', r'''
+		Maintain run-time statistics''',
+		type='boolean'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -542,8 +545,9 @@ methods = {
 		threads)''',
 		min='1'),
 	Config('statistics_log', '', r'''
-		log database connection statistics into a file.
-		See @ref statistics_log for more information''',
+		log database connection statistics into a file when the \c
+		the \c statistics configuration value is set to true.  See
+		@ref statistics_log for more information''',
 		type='category', subconfig=[
 		Config('clear', 'true', r'''
 		clear the statistics values after each set of log records

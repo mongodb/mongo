@@ -1034,14 +1034,18 @@ main(void)
 	ret = wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn);
 	/*! [Configure direct_io for data files] */
 
+	/*! [Statistics configuration] */
+	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
+	/*! [Statistics configuration] */
+
 	/*! [Statistics logging] */
 	ret = wiredtiger_open(
-	    home, NULL, "create,statistics_log=(wait=30)", &conn);
+	    home, NULL, "create,statistics,statistics_log=(wait=30)", &conn);
 	/*! [Statistics logging] */
 
 	/*! [Statistics logging with path] */
 	ret = wiredtiger_open(home, NULL,
-	    "create,"
+	    "create,statistics,"
 	    "statistics_log=(wait=120,path=\"/log/log.%m.%d.%y\")", &conn);
 	/*! [Statistics logging with path] */
 #endif
