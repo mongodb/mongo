@@ -59,11 +59,11 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
-
 	/* Check there's something to destroy. */
 	if (conn == NULL)
 		return (0);
+
+	session = conn->default_session;
 
 	/*
 	 * Close remaining open files (before discarding the mutex, the
