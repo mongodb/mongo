@@ -43,7 +43,9 @@ var chunkSizeBytes = 1024 * 1024;
 // if resetting the chunk size happens during reloads.  If the size is 
 // reset, we'd expect to split less, since the first split would then
 // disable further splits (statistically, since the decision is randomized).
-var insertsForSplit = Math.ceil((chunkSizeBytes * 1.25) / approxSize);
+// We choose 1.4 since split attempts happen about once every 1/5 chunksize,
+// and we want to be sure we def get a split attempt at a full chunk.
+var insertsForSplit = Math.ceil((chunkSizeBytes * 1.4) / approxSize);
 var totalInserts = insertsForSplit * numChunks;
 
 printjson({ chunkSizeBytes : chunkSizeBytes,
