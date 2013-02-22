@@ -12,6 +12,7 @@ Import("testEnv")
 Import("has_option")
 Import("usesm usev8")
 Import("installSetup")
+Import("enforce_glibc")
 Import("darwin windows solaris linux nix")
 
 env.SConscript(['base/SConscript',
@@ -742,11 +743,14 @@ if shellEnv is not None:
 
 def checkGlibc(target,source,env):
     import subprocess
+    import SCons.Errors
     stringProcess = subprocess.Popen( [ "strings", str( target[0] ) ], stdout=subprocess.PIPE )
     stringResult = stringProcess.communicate()[0]
     if stringResult.count( "GLIBC_2.4" ) > 0:
         print( "************* " + str( target[0] ) + " has GLIBC_2.4 dependencies!" )
-        Exit(-3)
+        raise SCons.Errors.BuildError(
+            node=target[0],
+            errstr="target has GLIBC_2.4 dependencies!")
 
 distBinaries = []
 
@@ -758,7 +762,7 @@ def installBinary( e, name ):
 
     name = add_exe( name )
 
-    if (not has_option( "no-glibc-check" ) and linux and "s3dist" in COMMAND_LINE_TARGETS):
+    if enforce_glibc:
         e.AddPostAction( name, checkGlibc )
 
     if (solaris or linux) and (not has_option("nostrip")):

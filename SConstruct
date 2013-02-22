@@ -904,6 +904,8 @@ elif not onlyServer:
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
+enforce_glibc = linux and has_option("release") and not has_option("no-glibc-check")
+
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
@@ -1129,6 +1131,7 @@ Export("usesm usev8")
 Export("darwin windows solaris linux freebsd nix")
 Export('module_sconscripts')
 Export("debugBuild")
+Export("enforce_glibc")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False)
