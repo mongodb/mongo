@@ -63,7 +63,8 @@ if( shardA.name == rsB.getURL() ){
 rsA.awaitReplication()
 rsB.awaitReplication()
 
-assert.eq( coll.find().itcount(), collSOk.find().itcount() )
+// Because of async migration cleanup, we need to wait for this condition to be true
+assert.soon( function(){ return coll.find().itcount() == collSOk.find().itcount() } )
 assert.eq( shardAColl.find().itcount(), 1 )
 assert.eq( shardAColl.findOne()._id, -1 )
 
