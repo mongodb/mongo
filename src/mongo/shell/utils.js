@@ -571,7 +571,9 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
     builtinMethods[Array] = "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some isArray reduce reduceRight".split( ' ' );
     builtinMethods[Boolean] = "".split( ' ' ); // nothing more than universal methods
     builtinMethods[Date] = "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toISOString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC now".split( ' ' );
-    builtinMethods[JSON] = "parse stringify".split(' ');
+    if (typeof JSON != "undefined") { // JSON is new in V8
+        builtinMethods["[object JSON]"] = "parse stringify".split(' ');
+    }
     builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(' ');
     builtinMethods[Number] = "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split( ' ' );
     builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split( ' ' );
