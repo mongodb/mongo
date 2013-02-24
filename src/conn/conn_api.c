@@ -964,5 +964,9 @@ err:	if (cbuf != NULL)
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_destroy(conn));
 
+	/* Let the server threads proceed. */
+	if (ret == 0)
+		conn->connection_initialized = 1;
+
 	return (ret);
 }

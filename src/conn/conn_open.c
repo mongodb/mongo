@@ -53,6 +53,9 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 	conn->cache_evict_tid_set = 1;
 
+	/* Start the optional checkpoint thread. */
+	WT_ERR(__wt_checkpoint_create(conn, cfg));
+
 	/* Start the optional statistics thread. */
 	WT_ERR(__wt_statlog_create(conn, cfg));
 
@@ -97,6 +100,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_thread_join(session, conn->cache_evict_tid));
 		conn->cache_evict_tid_set = 0;
 	}
+
+	/* Checkpoint server. */
+	WT_TRET(__wt_checkpoint_destroy(conn));
 
 	/* Statistics log server. */
 	WT_TRET(__wt_statlog_destroy(conn));

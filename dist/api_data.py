@@ -505,6 +505,16 @@ methods = {
 		alignment value should be used (512 bytes on Linux systems,
 		zero elsewhere)''',
 		min='-1', max='1MB'),
+	Config('checkpoint', '', r'''
+		periodically checkpoint the database''',
+		type='category', subconfig=[
+		Config('name', '"WiredTigerCheckpoint"', r'''
+		the checkpoint name'''),
+		Config('wait', '0', r'''
+		seconds to wait between each checkpoint; setting this value
+		configures periodic checkpoints''',
+		min='1', max='100000'),
+		]),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),

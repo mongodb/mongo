@@ -241,6 +241,7 @@ argc
 args
 argv
 async
+autockpt
 autocommit
 bdb
 bigram
