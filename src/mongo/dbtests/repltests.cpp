@@ -31,11 +31,6 @@
 
 #include "mongo/dbtests/dbtests.h"
 
-namespace mongo {
-    void createOplog();
-    void oldRepl();
-}
-
 namespace ReplTests {
 
     BSONObj f( const char *s ) {

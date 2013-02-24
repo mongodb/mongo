@@ -678,8 +678,6 @@ namespace mongo {
         exitCleanly(EXIT_NET_ERROR);
     }
 
-    void testPretouch();
-
     void initAndListen(int listenPort) {
         try {
             _initAndListen(listenPort);

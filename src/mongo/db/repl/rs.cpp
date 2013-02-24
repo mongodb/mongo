@@ -452,8 +452,6 @@ namespace mongo {
         return ret.release();
     }
 
-    void newReplUp();
-
     void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
         Lock::DBRead lk(rsoplog);
         BSONObj o;

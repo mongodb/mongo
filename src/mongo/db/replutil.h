@@ -22,10 +22,9 @@
 #include "repl.h"
 #include "cmdline.h"
 #include "repl/rs.h"
+#include "mongo/db/repl/master_slave.h"  // replAllDead
 
 namespace mongo {
-
-    extern const char *replAllDead;
 
     /* note we always return true for the "local" namespace.
 
@@ -76,10 +75,6 @@ namespace mongo {
         if ( ! str::startsWith( ns , "local" ) )
             return false;
         return ns[5] == 0 || ns[5] == '.';
-    }
-
-    inline void notMasterUnless(bool expr) {
-        uassert( 10107 , "not master" , expr );
     }
 
     class ParsedQuery;
