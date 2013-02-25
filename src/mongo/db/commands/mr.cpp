@@ -193,7 +193,7 @@ namespace mongo {
 
             Scope * s = _func.scope();
 
-            s->invokeSafe( _func.func() , &args, 0, 0, false, true, true );
+            s->invokeSafe( _func.func() , &args, 0, 0, false, false, true );
             ++numReduces;
 
             if ( s->type( "__returnValue" ) == Array ) {
