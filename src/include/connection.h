@@ -141,7 +141,8 @@ struct __wt_connection_impl {
 	const char	*ckpt_config;	/* Checkpoint configuration */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
-	WT_CONNECTION_STATS *stats;	/* Connection statistics */
+	WT_CONNECTION_STATS stats;	/* Connection statistics */
+	int		 statistics;	/* Global statistics configuration */
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */
 	int		 stat_tid_set;	/* Statistics log thread set */

@@ -77,7 +77,7 @@ wts_open(void)
 	snprintf(config, sizeof(config),
 	    "create,buffer_alignment=1024,direct_io=(data),"
 	    "checkpoint=(name=\"autockpt\", wait=17),"
-	    "statistics_log=(wait=5),"
+	    "statistics=true,statistics_log=(wait=5),"
 	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
 	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
 	    g.progname, g.c_cache,

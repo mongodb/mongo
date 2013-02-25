@@ -32,7 +32,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	 */
 	WT_ASSERT(session, number != 0 && size != 0);
 
-	if (session != NULL && S2C(session)->stats != NULL)
+	if (session != NULL)
 		WT_CSTAT_INCR(session, memory_allocation);
 
 	if ((p = calloc(number, size)) == NULL)
@@ -70,7 +70,7 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, bytes_to_allocate != 0);
 	WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
-	if (session != NULL && S2C(session)->stats != NULL) {
+	if (session != NULL) {
 		if (p == NULL)
 			WT_CSTAT_INCR(session, memory_allocation);
 		else
@@ -133,7 +133,7 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, bytes_to_allocate != 0);
 		WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
-		if (session != NULL && S2C(session)->stats != NULL)
+		if (session != NULL)
 			WT_CSTAT_INCR(session, memory_allocation);
 
 		if ((ret = posix_memalign(&newp,
@@ -228,7 +228,7 @@ __wt_free_int(WT_SESSION_IMPL *session, void *p_arg)
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
-	if (session != NULL && S2C(session)->stats != NULL)
+	if (session != NULL)
 		WT_CSTAT_INCR(session, memory_free);
 
 	free(p);

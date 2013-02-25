@@ -82,7 +82,8 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 		__wt_stat_clear_dsrc_stats(cst->stats);
 		stats = (WT_DSRC_STATS *)cst->stats;
 	} else {
-		WT_ERR(__wt_stat_alloc_dsrc_stats(session, &stats));
+		WT_ERR(__wt_calloc_def(session, 1, &stats));
+		__wt_stat_init_dsrc_stats(stats);
 		cst->stats_first = cst->stats = (WT_STATS *)stats;
 		cst->stats_count = sizeof(*stats) / sizeof(WT_STATS);
 	}

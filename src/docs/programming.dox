@@ -18,13 +18,14 @@ WiredTiger applications:
 - @subpage checkpoints
 - @subpage compression
 - @subpage hot_backup
+- @subpage statistics
 - @subpage threads
+- @subpage tuning
 
 - @subpage home
 - @subpage database_config
 - @subpage name_space
 - @subpage security
 - @subpage signals
-- @subpage tuning
 
  */

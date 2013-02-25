@@ -226,7 +226,7 @@ struct __wt_cursor_stat {
 	uint64_t v;			/* Current stats value */
 	WT_ITEM   pv;			/* Current stats value (string) */
 
-	void (*clear_func)(WT_STATS *);	/* Function to clear stats. */
+	void (*clear_func)(void *);	/* Function to clear stats. */
 	WT_BTREE *btree;		/* Pinned btree handle. */
 };
 

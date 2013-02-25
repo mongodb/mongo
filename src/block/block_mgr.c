@@ -197,9 +197,9 @@ __bm_free(WT_BM *bm,
  *	Block-manager statistics.
  */
 static int
-__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 {
-	__wt_block_stat(session, bm->block);
+	__wt_block_stat(session, bm->block, stats);
 	return (0);
 }
 
