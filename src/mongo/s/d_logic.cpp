@@ -69,7 +69,7 @@ namespace mongo {
 
         if( getsAResponse ){
             verify( dbresponse );
-            BufBuilder b( 32768 );
+            BufBuilder b( 512 );
             b.skip( sizeof( QueryResult ) );
             {
                 BSONObjBuilder bob;
@@ -87,6 +87,7 @@ namespace mongo {
             QueryResult *qr = (QueryResult*)b.buf();
             qr->_resultFlags() = ResultFlag_ErrSet | ResultFlag_ShardConfigStale;
             qr->len = b.len();
+            dassert( b.len() < 512 );
             qr->setOperation( opReply );
             qr->cursorId = 0;
             qr->startingFrom = 0;
@@ -116,7 +117,7 @@ namespace mongo {
 
         LOG(1) << "writeback queued for " << m.toString() << endl;
 
-        BSONObjBuilder b;
+        BSONObjBuilder b( (m.header()->len + 0x2000) & 0xfff );
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );
         b.append( "connectionId" , cc().getConnectionId() );
