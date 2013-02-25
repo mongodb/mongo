@@ -77,7 +77,6 @@ hvorfor
 i
 ikke
 ikkje
-ikkje
 ingen
 ingi
 inkje
@@ -134,7 +133,6 @@ samme
 seg
 selv
 si
-si
 sia
 sidan
 siden
@@ -146,7 +144,6 @@ skal
 skulle
 slik
 so
-som
 som
 somme
 somt
@@ -169,8 +166,7 @@ ville
 vore
 vors
 vort
-vår
-være
 være
 vært
+vår
 å
