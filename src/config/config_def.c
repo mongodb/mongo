@@ -424,13 +424,22 @@ __wt_confchk_table_meta[] = {
 
 const char *
 __wt_confdfl_wiredtiger_open =
-	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
-	"error_prefix=,eviction_dirty_target=80,eviction_target=80,"
-	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
-	",mmap=,multiprocess=0,session_max=50,shared_cache=(chunk=10MB,"
-	"name=pool,reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
-	"path=\"WiredTigerStat.%H\",timestamp=\"%b %d %H:%M:%S\",wait=0),"
-	"sync=,transactional=,use_environment_priv=0,verbose=";
+	"buffer_alignment=-1,cache_size=100MB,"
+	"checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),create=0,"
+	"direct_io=,error_prefix=,eviction_dirty_target=80,eviction_target=80"
+	",eviction_trigger=95,extensions=,hazard_max=1000,logging=0,"
+	"lsm_merge=,mmap=,multiprocess=0,session_max=50,"
+	"shared_cache=(chunk=10MB,name=pool,reserve=0,size=500MB),"
+	"statistics=0,statistics_log=(clear=,path=\"WiredTigerStat.%H\","
+	"timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,transactional=,"
+	"use_environment_priv=0,verbose=";
+
+WT_CONFIG_CHECK
+__wt_confchk_checkpoint_subconfigs[] = {
+	{ "name", "string", NULL, NULL },
+	{ "wait", "int", "min=1,max=100000", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
 
 WT_CONFIG_CHECK
 __wt_confchk_statistics_log_subconfigs[] = {
@@ -445,6 +454,8 @@ WT_CONFIG_CHECK
 __wt_confchk_wiredtiger_open[] = {
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL},
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
+	{ "checkpoint", "category", NULL,
+	     __wt_confchk_checkpoint_subconfigs},
 	{ "create", "boolean", NULL, NULL},
 	{ "direct_io", "list", "choices=[\"data\",\"log\"]", NULL},
 	{ "error_prefix", "string", NULL, NULL},

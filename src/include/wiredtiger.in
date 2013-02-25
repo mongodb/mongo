@@ -1227,6 +1227,13 @@ struct __wt_connection {
  * @config{cache_size, maximum heap memory to allocate for the cache. A database
  * should configure either a cache_size or a shared_cache not both.,an integer
  * between 1MB and 10TB; default \c 100MB.}
+ * @config{checkpoint = (, periodically checkpoint the database.,a set of
+ * related configuration options defined
+ * below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name.,a string;
+ * default \c "WiredTigerCheckpoint".}@config{&nbsp;&nbsp;&nbsp;&nbsp;wait,
+ * seconds to wait between each checkpoint; setting this value configures
+ * periodic checkpoints.,an integer between 1 and 100000; default \c 0.}@config{
+ * ),,}
  * @config{create, create the database if it does not exist.,a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a

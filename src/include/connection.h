@@ -76,8 +76,6 @@ struct __wt_connection_impl {
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 
-	int ckpt_backup;		/* Backup: don't delete checkpoints */
-
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 					/* Cache pool queue */
@@ -85,6 +83,8 @@ struct __wt_connection_impl {
 
 	const char *home;		/* Database home */
 	int is_new;			/* Connection created database */
+
+	int connection_initialized;	/* Connection is initialized */
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
@@ -130,7 +130,16 @@ struct __wt_connection_impl {
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
 
-	WT_TXN_GLOBAL txn_global;	/* Global transaction state. */
+	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
+
+	int ckpt_backup;		/* Backup: don't delete checkpoints */
+
+	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
+	pthread_t	 ckpt_tid;	/* Checkpoint thread */
+	int		 ckpt_tid_set;	/* Checkpoint thread set */
+	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
+	const char	*ckpt_config;	/* Checkpoint configuration */
+	long		 ckpt_usecs;	/* Checkpoint period */
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 	int		 statistics;	/* Global statistics configuration */
