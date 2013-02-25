@@ -906,7 +906,7 @@ namespace mongo {
            @param unique if true, indicates that key uniqueness should be enforced for this index
            @param name if not specified, it will be created from the keys automatically (which is recommended)
            @param cache if set to false, the index cache for the connection won't remember this call
-           @param background build index in the background (see mongodb docs/wiki for details)
+           @param background build index in the background (see mongodb docs for details)
            @param v index version. leave at default value. (unit tests set this parameter.)
            @param ttl. The value of how many seconds before data should be removed from a collection.
            @return whether or not sent message to db.
