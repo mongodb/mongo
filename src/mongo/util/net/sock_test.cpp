@@ -332,9 +332,11 @@ namespace {
             // Fail to recv that byte
             ASSERT_THROWS(tryRecv(), SocketException);
         }
+        // Failed byte should still be queued to recv.
+        ASSERT_EQUALS(size_t(1), countRecvable(1));
+        // Channel should be working again
         ASSERT_TRUE(trySend());
-        // Failed byte and additional byte should still be queued to recv.
-        ASSERT_EQUALS(size_t(2), countRecvable(2));
+        ASSERT_TRUE(tryRecv());
     }
 
 
