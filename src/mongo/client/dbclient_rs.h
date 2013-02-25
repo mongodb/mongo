@@ -617,12 +617,18 @@ namespace mongo {
      * A simple object for representing the list of tags. The initial state will
      * have a valid current tag as long as the list is not empty.
      */
-    class TagSet : public boost::noncopyable { // because of BSONArrayIteratorSorted
+    class TagSet {
     public:
         /**
          * Creates an empty tag list that is initially exhausted.
          */
         TagSet();
+
+        /**
+         * Creates a copy of the given TagSet. The new copy will have the
+         * iterator pointing at the initial position.
+         */
+        explicit TagSet(const TagSet& other);
 
         /**
          * Creates a tag set object that lazily iterates over the tag list.
@@ -661,18 +667,18 @@ namespace mongo {
         BSONObjIterator* getIterator() const;
 
         /**
-         * Create a new copy of this tag set and wuth the iterator pointing at the
-         * head.
-         */
-        TagSet* clone() const;
-
-        /**
          * @returns true if the other TagSet has the same tag set specification with
          *     this tag set, disregarding where the current iterator is pointing to.
          */
         bool equals(const TagSet& other) const;
 
     private:
+        /**
+         * This is purposely undefined as the semantics for assignment can be
+         * confusing. This is because BSONArrayIteratorSorted shouldn't be
+         * copied (because of how it manages internal buffer).
+         */
+        TagSet& operator=(const TagSet& other);
         BSONObj _currentTag;
         bool _isExhausted;
 
@@ -683,25 +689,21 @@ namespace mongo {
 
     struct ReadPreferenceSetting {
         /**
-         * @param tag cannot be NULL.
+         * @parm pref the read preference mode.
+         * @param tag the tag set. Note that this object will have the
+         *     tag set will have this in a reset state (meaning, this
+         *     object's copy of tag will have the iterator in the initial
+         *     position).
          */
-        ReadPreferenceSetting(ReadPreference pref, TagSet* tag):
-            pref(pref), tags(tag->clone()) {
-        }
-
-        ~ReadPreferenceSetting() {
-            delete tags;
+        ReadPreferenceSetting(ReadPreference pref, const TagSet& tag):
+            pref(pref), tags(tag) {
         }
 
         inline bool equals(const ReadPreferenceSetting& other) const {
-            return pref == other.pref && tags->equals(*other.tags);
+            return pref == other.pref && tags.equals(other.tags);
         }
 
         const ReadPreference pref;
-
-        /**
-         * Note: This object owns this memory.
-         */
-        TagSet* tags;
+        TagSet tags;
     };
 }

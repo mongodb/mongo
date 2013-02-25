@@ -244,19 +244,18 @@ namespace mongo {
                 uassert(16385, "tags for read preference should be an array",
                         tagsElem.type() == mongo::Array);
 
-                std::auto_ptr<TagSet> tags(new TagSet(BSONArray(tagsElem.Obj())));
-                if (pref == mongo::ReadPreference_PrimaryOnly && !tags->isExhausted()) {
+                TagSet tags(BSONArray(tagsElem.Obj().getOwned()));
+                if (pref == mongo::ReadPreference_PrimaryOnly && !tags.isExhausted()) {
                     uassert(16384, "Only empty tags are allowed with primary read preference",
-                            tags->getCurrentTag().isEmpty());
+                            tags.getCurrentTag().isEmpty());
                 }
 
-                return new ReadPreferenceSetting(pref, tags.release());
+                return new ReadPreferenceSetting(pref, tags);
             }
         }
 
-        BSONArrayBuilder arrayBuilder;
-        arrayBuilder.append(BSONObj());
-        return new ReadPreferenceSetting(pref, new TagSet(arrayBuilder.arr()));
+        TagSet tags(BSON_ARRAY(BSONObj()));
+        return new ReadPreferenceSetting(pref, tags);
     }
 
     /**
@@ -1537,8 +1536,8 @@ namespace mongo {
     DBClientConnection& DBClientReplicaSet::slaveConn() {
         BSONArray emptyArray(BSON_ARRAY(BSONObj()));
         TagSet tags(emptyArray);
-        shared_ptr<ReadPreferenceSetting> readPref(new ReadPreferenceSetting(
-                ReadPreference_SecondaryPreferred, new TagSet(emptyArray)));
+        shared_ptr<ReadPreferenceSetting> readPref(
+                new ReadPreferenceSetting(ReadPreference_SecondaryPreferred, tags));
         DBClientConnection* conn = selectNodeUsingTags(readPref);
 
         uassert( 16369, str::stream() << "No good nodes available for set: "
@@ -1742,7 +1741,7 @@ namespace mongo {
 
         ReplicaSetMonitorPtr monitor = _getMonitor();
         bool isPrimarySelected = false;
-        _lastSlaveOkHost = monitor->selectAndCheckNode(readPref->pref, readPref->tags,
+        _lastSlaveOkHost = monitor->selectAndCheckNode(readPref->pref, &readPref->tags,
                 &isPrimarySelected);
 
         if ( _lastSlaveOkHost.empty() ){
@@ -2010,6 +2009,13 @@ namespace mongo {
     TagSet::TagSet() : _isExhausted(true), _tagIterator(_tags) {
     }
 
+    TagSet::TagSet(const TagSet& other) :
+            _isExhausted(false),
+            _tags(other._tags.getOwned()),
+            _tagIterator(_tags) {
+        next();
+    }
+
     TagSet::TagSet(const BSONArray& tags) :
             _isExhausted(false),
             _tags(tags.getOwned()),
@@ -2039,10 +2045,6 @@ namespace mongo {
 
     BSONObjIterator* TagSet::getIterator() const {
         return new BSONObjIterator(_tags);
-    }
-
-    TagSet* TagSet::clone() const {
-        return new TagSet(BSONArray(_tags.copy()));
     }
 
     bool TagSet::equals(const TagSet& other) const {
