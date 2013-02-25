@@ -105,17 +105,34 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
  * and we use consecutive argument matching of typemaps to convert two args to
  * one.
  */
-%define SELFHELPER(type, name)
+%define WT_CLASS(type, class, name)
 %typemap(in, numinputs=0) type *name "$1 = *(type **)&jarg1;"
+%typemap(javaimports) type "
+/**
+  * @copydoc class
+  * @ingroup wt_java
+  */"
 %enddef
 
-SELFHELPER(struct __wt_connection, connection)
-SELFHELPER(struct __wt_session, session)
-SELFHELPER(struct __wt_cursor, cursor)
+%pragma(java) moduleimports=%{
+/**
+ * @defgroup wt_java WiredTiger Java API
+ *
+ * Java wrappers around the WiredTiger C API.
+ */
+
+/**
+ * @ingroup wt_java
+ */
+%}
+
+WT_CLASS(struct __wt_connection, WT_CONNECTION, connection)
+WT_CLASS(struct __wt_session, WT_SESSION, session)
+WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor)
 
 %define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
-%javamethodmodifiers SIGNATURE_CLASS::METHOD
-"/**
+%javamethodmodifiers SIGNATURE_CLASS::METHOD "
+  /**
    * @copydoc CLASS::METHOD
    */
   public ";
@@ -749,6 +766,12 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %ignore wiredtiger_extension_init;
 
 %ignore wiredtiger_open;
+%javamethodmodifiers wiredtiger_open_wrap "
+  /**
+   * @copydoc ::wiredtiger_open
+   */
+  public ";
+
 %rename(open) wiredtiger_open_wrap;
 %ignore __wt_connection::open_session;
 %rename(open_session) __wt_connection::open_session_wrap;

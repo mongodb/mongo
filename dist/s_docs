@@ -82,14 +82,12 @@ EOF
 		e=1
 	}
 
-        EXTRA_INPUT=""
-        f="../lang/python/wiredtiger.py"
-        if [ -f "$f" ]; then
-                EXTRA_INPUT+=" $f"
-        fi
-        if [ -f ../lang/java/wiredtiger_wrap.c ]; then
-                EXTRA_INPUT+=" ../../lang/java/src/com/wiredtiger/db"
-        fi
+	# Add optional extras
+	EXTRAS="../lang/java/src/com/wiredtiger/db ../lang/python/wiredtiger.py"
+	EXTRA_INPUT=""
+	for f in $EXTRAS ; do
+		[ -e "$f" ] && EXTRA_INPUT="$EXTRA_INPUT ../$f"
+	done
 
 	# Run again to generate the full doc set with Python and Java.
 	[ "$additional_languages" -eq 1 ] && [ "x$EXTRA_INPUT" != "x" ] && (
@@ -114,14 +112,14 @@ while :
 	-a)	# Build from scratch
 		clean=1
 		shift;;
-	-l)     # Generate the top-level landing page in ../docs/top
+	-l)	# Generate the top-level landing page in ../docs/top
 		filter="$filter; cat top/Doxyfile"
 		additional_languages=0
 		shift;;
-	-p)     # Generate PDFs
+	-p)	# Generate PDFs
 		filter="$filter| sed '/GENERATE_LATEX/s,=.*,=YES,'"
 		shift;;
-	-t)     # Include the TODO list
+	-t)	# Include the TODO list
 		filter="$filter| sed '/GENERATE_TODOLIST/s,=.*,=YES,'"
 		shift;;
 	*)
