@@ -442,8 +442,6 @@ typedef int int_void;
 %include "wiredtiger.h"
 
 %pythoncode %{
-## @}
-
 class stat:
 	'''keys for statistics cursors'''
 
@@ -454,6 +452,8 @@ class stat:
 	class dsrc:
 		'''keys for cursors on data source statistics'''
 		pass
+
+## @}
 
 import sys
 # All names starting with 'WT_STAT_DSRC_' are renamed to

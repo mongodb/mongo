@@ -58,6 +58,7 @@ flags = {
 ###################################################
 	'conn' : [
 		'CONN_CACHE_POOL',
+		'CONN_EVICTION_RUN',
 		'CONN_LSM_MERGE',
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',

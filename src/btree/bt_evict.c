@@ -302,11 +302,11 @@ __wt_cache_evict_server(void *arg)
 	cache->evict_entries = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
 	WT_ERR(__wt_calloc_def(session, cache->evict_entries, &cache->evict));
 
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
+	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
 
-		if (!F_ISSET(conn, WT_CONN_SERVER_RUN))
+		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
 			break;
 
 		WT_VERBOSE_ERR(session, evictserver, "sleeping");

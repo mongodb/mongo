@@ -55,6 +55,7 @@ src/conn/conn_api.c
 src/conn/conn_btree.c
 src/conn/conn_cache.c
 src/conn/conn_cache_pool.c
+src/conn/conn_ckpt.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
 src/conn/conn_stat.c

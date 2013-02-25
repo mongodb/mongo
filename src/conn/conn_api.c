@@ -319,6 +319,16 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		if (!F_ISSET(s, WT_SESSION_INTERNAL))
 			__wt_free(session, s->hazard);
 
+	/*
+	 * Shut down server threads other than the eviction server, which is
+	 * needed later to close btree handles.  Some of these threads access
+	 * btree handles, so take care in ordering shutdown to make sure they
+	 * exit before files are closed.
+	 */
+	F_CLR(conn, WT_CONN_SERVER_RUN);
+	WT_TRET(__wt_checkpoint_destroy(conn));
+	WT_TRET(__wt_statlog_destroy(conn));
+
 	/* Clean up open LSM handles. */
 	WT_ERR(__wt_lsm_cleanup(&conn->iface));
 
@@ -338,6 +348,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		__conn_remove_data_source(conn, ndsrc);
 
 	WT_TRET(__wt_connection_close(conn));
+
 	/* We no longer have a session, don't try to update it. */
 	session = NULL;
 
@@ -963,6 +974,10 @@ err:	if (cbuf != NULL)
 
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_destroy(conn));
+
+	/* Let the server threads proceed. */
+	if (ret == 0)
+		conn->connection_initialized = 1;
 
 	return (ret);
 }
