@@ -50,7 +50,9 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		return (0);
 	}
 	conn->stat_usecs = (long)cval.val * 1000000;
-	*runp = 1;
+
+	/* Statistics logging implies statistics. */
+	conn->statistics = *runp = 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.clear", &cval));
 	conn->stat_clear = cval.val != 0;
