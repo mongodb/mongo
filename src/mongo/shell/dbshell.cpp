@@ -42,6 +42,7 @@
 #ifdef _WIN32
 #include <io.h>
 #define isatty _isatty
+#define fileno _fileno
 #else
 #include <unistd.h>
 #endif
@@ -897,7 +898,7 @@ int _main( int argc, char* argv[], char **envp ) {
             }
         }
 
-        if ( !hasMongoRC && isatty(0) ) {
+        if ( !hasMongoRC && isatty(fileno(stdin)) ) {
            cout << "Welcome to the MongoDB shell.\n"
                    "For interactive help, type \"help\".\n"
                    "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
@@ -907,7 +908,7 @@ int _main( int argc, char* argv[], char **envp ) {
            f.close();
         }
 
-        if ( !nodb ) {
+        if ( !nodb && !mongo::cmdLine.quiet && isatty(fileno(stdin)) ) {
             scope->exec( "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings", false, true, false );
         }
 
