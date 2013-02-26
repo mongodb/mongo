@@ -75,12 +75,13 @@ wts_open(void)
 	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,buffer_alignment=1024,direct_io=(data),"
-	    "checkpoint=(name=\"autockpt\", wait=17),"
+	    "create,cache_size=%" PRIu32 "MB,"
+	    "error_prefix=\"%s\","
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s,"
 	    "statistics=true,statistics_log=(wait=5),"
-	    "error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
-	    g.progname, g.c_cache,
+	    "sync=false,",
+	    g.c_cache,
+	    g.progname,
 	    REVERSE_PATH,
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
