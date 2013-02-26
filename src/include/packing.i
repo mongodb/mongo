@@ -68,11 +68,13 @@ next:	if (pack->cur == pack->end)
 		return (WT_NOTFOUND);
 
 	if (isdigit(*pack->cur)) {
+		pv->havesize = 1;
 		pv->size = WT_STORE_SIZE(strtoul(pack->cur, &endsize, 10));
 		pack->cur = endsize;
-		pv->havesize = 1;
-	} else
+	} else {
+		pv->havesize = 0;
 		pv->size = 1;
+        }
 
 	pv->type = *pack->cur++;
 	pack->repeats = 0;
