@@ -25,6 +25,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	const char *tablename;
 	u_int i;
 
+	table = NULL;
 	tablename = uri;
 
 	/* Get the btree handle(s) and call the underlying function. */
@@ -52,18 +53,20 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
-			WT_RET(__wt_schema_worker(
+			WT_ERR(__wt_schema_worker(
 			    session, colgroup->source, func, cfg, open_flags));
 		}
 
-		WT_RET(__wt_schema_open_indices(session, table));
+		WT_ERR(__wt_schema_open_indices(session, table));
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
-			WT_RET(__wt_schema_worker(
+			WT_ERR(__wt_schema_worker(
 			    session, idx->source, func, cfg, open_flags));
 		}
 	} else
 		return (__wt_bad_object_type(session, uri));
 
+err:	if (table != NULL)
+		__wt_schema_release_table(session, table);
 	return (ret);
 }

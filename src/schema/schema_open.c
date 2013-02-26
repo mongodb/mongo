@@ -431,17 +431,19 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 	WT_RET(__wt_schema_get_table(session,
 	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
 
-	if (tablep != NULL)
-		*tablep = table;
-
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		colgroup = table->cgroups[i];
 		if (strcmp(colgroup->name, uri) == 0) {
 			*colgroupp = colgroup;
+			if (tablep != NULL)
+				*tablep = table;
+			else
+				__wt_schema_release_table(session, table);
 			return (0);
 		}
 	}
 
+	__wt_schema_release_table(session, table);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }
 
@@ -453,6 +455,7 @@ int
 __wt_schema_get_index(WT_SESSION_IMPL *session,
     const char *uri, WT_TABLE **tablep, WT_INDEX **indexp)
 {
+	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_TABLE *table;
 	const char *tablename, *tend;
@@ -468,21 +471,25 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 	WT_RET(__wt_schema_get_table(session,
 	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
 
-	if (tablep != NULL)
-		*tablep = table;
-
 	/* Try to find the index in the table. */
 	for (i = 0; i < table->nindices; i++) {
 		idx = table->indices[i];
 		if (strcmp(idx->name, uri) == 0) {
+			if (tablep != NULL)
+				*tablep = table;
+			else
+				__wt_schema_release_table(session, table);
 			*indexp = idx;
 			return (0);
 		}
 	}
 
 	/* Otherwise, open it. */
-	WT_RET(__wt_schema_open_index(
+	WT_ERR(__wt_schema_open_index(
 	    session, table, tend + 1, strlen(tend + 1), indexp));
+
+err:	__wt_schema_release_table(session, table);
+	WT_RET(ret);
 
 	if (*indexp != NULL)
 		return (0);

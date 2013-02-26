@@ -954,13 +954,16 @@ extern int __wt_schema_get_table(WT_SESSION_IMPL *session,
     size_t namelen,
     int ok_incomplete,
     WT_TABLE **tablep);
+extern void __wt_schema_release_table(WT_SESSION_IMPL *session,
+    WT_TABLE *table);
 extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session,
     WT_COLGROUP *colgroup);
 extern void __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx);
 extern void __wt_schema_destroy_table(WT_SESSION_IMPL *session,
     WT_TABLE *table);
-extern int __wt_schema_remove_table( WT_SESSION_IMPL *session, WT_TABLE *table);
-extern int __wt_schema_close_tables(WT_SESSION_IMPL *session);
+extern void __wt_schema_remove_table( WT_SESSION_IMPL *session,
+    WT_TABLE *table);
+extern void __wt_schema_close_tables(WT_SESSION_IMPL *session);
 extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
