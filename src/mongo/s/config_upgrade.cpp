@@ -291,7 +291,9 @@ namespace mongo {
             if (conn->type() == ConnectionString::SYNC) {
                 // TODO: Dynamic cast is bad, we need a better way of managing this op
                 // via the heirarchy (or not)
-                return (dynamic_cast<SyncClusterConnection*>(conn.get()))->prepare(*errMsg);
+                SyncClusterConnection* scc = dynamic_cast<SyncClusterConnection*>(conn.get());
+                fassert(16729, scc != NULL);
+                return scc->prepare(*errMsg);
             }
             else {
                 resultOk = conn->runCommand("admin", BSON( "fsync" << 1 ), result); 
