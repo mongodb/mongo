@@ -112,7 +112,7 @@ namespace mongo {
             std::vector<Privilege> privileges;
             c->addRequiredPrivileges(dbname, cmdObj, &privileges);
             AuthorizationManager* authManager = client.getAuthorizationManager();
-            if (c->requiresAuth() && (!authManager->checkAuthForPrivileges(privileges).isOK())) {
+            if (!authManager->checkAuthForPrivileges(privileges).isOK()) {
                 result.append("note", str::stream() << "not authorized for command: " <<
                                     c->name << " on database " << dbname);
                 appendCommandStatus(result, false, "unauthorized");

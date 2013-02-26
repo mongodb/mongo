@@ -51,7 +51,6 @@ namespace mongo {
                 "{ touch : <collection_name>, [data : true] , [index : true] }\n"
                 " at least one of data or index must be true; default is both are false\n";
         }
-        virtual bool requiresAuth() { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {

@@ -362,7 +362,6 @@ namespace mongo {
                 "  force - allows to run on a replica set primary\n"
                 "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer (defaults to true in this version)\n";
         }
-        virtual bool requiresAuth() { return true; }
         CompactCmd() : Command("compact") { }
 
         virtual bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

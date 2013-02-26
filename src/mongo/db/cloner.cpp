@@ -820,7 +820,6 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual bool requiresAuth() { return true; }
         virtual bool slaveOk() const {
             return false;
         }

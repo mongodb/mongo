@@ -1268,7 +1268,6 @@ namespace mongo {
         class IsDbGridCmd : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1286,7 +1285,6 @@ namespace mongo {
         class CmdIsMaster : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1318,7 +1316,6 @@ namespace mongo {
                 return true;
             }
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
@@ -1335,8 +1332,6 @@ namespace mongo {
         class CmdShardingGetPrevError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
-            virtual bool requiresAuth() { return false; }
-
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1362,7 +1357,6 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "check for an error on the last command executed";
             }
-            virtual bool requiresAuth() { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
@@ -1394,7 +1388,6 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
