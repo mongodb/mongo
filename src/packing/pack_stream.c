@@ -47,10 +47,11 @@ err:		(void)wiredtiger_pack_close(ps, NULL);
  *	Open a stream for unpacking.
  */
 int
-wiredtiger_unpack_start(WT_SESSION *wt_session,
-	const char *format, const void *buffer, size_t size, WT_PACK_STREAM **psp)
+wiredtiger_unpack_start(WT_SESSION *wt_session, const char *format,
+	const void *buffer, size_t size, WT_PACK_STREAM **psp)
 {
-	return (wiredtiger_pack_start(wt_session, format, (void *)buffer, size, psp));
+	return (wiredtiger_pack_start(
+	    wt_session, format, (void *)buffer, size, psp));
 }
 
 /*
@@ -86,7 +87,8 @@ wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 	case 'u':
 		pv.u.item.data = item->data;
 		pv.u.item.size = item->size;
-		WT_RET(__pack_write(session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
+		WT_RET(__pack_write(
+		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -113,7 +115,8 @@ wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i)
 	case 'l':
 	case 'q':
 		pv.u.i = i;
-		WT_RET(__pack_write(session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
+		WT_RET(__pack_write(
+		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -137,7 +140,8 @@ wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s)
 	case 'S':
 	case 's':
 		pv.u.s = s;
-		WT_RET(__pack_write(session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
+		WT_RET(__pack_write(
+		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -167,7 +171,8 @@ wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u)
 	case 'r':
 	case 't':
 		pv.u.u = u;
-		WT_RET(__pack_write(session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
+		WT_RET(__pack_write(
+		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
