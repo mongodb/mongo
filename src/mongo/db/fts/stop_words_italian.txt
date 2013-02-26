@@ -250,8 +250,6 @@ staresti
 starete
 starà
 starò
-stati
-stato
 stava
 stavamo
 stavano
