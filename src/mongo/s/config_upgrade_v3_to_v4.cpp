@@ -16,6 +16,8 @@
 
 #include "mongo/s/config_upgrade.h"
 
+#include <pcrecpp.h>
+
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/connpool.h"
@@ -26,6 +28,7 @@
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_config_version.h"
+#include "mongo/s/type_locks.h"
 #include "mongo/s/type_shard.h"
 
 namespace mongo {
@@ -67,10 +70,11 @@ namespace mongo {
 
         string workingSuffix = genWorkingSuffix(lastUpgradeId);
 
-        // Create new collection
         try {
             connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
             ScopedDbConnection& conn = *connPtr;
+
+            // Drop old upgrade collections on config server
 
             bool resultOk;
             BSONObj dropResult;
@@ -96,6 +100,25 @@ namespace mongo {
 
                 return false;
             }
+
+            // Force old locks taken by previous upgrade process on config server
+            // This is safe because no previous upgrade process can be active while we hold the
+            // upgrade lock.
+
+            log() << "forcing upgrade locks of previous failed upgrade with id "
+                  << lastUpgradeId.toString() << endl;
+
+            // Explicit builder needed b/c of regex
+            BSONObjBuilder lockQueryB;
+            lockQueryB.appendRegex(LocksType::why(), 
+                                   pcrecpp::RE::QuoteMeta("(" + lastUpgradeId.toString() + ")"));
+
+            conn->update(LocksType::ConfigNS,
+                         lockQueryB.obj(),
+                         BSON("$set" << BSON(LocksType::state(0))),
+                         false, true); // multi
+            _checkGLE(conn);
+
         }
         catch (const DBException& e) {
 
@@ -106,6 +129,73 @@ namespace mongo {
         }
 
         connPtr->done();
+        return true;
+    }
+
+    // Go through a map of collections and get distributed locks for each.
+    // The output of this function is to populate the collectionLocks with
+    // ScopedDistributedLocks - these locks get released when they go out of scope.
+    // Effectively this means when the collectionLocks vector is destroyed the locks
+    // are released.
+    // TODO: unique_ptrs may make this a bit simpler.
+    bool _acquireAllCollectionLocks(const ConnectionString& configLoc,
+                                    const map<string, CollectionType*> collections,
+                                    const string& lockMessage,
+                                    long long waitForMillis,
+                                    OwnedPointerVector<ScopedDistributedLock>* collectionLocks,
+                                    string* errMsg) 
+    {
+        // Do two passes here:
+        // 1 - First try to acquire the distributed lock for each lock once with no timeout
+        // 2 - Then wait for each lock we didn't get with the timeout
+        // The first pass allows us to force all the locks that are stale in 15 mins and not
+        // wait for the timeout for each.
+        
+        set<string> locksAcquired;
+        
+        for (int i = 0; i < 2; i++) {
+            
+            bool waitForLock = (i == 1);
+                           
+            for (map<string, CollectionType*>::const_iterator it = collections.begin();
+                    it != collections.end(); ++it)
+            {
+                const CollectionType& collection = *(it->second);
+
+                // Check that we haven't already acquired the lock
+                if (locksAcquired.find(collection.getNS()) != locksAcquired.end()) {
+                    continue;
+                }
+
+                ScopedDistributedLock* namespaceLock = new ScopedDistributedLock(configLoc,
+                                                                                 collection.getNS());
+                namespaceLock->setLockMessage(lockMessage);
+                
+                if (waitForLock) {
+                    if (!namespaceLock->acquire(waitForMillis, errMsg)) {
+                        delete namespaceLock;
+                        return false;
+                    }
+                }
+                else {
+                    if (!namespaceLock->tryAcquire(errMsg)) {
+                        delete namespaceLock;
+                        continue; // We'll try again later
+                    }
+                }
+                                
+                // The lock is now acquired
+                locksAcquired.insert(collection.getNS());
+                collectionLocks->mutableVector().push_back(namespaceLock);
+
+                // Progress update
+                if (collectionLocks->vector().size() % 10 == 0) {
+                    log() << "acquired " << collectionLocks->vector().size() << " locks out of "
+                          << collections.size() << " for config upgrade" << endl;
+                }
+            }
+        }
+
         return true;
     }
 
@@ -241,34 +331,26 @@ namespace mongo {
         OwnedPointerVector<ScopedDistributedLock> collectionLocks;
 
         log() << "acquiring locks for " << collections.size() << " sharded collections..." << endl;
-
-        for (map<string, CollectionType*>::const_iterator it = collections.begin();
-                it != collections.end(); ++it)
+        
+        // WARNING - this string is used programmatically when forcing locks, be careful when
+        // changing!
+        // TODO: Add programmatic "why" field to lock collection
+        string lockMessage = str::stream() << "ensuring epochs for config upgrade"
+                                           << " (" << upgradeId.toString() << ")";
+        
+        if (!_acquireAllCollectionLocks(configLoc,
+                                        collections,
+                                        lockMessage,
+                                        20 * 60 * 1000,
+                                        &collectionLocks,
+                                        errMsg))
         {
-            const CollectionType& collection = *(it->second);
 
-            ScopedDistributedLock* namespaceLock = new ScopedDistributedLock(configLoc,
-                                                                             collection.getNS());
+            *errMsg = stream() << "could not acquire all namespace locks for upgrade" 
+                               << " (" << upgradeId.toString() << ")"
+                               << causedBy(errMsg);
 
-            namespaceLock->setLockMessage(str::stream() << "upgrading " << collection.getNS()
-                                                        << " with new epochs for upgrade "
-                                                        << upgradeId);
-
-            if (!namespaceLock->acquire(15 * 60 * 1000, errMsg)) {
-
-                *errMsg = stream() << "could not acquire all namespace locks for upgrade"
-                                   << causedBy(errMsg);
-
-                return false;
-            }
-
-            collectionLocks.mutableVector().push_back(namespaceLock);
-
-            // Progress update
-            if (collectionLocks.vector().size() % 10 == 0) {
-                log() << "acquired " << collectionLocks.vector().size() << " locks out of "
-                      << collections.size() << " for config upgrade" << endl;
-            }
+            return false;
         }
 
         // We are now preventing all splits and migrates for all sharded collections
@@ -594,6 +676,8 @@ namespace mongo {
             // AT THIS POINT ANY FAILURE REQUIRES MANUAL INTERVENTION!
             connPtr->done();
         }
+
+        log() << "entered critical section for config upgrade" << endl;
 
         Status overwriteStatus = overwriteCollection(configLoc,
                                                      CollectionType::ConfigNS + workingSuffix,
