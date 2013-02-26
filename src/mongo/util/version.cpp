@@ -195,7 +195,7 @@ namespace mongo {
             if( !cmdLine.dur ) { 
                 log() << "**       Note that journaling defaults to off for 32 bit and is currently off." << startupWarningsLog;
             }
-            log() << "**       See http://www.mongodb.org/display/DOCS/32+bit" << startupWarningsLog;
+            log() << "**       See http://dochub.mongodb.org/core/32bit" << startupWarningsLog;
             warned = true;
         }
 

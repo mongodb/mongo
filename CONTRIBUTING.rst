@@ -51,8 +51,8 @@ not covered in this document you should default to the `Google CPP Style Guide`_
 Your commit message should also be prefaced with the relevant JIRA ticket, e.g. "SERVER-XXX Fixed
 a bug in aggregation".
 
-.. _kernel development rules: http://www.mongodb.org/display/DOCS/MongoDB+kernel+code+development+rules
-.. _Kernel Code Style guidelines: http://www.mongodb.org/display/DOCS/Kernel+code+style
+.. _kernel development rules: http://dochub.mongodb.org/core/kernelcodedevelopmentrules
+.. _Kernel Code Style guidelines: http://dochub.mongodb.org/core/kernelcodestyle
 .. _Google CPP Style Guide: http://google-styleguide.googlecode.com/svn/trunk/cppguide.xml
 .. _Google JavaScript Style Guide: http://google-styleguide.googlecode.com/svn/trunk/javascriptguide.xml
 

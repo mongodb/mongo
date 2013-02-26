@@ -42,7 +42,7 @@ namespace mongo {
             "Did not upgrade config database from v3 to v4 because the upgrade failed in\n"
             "the critical section.  Manual intervention is required to re-sync the config\n"
             "servers.  See:\n"
-            "http://docs.mongodb.org/manual/release-notes/2.4/\n"
+            "http://dochub.mongodb.org/core/2dot4upgradenotes\n"
             "******\n";
 
     static const char* cannotCleanupMessage =
@@ -51,7 +51,7 @@ namespace mongo {
             "Cannot upgrade config database from v3 to v4 because a previous upgrade\n"
             "failed in the critical section.  Manual intervention is required to re-sync\n"
             "the config servers.  See:\n"
-            "http://docs.mongodb.org/manual/release-notes/2.4/\n"
+            "http://dochub.mongodb.org/core/2dot4upgradenotes\n"
             "******\n";
 
     static const char* minMongoProcessVersion = "2.2";

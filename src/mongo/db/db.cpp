@@ -537,7 +537,7 @@ namespace mongo {
                     log() << "**          We suggest setting it to 256KB (512 sectors) or less"
                             << startupWarningsLog;
 
-                    log() << "**          http://www.mongodb.org/display/DOCS/Readahead"
+                    log() << "**          http://dochub.mongodb.org/core/readahead"
                             << startupWarningsLog;
                 }
             }
@@ -612,7 +612,7 @@ namespace mongo {
             log() << "**          Restart with --replSet unless you are doing maintenance and no"
                   << " other clients are connected." << startupWarningsLog;
             log() << "**          The TTL collection monitor will not start because of this." << startupWarningsLog;
-            log() << "**          For more info see http://www.mongodb.org/display/DOCS/TTL+Monitor" << startupWarningsLog;
+            log() << "**          For more info see http://dochub.mongodb.org/core/ttlcollections" << startupWarningsLog;
             log() << startupWarningsLog;
         }
 

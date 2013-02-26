@@ -1,6 +1,6 @@
 // The positional operator allows an update modifier field path to contain a sentinel ('$') path
 // part that is replaced with the numeric position of an array element matched by the update's query
-// spec.  <http://docs.mongodb.org/manual/reference/operators/#_S_>
+// spec.  <http://dochub.mongodb.org/core/positionaloperator>
 
 // If no array element position from a query is available to substitute for the positional operator
 // setinel ('$'), the update fails with an error.  SERVER-6669 SERVER-4713
