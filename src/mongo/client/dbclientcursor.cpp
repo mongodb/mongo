@@ -238,7 +238,7 @@ namespace mongo {
         BSONObj o(batch.data);
         batch.data += o.objsize();
         /* todo would be good to make data null at end of batch for safety */
-        return o;
+        return o.removeField("_rs");
     }
 
     void DBClientCursor::peek(vector<BSONObj>& v, int atMost) {

@@ -443,6 +443,8 @@ namespace mongo {
 
         // ----------- simple functions --------------
 
+        virtual BSONObj _appendMarker(BSONObj obj);
+
         /** throws userassertion "no master found" */
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );

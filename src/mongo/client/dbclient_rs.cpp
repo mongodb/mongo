@@ -1603,12 +1603,48 @@ namespace mongo {
 
     // ------------- simple functions -----------------
 
+    BSONObj _appendMarkerToObject(BSONObj obj, string name) {
+        const char* marker = "_rs";
+        BSONObjBuilder bb;
+        bb.appendElements(obj);
+        if(!obj.hasField(marker)) {
+            bb.append(marker, name);
+        }
+        return bb.obj();
+    }
+
+
+    BSONObj DBClientReplicaSet::_appendMarker(BSONObj obj) {
+        BSONObj result;
+        string name = _getMonitor()->getName();
+        if(obj.firstElementFieldName()[0] != '$') {
+            result = _appendMarkerToObject(obj, name);
+        } else {
+            BSONObjBuilder setObj;
+            BSONObjBuilder nb;
+            nb.appendElements(obj.removeField("$set"));
+            if(obj.hasField("$set")) {
+                BSONObj so = _appendMarkerToObject(obj.getField("$set").embeddedObject(), name);
+                setObj.appendElements(so);                
+            } else {
+                setObj.append("_rs", name);
+            }
+            nb.append("$set", setObj.obj());
+            result = nb.obj();
+        }
+        return result;
+    }
+
     void DBClientReplicaSet::insert( const string &ns , BSONObj obj , int flags) {
-        checkMaster()->insert(ns, obj, flags);
+        checkMaster()->insert(ns, _appendMarker(obj), flags);
     }
 
     void DBClientReplicaSet::insert( const string &ns, const vector< BSONObj >& v , int flags) {
-        checkMaster()->insert(ns, v, flags);
+        vector< BSONObj > m;
+        for(unsigned int i=0; i < v.size(); i++) {
+            m.push_back(_appendMarker(v[i]));
+        }
+        checkMaster()->insert(ns, m, flags);
     }
 
     void DBClientReplicaSet::remove( const string &ns , Query obj , int flags ) {
@@ -1616,7 +1652,7 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::update( const string &ns , Query query , BSONObj obj , int flags ) {
-        return checkMaster()->update( ns, query, obj, flags );
+        return checkMaster()->update( ns, query, _appendMarker(obj), flags );
     }
 
     auto_ptr<DBClientCursor> DBClientReplicaSet::query(const string &ns,
