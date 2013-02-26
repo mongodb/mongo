@@ -823,7 +823,7 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
 
     hidden_options.add_options()
     ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-    ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations") // experimental
+    ("pretouch", po::value<int>(), "n pretouch threads for applying master/slave operations")
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     ("nodur", "disable journaling")
