@@ -747,7 +747,8 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
-    ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
+        // SERVER-8536
+        //   ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
     ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
