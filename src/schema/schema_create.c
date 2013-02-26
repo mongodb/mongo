@@ -413,7 +413,6 @@ __create_table(WT_SESSION_IMPL *session,
 	/* Attempt to open the table now to catch any errors. */
 	WT_ERR(__wt_schema_get_table(
 	    session, tablename, strlen(tablename), 1, &table));
-	__wt_schema_release_table(session, table);
 
 	if (ncolgroups == 0) {
 		cgsize = strlen("colgroup:") + strlen(tablename) + 1;
@@ -422,7 +421,15 @@ __create_table(WT_SESSION_IMPL *session,
 		WT_ERR(__create_colgroup(session, cgname, exclusive, config));
 	}
 
-err:	__wt_free(session, cgname);
+	if (0) {
+err:		if (table != NULL) {
+			__wt_schema_remove_table(session, table);
+			table = NULL;
+		}
+	}
+	if (table != NULL)
+		__wt_schema_release_table(session, table);
+	__wt_free(session, cgname);
 	__wt_free(session, tableconf);
 	return (ret);
 }
