@@ -117,6 +117,7 @@ __drop_table(
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");
 
+	table = NULL;
 	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 1, &table));
 
 	/* Drop the column groups. */
