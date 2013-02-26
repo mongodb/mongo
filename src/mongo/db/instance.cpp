@@ -274,12 +274,10 @@ namespace mongo {
         if( ex ){
 
             op.debug().exceptionInfo = ex->getInfo();
-            LOGWITHRATELIMIT {
-                log() << "assertion " << ex->toString() << " ns:" << q.ns << " query:" <<
+            log() << "assertion " << ex->toString() << " ns:" << q.ns << " query:" <<
                 (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
-                if( q.ntoskip || q.ntoreturn )
-                    log() << " ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << endl;
-            }
+            if( q.ntoskip || q.ntoreturn )
+                log() << " ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << endl;
 
             SendStaleConfigException* scex = NULL;
             if ( ex->getCode() == SendStaleConfigCode ) scex = static_cast<SendStaleConfigException*>( ex.get() );
@@ -295,10 +293,6 @@ namespace mongo {
 
             if( scex ){
                 log() << "stale version detected during query over "
-                      << q.ns << " : " << errObj << endl;
-            }
-            else{
-                log() << "problem detected during query over "
                       << q.ns << " : " << errObj << endl;
             }
 
