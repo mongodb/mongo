@@ -38,7 +38,7 @@ __session_close_cache(WT_SESSION_IMPL *session)
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_discard_btree(session, btree_session));
 
-	WT_TRET(__wt_schema_close_tables(session));
+	__wt_schema_close_tables(session);
 
 	return (ret);
 }

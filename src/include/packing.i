@@ -74,7 +74,7 @@ next:	if (pack->cur == pack->end)
 	} else {
 		pv->havesize = 0;
 		pv->size = 1;
-        }
+	}
 
 	pv->type = *pack->cur++;
 	pack->repeats = 0;

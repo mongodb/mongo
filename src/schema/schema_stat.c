@@ -74,8 +74,8 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 	WT_UNUSED(flags);
 	name = uri + strlen("table:");
 
-	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
 	/* Clear the statistics we are about to recalculate. */
 	if (cst->stats != NULL) {
@@ -128,6 +128,7 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 	}
 
 err:	__wt_scr_free(&buf);
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 

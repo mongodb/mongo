@@ -187,16 +187,17 @@ __rename_table(WT_SESSION_IMPL *session,
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
-		WT_RET(__rename_tree(session, table, newuri,
+		WT_ERR(__rename_tree(session, table, newuri,
 		    table->cgroups[i]->name, cfg));
 
 	/* Rename the indices. */
-	WT_RET(__wt_schema_open_indices(session, table));
+	WT_ERR(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++)
-		WT_RET(__rename_tree(session, table, newuri,
+		WT_ERR(__rename_tree(session, table, newuri,
 		    table->indices[i]->name, cfg));
 
-	WT_RET(__wt_schema_remove_table(session, table));
+	__wt_schema_remove_table(session, table);
+	table = NULL;
 
 	/* Rename the table. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
@@ -205,6 +206,8 @@ __rename_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_metadata_insert(session, newuri, value));
 
 err:	__wt_scr_free(&buf);
+	if (table != NULL)
+		__wt_schema_release_table(session, table);
 	return (ret);
 }
 
