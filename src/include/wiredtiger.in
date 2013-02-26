@@ -1445,6 +1445,8 @@ int wiredtiger_struct_size(
 int wiredtiger_struct_unpack(WT_SESSION *session,
     const void *buffer, size_t size, const char *format, ...);
 
+#if !defined(SWIG)
+
 /*!
  * Streaming interface to packing.
  *
@@ -1566,6 +1568,8 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
  * @errors
  */
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
+
+#endif /* !defined(SWIG) */
 
 /*!
  * @}
