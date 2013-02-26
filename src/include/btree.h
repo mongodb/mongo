@@ -72,7 +72,7 @@ struct __wt_btree {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
 
-	WT_DSRC_STATS *stats;		/* Data-source statistics */
+	WT_DSRC_STATS stats;		/* Data-source statistics */
 	int maximum_depth;		/* Maximum tree depth */
 
 	/*

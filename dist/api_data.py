@@ -289,6 +289,9 @@ connection_runtime_config = [
 		trigger eviction when the cache becomes this full (as a
 		percentage)''',
 		min=10, max=99),
+	Config('statistics', 'false', r'''
+		Maintain database statistics that may impact performance''',
+		type='boolean'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -552,12 +555,13 @@ methods = {
 		threads)''',
 		min='1'),
 	Config('statistics_log', '', r'''
-		log database connection statistics into a file.
-		See @ref statistics_log for more information''',
+		log database connection statistics into a file when the
+		\c statistics configuration value is set to true.  See
+		@ref statistics_log for more information''',
 		type='category', subconfig=[
 		Config('clear', 'true', r'''
-		clear the statistics values after each set of log records
-		are written''', type='boolean'),
+		reset statistics counters after each set of log records are
+		written''', type='boolean'),
 		Config('path', '"WiredTigerStat.%H"', r'''
 		the pathname to a file into which the log records are written,
 		may contain strftime conversion specifications.  If the value
@@ -568,7 +572,7 @@ methods = {
 		conversion specifications'''),
 		Config('wait', '0', r'''
 		seconds to wait between each write of the log records; setting
-		this value configures statistics logging''',
+		this value configures \c statistics and statistics logging''',
 		min='5', max='100000'),
 		]),
 	Config('sync', 'true', r'''

@@ -45,5 +45,28 @@ class test_drop_create(wttest.WiredTigerTestCase):
             self.assertEqual(s.create("table:test", config), 0)
             self.assertEqual(s.close(), 0)
 
+    def test_drop_create2(self):
+        s, self.session = self.session, None
+        self.assertEqual(s.close(), 0)
+
+        # Test creating the same table with multiple sessions, to ensure
+        # that session table cache is working as expected.
+        s = self.conn.open_session()
+        s2 = self.conn.open_session()
+        self.assertEqual(s.drop("table:test", "force"), 0)
+        self.assertEqual(s.create("table:test", 'key_format=S,value_format=S,columns=(k,v)'), 0)
+        # Ensure the table cache for the second session knows about this table
+        c2 = s2.open_cursor("table:test", None, None)
+        c2.close()
+        self.assertEqual(s.drop("table:test"), 0)
+        # Create a table with the same name, but a different schema
+        self.assertEqual(s.create("table:test", 'key_format=S,value_format=l,columns=(k,v)'), 0)
+        c2 = s2.open_cursor("table:test", None, None)
+        c2.set_key("Hi")
+        c2.set_value(1)
+        c2.insert()
+        self.assertEqual(s.close(), 0)
+        self.assertEqual(s2.close(), 0)
+
 if __name__ == '__main__':
     wttest.run()

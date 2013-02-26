@@ -86,7 +86,7 @@ const char *
 __wt_confdfl_connection_reconfigure =
 	"cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
 	"eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	"name=pool,reserve=0,size=500MB),verbose=";
+	"name=pool,reserve=0,size=500MB),statistics=0,verbose=";
 
 WT_CONFIG_CHECK
 __wt_confchk_shared_cache_subconfigs[] = {
@@ -106,6 +106,7 @@ __wt_confchk_connection_reconfigure[] = {
 	{ "eviction_trigger", "int", "min=10,max=99", NULL},
 	{ "shared_cache", "category", NULL,
 	     __wt_confchk_shared_cache_subconfigs},
+	{ "statistics", "boolean", NULL, NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
@@ -429,7 +430,7 @@ __wt_confdfl_wiredtiger_open =
 	",eviction_trigger=95,extensions=,hazard_max=1000,logging=0,"
 	"lsm_merge=,mmap=,multiprocess=0,session_max=50,"
 	"shared_cache=(chunk=10MB,name=pool,reserve=0,size=500MB),"
-	"statistics_log=(clear=,path=\"WiredTigerStat.%H\","
+	"statistics=0,statistics_log=(clear=,path=\"WiredTigerStat.%H\","
 	"timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,transactional=,"
 	"use_environment_priv=0,verbose=";
 
@@ -470,6 +471,7 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "session_max", "int", "min=1", NULL},
 	{ "shared_cache", "category", NULL,
 	     __wt_confchk_shared_cache_subconfigs},
+	{ "statistics", "boolean", NULL, NULL},
 	{ "statistics_log", "category", NULL,
 	     __wt_confchk_statistics_log_subconfigs},
 	{ "sync", "boolean", NULL, NULL},

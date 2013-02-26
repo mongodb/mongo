@@ -130,7 +130,9 @@ extern int __wt_block_open(WT_SESSION_IMPL *session,
     WT_BLOCK **blockp);
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh);
-extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern void __wt_block_stat(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_DSRC_STATS *stats);
 extern int __wt_bm_read(WT_BM *bm,
     WT_SESSION_IMPL *session,
     WT_ITEM *buf,
@@ -573,7 +575,7 @@ extern int __wt_conn_btree_discard_single(WT_SESSION_IMPL *session,
 extern int __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn);
 extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags);
+extern void __wt_cache_stats_update(WT_SESSION_IMPL *session);
 extern int __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_conn_cache_pool_config(WT_SESSION_IMPL *session,
     const char **cfg);
@@ -587,9 +589,6 @@ extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags);
-extern int __wt_statlog_config(WT_SESSION_IMPL *session,
-    const char **cfg,
-    int *runp);
 extern int __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_statlog_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
@@ -955,13 +954,16 @@ extern int __wt_schema_get_table(WT_SESSION_IMPL *session,
     size_t namelen,
     int ok_incomplete,
     WT_TABLE **tablep);
+extern void __wt_schema_release_table(WT_SESSION_IMPL *session,
+    WT_TABLE *table);
 extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session,
     WT_COLGROUP *colgroup);
 extern void __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx);
 extern void __wt_schema_destroy_table(WT_SESSION_IMPL *session,
     WT_TABLE *table);
-extern int __wt_schema_remove_table( WT_SESSION_IMPL *session, WT_TABLE *table);
-extern int __wt_schema_close_tables(WT_SESSION_IMPL *session);
+extern void __wt_schema_remove_table( WT_SESSION_IMPL *session,
+    WT_TABLE *table);
+extern void __wt_schema_close_tables(WT_SESSION_IMPL *session);
 extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
@@ -1220,12 +1222,10 @@ extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);
 extern void __wt_scr_free_ext(WT_SESSION *wt_session, void *p);
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
-extern int __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session,
-    WT_DSRC_STATS **statsp);
-extern void __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg);
-extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
-    WT_CONNECTION_STATS **statsp);
-extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
+extern void __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats);
+extern void __wt_stat_clear_dsrc_stats(void *stats_arg);
+extern void __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats);
+extern void __wt_stat_clear_connection_stats(void *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_oldest(WT_SESSION_IMPL *session);

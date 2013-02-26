@@ -19,6 +19,9 @@ __schema_add_table(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_schema_open_table(session, name, namelen, &table));
 
+	/* Copy the schema generation into the new table. */
+	table->schema_gen = S2C(session)->schema_gen;
+
 	TAILQ_INSERT_HEAD(&session->tables, table, q);
 	*tablep = table;
 
@@ -36,10 +39,28 @@ __schema_find_table(WT_SESSION_IMPL *session,
 	WT_TABLE *table;
 	const char *tablename;
 
+restart:
 	TAILQ_FOREACH(table, &session->tables, q) {
 		tablename = table->name;
 		(void)WT_PREFIX_SKIP(tablename, "table:");
 		if (WT_STRING_MATCH(tablename, name, namelen)) {
+			/*
+			 * Ignore stale tables.
+			 *
+			 * XXX: should be managed the same as btree handles,
+			 * with a local cache in each session and a shared list
+			 * in the connection.  There is still a race here
+			 * between checking the generation and opening the
+			 * first column group.
+			 */
+			if (table->schema_gen != S2C(session)->schema_gen) {
+				if (table->refcnt == 0) {
+					__wt_schema_remove_table(
+					    session, table);
+					goto restart;
+				}
+				continue;
+			}
 			*tablep = table;
 			return (0);
 		}
@@ -59,7 +80,6 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	table = NULL;
 	ret = __schema_find_table(session, name, namelen, &table);
 
 	if (ret == WT_NOTFOUND)
@@ -72,10 +92,22 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 			    "until all column groups are created",
 			    table->name);
 
+		++table->refcnt;
 		*tablep = table;
 	}
 
 	return (ret);
+}
+
+/*
+ * __wt_schema_release_table --
+ *	Release a table handle.
+ */
+void
+__wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table)
+{
+	WT_ASSERT(session, table->refcnt > 0);
+	--table->refcnt;
 }
 
 /*
@@ -147,28 +179,25 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
  * __wt_schema_remove_table --
  *	Remove the table handle from the session, closing if necessary.
  */
-int
+void
 __wt_schema_remove_table(
     WT_SESSION_IMPL *session, WT_TABLE *table)
 {
+	WT_ASSERT(session, table->refcnt <= 1);
+
 	TAILQ_REMOVE(&session->tables, table, q);
 	__wt_schema_destroy_table(session, table);
-
-	return (0);
 }
 
 /*
  * __wt_schema_close_tables --
  *	Close all of the tables in a session.
  */
-int
+void
 __wt_schema_close_tables(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
 	WT_TABLE *table;
 
 	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
-		WT_TRET(__wt_schema_remove_table(session, table));
-
-	return (ret);
+		__wt_schema_remove_table(session, table);
 }

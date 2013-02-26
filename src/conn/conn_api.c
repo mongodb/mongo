@@ -362,23 +362,37 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	/*
+	 * Special version of cfg that doesn't include the default config: used
+	 * to limit changes to values that the application sets explicitly.
+	 * Note that any function using this value has to be prepared to handle
+	 * not-found as a valid option return.
+	 */
 	const char *raw_cfg[] = { config, NULL };
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
-	WT_UNUSED(cfg);
 
-	/*
-	 * Don't include the default config: only override values the
-	 * application sets explicitly.
-	 */
+	/* Turning on statistics clears any existing values. */
+	if ((ret =
+	    __wt_config_gets(session, raw_cfg, "statistics", &cval)) == 0) {
+		conn->statistics = cval.val == 0 ? 0 : 1;
+		if (conn->statistics)
+			__wt_stat_clear_connection_stats(&conn->stats);
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
-	WT_ERR(__conn_verbose_config(session, cfg));
+
+	WT_ERR(__conn_verbose_config(session, raw_cfg));
+
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		WT_ERR(__wt_cond_signal(
@@ -760,7 +774,8 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
-	WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "verbose", &cval));
+	if ((ret = __wt_config_gets(session, cfg, "verbose", &cval)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
@@ -892,6 +907,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		    "buffer_alignment requires posix_memalign");
 #endif
 
+	/*
+	 * Configuration: direct_io, mmap, statistics.
+	 */
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
 	for (ft = directio_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
@@ -901,10 +919,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
-
-	/* Configure mmap. */
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val == 0 ? 0 : 1;
+	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
+	conn->statistics = cval.val == 0 ? 0 : 1;
 
 	/* Load any extensions referenced in the config. */
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));

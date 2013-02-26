@@ -581,7 +581,7 @@ struct __wt_session {
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source.,a list of strings; default empty.}
 	 * @configend
-	 * @param cursorp a pointer to the newly opened cursor
+	 * @param[out] cursorp a pointer to the newly opened cursor
 	 * @errors
 	 */
 	int __F(open_cursor)(WT_SESSION *session,
@@ -1060,6 +1060,8 @@ struct __wt_connection {
 	 * allocate for the shared cache. Setting this will update the value if
 	 * one is already set.,an integer between 1MB and 10TB; default \c
 	 * 500MB.}@config{ ),,}
+	 * @config{statistics, Maintain database statistics that may impact
+	 * performance.,a boolean flag; default \c false.}
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
@@ -1109,7 +1111,7 @@ struct __wt_connection {
 	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
 	 * read-committed.}
 	 * @configend
-	 * @param sessionp the new session handle
+	 * @param[out] sessionp the new session handle
 	 * @errors
 	 */
 	int __F(open_session)(WT_CONNECTION *connection,
@@ -1279,20 +1281,24 @@ struct __wt_connection {
  * pool.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
  * the shared cache. Setting this will update the value if one is already
  * set.,an integer between 1MB and 10TB; default \c 500MB.}@config{ ),,}
- * @config{statistics_log = (, log database connection statistics into a file.
- * See @ref statistics_log for more information.,a set of related configuration
- * options defined below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;clear, clear the
- * statistics values after each set of log records are written.,a boolean flag;
- * default \c true.}@config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file
- * into which the log records are written\, may contain strftime conversion
+ * @config{statistics, Maintain database statistics that may impact
+ * performance.,a boolean flag; default \c false.}
+ * @config{statistics_log = (, log database connection statistics into a file
+ * when the \c statistics configuration value is set to true.  See @ref
+ * statistics_log for more information.,a set of related configuration options
+ * defined below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;clear, reset statistics
+ * counters after each set of log records are written.,a boolean flag; default
+ * \c true.}@config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
+ * which the log records are written\, may contain strftime conversion
  * specifications.  If the value is not an absolute path name\, the file is
  * created relative to the database home.,a string; default \c
  * "WiredTigerStat.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp
  * prepended to each log record\, may contain strftime conversion
  * specifications.,a string; default \c "%b %d
  * %H:%M:%S".}@config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
- * write of the log records; setting this value configures statistics
- * logging.,an integer between 5 and 100000; default \c 0.}@config{ ),,}
+ * write of the log records; setting this value configures \c statistics and
+ * statistics logging.,an integer between 5 and 100000; default \c 0.}@config{
+ * ),,}
  * @config{sync, flush files to stable storage when closing or writing
  * checkpoints.,a boolean flag; default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
@@ -1313,7 +1319,7 @@ struct __wt_connection {
  * for details).  Configuration values specified in the \c config argument to
  * the ::wiredtiger_open function override configuration values specified in
  * the \c WiredTiger.config file.
- * @param connectionp A pointer to the newly opened connection handle
+ * @param[out] connectionp A pointer to the newly opened connection handle
  * @errors
  */
 int wiredtiger_open(const char *home,
@@ -1378,6 +1384,9 @@ struct __wt_event_handler {
 	    const char *operation, uint64_t progress);
 };
 
+/*! @name Data packing and unpacking
+ * @{
+ */
 /*! Pack a structure into a buffer.
  *
  * See @ref packing for a description of the permitted format strings.
@@ -1435,6 +1444,136 @@ int wiredtiger_struct_size(
  */
 int wiredtiger_struct_unpack(WT_SESSION *session,
     const void *buffer, size_t size, const char *format, ...);
+
+#if !defined(SWIG)
+
+/*!
+ * Streaming interface to packing.
+ *
+ * This allows applications to pack or unpack records one field at a time.
+ * This is an opaque handle returned by ::wiredtiger_pack_start or
+ * ::wiredtiger_unpack_start.  It must be closed with ::wiredtiger_pack_close.
+ */
+typedef struct __wt_pack_stream WT_PACK_STREAM;
+
+/*!
+ * Start a packing operation into a buffer with the given format string.  This
+ * should be followed by a series of calls to ::wiredtiger_pack_item,
+ * ::wiredtiger_pack_int, ::wiredtiger_pack_str or ::wiredtiger_pack_uint
+ * to fill in the values.
+ *
+ * @param session the session handle
+ * @param format the data format, see @ref packing
+ * @param buffer a pointer to memory to hold the packed data
+ * @param size the size of the buffer
+ * @param[out] psp the new packing stream handle
+ * @errors
+ */
+int wiredtiger_pack_start(WT_SESSION *session,
+    const char *format, void *buffer, size_t size, WT_PACK_STREAM **psp);
+
+/*!
+ * Start an unpacking operation from a buffer with the given format string.
+ * This should be followed by a series of calls to ::wiredtiger_unpack_item,
+ * ::wiredtiger_unpack_int, ::wiredtiger_unpack_str or ::wiredtiger_unpack_uint
+ * to retrieve the packed values.
+ *
+ * @param session the session handle
+ * @param format the data format, see @ref packing
+ * @param buffer a pointer to memory holding the packed data
+ * @param size the size of the buffer
+ * @param[out] psp the new packing stream handle
+ * @errors
+ */
+int wiredtiger_unpack_start(WT_SESSION *session,
+    const char *format, const void *buffer, size_t size, WT_PACK_STREAM **psp);
+
+/*!
+ * Close a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] usedp the number of bytes in the buffer used by the stream
+ * @errors
+ */
+int wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp);
+
+/*!
+ * Pack an item into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param item an item to pack
+ * @errors
+ */
+int wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+
+/*!
+ * Pack a signed integer into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param i a signed integer to pack
+ * @errors
+ */
+int wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i);
+
+/*!
+ * Pack a string into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param s a string to pack
+ * @errors
+ */
+int wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s);
+
+/*!
+ * Pack an unsigned integer into a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param u an unsigned integer to pack
+ * @errors
+ */
+int wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u);
+
+/*!
+ * Unpack an item from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param item an item to unpack
+ * @errors
+ */
+int wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+
+/*!
+ * Unpack a signed integer from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] ip the unpacked signed integer
+ * @errors
+ */
+int wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip);
+
+/*!
+ * Unpack a string from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] sp the unpacked string
+ * @errors
+ */
+int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
+
+/*!
+ * Unpack an unsigned integer from a packing stream.
+ *
+ * @param ps the packing stream handle
+ * @param[out] up the unpacked unsigned integer
+ * @errors
+ */
+int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
+
+#endif /* !defined(SWIG) */
+
+/*!
+ * @}
+ */
 
 /*! Get version information.
  *

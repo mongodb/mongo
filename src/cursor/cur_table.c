@@ -623,6 +623,7 @@ __curtable_close(WT_CURSOR *cursor)
 		__wt_free(session, cursor->value_format);
 	__wt_free(session, ctable->cg_cursors);
 	__wt_free(session, ctable->idx_cursors);
+	__wt_schema_release_table(session, ctable->table);
 	/* The URI is owned by the table. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
@@ -742,10 +743,14 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = WT_PTRDIFF(columns, tablename);
 	WT_RET(__wt_schema_get_table(session, tablename, size, 0, &table));
 
-	if (table->is_simple)
+	if (table->is_simple) {
 		/* Just return a cursor on the underlying data source. */
-		return (__wt_open_cursor(session,
-		    table->cgroups[0]->source, NULL, cfg, cursorp));
+		ret = __wt_open_cursor(session,
+		    table->cgroups[0]->source, NULL, cfg, cursorp);
+
+		__wt_schema_release_table(session, table);
+		return (ret);
+	}
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
 
