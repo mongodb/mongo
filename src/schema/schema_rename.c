@@ -247,6 +247,9 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
 		ret = dsrc->rename(dsrc, &session->iface, uri, newuri, cfg);
 
+	/* Bump the schema generation so that stale data is ignored. */
+	++S2C(session)->schema_gen;
+
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */

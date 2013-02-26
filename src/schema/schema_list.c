@@ -19,6 +19,9 @@ __schema_add_table(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_schema_open_table(session, name, namelen, &table));
 
+	/* Copy the schema generation into the new table. */
+	table->schema_gen = S2C(session)->schema_gen;
+
 	TAILQ_INSERT_HEAD(&session->tables, table, q);
 	*tablep = table;
 
@@ -61,6 +64,20 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 
 	table = NULL;
 	ret = __schema_find_table(session, name, namelen, &table);
+
+	/*
+	 * Ignore stale tables.
+	 *
+	 * XXX: should be managed the same as btree handles, with a local cache
+	 * in each session and a shared list in the connection.  There is
+	 * still a race here between checking the generation and opening the
+	 * first column group.
+	 */
+	if (ret == 0 && table->schema_gen != S2C(session)->schema_gen) {
+		WT_RET(__wt_schema_remove_table(session, table));
+		table = NULL;
+		ret = WT_NOTFOUND;
+	}
 
 	if (ret == WT_NOTFOUND)
 		WT_WITH_SCHEMA_LOCK_OPT(session,

@@ -56,6 +56,8 @@ struct __wt_table {
 
 	int cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;
+
+	uint32_t schema_gen;	/* Cached schema generation number. */
 };
 
 /*

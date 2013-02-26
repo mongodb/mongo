@@ -461,6 +461,7 @@ intpack
 ints
 inuse
 io
+ip
 ispo
 kb
 kcell
@@ -574,6 +575,8 @@ presize
 printf
 printlog
 priv
+ps
+psp
 pthread
 putK
 putV
@@ -746,6 +749,7 @@ untyped
 upd
 upg
 uri
+usedp
 usr
 utf
 util
