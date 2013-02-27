@@ -25,7 +25,6 @@
 #include "mongo/s/mongo_version_range.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/s/type_database.h"
-#include "mongo/s/type_settings.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version.h"
@@ -278,30 +277,6 @@ namespace mongo {
         return VersionStatus_NeedUpgrade;
     }
 
-    // Returns true if we can confirm the balancer is stopped
-    bool _isBalancerStopped(const ConnectionString& configLoc, string* errMsg) {
-        
-        // Get the balancer information
-        scoped_ptr<ScopedDbConnection> connPtr;
-        
-        BSONObj balancerDoc;
-        try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-            
-            balancerDoc = conn->findOne(SettingsType::ConfigNS,
-                                        BSON(SettingsType::key("balancer")));
-        }
-        catch (const DBException& e) {
-            *errMsg = e.toString();
-            return false;
-        }
-
-        connPtr->done();
-        
-        return balancerDoc[SettingsType::balancerStopped()].trueValue();
-    }
-
     // Checks that all config servers are online
     bool _checkConfigServersAlive(const ConnectionString& configLoc, string* errMsg) {
         
@@ -470,15 +445,6 @@ namespace mongo {
         if (!_checkConfigServersAlive(configLoc, errMsg)) {
             
             *errMsg = stream() << "all config servers must be reachable for config upgrade"
-                               << causedBy(errMsg);
-            
-            return false;
-        }
-
-        // Check whether or not the balancer is online, if it is online we will not upgrade
-        if (!_isBalancerStopped(configLoc, errMsg)) {
-            
-            *errMsg = stream() << "balancer must be stopped for config upgrade"
                                << causedBy(errMsg);
             
             return false;

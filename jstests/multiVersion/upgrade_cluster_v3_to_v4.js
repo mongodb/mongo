@@ -32,9 +32,6 @@ var options = {
 
 var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
 
-// Just stop balancer, to simulate race conds
-st.setBalancer(false);
-
 var shards = st.s0.getDB("config").shards.find().toArray();
 var configConnStr = st._configDB;
 

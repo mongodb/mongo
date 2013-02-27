@@ -19,9 +19,6 @@ var options = {
 
 var st = new ShardingTest({ shards : 1, mongos : 1, other : options });
 
-// Just set balancer to false, don't wait for it
-st.setBalancer(false);
-
 var mongos = st.s0
 var config = mongos.getDB("config")
 var admin = mongos.getDB("admin")
