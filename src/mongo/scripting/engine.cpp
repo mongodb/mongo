@@ -349,6 +349,8 @@ namespace mongo {
         void reset() { _real->reset(); }
         void init(const BSONObj* data) { _real->init(data); }
         void localConnect(const char* dbName) { _real->localConnect(dbName); }
+        void setLocalDB(const string& dbName) { _real->setLocalDB(dbName); }
+        void loadStored(bool ignoreNotConnected = false) { _real->loadStored(ignoreNotConnected); }
         void externalSetup() { _real->externalSetup(); }
         void gc() { _real->gc(); }
         bool isKillPending() const { return _real->isKillPending(); }
@@ -406,16 +408,18 @@ namespace mongo {
     };
 
     /** Get a scope from the pool of scopes matching the supplied pool name */
-    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool) {
+    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool, const string& scopeType) {
         if (!scopeCache.get())
             scopeCache.reset(new ScopeCache());
 
-        Scope* s = scopeCache->get(pool);
+        Scope* s = scopeCache->get(pool + scopeType);
         if (!s)
             s = newScope();
 
         auto_ptr<Scope> p;
-        p.reset(new PooledScope(pool, s));
+        p.reset(new PooledScope(pool + scopeType, s));
+        p->setLocalDB(pool);
+        p->loadStored(true);
         return p;
     }
 

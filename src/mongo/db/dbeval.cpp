@@ -57,7 +57,7 @@ namespace mongo {
             return false;
         }
 
-        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbName + "dbeval" );
+        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbName, "dbeval" );
         ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {
             errmsg = (string)"compile failed: " + s->getError();

@@ -74,8 +74,8 @@ namespace mongo {
                 return;
             _initCalled = true;
 
-            _scope = globalScriptEngine->getPooledScope( _ns + "where" );
             NamespaceString ns( _ns );
+            _scope = globalScriptEngine->getPooledScope( ns.db.c_str(), "where" );
 
             massert( 10341 ,  "code has to be set first!" , ! _jsCode.empty() );
 
