@@ -275,7 +275,6 @@ descend:	for (;;) {
 			 * another thread.  The other cases get hazard pointers
 			 * and protect the page from eviction that way.
 			 */
-			set_read_gen = 0;
 			if (eviction) {
 retry:				if (ref->state != WT_REF_MEM ||
 				    !WT_ATOMIC_CAS(ref->state,
@@ -341,11 +340,11 @@ retry:				if (ref->state != WT_REF_MEM ||
 				 * we don't want to read it if it won't help.
 				 *
 				 * Pages read for compaction aren't "useful";
-				 * reset the page generation to 0 so the page
-				 * is quickly chosen for eviction.  (This can
-				 * race of course, but it's unlikely and will
-				 * only result in an incorrectly low page read
-				 * generation.)
+				 * reset the page generation to a low value so
+				 * the page is quickly chosen for eviction.
+				 * (This can race of course, but it's unlikely
+				 * and will only result in an incorrectly low
+				 * page read generation and possible eviction.)
 				 */
 				set_read_gen = 0;
 				if (compact) {
@@ -359,7 +358,7 @@ retry:				if (ref->state != WT_REF_MEM ||
 				WT_RET(
 				    __wt_page_swap(session, page, page, ref));
 				if (set_read_gen)
-					page->read_gen = 0;
+					page->read_gen = WT_READ_GEN_OLDEST;
 			}
 
 			page = ref->page;

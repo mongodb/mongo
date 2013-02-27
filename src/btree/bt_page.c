@@ -28,6 +28,7 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
+	uint64_t read_gen;
 	int busy;
 
 	for (;;) {
@@ -80,7 +81,7 @@ __wt_page_in_func(
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				page->read_gen = 0;
+				page->read_gen = WT_READ_GEN_OLDEST;
 				WT_RET(__wt_hazard_clear(session, page));
 				WT_RET(__wt_evict_server_wake(session));
 				break;
@@ -92,7 +93,16 @@ __wt_page_in_func(
 				return (ret);
 			}
 
-			page->read_gen = __wt_cache_read_gen(session);
+			/*
+			 * If this page has ever been considered for eviction,
+			 * and its generation is aging, update it.
+			 */
+			if (page->read_gen != 0) {
+				read_gen = WT_READ_GEN_STEP +
+				    __wt_cache_read_gen(session);
+				if (page->read_gen < read_gen)
+					page->read_gen = read_gen;
+			}
 			return (0);
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -127,7 +137,7 @@ __wt_page_inmem(
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->dsk = dsk;
-	page->read_gen = __wt_cache_read_gen(session);
+	page->read_gen = 0;
 	page->type = dsk->type;
 	if (disk_not_alloc)
 		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);

@@ -3997,7 +3997,7 @@ __rec_split_row(
 	/* Fill it in. */
 	page->parent = orig->parent;
 	page->ref = orig->ref;
-	page->read_gen = __wt_cache_read_gen(session);
+	page->read_gen = 0;
 	page->entries = r->bnd_next;
 	page->type = WT_PAGE_ROW_INT;
 
@@ -4110,7 +4110,7 @@ __rec_split_col(
 	/* Fill it in. */
 	page->parent = orig->parent;
 	page->ref = orig->ref;
-	page->read_gen = __wt_cache_read_gen(session);
+	page->read_gen = 0;
 	page->u.intl.recno = r->bnd[0].recno;
 	page->entries = r->bnd_next;
 	page->type = WT_PAGE_COL_INT;
