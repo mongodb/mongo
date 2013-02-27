@@ -22,15 +22,11 @@ var assertCannotRunCommands = function(mongo) {
     assert.throws( function() { test.system.users.findOne(); });
 
     test.foo.save({_id:0});
-    assert(test.getLastError());
+    test.foo.update({_id:0}, {$set:{x:20}});
+    test.foo.remove({_id:0});
+    assert.throws(function() { test.getLastError(); });
     
     assert.throws( function() { test.foo.findOne({_id:0}); });
-    
-    test.foo.update({_id:0}, {$set:{x:20}});
-    assert(test.getLastError());
-    
-    test.foo.remove({_id:0});
-    assert(test.getLastError());
 
     assert.throws(function() { 
         test.foo.mapReduce(
