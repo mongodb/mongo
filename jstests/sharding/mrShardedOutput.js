@@ -15,6 +15,7 @@ var testDB = st.getDB( "test" );
 var aaa = "aaaaaaaaaaaaaaaa";
 var str = aaa;
 while (str.length < 1*1024) { str += aaa; }
+testDB.foo.ensureIndex( { i: 1 } );
 
 st.printChunks();
 st.printChangeLog();
