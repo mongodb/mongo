@@ -33,7 +33,7 @@
 #include "mongo/db/repl/optime.h"
 #include "oplog.h"
 #include "../util/concurrency/thread_pool.h"
-#include "oplogreader.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "cloner.h"
 
 namespace mongo {

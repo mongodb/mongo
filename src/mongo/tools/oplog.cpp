@@ -19,7 +19,7 @@
 #include "pch.h"
 #include "mongo/base/initializer.h"
 #include "db/json.h"
-#include "db/oplogreader.h"
+#include "mongo/db/repl/oplogreader.h"
 
 #include "tool.h"
 
