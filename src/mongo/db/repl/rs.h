@@ -25,7 +25,7 @@
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_exception.h"
 #include "mongo/db/repl/rs_member.h"
-#include "mongo/db/repl/rs_optime.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/util/concurrency/list.h"
 #include "mongo/util/concurrency/msg.h"

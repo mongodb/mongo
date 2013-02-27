@@ -27,7 +27,7 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "clientcursor.h"
-#include "../util/optime.h"
+#include "mongo/db/repl/optime.h"
 #include "../util/timer.h"
 
 namespace mongo {
@@ -42,6 +42,8 @@ namespace mongo {
     void createOplog();
 
     void _logOpObjRS(const BSONObj& op);
+
+    const char rsoplog[] = "local.oplog.rs";
 
     /** Write operation to the log (local.oplog.$main)
 

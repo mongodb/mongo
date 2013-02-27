@@ -30,7 +30,7 @@
 #include "pdfile.h"
 #include "db.h"
 #include "dbhelpers.h"
-#include "../util/optime.h"
+#include "mongo/db/repl/optime.h"
 #include "oplog.h"
 #include "../util/concurrency/thread_pool.h"
 #include "oplogreader.h"

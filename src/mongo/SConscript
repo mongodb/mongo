@@ -276,7 +276,6 @@ env.StaticLibrary("coredb", [
                            '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",
-                    "db/common.cpp",
                     "util/net/miniwebserver.cpp",
                     "db/indexkey.cpp",
                     "db/stats/counters.cpp",
@@ -381,6 +380,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/repl/master_slave.cpp",
                     "db/repl/finding_start_cursor.cpp",
                     "db/repl/sync.cpp",
+                    "db/repl/optime.cpp",
                     "db/oplog.cpp",
                     "db/prefetch.cpp",
                     "db/repl_block.cpp",

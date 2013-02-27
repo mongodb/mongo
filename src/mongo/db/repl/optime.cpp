@@ -24,6 +24,10 @@
 
 namespace mongo {
 
+    OpTime OpTime::last(0, 0);
+    boost::condition OpTime::notifier;
+    mongo::mutex OpTime::m("optime");
+
     NOINLINE_DECL OpTime OpTime::skewed() {
         bool toLog = false;
         ONCE toLog = true;
@@ -32,10 +36,11 @@ namespace mongo {
         if ( last.i & 0x80000000 )
             toLog = true;
         if ( toLog ) {
-            log() << "clock skew detected  prev: " << last.secs << " now: " << (unsigned) time(0) << endl;
+            log() << "clock skew detected  prev: " << last.secs << " now: " << (unsigned) time(0) 
+                  << std::endl;
         }
         if ( last.i & 0x80000000 ) {
-            log() << "error large clock skew detected, shutting down" << endl;
+            log() << "error large clock skew detected, shutting down" << std::endl;
             throw ClockSkewException();
         }
         return last;

@@ -24,7 +24,7 @@
 #include "mongo/db/oplogreader.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/rs_optime.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/util/mongoutils/str.h"
 

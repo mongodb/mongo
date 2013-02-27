@@ -24,23 +24,3 @@
 /**
  * this just has globals
  */
-namespace mongo {
-
-    NOINLINE_DECL OpTime OpTime::skewed() {
-        bool toLog = false;
-        ONCE toLog = true;
-        RARELY toLog = true;
-        last.i++;
-        if ( last.i & 0x80000000 )
-            toLog = true;
-        if ( toLog ) {
-            log() << "clock skew detected  prev: " << last.secs << " now: " << (unsigned) time(0) << endl;
-        }
-        if ( last.i & 0x80000000 ) {
-            log() << "error large clock skew detected, shutting down" << endl;
-            throw ClockSkewException();
-        }
-        return last;
-    }
-
-}

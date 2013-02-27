@@ -90,33 +90,6 @@ namespace mongo {
 
     MONGO_FP_DECLARE(rsStopGetMore);
 
-    /*static*/ OpTime OpTime::_now() {
-        OpTime result;
-        unsigned t = (unsigned) time(0);
-        if ( last.secs == t ) {
-            last.i++;
-            result = last;
-        }
-        else if ( t < last.secs ) {
-            result = skewed(); // separate function to keep out of the hot code path
-        }
-        else { 
-            last = OpTime(t, 1);
-            result = last;
-        }
-        notifier.notify_all();
-        return last;
-    }
-    OpTime OpTime::now(const mongo::mutex::scoped_lock&) {
-        return _now();
-    }
-    OpTime OpTime::getLast(const mongo::mutex::scoped_lock&) {
-        return last;
-    }
-    boost::condition OpTime::notifier;
-    mongo::mutex OpTime::m("optime");
-
-    // OpTime::now() uses mutex, thus it is in this file not in the cpp files used by drivers and such
     void BSONElementManipulator::initTimestamp() {
         massert( 10332 ,  "Expected CurrentTime type", _element.type() == Timestamp );
         unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
@@ -635,14 +608,6 @@ namespace mongo {
     }
 
     QueryResult* emptyMoreResult(long long);
-
-    void OpTime::waitForDifferent(unsigned millis){
-        mutex::scoped_lock lk(m);
-        while (*this == last) {
-            if (!notifier.timed_wait(lk.boost(), boost::posix_time::milliseconds(millis)))
-                return; // timed out
-        }
-    }
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
