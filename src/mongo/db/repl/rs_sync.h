@@ -23,6 +23,7 @@
 #include "mongo/db/dur.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/oplog.h"
+#include "mongo/db/repl/sync.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
