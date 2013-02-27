@@ -76,11 +76,20 @@ namespace mongo {
                 continue;
             }
 
+            if ( i + 1 == fullName.size() ) {
+                // ends with '.'
+                buf << c;
+                continue;
+            }
+
             // check for ".$", skip if present
             if ( fullName[i+1] == '$' ) {
-                i++;
-                modified = true;
-                continue;
+                // only do this if its not something like $a
+                if ( i + 2 >= fullName.size() || fullName[i+2] == '.' ) {
+                    i++;
+                    modified = true;
+                    continue;
+                }
             }
 
             // check for ".###" for any number of digits (no letters)

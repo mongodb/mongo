@@ -29,8 +29,6 @@ namespace mongo {
         ASSERT_TRUE( a.mightBeIndexed( "a.b.c" ) );
         ASSERT_TRUE( a.mightBeIndexed( "a.$.b" ) );
 
-
-
         ASSERT_FALSE( a.mightBeIndexed( "b" ) );
         ASSERT_FALSE( a.mightBeIndexed( "a.c" ) );
     }
@@ -56,10 +54,18 @@ namespace mongo {
         ASSERT_TRUE( getCanonicalIndexField( "a.123.b", &x ) );
         ASSERT_EQUALS( x, "a.b" );
 
+        ASSERT_FALSE( getCanonicalIndexField( "a.$ref", &x ) );
+        ASSERT_FALSE( getCanonicalIndexField( "a.$ref.b", &x ) );
+
+
+        ASSERT_FALSE( getCanonicalIndexField( "a.c$d.b", &x ) );
+
         ASSERT_FALSE( getCanonicalIndexField( "a.123a", &x ) );
         ASSERT_FALSE( getCanonicalIndexField( "a.a123", &x ) );
         ASSERT_FALSE( getCanonicalIndexField( "a.123a.b", &x ) );
         ASSERT_FALSE( getCanonicalIndexField( "a.a123.b", &x ) );
+
+        ASSERT_FALSE( getCanonicalIndexField( "a.", &x ) );
     }
 
 }
