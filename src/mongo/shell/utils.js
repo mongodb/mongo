@@ -885,6 +885,25 @@ Random.genExp = function( mean ) {
     return -Math.log( r ) * mean;
 }
 
+/**
+ * Generate a random value from the normal distribution with specified 'mean' and
+ * 'standardDeviation'.
+ */
+Random.genNormal = function( mean, standardDeviation ) {    
+
+    // See http://en.wikipedia.org/wiki/Marsaglia_polar_method
+    while ( true ) {
+        var x = ( 2 * Random.rand() ) - 1;
+        var y = ( 2 * Random.rand() ) - 1;
+        var s = ( x * x ) + ( y * y );
+
+        if ( s > 0 && s < 1 ) {
+            var standardNormal = x * Math.sqrt( -2 * Math.log( s ) / s );
+            return mean + ( standardDeviation * standardNormal );
+        }
+    }
+}
+
 Geo = {};
 Geo.distance = function( a , b ){
     var ax = null;
