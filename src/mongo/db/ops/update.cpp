@@ -244,11 +244,6 @@ namespace mongo {
                             break;
                         nsdt = &NamespaceDetailsTransient::get(ns);
                         if ( mods.get() ) {
-                            set<string> bgKeys;
-                            for (int i = 0; i < d->indexBuildsInProgress; i++) {
-                                // we need to re-check indexes
-                                d->idx(d->nIndexes+i).keyPattern().getFieldNames(bgKeys);
-                            }
                             mods->setIndexedStatus( nsdt->indexKeys() );
                             modsIsIndexed = mods->maxNumIndexUpdated();
                         }
