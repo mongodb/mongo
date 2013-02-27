@@ -52,29 +52,17 @@ namespace mongo {
       return (BSONHolder*)ptr;
     }
 
+    void deleteBSONHolderOnCollect(v8::Persistent<v8::Value> objHandle, void* obj) {
+        BSONHolder* holder = static_cast<BSONHolder*>(obj);
+        holder->_scope->_lazyObjects.erase(holder);
+        deleteOnCollect<BSONHolder>(objHandle, obj);
+    }
+
     v8::Persistent<v8::Object> V8Scope::wrapBSONObject(v8::Local<v8::Object> obj,
                                                        BSONHolder* data) {
         obj->SetInternalField(0, v8::External::New(data));
         v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
-        p.MakeWeak(data, deleteOnCollect<BSONHolder>);
-        return p;
-    }
-
-    static void weakRefArrayCallback(v8::Persistent<v8::Value> p, void* scope) {
-        v8::HandleScope handle_scope;
-        if (!p.IsNearDeath())
-            return;
-        v8::Handle<v8::External> field =
-                v8::Handle<v8::External>::Cast(p->ToObject()->GetInternalField(0));
-        char* data = (char*) field->Value();
-        delete [] data;
-        p.Dispose();
-    }
-
-    v8::Persistent<v8::Object> V8Scope::wrapArrayObject(v8::Local<v8::Object> obj, char* data) {
-        obj->SetInternalField(0, v8::External::New(data));
-        v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
-        p.MakeWeak(this, weakRefArrayCallback);
+        p.MakeWeak(data, deleteBSONHolderOnCollect);
         return p;
     }
 
@@ -572,8 +560,21 @@ namespace mongo {
             roObjectTemplate.Dispose();
             internalFieldObjects.Dispose();
             _context.Dispose();
+            gc(); // collect any known garbage after _global and _context have been disposed
         }
         _isolate->Dispose();
+        // NOTE: Persistent external objects may not be collected after destroying the global
+        //       object and context.  Destroying the isolate frees its heap, but does not
+        //       execute the callbacks supplied to v8::Persistent::MakeWeak().
+        // free any remaining BSONHolder instances
+        if (!_lazyObjects.empty())
+            LOG(1) << "freeing uncollected BSONHolders: " << _lazyObjects.size() << endl;
+        for (set<BSONHolder*>::iterator it = _lazyObjects.begin();
+             it != _lazyObjects.end();
+             ++it) {
+            (*it)->_notifyV8Memory = false;
+            delete *it;
+        }
     }
 
     bool V8Scope::hasOutOfMemoryException() {
@@ -1447,6 +1448,9 @@ namespace mongo {
     v8::Persistent<v8::Object> V8Scope::mongoToLZV8(const BSONObj& m, bool readOnly) {
         v8::Local<v8::Object> o;
         BSONHolder* own = new BSONHolder(m);
+        // track the BSONHolder so the object can be freed when the V8Scope is destructed
+        own->_scope = this;
+        _lazyObjects.insert(own);
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();
@@ -1691,12 +1695,10 @@ namespace mongo {
                                    const string& elementName,
                                    v8::Handle<v8::Object> obj) {
         int len = obj->Get(v8StringData("len"))->ToInt32()->Value();
-        v8::Local<v8::External> c = v8::External::Cast(*(obj->GetInternalField(0)));
-        const char* dataArray = static_cast <const char*>(c->Value());
         b.appendBinData(elementName,
                         len,
                         mongo::BinDataType(obj->Get(v8StringData("type"))->ToInt32()->Value()),
-                        dataArray);
+                        base64::decode(toSTLString(obj->GetInternalField(0))).c_str());
     }
 
     void V8Scope::v8ToMongoObjectID(BSONObjBuilder& b,

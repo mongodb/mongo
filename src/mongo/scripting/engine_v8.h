@@ -20,6 +20,7 @@
 #include <v8.h>
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/v8_deadline_monitor.h"
 #include "mongo/scripting/v8_profiler.h"
@@ -47,24 +48,29 @@ namespace mongo {
      */
     template <typename _T>
     void deleteOnCollect(v8::Persistent<v8::Value> objHandle, void* obj) {
-        if (!objHandle.IsNearDeath())
-            return;
         delete static_cast<_T*>(obj);
         objHandle.Dispose();
     }
 
     class BSONHolder {
+    MONGO_DISALLOW_COPYING(BSONHolder);
     public:
-        BSONHolder(BSONObj obj) {
-            _obj = obj.getOwned();
-            _modified = false;
+        explicit BSONHolder(BSONObj obj) :
+            _obj(obj.getOwned()),
+            _modified(false),
+            _notifyV8Memory(true) {
+            // give hint v8's GC
             v8::V8::AdjustAmountOfExternalAllocatedMemory(_obj.objsize());
         }
         ~BSONHolder() {
-            v8::V8::AdjustAmountOfExternalAllocatedMemory(-_obj.objsize());
+            if (_notifyV8Memory)
+                // if v8 is still up, send hint to GC
+                v8::V8::AdjustAmountOfExternalAllocatedMemory(-_obj.objsize());
         }
+        V8Scope* _scope;
         BSONObj _obj;
         bool _modified;
+        bool _notifyV8Memory; // set to true if v8 is still usable during destruction
         list<string> _extra;
         set<string> _removed;
     };
@@ -228,7 +234,6 @@ namespace mongo {
          * GC callback for weak references to BSON objects (via BSONHolder)
          */
         v8::Persistent<v8::Object> wrapBSONObject(v8::Local<v8::Object> obj, BSONHolder* data);
-        v8::Persistent<v8::Object> wrapArrayObject(v8::Local<v8::Object> obj, char* data);
 
         /**
          * Create a V8 string with a local handle
@@ -247,6 +252,9 @@ namespace mongo {
          * Get the JS context this scope executes within.
          */
         v8::Persistent<v8::Context> getContext() { return _context; }
+
+        // store a pointer to all BSONHolder instances created in this V8Scope
+        set<BSONHolder*> _lazyObjects;
 
     private:
 
