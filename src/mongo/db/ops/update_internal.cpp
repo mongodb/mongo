@@ -922,12 +922,13 @@ namespace mongo {
             modState.fixedOpName = "$unset";
             return;
 
-        // $rename may involve dotted path creation, so we want to make sure we're not
-        // creating a path here for a rename that's a no-op. In other words if we're
-        // issuing a {$rename: {a.b : c.d} } that's a no-op, we don't want to create
-        // the a and c paths here. See test NestedNoName in the 'repl' suite.
+        // $rename/$setOnInsert may involve dotted path creation, so we want to make sure we're
+        // not creating a path here for a rename that's a no-op. In other words if we're
+        // issuing a {$rename: {a.b : c.d} } that's a no-op, we don't want to create the a and
+        // c paths here. See test NestedNoName in the 'repl' suite.
         case Mod::RENAME_FROM:
         case Mod::RENAME_TO:
+        case Mod::SET_ON_INSERT:
             if (modState.dontApply) {
                 return;
             }

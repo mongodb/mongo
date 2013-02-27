@@ -251,7 +251,6 @@ namespace UpdateTests {
             BSONObj res = fromjson("{'_id':0, a:1}");
             client().insert( ns(), res );
             client().update( ns(), Query(), BSON( "$setOnInsert" << BSON( "b" << 1 ) ) );
-            std::cout << client().findOne( ns(), BSON( "a" << 1 ) ) << std::endl; // XXX
             ASSERT( client().findOne( ns(), BSON( "a" << 1 ) ).woCompare( res ) == 0 );
         }
     };
@@ -277,6 +276,20 @@ namespace UpdateTests {
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 1 ) <<
                                                   "$setOnInsert" << BSON( "b" << 2 ) ), true );
             ASSERT( !client().findOne( ns(), BSON( "a" << 1 << "b" << 2 ) ).isEmpty() );
+        }
+    };
+
+    class SetOnInsertMissingParent : public SetBase {
+    public:
+        void run() {
+            // In a mod that uses dontApply, we should be careful not to create a
+            // parent unneccesarily.
+            BSONObj initial = fromjson( "{'_id':0}" );
+            BSONObj final = fromjson( "{'_id':0, d:1}" );
+            client().insert( ns(), initial );
+            client().update( ns(), initial, BSON( "$setOnInsert" << BSON( "a.b" << 1 ) <<
+                                                  "$set" << BSON( "d" << 1 ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), initial ), final );
         }
     };
 
@@ -2669,6 +2682,7 @@ namespace UpdateTests {
             add< SetOnInsertMissingField >();
             add< SetOnInsertExisting >();
             add< SetOnInsertMixed >();
+            add< SetOnInsertMissingParent >();
             add< ModDotted >();
             add< SetInPlaceDotted >();
             add< SetRecreateDotted >();
