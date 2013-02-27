@@ -842,6 +842,10 @@ namespace mongo {
 
 
     int NamespaceDetails::getRecordAllocationSize( int minRecordSize ) {
+
+        if ( isCapped() )
+            return minRecordSize;
+
         if ( _paddingFactor == 0 ) {
             warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
             setPaddingFactor(1.0);
