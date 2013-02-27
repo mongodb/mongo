@@ -1094,7 +1094,7 @@ __slvg_col_build_internal(
 	/* Fill it in. */
 	page->parent = NULL;				/* Root page */
 	page->ref = NULL;
-	page->read_gen = 0;
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
@@ -1672,7 +1672,7 @@ __slvg_row_build_internal(
 	/* Fill it in. */
 	page->parent = NULL;				/* Root page */
 	page->ref = NULL;
-	page->read_gen = 0;
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
 	WT_ERR(__slvg_modify_init(session, page));

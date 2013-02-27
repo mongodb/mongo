@@ -97,7 +97,7 @@ __wt_page_in_func(
 			 * If this page has ever been considered for eviction,
 			 * and its generation is aging, update it.
 			 */
-			if (page->read_gen != 0) {
+			if (page->read_gen != WT_READ_GEN_NOTSET) {
 				read_gen = WT_READ_GEN_STEP +
 				    __wt_cache_read_gen(session);
 				if (page->read_gen < read_gen)
@@ -137,7 +137,7 @@ __wt_page_inmem(
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->dsk = dsk;
-	page->read_gen = 0;
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->type = dsk->type;
 	if (disk_not_alloc)
 		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);

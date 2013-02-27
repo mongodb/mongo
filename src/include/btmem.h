@@ -294,6 +294,7 @@ struct __wt_page {
 	 * The read generation is not declared volatile or published: the read
 	 * generation is set a lot, and we don't want to write it that much.
 	 */
+#define	WT_READ_GEN_NOTSET	0
 #define	WT_READ_GEN_OLDEST	1
 #define	WT_READ_GEN_STEP	1000
 	uint64_t read_gen;

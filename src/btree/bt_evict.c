@@ -966,7 +966,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * read generation to a little bit in the future and move on,
 		 * give readers a chance to start updating the read generation.
 		 */
-		if (page->read_gen == 0) {
+		if (page->read_gen == WT_READ_GEN_NOTSET) {
 			page->read_gen =
 			    WT_READ_GEN_STEP + __wt_cache_read_gen(session);
 			continue;
