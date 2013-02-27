@@ -28,7 +28,6 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	uint64_t read_gen;
 	int busy;
 
 	for (;;) {
@@ -97,12 +96,11 @@ __wt_page_in_func(
 			 * If this page has ever been considered for eviction,
 			 * and its generation is aging, update it.
 			 */
-			if (page->read_gen != WT_READ_GEN_NOTSET) {
-				read_gen = WT_READ_GEN_STEP +
-				    __wt_cache_read_gen(session);
-				if (page->read_gen < read_gen)
-					page->read_gen = read_gen;
-			}
+			if (page->read_gen != WT_READ_GEN_NOTSET &&
+			    page->read_gen < __wt_cache_read_gen(session))
+				page->read_gen =
+				    __wt_cache_read_gen_set(session);
+
 			return (0);
 		WT_ILLEGAL_VALUE(session);
 		}

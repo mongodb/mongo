@@ -967,8 +967,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * give readers a chance to start updating the read generation.
 		 */
 		if (page->read_gen == WT_READ_GEN_NOTSET) {
-			page->read_gen =
-			    WT_READ_GEN_STEP + __wt_cache_read_gen(session);
+			page->read_gen = __wt_cache_read_gen_set(session);
 			continue;
 		}
 
@@ -1091,7 +1090,7 @@ __evict_get_page(
 		 * unlocked the page and some other thread may have evicted it
 		 * by the time we look at it.
 		 */
-		evict->page->read_gen = __wt_cache_read_gen(session);
+		evict->page->read_gen = __wt_cache_read_gen_set(session);
 
 		/*
 		 * Lock the page while holding the eviction mutex to prevent

@@ -144,7 +144,22 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline uint64_t
 __wt_cache_read_gen(WT_SESSION_IMPL *session)
 {
-	return (++S2C(session)->cache->read_gen);
+	return (S2C(session)->cache->read_gen);
+}
+
+static inline uint64_t
+__wt_cache_read_gen_set(WT_SESSION_IMPL *session)
+{
+	/*
+	 * We return read-generations from the future (where "the future" is
+	 * measured by increments of the global read generation).  The reason
+	 * is because when acquiring a new hazard reference on a page, we can
+	 * check its read generation, and if the read generation isn't less
+	 * than the current global generation, we don't bother updating the
+	 * page.  In other words, the goal is to avoid some number of updates
+	 * immediately after each update we have to make.
+	 */
+	return (++S2C(session)->cache->read_gen + WT_READ_GEN_STEP);
 }
 
 /*
