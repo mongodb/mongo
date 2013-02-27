@@ -1,7 +1,7 @@
 // index_set.h
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2013 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <vector>
+#include <set>
 
 #include "mongo/base/string_data.h"
 
@@ -39,7 +39,7 @@ namespace mongo {
         bool mightBeIndexed( const StringData& path ) const;
 
     private:
-        std::vector<std::string> _canonical;
+        std::set<std::string> _canonical;
     };
 
 }
