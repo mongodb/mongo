@@ -90,6 +90,8 @@ scratch
 /mongooplog
 /mongoperf
 /bsondump
+/loadgen
+/docgen
 
 *.tgz
 *.zip
