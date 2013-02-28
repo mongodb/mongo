@@ -444,7 +444,7 @@ env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.
 env.Library('stacktrace', 'util/stacktrace.cpp')
 
 env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
-            LIBDEPS=['stacktrace',
+            LIBDEPS=['stacktrace', 'foundation', 'unittest/unittest_crutch',
                      '$BUILD_DIR/mongo/base/base'])
 
 serverOnlyFiles += mmapFiles
