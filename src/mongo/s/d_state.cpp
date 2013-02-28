@@ -37,6 +37,7 @@
 #include "shard.h"
 #include "d_logic.h"
 #include "config.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 using namespace std;
@@ -373,9 +374,13 @@ namespace mongo {
     }
 
     void ShardedConnectionInfo::addHook() {
+        static mongo::mutex lock("ShardedConnectionInfo::addHook mutex");
         static bool done = false;
+
+        scoped_lock lk(lock);
         if (!done) {
-            LOG(1) << "adding sharding hook" << endl;
+            log() << "first cluster operation detected, adding sharding hook to enable versioning "
+                    "and authentication to remote servers" << endl;
             pool.addHook(new ShardingConnectionHook(false));
             shardConnectionPool.addHook(new ShardingConnectionHook(true));
             done = true;
