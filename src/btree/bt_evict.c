@@ -488,7 +488,6 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__wt_txn_init(session));
 
 	__wt_txn_get_evict_snapshot(session);
-	saved_txn.oldest_snap_min = txn->oldest_snap_min;
 	txn->isolation = TXN_ISO_READ_COMMITTED;
 	ret = __wt_rec_evict(session, page, 0);
 
@@ -501,6 +500,9 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_txn_destroy(session);
 	} else
 		__wt_txn_release_snapshot(session);
+
+	/* If the oldest transaction was updated, keep the newer value. */
+	saved_txn.oldest_snap_min = txn->oldest_snap_min;
 
 	*txn = saved_txn;
 	return (ret);

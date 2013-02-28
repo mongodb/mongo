@@ -209,16 +209,17 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 		    data_cksum, 0));
 
 	/* Process the checkpoint list, deleting and updating as required. */
-	WT_RET(__ckpt_process(session, block, ckptbase));
+	return (__ckpt_process(session, block, ckptbase));
+}
 
-	/*
-	 * Checkpoints have to hit disk (it would be reasonable to configure for
-	 * lazy checkpoints, but we don't support them yet).  Regardless, we're
-	 * not holding any locks, other writers can proceed while we wait.
-	 */
-	if (F_ISSET(S2C(session), WT_CONN_SYNC))
-		WT_RET(__wt_fsync(session, block->fh));
-
+/*
+ * __wt_block_sync --
+ *	Sync the file to disk.
+ */
+int
+__wt_block_sync(WT_SESSION_IMPL *session, WT_BLOCK *block)
+{
+	WT_RET(__wt_fsync(session, block->fh));
 	return (0);
 }
 
