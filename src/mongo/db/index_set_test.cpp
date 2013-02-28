@@ -33,6 +33,13 @@ namespace mongo {
         ASSERT_FALSE( a.mightBeIndexed( "a.c" ) );
     }
 
+    TEST( IndexPathSetTest, Simple2 ) {
+        IndexPathSet a;
+        a.addPath( "ab" );
+        ASSERT_FALSE( a.mightBeIndexed( "a" ) );
+    }
+
+
     TEST( IndexPathSetTest, getCanonicalIndexField1 ) {
         string x;
 

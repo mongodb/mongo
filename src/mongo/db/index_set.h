@@ -39,6 +39,9 @@ namespace mongo {
         bool mightBeIndexed( const StringData& path ) const;
 
     private:
+
+        bool _startsWith( const StringData& a, const StringData& b ) const;
+
         std::set<std::string> _canonical;
     };
 

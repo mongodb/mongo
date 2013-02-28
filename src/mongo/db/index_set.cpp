@@ -47,14 +47,26 @@ namespace mongo {
 
             StringData idx( *i );
 
-            if ( use.startsWith( idx ) )
+            if ( _startsWith( use, idx ) )
                 return true;
 
-            if ( idx.startsWith( use ) )
+            if ( _startsWith( idx, use ) )
                 return true;
         }
 
         return false;
+    }
+
+    bool IndexPathSet::_startsWith( const StringData& a, const StringData& b ) const {
+        if ( !a.startsWith( b ) )
+            return false;
+
+        // make sure there is a dot or EOL right after
+
+        if ( a.size() == b.size() )
+            return true;
+
+        return a[b.size()] == '.';
     }
 
     bool getCanonicalIndexField( const StringData& fullName, string* out ) {
