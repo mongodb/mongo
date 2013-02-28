@@ -694,6 +694,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 
 	switch (syncop) {
 	case WT_SYNC_CHECKPOINT:
+	case WT_SYNC_WRITE_LEAVES:
 		/*
 		 * The first pass walks all cache leaf pages, waiting for
 		 * concurrent activity in a page to be resolved, acquiring
@@ -709,6 +710,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
+
+		if (syncop == WT_SYNC_WRITE_LEAVES)
+			break;
 
 		/*
 		 * Pages cannot disappear from underneath internal pages when

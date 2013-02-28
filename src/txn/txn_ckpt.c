@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static int __checkpoint_sync(WT_SESSION_IMPL *, const char *[]);
+static int __checkpoint_write_leaves(WT_SESSION_IMPL *, const char *[]);
 
 /*
  * __checkpoint_apply --
@@ -108,6 +109,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
 	    !F_ISSET(txn, TXN_RUNNING));
 	__wt_spin_lock(session, &conn->metadata_lock);
+
+	/* Flush dirty leaf pages before we start the checkpoint. */
+	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
@@ -655,6 +659,22 @@ int
 __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	return (__checkpoint_worker(session, cfg, 1));
+}
+
+/*
+ * __checkpoint_write_leaves --
+ *	Write dirty leaf pages before a checkpoint.
+ */
+static int
+__checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_UNUSED(cfg);
+
+	if (session->btree->modified)
+		WT_RET(__wt_bt_cache_op(
+		    session, NULL, WT_SYNC_WRITE_LEAVES));
+
+	return (0);
 }
 
 /*
