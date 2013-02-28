@@ -241,6 +241,7 @@ int
 __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
 	session = conn->default_session;
@@ -255,6 +256,13 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_free(session, conn->stat_path);
 	__wt_free(session, conn->stat_stamp);
+
+	/* Close the server thread's session, free its hazard array. */
+	if (conn->stat_session != NULL) {
+		wt_session = &conn->stat_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		__wt_free(session, conn->stat_session->hazard);
+	}
 
 	return (ret);
 }
