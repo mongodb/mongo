@@ -967,8 +967,7 @@ namespace mongo {
                     return false;
                 }
                 string configdb = cmdObj["configdb"].String();
-                shardingState.enable( configdb );
-                configServer.init( configdb );
+                ShardingState::initialize(configdb);
             }
 
             MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , errmsg );
@@ -2012,7 +2011,7 @@ namespace mongo {
             }
 
             if ( ! configServer.ok() )
-                configServer.init( cmdObj["configServer"].String() );
+                ShardingState::initialize(cmdObj["configServer"].String());
 
             migrateStatus.prepare();
 

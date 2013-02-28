@@ -63,6 +63,12 @@ namespace mongo {
         }
     }
 
+    void ShardingState::initialize(const string& server) {
+        ShardedConnectionInfo::addHook();
+        shardingState.enable(server);
+        configServer.init(server);
+    }
+
     void ShardingState::gotShardName( const string& name ) {
         scoped_lock lk(_mutex);
         if ( _shardName.size() == 0 ) {
@@ -478,9 +484,7 @@ namespace mongo {
             }
             
             if ( locked ) {
-                ShardedConnectionInfo::addHook();
-                shardingState.enable( configdb );
-                configServer.init( configdb );
+                ShardingState::initialize(configdb);
                 return true;
             }
 
