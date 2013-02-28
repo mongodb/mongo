@@ -236,30 +236,41 @@ namespace mongo {
         Lock::assertWriteLocked( name );
         Client::Context ctx( name );
 
-        shared_ptr<Cursor> cursor = theDataFileMgr.findAll( name + ".system.namespaces" );
+        string systemNamespaces =  name + ".system.namespaces";
+
+        // Note: we build up a toDelete vector rather than dropping the collection inside the loop
+        // to avoid modifying the system.namespaces collection while iterating over it since that
+        // would corrupt the cursor.
+        vector<string> toDelete;
+        shared_ptr<Cursor> cursor = theDataFileMgr.findAll(systemNamespaces);
         while ( cursor && cursor->ok() ) {
-            BSONObj x = cursor->current();
+            BSONObj nsObj = cursor->current();
             cursor->advance();
 
-            BSONElement e = x.getFieldDotted( "options.temp" );
+            BSONElement e = nsObj.getFieldDotted( "options.temp" );
             if ( !e.trueValue() )
                 continue;
 
-            string ns = x["name"].String();
+            string ns = nsObj["name"].String();
 
             // Do not attempt to drop indexes
             if ( !NamespaceString::normal(ns.c_str()) )
                 continue;
 
+            toDelete.push_back(ns);
+        }
+
+        for (size_t i=0; i < toDelete.size(); i++) {
+            const string& ns = toDelete[i];
+
             string errmsg;
             BSONObjBuilder result;
-            dropCollection( ns, errmsg, result );
+            dropCollection(ns, errmsg, result);
 
             if ( errmsg.size() > 0 ) {
-                warning() << "could not delete temp collection: " << x
+                warning() << "could not delete temp collection: " << ns
                           << " because of: " << errmsg << endl;
             }
-
         }
     }
 
