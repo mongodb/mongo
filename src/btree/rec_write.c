@@ -3942,6 +3942,9 @@ err:			__wt_scr_free(&tkey);
 			__wt_cache_dirty_decr(session, page_size);
 	}
 
+	/* Record the most recent transaction ID we could have written. */
+	mod->disk_txn = session->txn.snap_min;
+
 	return (0);
 }
 

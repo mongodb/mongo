@@ -700,9 +700,11 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL | WT_TREE_WAIT;
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
-			/* Write dirty pages. */
-			if (__wt_page_is_modified(page))
+			/* Write dirty pages if nobody beat us to it. */
+			if (__wt_page_is_modified(page) && TXNID_LT(
+			    page->modify->disk_txn, session->txn.snap_min))
 				WT_ERR(__wt_rec_write(session, page, NULL, 0));
+
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
 
@@ -857,6 +859,9 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	cache = S2C(session)->cache;
 	retries = 0;
 
+	/* Update the oldest transaction ID -- we use it to filter pages. */
+	__wt_txn_get_oldest(session);
+
 	/*
 	 * NOTE: we don't hold the schema lock: files can't be removed without
 	 * the eviction server being involved, and when we're here, we aren't
@@ -934,6 +939,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page, *parent;
+	wt_txnid_t oldest_txn;
 	int modified, restarts, splits;
 
 	btree = session->btree;
@@ -942,6 +948,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	end = start + WT_EVICT_WALK_PER_FILE;
 	if (end > cache->evict + cache->evict_entries)
 		end = cache->evict + cache->evict_entries;
+	oldest_txn = session->txn.oldest_snap_min;
 
 	/*
 	 * Get some more eviction candidate pages.
@@ -1022,6 +1029,15 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 
 		/* Optionally ignore clean pages. */
 		if (!modified && !clean)
+			continue;
+
+		/*
+		 * If the oldest transaction hasn't changed since the last time
+		 * this page was written, there's no chance to make progress...
+		 */
+		if (modified &&
+		    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE) &&
+		    TXNID_LE(oldest_txn, page->modify->disk_txn))
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);
