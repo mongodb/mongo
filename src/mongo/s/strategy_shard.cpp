@@ -27,6 +27,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -613,6 +614,8 @@ namespace mongo {
                             // error gets checked on a different connection!
                             //
                             dbcon.done();
+
+                            globalOpCounters.incInsertInWriteLock(group.inserts.size());
 
                             //
                             // CHECK INTERMEDIATE ERROR
