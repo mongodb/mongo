@@ -98,6 +98,7 @@ namespace mongo {
 
         size_t find( char c , size_t fromPos = 0 ) const;
         size_t find( const StringData& needle ) const;
+        size_t rfind( char c, size_t fromPos = string::npos ) const;
 
         /**
          * Returns true if 'prefix' is a substring of this instance, anchored at position 0.
