@@ -353,6 +353,9 @@ __evict_worker(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
+	/* Assume we can make progress until we don't */
+	F_CLR(cache, WT_EVICT_STUCK);
+
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
 		/*
