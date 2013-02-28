@@ -297,11 +297,9 @@ __rec_review(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE *t;
-	WT_TXN *txn;
 	uint32_t i;
 
 	btree = session->btree;
-	txn = &session->txn;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -442,20 +440,6 @@ __rec_review(WT_SESSION_IMPL *session,
 			WT_VERBOSE_RET(session, evict,
 			    "eviction failed, reconciled page not clean");
 
-			/*
-			 * A pathological case: if we're the oldest transaction
-			 * in the system and we're stuck trying to find space,
-			 * abort the transaction to give up all hazard
-			 * references before trying again.
-			 */
-			if (F_ISSET(txn, TXN_RUNNING) &&
-			    __wt_txn_am_oldest(session) &&
-			    ++txn->eviction_fails >= 100) {
-				txn->eviction_fails = 0;
-				ret = WT_DEADLOCK;
-				WT_CSTAT_INCR(session, txn_fail_cache);
-			}
-
 			/* 
 			 * We may be able to discard any "update" memory the
 			 * page no longer needs.
@@ -473,7 +457,6 @@ __rec_review(WT_SESSION_IMPL *session,
 		WT_RET(ret);
 
 		WT_ASSERT(session, __wt_page_is_modified(page) == 0);
-		txn->eviction_fails = 0;
 	}
 
 	/*
