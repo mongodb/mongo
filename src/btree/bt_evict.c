@@ -226,6 +226,9 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	__wt_spin_unlock(session, &cache->evict_lock);
 
+	WT_CSTAT_INCR(session, cache_eviction_force);
+	WT_DSTAT_INCR(session, cache_eviction_force);
+
 	/* Wake the server, but don't worry if that fails. */
 	F_SET(cache, WT_EVICT_FORCE_PASS);
 	(void)__wt_evict_server_wake(session);
