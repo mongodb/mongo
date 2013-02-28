@@ -592,7 +592,7 @@ namespace spidermonkey {
             case Timestamp: {
                 JSObject * o = JS_NewObject( _context , &timestamp_class , 0 , 0 );
                 CHECKNEWOBJECT(o,_context,"Timestamp1");
-                setProperty( o , "t" , toval( (double)(e.timestampTime()) ) );
+                setProperty( o , "t" , toval( (double)(e.timestampTime() / 1000) ) );
                 setProperty( o , "i" , toval( (double)(e.timestampInc()) ) );
                 return OBJECT_TO_JSVAL( o );
             }

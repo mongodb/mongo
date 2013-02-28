@@ -33,6 +33,6 @@ assert.eq( 0 , t.find( { x : { $type : 3 } } ).itcount() , "B2" )
 
 t.insert( { _id : 100 , x : new Timestamp( 123456 , 50 ) } )
 x = t.findOne( { _id : 100 } ).x
-assert.eq( 123000 , x.t , "C1" )
+assert.eq( 123456 , x.t , "C1" )
 assert.eq( 50 , x.i , "C2" )
 

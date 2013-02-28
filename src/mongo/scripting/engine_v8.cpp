@@ -1385,7 +1385,7 @@ namespace mongo {
             case mongo::Timestamp: {
                 v8::Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() :
                                                        internalFieldObjects->NewInstance();
-                sub->ForceSet(v8::String::New("t"), v8::Number::New(f.timestampTime()));
+                sub->ForceSet(v8::String::New("t"), v8::Number::New(f.timestampTime() / 1000));
                 sub->ForceSet(v8::String::New("i"), v8::Number::New(f.timestampInc()));
                 sub->SetInternalField(0, v8::Uint32::New(f.type()));
                 o->ForceSet(name, sub);
@@ -1578,7 +1578,7 @@ namespace mongo {
         }
         case mongo::Timestamp:
             instance = internalFieldObjects->NewInstance();
-            instance->ForceSet(v8::String::New("t"), v8::Number::New(elem.timestampTime()));
+            instance->ForceSet(v8::String::New("t"), v8::Number::New(elem.timestampTime() / 1000 ));
             instance->ForceSet(v8::String::New("i"), v8::Number::New(elem.timestampInc()));
             instance->SetInternalField(0, v8::Uint32::New(elem.type()));
             return instance;
@@ -1657,7 +1657,7 @@ namespace mongo {
         case Timestamp:
             b.appendTimestamp(elementName,
                               Date_t(static_cast<uint64_t>(
-                                    obj->Get(v8::String::New("t"))->ToNumber()->Value())),
+                                    obj->Get(v8::String::New("t"))->ToNumber()->Value() * 1000 )),
                               obj->Get(v8::String::New("i"))->ToInt32()->Value());
             return;
         case MinKey:

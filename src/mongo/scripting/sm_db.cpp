@@ -1294,6 +1294,13 @@ zzz
                 c.setProperty( obj, "i", c.toval( 0.0 ) );
             }
             else {
+                long long t = parseLL(c.toString(argv[0]).c_str());
+                long long largestVal = ((2039LL-1970LL) *365*24*60*60); //seconds between 1970=2038
+                smuassert(  cx,
+                            ((string)(str::stream()
+                                << "The first argument must be in seconds;"
+                                << t << " is too large (max " << largestVal << ")")).c_str(),
+                            t <= largestVal );
                 c.setProperty( obj, "t", argv[ 0 ] );
                 c.setProperty( obj, "i", argv[ 1 ] );
             }
@@ -1688,7 +1695,7 @@ zzz
         }
 
         if ( JS_InstanceOf( c->_context , o , &timestamp_class , 0 ) ) {
-            b.appendTimestamp( name , (unsigned long long)c->getNumber( o , "t" ) , (unsigned int )c->getNumber( o , "i" ) );
+            b.appendTimestamp( name , (unsigned long long)c->getNumber( o , "t" ) * 1000 , (unsigned int )c->getNumber( o , "i" ) );
             return true;
         }
 

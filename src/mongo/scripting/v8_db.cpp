@@ -618,6 +618,12 @@ namespace mongo {
             it->ForceSet(scope->v8StringData("i"), v8::Number::New(0));
         }
         else if (args.Length() == 2) {
+            int64_t t = args[0]->IntegerValue();
+            int64_t largestVal = ((2039LL-1970LL) *365*24*60*60); //seconds between 1970-2038
+            if( t > largestVal )
+                return v8AssertionException( str::stream()
+                        << "The first argument must be in seconds;"
+                        << t << " is too large (max " << largestVal << ")");
             it->ForceSet(scope->v8StringData("t"), args[0]);
             it->ForceSet(scope->v8StringData("i"), args[1]);
         }
