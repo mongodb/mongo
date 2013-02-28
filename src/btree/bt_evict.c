@@ -966,6 +966,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 
 		WT_CSTAT_INCR(session, cache_eviction_walk);
 
+		/* Ignore root pages entirely. */
+		if (WT_PAGE_IS_ROOT(page))
+			continue;
+
 		/*
 		 * If this page has never been considered for eviction, set its
 		 * read generation to a little bit in the future and move on,
@@ -984,18 +988,15 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			continue;
 
 		/*
-		 * Skip root pages, and split-merge pages that have split-merge
-		 * pages as their parents (we're only interested in the top-most
-		 * split-merge page of deep trees).
+		 * Skip split-merge pages that have split-merge pages as their
+		 * parents (we're only interested in the top-most split-merge
+		 * page of deep trees).
 		 *
 		 * Don't skip empty or split pages: updates after their last
 		 * reconciliation may have changed their state and only the
 		 * reconciliation/eviction code can confirm if they should be
 		 * skipped.
 		 */
-		if (WT_PAGE_IS_ROOT(page))
-			continue;
-
 		if (page->modify != NULL &&
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) {
 			parent = page->parent;
