@@ -210,7 +210,7 @@ namespace mongo_test {
 
         static void simpleTask(FailPoint* failPoint) {
             while (true) {
-                MONGO_FAIL_POINT((*failPoint));
+                static_cast<void>(MONGO_FAIL_POINT((*failPoint)));
                 boost::this_thread::interruption_point();
             }
         }
