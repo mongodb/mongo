@@ -719,6 +719,10 @@ struct __wt_session {
 	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>.  This
 	 * limit is soft - it is possible for pages to be temporarily larger
 	 * than this value.,an integer between 512B and 10TB; default \c 5MB.}
+	 * @config{os_cache_max, maximum filesystem cache.  If non-zero\,
+	 * WiredTiger will attempt to flush the operating system buffer cache
+	 * whenever this amount of I/O is performed.,an integer greater than or
+	 * equal to 0; default \c 8MB.}
 	 * @config{prefix_compression, configure row-store format key prefix
 	 * compression.,a boolean flag; default \c true.}
 	 * @config{source, override the default data source URI derived from the

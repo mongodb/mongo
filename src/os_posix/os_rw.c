@@ -21,13 +21,21 @@ __wt_read(WT_SESSION_IMPL *session,
 	    "%s: read %" PRIu32 " bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
 
-	if (pread(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
-		return (0);
+	if (pread(fh->fd, buf, (size_t)bytes, offset) != (ssize_t)bytes)
+		WT_RET_MSG(session, __wt_errno(),
+		    "%s read error: failed to read %" PRIu32
+		    " bytes at offset %" PRIuMAX,
+		    fh->name, bytes, (uintmax_t)offset);
 
-	WT_RET_MSG(session, __wt_errno(),
-	    "%s read error: failed to read %" PRIu32 " bytes at offset %"
-	    PRIuMAX,
-	    fh->name, bytes, (uintmax_t)offset);
+#if HAVE_POSIX_FADVISE
+	if (fh->os_cache_max > 0 &&
+	    (fh->io_size += (off_t)bytes) > fh->os_cache_max) {
+		fh->io_size = 0;
+		WT_RET(posix_fadvise(fh->fd, 0, 0, POSIX_FADV_DONTNEED));
+	}
+#endif
+
+	return (0);
 }
 
 /*
@@ -44,11 +52,15 @@ __wt_write(WT_SESSION_IMPL *session,
 	    "%s: write %" PRIu32 " bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
 
-	if (pwrite(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
-		return (0);
+	if (pwrite(fh->fd, buf, (size_t)bytes, offset) != (ssize_t)bytes)
+		WT_RET_MSG(session, __wt_errno(),
+		    "%s write error: failed to write %" PRIu32
+		    " bytes at offset %" PRIuMAX,
+		    fh->name, bytes, (uintmax_t)offset);
 
-	WT_RET_MSG(session, __wt_errno(),
-	    "%s write error: failed to write %" PRIu32 " bytes at offset %"
-	    PRIuMAX,
-	    fh->name, bytes, (uintmax_t)offset);
+#if HAVE_POSIX_FADVISE
+	if (fh->os_cache_max > 0)
+		fh->io_size += (off_t)bytes;
+#endif
+	return (0);
 }

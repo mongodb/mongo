@@ -33,6 +33,8 @@ struct __wt_fh {
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
 	off_t	file_size;			/* File size */
+	off_t	io_size;			/* Current amount of I/O */
+	off_t	os_cache_max;			/* Max I/O before flushing */
 
 	char	*name;				/* File name */
 	int	fd;				/* POSIX file handle */
