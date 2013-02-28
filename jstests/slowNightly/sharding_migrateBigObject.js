@@ -41,7 +41,21 @@ admin.runCommand({ shardcollection : "" + coll, key : { _id : 1 } })
 assert.lt( 5 , mongos.getDB( "config" ).chunks.find( { ns : "test.stuff" } ).count() , "not enough chunks" );
 
 assert.soon( 
-    function(){ 
+    function(){
+        
+        // On *extremely* slow or variable systems, we've seen migrations fail in the critical section and
+        // kill the server.  Do an explicit check for this. SERVER-8781
+        // TODO: Remove once we can better specify what systems to run what tests on.
+        try { 
+            assert.eq(null, shardA.getDB("admin").getLastError());
+            assert.eq(null, shardB.getDB("admin").getLastError());
+        }
+        catch(e) {
+            print("An error occurred contacting a shard during balancing," +
+                  " this may be due to slow disk I/O, aborting test.");
+            throw e;
+        }
+         
         res = mongos.getDB( "config" ).chunks.group( { cond : { ns : "test.stuff" } , 
                                                        key : { shard : 1 }  , 
                                                        reduce : function( doc , out ){ out.nChunks++; } , 
