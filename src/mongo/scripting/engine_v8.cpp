@@ -1633,7 +1633,8 @@ namespace mongo {
     void V8Scope::v8ToMongoInternal(BSONObjBuilder& b,
                                     const string& elementName,
                                     v8::Handle<v8::Object> obj) {
-        uint32_t bsonType = obj->GetInternalField(0)->ToUint32()->Value();
+        uint32_t bsonTypeRaw = obj->GetInternalField(0)->ToUint32()->Value();
+        BSONType bsonType = static_cast<BSONType>(bsonTypeRaw);
         switch(bsonType) {
         case Timestamp:
             b.appendTimestamp(elementName,
