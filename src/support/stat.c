@@ -232,6 +232,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: internal levels merged";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
+	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
 	stats->cache_pages_dirty.desc =
 	    "cache: tracked dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
@@ -287,6 +288,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_eviction_merge_fail.v = 0;
 	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
+	stats->cache_eviction_walk.v = 0;
 	stats->cache_pages_dirty.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;

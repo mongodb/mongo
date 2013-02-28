@@ -68,6 +68,7 @@ connection_stats = [
 	    'cache: internal levels merged'),
 	Stat('cache_eviction_slow',
 	    'cache: eviction server unable to reach eviction goal'),
+	Stat('cache_eviction_walk', 'cache: pages walked for eviction'),
 	Stat('cache_pages_dirty', 'cache: tracked dirty pages in the cache'),
 	Stat('cache_pages_inuse',
 	    'cache: pages currently held in the cache', perm=1),

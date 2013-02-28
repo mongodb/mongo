@@ -964,6 +964,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			continue;
 		}
 
+		WT_CSTAT_INCR(session, cache_eviction_walk);
+
 		/*
 		 * If this page has never been considered for eviction, set its
 		 * read generation to a little bit in the future and move on,
