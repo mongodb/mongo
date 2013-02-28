@@ -123,6 +123,22 @@ namespace {
         ASSERT_EQUALS( string("foo").find( "" ), StringData("foo").find( "" ) );
     }
 
+    TEST(Rfind, Char1) {
+        ASSERT_EQUALS( string::npos, StringData( "foo" ).rfind( 'a' ) );
+
+        ASSERT_EQUALS( 0U, StringData( "foo" ).rfind( 'f' ) );
+        ASSERT_EQUALS( 0U, StringData( "foo" ).rfind( 'f', 3 ) );
+        ASSERT_EQUALS( 0U, StringData( "foo" ).rfind( 'f', 2 ) );
+        ASSERT_EQUALS( 0U, StringData( "foo" ).rfind( 'f', 1 ) );
+        ASSERT_EQUALS( string::npos, StringData( "foo", 0 ).rfind( 'f' ) );
+
+        ASSERT_EQUALS( 2U, StringData( "foo" ).rfind( 'o' ) );
+        ASSERT_EQUALS( 2U, StringData( "foo", 3 ).rfind( 'o' ) );
+        ASSERT_EQUALS( 1U, StringData( "foo", 2 ).rfind( 'o' ) );
+        ASSERT_EQUALS( string::npos, StringData( "foo", 1 ).rfind( 'o' ) );
+        ASSERT_EQUALS( string::npos, StringData( "foo", 0 ).rfind( 'o' ) );
+    }
+
     // this is to verify we match std::string
     void SUBSTR_TEST_HELP(StringData big, StringData small, size_t start, size_t len) {
         ASSERT_EQUALS(small.toString(), big.toString().substr(start, len));

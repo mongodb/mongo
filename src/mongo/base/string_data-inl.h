@@ -90,6 +90,18 @@ namespace mongo {
 
     }
 
+    inline size_t StringData::rfind( char c, size_t fromPos ) const {
+        const size_t sz = size();
+        if ( fromPos > sz )
+            fromPos = sz;
+
+        for ( const char* cur = _data + fromPos; cur > _data; --cur ) {
+            if ( *(cur - 1) == c )
+                return (cur - _data) - 1;
+        }
+        return string::npos;
+    }
+
     inline StringData StringData::substr( size_t pos, size_t n ) const {
         if ( pos > size() )
             throw std::out_of_range( "out of range" );
