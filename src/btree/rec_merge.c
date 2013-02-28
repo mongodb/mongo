@@ -203,7 +203,7 @@ __merge_new_page(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_def(session, (size_t)entries, &newpage->u.intl.t));
 
 	/* Fill it in. */
-	newpage->read_gen = __wt_cache_read_gen(session);
+	newpage->read_gen = WT_READ_GEN_NOTSET;
 	newpage->entries = entries;
 	newpage->type = type;
 

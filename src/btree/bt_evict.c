@@ -962,6 +962,16 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		}
 
 		/*
+		 * If this page has never been considered for eviction, set its
+		 * read generation to a little bit in the future and move on,
+		 * give readers a chance to start updating the read generation.
+		 */
+		if (page->read_gen == WT_READ_GEN_NOTSET) {
+			page->read_gen = __wt_cache_read_gen_set(session);
+			continue;
+		}
+
+		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
 		 */
@@ -1080,7 +1090,7 @@ __evict_get_page(
 		 * unlocked the page and some other thread may have evicted it
 		 * by the time we look at it.
 		 */
-		evict->page->read_gen = __wt_cache_read_gen(session);
+		evict->page->read_gen = __wt_cache_read_gen_set(session);
 
 		/*
 		 * Lock the page while holding the eviction mutex to prevent

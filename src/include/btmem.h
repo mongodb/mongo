@@ -274,17 +274,29 @@ struct __wt_page {
 	WT_PAGE_MODIFY *modify;
 
 	/*
-	 * The read generation is incremented each time the page is searched,
-	 * and acts as an LRU value for each page in the tree; it is read by
-	 * the eviction server thread to select pages to be discarded from the
-	 * in-memory tree.
+	 * The page's read generation acts as an LRU value for each page in the
+	 * tree; it is used by the eviction server thread to select pages to be
+	 * discarded from the in-memory tree.
 	 *
-	 * The read generation is a 64-bit value; incremented every time the
-	 * page is searched, a 32-bit value could overflow.
+	 * The read generation is a 64-bit value, if incremented frequently, a
+	 * 32-bit value could overflow.
 	 *
-	 * The read-generation is not declared volatile: read-generation is set
-	 * a lot (on every access), and we don't want to write it that much.
+	 * The read generation is a piece of shared memory potentially accessed
+	 * by many threads.  We don't want to update page read generations for
+	 * in-cache workloads and suffer the cache misses, so we don't simply
+	 * increment the read generation value on every access.  Instead, the
+	 * read generation is initialized to 0, then set to a real value if the
+	 * page is ever considered for eviction.  Once set to a real value, the
+	 * read generation is potentially incremented every time the page is
+	 * accessed.  To try and avoid incrementing the page at a fast rate in
+	 * this case, the read generation is incremented to a future point.
+	 *
+	 * The read generation is not declared volatile or published: the read
+	 * generation is set a lot, and we don't want to write it that much.
 	 */
+#define	WT_READ_GEN_NOTSET	0
+#define	WT_READ_GEN_OLDEST	1
+#define	WT_READ_GEN_STEP	1000
 	uint64_t read_gen;
 
 	/*
