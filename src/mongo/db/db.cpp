@@ -308,7 +308,7 @@ namespace mongo {
                 }
             }
 
-            h->versionMinor = 5;
+            getDur().writingInt(h->versionMinor) = 5;
             return true;
         }
 
