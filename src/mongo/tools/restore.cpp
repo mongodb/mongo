@@ -176,13 +176,13 @@ public:
                     }
 
                     BSONObjBuilder tsRestrictBldr;
-                    if (tsOptime != NULL)
+                    if (!tsOptime.isNull())
                         tsRestrictBldr << "$gt" << tsOptime;
                     tsRestrictBldr << "$lt" << *_oplogLimitTS.get();
 
                     BSONObj query = BSON("ts" << tsRestrictBldr.obj());
 
-                    if (tsOptime != NULL) {
+                    if (!tsOptime.isNull()) {
                         log() << "Latest oplog entry on the server is " << tsOptime.getSecs()
                                 << ":" << tsOptime.getInc() << endl;
                         log() << "Only applying oplog entries matching this criteria: "
