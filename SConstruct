@@ -164,6 +164,7 @@ add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
 add_option( "cxx", "compiler to use" , 1 , True )
 add_option( "cc", "compiler to use for c" , 1 , True )
 add_option( "ld", "linker to use" , 1 , True )
+add_option( "c++11", "enable c++11 support (experimental)", 0, True )
 
 add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , True )
 add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , True )
@@ -905,6 +906,25 @@ def doConfigure(myenv):
         # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. We disable the
         # warning so it doesn't become an error.
         AddToCCFLAGSIfSupported(myenv, '-Wno-mismatched-tags')
+
+    if has_option('c++11'):
+        # The Microsoft compiler does not need a switch to enable C++11. Again we should be
+        # checking for MSVC, not windows. In theory, we might be using clang or icc on windows.
+        if not windows:
+            # For our other compilers (gcc and clang) we need to pass -std=c++0x or -std=c++11,
+            # but we prefer the latter. Try that first, and fall back to c++0x if we don't
+            # detect that --std=c++11 works.
+            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++11'):
+                if not AddToCXXFLAGSIfSupported(myenv, '-std=c++0x'):
+                    print( 'C++11 mode requested, but cannot find a flag to enable it' )
+                    Exit(1)
+            # Our current builtin tcmalloc is not compilable in C++11 mode. Remove this
+            # check when our builtin release of tcmalloc contains the resolution to
+            # http://code.google.com/p/gperftools/issues/detail?id=477.
+            if get_option('allocator') == 'tcmalloc':
+                if not use_system_version_of_library('tcmalloc'):
+                    print( 'TCMalloc is not currently compatible with C++11' )
+                    Exit(1)
 
     # glibc's memcmp is faster than gcc's
     if nix and linux:
