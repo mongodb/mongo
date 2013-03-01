@@ -210,12 +210,6 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Set the location in the eviction queue to the new entry. */
 	cache->evict_current = cache->evict;
-	/*
-	 * If the candidate list was empty we are adding a candidate, in all
-	 * other cases we are replacing an existing candidate.
-	 */
-	if (cache->evict_candidates == 0)
-		cache->evict_candidates++;
 
 	/*
 	 * Lock the page so other threads cannot get new read locks on the
@@ -370,6 +364,14 @@ __evict_worker(WT_SESSION_IMPL *session)
 		/* Check for forced eviction while we hold the lock. */
 		force = F_ISSET(cache, WT_EVICT_FORCE_PASS) ? 1 : 0;
 		F_CLR(cache, WT_EVICT_FORCE_PASS);
+
+		/*
+		 * If we are forcing, make sure we look at the first entry.
+		 * Scheduling forced eviction may have raced with a thread
+		 * reaching the end of the queue.
+		 */
+		if (force && cache->evict_candidates == 0)
+			cache->evict_candidates++;
 
 		__wt_spin_unlock(session, &cache->evict_lock);
 		WT_RET(ret);
@@ -1098,7 +1100,7 @@ __evict_get_page(
 	 * and the eviction server is stuck trying to find space, abort the
 	 * transaction to give up all hazard references before trying again.
 	 */
-	if (F_ISSET(cache, WT_EVICT_STUCK) &&
+	if (is_app && F_ISSET(cache, WT_EVICT_STUCK) &&
 	    F_ISSET(&session->txn, TXN_RUNNING) &&
 	    __wt_txn_am_oldest(session)) {
 		F_CLR(cache, WT_EVICT_STUCK);
