@@ -273,8 +273,9 @@ namespace mongo {
     }
 
     int SSLManager::_ssl_connect(SSL* ssl) {
+        int ret = 0;
         for (int i=0; i<3; ++i) {
-            int ret = SSL_connect(ssl);
+            ret = SSL_connect(ssl);
             if (ret == 1) 
                 return ret;
             int code = SSL_get_error(ssl, ret);
@@ -283,7 +284,8 @@ namespace mongo {
             if (code != SSL_ERROR_WANT_READ)
                 return ret;
         }
-        fassertFailed(16697);
+        // Give up and return connection-failure error to user
+        return ret;
     }
     SSL* SSLManager::connect(int fd) {
         SSL* ssl = _secure(fd);
@@ -347,8 +349,11 @@ namespace mongo {
         case SSL_ERROR_WANT_READ:
         case SSL_ERROR_WANT_WRITE:
             // should not happen because we turned on AUTO_RETRY
-            error() << "SSL error: " << code << endl;
-            fassertFailed( 16676 );
+            // However, it turns out this CAN happen during a connect, if the other side
+            // accepts the socket connection but fails to do the SSL handshake in a timely
+            // manner.
+            error() << "SSL error: " << code << ", possibly timed out during connect" << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
 
         case SSL_ERROR_SYSCALL:
