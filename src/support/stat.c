@@ -47,8 +47,10 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->cache_eviction_dirty.desc = "modified pages evicted";
 	stats->cache_eviction_fail.desc =
 	    "data source pages selected for eviction unable to be evicted";
+	stats->cache_eviction_force.desc =
+	    "cache: pages queued for forced eviction";
 	stats->cache_eviction_hazard.desc =
-	    "eviction unable to acquire hazard pointer";
+	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "internal pages evicted";
 	stats->cache_eviction_merge.desc =
 	    "cache: internal page merge operations completed";
@@ -149,6 +151,7 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
+	stats->cache_eviction_force.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_merge.v = 0;
@@ -216,8 +219,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
+	stats->cache_eviction_force.desc =
+	    "cache: pages queued for forced eviction";
 	stats->cache_eviction_hazard.desc =
-	    "cache: eviction unable to acquire hazard pointer";
+	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_eviction_merge.desc =
 	    "cache: internal page merge operations completed";
@@ -227,6 +232,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: internal levels merged";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
+	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
 	stats->cache_pages_dirty.desc =
 	    "cache: tracked dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
@@ -275,12 +281,14 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
+	stats->cache_eviction_force.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_merge.v = 0;
 	stats->cache_eviction_merge_fail.v = 0;
 	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
+	stats->cache_eviction_walk.v = 0;
 	stats->cache_pages_dirty.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
