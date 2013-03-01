@@ -70,8 +70,9 @@ namespace mongo {
                 Date_t lastPing = ping.getPing();
 
                 long long quietIntervalMillis = 0;
-                if ((jsTime() - lastPing) >= 0) {
-                    quietIntervalMillis = static_cast<long long>(jsTime() - lastPing);
+                Date_t currentJsTime = jsTime();
+                if (currentJsTime >= lastPing) {
+                    quietIntervalMillis = static_cast<long long>(currentJsTime - lastPing);
                 }
                 long long quietIntervalMins = quietIntervalMillis / (60 * 1000);
 
