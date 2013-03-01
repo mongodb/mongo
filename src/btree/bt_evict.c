@@ -356,9 +356,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	/* Assume we can make progress until we don't */
-	F_CLR(cache, WT_EVICT_STUCK);
-
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
 		/*
@@ -413,6 +410,11 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 			clean = 1;
 
+		/*
+		 * Track whether pages are being evicted.  This will be cleared
+		 * by the next thread to successfully evict a page.
+		 */
+		F_SET(cache, WT_EVICT_NO_PROGRESS);
 		WT_RET(__evict_lru(session, clean));
 
 		__evict_dirty_validate(conn);
@@ -422,7 +424,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * any progress at all, mark the cache "stuck" and go back to
 		 * sleep, it's not something we can fix.
 		 */
-		if (clean && __wt_cache_bytes_inuse(cache) >= bytes_inuse) {
+		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
 			if (loop == 10) {
 				F_SET(cache, WT_EVICT_STUCK);
 				WT_CSTAT_INCR(session, cache_eviction_slow);
@@ -1196,6 +1198,7 @@ int
 __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 {
 	WT_BTREE *btree, *saved_btree;
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 
@@ -1213,6 +1216,10 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 
 	WT_CLEAR_BTREE_IN_SESSION(session);
 	session->btree = saved_btree;
+
+	cache = S2C(session)->cache;
+	if (ret == 0 && F_ISSET(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK))
+		F_CLR(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK);
 
 	return (ret);
 }

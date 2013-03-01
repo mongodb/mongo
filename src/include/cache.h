@@ -76,7 +76,8 @@ struct __wt_cache {
 	 * Flags.
 	 */
 #define	WT_EVICT_FORCE_PASS	0x01	/* Ignore the eviction trigger */
-#define	WT_EVICT_STUCK		0x02	/* Eviction server is stuck */
+#define	WT_EVICT_NO_PROGRESS	0x02	/* Check if pages are being evicted */
+#define	WT_EVICT_STUCK		0x04	/* Eviction server is stuck */
 	uint32_t flags;
 };
 
