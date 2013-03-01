@@ -686,11 +686,13 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_TXN *txn;
 	uint32_t flags;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
 	page = NULL;
+	txn = &session->txn;
 
 	switch (syncop) {
 	case WT_SYNC_CHECKPOINT:
@@ -704,9 +706,15 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
 			/* Write dirty pages if nobody beat us to it. */
-			if (__wt_page_is_modified(page) && TXNID_LT(
-			    page->modify->disk_txn, session->txn.snap_min))
-				WT_ERR(__wt_rec_write(session, page, NULL, 0));
+			if (__wt_page_is_modified(page)) {
+				if (txn->isolation == TXN_ISO_READ_COMMITTED)
+					__wt_txn_get_snapshot(
+					    session, WT_TXN_NONE, WT_TXN_NONE);
+				ret = __wt_rec_write(session, page, NULL, 0);
+				if (txn->isolation == TXN_ISO_READ_COMMITTED)
+					__wt_txn_release_snapshot(session);
+				WT_ERR(ret);
+			}
 
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}

@@ -111,6 +111,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	__wt_spin_lock(session, &conn->metadata_lock);
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
+	txn->isolation = TXN_ISO_READ_COMMITTED;
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
 
 	WT_ERR(__wt_meta_track_on(session));
