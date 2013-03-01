@@ -76,16 +76,16 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		WT_ASSERT(session, session->ncursors > 0);
 		/*
-		 * We no longer have any active cursors, and there is no
+		 * We no longer have any active cursors: if there is no
 		 * transaction running, check if our operation overflowed the
 		 * cache.  We don't care if we fail to evict pages: our
 		 * operation is done regardless.
 		 */
-		if (--session->ncursors == 0 &&
-		    !F_ISSET(&session->txn, TXN_RUNNING)) {
+		if (--session->ncursors == 0) {
 			__wt_txn_read_last(session);
 
-			(void)__wt_cache_full_check(session);
+			if (!F_ISSET(&session->txn, TXN_RUNNING))
+				(void)__wt_cache_full_check(session);
 		}
 		F_CLR(cbt, WT_CBT_ACTIVE);
 	}

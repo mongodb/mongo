@@ -722,7 +722,7 @@ struct __wt_session {
 	 * @config{os_cache_max, maximum filesystem cache.  If non-zero\,
 	 * WiredTiger will attempt to flush the operating system buffer cache
 	 * whenever this amount of I/O is performed.,an integer greater than or
-	 * equal to 0; default \c 8MB.}
+	 * equal to 0; default \c 0.}
 	 * @config{prefix_compression, configure row-store format key prefix
 	 * compression.,a boolean flag; default \c true.}
 	 * @config{source, override the default data source URI derived from the

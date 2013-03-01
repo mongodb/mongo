@@ -133,7 +133,7 @@ __wt_confdfl_file_meta =
 	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
 	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
 	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_max=8MB,"
+	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_max=0,"
 	"prefix_compression=,split_pct=75,value_format=u,version=(major=0,"
 	"minor=0)";
 
@@ -258,7 +258,7 @@ __wt_confdfl_session_create =
 	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
 	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
 	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_max=8MB,"
+	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_max=0,"
 	"prefix_compression=,source=,split_pct=75,type=file,value_format=u";
 
 WT_CONFIG_CHECK

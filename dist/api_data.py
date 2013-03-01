@@ -214,7 +214,7 @@ file_config = format_meta + lsm_config + [
 		soft - it is possible for pages to be temporarily larger than
 		this value''',
 		min='512B', max='10TB'),
-	Config('os_cache_max', '8MB', r'''
+	Config('os_cache_max', '0', r'''
 		maximum filesystem cache.  If non-zero, WiredTiger will attempt to
 		flush the operating system buffer cache whenever this amount of I/O is
 		performed''',
