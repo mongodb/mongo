@@ -199,7 +199,6 @@ add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
 
 add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
-add_option( "clang" , "use clang++ rather than g++ (experimental)" , 0 , True )
 
 # debugging/profiling help
 if os.sys.platform.startswith("linux") and (os.uname()[-1] == 'x86_64'):
@@ -348,10 +347,6 @@ else:
 if has_option( "cxx" ):
     env["CC"] = get_option( "cxx" )
     env["CXX"] = get_option( "cxx" )
-elif has_option("clang"):
-    env["CC"] = 'clang'
-    env["CXX"] = 'clang++'
-
 if has_option( "cc" ):
     env["CC"] = get_option( "cc" )
 
@@ -702,10 +697,10 @@ if nix:
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
-    if linux:
+    if linux or darwin:
         env.Append( CCFLAGS=["-Werror", "-pipe"] )
-        if not has_option('clang'):
-            env.Append( CCFLAGS=["-fno-builtin-memcmp"] ) # glibc's memcmp is faster than gcc's
+        # Don't make deprecated declarations errors.
+        env.Append( CCFLAGS=["-Wno-error=deprecated-declarations"] )
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
@@ -745,21 +740,6 @@ if nix:
 
     if has_option( "gdbserver" ):
         env.Append( CPPDEFINES=["USE_GDBSERVER"] )
-
-    # pre-compiled headers
-    if usePCH and 'Gch' in dir( env ):
-        print( "using precompiled headers" )
-        if has_option('clang'):
-            #env['GCHSUFFIX']  = '.pch' # clang++ uses pch.h.pch rather than pch.h.gch
-            #env.Prepend( CXXFLAGS=' -include pch.h ' ) # clang++ only uses pch from command line
-            print( "ERROR: clang pch is broken for now" )
-            Exit(1)
-        env['Gch'] = env.Gch( "$BUILD_DIR/mongo/pch.h$GCHSUFFIX",
-                              "src/mongo/pch.h" )[0]
-        env['GchSh'] = env[ 'Gch' ]
-    elif os.path.exists( env.File("$BUILD_DIR/mongo/pch.h$GCHSUFFIX").abspath ):
-        print( "removing precompiled headers" )
-        os.unlink( env.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath ) # gcc uses the file if it exists
 
 if usesm:
     env.Append( CPPDEFINES=["JS_C_STRINGS_ARE_UTF8"] )
@@ -809,12 +789,128 @@ env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 
 
 def doConfigure(myenv):
-    conf = Configure(myenv)
+
+    def CheckToolIsClang(context, tool_name, tool, extension):
+        test_body = """
+                    #ifndef __clang__
+                    #error
+                    #endif
+                    """
+        context.Message('Checking if %s compiler "%s" is clang ...' % (tool_name, tool))
+        ret = context.TryCompile(test_body, extension)
+        context.Result(ret)
+        return ret
+
+    conf = Configure(myenv, clean=False, help=False, custom_tests = {
+        'CheckCCIsClang'  : lambda(ctx): CheckToolIsClang(ctx, "C", ctx.env["CC"], ".c"),
+        'CheckCXXIsClang' : lambda(ctx): CheckToolIsClang(ctx, "C++", ctx.env["CXX"], ".cpp"),
+    })
+
+    if 'CheckCC' in dir( conf ):
+        if not conf.CheckCC():
+            print( "C compiler not installed!" )
+            Exit(1)
+    cc_is_clang = conf.CheckCCIsClang()
 
     if 'CheckCXX' in dir( conf ):
-        if  not conf.CheckCXX():
-            print( "c++ compiler not installed!" )
+        if not conf.CheckCXX():
+            print( "C++ compiler not installed!" )
             Exit(1)
+    cxx_is_clang = conf.CheckCXXIsClang()
+
+    if not cc_is_clang == cxx_is_clang:
+        print("C and C++ compiler should either both be from clang, or both not from clang!")
+        Exit(1)
+
+    myenv = conf.Finish()
+
+    # TODO: OK, so where do we store our clangy-ness so we can ask for it later? I'm hoping
+    # that the answer is *not* in some global and that we can attach it to our Vars, Options,
+    # or Env. For now, it only seems to be needed within this method though.
+    using_clang = cc_is_clang
+
+    # Enable PCH if we are on 'NIX, the 'Gch' tool is enabled, and if we are not using
+    # clang. Otherwise, remove any pre-compiled header since gcc will try to use it if it
+    # exists.
+    if nix and usePCH and 'Gch' in dir( myenv ):
+        if using_clang:
+            # clang++ uses pch.h.pch rather than pch.h.gch
+            myenv['GCHSUFFIX'] = '.pch'
+            # clang++ only uses pch from command line
+            myenv.Prepend( CXXFLAGS=' -include pch.h ' )
+            # But it doesn't appear to work, so error out for now.
+            print( "ERROR: clang pch is broken for now" )
+            Exit(1)
+        myenv['Gch'] = myenv.Gch( "$BUILD_DIR/mongo/pch.h$GCHSUFFIX",
+                                    "src/mongo/pch.h" )[0]
+        myenv['GchSh'] = myenv[ 'Gch' ]
+    elif os.path.exists( myenv.File("$BUILD_DIR/mongo/pch.h$GCHSUFFIX").abspath ):
+        print( "removing precompiled headers" )
+        os.unlink( myenv.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath )
+
+    def AddFlagIfSupported(env, tool, extension, flag, **mutation):
+        def CheckFlagTest(context, tool, extension, flag):
+            test_body = ""
+            context.Message('Checking if %s compiler supports %s ...' % (tool, flag))
+            ret = context.TryCompile(test_body, extension)
+            context.Result(ret)
+            return ret
+
+        cloned = env.Clone()
+        cloned.Append(**mutation)
+
+        if windows:
+            # TODO: Should be checking for MSVC, not windows here.
+            print("AddFlagIfSupported is not currently supported on Windows")
+            Exit(1)
+
+        # For GCC, we don't need anything since bad flags are already errors, but
+        # adding -Werror won't hurt. For clang, bad flags are only warnings, so we need -Werror
+        # to make them real errors.
+        cloned.Append(CCFLAGS=['-Werror'])
+        conf = Configure(cloned, clean=False, help=False, custom_tests = {
+                'CheckFlag' : lambda(ctx) : CheckFlagTest(ctx, tool, extension, flag)
+        })
+        available = conf.CheckFlag()
+        conf.Finish()
+        if available:
+            env.Append(**mutation)
+        return available
+
+    # TOOD(acm): For clang, for instance, we need -Werror or invalid
+    # flags are only warnings. This should be handled more flexibly, but I'm
+    # leaving it here just to demonstrate.
+    def AddToCCFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C', '.c', flag, CCFLAGS=[flag])
+
+    def AddToCXXFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C++', '.cpp', flag, CXXFLAGS=[flag])
+
+    if using_clang:
+        # Clang likes to warn about unused functions, which seems a tad aggressive and breaks
+        # -Werror, which we want to be able to use.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-function')
+
+        # TODO: Note that the following two flags are added to CCFLAGS even though they are
+        # really C++ specific. We need to do this because SCons passes CXXFLAGS *before*
+        # CCFLAGS, but CCFLAGS contains -Wall, which re-enables the warnings we are trying to
+        # suppress. In the future, we should move all warning flags to CCWARNFLAGS and
+        # CXXWARNFLAGS and add these to CCOM and CXXCOM as appropriate.
+        #
+        # Clang likes to warn about unused private fields, but some of our third_party
+        # libraries have such things.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-private-field')
+        # Clang warns about struct/class tag mismatch, but most people think that that is not
+        # really an issue, see
+        # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. We disable the
+        # warning so it doesn't become an error.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-mismatched-tags')
+
+    # glibc's memcmp is faster than gcc's
+    if nix and linux:
+        AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
+
+    conf = Configure(myenv)
 
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
@@ -828,7 +924,7 @@ def doConfigure(myenv):
                 Exit(1)
 
     if conf.CheckHeader('unistd.h'):
-        myenv.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
+        conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
 
     if solaris or conf.CheckDeclaration('clock_gettime', includes='#include <time.h>'):
         conf.CheckLib('rt')
@@ -837,9 +933,9 @@ def doConfigure(myenv):
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
 
-        myenv.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
+        conf.env.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
 
-    myenv["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
+    conf.env["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
     if solaris:
         conf.CheckLib( "nsl" )
@@ -852,8 +948,8 @@ def doConfigure(myenv):
         if not conf.CheckLib( v8_lib_choices ):
             Exit(1)
 
-    env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
-    if env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
+    conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
+    if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
         "gsasl", "gsasl.h", "C", "gsasl_check_version(GSASL_VERSION);", autoadd=False):
 
         Exit(1)
@@ -888,11 +984,11 @@ def doConfigure(myenv):
             print( "--heapcheck neads header 'google/heap-checker.h'" )
             Exit( 1 )
 
-        myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
-        myenv.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
+        conf.env.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
+        conf.env.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
 
     # ask each module to configure itself and the build environment.
-    moduleconfig.configure_modules(mongo_modules, conf, env)
+    moduleconfig.configure_modules(mongo_modules, conf)
 
     return conf.Finish()
 
