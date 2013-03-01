@@ -186,6 +186,7 @@ add_option( "ssl" , "Enable SSL" , 0 , True )
 # library choices
 add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
 add_option( "usev8" , "use v8 for javascript" , 0 , True )
+add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
@@ -925,6 +926,16 @@ def doConfigure(myenv):
                 if not use_system_version_of_library('tcmalloc'):
                     print( 'TCMalloc is not currently compatible with C++11' )
                     Exit(1)
+
+    if has_option('libc++'):
+        if not using_clang:
+            print( 'libc++ is currently only supported for clang')
+            Exit(1)
+        if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
+            myenv.Append(LINKFLAGS=['-stdlib=libc++'])
+        else:
+            print( 'libc++ requested, but compiler does not support -stdlib=libc++' )
+            Exit(1)
 
     # glibc's memcmp is faster than gcc's
     if nix and linux:
