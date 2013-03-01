@@ -189,6 +189,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;psapi.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -224,6 +225,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;psapi.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -259,6 +261,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
       <MinimalRebuild>No</MinimalRebuild>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;psapi.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -291,6 +294,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
       <MinimalRebuild>No</MinimalRebuild>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;psapi.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
