@@ -616,6 +616,14 @@ tojsonObject = function(x, indent, nolint){
     return s + indent + "}";
 }
 
+printjson = function(x){
+    print( tojson( x ) );
+}
+
+printjsononeline = function(x){
+    print( tojsononeline( x ) );
+}
+
 isString = function(x){
     return typeof(x) == "string";
 }
