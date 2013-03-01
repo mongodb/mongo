@@ -23,6 +23,9 @@
 #include "../util/stringutils.h"
 #include "mongo/util/mongoutils/str.h"
 #include "../util/text.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
 
 namespace mongo {
@@ -78,7 +81,7 @@ namespace mongo {
         return l.woCompare( r , _spec->keyPattern );
     }
 
-    void IndexSpec::_init() {
+    void IndexSpec::_init(PluginRules rules) {
         verify( keyPattern.objsize() );
 
         // some basics
@@ -123,12 +126,41 @@ namespace mongo {
             string pluginName = IndexPlugin::findPluginName( keyPattern );
             if ( pluginName.size() ) {
                 IndexPlugin * plugin = IndexPlugin::get( pluginName );
-                if ( ! plugin ) {
-                    log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+
+                switch (rules) {
+                case NoPlugins:
+                    uasserted(16735,
+                              str::stream()
+                                << "Attempting to use index type '" << pluginName << "' "
+                                << "where index types are not allowed (1 or -1 only).");
+                    break;
+
+                case RulesFor22: {
+                    if ( ! plugin ) {
+                        log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+                    }
+
+                    if (!IndexPlugin::existedBefore24(pluginName)) {
+                        warning() << "Treating index " << info << " as ascending since "
+                                  << "it was created before 2.4 and '" << pluginName << "' "
+                                  << "was not a valid type at that time."
+                                  << endl;
+
+                        plugin = NULL;
+                    }
+                    break;
                 }
-                else {
+                case RulesFor24:
+                    // This assert will be triggered when downgrading from a future version that
+                    // supports an index plugin unsupported by this version.
+                    uassert(16736, str::stream() << "Invalid index type '" << pluginName << "' "
+                                                 << "in index " << info
+                           , plugin);
+                    break;
+                }
+
+                if (plugin)
                     _indexType.reset( plugin->generate( this ) );
-                }
             }
         }
 

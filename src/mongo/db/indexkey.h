@@ -142,6 +142,19 @@ namespace mongo {
          */
         static string findPluginName( const BSONObj& keyPattern );
 
+        /**
+         * True if is a regular (non-plugin) index or uses a plugin that existed before 2.4.
+         * These plugins are grandfathered in and allowed to exist in DBs with
+         * PDFILE_MINOR_VERSION_22_AND_OLDER
+         */
+        static bool existedBefore24(const string& name) {
+            return name.empty()
+                || name == "2d"
+                || name == "geoHaystack"
+                || name == "hashed"
+                ;
+        }
+
     private:
         string _name;
         static map<string,IndexPlugin*> * _plugins;
@@ -152,6 +165,12 @@ namespace mongo {
        */
     class IndexSpec {
     public:
+        enum PluginRules {
+            NoPlugins,
+            RulesFor22, // if !IndexPlugin::existedBefore24() treat as ascending
+            RulesFor24, // allow new plugins but error if unknown
+        };
+
         BSONObj keyPattern; // e.g., { name : 1 }
         BSONObj info; // this is the same as IndexDetails::info.obj()
 
@@ -159,22 +178,25 @@ namespace mongo {
             : _details(0) , _finishedInit(false) {
         }
 
-        explicit IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
+        explicit IndexSpec(const BSONObj& k, const BSONObj& m=BSONObj(),
+                           PluginRules rules=RulesFor24)
             : keyPattern(k) , info(m) , _details(0) , _finishedInit(false) {
-            _init();
+            _init(rules);
         }
 
         /**
            this is a DiscLoc of an IndexDetails info
            should have a key field
          */
-        explicit IndexSpec( const DiskLoc& loc ) {
-            reset( loc );
+        explicit IndexSpec(const DiskLoc& loc, PluginRules rules=RulesFor24) {
+            reset(loc, rules);
         }
 
-        void reset( const BSONObj& info );
-        void reset( const DiskLoc& infoLoc ) { reset(infoLoc.obj()); }
-        void reset( const IndexDetails * details );
+        void reset(const BSONObj& info, PluginRules rules=RulesFor24);
+        void reset(const IndexDetails * details); // determines rules based on pdfile version
+        void reset(const DiskLoc& infoLoc, PluginRules rules=RulesFor24) {
+            reset(infoLoc.obj(), rules);
+        }
 
         void getKeys( const BSONObj &obj, BSONObjSet &keys ) const;
 
@@ -232,7 +254,7 @@ namespace mongo {
         shared_ptr<IndexType> _indexType;
         const IndexDetails * _details;
 
-        void _init();
+        void _init(PluginRules rules);
 
         friend class IndexType;
         friend class KeyGeneratorV0;

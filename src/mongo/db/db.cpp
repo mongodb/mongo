@@ -293,7 +293,7 @@ namespace mongo {
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
             verify( PDFILE_VERSION == 4 );
-            verify( PDFILE_VERSION_MINOR == 5 );
+            verify( PDFILE_VERSION_MINOR_22_AND_OLDER == 5 );
 
             list<string> colls = db.getCollectionNames( dbName );
             for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
@@ -341,8 +341,11 @@ namespace mongo {
 
                 log() << "****" << endl;
                 log() << "****" << endl;
-                log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                      << "new version: " << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR << endl;
+                log() << "need to upgrade database " << dbName << " "
+                      << "with pdfile version " << h->version << "." << h->versionMinor << ", "
+                      << "new version: "
+                      << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR_22_AND_OLDER
+                      << endl;
                 if ( shouldRepairDatabases ) {
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;
@@ -359,6 +362,23 @@ namespace mongo {
                 }
             }
             else {
+                if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
+                    const string systemIndexes = cc().database()->name + ".system.indexes";
+                    shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
+                    for ( ; cursor && cursor->ok(); cursor->advance()) {
+                        const BSONObj index = cursor->current();
+                        const BSONObj key = index.getObjectField("key");
+                        const string plugin = IndexPlugin::findPluginName(key);
+                        if (IndexPlugin::existedBefore24(plugin))
+                            continue;
+
+                        log() << "Index " << index << " claims to be of type '" << plugin << "', "
+                              << "which is either invalid or did not exist before v2.4. "
+                              << "See the upgrade section: "
+                              << "http://dochub.mongodb.org/core/upgrade-2.4"
+                              << startupWarningsLog;
+                    }
+                }
                 Database::closeDatabase( dbName.c_str(), dbpath );
             }
         }
