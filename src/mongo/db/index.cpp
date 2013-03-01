@@ -367,8 +367,13 @@ namespace mongo {
         }
 
         string pluginName = IndexPlugin::findPluginName( key );
-        IndexPlugin * plugin = pluginName.size() ? IndexPlugin::get( pluginName ) : 0;
-
+        IndexPlugin * plugin = NULL;
+        if (pluginName.size()) {
+            plugin = IndexPlugin::get(pluginName);
+            uassert(16734, str::stream() << "Unknown index plugin '" << pluginName << "' "
+                                         << "in index "<< key
+                   , plugin);
+        }
 
         { 
             BSONObj o = io;
