@@ -31,7 +31,7 @@ expected.push({ a : 1, b : "ObjectID(" + objId.valueOf() + ")", c : "[ 1, 2, 3 ]
 expected.push({ a : -2.0, b : "", c : "$MinKey", d : "Then he said, \"Hello World!\"", e : 3})
 // "t" should be 1234, but the shell interprets the first field of timestamps as milliseconds while
 // they are stored as seconds.  See SERVER-7718.
-expected.push({ a : "D76DF8", b : "2009-08-27T00:00:00Z", c : "{ \"$timestamp\" : { \"t\" : 1, \"i\" : 9876 } }", d : "/foo*\\\"bar\\\"/i", e : tojson(function foo() { print("Hello World!"); })})
+expected.push({ a : "D76DF8", b : "2009-08-27T00:00:00Z", c : "{ \"$timestamp\" : { \"t\" : 1234, \"i\" : 9876 } }", d : "/foo*\\\"bar\\\"/i", e : tojson(function foo() { print("Hello World!"); })})
 
 actual = []
 actual.push(c.find({a : 1}).toArray()[0]);

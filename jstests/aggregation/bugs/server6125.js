@@ -61,7 +61,7 @@ function setupArray(){
         { _id : 9, a : BinData(0, "77+9"), ty : "BinData" },
         { _id : 10, a : new ObjectId("0102030405060708090A0B0C"), ty : "ObjectId" },
         { _id : 11, a : true, ty : "Boolean" },
-        { _id : 12, a : new Timestamp( 1, 1 ), ty : "Timestamp" },
+        { _id : 12, a : new Timestamp( 1/1000 , 1 ), ty : "Timestamp" },
         { _id : 13, a : new Date( 2 ), ty : "Date" },
         { _id : 14, a : /regex/, ty : "RegExp" },
         { _id : 15, a : new DBPointer("test.s6125",new ObjectId("0102030405060708090A0B0C")), ty : "DBPointer" },
