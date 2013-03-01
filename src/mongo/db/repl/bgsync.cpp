@@ -430,8 +430,8 @@ namespace replset {
         // this is just to get the op off the queue, it's been peeked at
         // and queued for application already
         BSONObj op = _buffer.blockingPop();
-        bufferCountGauge.increment(-1);
-        bufferSizeGauge.increment(-getSize(op));
+        bufferCountGauge.decrement(1);
+        bufferSizeGauge.decrement(getSize(op));
     }
 
     bool BackgroundSync::isStale(OplogReader& r, BSONObj& remoteOldestOp) {
