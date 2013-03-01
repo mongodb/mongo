@@ -22,9 +22,9 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	int ckpt_closed, target_list, tracking;
+	int ckpt_closed, target_list;
 
-	target_list = tracking = 0;
+	target_list = 0;
 
 	/* Step through the list of targets and checkpoint each one. */
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
