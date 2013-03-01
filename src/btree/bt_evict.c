@@ -1101,7 +1101,6 @@ __evict_get_page(
 	 * transaction to give up all hazard references before trying again.
 	 */
 	if (is_app && F_ISSET(cache, WT_EVICT_STUCK) &&
-	    F_ISSET(&session->txn, TXN_RUNNING) &&
 	    __wt_txn_am_oldest(session)) {
 		F_CLR(cache, WT_EVICT_STUCK);
 		WT_CSTAT_INCR(session, txn_fail_cache);
