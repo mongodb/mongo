@@ -426,7 +426,7 @@ public:
                 }
             }
         }
-        else if ( endsWith( _curns.c_str() , ".system.indexes" )) {
+        else if (NamespaceString(_curns).coll == "system.indexes") {
             createIndex(obj, true);
         }
         else if (_drop && endsWith(_curns.c_str(), ".system.users") && _users.count(obj["user"].String())) {

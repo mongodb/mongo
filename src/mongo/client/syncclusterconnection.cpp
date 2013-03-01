@@ -23,6 +23,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespacestring.h"
 
 // error codes 8000-8009
 
@@ -314,8 +315,9 @@ namespace mongo {
 
     void SyncClusterConnection::insert( const string &ns, BSONObj obj , int flags) {
 
-        uassert( 13119 , (string)"SyncClusterConnection::insert obj has to have an _id: " + obj.jsonString() ,
-                 ns.find( ".system.indexes" ) != string::npos || obj["_id"].type() );
+        uassert(13119,
+                (string)"SyncClusterConnection::insert obj has to have an _id: " + obj.jsonString(),
+                 NamespaceString(ns).coll == "system.indexes" || obj["_id"].type());
 
         string errmsg;
         if ( ! prepare( errmsg ) )

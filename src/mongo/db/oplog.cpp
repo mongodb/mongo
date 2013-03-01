@@ -28,6 +28,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/queryoptimizer.h"
@@ -764,8 +765,7 @@ namespace mongo {
         if ( *opType == 'i' ) {
             opCounters->gotInsert();
 
-            const char *p = strchr(ns, '.');
-            if ( p && strcmp(p, ".system.indexes") == 0 ) {
+            if (NamespaceString(ns).coll == "system.indexes") {
                 // updates aren't allowed for indexes -- so we will do a regular insert. if index already
                 // exists, that is ok.
                 theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());

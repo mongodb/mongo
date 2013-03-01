@@ -49,6 +49,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/lasterror.h"
 #include "mongo/db/memconcept.h"
 #include "mongo/db/namespace-inl.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/replutil.h"
@@ -1076,7 +1077,7 @@ namespace mongo {
                 s->nrecords--;
             }
 
-            if ( strstr(ns, ".system.indexes") ) {
+            if (NamespaceString(ns).coll ==  "system.indexes") {
                 /* temp: if in system.indexes, don't reuse, and zero out: we want to be
                    careful until validated more, as IndexDetails has pointers
                    to this disk location.  so an incorrectly done remove would cause
@@ -1408,7 +1409,7 @@ namespace mongo {
         uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
         if ( strstr(ns, ".system.") ) {
             // later:check for dba-type permissions here if have that at some point separate
-            if ( strstr(ns, ".system.indexes" ) )
+            if (NamespaceString(ns).coll == "system.indexes")
                 wouldAddIndex = true;
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
@@ -1447,7 +1448,9 @@ namespace mongo {
                                         const string& tabletoidxns,
                                         const DiskLoc& loc,
                                         bool mayInterrupt) {
-        uassert( 13143 , "can't create index on system.indexes" , tabletoidxns.find( ".system.indexes" ) == string::npos );
+        uassert(13143,
+                "can't create index on system.indexes",
+                NamespaceString(tabletoidxns).coll != "system.indexes");
 
         BSONObj info = loc.obj();
         bool background = info["background"].trueValue();

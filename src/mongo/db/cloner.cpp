@@ -28,6 +28,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/sort_phase_one.h"
@@ -138,7 +139,7 @@ namespace mongo {
 
                 BSONObj js = tmp;
                 if ( isindex ) {
-                    verify( strstr(from_collection, "system.indexes") );
+                    verify(NamespaceString(from_collection).coll == "system.indexes");
                     js = fixindex(tmp);
                     storedForLater->push_back( js.getOwned() );
                     continue;
