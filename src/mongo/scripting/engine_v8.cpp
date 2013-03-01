@@ -52,17 +52,12 @@ namespace mongo {
       return (BSONHolder*)ptr;
     }
 
-    void deleteBSONHolderOnCollect(v8::Persistent<v8::Value> objHandle, void* obj) {
-        BSONHolder* holder = static_cast<BSONHolder*>(obj);
-        holder->_scope->_lazyObjects.erase(holder);
-        deleteOnCollect<BSONHolder>(objHandle, obj);
-    }
-
     v8::Persistent<v8::Object> V8Scope::wrapBSONObject(v8::Local<v8::Object> obj,
                                                        BSONHolder* data) {
+        data->_scope = this;
         obj->SetInternalField(0, v8::External::New(data));
         v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
-        p.MakeWeak(data, deleteBSONHolderOnCollect);
+        bsonHolderTracker.track(p, data);
         return p;
     }
 
@@ -560,21 +555,10 @@ namespace mongo {
             roObjectTemplate.Dispose();
             internalFieldObjects.Dispose();
             _context.Dispose();
-            gc(); // collect any known garbage after _global and _context have been disposed
         }
         _isolate->Dispose();
-        // NOTE: Persistent external objects may not be collected after destroying the global
-        //       object and context.  Destroying the isolate frees its heap, but does not
-        //       execute the callbacks supplied to v8::Persistent::MakeWeak().
-        // free any remaining BSONHolder instances
-        if (!_lazyObjects.empty())
-            LOG(1) << "freeing uncollected BSONHolders: " << _lazyObjects.size() << endl;
-        for (set<BSONHolder*>::iterator it = _lazyObjects.begin();
-             it != _lazyObjects.end();
-             ++it) {
-            (*it)->_notifyV8Memory = false;
-            delete *it;
-        }
+        // set the isolate to NULL so ObjTracker destructors know that v8 is no longer reachable
+        _isolate = NULL;
     }
 
     bool V8Scope::hasOutOfMemoryException() {
@@ -1448,9 +1432,6 @@ namespace mongo {
     v8::Persistent<v8::Object> V8Scope::mongoToLZV8(const BSONObj& m, bool readOnly) {
         v8::Local<v8::Object> o;
         BSONHolder* own = new BSONHolder(m);
-        // track the BSONHolder so the object can be freed when the V8Scope is destructed
-        own->_scope = this;
-        _lazyObjects.insert(own);
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();

@@ -21,6 +21,8 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/v8_deadline_monitor.h"
 #include "mongo/scripting/v8_profiler.h"
@@ -40,39 +42,74 @@ namespace mongo {
 
     class V8ScriptEngine;
     class V8Scope;
+    class BSONHolder;
 
     typedef v8::Handle<v8::Value> (*v8Function)(V8Scope* scope, const v8::Arguments& args);
 
     /**
-     * v8 callback for persistent handles that are to be freed by the GC
+     * The ObjTracker class keeps track of all weakly referenced v8 objects.  This is
+     * required because v8 does not invoke the WeakReferenceCallback when shutting down
+     * the context/isolate.  To track a new object, add an ObjTracker<MyObjType> member
+     * variable to the V8Scope (if one does not already exist for that type).  Instead
+     * of calling v8::Persistent::MakeWeak() directly, simply invoke track() with the
+     * persistent handle and the pointer to be freed.
      */
-    template <typename _T>
-    void deleteOnCollect(v8::Persistent<v8::Value> objHandle, void* obj) {
-        delete static_cast<_T*>(obj);
-        objHandle.Dispose();
-    }
-
-    class BSONHolder {
-    MONGO_DISALLOW_COPYING(BSONHolder);
+    template <typename _ObjType>
+    class ObjTracker {
     public:
-        explicit BSONHolder(BSONObj obj) :
-            _obj(obj.getOwned()),
-            _modified(false),
-            _notifyV8Memory(true) {
-            // give hint v8's GC
-            v8::V8::AdjustAmountOfExternalAllocatedMemory(_obj.objsize());
+        /** Track an object to be freed when it is no longer referenced in JavaScript.
+         * @param  instanceHandle  persistent handle to the weakly referenced object
+         * @param  rawData         pointer to the object instance
+         */
+        void track(v8::Persistent<v8::Value> instanceHandle, _ObjType* instance) {
+            TrackedPtr* collectionHandle = new TrackedPtr(instance, this);
+            instanceHandle.MakeWeak(collectionHandle, deleteOnCollect);
         }
-        ~BSONHolder() {
-            if (_notifyV8Memory)
-                // if v8 is still up, send hint to GC
-                v8::V8::AdjustAmountOfExternalAllocatedMemory(-_obj.objsize());
+        /**
+         * Free any remaining objects which are being tracked.  Invoked when
+         * the V8Scope is destructed.
+         */
+        ~ObjTracker() {
+            if (!_container.empty())
+                LOG(1) << "freeing " << _container.size() << " uncollected "
+                       << typeid(_ObjType).name() << " objects" << endl;
+            typename set<_ObjType*>::iterator it = _container.begin();
+            while (it != _container.end()) {
+                delete *it;
+                _container.erase(it++);
+            }
         }
-        V8Scope* _scope;
-        BSONObj _obj;
-        bool _modified;
-        bool _notifyV8Memory; // set to true if v8 is still usable during destruction
-        list<string> _extra;
-        set<string> _removed;
+    private:
+        /**
+         * Simple struct which contains a pointer to the tracked object, and a pointer
+         * to the ObjTracker which owns it.  This is the argument supplied to v8's
+         * WeakReferenceCallback and MakeWeak().
+         */
+        struct TrackedPtr {
+        public:
+            TrackedPtr(_ObjType* instance, ObjTracker<_ObjType>* tracker) :
+                _objPtr(instance),
+                _tracker(tracker) { }
+            _ObjType* _objPtr;
+            ObjTracker<_ObjType>* _tracker;
+        };
+
+        /**
+         * v8 callback for weak persistent handles that have been marked for removal by the
+         * garbage collector.  Signature conforms to v8's WeakReferenceCallback.
+         * @param  instanceHandle  persistent handle to the weakly referenced object
+         * @param  rawData         pointer to the TrackedPtr instance
+         */
+        static void deleteOnCollect(v8::Persistent<v8::Value> instanceHandle, void* rawData) {
+            TrackedPtr* trackedPtr = static_cast<TrackedPtr*>(rawData);
+            trackedPtr->_tracker->_container.erase(trackedPtr->_objPtr);
+            delete trackedPtr->_objPtr;
+            delete trackedPtr;
+            instanceHandle.Dispose();
+        }
+
+        // container for all instances of the tracked _ObjType
+        set<_ObjType*> _container;
     };
 
     /**
@@ -253,8 +290,10 @@ namespace mongo {
          */
         v8::Persistent<v8::Context> getContext() { return _context; }
 
-        // store a pointer to all BSONHolder instances created in this V8Scope
-        set<BSONHolder*> _lazyObjects;
+        ObjTracker<BSONHolder> bsonHolderTracker;
+        ObjTracker<DBClientWithCommands> dbClientWithCommandsTracker;
+        ObjTracker<DBClientBase> dbClientBaseTracker;
+        ObjTracker<DBClientCursor> dbClientCursorTracker;
 
     private:
 
@@ -388,6 +427,28 @@ namespace mongo {
         OpIdToScopeMap _opToScopeMap;       // map of mongo op ids to scopes (protected by
                                             // _globalInterruptLock).
         DeadlineMonitor<V8Scope> _deadlineMonitor;
+    };
+
+    class BSONHolder {
+    MONGO_DISALLOW_COPYING(BSONHolder);
+    public:
+        explicit BSONHolder(BSONObj obj) :
+            _scope(NULL),
+            _obj(obj.getOwned()),
+            _modified(false) {
+            // give hint v8's GC
+            v8::V8::AdjustAmountOfExternalAllocatedMemory(_obj.objsize());
+        }
+        ~BSONHolder() {
+            if (_scope && _scope->getIsolate())
+                // if v8 is still up, send hint to GC
+                v8::V8::AdjustAmountOfExternalAllocatedMemory(-_obj.objsize());
+        }
+        V8Scope* _scope;
+        BSONObj _obj;
+        bool _modified;
+        list<string> _extra;
+        set<string> _removed;
     };
 
     /**

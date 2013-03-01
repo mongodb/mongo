@@ -127,7 +127,7 @@ namespace mongo {
         }
 
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.Holder());
-        self.MakeWeak(conn, deleteOnCollect<DBClientWithCommands>);
+        scope->dbClientWithCommandsTracker.track(self, conn);
 
         ScriptEngine::runConnectCallback(*conn);
 
@@ -143,7 +143,7 @@ namespace mongo {
 
         DBClientBase* conn = createDirectClient();
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
-        self.MakeWeak(conn, deleteOnCollect<DBClientBase>);
+        scope->dbClientBaseTracker.track(self, conn);
 
         args.This()->SetInternalField(0, v8::External::New(conn));
         args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
@@ -194,7 +194,7 @@ namespace mongo {
 
         v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
         c->SetInternalField(0, v8::External::New(cursor.get()));
-        c.MakeWeak(cursor.release(), deleteOnCollect<DBClientCursor>);
+        scope->dbClientCursorTracker.track(c, cursor.release());
         return c;
     }
 
