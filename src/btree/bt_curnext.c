@@ -402,7 +402,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_DSTAT_INCR(session, cursor_next);
 
-	flags = 0;					/* Tree walk flags. */
+	flags = WT_TREE_SKIP_INTL;			/* Tree walk flags. */
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 
@@ -476,12 +476,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 		}
 
 		cbt->page = NULL;
-		do {
-			WT_ERR(__wt_tree_walk(session, &page, flags));
-			WT_ERR_TEST(page == NULL, WT_NOTFOUND);
-		} while (
-		    page->type == WT_PAGE_COL_INT ||
-		    page->type == WT_PAGE_ROW_INT);
+		WT_ERR(__wt_tree_walk(session, &page, flags));
+		WT_ERR_TEST(page == NULL, WT_NOTFOUND);
+		WT_ASSERT(session,
+		    page->type != WT_PAGE_COL_INT &&
+		    page->type != WT_PAGE_ROW_INT);
 		cbt->page = page;
 
 		/* Initialize the page's modification information */
