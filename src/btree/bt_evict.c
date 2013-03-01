@@ -707,7 +707,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * concurrent activity in a page to be resolved, acquiring
 		 * hazard references to prevent eviction.
 		 */
-		flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL | WT_TREE_WAIT;
+		flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL;
+		if (syncop == WT_SYNC_CHECKPOINT)
+			flags |= WT_TREE_WAIT;
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
 			/* Write dirty pages if nobody beat us to it. */
