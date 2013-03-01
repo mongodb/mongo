@@ -75,9 +75,9 @@ namespace mongo {
     void disableNagle(int sock) {
         int x = 1;
         if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            error() << "disableNagle failed" << endl;
+            error() << "disableNagle failed: " << errnoWithDescription() << endl;
         if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
-            error() << "SO_KEEPALIVE failed" << endl;
+            error() << "SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
     }
 #else
     
