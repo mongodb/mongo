@@ -75,7 +75,7 @@ static void *
 __stat_server(void *arg)
 {
 	struct timespec ts;
-	struct tm *tm;
+	struct tm *tm, _tm;
 	FILE *fp;
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
@@ -138,7 +138,7 @@ __stat_server(void *arg)
 
 		/* Get the current local time of day. */
 		WT_ERR(__wt_epoch(session, &ts));
-		tm = localtime(&ts.tv_sec);
+		tm = localtime_r(&ts.tv_sec, &_tm);
 
 		/* Create the logging path name for this time of day. */
 		if (strftime(tmp.mem, tmp.memsize, conn->stat_path, tm) == 0)
