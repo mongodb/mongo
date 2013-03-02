@@ -223,6 +223,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/loglong.js",// log might overflow before 
                                                         // this has a chance to see the message
                                    "jstests/connections_opened.js", // counts connections, globally
+                                   "jstests/opcounters.js",
                                    "jstests/currentop.js"// SERVER-8673, plus rwlock yielding issues
                                   ] );
         
