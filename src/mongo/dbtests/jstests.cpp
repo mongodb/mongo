@@ -1142,6 +1142,437 @@ namespace JSTests {
             }
         };
 
+        class Empty : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{}";
+            }
+        };
+
+        class EmptyWithSpace : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ }";
+            }
+        };
+
+        class SingleString : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", "b" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"b\" }";
+            }
+        };
+
+        class EmptyStrings : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "", "" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"\" : \"\" }";
+            }
+        };
+
+        class SingleNumber : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", 1 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : 1 }";
+            }
+        };
+
+        class RealNumber : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", strtod( "0.7", 0 ) );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : 0.7 }";
+            }
+        };
+
+        class FancyNumber : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", strtod( "-4.4433e-2", 0 ) );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : -4.4433e-2 }";
+            }
+        };
+
+        class TwoElements : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", 1 );
+                b.append( "b", "foo" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : 1, \"b\" : \"foo\" }";
+            }
+        };
+
+        class Subobject : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", 1 );
+                BSONObjBuilder c;
+                c.append( "z", b.done() );
+                return c.obj();
+            }
+            virtual string json() const {
+                return "{ \"z\" : { \"a\" : 1 } }";
+            }
+        };
+
+        class DeeplyNestedObject : public TestRoundTrip {
+            virtual string buildJson(int depth) const {
+                if (depth == 0) {
+                    return "{\"0\":true}";
+                }
+                else {
+                    std::stringstream ss;
+                    ss << "{\"" << depth << "\":" << buildJson(depth - 1) << "}";
+                    depth--;
+                    return ss.str();
+                }
+            }
+            virtual BSONObj buildBson(int depth) const {
+                BSONObjBuilder builder;
+                if (depth == 0) {
+                    builder.append( "0", true );
+                    return builder.obj();
+                }
+                else {
+                    std::stringstream ss;
+                    ss << depth;
+                    depth--;
+                    builder.append(ss.str(), buildBson(depth));
+                    return builder.obj();
+                }
+            }
+            virtual BSONObj bson() const {
+                return buildBson(35);
+            }
+            virtual string json() const {
+                return buildJson(35);
+            }
+        };
+
+        class ArrayEmpty : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                vector< int > arr;
+                BSONObjBuilder b;
+                b.append( "a", arr );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : [] }";
+            }
+        };
+
+        class Array : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                vector< int > arr;
+                arr.push_back( 1 );
+                arr.push_back( 2 );
+                arr.push_back( 3 );
+                BSONObjBuilder b;
+                b.append( "a", arr );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : [ 1, 2, 3 ] }";
+            }
+        };
+
+        class True : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendBool( "a", true );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : true }";
+            }
+        };
+
+        class False : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendBool( "a", false );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : false }";
+            }
+        };
+
+        class Null : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendNull( "a" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : null }";
+            }
+        };
+
+        class Undefined : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendUndefined( "a" );
+                return b.obj();
+            }
+
+            // Don't need to return anything because we are overriding both jsonOut and jsonIn
+            virtual string json() const { return ""; }
+
+            // undefined values come out as null in the shell.  See SERVER-6102.
+            virtual string jsonIn() const {
+                return "{ \"a\" : undefined }";
+            }
+            virtual string jsonOut() const {
+                return "{ \"a\" : null }";
+            }
+        };
+
+        class EscapedCharacters : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", "\" \\ / \b \f \n \r \t \v" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t \\v\" }";
+            }
+        };
+
+        class NonEscapedCharacters : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", "% { a z $ # '  " );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\\% \\{ \\a \\z \\$ \\# \\' \\ \" }";
+            }
+        };
+
+        class AllowedControlCharacter : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", "\x7f" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\x7f\" }";
+            }
+        };
+
+        class NumbersInFieldName : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "b1", "b" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ b1 : \"b\" }";
+            }
+        };
+
+        class EscapeFieldName : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "\n", "b" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"\\n\" : \"b\" }";
+            }
+        };
+
+        class EscapedUnicodeToUtf8 : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                unsigned char u[ 7 ];
+                u[ 0 ] = 0xe0 | 0x0a;
+                u[ 1 ] = 0x80;
+                u[ 2 ] = 0x80;
+                u[ 3 ] = 0xe0 | 0x0a;
+                u[ 4 ] = 0x80;
+                u[ 5 ] = 0x80;
+                u[ 6 ] = 0;
+                b.append( "a", (char *) u );
+                BSONObj built = b.obj();
+                ASSERT_EQUALS( string( (char *) u ), built.firstElement().valuestr() );
+                return built;
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\\ua000\\uA000\" }";
+            }
+        };
+
+        class Utf8AllOnes : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                unsigned char u[ 8 ];
+                u[ 0 ] = 0x01;
+
+                u[ 1 ] = 0x7f;
+
+                u[ 2 ] = 0xdf;
+                u[ 3 ] = 0xbf;
+
+                u[ 4 ] = 0xef;
+                u[ 5 ] = 0xbf;
+                u[ 6 ] = 0xbf;
+
+                u[ 7 ] = 0;
+
+                b.append( "a", (char *) u );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\\u0001\\u007f\\u07ff\\uffff\" }";
+            }
+        };
+
+        class Utf8FirstByteOnes : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                unsigned char u[ 6 ];
+                u[ 0 ] = 0xdc;
+                u[ 1 ] = 0x80;
+
+                u[ 2 ] = 0xef;
+                u[ 3 ] = 0xbc;
+                u[ 4 ] = 0x80;
+
+                u[ 5 ] = 0;
+
+                b.append( "a", (char *) u );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\\u0700\\uff00\" }";
+            }
+        };
+
+        class BinData : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                char z[ 3 ];
+                z[ 0 ] = 'a';
+                z[ 1 ] = 'b';
+                z[ 2 ] = 'c';
+                BSONObjBuilder b;
+                b.appendBinData( "a", 3, BinDataGeneral, z );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : BinData( 0 , \"YWJj\" ) }";
+            }
+        };
+
+        class BinDataPaddedSingle : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                char z[ 2 ];
+                z[ 0 ] = 'a';
+                z[ 1 ] = 'b';
+                BSONObjBuilder b;
+                b.appendBinData( "a", 2, BinDataGeneral, z );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : BinData( 0 , \"YWI=\" ) }";
+            }
+        };
+
+        class BinDataPaddedDouble : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                char z[ 1 ];
+                z[ 0 ] = 'a';
+                BSONObjBuilder b;
+                b.appendBinData( "a", 1, BinDataGeneral, z );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : BinData( 0 , \"YQ==\" ) }";
+            }
+        };
+
+        class BinDataAllChars : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                unsigned char z[] = {
+                    0x00, 0x10, 0x83, 0x10, 0x51, 0x87, 0x20, 0x92, 0x8B, 0x30,
+                    0xD3, 0x8F, 0x41, 0x14, 0x93, 0x51, 0x55, 0x97, 0x61, 0x96,
+                    0x9B, 0x71, 0xD7, 0x9F, 0x82, 0x18, 0xA3, 0x92, 0x59, 0xA7,
+                    0xA2, 0x9A, 0xAB, 0xB2, 0xDB, 0xAF, 0xC3, 0x1C, 0xB3, 0xD3,
+                    0x5D, 0xB7, 0xE3, 0x9E, 0xBB, 0xF3, 0xDF, 0xBF
+                };
+                BSONObjBuilder b;
+                b.appendBinData( "a", 48, BinDataGeneral, z );
+                return b.obj();
+            }
+            virtual string json() const {
+                stringstream ss;
+                ss << "{ \"a\" : BinData( 0 , \"ABCDEFGHIJKLMNOPQRSTUVWXYZ" <<
+                                               "abcdefghijklmnopqrstuvwxyz0123456789+/\" ) }";
+                return ss.str();
+            }
+        };
+
+        class Date : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendDate( "a", 0 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : new Date( 0 ) }";
+            }
+        };
+
+        class DateNonzero : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendDate( "a", 100 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : new Date( 100 ) }";
+            }
+        };
+
+        class DateNegative : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendDate( "a", -1 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : new Date( -1 ) }";
+            }
+        };
+
         class Timestamp : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -1150,6 +1581,176 @@ namespace JSTests {
             }
             virtual string json() const {
                 return "{ \"a\" : Timestamp( 20, 5 ) }";
+            }
+        };
+
+        class Regex : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendRegex( "a", "b", "" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : /b/ }";
+            }
+        };
+
+        class RegexWithQuotes : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendRegex( "a", "\"", "" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : /\"/ }";
+            }
+        };
+
+        class UnquotedFieldName : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a_b", 1 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ a_b : 1 }";
+            }
+        };
+
+        class SingleQuotes : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "ab'c\"", "bb\b '\"" );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ 'ab\\'c\"' : 'bb\\b \\'\"' }";
+            }
+        };
+
+        class ObjectId : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                OID id;
+                id.init( "deadbeeff00ddeadbeeff00d" );
+                BSONObjBuilder b;
+                b.appendOID( "foo", &id );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"foo\": ObjectId( \"deadbeeff00ddeadbeeff00d\" ) }";
+            }
+        };
+
+        class NumberLong : public TestRoundTrip {
+        public:
+            virtual BSONObj bson() const {
+                return BSON( "long" << 4611686018427387904ll ); // 2**62
+            }
+            virtual string json() const {
+                return "{ \"long\": NumberLong(4611686018427387904) }";
+            }
+        };
+
+        class NumberInt : public TestRoundTrip {
+        public:
+            virtual BSONObj bson() const {
+                return BSON( "int" << static_cast<int>(4294967295) );
+            }
+            virtual string json() const {
+                return "{ \"int\": NumberInt(4294967295) }";
+            }
+        };
+
+        class Number : public TestRoundTrip {
+        public:
+            virtual BSONObj bson() const {
+                return BSON( "double" << 3.14 );
+            }
+            virtual string json() const {
+                return "{ \"double\": Number(3.14) }";
+            }
+        };
+
+        class UUID : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                unsigned char z[] = {
+                    0xAB, 0xCD, 0xEF, 0xAB, 0xCD, 0xEF,
+                    0xAB, 0xCD, 0xEF, 0xAB, 0xCD, 0xEF,
+                    0x00, 0x00, 0x00, 0x00
+                };
+                b.appendBinData( "a" , 16 , bdtUUID , z );
+                return b.obj();
+            }
+
+            // Don't need to return anything because we are overriding both jsonOut and jsonIn
+            virtual string json() const { return ""; }
+
+            // The UUID constructor corresponds to a special BinData type
+            virtual string jsonIn() const {
+                return "{ \"a\" : UUID(\"abcdefabcdefabcdefabcdef00000000\") }";
+            }
+            virtual string jsonOut() const {
+                return "{ \"a\" : BinData(3,\"q83vq83vq83vq83vAAAAAA==\") }";
+            }
+        };
+
+        class HexData : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                unsigned char z[] = {
+                    0xAB, 0xCD, 0xEF, 0xAB, 0xCD, 0xEF,
+                    0xAB, 0xCD, 0xEF, 0xAB, 0xCD, 0xEF,
+                    0x00, 0x00, 0x00, 0x00
+                };
+                b.appendBinData( "a" , 16 , BinDataGeneral , z );
+                return b.obj();
+            }
+
+            // Don't need to return anything because we are overriding both jsonOut and jsonIn
+            virtual string json() const { return ""; }
+
+            // The HexData constructor creates a BinData type from a hex string
+            virtual string jsonIn() const {
+                return "{ \"a\" : HexData(0,\"abcdefabcdefabcdefabcdef00000000\") }";
+            }
+            virtual string jsonOut() const {
+                return "{ \"a\" : BinData(0,\"q83vq83vq83vq83vAAAAAA==\") }";
+            }
+        };
+
+        class MD5 : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                unsigned char z[] = {
+                    0xAB, 0xCD, 0xEF, 0xAB, 0xCD, 0xEF,
+                    0xAB, 0xCD, 0xEF, 0xAB, 0xCD, 0xEF,
+                    0x00, 0x00, 0x00, 0x00
+                };
+                b.appendBinData( "a" , 16 , MD5Type , z );
+                return b.obj();
+            }
+
+            // Don't need to return anything because we are overriding both jsonOut and jsonIn
+            virtual string json() const { return ""; }
+
+            // The HexData constructor creates a BinData type from a hex string
+            virtual string jsonIn() const {
+                return "{ \"a\" : MD5(\"abcdefabcdefabcdefabcdef00000000\") }";
+            }
+            virtual string jsonOut() const {
+                return "{ \"a\" : BinData(5,\"q83vq83vq83vq83vAAAAAA==\") }";
+            }
+        };
+
+        class NullString : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "x" , "a\0b" , 4 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"x\" : \"a\\u0000b\" }";
             }
         };
 
@@ -1421,13 +2022,57 @@ namespace JSTests {
             add< ScopeOut >();
             add< InvalidStoredJS >();
 
+            add< NoReturnSpecified >();
+
             add< RoundTripTests::DBRefTest >();
             add< RoundTripTests::DBPointerTest >();
             add< RoundTripTests::InformalDBRefTest >();
             add< RoundTripTests::InformalDBRefOIDTest >();
             add< RoundTripTests::InformalDBRefExtraFieldTest >();
+            add< RoundTripTests::Empty >();
+            add< RoundTripTests::EmptyWithSpace >();
+            add< RoundTripTests::SingleString >();
+            add< RoundTripTests::EmptyStrings >();
+            add< RoundTripTests::SingleNumber >();
+            add< RoundTripTests::RealNumber >();
+            add< RoundTripTests::FancyNumber >();
+            add< RoundTripTests::TwoElements >();
+            add< RoundTripTests::Subobject >();
+            add< RoundTripTests::DeeplyNestedObject >();
+            add< RoundTripTests::ArrayEmpty >();
+            add< RoundTripTests::Array >();
+            add< RoundTripTests::True >();
+            add< RoundTripTests::False >();
+            add< RoundTripTests::Null >();
+            add< RoundTripTests::Undefined >();
+            add< RoundTripTests::EscapedCharacters >();
+            add< RoundTripTests::NonEscapedCharacters >();
+            add< RoundTripTests::AllowedControlCharacter >();
+            add< RoundTripTests::NumbersInFieldName >();
+            add< RoundTripTests::EscapeFieldName >();
+            add< RoundTripTests::EscapedUnicodeToUtf8 >();
+            add< RoundTripTests::Utf8AllOnes >();
+            add< RoundTripTests::Utf8FirstByteOnes >();
+            add< RoundTripTests::BinData >();
+            add< RoundTripTests::BinDataPaddedSingle >();
+            add< RoundTripTests::BinDataPaddedDouble >();
+            add< RoundTripTests::BinDataAllChars >();
+            add< RoundTripTests::Date >();
+            add< RoundTripTests::DateNonzero >();
+            add< RoundTripTests::DateNegative >();
             add< RoundTripTests::Timestamp >();
-            add< NoReturnSpecified >();
+            add< RoundTripTests::Regex >();
+            add< RoundTripTests::RegexWithQuotes >();
+            add< RoundTripTests::UnquotedFieldName >();
+            add< RoundTripTests::SingleQuotes >();
+            add< RoundTripTests::ObjectId >();
+            add< RoundTripTests::NumberLong >();
+            add< RoundTripTests::NumberInt >();
+            add< RoundTripTests::Number >();
+            add< RoundTripTests::UUID >();
+            add< RoundTripTests::HexData >();
+            add< RoundTripTests::MD5 >();
+            add< RoundTripTests::NullString >();
         }
     } myall;
 
