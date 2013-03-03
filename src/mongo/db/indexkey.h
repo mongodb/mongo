@@ -50,6 +50,13 @@ namespace mongo {
         virtual ~IndexType();
 
         virtual void getKeys( const BSONObj &obj, BSONObjSet &keys ) const = 0;
+
+        /**
+         * Returns the element placed in an index key when indexing a field absent from a document.
+         * By default this is a null BSONElement.
+         */
+        virtual BSONElement missingField() const;
+
         /* Full semantics of numWanted:
          * numWanted == 0 : Return any number of results, but try to return in batches of 101.
          * numWanted == 1 : Return exactly one result.
@@ -171,7 +178,15 @@ namespace mongo {
 
         void getKeys( const BSONObj &obj, BSONObjSet &keys ) const;
 
-        BSONElement missingField() const { return _nullElt; }
+        /**
+         * Returns the element placed in an index key when indexing a field absent from a document.
+         * By default this is a null BSONElement.
+         */
+        BSONElement missingField() const {
+            if ( _indexType.get() )
+                return _indexType->missingField();
+            return _nullElt;
+        }
 
         string getTypeName() const {
             if ( _indexType.get() )

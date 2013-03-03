@@ -23,6 +23,7 @@
 
 #include "../db/db.h"
 #include "../db/json.h"
+#include "mongo/db/hashindex.h"
 #include "mongo/db/queryutil.h"
 
 #include "dbtests.h"
@@ -948,6 +949,59 @@ namespace NamespaceTests {
                 ASSERT_EQUALS( HELPFUL, spec.suitability( frs3, BSON( "1" << 1 ) ) );
             }
         };
+
+        /** A missing field is represented as null in a btree index. */
+        class BtreeIndexMissingField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ) );
+                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
+            }
+        };
+        
+        /** A missing field is represented as null in a 2d index. */
+        class TwoDIndexMissingField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << "2d" ) );
+                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
+            }
+        };
+        
+        /** A missing field is represented with the hash of null in a hashed index. */
+        class HashedIndexMissingField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << "hashed" ) );
+                BSONObj nullObj = BSON( "a" << BSONNULL );
+                BSONObjSet nullFieldKeySet;
+                spec.getKeys( nullObj, nullFieldKeySet );
+                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
+                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0 ),
+                               nullFieldFromKey.Long() );
+                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
+                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
+            }
+        };
+
+        /**
+         * A missing field is represented with the hash of null in a hashed index.  This hash value
+         * depends on the hash seed.
+         */
+        class HashedIndexMissingFieldAlternateSeed {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << "hashed" ), BSON( "seed" << 0x5eed ) );
+                BSONObj nullObj = BSON( "a" << BSONNULL );
+                BSONObjSet nullFieldKeySet;
+                spec.getKeys( BSONObj(), nullFieldKeySet );
+                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
+                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0x5eed ),
+                               nullFieldFromKey.Long() );
+                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
+                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
+            }
+        };
         
     } // namespace IndexSpecTests
     
@@ -1432,6 +1486,10 @@ namespace NamespaceTests {
             add< IndexDetailsTests::CompoundMissing >();
             add< IndexSpecTests::Suitability >();
             add< IndexSpecTests::NumericFieldSuitability >();
+            add< IndexSpecTests::BtreeIndexMissingField >();
+            add< IndexSpecTests::TwoDIndexMissingField >();
+            add< IndexSpecTests::HashedIndexMissingField >();
+            add< IndexSpecTests::HashedIndexMissingFieldAlternateSeed >();
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();

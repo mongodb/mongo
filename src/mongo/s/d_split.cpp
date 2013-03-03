@@ -131,14 +131,21 @@ namespace mongo {
                 return true;
             }
 
+            // Find the 'missingField' value used to represent a missing document field in a key of
+            // this index.
+            // NOTE A local copy of 'missingField' is made because IndexSpec objects may be
+            // invalidated during a db lock yield.
+            BSONObj missingFieldObj = idx->getSpec().missingField().wrap();
+            BSONElement missingField = missingFieldObj.firstElement();
+            
             // for now, the only check is that all shard keys are filled
-            // null is ok, 
+            // a 'missingField' valued index key is ok if the field is present in the document,
             // TODO if $exist for nulls were picking the index, it could be used instead efficiently
             int keyPatternLength = keyPattern.nFields();
             while ( cc->ok() ) {
                 BSONObj currKey = c->currKey();
                 
-                //check that current key contains non-null elements for all fields in keyPattern
+                //check that current key contains non missing elements for all fields in keyPattern
                 BSONObjIterator i( currKey );
                 for( int k = 0; k < keyPatternLength ; k++ ) {
                     if( ! i.more() ) {
@@ -147,8 +154,8 @@ namespace mongo {
                         return false;
                     }
                     BSONElement currKeyElt = i.next();
-
-                    if ( currKeyElt.type() && currKeyElt.type() != jstNULL )
+                    
+                    if ( !currKeyElt.eoo() && !currKeyElt.valuesEqual( missingField ) )
                         continue;
 
                     BSONObj obj = c->current();
@@ -163,7 +170,7 @@ namespace mongo {
                         continue;
                     
                     ostringstream os;
-                    os << "found null value in key " << bc->prettyKey( currKey ) << " for doc: "
+                    os << "found missing value in key " << bc->prettyKey( currKey ) << " for doc: "
                        << ( obj.hasField( "_id" ) ? obj.toString() : obj["_id"].toString() );
                     log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
                     

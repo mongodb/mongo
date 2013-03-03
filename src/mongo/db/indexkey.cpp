@@ -42,6 +42,10 @@ namespace mongo {
     IndexType::~IndexType() {
     }
 
+    BSONElement IndexType::missingField() const {
+        return _spec->_nullElt;
+    }
+
     const BSONObj& IndexType::keyPattern() const {
         return _spec->keyPattern;
     }
