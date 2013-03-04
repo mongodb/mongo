@@ -379,8 +379,10 @@ namespace mongo {
                 }
                 else if ( str::equals( e.fieldName(), "textIndexVersion" ) ) {
                     textIndexVersion = e.numberInt();
+                    uassert( 16730,
+                             str::stream() << "bad textIndexVersion: " << textIndexVersion,
+                             textIndexVersion == 1 );
                 }
-
                 else {
                     b.append( e );
                 }
