@@ -3,6 +3,11 @@
 // simply emits all of its input documents (only the 1 KiB field) and the reduce stage returns its
 // input document.  Checks are made that all inserted records make it into the 'foo' collection,
 // and that the sharded output collection is evenly distributed across the shards.
+// If the count of documents in the 'foo' collection does not match the number inserted, the test
+// tries to find each document by its insertion number ('i') through mongos.  If not found through
+// mongos, the shards are queried directly and the results are printed.  It should be possible to
+// figure out what the history of the document was by examining the output of printShardingStatus
+// (at the end of the document check) and comparing it with the migrations logged earlier.
 
 jsTest.log("Setting up new ShardingTest");
 var st = new ShardingTest( "mrShardedOutput", 2, 1, 1, { chunksize : 1 } );
@@ -27,6 +32,11 @@ var numDocs = 0;
 var buildIs32bits = (testDB.serverBuildInfo().bits == 32);
 var numBatch = buildIs32bits ? (30 * 1000) : (100 * 1000);
 var numChunks = 0;
+var docLookup = [];
+var foundText = [ "not found on either shard",
+                  "found on shard0000",
+                  "found on shard0001",
+                  "found on both shard0000 and shard0001" ];
 
 var numIterations = 2;
 for (var iter = 0; iter < numIterations; ++iter) {
@@ -37,7 +47,9 @@ for (var iter = 0; iter < numIterations; ++iter) {
         if (i % 1000 == 0) {
             print("\n========> Saved total of " + (numDocs + i) + " documents\n");
         }
-        testDB.foo.save( {a: Math.random() * 1000, y: str, i: numDocs + i} );
+        var randomKey = Math.random() * 1000;
+        docLookup.push(randomKey);
+        testDB.foo.save( {a: randomKey, y: str, i: numDocs + i} );
     }
     print("\n========> Finished saving total of " + (numDocs + i) + " documents");
 
@@ -62,7 +74,10 @@ for (var iter = 0; iter < numIterations; ++iter) {
         jsTest.log("Checking for missing documents");
         for (i = 0; i < numDocs; ++i) {
             if ( !testDB.foo.findOne({ i: i }, { i: 1 }) ) {
-                print("\n========> Could not find document " + i + "\n");
+                var found0 = st.shard0.getDB("test").foo.findOne({ i: i }, { i: 1 }) ? 1 : 0;
+                var found1 = st.shard1.getDB("test").foo.findOne({ i: i }, { i: 1 }) ? 2 : 0;
+                print("\n*** ====> mongos could not find document " + i + " with shard key " +
+                      docLookup[i] + ": " + foundText[found0 + found1] + "\n");
             }
             if (i % 1000 == 0) {
                 print( "\n========> Checked " + i + "\n");
