@@ -18,6 +18,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/base/parse_number.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {
@@ -63,20 +64,19 @@ namespace mongo {
         x = sp;
     }
 
-    template<>
-    Status ExportedServerParameter<int>::setFromString( const string& str ) {
-        return set( atoi(str.c_str() ) );
+    template <typename T>
+    Status ExportedServerParameter<T>::setFromString( const string& str ) {
+        T value;
+        Status status = parseNumberFromString( str, &value );
+        if ( !status.isOK() )
+            return status;
+        return set( value );
     }
 
-    template<>
-    Status ExportedServerParameter<double>::setFromString( const string& str ) {
-        const char* start = str.c_str();
-        char* end;
-        double d = strtod( str.c_str(), &end );
-        if ( start == end )
-            return Status( ErrorCodes::BadValue, "not a double" );
-        return set( d );
-    }
+    template Status ExportedServerParameter<int>::setFromString( const string& str );
+    template Status ExportedServerParameter<long>::setFromString( const string& str );
+    template Status ExportedServerParameter<long long>::setFromString( const string& str );
+    template Status ExportedServerParameter<double>::setFromString( const string& str );
 
     template<>
     Status ExportedServerParameter<string>::setFromString( const string& str ) {
@@ -93,7 +93,6 @@ namespace mongo {
             return set(false);
         return Status( ErrorCodes::BadValue, "can't convert string to bool" );
     }
-
 
     template<>
     Status ExportedServerParameter< vector<string> >::setFromString( const string& str ) {
