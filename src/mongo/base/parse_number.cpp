@@ -15,6 +15,8 @@
 
 #include "mongo/base/parse_number.h"
 
+#include <cerrno>
+#include <cstdlib>
 #include <limits>
 
 #include "mongo/platform/cstdint.h"
@@ -181,5 +183,34 @@ namespace mongo {
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned int)
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(int8_t);
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(uint8_t);
+#undef DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE
+
+    template <>
+    Status parseNumberFromStringWithBase<double>(const StringData& stringValue,
+                                                 int base,
+                                                 double* result) {
+        if (base != 0) {
+            return Status(ErrorCodes::BadValue,
+                          "Must pass 0 as base to parseNumberFromStringWithBase<double>.");
+        }
+        if (stringValue.empty())
+            return Status(ErrorCodes::FailedToParse, "Empty string");
+
+        if (isspace(stringValue[0]))
+            return Status(ErrorCodes::FailedToParse, "Leading whitespace");
+
+        std::string str = stringValue.toString();
+        const char* cStr = str.c_str();
+        char* endp;
+        errno = 0;
+        double d = strtod(cStr, &endp);
+        int actualErrno = errno;
+        if (endp != stringValue.size() + cStr)
+            return Status(ErrorCodes::FailedToParse, "Did not consume whole number.");
+        if (actualErrno == ERANGE)
+            return Status(ErrorCodes::FailedToParse, "Out of range");
+        *result = d;
+        return Status::OK();
+    }
 
 }  // namespace mongo

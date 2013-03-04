@@ -222,5 +222,69 @@ namespace {
             ASSERT_PARSES(uint8_t, std::string(mongoutils::str::stream() << i), i);
     }
 
+    TEST(Double, TestRejectingBadBases) {
+        double ignored;
+
+        // Only supported base for parseNumberFromStringWithBase<double> is 0.
+        ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("0", -1, &ignored));
+        ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("0", 1, &ignored));
+        ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("0", 8, &ignored));
+        ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("0", 10, &ignored));
+        ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("0", 16, &ignored));
+    }
+
+    TEST(Double, TestParsingGarbage) {
+        double d;
+        CommonNumberParsingTests<double>::TestParsingGarbage();
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1.0.1", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1.0-1", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>(" 1.0", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1.0P4", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1e6	", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("	1e6", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1e6 ", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>(" 1e6", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("0xabcab.defPa", &d));
+    }
+
+    TEST(Double, TestParsingOverflow) {
+        double d;
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1e309", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("-1e309", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1e-309", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("-1e-309", &d));
+    }
+
+    TEST(Double, TestParsingNan) {
+        double d = 0;
+        ASSERT_OK(parseNumberFromString("NaN", &d));
+        ASSERT_TRUE(isnan(d));
+    }
+
+    TEST(Double, TestParsingInfinity) {
+        double d = 0;
+        ASSERT_OK(parseNumberFromString("infinity", &d));
+        ASSERT_TRUE(isinf(d));
+        d = 0;
+        ASSERT_OK(parseNumberFromString("-Infinity", &d));
+        ASSERT_TRUE(isinf(d));
+    }
+
+    TEST(Double, TestParsingNormal) {
+        ASSERT_PARSES(double, "10", 10);
+        ASSERT_PARSES(double, "0", 0);
+        ASSERT_PARSES(double, "1", 1);
+        ASSERT_PARSES(double, "0xff", 0xff);
+        ASSERT_PARSES(double, "-10", -10);
+        ASSERT_PARSES(double, "-0xff", -0xff);
+
+        ASSERT_PARSES(double, "1e8", 1e8);
+        ASSERT_PARSES(double, "1e-8", 1e-8);
+        ASSERT_PARSES(double, "12e-8", 12e-8);
+        ASSERT_PARSES(double, "-485.381e-8", -485.381e-8);
+
+        ASSERT_PARSES(double, "0xabcab.defdefP-10", 0xabcab.defdefP-10);
+    }
+
 }  // namespace
 }  // namespace mongo
