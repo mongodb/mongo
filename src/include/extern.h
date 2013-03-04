@@ -47,7 +47,6 @@ extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     WT_CKPT *ckptbase,
     int data_cksum);
-extern int __wt_block_sync(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
 extern int __wt_block_compact_skip( WT_SESSION_IMPL *session,

@@ -73,7 +73,7 @@ __bm_checkpoint(WT_BM *bm,
 static int
 __bm_sync(WT_BM *bm, WT_SESSION_IMPL *session)
 {
-	return (__wt_block_sync(session, bm->block));
+	return (__wt_fsync(session, bm->block->fh));
 }
 
 /*

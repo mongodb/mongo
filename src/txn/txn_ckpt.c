@@ -685,11 +685,15 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_BM *bm;
+	WT_BTREE *btree;
 
 	WT_UNUSED(cfg);
-	bm = session->btree->bm;
-	return ((bm == NULL) ? 0 : bm->sync(bm, session));
+	btree = session->btree;
+
+	/* Only sync ordinary handles: checkpoint handles are read-only. */
+	if (btree->checkpoint == NULL && btree->bm != NULL)
+		return (btree->bm->sync(btree->bm, session));
+	return (0);
 }
 
 /*

@@ -213,17 +213,6 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_block_sync --
- *	Sync the file to disk.
- */
-int
-__wt_block_sync(WT_SESSION_IMPL *session, WT_BLOCK *block)
-{
-	WT_RET(__wt_fsync(session, block->fh));
-	return (0);
-}
-
-/*
  * __ckpt_extlist_read --
  *	Read a checkpoints extent lists and copy
  */
