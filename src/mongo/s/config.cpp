@@ -771,26 +771,29 @@ namespace mongo {
         unsigned firstGood = 0;
         int up = 0;
         vector<BSONObj> res;
+        // The last error we saw on a config server
+        string error;
         for ( unsigned i=0; i<_config.size(); i++ ) {
-            BSONObj x;
+            BSONObj result;
 
             scoped_ptr<ScopedDbConnection> conn;
 
             try {
                 conn.reset( ScopedDbConnection::getInternalScopedDbConnection( _config[i], 30.0 ) );
 
-                // check auth
-                conn->get()->update("config.foo.bar", BSONObj(), BSON("x" << 1));
-                conn->get()->simpleCommand( "admin", &x, "getlasterror");
-                if (x["err"].type() == String && x["err"].String() == "unauthorized") {
-                    errmsg = "not authorized, did you start with --keyFile?";
-                    return false;
-                }
+                if ( ! conn->get()->simpleCommand( "config" , &result, "dbhash" ) ) {
 
-                if ( ! conn->get()->simpleCommand( "config" , &x , "dbhash" ) )
-                    x = BSONObj();
+                    // TODO: Make this a helper
+                    error = result["errmsg"].eoo() ? "" : result["errmsg"].String();
+                    if (!result["assertion"].eoo()) error = result["assertion"].String();
+
+                    warning() << "couldn't check dbhash on config server " << _config[i] 
+                              << causedBy(result.toString()) << endl;
+
+                    result = BSONObj();
+                }
                 else {
-                    x = x.getOwned();
+                    result = result.getOwned();
                     if ( up == 0 )
                         firstGood = i;
                     up++;
@@ -805,16 +808,18 @@ namespace mongo {
                 // We need to catch DBExceptions b/c sometimes we throw them
                 // instead of socket exceptions when findN fails
 
-                warning() << " couldn't check on config server:" << _config[i] << " ok for now : " << e.toString() << endl;
+                error = e.toString();
+                warning() << " couldn't check dbhash on config server " << _config[i] << causedBy(e) << endl;
             }
-            res.push_back(x);
+            res.push_back(result);
         }
 
         if ( _config.size() == 1 )
             return true;
 
         if ( up == 0 ) {
-            errmsg = "no config servers reachable";
+            // Use a ptr to error so if empty we won't add causedby
+            errmsg = str::stream() << "no config servers successfully contacted" << causedBy(&error);
             return false;
         }
 
@@ -859,7 +864,7 @@ namespace mongo {
         if ( checkConsistency ) {
             string errmsg;
             if ( ! checkConfigServersConsistent( errmsg ) ) {
-                LOG( LL_ERROR ) << "config servers not in sync! " << errmsg << warnings;
+                LOG( LL_ERROR ) << "could not verify that config servers are in sync" << causedBy(errmsg) << warnings;
                 return false;
             }
         }
