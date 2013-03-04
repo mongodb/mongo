@@ -13,6 +13,7 @@ flags = {
 		'SYNC_COMPACT',
 		'SYNC_DISCARD',
 		'SYNC_DISCARD_NOWRITE',
+		'SYNC_WRITE_LEAVES',
 	],
 	'direct_io' : [
 		'DIRECTIO_DATA',

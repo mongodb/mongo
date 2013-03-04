@@ -133,6 +133,14 @@ struct __wt_page_modify {
 	 */
 	uint32_t disk_gen;
 
+	/*
+	 * Track the highest transaction ID at which the page was written to
+	 * disk.  This can be used to avoid trying to write the page multiple
+	 * times if a snapshot is keeping old versions pinned (e.g., in a
+	 * checkpoint).
+	 */
+	wt_txnid_t disk_txn;
+
 	union {
 		WT_PAGE *split;		/* Resulting split */
 		WT_ADDR	 replace;	/* Resulting replacement */

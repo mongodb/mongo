@@ -65,7 +65,7 @@
 		else {							\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\
 			if (ret == 0 || ret == WT_DEADLOCK) {		\
-				ret = 0;				\
+				ret = __wt_cache_full_check(s);		\
 				continue;				\
 			}						\
 		}							\
@@ -74,7 +74,7 @@
 	    (ret) != WT_DUPLICATE_KEY)					\
 		F_SET(&(s)->txn, TXN_ERROR);				\
 	break;								\
-} while (1)
+} while (ret == 0)
 
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some
