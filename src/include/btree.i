@@ -237,13 +237,6 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET(__wt_calloc_def(session, 1, &modify));
 
 	/*
-	 * The page can never end up with changes older than the oldest
-	 * running transaction.
-	 */
-	if (F_ISSET(&session->txn, TXN_RUNNING))
-		modify->disk_txn = session->txn.snap_min - 1;
-
-	/*
 	 * Multiple threads of control may be searching and deciding to modify
 	 * a page, if we don't do the update, discard the memory.
 	 */
@@ -263,7 +256,15 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
 		(void)WT_ATOMIC_ADD(
 		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+
+		/*
+		 * The page can never end up with changes older than the oldest
+		 * running transaction.
+		 */
+		if (F_ISSET(&session->txn, TXN_RUNNING))
+			page->modify->disk_txn = session->txn.snap_min - 1;
 	}
+
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
