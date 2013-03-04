@@ -96,14 +96,10 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 
 	if (checkpoint) {
 		/*
-		 * Read-only objects are mapped into memory instead of being
-		 * read into cache buffers.
-		 *
-		 * Turn off mapping when verifying the file, because we can't
-		 * perform checksum validation of mapped segments, and verify
-		 * has to checksum pages.
+		 * Read-only objects are optionally mapped into memory instead
+		 * of being read into cache buffers.
 		 */
-		if (conn->mmap && !bm->block->verify)
+		if (conn->mmap)
 			WT_RET(__wt_block_map(
 			    session, bm->block, &bm->map, &bm->maplen));
 
