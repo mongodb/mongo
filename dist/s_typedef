@@ -54,6 +54,12 @@ check() {
 	test -s $t && cat $t
 }
 
+usage()
+{
+	echo 'usage: s_typedef [-bc]' >&2
+	exit 1
+}
+test "$#" -eq 1 || usage
 while :
 	do case "$1" in
 	-b)				# -b builds the typedefs
@@ -63,12 +69,9 @@ while :
 		check
 		shift;;
 	*)
+		test "$#" -eq 0 || usage
 		break;;
 	esac
 done
 
-test "$#" -eq 0 || {
-	echo 'usage: s_typedef [-bc]' >&2
-	exit 1
-}
 exit 0
