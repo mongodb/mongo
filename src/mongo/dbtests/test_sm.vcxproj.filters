@@ -3370,6 +3370,9 @@
     <ClCompile Include="..\db\index_set.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\hashindex.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">

@@ -2805,6 +2805,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="..\db\geo\shapes.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
+    <ClCompile Include="..\db\hashindex.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
     <ClCompile Include="..\db\index_set.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
