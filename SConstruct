@@ -499,6 +499,12 @@ if "darwin" == os.sys.platform:
     darwin = True
     platform = "osx" # prettier than darwin
 
+    # Unfortunately, we are too late here to affect the variant dir. We could maybe make this
+    # flag available on all platforms and complain if it is used on non-darwin targets.
+    osx_version_choices = ['10.6', '10.7', '10.8']
+    add_option("osx-version-min", "minimum OS X version to support", 1, False,
+               type = 'choice', default = osx_version_choices[0], choices = osx_version_choices)
+
     if env["CXX"] is None:
         if os.path.exists( "/usr/bin/g++-4.2" ):
             env["CXX"] = "g++-4.2"
@@ -926,6 +932,13 @@ def doConfigure(myenv):
                 if not use_system_version_of_library('tcmalloc'):
                     print( 'TCMalloc is not currently compatible with C++11' )
                     Exit(1)
+
+    # This needs to happen before we check for libc++, since it affects whether libc++ is available.
+    if darwin and has_option('osx-version-min'):
+        min_version = get_option('osx-version-min')
+        if not AddToCCFLAGSIfSupported(myenv, '-mmacosx-version-min=%s' % (min_version)):
+            print( "Can't set minimum OS X version with this compiler" )
+            Exit(1)
 
     if has_option('libc++'):
         if not using_clang:
