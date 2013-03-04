@@ -53,6 +53,36 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
 	*addr_size = WT_PTRDIFF32(endp, addr);
 
+#ifdef HAVE_SYNC_FILE_RANGE
+	/*
+	 * If we're writing through the system's buffer cache, schedule a
+	 * write immediately so the next checkpoint's fsync doesn't swamp
+	 * an underlying SSD.
+	 */
+	if (!block->fh->direct_io) {
+		WT_DECL_RET;
+
+		if ((ret = sync_file_range(block->fh->fd,
+		    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE)) != 0)
+			WT_RET_MSG(
+			    session, ret, "%s: sync_file_range", block->name);
+	}
+#endif
+#ifdef HAVE_POSIX_FADVISE
+	/*
+	 * If we're writing through the system's buffer cache, discard blocks we
+	 * no longer need.  The call should be cheap, allowing us to use a limit
+	 * small enough it shouldn't require tuning.
+	 *
+	 * The counter isn't locked in any way, if we race, we race, all we're
+	 * doing is a system call to discard buffers.
+	 */
+	if (!block->fh->direct_io)
+		if (block->cache_discard_counter++ > 1000) {
+			block->cache_discard_counter = 0;
+			WT_RET(__wt_block_cache_discard(session, block));
+		}
+#endif
 	return (0);
 }
 

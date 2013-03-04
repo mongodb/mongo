@@ -97,16 +97,15 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 	if (checkpoint) {
 		/*
 		 * Read-only objects are mapped into memory instead of being
-		 * read into cache buffers.  Ignore errors, with no mapping
-		 * we'll read into the cache.
+		 * read into cache buffers.
 		 *
 		 * Turn off mapping when verifying the file, because we can't
 		 * perform checksum validation of mapped segments, and verify
 		 * has to checksum pages.
 		 */
 		if (conn->mmap && !bm->block->verify)
-			(void)__wt_mmap(
-			    session, bm->block->fh, &bm->map, &bm->maplen);
+			WT_RET(__wt_block_map(
+			    session, bm->block, &bm->map, &bm->maplen));
 
 		/*
 		 * If this handle is for a checkpoint, that is, read-only, there
@@ -142,7 +141,7 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 	/* Unmap any mapped segment. */
 	if (bm->map != NULL)
 		WT_TRET(
-		    __wt_munmap(session, bm->block->fh, bm->map, bm->maplen));
+		    __wt_block_unmap(session, bm->block, bm->map, bm->maplen));
 
 	/* Unload the checkpoint. */
 	WT_TRET(__wt_block_checkpoint_unload(session, bm->block, !bm->is_live));

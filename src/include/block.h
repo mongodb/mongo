@@ -197,6 +197,15 @@ struct __wt_block {
 	uint32_t allocsize;		/* Allocation size */
 	u_int block_header;		/* Header length */
 
+	/* A list of chunks mapped from this file. */
+	struct __wt_block_map_entry {
+		void	*map;
+		size_t	 maplen;
+	} *map;				/* List of mapped chunks */
+	uint32_t map_entries;
+
+	uint32_t cache_discard_counter;	/* Count to cache cleanup */
+
 	/*
 	 * There is only a single checkpoint in a file that can be written.  The
 	 * information could logically live in the WT_BM structure, but then we

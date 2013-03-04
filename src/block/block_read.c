@@ -55,7 +55,18 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	}
 
 	/* Read the block. */
-	return (__wt_block_read_off(session, block, buf, offset, size, cksum));
+	WT_RET(__wt_block_read_off(session, block, buf, offset, size, cksum));
+
+#ifdef HAVE_POSIX_FADVISE
+	/*
+	 * Blocks read through this interface are always cached by the upper
+	 * level engine, discard them from the system's buffer cache.
+	 */
+	if (!block->fh->direct_io)
+		WT_RET(posix_fadvise(block->fh->fd,
+		    (off_t)offset, (off_t)size, POSIX_FADV_DONTNEED));
+#endif
+	return (0);
 }
 
 /*
