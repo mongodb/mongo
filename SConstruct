@@ -156,6 +156,7 @@ add_option( "full", "include client and headers when doing scons install", 0 , F
 add_option( "release" , "release build" , 0 , True )
 add_option( "static" , "fully static build" , 0 , False )
 add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
+add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
 
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
@@ -636,12 +637,6 @@ elif "win32" == os.sys.platform:
         # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
         env.Append( CCFLAGS= ["/O2", "/Oy-", "/MT"] )
 
-        # TODO: this has caused some linking problems :
-        # /GL whole program optimization
-        # /LTCG link time code generation
-        env.Append( CCFLAGS= ["/GL"] )
-        env.Append( LINKFLAGS=" /LTCG " )
-        env.Append( ARFLAGS=" /LTCG " ) # for the Library Manager
         # /DEBUG will tell the linker to create a .pdb file
         # which WinDbg and Visual Studio will use to resolve
         # symbols if you want to debug a release-mode image.
@@ -998,6 +993,31 @@ def doConfigure(myenv):
             myenv.Append(LINKFLAGS=['-stdlib=libc++'])
         else:
             print( 'libc++ requested, but compiler does not support -stdlib=libc++' )
+            Exit(1)
+
+    # Apply any link time optimization settings as selected by the 'lto' option.
+    if has_option('lto'):
+        if using_msvc():
+            # Note that this is actually more aggressive than LTO, it is whole program
+            # optimization due to /GL. However, this is historically what we have done for
+            # windows, so we are keeping it.
+            #
+            # /GL implies /LTCG, so no need to say it in CCFLAGS, but we do need /LTCG on the
+            # link flags.
+            myenv.Append(CCFLAGS=['/GL'])
+            myenv.Append(LINKFLAGS=['/LTCG'])
+            myenv.Append(ARFLAGS=['/LTCG'])
+        elif using_gcc() or using_clang():
+            # For GCC and clang, the flag is -flto, and we need to pass it both on the compile
+            # and link lines.
+            if AddToCCFLAGSIfSupported(myenv, '-flto'):
+                myenv.Append(LINKFLAGS=['-flto'])
+            else:
+                print( "Link time optimization requested, " +
+                       "but selected compiler does not honor -flto" )
+                Exit(1)
+        else:
+            printf("Don't know how to enable --lto on current toolchain")
             Exit(1)
 
     # glibc's memcmp is faster than gcc's
