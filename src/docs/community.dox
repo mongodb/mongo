@@ -1,0 +1,23 @@
+/*! @page community WiredTiger community and contact information
+
+WiredTiger Inc., and the WiredTiger community maintain and develop
+<a href="https://github.com/wiredtiger">WiredTiger on GitHub</a>,
+and all contributors are welcome!
+
+All source code and revision histories for this software are available
+in the <a href="https://github.com/wiredtiger/wiredtiger"> WiredTiger
+source tree repository</a>.
+
+Please submit any feature suggestions and bug reports at
+<a href="https://github.com/wiredtiger/wiredtiger/issues">
+WiredTiger's Issues page</a>.
+
+Discussion of WiredTiger issues and development can also be found in
+the
+<a href="http://groups.google.com/group/wiredtiger-users">WiredTiger
+Google Group</a>.
+
+To contact WiredTiger, Inc. please send email to
+<a mailto="info@wiredtiger.com">info@wiredtiger.com</a>.
+
+*/
