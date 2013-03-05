@@ -1,144 +1,161 @@
-s = new ShardingTest( "features3" , 2 , 1 , 1 );
+// This script tests the following behaviors:
+//   - Creates a sharded collection (test.foo)
+//   - Manually adds a split point
+//   - Disables the balancer
+//   - Inserts 10k documents and ensures they're evenly distributed
+//   - Verifies a $where query can be killed on multiple DBs
+//   - Tests fsync and fsync+lock permissions on sharded db
 
-// Stop balancer, since we're moving chunks 
+var s = new ShardingTest( "features3" , 2 , 1 , 1 );
+var db = s.getDB("test");   // db variable name is required due to startParallelShell()
+var numDocs = 10000;
+db.foo.drop();
+
+// stop the balancer
 s.stopBalancer()
 
-s.adminCommand( { enablesharding : "test" } );
+// shard test.foo and add a split point
+s.adminCommand({enablesharding: "test"});
+s.adminCommand({shardcollection : "test.foo", key: {_id: 1}});
+s.adminCommand({split : "test.foo", middle: {_id: numDocs/2}});
 
-a = s._connections[0].getDB( "test" );
-b = s._connections[1].getDB( "test" );
+// move a chunk range to the non-primary shard
+s.adminCommand({moveChunk: "test.foo", find: {_id: 3},
+                to: s.getNonPrimaries("test")[0], _waitForDelete: true});
 
-db = s.getDB( "test" );
+// restart balancer
+s.setBalancer(true)
 
-// ---------- load some data -----
+// insert 10k small documents into the sharded collection
+for (i = 0; i < numDocs; i++)
+    db.foo.insert({_id: i});
 
-s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
-N = 10000;
-s.adminCommand( { split : "test.foo" , middle : { _id : N/2 } } )
-s.adminCommand({ moveChunk: "test.foo", find: { _id: 3 },
-    to: s.getNonPrimaries("test")[0], _waitForDelete: true });
-
-// Can restart balancer now
-s.setBalancer( true )
-
-for ( i=0; i<N; i++ )
-    db.foo.insert( { _id : i } )
 db.getLastError();
-x = db.foo.stats();
-assert.eq( "test.foo" , x.ns , "basic1" )
-assert( x.sharded , "basic2" )
-assert.eq( N , x.count , "total count" )
-assert.eq( N / 2 , x.shards.shard0000.count , "count on shard0000" )
-assert.eq( N / 2 , x.shards.shard0001.count , "count on shard0001" )
-assert( x.totalIndexSize > 0 )
-assert( x.numExtents > 0 )
+var x = db.foo.stats();
 
-db.bar.insert( { x : 1 } )
-x = db.bar.stats();
-assert.eq( 1 , x.count , "XXX1" )
-assert.eq( "test.bar" , x.ns , "XXX2" )
-assert( ! x.sharded , "XXX3: " + tojson(x) )
+// verify the colleciton has been sharded and documents are evenly distributed
+assert.eq("test.foo", x.ns, "namespace mismatch");
+assert(x.sharded, "collection is not sharded");
+assert.eq(numDocs, x.count, "total count");
+assert.eq(numDocs / 2, x.shards.shard0000.count, "count on shard0000");
+assert.eq(numDocs / 2, x.shards.shard0001.count, "count on shard0001");
+assert(x.totalIndexSize > 0);
+assert(x.numExtents > 0);
 
-// Fork shell and start pulling back data
-start = new Date()
+// insert one doc into a non-sharded collection
+db.bar.insert({x: 1});
+var x = db.bar.stats();
+assert.eq(1, x.count, "XXX1");
+assert.eq("test.bar", x.ns, "XXX2");
+assert(!x.sharded, "XXX3: " + tojson(x));
 
-print( "about to fork shell: " + Date() )
+// fork shell and start querying the data
+var start = new Date();
 
-// TODO:  Still potential problem when our sampling of current ops misses when $where is active - 
+// TODO:  Still potential problem when our sampling of current ops misses when $where is active -
 // solution is to increase sleep time
-whereKillSleepTime = 10000;
-parallelCommand = 
+var whereKillSleepTime = 10000;
+var parallelCommand =
     "try { " +
-    "  db.foo.find( function(){ sleep( " + whereKillSleepTime + " ); return false; } ).itcount(); " +
-    "} catch(e){ print('PShell execution ended:'); printjson( e ) }"
+    "    db.foo.find(function(){ " +
+    "        sleep( " + whereKillSleepTime + " ); " +
+    "        return false; " +
+    "     }).itcount(); " +
+    "} " +
+    "catch(e) { " +
+    "    print('PShell execution ended:'); " +
+    "    printjson(e) " +
+    "}";
 
-join = startParallelShell( parallelCommand )
-print( "after forking shell: " + Date() )
-
+// fork a parallel shell, but do not wait for it to start
+print("about to fork new shell at: " + Date());
+join = startParallelShell(parallelCommand);
+print("done forking shell at: " + Date());
+sleep(1000);
 // Get all current $where operations
-function getMine( printInprog ){
-    
+function getMine(printInprog) {
     var inprog = db.currentOp().inprog;
-    
-    if ( printInprog )
-        printjson( inprog )
-    
+    if (printInprog)
+        printjson(inprog);
+
     // Find all the where queries
-    var mine = []
-    for ( var x=0; x<inprog.length; x++ ){
-        if ( inprog[x].query && inprog[x].query.$where ){
-            mine.push( inprog[x] )
+    var mine = [];
+    for (var x=0; x<inprog.length; x++) {
+        if (inprog[x].query && inprog[x].query.$where) {
+            mine.push(inprog[x]);
         }
     }
-    
+
     return mine;
 }
 
-var state = 0; // 0 = not found, 1 = killed, 
+var curOpState = 0; // 0 = not found, 1 = killed
 var killTime = null;
 var i = 0;
 
-assert.soon( function(){
-    
+assert.soon(function() {
     // Get all the current operations
-    mine = getMine( state == 0 && i > 20 );
+    mine = getMine(curOpState == 0 && i > 20);
     i++;
-    
+
     // Wait for the queries to start
-    if ( state == 0 && mine.length > 0 ){
-        // Queries started
-        state = 1;
-        // Kill all $where
-        mine.forEach( function(z){ printjson( db.getSisterDB( "admin" ).killOp( z.opid ) ); }  )
-        killTime = new Date()
+    if (curOpState == 0 && mine.length > 0) {
+        // queries started
+        curOpState = 1;
+        // kill all $where
+        mine.forEach(function(z) {
+            printjson(db.getSisterDB("admin").killOp(z.opid));
+        });
+        killTime = new Date();
     }
     // Wait for killed queries to end
-    else if ( state == 1 && mine.length == 0 ){
+    else if (curOpState == 1 && mine.length == 0) {
         // Queries ended
-        state = 2;
+        curOpState = 2;
         return true;
     }
-    
-}, "Couldn't kill the $where operations.", 2 * 60 * 1000 )
 
-print( "after loop: " + Date() );
-assert( killTime , "timed out waiting too kill last mine:" + tojson(mine) )
+}, "Couldn't kill the $where operations.", 2 * 60 * 1000);
 
-assert.eq( 2 , state , "failed killing" );
+print("after loop: " + Date());
+assert(killTime, "timed out waiting too kill last mine:" + tojson(mine));
 
-killTime = (new Date()).getTime() - killTime.getTime()
-print( "killTime: " + killTime );
-print( "time if run full: " + ( N * whereKillSleepTime ) );
-assert.gt( whereKillSleepTime * N / 20 , killTime , "took too long to kill" )
+assert.eq( 2 , curOpState , "failed killing" );
 
-join()
+killTime = new Date().getTime() - killTime.getTime();
+print("killTime: " + killTime);
+print("time if run full: " + (numDocs * whereKillSleepTime));
+assert.gt(whereKillSleepTime * numDocs / 20, killTime, "took too long to kill");
 
-end = new Date()
+// wait for the parallel shell we spawned to complete
+join();
+var end = new Date();
+print("elapsed: " + (end.getTime() - start.getTime()));
 
-print( "elapsed: " + ( end.getTime() - start.getTime() ) );
+// test fsync command on non-admin db
+x = db.runCommand("fsync");
+assert(!x.ok , "fsync on non-admin namespace should fail : " + tojson(x));
+assert(x.errmsg.indexOf("access denied") >= 0,
+       "fsync on non-admin succeeded, but should have failed: " + tojson(x));
 
+// test fsync on admin db
+x = db._adminCommand("fsync");
+assert(x.ok == 1 && x.numFiles > 0, "fsync failed: " + tojson(x));
 
-x = db.runCommand( "fsync" )
-assert( ! x.ok , "fsync not on admin should fail : " + tojson( x ) );
-assert( x.errmsg.indexOf( "access denied" ) >= 0 , "fsync not on admin should fail : " + tojson( x ) )
-
-x = db._adminCommand( "fsync" )
-assert( x.ok == 1 && x.numFiles > 0 , "fsync failed : " + tojson( x ) )
-
-x = db._adminCommand( { "fsync" :1, lock:true } )
-assert( ! x.ok , "lock should fail: " + tojson( x ) )
-
+// test fsync+lock on admin db
+x = db._adminCommand({"fsync" :1, lock:true});
+assert(!x.ok, "lock should fail: " + tojson(x));
 
 // write back stuff
 // SERVER-4194
 
-function countWritebacks( curop ) {
-    print( "---------------" );
+function countWritebacks(curop) {
+    print("---------------");
     var num = 0;
-    for ( var i=0; i<curop.inprog.length; i++ ) {
+    for (var i = 0; i < curop.inprog.length; i++) {
         var q = curop.inprog[i].query;
-        if ( q && q.writebacklisten ) {
-            printjson( curop.inprog[i] );
+        if (q && q.writebacklisten) {
+            printjson(curop.inprog[i]);
             num++;
         }
     }
@@ -146,14 +163,10 @@ function countWritebacks( curop ) {
 }
 
 x = db.currentOp();
-assert.eq( 0 , countWritebacks( x ) , "without all");
+assert.eq(0, countWritebacks(x), "without all");
 
-x = db.currentOp( true );
-y = countWritebacks( x )
-assert( y == 1 || y == 2  , "with all: "  + y );
-
-
-
-
+x = db.currentOp(true);
+y = countWritebacks(x);
+assert(y == 1 || y == 2, "with all: " + y);
 
 s.stop()
