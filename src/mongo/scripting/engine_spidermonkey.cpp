@@ -1810,17 +1810,17 @@ namespace spidermonkey {
 
         s.localConnect( "foo" );
 
-        s.exec( "verify( db.getMongo() )" );
-        s.exec( "verify( db.bar , 'collection getting does not work' ); " );
+        s.exec( "assert( db.getMongo() )" );
+        s.exec( "assert( db.bar , 'collection getting does not work' ); " );
         s.exec( "assert.eq( db._name , 'foo' );" );
-        s.exec( "verify( _mongo == db.getMongo() ); " );
-        s.exec( "verify( _mongo == db._mongo ); " );
-        s.exec( "verify( typeof DB.bar == 'undefined' ); " );
-        s.exec( "verify( typeof DB.prototype.bar == 'undefined' , 'resolution is happening on prototype, not object' ); " );
+        s.exec( "assert( _mongo == db.getMongo() ); " );
+        s.exec( "assert( _mongo == db._mongo ); " );
+        s.exec( "assert( typeof DB.bar == 'undefined' ); " );
+        s.exec( "assert( typeof DB.prototype.bar == 'undefined' , 'resolution is happening on prototype, not object' ); " );
 
-        s.exec( "verify( db.bar ); " );
-        s.exec( "verify( typeof db.addUser == 'function' )" );
-        s.exec( "verify( db.addUser == DB.prototype.addUser )" );
+        s.exec( "assert( db.bar ); " );
+        s.exec( "assert( typeof db.addUser == 'function' )" );
+        s.exec( "assert( db.addUser == DB.prototype.addUser )" );
         s.exec( "assert.eq( 'foo.bar' , db.bar._fullName ); " );
         s.exec( "db.bar.verify();" );
 
