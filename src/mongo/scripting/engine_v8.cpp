@@ -1795,7 +1795,7 @@ namespace mongo {
             }
         }
 
-        v8::Local<v8::Array> names = o->GetPropertyNames();
+        v8::Local<v8::Array> names = o->GetOwnPropertyNames();
         for (unsigned int i=0; i<names->Length(); i++) {
             v8::Local<v8::String> name = names->Get(i)->ToString();
             v8::Local<v8::Value> value = o->Get(name);
