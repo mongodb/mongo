@@ -294,6 +294,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
+	const char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
 	if ((ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree)) == 0) {
@@ -302,9 +303,15 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	/* If the tree has metadata, it already exists. */
-	if (__wt_metadata_read(session, uri, &config) == 0) {
-		__wt_free(session, config);
+	/*
+	 * If the tree has metadata, it already exists.
+	 *
+	 * !!!
+	 * Use a local variable: we don't care what the existing configuration
+	 * is, but we don't want to overwrite the real config.
+	 */
+	if (__wt_metadata_read(session, uri, &tmpconfig) == 0) {
+		__wt_free(session, tmpconfig);
 		return (exclusive ? EEXIST : 0);
 	}
 	WT_RET_NOTFOUND_OK(ret);
