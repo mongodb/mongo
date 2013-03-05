@@ -6,7 +6,10 @@
 //   - Verifies a $where query can be killed on multiple DBs
 //   - Tests fsync and fsync+lock permissions on sharded db
 
-var s = new ShardingTest( "features3" , 2 , 1 , 1 );
+var s = new ShardingTest({shards: 2,
+                          mongos: 1,
+                          verbose:1,
+                          other: {separateConfig: true}});
 var db = s.getDB("test");   // db variable name is required due to startParallelShell()
 var numDocs = 10000;
 db.foo.drop();
@@ -71,7 +74,7 @@ var parallelCommand =
 print("about to fork new shell at: " + Date());
 join = startParallelShell(parallelCommand);
 print("done forking shell at: " + Date());
-sleep(1000);
+
 // Get all current $where operations
 function getMine(printInprog) {
     var inprog = db.currentOp().inprog;
@@ -95,7 +98,9 @@ var i = 0;
 
 assert.soon(function() {
     // Get all the current operations
-    mine = getMine(curOpState == 0 && i > 20);
+    mine = getMine(true);  // SERVER-8794: print all operations
+    // get curren tops, but only print out operations before we see a $where op has started
+    // mine = getMine(curOpState == 0 && i > 20);
     i++;
 
     // Wait for the queries to start
