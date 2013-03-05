@@ -219,16 +219,16 @@ namespace mongo {
             }
         }
 
-        map<string, ScriptingFunction>::iterator i = _cachedFunctions.find(code);
+        FunctionCacheMap::iterator i = _cachedFunctions.find(code);
         if (i != _cachedFunctions.end())
             return i->second;
         // NB: we calculate the function number for v8 so the cache can be utilized to
         //     lookup the source on an exception, but SpiderMonkey uses the value
         //     returned by JS_CompileFunction.
-        ScriptingFunction functionNumber = getFunctionCache().size() + 1;
-        _cachedFunctions[code] = functionNumber;
-        ScriptingFunction f = _createFunction(code, functionNumber);
-        return f;
+        ScriptingFunction defaultFunctionNumber = getFunctionCache().size() + 1;
+        ScriptingFunction& actualFunctionNumber = _cachedFunctions[code];
+        actualFunctionNumber = _createFunction(code, defaultFunctionNumber);
+        return actualFunctionNumber;
     }
 
     namespace JSFiles {
