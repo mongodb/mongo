@@ -1,7 +1,8 @@
 /*! @page license WiredTiger license
 
-The WiredTiger software is Open Source software: you may redistribute
-it and modify it under the terms of version 3 of the
+The complete WiredTiger software package is Open Source software: you
+are welcome to modify and redistribute it under the terms of version 3
+of the
 <a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
 <b>GNU General Public License</b></a>
 as published by the Free Software Foundation. This program is
@@ -11,6 +12,13 @@ FITNESS FOR A PARTICULAR PURPOSE.  See the
 <a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
 <b>GNU General Public License</b></a> for details.
 
+For a license to use the WiredTiger software under conditions other than
+those described above, or for technical support for this software, please
+contact WiredTiger, Inc. at
+<a mailto="info@wiredtiger.com">info@wiredtiger.com</a>.
+
+@section library 3rd party software included in the WiredTiger library binary
+
 The WiredTiger library binary includes software copyrighted under the
 terms of the
 <a href="http://www.opensource.org/licenses/BSD-3-Clause">
@@ -19,13 +27,6 @@ and the
 <a href="http://www.opensource.org/licenses/MIT">
 <b>MIT License</b></a>.  Any redistribution should comply with these
 copyrights.
-
-For a license to use the WiredTiger software under conditions other than
-those described above, or for technical support for this software, please
-contact WiredTiger, Inc. at
-<a mailto="info@wiredtiger.com">info@wiredtiger.com</a>.
-
-@section library 3rd party software included in the WiredTiger library binary
 
 The WiredTiger library binary includes the following 3rd party software,
 distributed under the following licenses:
@@ -51,10 +52,9 @@ sources, please review the copyright notices and LICENSE files included
 in the WiredTiger distribution for the terms and conditions of such
 redistribution.
 
-@section pd Public domain software
+@section public_domain Public domain software
 
-Portions of this program are public domain software.  Public domain
-files have copyright notices releasing the software into the public
-domain and may be freely used.
+Portions of this program are public domain software.  Public domain files have
+notices releasing the software into the public domain and may be freely used.
 
 */

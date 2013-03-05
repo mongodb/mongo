@@ -19,6 +19,7 @@
       <tab type="globals" visible="yes" title="" intro=""/>
     </tab>
     <tab type="examples" visible="yes" title="" intro=""/>  
+    <tab type="user" url="community.html" visible="yes" title="Community"/>
     <tab type="user" url="license.html" visible="yes" title="License"/>
   </navindex>
 
