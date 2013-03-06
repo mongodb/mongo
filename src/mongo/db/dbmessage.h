@@ -131,6 +131,11 @@ namespace mongo {
             const int *d = reinterpret_cast<const int *>(p); 
             return *d;
         }
+        int& reservedField() { 
+            char *p = data - 4;
+            int *d = reinterpret_cast<int *>(p); 
+            return *d;
+        }
 
         const char * getns() const {
             return data;
@@ -243,7 +248,7 @@ namespace mongo {
 
     private:
         const Message& m;
-        const char * const data;
+        char * const data;
         const char *nextjsobj;
         const char * const theEnd;
         const char *mark;
