@@ -76,8 +76,6 @@ struct __wt_connection_impl {
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 
-	int ckpt_backup;		/* Backup: don't delete checkpoints */
-
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 					/* Cache pool queue */
@@ -86,9 +84,12 @@ struct __wt_connection_impl {
 	const char *home;		/* Database home */
 	int is_new;			/* Connection created database */
 
+	int connection_initialized;	/* Connection is initialized */
+
 	WT_FH *lock_fh;			/* Lock file handle */
 
-	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
+	pthread_t cache_evict_tid;	/* Eviction server thread ID */
+	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
@@ -129,9 +130,27 @@ struct __wt_connection_impl {
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
 
-	WT_TXN_GLOBAL txn_global;	/* Global transaction state. */
+	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
-	WT_CONNECTION_STATS *stats;	/* Connection statistics */
+	int ckpt_backup;		/* Backup: don't delete checkpoints */
+
+	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
+	pthread_t	 ckpt_tid;	/* Checkpoint thread */
+	int		 ckpt_tid_set;	/* Checkpoint thread set */
+	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
+	const char	*ckpt_config;	/* Checkpoint configuration */
+	long		 ckpt_usecs;	/* Checkpoint period */
+
+	WT_CONNECTION_STATS stats;	/* Connection statistics */
+	int		 statistics;	/* Global statistics configuration */
+	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
+	pthread_t	 stat_tid;	/* Statistics log thread */
+	int		 stat_tid_set;	/* Statistics log thread set */
+	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
+	int		 stat_clear;	/* Statistics log clear */
+	const char	*stat_path;	/* Statistics log path format */
+	const char	*stat_stamp;	/* Statistics log timestamp format */
+	long		 stat_usecs;	/* Statistics log period */
 
 	WT_FH	   *log_fh;		/* Logging file handle */
 
@@ -149,6 +168,8 @@ struct __wt_connection_impl {
 
 	/* If non-zero, all buffers used for I/O will be aligned to this. */
 	size_t buffer_alignment;
+
+	uint32_t schema_gen;		/* Schema generation number */
 
 	uint32_t direct_io;		/* O_DIRECT configuration */
 	int	 mmap;			/* mmap configuration */

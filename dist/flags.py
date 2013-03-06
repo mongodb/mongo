@@ -13,6 +13,7 @@ flags = {
 		'SYNC_COMPACT',
 		'SYNC_DISCARD',
 		'SYNC_DISCARD_NOWRITE',
+		'SYNC_WRITE_LEAVES',
 	],
 	'direct_io' : [
 		'DIRECTIO_DATA',
@@ -58,6 +59,7 @@ flags = {
 ###################################################
 	'conn' : [
 		'CONN_CACHE_POOL',
+		'CONN_EVICTION_RUN',
 		'CONN_LSM_MERGE',
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',

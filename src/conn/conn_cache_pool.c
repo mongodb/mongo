@@ -25,7 +25,7 @@ static int  __cache_pool_balance(void);
 
 /*
  * __wt_conn_cache_pool_config --
- *	Parse and setup and cache pool options.
+ *	Parse and setup the cache pool options.
  */
 int
 __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
@@ -240,27 +240,31 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 			break;
 		}
 
-	if (!found) {
-		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		return (0);
+	/*
+	 * If there was an error during open, we may not have made it onto the
+	 * queue.  We did increment the reference count, so proceed regardless.
+	 */
+	if (found) {
+		WT_VERBOSE_TRET(session, shared_cache,
+		    "Removing %s from cache pool.", entry->home);
+		TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
+
+		/* Give the connection's resources back to the pool. */
+		WT_ASSERT(session, cp->currently_used >= conn->cache_size);
+		cp->currently_used -= conn->cache_size;
 	}
 
-	WT_VERBOSE_TRET(session, shared_cache,
-	    "Removing %s from cache pool.", entry->home);
-	TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
-
-	/* Give the connection's resources back to the pool. */
-	WT_ASSERT(session, cp->currently_used >= conn->cache_size);
-	cp->currently_used -= conn->cache_size;
-	--cp->refs;
-	if (cp->refs == 0 && TAILQ_EMPTY(&cp->cache_pool_qh))
+	WT_ASSERT(session, cp->refs > 0);
+	if (--cp->refs == 0) {
+		WT_ASSERT(session, TAILQ_EMPTY(&cp->cache_pool_qh));
 		F_CLR(cp, WT_CACHE_POOL_RUN);
+	}
 
 	/*
 	 * Free the connection pool session if it was created by this
 	 * connection. A new one will be created by the next balance pass.
 	 */
-	if (cp->session != NULL && entry == S2C(cp->session)) {
+	if (cp->session != NULL && conn == S2C(cp->session)) {
 		WT_VERBOSE_TRET(cp->session, shared_cache,
 		    "Freeing a cache pool session due to connection close.");
 		wt_session = &cp->session->iface;
@@ -289,9 +293,11 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
 
-		/* Shut down the cache pool worker. */
-		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
-		WT_TRET(__wt_thread_join(session, cp->cache_pool_tid));
+		if (found) {
+			/* Shut down the cache pool worker. */
+			WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
+			WT_TRET(__wt_thread_join(session, cp->cache_pool_tid));
+		}
 
 		/* Now free the pool. */
 		__wt_free(session, cp->name);

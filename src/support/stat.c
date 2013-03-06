@@ -2,13 +2,9 @@
 
 #include "wt_internal.h"
 
-int
-__wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
+void
+__wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 {
-	WT_DSRC_STATS *stats;
-
-	WT_RET(__wt_calloc_def(session, 1, &stats));
-
 	stats->block_alloc.desc = "blocks allocated";
 	stats->block_allocsize.desc =
 	    "block manager file allocation unit size";
@@ -51,8 +47,10 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->cache_eviction_dirty.desc = "modified pages evicted";
 	stats->cache_eviction_fail.desc =
 	    "data source pages selected for eviction unable to be evicted";
+	stats->cache_eviction_force.desc =
+	    "cache: pages queued for forced eviction";
 	stats->cache_eviction_hazard.desc =
-	    "eviction unable to acquire hazard pointer";
+	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "internal pages evicted";
 	stats->cache_eviction_merge.desc =
 	    "cache: internal page merge operations completed";
@@ -109,13 +107,10 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->session_compact.desc = "object compaction";
 	stats->txn_update_conflict.desc = "update conflicts";
 	stats->txn_write_conflict.desc = "write generation conflicts";
-
-	*statsp = stats;
-	return (0);
 }
 
 void
-__wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
+__wt_stat_clear_dsrc_stats(void *stats_arg)
 {
 	WT_DSRC_STATS *stats;
 
@@ -156,6 +151,7 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
+	stats->cache_eviction_force.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_merge.v = 0;
@@ -203,13 +199,9 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->txn_write_conflict.v = 0;
 }
 
-int
-__wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS **statsp)
+void
+__wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 {
-	WT_CONNECTION_STATS *stats;
-
-	WT_RET(__wt_calloc_def(session, 1, &stats));
-
 	stats->block_byte_map_read.desc =
 	    "mapped bytes read by the block manager";
 	stats->block_byte_read.desc = "bytes read by the block manager";
@@ -227,8 +219,10 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
+	stats->cache_eviction_force.desc =
+	    "cache: pages queued for forced eviction";
 	stats->cache_eviction_hazard.desc =
-	    "cache: eviction unable to acquire hazard pointer";
+	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_eviction_merge.desc =
 	    "cache: internal page merge operations completed";
@@ -238,6 +232,7 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	    "cache: internal levels merged";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
+	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
 	stats->cache_pages_dirty.desc =
 	    "cache: tracked dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
@@ -248,7 +243,13 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->file_open.desc = "files currently open";
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
+	stats->memory_grow.desc = "total heap memory re-allocations";
 	stats->read_io.desc = "total read I/Os";
+	stats->rec_pages.desc = "page reconciliation calls";
+	stats->rec_pages_eviction.desc =
+	    "page reconciliation calls for eviction";
+	stats->rec_skipped_update.desc =
+	    "reconciliation failed because an update could not be included";
 	stats->rwlock_read.desc = "pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
@@ -260,13 +261,10 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	    "transaction failures due to cache overflow";
 	stats->txn_rollback.desc = "transactions rolled-back";
 	stats->write_io.desc = "total write I/Os";
-
-	*statsp = stats;
-	return (0);
 }
 
 void
-__wt_stat_clear_connection_stats(WT_STATS *stats_arg)
+__wt_stat_clear_connection_stats(void *stats_arg)
 {
 	WT_CONNECTION_STATS *stats;
 
@@ -283,12 +281,14 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
+	stats->cache_eviction_force.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_merge.v = 0;
 	stats->cache_eviction_merge_fail.v = 0;
 	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
+	stats->cache_eviction_walk.v = 0;
 	stats->cache_pages_dirty.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
@@ -296,7 +296,11 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->file_open.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
+	stats->memory_grow.v = 0;
 	stats->read_io.v = 0;
+	stats->rec_pages.v = 0;
+	stats->rec_pages_eviction.v = 0;
+	stats->rec_skipped_update.v = 0;
 	stats->rwlock_read.v = 0;
 	stats->rwlock_write.v = 0;
 	stats->txn_ancient.v = 0;

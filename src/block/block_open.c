@@ -129,6 +129,10 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
 
+	/* Get the OS buffer cache maximum size. */
+	WT_ERR(__wt_config_getones(session, config, "os_cache_max", &cval));
+	block->fh->os_cache_max = cval.val;
+
 	/* Initialize the live checkpoint's lock. */
 	__wt_spin_init(session, &block->live_lock);
 
@@ -272,7 +276,7 @@ err:	__wt_scr_free(&buf);
  *	Block statistics
  */
 void
-__wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 {
 	/*
 	 * We're looking inside the live system's structure, which normally
@@ -281,11 +285,11 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * isn't like this is a common function for an application to call.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	WT_DSTAT_SET(session, block_allocsize, block->allocsize);
-	WT_DSTAT_SET(session, block_checkpoint_size, block->live.ckpt_size);
-	WT_DSTAT_SET(session, block_magic, WT_BLOCK_MAGIC);
-	WT_DSTAT_SET(session, block_major, WT_BLOCK_MAJOR_VERSION);
-	WT_DSTAT_SET(session, block_minor, WT_BLOCK_MINOR_VERSION);
-	WT_DSTAT_SET(session, block_size, block->fh->file_size);
+	WT_STAT_SET(stats, block_allocsize, block->allocsize);
+	WT_STAT_SET(stats, block_checkpoint_size, block->live.ckpt_size);
+	WT_STAT_SET(stats, block_magic, WT_BLOCK_MAGIC);
+	WT_STAT_SET(stats, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_STAT_SET(stats, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_STAT_SET(stats, block_size, block->fh->file_size);
 	__wt_spin_unlock(session, &block->live_lock);
 }

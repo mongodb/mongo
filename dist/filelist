@@ -55,6 +55,7 @@ src/conn/conn_api.c
 src/conn/conn_btree.c
 src/conn/conn_cache.c
 src/conn/conn_cache_pool.c
+src/conn/conn_ckpt.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
 src/conn/conn_stat.c
@@ -104,8 +105,9 @@ src/os_posix/os_strtouq.c
 src/os_posix/os_thread.c
 src/os_posix/os_time.c
 src/os_posix/os_yield.c
-src/packing/packing.c
-src/packing/packing_api.c
+src/packing/pack_api.c
+src/packing/pack_impl.c
+src/packing/pack_stream.c
 src/schema/schema_create.c
 src/schema/schema_drop.c
 src/schema/schema_list.c

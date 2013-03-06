@@ -67,6 +67,16 @@ __bm_checkpoint(WT_BM *bm,
 }
 
 /*
+ * __bm_sync --
+ *	Flush a file to disk.
+ */
+static int
+__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+	return (__wt_fsync(session, bm->block->fh));
+}
+
+/*
  * __bm_checkpoint_load --
  *	Load a checkpoint point.
  */
@@ -197,9 +207,9 @@ __bm_free(WT_BM *bm,
  *	Block-manager statistics.
  */
 static int
-__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 {
-	__wt_block_stat(session, bm->block);
+	__wt_block_stat(session, bm->block, stats);
 	return (0);
 }
 
@@ -333,6 +343,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->salvage_valid = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, uint8_t *, uint32_t))__bm_readonly;
 		bm->stat = __bm_stat;
+		bm->sync = (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->verify_addr = __bm_verify_addr;
 		bm->verify_end = __bm_verify_end;
 		bm->verify_start = __bm_verify_start;
@@ -358,6 +369,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->salvage_start = __bm_salvage_start;
 		bm->salvage_valid = __bm_salvage_valid;
 		bm->stat = __bm_stat;
+		bm->sync = __bm_sync;
 		bm->verify_addr = __bm_verify_addr;
 		bm->verify_end = __bm_verify_end;
 		bm->verify_start = __bm_verify_start;

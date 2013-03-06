@@ -145,7 +145,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	/* Make sure the column group is referenced from the table. */
 	if (cgname != NULL && (ret =
 	    __wt_config_subgets(session, &table->cgconf, cgname, &cval)) != 0)
-		WT_RET_MSG(session, EINVAL,
+		WT_ERR_MSG(session, EINVAL,
 		    "Column group '%s' not found in table '%.*s'",
 		    cgname, (int)tlen, tablename);
 
@@ -205,6 +205,8 @@ err:	__wt_free(session, cgconf);
 	__wt_buf_free(session, &confbuf);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
+
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 
@@ -357,6 +359,8 @@ err:	__wt_free(session, idxconf);
 	__wt_buf_free(session, &extra_cols);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
+
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 
@@ -383,8 +387,10 @@ __create_table(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	if ((ret = __wt_schema_get_table(session,
-	    tablename, strlen(tablename), 0, &table)) == 0)
+	    tablename, strlen(tablename), 0, &table)) == 0) {
+		__wt_schema_release_table(session, table);
 		return (exclusive ? EEXIST : 0);
+	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	WT_RET(__wt_config_gets(session, cfg, "colgroups", &cval));
@@ -418,9 +424,13 @@ __create_table(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		if (table != NULL)
-			WT_TRET(__wt_schema_remove_table(session, table));
+err:		if (table != NULL) {
+			__wt_schema_remove_table(session, table);
+			table = NULL;
+		}
 	}
+	if (table != NULL)
+		__wt_schema_release_table(session, table);
 	__wt_free(session, cgname);
 	__wt_free(session, tableconf);
 	return (ret);

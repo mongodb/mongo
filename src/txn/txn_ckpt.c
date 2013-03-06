@@ -7,46 +7,24 @@
 
 #include "wt_internal.h"
 
+static int __checkpoint_sync(WT_SESSION_IMPL *, const char *[]);
+static int __checkpoint_write_leaves(WT_SESSION_IMPL *, const char *[]);
+
 /*
- * __wt_txn_checkpoint --
- *	Checkpoint a database or a list of objects in the database.
+ * __checkpoint_apply --
+ *	Apply an operation to all files involved in a checkpoint.
  */
-int
-__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
+	int (*op)(WT_SESSION_IMPL *, const char *[]))
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_BTREE *btree, *saved_btree;
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_SESSION *wt_session;
-	WT_TXN *txn;
-	void *saved_meta_next;
-	int ckpt_closed, target_list, tracking;
+	int ckpt_closed, target_list;
 
-	conn = S2C(session);
-	target_list = tracking = 0;
-	txn = &session->txn;
-
-	/*
-	 * Only one checkpoint can be active at a time, and checkpoints must
-	 * run in the same order as they update the metadata; we are using the
-	 * schema lock to determine that ordering, so we can't move this to
-	 * __session_checkpoint.
-	 *
-	 * Begin a transaction for the checkpoint.
-	 */
-	WT_ASSERT(session,
-	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
-	    !F_ISSET(txn, TXN_RUNNING));
-	__wt_spin_lock(session, &conn->metadata_lock);
-
-	wt_session = &session->iface;
-	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
-
-	WT_ERR(__wt_meta_track_on(session));
-	tracking = 1;
+	target_list = 0;
 
 	/* Step through the list of targets and checkpoint each one. */
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
@@ -65,7 +43,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
 		if ((ret = __wt_schema_worker(
-		    session, tmp->data, __wt_checkpoint, cfg, 0)) != 0)
+		    session, tmp->data, op, cfg, 0)) != 0)
 			WT_ERR_MSG(session, ret, "%s", (const char *)tmp->data);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
@@ -91,9 +69,69 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		if (cval.len != 0)
 			ckpt_closed = 1;
 		WT_ERR(ckpt_closed ?
-		    __wt_meta_btree_apply(session, __wt_checkpoint, cfg) :
-		    __wt_conn_btree_apply(session, __wt_checkpoint, cfg));
+		    __wt_meta_btree_apply(session, op, cfg) :
+		    __wt_conn_btree_apply(session, op, cfg));
 	}
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
+}
+
+/*
+ * __wt_txn_checkpoint --
+ *	Checkpoint a database or a list of objects in the database.
+ */
+int
+__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_BTREE *btree, *saved_btree;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	WT_TXN *txn;
+	void *saved_meta_next;
+	int tracking;
+
+	conn = S2C(session);
+	tracking = 0;
+	txn = &session->txn;
+
+	/*
+	 * Only one checkpoint can be active at a time, and checkpoints must
+	 * run in the same order as they update the metadata; we are using the
+	 * schema lock to determine that ordering, so we can't move this to
+	 * __session_checkpoint.
+	 *
+	 * Begin a transaction for the checkpoint.
+	 */
+	WT_ASSERT(session,
+	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+	    !F_ISSET(txn, TXN_RUNNING));
+	__wt_spin_lock(session, &conn->metadata_lock);
+
+	/* Flush dirty leaf pages before we start the checkpoint. */
+	txn->isolation = TXN_ISO_READ_COMMITTED;
+	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
+
+	WT_ERR(__wt_meta_track_on(session));
+	tracking = 1;
+
+	/* Start a snapshot transaction for the checkpoint. */
+	wt_session = &session->iface;
+	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
+
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
+
+	/* Release the snapshot transaction, before syncing the file(s). */
+	__wt_txn_release(session);
+
+	/*
+	 * Checkpoints have to hit disk (it would be reasonable to configure for
+	 * lazy checkpoints, but we don't support them yet).
+	 */
+	if (F_ISSET(conn, WT_CONN_SYNC))
+		WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_sync));
 
 	/* Checkpoint the metadata file. */
 	TAILQ_FOREACH(btree, &conn->btqh, q)
@@ -137,7 +175,8 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	__wt_txn_release(session);
+	if (F_ISSET(txn, TXN_RUNNING))
+		__wt_txn_release(session);
 	__wt_spin_unlock(session, &conn->metadata_lock);
 
 	__wt_scr_free(&tmp);
@@ -624,11 +663,48 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __checkpoint_write_leaves --
+ *	Write dirty leaf pages before a checkpoint.
+ */
+static int
+__checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_UNUSED(cfg);
+
+	if (session->btree->modified)
+		WT_RET(__wt_bt_cache_op(
+		    session, NULL, WT_SYNC_WRITE_LEAVES));
+
+	return (0);
+}
+
+/*
+ * __checkpoint_sync --
+ *	Sync a file that has been checkpointed.
+ */
+static int
+__checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_BTREE *btree;
+
+	WT_UNUSED(cfg);
+	btree = session->btree;
+
+	/* Only sync ordinary handles: checkpoint handles are read-only. */
+	if (btree->checkpoint == NULL && btree->bm != NULL)
+		return (btree->bm->sync(btree->bm, session));
+	return (0);
+}
+
+/*
  * __wt_checkpoint_close --
  *	Checkpoint a file as part of a close.
  */
 int
 __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	return (__checkpoint_worker(session, cfg, 0));
+	WT_RET(__checkpoint_worker(session, cfg, 0));
+	if (F_ISSET(S2C(session), WT_CONN_SYNC))
+		WT_RET(__checkpoint_sync(session, cfg));
+	return (0);
 }

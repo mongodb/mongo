@@ -210,11 +210,13 @@ Vv
 VxWorks
 WIREDTIGER
 WeakHashLen
+Wformat
 WinNT
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerHome
+WiredTigerStat
 WithSeeds
 Wuninitialized
 XP
@@ -239,6 +241,7 @@ argc
 args
 argv
 async
+autockpt
 autocommit
 bdb
 bigram
@@ -458,6 +461,7 @@ intpack
 ints
 inuse
 io
+ip
 ispo
 kb
 kcell
@@ -535,6 +539,7 @@ nhex
 nl
 nlpo
 nocase
+nonliteral
 noop
 nop
 notfound
@@ -558,6 +563,7 @@ os
 ovfl
 packv
 patchp
+pathname
 pathnames
 perf
 pfx
@@ -570,6 +576,8 @@ presize
 printf
 printlog
 priv
+ps
+psp
 pthread
 putK
 putV
@@ -626,6 +634,7 @@ sizep
 sizev
 skiplist
 skiplists
+sl
 slotsp
 slvg
 snaplen
@@ -638,6 +647,7 @@ srch
 srvr
 sset
 startup
+statlog
 stbar
 stdarg
 stderr
@@ -647,6 +657,7 @@ str
 strcmp
 strdup
 strerror
+strftime
 stringin
 strncpy
 strndup
@@ -739,6 +750,7 @@ untyped
 upd
 upg
 uri
+usedp
 usr
 utf
 util

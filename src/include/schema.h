@@ -5,12 +5,12 @@
  * See the file LICENSE for redistribution information.
  */
 
-/* Character constants for projection plans. */
-#define	WT_PROJ_KEY	'k' /* Go to key in cursor <arg>. */
-#define	WT_PROJ_NEXT	'n' /* Process the next item (<arg> repeats). */
-#define	WT_PROJ_REUSE	'r' /* Reuse the previous item (<arg> repeats). */
-#define	WT_PROJ_SKIP	's' /* Skip a column in the cursor (<arg> repeats). */
-#define	WT_PROJ_VALUE	'v' /* Go to the value in cursor <arg>. */
+/* Character constants for projection plans */
+#define	WT_PROJ_KEY	'k' /* Go to key in cursor <arg> */
+#define	WT_PROJ_NEXT	'n' /* Process the next item (<arg> repeats) */
+#define	WT_PROJ_REUSE	'r' /* Reuse the previous item (<arg> repeats) */
+#define	WT_PROJ_SKIP	's' /* Skip a column in the cursor (<arg> repeats) */
+#define	WT_PROJ_VALUE	'v' /* Go to the value in cursor <arg> */
 
 struct __wt_colgroup {
 	const char *name;		/* Logical name */
@@ -32,7 +32,7 @@ struct __wt_index {
 	const char *key_plan;		/* Key projection plan */
 	const char *value_plan;		/* Value projection plan */
 
-	int need_value;			/* Index must have a non-empty value. */
+	int need_value;			/* Index must have a non-empty value */
 };
 
 /*
@@ -56,6 +56,9 @@ struct __wt_table {
 
 	int cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;
+
+	uint32_t refcnt;	/* Number of open cursors */
+	uint32_t schema_gen;	/* Cached schema generation number */
 };
 
 /*

@@ -32,7 +32,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	 */
 	WT_ASSERT(session, number != 0 && size != 0);
 
-	if (session != NULL && S2C(session)->stats != NULL)
+	if (session != NULL)
 		WT_CSTAT_INCR(session, memory_allocation);
 
 	if ((p = calloc(number, size)) == NULL)
@@ -56,21 +56,26 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
-	 */
-	WT_ASSERT(session, bytes_to_allocate != 0);
-
-	/*
+	 *
 	 * Sometimes we're allocating memory and we don't care about the
 	 * final length -- bytes_allocated_ret may be NULL.
 	 */
-	bytes_allocated = (bytes_allocated_ret == NULL) ?
-	    0 : *bytes_allocated_ret;
+	p = *(void **)retp;
+	bytes_allocated =
+	    (bytes_allocated_ret == NULL) ? 0 : *bytes_allocated_ret;
+	WT_ASSERT(session,
+	    (p == NULL && bytes_allocated == 0) ||
+	    (p != NULL &&
+	    (bytes_allocated_ret == NULL || bytes_allocated != 0)));
+	WT_ASSERT(session, bytes_to_allocate != 0);
 	WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
-	p = *(void **)retp;
-
-	if (p == NULL && session != NULL && S2C(session)->stats != NULL)
-		WT_CSTAT_INCR(session, memory_allocation);
+	if (session != NULL) {
+		if (p == NULL)
+			WT_CSTAT_INCR(session, memory_allocation);
+		else
+			WT_CSTAT_INCR(session, memory_grow);
+	}
 
 	if ((p = realloc(p, bytes_to_allocate)) == NULL)
 		WT_RET_MSG(session, __wt_errno(), "memory allocation");
@@ -114,21 +119,21 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		void *p, *newp;
 		size_t bytes_allocated;
 
-		WT_ASSERT(session, bytes_to_allocate != 0);
-
 		/*
 		 * Sometimes we're allocating memory and we don't care about the
 		 * final length -- bytes_allocated_ret may be NULL.
 		 */
-		bytes_allocated = (bytes_allocated_ret == NULL) ?
-		    0 : *bytes_allocated_ret;
+		p = *(void **)retp;
+		bytes_allocated =
+		    (bytes_allocated_ret == NULL) ? 0 : *bytes_allocated_ret;
+		WT_ASSERT(session,
+		    (p == NULL && bytes_allocated == 0) ||
+		    (p != NULL &&
+		    (bytes_allocated_ret == NULL || bytes_allocated != 0)));
+		WT_ASSERT(session, bytes_to_allocate != 0);
 		WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
-		p = *(void **)retp;
-
-		WT_ASSERT(session, p == NULL || bytes_allocated != 0);
-
-		if (p == NULL && session != NULL && S2C(session)->stats != NULL)
+		if (session != NULL)
 			WT_CSTAT_INCR(session, memory_allocation);
 
 		if ((ret = posix_memalign(&newp,
@@ -207,22 +212,24 @@ __wt_free_int(WT_SESSION_IMPL *session, void *p_arg)
 {
 	void *p;
 
-	/*
-	 * !!!
-	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
-	 */
-	if (session != NULL && S2C(session)->stats != NULL)
-		WT_CSTAT_INCR(session, memory_free);
+	p = *(void **)p_arg;
+	if (p == NULL)				/* ANSI C free semantics */
+		return;
 
 	/*
 	 * If there's a serialization bug we might race with another thread.
 	 * We can't avoid the race (and we aren't willing to flush memory),
-	 * but we minimize the window by clearing the free address atomically,
-	 * hoping a racing thread will see, and won't free, a NULL pointer.
+	 * but we minimize the window by clearing the free address, hoping a
+	 * racing thread will see, and won't free, a NULL pointer.
 	 */
-	p = *(void **)p_arg;
 	*(void **)p_arg = NULL;
 
-	if (p != NULL)			/* ANSI C free semantics */
-		free(p);
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 */
+	if (session != NULL)
+		WT_CSTAT_INCR(session, memory_free);
+
+	free(p);
 }

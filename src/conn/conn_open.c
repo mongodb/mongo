@@ -38,7 +38,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_WRITE_BARRIER();
 
 	/* Start worker threads. */
-	F_SET(conn, WT_CONN_SERVER_RUN);
+	F_SET(conn, WT_CONN_EVICTION_RUN | WT_CONN_SERVER_RUN);
 
 	/*
 	 * Start the eviction thread.
@@ -51,6 +51,13 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	evict_session->name = "eviction-server";
 	WT_ERR(__wt_thread_create(session,
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
+	conn->cache_evict_tid_set = 1;
+
+	/* Start the optional checkpoint thread. */
+	WT_ERR(__wt_checkpoint_create(conn, cfg));
+
+	/* Start the optional statistics thread. */
+	WT_ERR(__wt_statlog_create(conn, cfg));
 
 	return (0);
 
@@ -86,11 +93,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		fh = TAILQ_FIRST(&conn->fhqh);
 	}
 
-	/* Shut down the server threads. */
-	F_CLR(conn, WT_CONN_SERVER_RUN);
-	if (conn->cache_evict_tid != 0) {
+	/* Shut down the eviction server thread. */
+	F_CLR(conn, WT_CONN_EVICTION_RUN);
+	if (conn->cache_evict_tid_set) {
 		WT_TRET(__wt_evict_server_wake(session));
 		WT_TRET(__wt_thread_join(session, conn->cache_evict_tid));
+		conn->cache_evict_tid_set = 0;
 	}
 
 	/* Disconnect from shared cache - must be before cache destroy. */

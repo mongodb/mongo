@@ -27,6 +27,7 @@ connection_stats = [
 	Stat('file_open', 'files currently open'),
 	Stat('memory_allocation', 'total heap memory allocations'),
 	Stat('memory_free', 'total heap memory frees'),
+	Stat('memory_grow', 'total heap memory re-allocations'),
 	Stat('read_io', 'total read I/Os'),
 	Stat('rwlock_read', 'pthread mutex shared lock read-lock calls'),
 	Stat('rwlock_write', 'pthread mutex shared lock write-lock calls'),
@@ -55,8 +56,9 @@ connection_stats = [
 	Stat('cache_eviction_dirty', 'cache: modified pages evicted'),
 	Stat('cache_eviction_fail',
 	    'cache: pages selected for eviction unable to be evicted'),
+	Stat('cache_eviction_force', 'cache: pages queued for forced eviction'),
 	Stat('cache_eviction_hazard',
-	    'cache: eviction unable to acquire hazard pointer'),
+	    'cache: hazard pointer blocked page eviction'),
 	Stat('cache_eviction_internal', 'cache: internal pages evicted'),
 	Stat('cache_eviction_merge',
 	    'cache: internal page merge operations completed'),
@@ -66,11 +68,20 @@ connection_stats = [
 	    'cache: internal levels merged'),
 	Stat('cache_eviction_slow',
 	    'cache: eviction server unable to reach eviction goal'),
+	Stat('cache_eviction_walk', 'cache: pages walked for eviction'),
 	Stat('cache_pages_dirty', 'cache: tracked dirty pages in the cache'),
 	Stat('cache_pages_inuse',
 	    'cache: pages currently held in the cache', perm=1),
 	Stat('cache_read', 'cache: pages read into cache'),
 	Stat('cache_write', 'cache: pages written from cache'),
+
+	##########################################
+	# Reconciliation statistics
+	##########################################
+	Stat('rec_pages', 'page reconciliation calls'),
+	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
+	Stat('rec_skipped_update',
+	    'reconciliation failed because an update could not be included'),
 
 	##########################################
 	# Transaction statistics
@@ -166,8 +177,9 @@ dsrc_stats = [
 	Stat('cache_eviction_dirty', 'modified pages evicted'),
 	Stat('cache_eviction_fail',
 	    'data source pages selected for eviction unable to be evicted'),
+	Stat('cache_eviction_force', 'cache: pages queued for forced eviction'),
 	Stat('cache_eviction_hazard',
-	    'eviction unable to acquire hazard pointer'),
+	    'cache: hazard pointer blocked page eviction'),
 	Stat('cache_eviction_internal', 'internal pages evicted'),
 	Stat('cache_eviction_merge',
 	    'cache: internal page merge operations completed'),

@@ -292,6 +292,9 @@ __curindex_close(WT_CURSOR *cursor)
 
 	if (cindex->child != NULL)
 		WT_TRET(cindex->child->close(cindex->child));
+
+	if (cindex->table != NULL)
+		__wt_schema_release_table(session, cindex->table);
 	/* The URI is owned by the index. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));

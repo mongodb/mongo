@@ -155,7 +155,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	if (btree->val_ovfl_lock != NULL)
 		WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
-	__wt_free(session, btree->stats);
 
 	btree->bulk_load_ok = 0;
 
@@ -299,7 +298,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_rwlock_alloc(
 	    session, "btree overflow lock", &btree->val_ovfl_lock));
 
-	WT_RET(__wt_stat_alloc_dsrc_stats(session, &btree->stats));
+	__wt_stat_init_dsrc_stats(&btree->stats);
 
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 	btree->modified = 0;				/* Clean */

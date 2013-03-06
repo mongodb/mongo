@@ -178,7 +178,6 @@ typedef struct {
 	 * these fields work.
 	 */
 	int	 cell_zero;		/* Row-store internal page 0th key */
-	WT_REF	*merge_ref;		/* Row-store merge correction key */
 
 	/*
 	 * WT_DICTIONARY --
@@ -290,9 +289,12 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 
 	WT_VERBOSE_RET(
 	    session, reconcile, "%s", __wt_page_type_string(page->type));
+	WT_CSTAT_INCR(session, rec_pages);
 	WT_DSTAT_INCR(session, rec_pages);
-	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED))
+	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED)) {
+		WT_CSTAT_INCR(session, rec_pages_eviction);
 		WT_DSTAT_INCR(session, rec_pages_eviction);
+	}
 
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
@@ -575,6 +577,7 @@ __rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		WT_PANIC_RETX(
 		    session, "reconciliation illegally skipped an update");
 	case WT_SKIP_UPDATE_QUIT:
+		WT_CSTAT_INCR(session, rec_skipped_update);
 		WT_DSTAT_INCR(session, rec_skipped_update);
 		return (EBUSY);
 	case 0:
@@ -1210,18 +1213,11 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 	 * length byte string, get a copy.
 	 *
 	 * This function is called from the split code at each split boundary,
-	 * but that means we're not called before the first boundary.  When we
-	 * do the split work at the second boundary, we need to copy the key
-	 * for the first boundary from the page we're building.  Alternatively,
-	 * we could store a copy of the first key we put on a page somewhere,
-	 * perhaps while building the keys for a page, but that's likely to be
-	 * even uglier.
-	 */
-	if (r->bnd_next == 1)
-		WT_RET(__rec_split_row_promote_cell(
-		    session, r->dsk.mem, &r->bnd[0].key));
-
-	/*
+	 * but that means we're not called before the first boundary.  It's OK
+	 * we never do the work for the first boundary because that key cannot
+	 * come from the page, it has to come from the parent.  See the comment
+	 * in the code that creates the row-store split-merge page for details.
+	 *
 	 * For the current slot, take the last key we built, after doing suffix
 	 * compression.  The "last key we built" describes some process: before
 	 * calling the split code, we must place the last key on the page before
@@ -1453,8 +1449,14 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * Set the promotion key for the chunk.  Repeated each time we
 		 * try and split, which might be wasted work, but detecting
 		 * repeated key-building is probably more complicated than it's
-		 * worth.
+		 * worth.  Don't bother doing the work for the first boundary,
+		 * that key cannot come from the page, it has to come from the
+		 * parent.  See the comment in the code that creates the row-
+		 * store split-merge page for details.
 		 */
+		if (r->bnd_next == 0)
+			break;
+
 		WT_RET(__rec_split_row_promote_cell(session, dsk, &bnd->key));
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -2976,37 +2978,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Modified child.
 		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
-		 *
-		 * There's one special case we have to handle here: the internal
-		 * page being merged has a potentially incorrect first key and
-		 * we need to replace it with the one we have.  The problem is
-		 * caused by the fact that the page search algorithm coerces the
-		 * 0th key on any internal page to be smaller than any search
-		 * key.  We do that because we don't want to have to update the
-		 * internal pages every time a new "smallest" key is inserted
-		 * into the tree.  But, if a new "smallest" key is inserted into
-		 * our split-created subtree, and we don't update the internal
-		 * page, when we merge that internal page into its parent page,
-		 * the key may be incorrect (or more likely, have been coerced
-		 * to a single byte because it's an internal page's 0th key).
-		 * Imagine the following tree:
-		 *
-		 *	2	5	40	internal page
-		 *		|
-		 * 	    10  | 20		split-created internal page
-		 *	    |
-		 *	    6			inserted smallest key
-		 *
-		 * after a simple merge, we'd have corruption:
-		 *
-		 *	2    10    20	40	merged internal page
-		 *	     |
-		 *	     6			key sorts before parent's key
-		 *
-		 * To fix this problem, we take the higher-level page's key as
-		 * our first key, because that key sorts before any possible
-		 * key inserted into the subtree, and discard whatever 0th key
-		 * is on the split-created internal page.
 		 */
 		if (state == WT_CHILD_MODIFIED)
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
@@ -3047,7 +3018,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					    session, page,
 					    kpack->data, kpack->size));
 
-				r->merge_ref = ref;
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
@@ -3089,7 +3059,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/*
 		 * Build key cell.
-		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
 		if (onpage_ovfl) {
@@ -3209,14 +3178,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			case WT_PM_REC_SPLIT:
 			case WT_PM_REC_SPLIT_MERGE:
-				/*
-				 * If we have a merge key set, we're working our
-				 * way down a merge tree.  If we have not set a
-				 * merge key, we're starting descent of a new
-				 * merge tree, set the merge key.
-				 */
-				if (r->merge_ref == NULL)
-					r->merge_ref = ref;
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
@@ -3247,14 +3208,10 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		__rec_cell_build_addr(r, p, size, vtype, 0);
 
 		/*
-		 * Build the key cell.  If this is the first key in a "to be
-		 * merged" subtree, use the merge correction key saved in the
-		 * top-level parent page when this function was called.
-		 *
+		 * Build the key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		ikey = r->merge_ref == NULL ? ref->u.key : r->merge_ref->u.key;
-		r->merge_ref = NULL;
+		ikey = ref->u.key;
 		WT_RET(__rec_cell_build_key(session, r, WT_IKEY_DATA(ikey),
 		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
 		r->cell_zero = 0;
@@ -3985,6 +3942,9 @@ err:			__wt_scr_free(&tkey);
 			__wt_cache_dirty_decr(session, page_size);
 	}
 
+	/* Record the most recent transaction ID we could have written. */
+	mod->disk_txn = session->txn.snap_min;
+
 	return (0);
 }
 
@@ -4028,6 +3988,7 @@ __rec_split_row(
 	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
+	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_REF *ref;
 	uint32_t i;
@@ -4039,7 +4000,7 @@ __rec_split_row(
 	/* Fill it in. */
 	page->parent = orig->parent;
 	page->ref = orig->ref;
-	page->read_gen = __wt_cache_read_gen(session);
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = r->bnd_next;
 	page->type = WT_PAGE_ROW_INT;
 
@@ -4064,6 +4025,50 @@ __rec_split_row(
 	 */
 	WT_ERR(__wt_page_modify_init(session, page));
 	F_SET(page->modify, WT_PM_REC_SPLIT_MERGE);
+
+	/*
+	 * The "parent" key for each split chunk is the first key on the chunk,
+	 * except for the 0th chunk, which cannot come from the page itself as
+	 * it might not be small enough.    If the existing key for the page is
+	 * smaller than the first key on the chunk we can lose after the merge.
+	 * Imagine the following tree, where an internal page has keys 2, 5 and
+	 * 40.  The page with key 5 splits into two chunks, and 10 is the first
+	 * key in the first chunk.
+	 *
+	 *	2	5	40	internal page
+	 *		|
+	 * 	    10  | 20		split-created internal page
+	 *
+	 * If we subsequently insert a key 6, it works because the page search
+	 * algorithm coerces the 0th key of an internal page to be smaller than
+	 * any search key.  (We do that because we don't want to have to update
+	 * internal pages every time a new "smallest" key is inserted into the
+	 * tree.)   Anyway, that results in the following tree:
+	 *
+	 *	2	5	40	internal page
+	 *		|
+	 * 	    10  | 20		split-created internal page
+	 *	    |
+	 *	    6			inserted smallest key
+	 *
+	 * after a simple merge where we replace page 5 with pages 10 and 20,
+	 * we'd have corruption:
+	 *
+	 *	2    10    20	40	merged internal page
+	 *	     |
+	 *	     6			key sorts before parent's key
+	 *
+	 * To fix this problem, we take the original parent page's key as the
+	 * first chunk's key because that key sorts before any possible key
+	 * inserted into the subtree.
+	 */
+	if (WT_PAGE_IS_ROOT(orig))
+		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, "", 1));
+	else {
+		ikey = orig->ref->u.key;
+		WT_ERR(__wt_buf_set(
+		    session, &r->bnd[0].key, WT_IKEY_DATA(ikey), ikey->size));
+	}
 
 	/* Enter each split page into the new, internal page. */
 	for (ref = page->u.intl.t,
@@ -4108,7 +4113,7 @@ __rec_split_col(
 	/* Fill it in. */
 	page->parent = orig->parent;
 	page->ref = orig->ref;
-	page->read_gen = __wt_cache_read_gen(session);
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->u.intl.recno = r->bnd[0].recno;
 	page->entries = r->bnd_next;
 	page->type = WT_PAGE_COL_INT;

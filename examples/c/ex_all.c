@@ -459,7 +459,7 @@ session_ops(WT_SESSION *session)
 	 * (string, signed 32-bit integer, unsigned 16-bit integer).
 	 */
 	ret = session->create(session, "table:mytable",
-	    "key_format=r,value_format=SiH"
+	    "key_format=r,value_format=SiH,"
 	    "columns=(id,department,salary,year-started)");
 	/*! [Create a table with columns] */
 
@@ -991,14 +991,15 @@ hot_backup(WT_SESSION *session)
 int
 main(void)
 {
+	WT_CONNECTION *conn;
 	int ret;
 
 	{
-	WT_CONNECTION *conn;
 	/*! [Open a connection] */
 	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
 	}
+	(void)conn->close(conn, NULL);
 
 #ifdef MIGHT_NOT_RUN
 	/*
@@ -1008,32 +1009,57 @@ main(void)
 	 */
 	{
 	/*! [Configure bzip2 extension] */
-	WT_CONNECTION *conn;
-
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
 	/*! [Configure bzip2 extension] */
 	}
+	(void)conn->close(conn, NULL);
 
 	{
 	/*! [Configure snappy extension] */
-	WT_CONNECTION *conn;
-
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
 	/*! [Configure snappy extension] */
 	}
+	(void)conn->close(conn, NULL);
 
 	/*
-	 * We're not allowed to open multiple connections, don't run more than
-	 * one wiredtiger_open call.
+	 * This example code gets run, and direct I/O might not be available,
+	 * causing the open to fail.  The documentation requires code snippets,
+	 * use #ifdef's to avoid running it.
 	 */
-	{
+	/* Might Not Run: direct I/O may not be available. */
 	/*! [Configure direct_io for data files] */
 	ret = wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn);
 	/*! [Configure direct_io for data files] */
+	(void)conn->close(conn, NULL);
+#endif
+
+	/*! [Statistics configuration] */
+	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
+	/*! [Statistics configuration] */
+	(void)conn->close(conn, NULL);
+
+	/*! [Statistics logging] */
+	ret = wiredtiger_open(
+	    home, NULL, "create,statistics_log=(wait=30)", &conn);
+	/*! [Statistics logging] */
+	(void)conn->close(conn, NULL);
+
+#ifdef MIGHT_NOT_RUN
+	/*
+	 * This example code gets run, and a non-existent log file path might
+	 * cause the open to fail.  The documentation requires code snippets,
+	 * use #ifdef's to avoid running it.
+	 */
+	/*! [Statistics logging with path] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "statistics_log=(wait=120,path=\"/log/log.%m.%d.%y\")", &conn);
+	/*! [Statistics logging with path] */
+	(void)conn->close(conn, NULL);
 #endif
 
 	/*! [Get the WiredTiger library version #1] */

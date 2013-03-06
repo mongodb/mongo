@@ -26,9 +26,16 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 
 	btree = session->btree;
-	if (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+
+	/*
+	 * Ignore internal pages (check read-only information first to the
+	 * extent possible, this is shared data).
+	 */
+	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
+		return;
+
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
 	    __wt_page_is_modified(page) &&
-	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
 	    page->memory_footprint > btree->maxmempage)
 		__wt_evict_forced_page(session, page);
 }
@@ -137,7 +144,22 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline uint64_t
 __wt_cache_read_gen(WT_SESSION_IMPL *session)
 {
-	return (++S2C(session)->cache->read_gen);
+	return (S2C(session)->cache->read_gen);
+}
+
+static inline uint64_t
+__wt_cache_read_gen_set(WT_SESSION_IMPL *session)
+{
+	/*
+	 * We return read-generations from the future (where "the future" is
+	 * measured by increments of the global read generation).  The reason
+	 * is because when acquiring a new hazard reference on a page, we can
+	 * check its read generation, and if the read generation isn't less
+	 * than the current global generation, we don't bother updating the
+	 * page.  In other words, the goal is to avoid some number of updates
+	 * immediately after each update we have to make.
+	 */
+	return (++S2C(session)->cache->read_gen + WT_READ_GEN_STEP);
 }
 
 /*
@@ -234,7 +256,15 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
 		(void)WT_ATOMIC_ADD(
 		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+
+		/*
+		 * The page can never end up with changes older than the oldest
+		 * running transaction.
+		 */
+		if (F_ISSET(&session->txn, TXN_RUNNING))
+			page->modify->disk_txn = session->txn.snap_min - 1;
 	}
+
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -472,7 +502,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * No lock is required because the session array is fixed size, but it
-	 * it may contain inactive entries.  We must review any active session
+	 * may contain inactive entries.  We must review any active session
 	 * that might contain a hazard pointer, so insert a barrier before
 	 * reading the active session count.  That way, no matter what sessions
 	 * come or go, we'll check the slots for all of the sessions that could

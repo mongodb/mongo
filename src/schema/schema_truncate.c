@@ -43,8 +43,8 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	WT_TABLE *table;
 	u_int i;
 
-	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
+	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
 	/* Truncate the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -76,6 +76,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	}
 
 err:	__wt_scr_free(&namebuf);
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 
