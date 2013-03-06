@@ -130,7 +130,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
 
 	/* Get the OS buffer cache maximum size. */
-	WT_ERR(__wt_config_getones(session, config, "os_cache_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
 	block->fh->os_cache_max = cval.val;
 
 	/* Initialize the live checkpoint's lock. */
