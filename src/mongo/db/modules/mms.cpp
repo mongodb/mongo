@@ -61,7 +61,7 @@ namespace mongo {
 
         void run() {
             if ( _token.size() == 0  && _name.size() == 0 ) {
-                log(1) << "mms not configured" << endl;
+                LOG(1) << "mms not configured" << endl;
                 return;
             }
 
@@ -105,15 +105,15 @@ namespace mongo {
 
                     BSONObj postData = bb.obj();
 
-                    log(1) << "mms url: " << url.str() << "\n\t post: " << postData << endl;;
+                    LOG(1) << "mms url: " << url.str() << "\n\t post: " << postData << endl;;
 
                     HttpClient c;
                     HttpClient::Result r;
                     int rc = c.post( url.str() , postData.jsonString() , &r );
-                    log(1) << "\t response code: " << rc << endl;
+                    LOG(1) << "\t response code: " << rc << endl;
                     if ( rc != 200 ) {
                         log() << "mms error response code:" << rc << endl;
-                        log(1) << "mms error body:" << r.getEntireResponse() << endl;
+                        LOG(1) << "mms error body:" << r.getEntireResponse() << endl;
                     }
                 }
                 catch ( std::exception& e ) {

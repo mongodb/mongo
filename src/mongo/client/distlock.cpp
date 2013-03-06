@@ -492,7 +492,7 @@ namespace mongo {
         // This should always be true, if not, we are using the lock incorrectly.
         verify( _name != "" );
 
-        log( logLvl ) << "trying to acquire new distributed lock for " << _name << " on " << _conn
+        LOG( logLvl ) << "trying to acquire new distributed lock for " << _name << " on " << _conn
                       << " ( lock timeout : " << _lockTimeout
                       << ", ping interval : " << _lockPing << ", process : " << _processId << " )"
                       << endl;
