@@ -35,6 +35,13 @@ __wt_block_map(
 		return (0);
 
 	/*
+	 * Turn off mapping if the application configured a cache size maximum,
+	 * we can't control how much of the cache size we use in that case.
+	 */
+	if (block->os_cache_max != 0)
+		return (0);
+
+	/*
 	 * Map the file into memory.
 	 * Ignore errors, we'll read the file through the cache if map fails.
 	 */
