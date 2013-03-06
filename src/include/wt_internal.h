@@ -61,8 +61,6 @@ struct __wt_block_desc;
     typedef struct __wt_block_desc WT_BLOCK_DESC;
 struct __wt_block_header;
     typedef struct __wt_block_header WT_BLOCK_HEADER;
-struct __wt_block_map_entry;
-    typedef struct __wt_block_map_entry WT_BLOCK_MAP_ENTRY;
 struct __wt_bloom;
     typedef struct __wt_bloom WT_BLOOM;
 struct __wt_bloom_hash;

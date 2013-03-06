@@ -195,16 +195,12 @@ struct __wt_block {
 
 	/* Configuration information, set when the file is opened. */
 	uint32_t allocsize;		/* Allocation size */
-	u_int block_header;		/* Header length */
+	u_int	 block_header;		/* Header length */
 
-	/* A list of chunks mapped from this file. */
-	struct __wt_block_map_entry {
-		void	*map;
-		size_t	 maplen;
-	} *map;				/* List of mapped chunks */
-	uint32_t map_entries;
+	int64_t	 os_cache;		/* System buffer cache flush max */
+	int64_t	 os_cache_max;
 
-	uint32_t cache_discard_counter;	/* Count to cache cleanup */
+	int	 os_write_schedule;	/* Immediately schedule writes */
 
 	/*
 	 * There is only a single checkpoint in a file that can be written.  The

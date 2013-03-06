@@ -133,8 +133,9 @@ __wt_confdfl_file_meta =
 	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
 	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
 	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,prefix_compression=,"
-	"split_pct=75,value_format=u,version=(major=0,minor=0)";
+	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_max=0,"
+	"os_write_schedule=0,prefix_compression=,split_pct=75,value_format=u,"
+	"version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -168,6 +169,8 @@ __wt_confchk_file_meta[] = {
 	{ "lsm_merge_max", "int", "min=2,max=100", NULL},
 	{ "lsm_merge_threads", "int", "min=1,max=10", NULL},
 	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
+	{ "os_cache_max", "int", "min=0", NULL},
+	{ "os_write_schedule", "boolean", NULL, NULL},
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
 	{ "value_format", "format", NULL, NULL},
@@ -256,8 +259,9 @@ __wt_confdfl_session_create =
 	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
 	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
 	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,prefix_compression=,source=,"
-	"split_pct=75,type=file,value_format=u";
+	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_max=0,"
+	"os_write_schedule=0,prefix_compression=,source=,split_pct=75,"
+	"type=file,value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
@@ -292,6 +296,8 @@ __wt_confchk_session_create[] = {
 	{ "lsm_merge_max", "int", "min=2,max=100", NULL},
 	{ "lsm_merge_threads", "int", "min=1,max=10", NULL},
 	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
+	{ "os_cache_max", "int", "min=0", NULL},
+	{ "os_write_schedule", "boolean", NULL, NULL},
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "source", "string", NULL, NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},

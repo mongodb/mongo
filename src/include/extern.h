@@ -112,15 +112,6 @@ extern int __wt_block_extlist_init(WT_SESSION_IMPL *session,
     const char *name,
     const char *extname);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
-extern void __wt_block_map_add( WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    void *map,
-    size_t maplen);
-extern void __wt_block_map_del( WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    void *map,
-    size_t maplen);
-extern int __wt_block_cache_discard(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_map( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     void *mapp,
