@@ -967,9 +967,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
-	WT_PAGE *page, *parent;
+	WT_PAGE *page;
 	wt_txnid_t oldest_txn;
-	int modified, restarts, splits;
+	int modified, restarts, levels;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -982,7 +982,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	/*
 	 * Get some more eviction candidate pages.
 	 */
-	for (evict = start, restarts = splits = 0;
+	for (evict = start, restarts = 0;
 	    evict < end && ret == 0;
 	    ret = __wt_tree_walk(session, &btree->evict_page, WT_TREE_EVICT)) {
 		if ((page = btree->evict_page) == NULL) {
@@ -1000,6 +1000,33 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		}
 
 		WT_CSTAT_INCR(session, cache_eviction_walk);
+
+#define	WT_IS_SPLIT_MERGE(p)						\
+	((p)->modify != NULL && F_ISSET((p)->modify, WT_PM_REC_SPLIT_MERGE))
+
+		/* Look for a split-merge (grand)parent page to merge. */
+		for (levels = 0;
+		    levels < WT_MERGE_STACK_MIN && page != NULL &&
+		    WT_IS_SPLIT_MERGE(page);
+		    page = page->parent, levels++)
+			;
+
+		/*
+		 * Only look for a parent at exactly the right height above: if
+		 * the stack is deep enough, we'll find it eventually, and we
+		 * don't want to do too much work on every level.
+		 *
+		 * !!!
+		 * We don't restrict ourselves to only the top-most page.  If
+		 * there are split-merge pages under the root page in a big,
+		 * busy tree, the merge will only happen if we can lock the
+		 * whole tree exclusively.  Consider subtrees if locking the
+		 * whole tree fails.
+		 */
+		if (page == NULL ||
+		    (levels != 0 && levels != WT_MERGE_STACK_MIN) ||
+		    (levels == WT_MERGE_STACK_MIN && !WT_IS_SPLIT_MERGE(page)))
+			continue;
 
 		/* Ignore root pages entirely. */
 		if (WT_PAGE_IS_ROOT(page))
@@ -1021,26 +1048,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 */
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 			continue;
-
-		/*
-		 * Skip split-merge pages that have split-merge pages as their
-		 * parents (we're only interested in the top-most split-merge
-		 * page of deep trees).
-		 *
-		 * Don't skip empty or split pages: updates after their last
-		 * reconciliation may have changed their state and only the
-		 * reconciliation/eviction code can confirm if they should be
-		 * skipped.
-		 */
-		if (page->modify != NULL &&
-		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) {
-			parent = page->parent;
-			if (++splits < WT_MERGE_STACK_MIN ||
-			    (parent->modify != NULL &&
-			    F_ISSET(parent->modify, WT_PM_REC_SPLIT_MERGE)))
-				continue;
-		} else
-			splits = 0;
 
 		/*
 		 * If the file is being checkpointed, there's a period of time
@@ -1068,7 +1075,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * this page was written, there's no chance to make progress...
 		 */
 		if (modified &&
-		    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE) &&
 		    TXNID_LE(oldest_txn, page->modify->disk_txn))
 			continue;
 
