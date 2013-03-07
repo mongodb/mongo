@@ -275,6 +275,10 @@ namespace mongo {
         }
 
         {
+            // NOTE: This lock prevents the ns version from changing while a write operation occurs.
+            Lock::DBRead readLk(ns);
+            
+            // This lock prevents simultaneous metadata changes using the same map
             scoped_lock lk( _mutex );
 
             // since we loaded the chunk manager unlocked, other thread may have done the same
