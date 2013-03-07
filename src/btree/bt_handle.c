@@ -484,12 +484,12 @@ __wt_btree_leaf_create(
  *      Access the size of an in-memory tree with a single leaf page.
  */
 int
-__wt_btree_get_memsize(
-    WT_SESSION_IMPL *session, WT_BTREE *btree, uint32_t **memsizep)
+__wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
 {
+	WT_BTREE *btree;
 	WT_PAGE *root, *child;
 
-	WT_UNUSED(session);
+	btree = session->btree;
 	root = btree->root_page;
 	child = root->u.intl.t->page;
 

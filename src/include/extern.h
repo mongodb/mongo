@@ -276,8 +276,7 @@ extern int __wt_btree_leaf_create( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref,
     WT_PAGE **pagep);
-extern int __wt_btree_get_memsize( WT_SESSION_IMPL *session,
-    WT_BTREE *btree,
+extern int __wt_btree_get_memsize(WT_SESSION_IMPL *session,
     uint32_t **memsizep);
 extern int __wt_btree_release_memsize(WT_SESSION_IMPL *session,
     WT_BTREE *btree);
