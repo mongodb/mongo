@@ -143,17 +143,17 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 
 	/* Configuration: optional immediate write scheduling flag. */
 	WT_ERR(
-	    __wt_config_getones(session, config, "os_write_schedule", &cval));
-	block->os_write_schedule = cval.val != 0;
-#ifdef HAVE_POSIX_FADVISE
-	if (conn->direct_io && block->os_write_schedule)
+	    __wt_config_getones(session, config, "os_cache_dirty_max", &cval));
+	block->os_cache_dirty_max = cval.val;
+#ifdef HAVE_SYNC_FILE_RANGE
+	if (conn->direct_io && block->os_cache_dirty_max)
 		WT_ERR_MSG(session, EINVAL,
-		    "os_write_schedule not supported in combination with "
+		    "os_cache_dirty_max not supported in combination with "
 		    "direct_io");
 #else
-	if (block->os_write_schedule)
+	if (block->os_cache_dirty_max)
 		WT_ERR_MSG(session, EINVAL,
-		    "os_write_schedule not supported if sync_file_range not "
+		    "os_cache_dirty_max not supported if sync_file_range not "
 		    "available");
 #endif
 

@@ -199,8 +199,8 @@ struct __wt_block {
 
 	int64_t	 os_cache;		/* System buffer cache flush max */
 	int64_t	 os_cache_max;
-
-	int	 os_write_schedule;	/* Immediately schedule writes */
+	int64_t	 os_cache_dirty;	/* System buffer cache write max */
+	int64_t	 os_cache_dirty_max;
 
 	/*
 	 * There is only a single checkpoint in a file that can be written.  The

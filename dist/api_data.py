@@ -215,13 +215,16 @@ file_config = format_meta + lsm_config + [
 		this value''',
 		min='512B', max='10TB'),
 	Config('os_cache_max', '0', r'''
-		maximum system buffer cache usage, in bytes.  If non-zero, flush
-		the system's buffer cache after the specified number of bytes
-		from this object is read or written through the buffer cache''',
+		maximum system buffer cache usage, in bytes.  If non-zero, evict
+		object blocks from the system buffer cache after that many bytes
+		from this object are read or written into the buffer cache''',
 		min=0),
-	Config('os_write_schedule', 'false', r'''
-		immediately schedule page writes to backing storage''',
-		type='boolean'),
+	Config('os_cache_dirty_max', '0', r'''
+		maximum dirty system buffer cache usage, in bytes.  If non-zero,
+		schedule writes for dirty blocks belonging to this object in the
+		system buffer cache after that many bytes from this object are
+		written into the buffer cache''',
+		min=0),
 	Config('prefix_compression', 'true', r'''
 		configure row-store format key prefix compression''',
 		type='boolean'),
