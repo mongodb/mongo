@@ -272,6 +272,7 @@ extern int __wt_btree_get_memsize(WT_SESSION_IMPL *session,
     uint32_t **memsizep);
 extern int __wt_btree_release_memsize(WT_SESSION_IMPL *session,
     WT_BTREE *btree);
+extern uint32_t __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
@@ -401,7 +402,13 @@ extern int __wt_row_key_copy( WT_SESSION_IMPL *session,
     WT_ROW *rip_arg,
     WT_ITEM *retb);
 extern WT_CELL *__wt_row_value(WT_PAGE *page, WT_ROW *rip);
-extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
+extern int __wt_row_ikey_incr(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    uint32_t cell_offset,
+    const void *key,
+    uint32_t size,
+    void *ikeyp);
+extern int __wt_row_ikey(WT_SESSION_IMPL *session,
     uint32_t cell_offset,
     const void *key,
     uint32_t size,

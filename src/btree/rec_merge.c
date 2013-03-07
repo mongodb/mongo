@@ -199,8 +199,10 @@ __merge_new_page(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE *newpage;
 
-	WT_RET(__wt_calloc_def(session, 1, &newpage));
+	WT_RET(__wt_cache_page_new(session, &newpage));
 	WT_ERR(__wt_calloc_def(session, (size_t)entries, &newpage->u.intl.t));
+	__wt_cache_page_inmem_incr(
+	    session, newpage, entries * sizeof(newpage->u.intl.t));
 
 	/* Fill it in. */
 	newpage->read_gen = WT_READ_GEN_NOTSET;
@@ -216,8 +218,7 @@ __merge_new_page(WT_SESSION_IMPL *session,
 	*pagep = newpage;
 	return (0);
 
-err:	__wt_free(session, newpage->u.intl.t);
-	__wt_free(session, newpage);
+err:	__wt_page_out(session, &newpage);
 	return (ret);
 }
 
@@ -244,8 +245,8 @@ __merge_promote_key(WT_SESSION_IMPL *session, WT_REF *ref)
 		child_ref = &page->u.intl.t[0];
 		ikey = child_ref->u.key;
 		WT_ASSERT(session, ikey != NULL);
-		return (__wt_row_ikey_alloc(
-		    session, 0, WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
+		return (__wt_row_ikey_incr(session,
+		    page, 0, WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
 
 	WT_ILLEGAL_VALUE(session);
 	}
