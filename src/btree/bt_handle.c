@@ -669,7 +669,7 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * unit, use a percentage of the maximum page size).
 	 */
 	if (split_size == btree->allocsize)
-		split_size = (btree->allocsize * btree->split_pct) / 100;
+		split_size = (a * btree->split_pct) / 100;
 
 	return (split_size);
 }
