@@ -23,6 +23,7 @@
 #include "cmdline.h"
 #include "repl/rs.h"
 #include "mongo/db/repl/master_slave.h"  // replAllDead
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
 
 namespace mongo {
 

@@ -42,6 +42,7 @@
 #include "mongo/db/module.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl.h"
+#include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/stats/counters.h"

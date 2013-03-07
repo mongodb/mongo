@@ -38,43 +38,6 @@
 
 namespace mongo {
 
-    /* replication slave? (possibly with slave)
-       --slave cmd line setting -> SimpleSlave
-    */
-    typedef enum { NotSlave=0, SimpleSlave } SlaveTypes;
-
-    class ReplSettings {
-    public:
-        SlaveTypes slave;
-
-        /** true means we are master and doing replication.  if we are not writing to oplog, this won't be true. */
-        bool master;
-
-        bool fastsync;
-
-        bool autoresync;
-
-        int slavedelay;
-
-        set<string> discoveredSeeds;
-        mutex discoveredSeeds_mx;
-
-        BSONObj reconfig;
-
-        ReplSettings()
-            : slave(NotSlave),
-            master(false),
-            fastsync(),
-            autoresync(false),
-            slavedelay(),
-            discoveredSeeds(),
-            discoveredSeeds_mx("ReplSettings::discoveredSeeds") {
-        }
-
-    };
-
-    extern ReplSettings replSettings;
-
     /* A replication exception */
     class SyncException : public DBException {
     public:
@@ -174,8 +137,6 @@ namespace mongo {
         static void forceResyncDead( const char *requester );
         void forceResync( const char *requester );
     };
-
-    bool anyReplEnabled();
 
     /**
      * Helper class used to set and query an ignore state for a named database.

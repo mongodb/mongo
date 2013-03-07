@@ -35,6 +35,7 @@
 #include "mongo/db/repl.h"
 #include "mongo/db/repl_block.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/elapsed_tracker.h"

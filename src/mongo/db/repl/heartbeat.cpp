@@ -24,6 +24,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/health.h"
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/msg.h"
@@ -38,7 +39,6 @@ namespace mongo {
     using namespace bson;
 
     extern bool replSetBlind;
-    extern ReplSettings replSettings;
 
     unsigned int HeartbeatInfo::numPings;
 
