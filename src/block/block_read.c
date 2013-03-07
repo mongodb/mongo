@@ -60,7 +60,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 #ifdef HAVE_POSIX_FADVISE
 	/* Optionally discard blocks from the system's buffer cache. */
 	if (block->os_cache_max != 0 &&
-	    (block->os_cache += offset) > block->os_cache_max) {
+	    (block->os_cache += size) > block->os_cache_max) {
 		WT_DECL_RET;
 
 		block->os_cache = 0;
