@@ -38,6 +38,8 @@
 #endif
 
 #ifdef MONGO_SSL
+#include <boost/thread/recursive_mutex.hpp>
+
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #endif
@@ -391,7 +393,7 @@ namespace mongo {
         
         static void init() {
             while ( (int)_mutex.size() < CRYPTO_num_locks() )
-                _mutex.push_back( new SimpleMutex("SSLThreadInfo") );
+                _mutex.push_back( new boost::recursive_mutex );
         }
 
         static SSLThreadInfo* get() {
@@ -407,7 +409,10 @@ namespace mongo {
         unsigned _id;
         
         static AtomicUInt _next;
-        static vector<SimpleMutex*> _mutex;
+        // Note: see SERVER-8734 for why we are using a recursive mutex here.
+        // Once the deadlock fix in OpenSSL is incorporated into most distros of
+        // Linux, this can be changed back to a nonrecursive mutex.
+        static std::vector<boost::recursive_mutex*> _mutex;
         static boost::thread_specific_ptr<SSLThreadInfo> _thread;
     };
 
@@ -419,7 +424,7 @@ namespace mongo {
     }
 
     AtomicUInt SSLThreadInfo::_next;
-    vector<SimpleMutex*> SSLThreadInfo::_mutex;
+    vector<boost::recursive_mutex*> SSLThreadInfo::_mutex;
     boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
     
 
