@@ -59,7 +59,7 @@ namespace mongo {
                                "%lu "  /* start_time */
                                "%lu "
                                "%ld " // rss
-                               "%lu %"KLF"u %"KLF"u %"KLF"u %"KLF"u %"KLF"u "
+                               "%lu %" KLF "u %" KLF "u %" KLF "u %" KLF "u %" KLF "u "
                                /*
                                  "%*s %*s %*s %*s "
                                  "%"KLF"u %*lu %*lu "
