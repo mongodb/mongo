@@ -1065,9 +1065,8 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * split pages, because otherwise we could end up splitting one large
 	 * packed page over and over.   We don't want to pick the minimum size
 	 * either, because that penalizes an application that did a bulk load
-	 * and subsequently inserted a few items into packed pages.  Currently,
-	 * I'm using 75%, but I have no empirical evidence that's a good value.
-	 * We should leave this as a tuning variable, but probably undocumented.
+	 * and subsequently inserted a few items into packed pages.  Currently
+	 * defaulted to 75%, but I have no empirical evidence that's "correct".
 	 *
 	 * The maximum page size may be a multiple of the split page size (for
 	 * example, there's a maximum page size of 128KB, but because the table
