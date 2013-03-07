@@ -3978,11 +3978,11 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 }
 
 /*
- * __rec_split_merge_create --
+ * __rec_split_merge_new --
  *	Create a split-merge page.
  */
 static int
-__rec_split_merge_create(WT_SESSION_IMPL *session,
+__rec_split_merge_new(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *orig, WT_PAGE **pagep, uint8_t type)
 {
 	WT_PAGE *page;
@@ -4043,11 +4043,11 @@ __rec_split_row(
 	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_REF *ref;
+	size_t size;
 	uint32_t i;
 
 	/* Allocate a split-merge page. */
-	WT_ERR(
-	    __rec_split_merge_create(session, r, orig, &page, WT_PAGE_ROW_INT));
+	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_ROW_INT));
 
 	/*
 	 * The "parent" key for each split chunk is the first key on the chunk,
@@ -4094,6 +4094,7 @@ __rec_split_row(
 	}
 
 	/* Enter each split child page into the new internal page. */
+	size = 0;
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
@@ -4101,11 +4102,14 @@ __rec_split_row(
 		bnd->addr.addr = NULL;
 
 		ref->page = NULL;
-		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		WT_ERR(__wt_row_ikey(session, 0,
 		    bnd->key.data, bnd->key.size, &ref->u.key));
+		size += sizeof(WT_IKEY) + bnd->key.size;
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}
+	__wt_cache_page_inmem_incr(
+	    session, page, r->bnd_next * sizeof(WT_ADDR) + size);
 
 	*splitp = page;
 	return (0);
@@ -4131,8 +4135,7 @@ __rec_split_col(
 	uint32_t i;
 
 	/* Allocate a split-merge page. */
-	WT_ERR(
-	    __rec_split_merge_create(session, r, orig, &page, WT_PAGE_COL_INT));
+	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_COL_INT));
 
 	/* Enter each split child page into the new internal page. */
 	for (ref = page->u.intl.t,
@@ -4146,6 +4149,8 @@ __rec_split_col(
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}
+	__wt_cache_page_inmem_incr(
+	    session, page, r->bnd_next * sizeof(WT_ADDR));
 
 	*splitp = page;
 	return (0);

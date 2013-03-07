@@ -245,8 +245,8 @@ __merge_promote_key(WT_SESSION_IMPL *session, WT_REF *ref)
 		child_ref = &page->u.intl.t[0];
 		ikey = child_ref->u.key;
 		WT_ASSERT(session, ikey != NULL);
-		return (__wt_row_ikey_alloc(
-		    session, 0, WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
+		return (__wt_row_ikey_incr(session,
+		    page, 0, WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
 
 	WT_ILLEGAL_VALUE(session);
 	}

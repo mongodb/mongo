@@ -1706,9 +1706,8 @@ __slvg_row_build_internal(
 			WT_ERR(__slvg_row_build_leaf(
 			    session, trk, page, ref, ss));
 		} else
-			WT_ERR(__wt_row_ikey_alloc(session, 0,
-			    trk->row_start.data,
-			    trk->row_start.size,
+			WT_ERR(__wt_row_ikey_incr(session, page, 0,
+			    trk->row_start.data, trk->row_start.size,
 			    &ref->u.key));
 		++ref;
 	}
@@ -1829,8 +1828,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 */
 	rip = page->u.row.d + skip_start;
 	WT_ERR(__wt_row_key(session, page, rip, key, 0));
-	WT_ERR(
-	    __wt_row_ikey_alloc(session, 0, key->data, key->size, &ref->u.key));
+	WT_ERR(__wt_row_ikey_incr(
+	    session, page, 0, key->data, key->size, &ref->u.key));
 
 	/*
 	 * Discard backing overflow pages for any items being discarded that
