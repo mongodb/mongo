@@ -272,6 +272,7 @@ extern int __wt_btree_get_memsize(WT_SESSION_IMPL *session,
     uint32_t **memsizep);
 extern int __wt_btree_release_memsize(WT_SESSION_IMPL *session,
     WT_BTREE *btree);
+extern uint32_t __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);

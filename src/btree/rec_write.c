@@ -1092,10 +1092,9 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	if (r->raw_compression)
 		r->split_size = 0;
 	else if (page->type == WT_PAGE_COL_FIX)
-		r->split_size = r->page_size;
+		r->split_size = r->page_size_max;
 	else
-		r->split_size = WT_SPLIT_PAGE_SIZE(
-		    r->page_size, btree->allocsize, btree->split_pct);
+		r->split_size = __wt_split_page_size(btree, r->page_size_max);
 
 	/*
 	 * If the maximum page size is the same as the split page size, either
@@ -1835,7 +1834,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
 	 * information remains unchanged between the pages.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->split_size, &tmp));
+	WT_RET(__wt_scr_alloc(session, r->page_size_max, &tmp));
 	dsk = tmp->mem;
 	memcpy(dsk, r->dsk.mem, WT_PAGE_HEADER_SIZE);
 
