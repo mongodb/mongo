@@ -56,7 +56,8 @@ namespace {
         builder.appendChar(' ');
     }
 
-    MONGO_INITIALIZER_WITH_PREREQUISITES(SetServerLogContextFunction, ())(InitializerContext*) {
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SetServerLogContextFunction,
+                                         MONGO_NO_PREREQUISITES)(InitializerContext*) {
         if (!logUserIds)
             return Status::OK();
 

@@ -62,12 +62,12 @@
 /**
  * Convenience parameter representing an empty set of prerequisites for an initializer function.
  */
-#define MONGO_NO_PREREQUISITES ()
+#define MONGO_NO_PREREQUISITES (NULL)
 
 /**
  * Convenience parameter representing an empty set of dependents of an initializer function.
  */
-#define MONGO_NO_DEPENDENTS ()
+#define MONGO_NO_DEPENDENTS (NULL)
 
 /**
  * Convenience parameter representing the default set of dependents for initializer functions.

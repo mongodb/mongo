@@ -26,7 +26,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())(InitializerContext* context) {
+    MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered,
+                              MONGO_NO_PREREQUISITES,
+                              MONGO_NO_DEPENDENTS)(InitializerContext* context) {
         _fpRegistry->freeze();
         return Status::OK();
     }
