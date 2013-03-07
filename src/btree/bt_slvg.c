@@ -1088,7 +1088,7 @@ __slvg_col_build_internal(
 	uint32_t i;
 
 	/* Allocate a column-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_RET(__wt_cache_page_new(session, &page));
 	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
 
 	/* Fill it in. */
@@ -1666,7 +1666,7 @@ __slvg_row_build_internal(
 	uint32_t i;
 
 	/* Allocate a row-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_RET(__wt_cache_page_new(session, &page));
 	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
 
 	/* Fill it in. */

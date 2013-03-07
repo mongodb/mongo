@@ -316,13 +316,16 @@ __wt_cache_evict_server(void *arg)
 	WT_VERBOSE_ERR(session, evictserver, "exiting");
 
 	if (ret == 0) {
-		if (__wt_cache_bytes_inuse(cache) != 0) {
+		if (cache->pages_inmem != cache->pages_evict)
 			__wt_errx(session,
-			    "cache server: exiting with %" PRIu64 " pages, "
-			    "%" PRIu64 " bytes in use",
-			    __wt_cache_pages_inuse(cache),
-			    __wt_cache_bytes_inuse(cache));
-		}
+			    "cache server: exiting with %" PRIu64 " pages in "
+			    "memory and %" PRIu64 " pages evicted",
+			    cache->pages_inmem, cache->pages_evict);
+		if (cache->bytes_inmem != cache->bytes_evict)
+			__wt_errx(session,
+			    "cache server: exiting with %" PRIu64 " bytes in "
+			    "memory and %" PRIu64 " bytes evicted",
+			    cache->bytes_inmem, cache->bytes_evict);
 	} else
 err:		WT_PANIC_ERR(session, ret, "eviction server error");
 

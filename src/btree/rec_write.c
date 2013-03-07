@@ -3978,31 +3978,31 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 }
 
 /*
- * __rec_split_row --
- *	Split a row-store page, creating a new internal page.
+ * __rec_split_merge_create --
+ *	Create a split-merge page.
  */
 static int
-__rec_split_row(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *orig, WT_PAGE **splitp)
+__rec_split_merge_create(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_PAGE *orig, WT_PAGE **pagep, uint8_t type)
 {
-	WT_ADDR *addr;
-	WT_BOUNDARY *bnd;
-	WT_DECL_RET;
-	WT_IKEY *ikey;
 	WT_PAGE *page;
-	WT_REF *ref;
-	uint32_t i;
 
-	/* Allocate a row-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)r->bnd_next, &page->u.intl.t));
+	/* Allocate a new internal page and fill it in. */
+	WT_RET(__wt_cache_page_new(session, &page));
+	*pagep = page;
 
 	/* Fill it in. */
 	page->parent = orig->parent;
 	page->ref = orig->ref;
+	if (type == WT_PAGE_COL_INT)
+		page->u.intl.recno = r->bnd[0].recno;
+	WT_RET(__wt_calloc_def(session, (size_t)r->bnd_next, &page->u.intl.t));
+	__wt_cache_page_inmem_incr(
+	    session, page, r->bnd_next * sizeof(page->u.intl.t));
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = r->bnd_next;
-	page->type = WT_PAGE_ROW_INT;
+	page->type = type;
+	page->flags_atomic = WT_PAGE_DISK_NOT_ALLOC;
 
 	/*
 	 * We don't re-write parent pages when child pages split, which means
@@ -4023,8 +4023,31 @@ __rec_split_row(
 	 * its memory discarded, but the newly created split page cannot be
 	 * evicted, it can only be merged into its parent.
 	 */
-	WT_ERR(__wt_page_modify_init(session, page));
+	WT_RET(__wt_page_modify_init(session, page));
 	F_SET(page->modify, WT_PM_REC_SPLIT_MERGE);
+
+	return (0);
+}
+
+/*
+ * __rec_split_row --
+ *	Split a row-store page, creating a new internal page.
+ */
+static int
+__rec_split_row(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *orig, WT_PAGE **splitp)
+{
+	WT_ADDR *addr;
+	WT_BOUNDARY *bnd;
+	WT_DECL_RET;
+	WT_IKEY *ikey;
+	WT_PAGE *page;
+	WT_REF *ref;
+	uint32_t i;
+
+	/* Allocate a split-merge page. */
+	WT_ERR(
+	    __rec_split_merge_create(session, r, orig, &page, WT_PAGE_ROW_INT));
 
 	/*
 	 * The "parent" key for each split chunk is the first key on the chunk,
@@ -4070,7 +4093,7 @@ __rec_split_row(
 		    session, &r->bnd[0].key, WT_IKEY_DATA(ikey), ikey->size));
 	}
 
-	/* Enter each split page into the new, internal page. */
+	/* Enter each split child page into the new internal page. */
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
@@ -4087,7 +4110,8 @@ __rec_split_row(
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page);
+err:	if (page != NULL)
+		__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -4106,25 +4130,11 @@ __rec_split_col(
 	WT_REF *ref;
 	uint32_t i;
 
-	/* Allocate a column-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)r->bnd_next, &page->u.intl.t));
+	/* Allocate a split-merge page. */
+	WT_ERR(
+	    __rec_split_merge_create(session, r, orig, &page, WT_PAGE_COL_INT));
 
-	/* Fill it in. */
-	page->parent = orig->parent;
-	page->ref = orig->ref;
-	page->read_gen = WT_READ_GEN_NOTSET;
-	page->u.intl.recno = r->bnd[0].recno;
-	page->entries = r->bnd_next;
-	page->type = WT_PAGE_COL_INT;
-
-	/*
-	 * See the comment above in __rec_split_row().
-	 */
-	WT_ERR(__wt_page_modify_init(session, page));
-	F_SET(page->modify, WT_PM_REC_SPLIT_MERGE);
-
-	/* Enter each split page into the new, internal page. */
+	/* Enter each split child page into the new internal page. */
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
@@ -4140,7 +4150,8 @@ __rec_split_col(
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page);
+err:	if (page != NULL)
+		__wt_page_out(session, &page);
 	return (ret);
 }
 

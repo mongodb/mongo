@@ -121,28 +121,23 @@ __wt_page_inmem(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	size_t inmem_size;
+	size_t size;
 
 	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
 	*pagep = NULL;
 
-	/*
-	 * Allocate and initialize the WT_PAGE.
-	 * Set the LRU so the page is not immediately selected for eviction.
-	 * Set the read generation (which can't match a search where the write
-	 * generation wasn't set, that is, remained 0).
-	 */
-	WT_RET(__wt_calloc_def(session, 1, &page));
+	/* Allocate and initialize a new WT_PAGE. */
+	WT_RET(__wt_cache_page_new(session, &page));
+
 	page->dsk = dsk;
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->type = dsk->type;
 	if (disk_not_alloc)
 		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);
 
-	inmem_size = sizeof(WT_PAGE);
-	if (!disk_not_alloc)
-		inmem_size += dsk->mem_size;
+	/* Track the in-memory size for this page. */
+	size = disk_not_alloc ? 0 : dsk->mem_size;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -151,22 +146,23 @@ __wt_page_inmem(
 		break;
 	case WT_PAGE_COL_INT:
 		page->u.intl.recno = dsk->recno;
-		WT_ERR(__inmem_col_int(session, page, &inmem_size));
+		WT_ERR(__inmem_col_int(session, page, &size));
 		break;
 	case WT_PAGE_COL_VAR:
 		page->u.col_var.recno = dsk->recno;
-		WT_ERR(__inmem_col_var(session, page, &inmem_size));
+		WT_ERR(__inmem_col_var(session, page, &size));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__inmem_row_int(session, page, &inmem_size));
+		WT_ERR(__inmem_row_int(session, page, &size));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__inmem_row_leaf(session, page, &inmem_size));
+		WT_ERR(__inmem_row_leaf(session, page, &size));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	__wt_cache_page_read(session, page, inmem_size);
+	/* Update the page's in-memory size and the cache. */
+	__wt_cache_page_inmem_incr(session, page, size);
 
 	/* Link the new page into the parent. */
 	if (parent_ref != NULL)

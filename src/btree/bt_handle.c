@@ -378,7 +378,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	 * __wt_page_out on error, we require a correct page setup at each point
 	 * where we might fail.
 	 */
-	WT_ERR(__wt_calloc_def(session, 1, &root));
+	WT_ERR(__wt_cache_page_new(session, &root));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
@@ -458,7 +458,7 @@ __wt_btree_leaf_create(
 
 	btree = session->btree;
 
-	WT_RET(__wt_calloc_def(session, 1, &leaf));
+	WT_RET(__wt_cache_page_new(session, &leaf));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		leaf->u.col_fix.recno = 1;

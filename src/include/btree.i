@@ -100,28 +100,28 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, size_t size)
 }
 
 /*
- * __wt_cache_page_read --
- *	Read pages into the cache.
+ * __wt_cache_page_new --
+ *	Create or read a page into the cache.
  */
-static inline void
-__wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+static inline int
+__wt_cache_page_new(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
+	WT_PAGE *page;
 
 	cache = S2C(session)->cache;
-	WT_ASSERT(session, size != 0);
-	(void)WT_ATOMIC_ADD(cache->pages_read, 1);
-	(void)WT_ATOMIC_ADD(cache->bytes_read, size);
-	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 
 	/*
-	 * It's unusual, but possible, that the page is already dirty.
-	 * For example, when reading an in-memory page with references to
-	 * deleted leaf pages, the internal page may be marked dirty.  If so,
-	 * update the total bytes dirty here.
+	 * Encapsulated because we're going to "discard" the page on error,
+	 * and we need to make sure we've incremented the page count.
 	 */
-	if (__wt_page_is_modified(page))
-		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	__wt_cache_page_inmem_incr(session, page, sizeof(WT_PAGE));
+
+	(void)WT_ATOMIC_ADD(cache->pages_inmem, 1);
+
+	*pagep = page;
+	return (0);
 }
 
 /*
@@ -134,7 +134,9 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
+
 	WT_ASSERT(session, page->memory_footprint != 0);
+
 	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
 	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
 
@@ -177,7 +179,7 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	pages_in = cache->pages_read;
+	pages_in = cache->pages_inmem;
 	pages_out = cache->pages_evict;
 	return (pages_in > pages_out ? pages_in - pages_out : 0);
 }
@@ -197,7 +199,7 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	bytes_in = cache->bytes_read + cache->bytes_inmem;
+	bytes_in = cache->bytes_inmem;
 	bytes_out = cache->bytes_evict;
 	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
 }
@@ -238,9 +240,13 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
-	 * a page, if we don't do the update, discard the memory.
+	 * a page.  If our modify structure is used, update the page's memory
+	 * footprint, else discard the modify structure, another thread did the
+	 * work.
 	 */
-	if (!WT_ATOMIC_CAS(page->modify, NULL, modify))
+	if (WT_ATOMIC_CAS(page->modify, NULL, modify))
+		__wt_cache_page_inmem_incr(session, page, sizeof(*modify));
+	else
 		__wt_free(session, modify);
 	return (0);
 }
