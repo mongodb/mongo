@@ -32,7 +32,6 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/queryoptimizer.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl_block.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/replication_server_status.h"

@@ -1,5 +1,3 @@
-// @file repl.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -16,43 +14,20 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/db/repl/repl_start.h"
 
-#include <boost/thread/thread.hpp>
-#include <string>
-#include <vector>
+#include <boost/bind.hpp>
+#include <boost/thread.hpp>
+#include <iostream>
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
-#include "jsobj.h"
-#include "../util/goodies.h"
-#include "repl.h"
-#include "../util/net/message.h"
-#include "../util/background.h"
-#include "../client/connpool.h"
-#include "pdfile.h"
-#include "db.h"
-#include "commands.h"
-#include "cmdline.h"
-#include "repl_block.h"
-#include "repl/rs.h"
-#include "replutil.h"
-#include "repl/connections.h"
-#include "ops/update.h"
-#include "pcrecpp.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/instance.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/queryutil.h"
-#include "mongo/base/counter.h"
-#include "mongo/db/oplog.h"
+#include "mongo/db/cmdline.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    void startReplSets(ReplSetCmdline*);
     void startReplication() {
         /* if we are going to be a replica set, we aren't doing other forms of replication. */
         if( !cmdLine._replSet.empty() ) {

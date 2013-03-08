@@ -55,6 +55,10 @@ namespace mongo {
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
+    class ReplSetCmdline;
+
+    // Main entry point for replica sets
+    void startReplSets(ReplSetCmdline *replSetCmdline);
 
     /* member of a replica set */
     class Member : public List1<Member>::Base {

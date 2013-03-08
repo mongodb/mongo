@@ -18,7 +18,6 @@
  */
 
 #include "pch.h"
-#include "../db/repl.h"
 
 #include "../db/db.h"
 #include "../db/instance.h"

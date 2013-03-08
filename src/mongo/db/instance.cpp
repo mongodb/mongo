@@ -52,7 +52,6 @@
 #include "mongo/db/ops/query.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pagefault.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/replutil.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/d_logic.h"

@@ -22,7 +22,6 @@
 #include "../db/jsobj.h"
 #include "../db/jsobjmanipulator.h"
 #include "../db/json.h"
-#include "../db/repl.h"
 #include "dbtests.h"
 #include "../util/stringutils.h"
 #include "../util/mongoutils/checksum.h"

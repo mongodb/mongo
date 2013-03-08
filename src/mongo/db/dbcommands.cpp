@@ -49,7 +49,6 @@
 #include "mongo/db/ops/count.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryoptimizer.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl_block.h"
 #include "mongo/db/replutil.h"
 #include "mongo/db/stats/timer_stats.h"

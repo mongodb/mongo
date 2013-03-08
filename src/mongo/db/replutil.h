@@ -19,7 +19,6 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "json.h"
-#include "repl.h"
 #include "cmdline.h"
 #include "repl/rs.h"
 #include "mongo/db/repl/master_slave.h"  // replAllDead

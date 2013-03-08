@@ -17,7 +17,6 @@
 */
 
 #include "pch.h"
-#include "repl.h"
 #include "repl_block.h"
 #include "instance.h"
 #include "dbhelpers.h"

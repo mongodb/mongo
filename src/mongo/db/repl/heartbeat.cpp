@@ -20,7 +20,6 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/health.h"

@@ -32,7 +32,6 @@
 #include "../util/md5.hpp"
 #include "../util/processinfo.h"
 #include "json.h"
-#include "repl.h"
 #include "repl_block.h"
 #include "replutil.h"
 #include "commands.h"

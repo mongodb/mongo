@@ -48,7 +48,6 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/queryoptimizer.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl_block.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"

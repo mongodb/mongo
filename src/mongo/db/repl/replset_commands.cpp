@@ -24,7 +24,6 @@
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "../cmdline.h"
 #include "../commands.h"
-#include "../repl.h"
 #include "health.h"
 #include "rs.h"
 #include "rs_config.h"

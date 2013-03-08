@@ -28,11 +28,11 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/oplog.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
 #include "mongo/db/server_parameters.h"

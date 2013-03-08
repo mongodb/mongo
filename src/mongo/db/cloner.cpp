@@ -29,8 +29,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/db/oplog.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/sort_phase_one.h"
 
 namespace mongo {

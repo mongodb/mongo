@@ -24,7 +24,6 @@
 #include "introspect.h"
 #include "../util/lruishmap.h"
 #include "json.h"
-#include "repl.h"
 #include "commands.h"
 #include "cmdline.h"
 

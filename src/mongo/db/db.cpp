@@ -41,7 +41,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/module.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/repl.h"
+#include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
@@ -82,7 +82,6 @@ namespace mongo {
 
     static void setupSignalHandlers();
     static void startInterruptThread();
-    void startReplication();
     void exitCleanly( ExitCode code );
 
 #ifdef _WIN32

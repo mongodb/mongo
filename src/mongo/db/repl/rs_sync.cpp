@@ -27,7 +27,6 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/prefetch.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_sync.h"

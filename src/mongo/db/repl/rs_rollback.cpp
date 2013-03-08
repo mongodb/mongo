@@ -22,7 +22,6 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/repl.h"
 
 /* Scenarios
 
