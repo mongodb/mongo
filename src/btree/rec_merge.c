@@ -201,8 +201,7 @@ __merge_new_page(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_cache_page_new(session, &newpage));
 	WT_ERR(__wt_calloc_def(session, (size_t)entries, &newpage->u.intl.t));
-	__wt_cache_page_inmem_incr(
-	    session, newpage, entries * sizeof(newpage->u.intl.t));
+	__wt_cache_page_inmem_incr(session, newpage, entries * sizeof(WT_REF));
 
 	/* Fill it in. */
 	newpage->read_gen = WT_READ_GEN_NOTSET;
