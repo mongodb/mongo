@@ -353,7 +353,6 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 WT_UPDATE *
 __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	WT_TXN *txn;
 	WT_UPDATE *next;
 
 	/*
@@ -361,13 +360,7 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	 * the rest of the chain; because this routine is called from inside
 	 * a serialization function, the caller has responsibility for actually
 	 * freeing the memory.
-	 */
-	txn = &session->txn;
-	if (txn->isolation != TXN_ISO_SNAPSHOT &&
-	    txn->isolation != TXN_ISO_READ_COMMITTED)
-		return (NULL);
-
-	/*
+	 *
 	 * Walk the list of updates, looking for obsolete updates.  If we find
 	 * an update no session will ever move past, we can discard any updates
 	 * that appear after it.
