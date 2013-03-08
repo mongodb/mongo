@@ -5,14 +5,14 @@ lookAtDocumentMetrics = false;
 
 if ( db.serverStatus().metrics ) {
     var ss = db.serverStatus();
-    lookAtDocumentMetrics = ss.metrics.document != null && ss.metrics.document.scanned != null;
+    lookAtDocumentMetrics = ss.metrics.document != null && ss.metrics.queryExecutor.scanned != null;
 }
 
 print( "lookAtDocumentMetrics: " + lookAtDocumentMetrics );
 
 if ( lookAtDocumentMetrics ) {
     // ignore mongos
-    nscannedStart = db.serverStatus().metrics.document.scanned
+    nscannedStart = db.serverStatus().metrics.queryExecutor.scanned
 }
 
 
@@ -47,6 +47,6 @@ assert(t.validate().valid,"not valid");
 
 if ( lookAtDocumentMetrics ) {
     // ignore mongos
-    nscannedEnd = db.serverStatus().metrics.document.scanned
+    nscannedEnd = db.serverStatus().metrics.queryExecutor.scanned
     assert.lte( nscannedStart + 16, nscannedEnd );
 }

@@ -213,7 +213,7 @@ namespace mongo {
     static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
     static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
     static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
-    static ServerStatusMetricField<Counter64> displayScanned( "document.scanned", &scannedCounter );
+    static ServerStatusMetricField<Counter64> displayScanned( "queryExecutor.scanned", &scannedCounter );
 
     static Counter64 idhackCounter;
     static Counter64 scanAndOrderCounter;
