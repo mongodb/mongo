@@ -87,7 +87,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * boundary, this is one of the reasons the btree layer must find out
 	 * from the block-manager layer the maximum size of the eventual write.
 	 */
-	align_size = WT_ALIGN32(buf->size, block->allocsize);
+	align_size = WT_ALIGN(buf->size, block->allocsize);
 	if (align_size > buf->memsize) {
 		WT_ASSERT(session, align_size <= buf->memsize);
 		WT_RET_MSG(session, EINVAL,

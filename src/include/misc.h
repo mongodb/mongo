@@ -41,8 +41,6 @@
  */
 #define	WT_ALIGN(n, v)							\
 	((((uintmax_t)(n)) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
-#define	WT_ALIGN32(n, v)						\
-	((uint32_t)WT_ALIGN(n, v))
 
 /* Min, max. */
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))

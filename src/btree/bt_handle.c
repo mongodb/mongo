@@ -569,7 +569,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	 * parent.
 	 */
 	WT_RET(__wt_config_getones(session, config, "memory_page_max", &cval));
-	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
+	btree->maxmempage = (uint64_t)WT_MAX(cval.val, 50 * btree->maxleafpage);
 
 	/*
 	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's no
@@ -661,7 +661,7 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size = WT_ALIGN32((a * btree->split_pct) / 100, btree->allocsize);
+	split_size = WT_ALIGN((a * btree->split_pct) / 100, btree->allocsize);
 
 	/*
 	 * If the result of that calculation is the same as the allocation unit
@@ -669,7 +669,7 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * unit, use a percentage of the maximum page size).
 	 */
 	if (split_size == btree->allocsize)
-		split_size = (a * btree->split_pct) / 100;
+		split_size = (uint32_t)((a * btree->split_pct) / 100);
 
 	return (split_size);
 }
