@@ -22,12 +22,5 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s fsync error", fh->name);
 
-#ifdef HAVE_POSIX_FADVISE
-	if (fh->os_cache_max > 0 && fh->io_size > fh->os_cache_max) {
-		fh->io_size = 0;
-		WT_RET(posix_fadvise(fh->fd, 0, 0, POSIX_FADV_DONTNEED));
-	}
-#endif
-
 	return (0);
 }

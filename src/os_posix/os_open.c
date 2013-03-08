@@ -147,6 +147,11 @@ __wt_open(WT_SESSION_IMPL *session,
 	fh->fd = fd;
 	fh->refcnt = 1;
 
+#ifdef O_DIRECT
+	if (f & O_DIRECT)
+		fh->direct_io = 1;
+#endif
+
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(session, fh, &fh->file_size));
 

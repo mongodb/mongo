@@ -141,6 +141,31 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_RET(ret);
 	}
 
+#ifdef HAVE_SYNC_FILE_RANGE
+	/*
+	 * Optionally schedule writes for dirty pages in the system buffer
+	 * cache.
+	 */
+	if (block->os_cache_dirty_max != 0 &&
+	    (block->os_cache_dirty += align_size) > block->os_cache_dirty_max) {
+		block->os_cache_dirty = 0;
+		if ((ret = sync_file_range(block->fh->fd,
+		    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE)) != 0)
+			WT_RET_MSG(
+			    session, ret, "%s: sync_file_range", block->name);
+	}
+#endif
+#ifdef HAVE_POSIX_FADVISE
+	/* Optionally discard blocks from the system buffer cache. */
+	if (block->os_cache_max != 0 &&
+	    (block->os_cache += align_size) > block->os_cache_max) {
+		block->os_cache = 0;
+		if ((ret = posix_fadvise(block->fh->fd,
+		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0)
+			WT_RET_MSG(
+			    session, ret, "%s: posix_fadvise", block->name);
+	}
+#endif
 	WT_CSTAT_INCR(session, block_write);
 	WT_CSTAT_INCRV(session, block_byte_write, align_size);
 

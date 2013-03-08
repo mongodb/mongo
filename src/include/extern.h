@@ -112,6 +112,14 @@ extern int __wt_block_extlist_init(WT_SESSION_IMPL *session,
     const char *name,
     const char *extname);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
+extern int __wt_block_map( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    void *mapp,
+    size_t *maplenp);
+extern int __wt_block_unmap( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    void *map,
+    size_t maplen);
 extern int __wt_block_manager_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *config,

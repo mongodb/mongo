@@ -27,14 +27,6 @@ __wt_read(WT_SESSION_IMPL *session,
 		    " bytes at offset %" PRIuMAX,
 		    fh->name, bytes, (uintmax_t)offset);
 
-#ifdef HAVE_POSIX_FADVISE
-	if (fh->os_cache_max > 0 &&
-	    (fh->io_size += (off_t)bytes) > fh->os_cache_max) {
-		fh->io_size = 0;
-		WT_RET(posix_fadvise(fh->fd, 0, 0, POSIX_FADV_DONTNEED));
-	}
-#endif
-
 	return (0);
 }
 
@@ -58,9 +50,5 @@ __wt_write(WT_SESSION_IMPL *session,
 		    " bytes at offset %" PRIuMAX,
 		    fh->name, bytes, (uintmax_t)offset);
 
-#ifdef HAVE_POSIX_FADVISE
-	if (fh->os_cache_max > 0)
-		fh->io_size += (off_t)bytes;
-#endif
 	return (0);
 }
