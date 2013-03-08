@@ -27,8 +27,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 
