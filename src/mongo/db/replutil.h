@@ -78,8 +78,4 @@ namespace mongo {
         return ns[5] == 0 || ns[5] == '.';
     }
 
-    class ParsedQuery;
-    
-    void replVerifyReadsOk(const ParsedQuery* pq = 0);
-
 } // namespace mongo

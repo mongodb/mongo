@@ -73,25 +73,4 @@ namespace mongo {
         startMasterSlave();
     }
 
-    /** we allow queries to SimpleSlave's */
-    void replVerifyReadsOk(const ParsedQuery* pq) {
-        if( replSet ) {
-            // todo: speed up the secondary case.  as written here there are 2 mutex entries, it
-            // can b 1.
-            if( isMaster() ) return;
-            uassert(13435, "not master and slaveOk=false",
-                    !pq || pq->hasOption(QueryOption_SlaveOk) || pq->hasReadPref());
-            uassert(13436,
-                    "not master or secondary; cannot currently read from this replSet member",
-                    theReplSet && theReplSet->isSecondary() );
-        }
-        else {
-            uassert( 10107,
-                     "not master", 
-                     isMaster() || 
-                     (!pq || pq->hasOption(QueryOption_SlaveOk)) ||
-                     replSettings.slave == SimpleSlave );
-        }
-    }
-
 } // namespace mongo

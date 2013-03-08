@@ -30,6 +30,7 @@
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/replutil.h"
 #include "mongo/db/repl/finding_start_cursor.h"
+#include "mongo/db/repl/repl_reads_ok.h"
 #include "mongo/db/scanandorder.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
