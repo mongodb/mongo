@@ -215,7 +215,7 @@ namespace {
             }
 
             bool end() const {
-                return _pos.outOfRange 
+                return _pos.outOfRange
                     || _curSlice.sliceNum >= _pos.numberOfSlices
                     || _curSlice.sliceNum > _pos.lastSliceNum;
             }
@@ -510,7 +510,7 @@ namespace {
      *             recBytes: <record size>,
      *             bsonBytes: <bson document size>,
      *  (optional) characteristic: <value of the characteristic field>
-     *           }, 
+     *           },
      *           ... (one element per record)
      *       ],
      *  (optional) deletedRecords: [
@@ -703,7 +703,7 @@ namespace {
 
     /**
      * @param ex requested extent; if NULL analyze entire namespace
-     */ 
+     */
     bool runInternal(const NamespaceDetails* nsd, const Extent* ex, SubCommand subCommand,
                      AnalyzeParams& globalParams, string& errmsg, BSONObjBuilder& result) {
 
