@@ -3769,7 +3769,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
-		mod->u.replace.addr = NULL;
 		mod->u.replace.size = 0;
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
@@ -3970,7 +3969,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (bnd->addr.addr != NULL) {
 			WT_TRET(bm->free(
 			    bm, session, bnd->addr.addr, bnd->addr.size));
-			bnd->addr.addr = NULL;
+			__wt_free(session, bnd->addr.addr);
 		}
 	return (ret);
 }
