@@ -385,7 +385,12 @@ namespace mutablebson {
      *
      */
 
+// Work around http://gcc.gnu.org/bugzilla/show_bug.cgi?id=29365. Note that the selection of
+// minor version 4 is somewhat arbitrary. It does appear that the fix for this was backported
+// to earlier versions. This is a conservative choice that we can revisit later.
+#if !defined(__GNUC__) || (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
     namespace {
+#endif
 
         // The designated field name for the root element.
         const char kRootFieldName[] = "";
@@ -531,7 +536,9 @@ namespace mutablebson {
             return Status(ErrorCodes::IllegalOperation, "cannot add the root as a child");
         }
 
+#if !defined(__GNUC__) || (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
     } // namespace
+#endif
 
     /** Document::Impl holds the Document state. Please see the file comment above for details
      *  on the fields of Impl and how they are used to realize the implementation of mutable
