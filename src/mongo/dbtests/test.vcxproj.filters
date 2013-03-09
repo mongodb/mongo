@@ -799,18 +799,6 @@
     <ClInclude Include="..\bson\util\bson_extract.h">
       <Filter>bson\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\auth\action_type.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -2205,6 +2193,27 @@
     <ClInclude Include="..\db\index_set.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
+    <ClInclude Include="..\bson\mutable\algorithm.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\const_element.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\const_element-inl.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\document.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\document-inl.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\element.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\element-inl.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3026,18 +3035,6 @@
     </ClCompile>
     <ClCompile Include="..\bson\util\bson_extract.cpp">
       <Filter>bson\util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp">
-      <Filter>bson\mutable</Filter>
     </ClCompile>
     <ClCompile Include="..\db\auth\action_type.cpp">
       <Filter>db\auth</Filter>
@@ -4200,6 +4197,18 @@
     </ClCompile>
     <ClCompile Include="..\db\hashindex.cpp">
       <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\document.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\element.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_algo_test.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_test.cpp">
+      <Filter>bson\mutable</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

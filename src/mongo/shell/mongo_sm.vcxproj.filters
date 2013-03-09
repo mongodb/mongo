@@ -569,18 +569,6 @@
     <ClCompile Include="..\bson\util\bson_extract.cpp">
       <Filter>bson\util</Filter>
     </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\processinfo.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -622,6 +610,18 @@
     </ClCompile>
     <ClCompile Include="..\client\sasl_client_authenticate.cpp">
       <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\document.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\element.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_algo_test.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_test.cpp">
+      <Filter>bson\mutable</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1388,18 +1388,6 @@
     <ClInclude Include="..\bson\util\bson_extract.h">
       <Filter>bson\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\fail_point_service.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -1453,6 +1441,27 @@
     </ClInclude>
     <ClInclude Include="..\client\sasl_client_authenticate.h">
       <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\algorithm.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\const_element.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\const_element-inl.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\document.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\document-inl.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\element.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\element-inl.h">
+      <Filter>bson\mutable</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

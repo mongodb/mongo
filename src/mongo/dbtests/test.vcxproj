@@ -563,10 +563,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\bson_field.h" />
     <ClInclude Include="..\bson\bson_validate.h" />
     <ClInclude Include="..\bson\inline_decls.h" />
-    <ClInclude Include="..\bson\mutable\mutable_bson.h" />
-    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h" />
-    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h" />
-    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h" />
+    <ClInclude Include="..\bson\mutable\algorithm.h" />
+    <ClInclude Include="..\bson\mutable\const_element-inl.h" />
+    <ClInclude Include="..\bson\mutable\const_element.h" />
+    <ClInclude Include="..\bson\mutable\document-inl.h" />
+    <ClInclude Include="..\bson\mutable\document.h" />
+    <ClInclude Include="..\bson\mutable\element-inl.h" />
+    <ClInclude Include="..\bson\mutable\element.h" />
     <ClInclude Include="..\bson\oid.h" />
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="..\base\string_data.h" />
@@ -2011,10 +2014,37 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\base\status.cpp" />
     <ClCompile Include="..\base\string_data.cpp" />
     <ClCompile Include="..\bson\bson_validate.cpp" />
-    <ClCompile Include="..\bson\mutable\mutable_bson.cpp" />
-    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp" />
-    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
-    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
+    <ClCompile Include="..\bson\mutable\document.cpp">
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">$(IntDir)bson_mutable_document.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\element.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_algo_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />

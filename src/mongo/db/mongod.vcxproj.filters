@@ -875,18 +875,6 @@
     <ClCompile Include="auth\authorization_manager.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp">
-      <Filter>bson\mutable</Filter>
-    </ClCompile>
     <ClCompile Include="geo\s2cursor.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
@@ -1814,6 +1802,18 @@
     <ClCompile Include="index_set.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="..\bson\mutable\document.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\element.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_algo_test.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_test.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2552,18 +2552,6 @@
     </ClInclude>
     <ClInclude Include="auth\authorization_manager.h">
       <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h">
-      <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h">
-      <Filter>bson\mutable</Filter>
     </ClInclude>
     <ClInclude Include="geo\s2common.h">
       <Filter>db\geo</Filter>
@@ -3827,6 +3815,27 @@
     </ClInclude>
     <ClInclude Include="index_set.h">
       <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\algorithm.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\const_element.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\const_element-inl.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\document.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\document-inl.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\element.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\element-inl.h">
+      <Filter>bson\mutable</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
