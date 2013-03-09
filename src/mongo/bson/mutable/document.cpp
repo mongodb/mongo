@@ -482,7 +482,10 @@ namespace mutablebson {
             dassert(eltRaw < objRaw + object.objsize());
             dassert(eltRaw + elt.size() <= objRaw + object.objsize());
             const ptrdiff_t offset = eltRaw - objRaw;
-            verify(offset <= std::numeric_limits<uint32_t>::max());
+            // BSON documents express their size as an int32_t so we should always be able to
+            // express the offset as a uint32_t.
+            verify(offset > 0);
+            verify(offset <= std::numeric_limits<int32_t>::max());
             return offset;
         }
 
