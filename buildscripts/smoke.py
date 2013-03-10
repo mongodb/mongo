@@ -219,7 +219,9 @@ class mongod(object):
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
                      '--sslCAFile', 'jstests/libs/ca.pem',
                      '--sslWeakCertificateValidation']
-        
+
+        argv += ['--enableExperimentalStorageDetailsCmd']
+
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 

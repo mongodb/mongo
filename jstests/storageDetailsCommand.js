@@ -8,12 +8,8 @@ for (var i = 0; i < 3000; ++i) {
 }
 
 function test() {
-    var result = t.diskStorageStats({numberOfSlices: 100});
-    if (result["bad cmd"]) {
-        print("storageDetails command not available: skipping");
-        return;
-    }
 
+    var result = t.diskStorageStats({numberOfSlices: 100});
     assert.commandWorked(result);
 
     function checkDiskStats(data) {
@@ -96,3 +92,5 @@ function test() {
     checkErrorConditions(t.diskStorageStats);
     checkErrorConditions(t.pagesInRAM);
 }
+
+test()
