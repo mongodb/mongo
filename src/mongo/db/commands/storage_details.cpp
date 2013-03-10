@@ -22,6 +22,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
 #include "mongo/db/jsobj.h"
@@ -41,7 +42,8 @@ namespace {
      */
     enum SubCommand {
         SUBCMD_DISK_STORAGE,
-        SUBCMD_PAGES_IN_RAM
+        SUBCMD_PAGES_IN_RAM,
+        SUBCMD_DOCUMENTS_IN_RAM
     };
 
     /**
@@ -279,7 +281,7 @@ namespace {
     // Command
 
     /**
-     * This command provides detailed and aggreate information regarding record and deleted record
+     * This command provides detailed and aggregate information regarding record and deleted record
      * layout in storage files and in memory.
      */
     class StorageDetailsCmd : public Command {
@@ -293,16 +295,17 @@ namespace {
         virtual void help(stringstream& h) const {
             h << "EXPERIMENTAL (UNSUPPORTED). "
               << "Provides detailed and aggregate information regarding record and deleted record "
-              << "layout in storage files ({analyze: 'diskStorage'}) and percentage of pages "
-              << "currently in RAM ({analyze: 'pagesInRAM'}). Slow if run on large collections. "
-              << "Select the desired subcommand with {analyze: 'diskStorage' | 'pagesInRAM'}; "
-              << "specify {extent: num_} and, optionally, {range: [start, end]} to restrict "
-              << "processing to a single extent (start and end are offsets from the beginning of "
-              << "the extent. {granularity: bytes} or {numberOfSlices: num_} enable aggregation of "
-              << "statistic per-slice: the extent(s) will either be subdivided in about "
-              << "'numberOfSlices' slices or in slices of size 'granularity'. "
-              << "{characteristicField: dotted_path} enables collection of a field to make "
-              << "it possible to identify which kind of record belong to each slice/extent. "
+              << "layout in storage files ({analyze: 'diskStorage'}), percentage of pages "
+              << "currently in RAM ({analyze: 'pagesInRAM'}) or percentage of documents currently "
+              << "in RAM ({analyze: 'documentsInRAM'}). Slow if run on large collections. Select "
+              << "the desired subcommand with {analyze: 'diskStorage' | 'pagesInRAM' | "
+              << "'documentsInRAM'}; specify {extent: num_} and, optionally, {range: [start, "
+              << "end]} to restrict processing to a single extent (start and end are offsets from "
+              << "the beginning of the extent. {granularity: bytes} or {numberOfSlices: num_} "
+              << "enable aggregation of statistic per-slice: the extent(s) will either be "
+              << "subdivided in about 'numberOfSlices' slices or in slices of size 'granularity'. "
+              << "{characteristicField: dotted_path} enables collection of a field to make it "
+              << "possible to identify which kind of record belong to each slice/extent. "
               << "{showRecords: true} enables a dump of all records and deleted records "
               << "encountered. Example: "
               << "{storageDetails: 'collectionName', analyze: 'diskStorage', granularity: 1 << 20}";
@@ -669,6 +672,133 @@ namespace {
     }
 
     /**
+     * Outputs the percentage of documents in memory of the collection.
+     * The entire collection is scanned using the id index.
+     * It also measures the internal and external memory fragmentation.
+     *
+     * The output has the form:
+     *     { inMem:             <ratio of documents in memory for the entire collection>,
+     *       nscanned:          <number of scanned documents of the collection>,
+     *       netBytesInRAM:     <total size of document data in memory>,
+     *       pageBytesInRAM:    <total size of data in memory including overhead of paging>,
+     *       memFragmentation:  <percentage of memory that is wasted by the paging overhead>
+     *                            (1 - netBytesInMemory / pageBytesInMemory)
+     *     }
+     *
+     *
+     * Example:
+     *
+     * > db.test.documentsInRAM()
+     * {
+     *         "inMem" : 1,
+     *         "nscanned" : 33,
+     *         "netBytesInRAM" : 1304,
+     *         "pageBytesInRAM" : 4096,
+     *         "memFragmentation" : 0.681640625,
+     *         "ok" : 1
+     * }
+     *
+     * The collection contains 33 documents. All of them are in memory (inMem=1).
+     * The total size of all documents is 1304 bytes.
+     * One page is necessary to keep the documents in memory.
+     * 4096-1304=2792 bytes is wasted for the internal memory fragmentation,
+     * which is 68.2% of the total used memory.
+     *
+     *
+     * @return true on success, false on failure
+     */
+    bool analyzeDocumentsInRAM(NamespaceDetails* nsd, string& errmsg, BSONObjBuilder& result) {
+
+        if (!ProcessInfo::blockCheckSupported()) {
+            errmsg = "blockCheck is not supported on this platform";
+            return false;
+        }
+
+        int idxNo = nsd->findIdIndex();
+        if ( idxNo < 0 ) {
+            errmsg = "found no id index";
+            return false;
+        }
+
+        IndexDetails& idx = nsd->idx( idxNo );
+
+        BSONObj min = BSON("" << MINKEY);
+        BSONObj max = BSON("" << MAXKEY);
+
+        shared_ptr<BtreeCursor> cursor( BtreeCursor::make( nsd, idx, min, max, true, 1 ) );
+
+        long long documentsInMemory = 0;
+        long long netBytesInRAM = 0;
+        set<const void*> pagesInMemory;
+
+        while ( cursor->ok() ) {
+
+            Record* record = cursor->currLoc().rec();
+
+            cursor->advance();
+
+            if ( !ProcessInfo::blockInMemory(record) ) {
+                continue;
+            }
+
+            const unsigned char* startAddr;
+            startAddr = reinterpret_cast<const unsigned char*>(ProcessInfo::alignToStartOfPage(record));
+
+            const unsigned char* endAddr = reinterpret_cast<const unsigned char*>(record);
+            endAddr += record->lengthWithHeaders();
+
+            long memSize = endAddr - startAddr;
+            verify(memSize >= record->lengthWithHeaders());
+
+            size_t numPages = ceilingDiv(memSize, ProcessInfo::getPageSize());
+            verify(numPages > 0);
+
+            vector<char> pages(numPages);
+            if ( !ProcessInfo::pagesInMemory(startAddr, numPages, &pages) ) {
+                errmsg = "system call failed";
+                return false;
+            }
+
+
+            bool documentCompletelyInMemory = true;
+            // skip document if not all pages in memory
+            for (size_t page = 0; page < numPages; page++) {
+                if ( !pages[page] ) {
+                    documentCompletelyInMemory = false;
+                    break;
+                }
+            }
+
+            if ( !documentCompletelyInMemory ) {
+                continue;
+            }
+
+            netBytesInRAM += record->netLength();
+
+            for (size_t page = 0; page < numPages; page++) {
+                const void* pageAddr = startAddr + page * ProcessInfo::getPageSize();
+                pagesInMemory.insert(pageAddr);
+            }
+
+            documentsInMemory++;
+        }
+
+        double inMem = static_cast<double>(documentsInMemory) / cursor->nscanned();
+        result.appendNumber("inMem", inMem);
+
+        result.appendNumber("nscanned", cursor->nscanned());
+
+        result.appendNumber("netBytesInRAM", netBytesInRAM);
+        int pageBytesInRAM = pagesInMemory.size() * ProcessInfo::getPageSize();
+        result.appendNumber("pageBytesInRAM", pageBytesInRAM);
+
+        double memFragmentation = 1.0 - static_cast<double>(netBytesInRAM) / pageBytesInRAM;
+        result.appendNumber("memFragmentation", memFragmentation);
+
+        return true;
+    }
+
+    /**
      * Analyze a single extent.
      * @param params analysis parameters, will be updated with computed number of slices or
      *               granularity
@@ -697,6 +827,8 @@ namespace {
                 return analyzeDiskStorage(nsd, ex, params, errmsg, outputBuilder);
             case SUBCMD_PAGES_IN_RAM:
                 return analyzePagesInRAM(ex, params, errmsg, outputBuilder);
+            case SUBCMD_DOCUMENTS_IN_RAM:
+                verify(false && "unreachable");
         }
         verify(false && "unreachable");
     }
@@ -748,7 +880,7 @@ namespace {
         return true;
     }
 
-    static const char* USE_ANALYZE_STR = "use {analyze: 'diskStorage' | 'pagesInRAM'}";
+    static const char* USE_ANALYZE_STR = "use {analyze: 'diskStorage' | 'pagesInRAM' | 'documentsInRAM' }";
 
     bool StorageDetailsCmd::run(const string& dbname, BSONObj& cmdObj, int, string& errmsg,
                                 BSONObjBuilder& result, bool fromRepl) {
@@ -768,6 +900,9 @@ namespace {
         else if (str::equals(subCommandStr, "pagesInRAM")) {
             subCommand = SUBCMD_PAGES_IN_RAM;
         }
+        else if (str::equals(subCommandStr, "documentsInRAM")) {
+            subCommand = SUBCMD_DOCUMENTS_IN_RAM;
+        }
         else {
             errmsg = str::stream() << subCommandStr << " is not a valid subcommand, "
                                                     << USE_ANALYZE_STR;
@@ -775,13 +910,17 @@ namespace {
         }
 
         const string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-        const NamespaceDetails* nsd = nsdetails(ns);
+        NamespaceDetails* nsd = nsdetails(ns);
         if (!cmdLine.quiet) {
             tlog() << "CMD: storageDetails " << ns << ", analyze " << subCommandStr << endl;
         }
         if (!nsd) {
             errmsg = "ns not found";
             return false;
+        }
+
+        if (subCommand == SUBCMD_DOCUMENTS_IN_RAM) {
+            return analyzeDocumentsInRAM(nsd, errmsg, result);
         }
 
         const Extent* extent = NULL;

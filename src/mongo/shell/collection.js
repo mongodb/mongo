@@ -549,6 +549,16 @@ DBCollection.prototype.pagesInRAM = function(opt) {
     return this._db.runCommand(cmd);
 }
 
+/**
+ * Invokes the storageDetails command to report memory statistics
+ * of documents in the collection.
+ */
+DBCollection.prototype.documentsInRAM = function(opt) {
+	var cmd = { storageDetails: this.getName(), analyze: 'documentsInRAM' };
+	if (typeof(opt) == 'object') Object.extend(cmd, opt);
+	return this._db.runCommand(cmd);
+}
+
 // Refer to pagesInRAM
 DBCollection.prototype.getPagesInRAM = function(params) {
     var stats = this.pagesInRAM(params);

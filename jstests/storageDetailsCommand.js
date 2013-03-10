@@ -44,6 +44,8 @@ function test() {
         }
     }
 
+    // subcommand pagesInRAM
+
     result = t.pagesInRAM({numberOfSlices: 100});
     assert(result.ok);
 
@@ -62,6 +64,27 @@ function test() {
             assert(isNumber(extents[i].slices[c]));
         }
     }
+
+    // subcommand documentsInRAM
+
+    result = t.documentsInRAM();
+    assert(result.ok);
+
+    assert(isNumber(result.inMem));
+    assert(isNumber(result.nscanned));
+    assert(isNumber(result.netBytesInRAM));
+    assert(isNumber(result.pageBytesInRAM));
+    assert(isNumber(result.memFragmentation));
+
+    stats = t.stats();
+    assert(stats.ok);
+
+    assert.eq(result.inMem, 1.0);
+    assert.eq(result.nscanned, stats.count);
+    assert.eq(result.netBytesInRAM, stats.size);
+    assert(result.pageBytesInRAM >= result.netBytesInRAM);
+    assert(result.memFragmentation >= 0.0);
+    assert(result.memFragmentation <= 1.0);
 
     function checkErrorConditions(helper) {
         var result = helper.apply(t, [{extent: 'a'}]);
