@@ -448,11 +448,13 @@ __wt_cell_type_raw(WT_CELL *cell)
 static inline int
 __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
-	WT_DECL_RET;
 	uint64_t v;
 	const uint8_t *p;
 	uint32_t saved_len;
 	uint64_t saved_v;
+	int copied;
+
+	copied = 0;
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
@@ -467,7 +469,8 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		return (WT_ERROR);					\
 } while (0)
 
-	memset(unpack, 0, sizeof(*unpack));
+restart:
+	WT_CLEAR(*unpack);
 	unpack->cell = cell;
 
 	/*
@@ -560,11 +563,8 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		saved_len = WT_PTRDIFF32(p, cell);
 		saved_v = unpack->v;
 		cell = (WT_CELL *)((uint8_t *)cell - v);
-		ret = __wt_cell_unpack_safe(cell, unpack, end);
-		unpack->raw = WT_CELL_VALUE_COPY;
-		unpack->__len = saved_len;
-		unpack->v = saved_v;
-		return (ret);
+		copied = 1;
+		goto restart;
 
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
@@ -600,6 +600,11 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	 * we need the right length).
 	 */
 done:	CHK(cell, unpack->__len);
+	if (copied) {
+		unpack->raw = WT_CELL_VALUE_COPY;
+		unpack->__len = saved_len;
+		unpack->v = saved_v;
+	}
 	return (0);
 }
 
