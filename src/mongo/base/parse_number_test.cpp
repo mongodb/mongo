@@ -21,6 +21,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/platform/float_utils.h"
 #include "mongo/util/mongoutils/str.h"  // for str::stream()!
 #include "mongo/unittest/unittest.h"
 
@@ -251,23 +252,23 @@ namespace {
         double d;
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1e309", &d));
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("-1e309", &d));
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1e-309", &d));
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("-1e-309", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1e-400", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("-1e-400", &d));
     }
 
     TEST(Double, TestParsingNan) {
         double d = 0;
         ASSERT_OK(parseNumberFromString("NaN", &d));
-        ASSERT_TRUE(isnan(d));
+        ASSERT_TRUE(isNaN(d));
     }
 
     TEST(Double, TestParsingInfinity) {
         double d = 0;
         ASSERT_OK(parseNumberFromString("infinity", &d));
-        ASSERT_TRUE(isinf(d));
+        ASSERT_TRUE(isInf(d));
         d = 0;
         ASSERT_OK(parseNumberFromString("-Infinity", &d));
-        ASSERT_TRUE(isinf(d));
+        ASSERT_TRUE(isInf(d));
     }
 
     TEST(Double, TestParsingNormal) {
