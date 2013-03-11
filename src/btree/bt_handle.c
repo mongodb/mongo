@@ -278,9 +278,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		break;
 	}
 
-	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
-	btree->split_pct = (u_int)cval.val;
-
 	WT_RET(__wt_config_gets(session, cfg, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q)
@@ -376,7 +373,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	 * __wt_page_out on error, we require a correct page setup at each point
 	 * where we might fail.
 	 */
-	WT_ERR(__wt_calloc_def(session, 1, &root));
+	WT_ERR(__wt_cache_page_new(session, &root));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
@@ -396,7 +393,8 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
-		WT_ERR(__wt_row_ikey_alloc(session, 0, "", 1, &ref->u.key));
+		WT_ERR(
+		    __wt_row_ikey_incr(session, leaf, 0, "", 1, &ref->u.key));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
@@ -456,7 +454,7 @@ __wt_btree_leaf_create(
 
 	btree = session->btree;
 
-	WT_RET(__wt_calloc_def(session, 1, &leaf));
+	WT_RET(__wt_cache_page_new(session, &leaf));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		leaf->u.col_fix.recno = 1;
@@ -482,12 +480,12 @@ __wt_btree_leaf_create(
  *      Access the size of an in-memory tree with a single leaf page.
  */
 int
-__wt_btree_get_memsize(
-    WT_SESSION_IMPL *session, WT_BTREE *btree, uint32_t **memsizep)
+__wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
 {
+	WT_BTREE *btree;
 	WT_PAGE *root, *child;
 
-	WT_UNUSED(session);
+	btree = session->btree;
 	root = btree->root_page;
 	child = root->u.intl.t->page;
 
@@ -543,7 +541,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
-	uint32_t intl_split_size, leaf_split_size, split_pct;
+	uint32_t intl_split_size, leaf_split_size;
 	const char **cfg;
 
 	btree = session->btree;
@@ -559,6 +557,9 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree->maxleafpage = (uint32_t)cval.val;
 	WT_RET(__wt_config_gets(session, cfg, "leaf_item_max", &cval));
 	btree->maxleafitem = (uint32_t)cval.val;
+
+	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
+	btree->split_pct = (u_int)cval.val;
 
 	/*
 	 * When a page is forced to split, we want at least 50 entries on its
@@ -597,12 +598,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * Set the split percentage: reconciliation splits to a smaller-than-
 	 * maximum page size so we don't split every time a new entry is added.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
-	split_pct = (uint32_t)cval.val;
-	intl_split_size = WT_SPLIT_PAGE_SIZE(
-	    btree->maxintlpage, btree->allocsize, split_pct);
-	leaf_split_size = WT_SPLIT_PAGE_SIZE(
-	    btree->maxleafpage, btree->allocsize, split_pct);
+	intl_split_size = __wt_split_page_size(btree, btree->maxintlpage);
+	leaf_split_size = __wt_split_page_size(btree, btree->maxleafpage);
 
 	/*
 	 * Default values for internal and leaf page items: make sure at least
@@ -636,12 +633,42 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 */
 	if (btree->maxintlitem > intl_split_size / 2)
 		return (pse2(session, "internal",
-		    btree->maxintlpage, btree->maxintlitem, split_pct));
+		    btree->maxintlpage, btree->maxintlitem, btree->split_pct));
 	if (btree->maxleafitem > leaf_split_size / 2)
 		return (pse2(session, "leaf",
-		    btree->maxleafpage, btree->maxleafitem, split_pct));
+		    btree->maxleafpage, btree->maxleafitem, btree->split_pct));
 
 	return (0);
+}
+
+/*
+ * __wt_split_page_size --
+ *	Split page size calculation: we don't want to repeatedly split every
+ * time a new entry is added, so we split to a smaller-than-maximum page size.
+ */
+uint32_t
+__wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
+{
+	uintmax_t a;
+	uint32_t split_size;
+
+	/*
+	 * Ideally, the split page size is some percentage of the maximum page
+	 * size rounded to an allocation unit (round to an allocation unit so
+	 * we don't waste space when we write).
+	 */
+	a = maxpagesize;			/* Don't overflow. */
+	split_size = WT_ALIGN((a * btree->split_pct) / 100, btree->allocsize);
+
+	/*
+	 * If the result of that calculation is the same as the allocation unit
+	 * (that happens if the maximum size is the same size as an allocation
+	 * unit, use a percentage of the maximum page size).
+	 */
+	if (split_size == btree->allocsize)
+		split_size = (uint32_t)((a * btree->split_pct) / 100);
+
+	return (split_size);
 }
 
 static int

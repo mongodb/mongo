@@ -48,13 +48,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 		    hp->page, hp->file, hp->line);
 	}
 #endif
-	/*
-	 * Pages without a memory footprint aren't associated with the cache
-	 * and were never counted as "pages read".  If the page has a memory
-	 * footprint, update the cache information based on the discard.
-	 */
-	if (page->memory_footprint != 0)
-		__wt_cache_page_evict(session, page);
+	/* Update the cache's information. */
+	__wt_cache_page_evict(session, page);
 
 	/* Free the page modification information. */
 	if (page->modify != NULL)

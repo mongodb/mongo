@@ -121,28 +121,23 @@ __wt_page_inmem(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	size_t inmem_size;
+	size_t size;
 
 	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
 	*pagep = NULL;
 
-	/*
-	 * Allocate and initialize the WT_PAGE.
-	 * Set the LRU so the page is not immediately selected for eviction.
-	 * Set the read generation (which can't match a search where the write
-	 * generation wasn't set, that is, remained 0).
-	 */
-	WT_RET(__wt_calloc_def(session, 1, &page));
+	/* Allocate and initialize a new WT_PAGE. */
+	WT_RET(__wt_cache_page_new(session, &page));
+
 	page->dsk = dsk;
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->type = dsk->type;
 	if (disk_not_alloc)
 		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);
 
-	inmem_size = sizeof(WT_PAGE);
-	if (!disk_not_alloc)
-		inmem_size += dsk->mem_size;
+	/* Track the in-memory size for this page. */
+	size = disk_not_alloc ? 0 : dsk->mem_size;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -151,22 +146,23 @@ __wt_page_inmem(
 		break;
 	case WT_PAGE_COL_INT:
 		page->u.intl.recno = dsk->recno;
-		WT_ERR(__inmem_col_int(session, page, &inmem_size));
+		WT_ERR(__inmem_col_int(session, page, &size));
 		break;
 	case WT_PAGE_COL_VAR:
 		page->u.col_var.recno = dsk->recno;
-		WT_ERR(__inmem_col_var(session, page, &inmem_size));
+		WT_ERR(__inmem_col_var(session, page, &size));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__inmem_row_int(session, page, &inmem_size));
+		WT_ERR(__inmem_row_int(session, page, &size));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__inmem_row_leaf(session, page, &inmem_size));
+		WT_ERR(__inmem_row_leaf(session, page, &size));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	__wt_cache_page_read(session, page, inmem_size);
+	/* Update the page's in-memory size and the cache. */
+	__wt_cache_page_inmem_incr(session, page, size);
 
 	/* Link the new page into the parent. */
 	if (parent_ref != NULL)
@@ -202,7 +198,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Build in-memory index for column-store internal pages.
  */
 static int
-__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -221,7 +217,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.intl.t));
-	*inmem_sizep += dsk->u.entries * sizeof(*page->u.intl.t);
+	*sizep += dsk->u.entries * sizeof(*page->u.intl.t);
 
 	/*
 	 * Walk the page, building references: the page contains value items.
@@ -245,7 +241,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
  *	column-store trees.
  */
 static int
-__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -270,7 +266,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.col_var.d));
-	*inmem_sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
+	*sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
@@ -303,11 +299,11 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		indx++;
 		recno += rle;
 	}
+	*sizep += bytes_allocated;
 
 	page->u.col_var.repeats = repeats;
 	page->u.col_var.nrepeats = nrepeats;
 	page->entries = dsk->u.entries;
-	*inmem_sizep += bytes_allocated;
 	return (0);
 }
 
@@ -316,7 +312,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
  *	Build in-memory index for row-store internal pages.
  */
 static int
-__inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -345,7 +341,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	nindx = dsk->u.entries / 2;
 	WT_ERR((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
-	*inmem_sizep += nindx * sizeof(*page->u.intl.t);
+	*sizep += nindx * sizeof(*page->u.intl.t);
 
 	/*
 	 * Set the number of elements now -- we're about to allocate memory,
@@ -457,10 +453,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		 * for reconciliation, the row-store reconciliation function
 		 * depends on keys always be instantiated.
 		 */
-		WT_ERR(__wt_row_ikey_alloc(session,
+		WT_ERR(__wt_row_ikey(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
 		    current->data, current->size, &ref->u.key));
-		*inmem_sizep += sizeof(WT_IKEY) + current->size;
+		*sizep += sizeof(WT_IKEY) + current->size;
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new
@@ -483,7 +479,7 @@ err:	__wt_scr_free(&current);
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -531,7 +527,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->mem_size));
 
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
-	*inmem_sizep += nindx * sizeof(*page->u.row.d);
+	*sizep += nindx * sizeof(*page->u.row.d);
 
 	/* Walk the page again, building indices. */
 	rip = page->u.row.d;

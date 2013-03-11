@@ -215,9 +215,15 @@ file_config = format_meta + lsm_config + [
 		this value''',
 		min='512B', max='10TB'),
 	Config('os_cache_max', '0', r'''
-		maximum filesystem cache.  If non-zero, WiredTiger will attempt to
-		flush the operating system buffer cache whenever this amount of I/O is
-		performed''',
+		maximum system buffer cache usage, in bytes.  If non-zero, evict
+		object blocks from the system buffer cache after that many bytes
+		from this object are read or written into the buffer cache''',
+		min=0),
+	Config('os_cache_dirty_max', '0', r'''
+		maximum dirty system buffer cache usage, in bytes.  If non-zero,
+		schedule writes for dirty blocks belonging to this object in the
+		system buffer cache after that many bytes from this object are
+		written into the buffer cache''',
 		min=0),
 	Config('prefix_compression', 'true', r'''
 		configure row-store format key prefix compression''',

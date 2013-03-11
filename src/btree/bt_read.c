@@ -49,8 +49,8 @@ __cache_read_row_deleted(
 		upd->txnid = ref->txnid;
 	}
 
-	__wt_cache_page_inmem_incr(
-	    session, page, sizeof(WT_UPDATE) * page->entries);
+	__wt_cache_page_inmem_incr(session, page,
+	    page->entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
 
 	return (0);
 }

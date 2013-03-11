@@ -40,13 +40,6 @@
 #define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
 
 /*
- * Split page size calculation -- we don't want to repeatedly split every time
- * a new entry is added, so we split to a smaller-than-maximum page size.
- */
-#define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN32(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
-
-/*
  * XXX
  * The server threads use their own WT_SESSION_IMPL handles because they may
  * want to block (for example, the eviction server calls reconciliation, and
