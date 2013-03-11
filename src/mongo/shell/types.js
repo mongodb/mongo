@@ -539,7 +539,7 @@ tojson = function(x, indent, nolint){
     case "object":{
         var s = tojsonObject(x, indent, nolint);
         if ((nolint == null || nolint == true) && s.length < 80 && (indent == null || indent.length == 0)){
-            s = s.replace(/[\s\r\n ]+/gm, " ");
+            s = s.replace(/[\t\r\n]+/gm, " ");
         }
         return s;
     }
