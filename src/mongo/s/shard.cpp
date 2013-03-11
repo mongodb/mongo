@@ -421,7 +421,8 @@ namespace mongo {
                                       false );
 
             uassert( 15847, str::stream() << "can't authenticate to server "
-                                          << conn->getServerAddress() << causedBy( err ), result );
+                                          << conn->getServerAddress() << causedBy( err ), 
+                     result );
         }
 
         if ( _shardedConnections && versionManager.isVersionableCB( conn ) ) {
