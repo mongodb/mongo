@@ -130,12 +130,9 @@ __wt_confdfl_file_meta =
 	"checksum=on,collator=,columns=,dictionary=0,format=btree,"
 	"huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,key_gap=10"
-	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
-	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
-	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_dirty_max=0,"
-	"os_cache_max=0,prefix_compression=,split_pct=75,value_format=u,"
-	"version=(major=0,minor=0)";
+	",leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB,"
+	"os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,split_pct=75"
+	",value_format=u,version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -159,15 +156,6 @@ __wt_confchk_file_meta[] = {
 	{ "key_gap", "int", "min=0", NULL},
 	{ "leaf_item_max", "int", "min=0", NULL},
 	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL},
-	{ "lsm_bloom", "boolean", NULL, NULL},
-	{ "lsm_bloom_bit_count", "int", "min=2,max=1000", NULL},
-	{ "lsm_bloom_config", "string", NULL, NULL},
-	{ "lsm_bloom_hash_count", "int", "min=2,max=100", NULL},
-	{ "lsm_bloom_newest", "boolean", NULL, NULL},
-	{ "lsm_bloom_oldest", "boolean", NULL, NULL},
-	{ "lsm_chunk_size", "int", "min=512K,max=500MB", NULL},
-	{ "lsm_merge_max", "int", "min=2,max=100", NULL},
-	{ "lsm_merge_threads", "int", "min=1,max=10", NULL},
 	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
 	{ "os_cache_dirty_max", "int", "min=0", NULL},
 	{ "os_cache_max", "int", "min=0", NULL},
