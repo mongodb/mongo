@@ -38,9 +38,9 @@ env.CppUnitTest('owned_pointer_map_test',
                 ['owned_pointer_map_test.cpp'],
                 LIBDEPS=['base'])
 
-env.CppUnitTest('parse_number_test',
-                ['parse_number_test.cpp'],
-                LIBDEPS=['base'])
+#env.CppUnitTest('parse_number_test',
+#                ['parse_number_test.cpp'],
+#                LIBDEPS=['base'])
 
 env.CppUnitTest('status_test',
                 'status_test.cpp',
