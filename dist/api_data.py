@@ -122,7 +122,7 @@ lsm_config = [
 ]
 
 # Per-file configuration
-file_config = format_meta + lsm_config + [
+file_config = format_meta + [
 	Config('allocation_size', '512B', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
@@ -351,7 +351,7 @@ methods = {
 		min='10', max='50'),
 ]),
 
-'session.create' : Method(table_only_meta + file_config + source_meta + [
+'session.create' : Method(table_only_meta + file_config + lsm_config + source_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
 		object exists, check that its settings match the specified

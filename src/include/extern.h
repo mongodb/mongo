@@ -122,7 +122,6 @@ extern int __wt_block_unmap( WT_SESSION_IMPL *session,
     size_t maplen);
 extern int __wt_block_manager_open(WT_SESSION_IMPL *session,
     const char *filename,
-    const char *config,
     const char *cfg[],
     int forced_salvage,
     WT_BM **bmp);
@@ -132,7 +131,6 @@ extern int __wt_block_manager_create(WT_SESSION_IMPL *session,
     const char *filename);
 extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
-    const char *config,
     const char *cfg[],
     int forced_salvage,
     WT_BLOCK **blockp);
@@ -267,7 +265,7 @@ extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_sync_file(WT_SESSION_IMPL *session, int syncop);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
-extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -281,8 +279,7 @@ extern int __wt_btree_get_memsize(WT_SESSION_IMPL *session,
 extern int __wt_btree_release_memsize(WT_SESSION_IMPL *session,
     WT_BTREE *btree);
 extern uint32_t __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize);
-extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
-    const char *config);
+extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
 extern int __wt_bt_read(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
@@ -570,7 +567,7 @@ extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
     const char *ckpt,
-    const char *cfg[],
+    const char *op_cfg[],
     uint32_t flags);
 extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,

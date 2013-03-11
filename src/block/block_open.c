@@ -93,8 +93,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 int
 __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
-    const char *config, const char *cfg[], int forced_salvage,
-    WT_BLOCK **blockp)
+    const char *cfg[], int forced_salvage, WT_BLOCK **blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
@@ -123,12 +122,12 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
-	/* Configuration: allocation size. */
-	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
+	/* Get the allocation size. */
+	WT_ERR(__wt_config_gets(session, cfg, "allocation_size", &cval));
 	block->allocsize = (uint32_t)cval.val;
 
 	/* Configuration: optional OS buffer cache maximum size. */
-	WT_ERR(__wt_config_getones(session, config, "os_cache_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
 	block->os_cache_max = cval.val;
 #ifdef HAVE_POSIX_FADVISE
 	if (conn->direct_io && block->os_cache_max)
@@ -142,8 +141,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 #endif
 
 	/* Configuration: optional immediate write scheduling flag. */
-	WT_ERR(
-	    __wt_config_getones(session, config, "os_cache_dirty_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "os_cache_dirty_max", &cval));
 	block->os_cache_dirty_max = cval.val;
 #ifdef HAVE_SYNC_FILE_RANGE
 	if (conn->direct_io && block->os_cache_dirty_max)
