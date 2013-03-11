@@ -26,6 +26,7 @@
 #include "mongo/db/queryoptimizer.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 
 #include "mongo/dbtests/dbtests.h"
