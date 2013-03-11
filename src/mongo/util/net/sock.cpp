@@ -29,6 +29,7 @@
 # include <arpa/inet.h>
 # include <errno.h>
 # include <netdb.h>
+# include <resolv.h>
 # if defined(__openbsd__)
 #  include <sys/uio.h>
 # endif
@@ -50,6 +51,8 @@ namespace mongo {
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
+    mongo::mutex _refreshMutex("SockAddr::_refreshMutex");
+    time_t lastRefresh;
     
     void setSockTimeouts(int sock, double secs) {
         struct timeval tv;
@@ -187,6 +190,12 @@ namespace mongo {
                 hints.ai_flags &= ~AI_NUMERICHOST;
                 ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
             }
+            if (ret) {
+                if( target != "0.0.0.0" ) {
+                    refreshResolv();
+                    ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
+                }
+            }
 
             if (ret) {
                 // we were unsuccessful
@@ -205,6 +214,21 @@ namespace mongo {
                 freeaddrinfo(addrs);
             }
         }
+    }
+
+    void refreshResolv() {
+        #if !(defined _WIN32 || defined __APPLE__)
+        //If lock is taken someone else is doing refresh
+        scoped_lock lk( _refreshMutex );
+        if ( ! lastRefresh ) {
+              res_init();
+              time(&lastRefresh);
+        }
+        if (difftime(time(NULL),lastRefresh) > MAX_REFRESH_SECS) {
+              res_init();
+              time(&lastRefresh);
+        }
+        #endif
     }
 
     bool SockAddr::isLocalHost() const {
@@ -461,13 +485,13 @@ namespace mongo {
     public:
         ConnectBG(int sock, SockAddr remote) : _sock(sock), _remote(remote) { }
 
-        void run() { _res = ::connect(_sock, _remote.raw(), _remote.addressSize); }
+        void run() { _result = ::connect(_sock, _remote.raw(), _remote.addressSize); }
         string name() const { return "ConnectBG"; }
-        int inError() const { return _res; }
+        int inError() const { return _result; }
 
     private:
         int _sock;
-        int _res;
+        int _result;
         SockAddr _remote;
     };
 
