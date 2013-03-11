@@ -1436,7 +1436,7 @@ namespace mongo {
 
                         }
                         else {
-                            error() << "moveChunk commit failed: version is at"
+                            error() << "moveChunk commit failed: version is at "
                                             << checkVersion << " instead of " << nextVersion << migrateLog;
                             error() << "TERMINATING" << migrateLog;
                             dbexit( EXIT_SHARDING_ERROR );
