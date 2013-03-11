@@ -1225,9 +1225,6 @@
     <ClInclude Include="..\db\repl\rs_config.h">
       <Filter>db\repl</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\repl\rs_optime.h">
-      <Filter>db\repl</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\repl\rs_exception.h">
       <Filter>db\repl</Filter>
     </ClInclude>
@@ -1372,13 +1369,7 @@
     <ClInclude Include="..\db\namespacestring.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\nonce.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\oplog.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\oplogreader.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\pdfile.h">
@@ -1394,9 +1385,6 @@
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\queryutil.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\repl.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\replutil.h">

@@ -1808,6 +1808,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="btree_stats.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="client_basic.cpp" />
+    <ClCompile Include="commands\apply_ops.cpp" />
     <ClCompile Include="commands\authentication_commands.cpp" />
     <ClCompile Include="commands\connection_status.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
@@ -2225,6 +2226,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="prefetch.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="repl\bgsync.cpp" />
+    <ClCompile Include="repl\finding_start_cursor.cpp" />
+    <ClCompile Include="repl\master_slave.cpp" />
+    <ClCompile Include="repl\oplogreader.cpp" />
+    <ClCompile Include="repl\optime.cpp" />
+    <ClCompile Include="repl\replication_server_status.cpp" />
+    <ClCompile Include="repl\repl_reads_ok.cpp" />
+    <ClCompile Include="repl\repl_start.cpp" />
+    <ClCompile Include="repl\sync.cpp" />
     <ClCompile Include="server_extra_log_context.cpp" />
     <ClCompile Include="server_parameters.cpp" />
     <ClCompile Include="stats\timer_stats.cpp" />
@@ -2588,7 +2597,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="querypattern.cpp" />
     <ClCompile Include="record.cpp" />
-    <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl\heartbeat.cpp" />
     <ClCompile Include="repl\manager.cpp" />
@@ -2678,9 +2686,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="record.h" />
     <ClInclude Include="replutil.h" />
     <ClInclude Include="repl\bgsync.h" />
+    <ClInclude Include="repl\finding_start_cursor.h" />
+    <ClInclude Include="repl\master_slave.h" />
+    <ClInclude Include="repl\oplogreader.h" />
+    <ClInclude Include="repl\optime.h" />
+    <ClInclude Include="repl\replication_server_status.h" />
+    <ClInclude Include="repl\repl_reads_ok.h" />
+    <ClInclude Include="repl\repl_start.h" />
     <ClInclude Include="repl\rs_exception.h" />
     <ClInclude Include="repl\rs_member.h" />
     <ClInclude Include="repl\rs_sync.h" />
+    <ClInclude Include="repl\sync.h" />
     <ClInclude Include="repl_block.h" />
     <ClInclude Include="restapi.h" />
     <ClInclude Include="server_parameters.h" />
@@ -2847,7 +2863,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="mongommf.h" />
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="namespacestring.h" />
-    <ClInclude Include="oplogreader.h" />
     <ClInclude Include="ops\count.h" />
     <ClInclude Include="ops\delete.h" />
     <ClInclude Include="ops\update.h" />
@@ -2863,10 +2878,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="pipeline\value.h" />
     <ClInclude Include="projection.h" />
     <ClInclude Include="queryutil.h" />
-    <ClInclude Include="repl.h" />
     <ClInclude Include="repl\connections.h" />
     <ClInclude Include="repl\multicmd.h" />
-    <ClInclude Include="repl\rs_optime.h" />
     <ClInclude Include="stats\counters.h" />
     <ClInclude Include="stats\service_stats.h" />
     <ClInclude Include="stats\snapshots.h" />

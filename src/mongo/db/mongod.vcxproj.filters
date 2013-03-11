@@ -695,9 +695,6 @@
     <ClCompile Include="record.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="repl.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
     <ClCompile Include="repl_block.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
@@ -1814,6 +1811,33 @@
     <ClCompile Include="..\bson\mutable\mutable_bson_test.cpp">
       <Filter>bson\mutable</Filter>
     </ClCompile>
+    <ClCompile Include="commands\apply_ops.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\finding_start_cursor.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\master_slave.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\oplogreader.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\optime.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\repl_reads_ok.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\repl_start.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\replication_server_status.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\sync.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2088,9 +2112,6 @@
     <ClInclude Include="repl\rs_config.h">
       <Filter>db\repl</Filter>
     </ClInclude>
-    <ClInclude Include="repl\rs_optime.h">
-      <Filter>db\repl</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\concurrency\rwlock.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
@@ -2283,9 +2304,6 @@
     <ClInclude Include="namespace_details.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="oplogreader.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="pagefault.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -2302,9 +2320,6 @@
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="queryutil.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="repl.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
@@ -3836,6 +3851,30 @@
     </ClInclude>
     <ClInclude Include="..\bson\mutable\element-inl.h">
       <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\finding_start_cursor.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\master_slave.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\oplogreader.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\optime.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\repl_reads_ok.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\repl_start.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\replication_server_status.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\sync.h">
+      <Filter>db\repl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
