@@ -213,15 +213,14 @@ __conn_btree_config_clear(WT_SESSION_IMPL *session)
 
 /*
  * __conn_btree_config_set --
- *	Set up the underlying object's configuration information.
+ *	Set up a btree handle's configuration information.
  */
 static int
-__conn_btree_config_set(WT_SESSION_IMPL *session, const char *cfg[])
+__conn_btree_config_set(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	u_int i;
-	const char **a, **b, *metaconf;
+	const char *metaconf;
 
 	btree = session->btree;
 
@@ -236,9 +235,6 @@ __conn_btree_config_set(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * The configuration information in descending order of importance: the
-	 * defaults, the metadata, then the specific open call's configuration.
-	 *
 	 * The defaults are included because underlying objects have persistent
 	 * configuration information stored in the metadata file.  If defaults
 	 * are included in the configuration, we can add new configuration
@@ -246,28 +242,15 @@ __conn_btree_config_set(WT_SESSION_IMPL *session, const char *cfg[])
 	 * in case a configuration string isn't initialized, as long as the new
 	 * configuration string has an appropriate default value.
 	 *
-	 * Allocate the object's configuration array.
-	 *
 	 * The error handling is a little odd, but be careful: we're holding a
 	 * chunk of allocated memory in metaconf.  If we fail before we copy a
 	 * reference to it into the object's configuration array, we must free
 	 * it, after the copy, we don't want to free it.
 	 */
-	i = 3;
-	if (cfg != NULL)
-		for (b = cfg; *b != NULL; ++b)
-			++i;
-	WT_ERR(__wt_calloc_def(session, i, &btree->cfg));
-
-	a = btree->cfg;
-	WT_ERR(__wt_strdup(session, __wt_confdfl_file_meta, a));
-	if (metaconf != NULL) {
-		*++a = metaconf;
-		metaconf = NULL;
-	}
-	if (cfg != NULL)
-		for (b = cfg; *b != NULL; ++b)
-			WT_ERR(__wt_strdup(session, *b, ++a));
+	WT_ERR(__wt_calloc_def(session, 3, &btree->cfg));
+	WT_ERR(__wt_strdup(session, __wt_confdfl_file_meta, &btree->cfg[0]));
+	btree->cfg[1] = metaconf;
+	metaconf = NULL;
 	return (0);
 
 err:	__wt_free(session, metaconf);
@@ -279,7 +262,8 @@ err:	__wt_free(session, metaconf);
  *	Open the current btree handle.
  */
 static int
-__conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+__conn_btree_open(
+	WT_SESSION_IMPL *session, const char *op_cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -301,13 +285,13 @@ __conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_btree_config_clear(session);
-	WT_RET(__conn_btree_config_set(session, cfg));
+	WT_RET(__conn_btree_config_set(session));
 
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
 	do {
-		WT_ERR(__wt_btree_open(session));
+		WT_ERR(__wt_btree_open(session, op_cfg));
 		F_SET(btree, WT_BTREE_OPEN);
 		/*
 		 * Checkpoint handles are read only, so eviction calculations
@@ -338,7 +322,7 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
  */
 int
 __wt_conn_btree_get(WT_SESSION_IMPL *session,
-    const char *name, const char *ckpt, const char *cfg[], uint32_t flags)
+    const char *name, const char *ckpt, const char *op_cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -350,7 +334,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	if (!LF_ISSET(WT_BTREE_LOCK_ONLY) &&
 	    (!F_ISSET(btree, WT_BTREE_OPEN) ||
 	    LF_ISSET(WT_BTREE_SPECIAL_FLAGS)))
-		if ((ret = __conn_btree_open(session, cfg, flags)) != 0) {
+		if ((ret = __conn_btree_open(session, op_cfg, flags)) != 0) {
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 			WT_TRET(__wt_rwunlock(session, btree->rwlock));
 		}

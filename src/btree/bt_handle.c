@@ -20,7 +20,7 @@ static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
  *	Open a Btree.
  */
 int
-__wt_btree_open(WT_SESSION_IMPL *session)
+__wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -54,12 +54,9 @@ __wt_btree_open(WT_SESSION_IMPL *session)
 
 	/* Handle salvage configuration. */
 	forced_salvage = 0;
-	if (F_ISSET(btree, WT_BTREE_SALVAGE) && btree->cfg != NULL) {
-		ret = __wt_config_gets(session, btree->cfg, "force", &cval);
-		if (ret != 0 && ret != WT_NOTFOUND)
-			WT_ERR(ret);
-		if (ret == 0 && cval.val != 0)
-			forced_salvage = 1;
+	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
+		WT_ERR(__wt_config_gets(session, op_cfg, "force", &cval));
+		forced_salvage = (cval.val != 0);
 	}
 
 	/* Initialize and configure the WT_BTREE structure. */
