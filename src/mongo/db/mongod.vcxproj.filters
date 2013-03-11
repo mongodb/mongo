@@ -163,6 +163,9 @@
     <ClCompile Include="commands\distinct.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="commands\distinctcount.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
     <ClCompile Include="geo\2d.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
