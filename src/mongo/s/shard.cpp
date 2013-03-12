@@ -339,7 +339,7 @@ namespace mongo {
         out.flush();
     }
 
-    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd , bool internal ) const {
+    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
         ScopedDbConnection conn(getConnString());
         BSONObj res;
         bool ok = conn->runCommand( db , cmd , res );
@@ -355,7 +355,7 @@ namespace mongo {
     }
 
     ShardStatus Shard::getStatus() const {
-        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) , true ) );
+        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
     }
 
     void Shard::reloadShardInfo() {

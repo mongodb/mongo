@@ -123,10 +123,10 @@ namespace mongo {
         bool ok() const { return _addr.size() > 0; }
 
         // Set internal to true to run the command with internal authentication privileges.
-        BSONObj runCommand( const string& db , const string& simple , bool internal = false ) const {
-            return runCommand( db , BSON( simple << 1 ) , internal );
+        BSONObj runCommand( const string& db , const string& simple ) const {
+            return runCommand( db , BSON( simple << 1 ) );
         }
-        BSONObj runCommand( const string& db , const BSONObj& cmd , bool internal = false) const ;
+        BSONObj runCommand( const string& db , const BSONObj& cmd ) const ;
 
         ShardStatus getStatus() const ;
         
