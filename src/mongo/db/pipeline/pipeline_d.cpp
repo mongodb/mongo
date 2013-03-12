@@ -15,12 +15,13 @@
  */
 
 #include "pch.h"
-#include "db/pipeline/pipeline.h"
-#include "db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_d.h"
 
-#include "db/cursor.h"
-#include "db/queryutil.h"
-#include "db/pipeline/document_source.h"
+#include "mongo/db/cursor.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/instance.h"
 
@@ -161,7 +162,7 @@ namespace mongo {
 
             /* try to create the cursor with the query and the sort */
             shared_ptr<Cursor> pSortedCursor(
-                pCursor = NamespaceDetailsTransient::getCursor(
+                pCursor = getOptimizedCursor(
                     fullName.c_str(), *pQueryObj, *pSortObj,
                     QueryPlanSelectionPolicy::any(), pq));
 
@@ -185,7 +186,7 @@ namespace mongo {
 
             /* try to create the cursor without the sort */
             shared_ptr<Cursor> pUnsortedCursor(
-                pCursor = NamespaceDetailsTransient::getCursor(
+                pCursor = getOptimizedCursor(
                     fullName.c_str(), *pQueryObj, BSONObj(),
                     QueryPlanSelectionPolicy::any(), pq));
 

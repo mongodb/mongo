@@ -19,6 +19,7 @@
 #include "mongo/db/queryoptimizercursorimpl.h"
 
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/query_plan_selection_policy.h"
 #include "mongo/db/query_plan_summary.h"
 #include "mongo/db/query_optimizer_internal.h"
 
@@ -353,25 +354,6 @@ namespace mongo {
             throw;
         }
         return shared_ptr<Cursor>();
-    }
-    
-    shared_ptr<Cursor>
-    NamespaceDetailsTransient::getCursor( const StringData &ns,
-                                         const BSONObj &query,
-                                         const BSONObj &order,
-                                         const QueryPlanSelectionPolicy &planPolicy,
-                                         const shared_ptr<const ParsedQuery> &parsedQuery,
-                                         bool requireOrder,
-                                         QueryPlanSummary *singlePlanSummary ) {
-
-        CursorGenerator generator( ns,
-                                   query,
-                                   order,
-                                   planPolicy,
-                                   parsedQuery,
-                                   requireOrder,
-                                   singlePlanSummary );
-        return generator.generate();
     }
     
     CursorGenerator::CursorGenerator( const StringData &ns,

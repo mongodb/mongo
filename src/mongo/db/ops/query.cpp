@@ -26,6 +26,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_plan_summary.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_optimizer_internal.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/repl/finding_start_cursor.h"
@@ -691,14 +692,13 @@ namespace mongo {
             cursor = FindingStartCursor::getCursor( ns.c_str(), query, order );
         }
         else {
-            cursor =
-                NamespaceDetailsTransient::getCursor( ns.c_str(),
-                                                      query,
-                                                      order,
-                                                      QueryPlanSelectionPolicy::any(),
-                                                      pq_shared,
-                                                      false,
-                                                      &queryPlan );
+            cursor = getOptimizedCursor( ns.c_str(),
+                                         query,
+                                         order,
+                                         QueryPlanSelectionPolicy::any(),
+                                         pq_shared,
+                                         false,
+                                         &queryPlan );
         }
         verify( cursor );
         

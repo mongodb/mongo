@@ -35,6 +35,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/replutil.h"
 #include "mongo/db/repl/oplog.h"
@@ -961,8 +963,7 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] << "n" << GTE << n );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            shared_ptr<Cursor> cursor = NamespaceDetailsTransient::bestGuessCursor(ns.c_str(),
-                                                                                   query, sort);
+            shared_ptr<Cursor> cursor = getBestGuessCursor(ns.c_str(), query, sort);
             if ( ! cursor ) {
                 errmsg = "need an index on { files_id : 1 , n : 1 }";
                 return false;

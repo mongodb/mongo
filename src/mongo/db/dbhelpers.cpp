@@ -32,7 +32,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/queryoptimizercursor.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/s/d_logic.h"
@@ -87,10 +87,12 @@ namespace mongo {
     */
     DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
         shared_ptr<Cursor> c =
-            NamespaceDetailsTransient::getCursor( ns, query, BSONObj(),
-                                                  requireIndex ?
-                                                  QueryPlanSelectionPolicy::indexOnly() :
-                                                  QueryPlanSelectionPolicy::any() );
+            getOptimizedCursor( ns,
+                                query,
+                                BSONObj(),
+                                requireIndex ?
+                                    QueryPlanSelectionPolicy::indexOnly() :
+                                    QueryPlanSelectionPolicy::any() );
         while( c->ok() ) {
             if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
                 return c->currLoc();
@@ -144,7 +146,7 @@ namespace mongo {
 
         Client::Context tx( ns );
         
-        shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns.c_str(), query );
+        shared_ptr<Cursor> c = getOptimizedCursor( ns.c_str(), query );
 
         while( c->ok() ) {
             if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {

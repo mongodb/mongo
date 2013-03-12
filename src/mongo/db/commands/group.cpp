@@ -23,10 +23,11 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/db/clientcursor.h"
 
 namespace mongo {
 
@@ -105,7 +106,7 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor(ns.c_str() , query);
+            shared_ptr<Cursor> cursor = getOptimizedCursor(ns.c_str() , query);
             ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
                                                              ns ) );
 

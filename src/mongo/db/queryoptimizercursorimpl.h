@@ -1,5 +1,3 @@
-// @file queryoptimizercursorimpl.h - A cursor interleaving multiple candidate cursors.
-
 /**
  *    Copyright (C) 2011 10gen Inc.
  *
