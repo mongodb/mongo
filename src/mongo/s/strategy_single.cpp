@@ -142,9 +142,8 @@ namespace mongo {
 
                 for ( unsigned i=0; i<shards.size(); i++ ) {
                     Shard shard = shards[i];
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getScopedDbConnection( shard.getConnString() ) );
-                    BSONObj temp = conn->get()->findOne( r.getns() , q.query );
+                    ScopedDbConnection conn(shard.getConnString());
+                    BSONObj temp = conn->findOne( r.getns() , q.query );
                     if ( temp["inprog"].isABSONObj() ) {
                         BSONObjIterator i( temp["inprog"].Obj() );
                         while ( i.more() ) {
@@ -168,7 +167,7 @@ namespace mongo {
                             arr.append( x.obj() );
                         }
                     }
-                    conn->done();
+                    conn.done();
                 }
 
                 arr.done();
@@ -200,10 +199,9 @@ namespace mongo {
                         log() << "want to kill op: " << e << endl;
                         Shard s(shard);
 
-                        scoped_ptr<ScopedDbConnection> conn(
-                                ScopedDbConnection::getScopedDbConnection( s.getConnString() ) );
-                        conn->get()->findOne( r.getns() , BSON( "op" << opid ) );
-                        conn->done();
+                        ScopedDbConnection conn(s.getConnString());
+                        conn->findOne( r.getns() , BSON( "op" << opid ) );
+                        conn.done();
                     }
                 }
             }

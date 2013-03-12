@@ -1019,18 +1019,16 @@ namespace mongo {
             ChunkVersion startingVersion;
             string myOldShard;
             {
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection(
-                                shardingState.getConfigServer(), 30));
+                ScopedDbConnection conn(shardingState.getConfigServer(), 30);
 
                 BSONObj x;
                 BSONObj currChunk;
                 try{
-                    x = conn->get()->findOne(ChunkType::ConfigNS,
+                    x = conn->findOne(ChunkType::ConfigNS,
                                              Query(BSON(ChunkType::ns(ns)))
                                                   .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
 
-                    currChunk = conn->get()->findOne(ChunkType::ConfigNS,
+                    currChunk = conn->findOne(ChunkType::ConfigNS,
                                                      shardId.wrap(ChunkType::name().c_str()));
                 }
                 catch( DBException& e ){
@@ -1044,7 +1042,7 @@ namespace mongo {
                 verify(currChunk[ChunkType::min()].type());
                 verify(currChunk[ChunkType::max()].type());
                 myOldShard = currChunk[ChunkType::shard()].String();
-                conn->done();
+                conn.done();
 
                 BSONObj currMin = currChunk[ChunkType::min()].Obj();
                 BSONObj currMax = currChunk[ChunkType::max()].Obj();
@@ -1122,21 +1120,20 @@ namespace mongo {
                 if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
                     return false;
 
-                scoped_ptr<ScopedDbConnection> connTo(
-                        ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                ScopedDbConnection connTo(toShard.getConnString());
                 BSONObj res;
                 bool ok;
                 try{
-                    ok = connTo->get()->runCommand( "admin" ,
-                                                    BSON( "_recvChunkStart" << ns <<
-                                                          "from" << fromShard.getConnString() <<
-                                                          "min" << min <<
-                                                          "max" << max <<
-                                                          "shardKeyPattern" << shardKeyPattern <<
-                                                          "configServer" << configServer.modelServer() <<
-                                                          "secondaryThrottle" << secondaryThrottle
-                                                          ) ,
-                                                    res );
+                    ok = connTo->runCommand( "admin" ,
+                                             BSON( "_recvChunkStart" << ns <<
+                                                   "from" << fromShard.getConnString() <<
+                                                   "min" << min <<
+                                                   "max" << max <<
+                                                   "shardKeyPattern" << shardKeyPattern <<
+                                                   "configServer" << configServer.modelServer() <<
+                                                   "secondaryThrottle" << secondaryThrottle
+                                             ) ,
+                                             res );
                 }
                 catch( DBException& e ){
                     errmsg = str::stream() << "moveChunk could not contact to: shard "
@@ -1145,7 +1142,7 @@ namespace mongo {
                     return false;
                 }
 
-                connTo->done();
+                connTo.done();
 
                 if ( ! ok ) {
                     errmsg = "moveChunk failed to engage TO-shard in the data transfer: ";
@@ -1165,12 +1162,11 @@ namespace mongo {
                 // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few
                 // iterations, since we want empty chunk migrations to be fast.
                 sleepmillis( 1 << std::min( i , 10 ) );
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                ScopedDbConnection conn(toShard.getConnString());
                 BSONObj res;
                 bool ok;
                 try {
-                    ok = conn->get()->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
+                    ok = conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
                     res = res.getOwned();
                 }
                 catch( DBException& e ){
@@ -1179,7 +1175,7 @@ namespace mongo {
                     return false;
                 }
 
-                conn->done();
+                conn.done();
 
                 LOG(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
@@ -1196,13 +1192,12 @@ namespace mongo {
                 if ( migrateFromStatus.mbUsed() > (500 * 1024 * 1024) ) {
                     // this is too much memory for us to use for this
                     // so we're going to abort the migrate
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                    ScopedDbConnection conn(toShard.getConnString());
 
                     BSONObj res;
-                    conn->get()->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
+                    conn->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
                     res = res.getOwned();
-                    conn->done();
+                    conn.done();
                     error() << "aborting migrate because too much memory used res: " << res << migrateLog;
                     errmsg = "aborting migrate because too much memory used";
                     result.appendBool( "split" , true );
@@ -1237,14 +1232,12 @@ namespace mongo {
                 // could be ongoing
                 {
                     BSONObj res;
-                    scoped_ptr<ScopedDbConnection> connTo(
-                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString(),
-                                                                       35.0 ) );
+                    ScopedDbConnection connTo(toShard.getConnString(), 35.0);
 
                     bool ok;
 
                     try{
-                        ok = connTo->get()->runCommand( "admin" ,
+                        ok = connTo->runCommand( "admin" ,
                                                         BSON( "_recvChunkCommit" << 1 ) ,
                                                         res );
                     }
@@ -1254,7 +1247,7 @@ namespace mongo {
                         ok = false;
                     }
 
-                    connTo->done();
+                    connTo.done();
 
                     if ( ! ok ) {
                         log() << "moveChunk migrate commit not accepted by TO-shard: " << res
@@ -1389,12 +1382,9 @@ namespace mongo {
                 bool ok = false;
                 BSONObj cmdResult;
                 try {
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getInternalScopedDbConnection(
-                                    shardingState.getConfigServer(),
-                                    10.0 ) );
-                    ok = conn->get()->runCommand( "config" , cmd , cmdResult );
-                    conn->done();
+                    ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
+                    ok = conn->runCommand( "config" , cmd , cmdResult );
+                    conn.done();
                 }
                 catch ( DBException& e ) {
                     warning() << e << migrateLog;
@@ -1417,16 +1407,13 @@ namespace mongo {
                     sleepsecs( 10 );
 
                     try {
-                        scoped_ptr<ScopedDbConnection> conn(
-                                ScopedDbConnection::getInternalScopedDbConnection(
-                                        shardingState.getConfigServer(),
-                                        10.0 ) );
+                        ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
 
                         // look for the chunk in this shard whose version got bumped
                         // we assume that if that mod made it to the config, the applyOps was successful
-                        BSONObj doc = conn->get()->findOne(ChunkType::ConfigNS,
-                                                           Query(BSON(ChunkType::ns(ns)))
-                                                               .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+                        BSONObj doc = conn->findOne(ChunkType::ConfigNS,
+                                                    Query(BSON(ChunkType::ns(ns)))
+                                                        .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
 
                         ChunkVersion checkVersion =
                             ChunkVersion::fromBSON(doc[ChunkType::DEPRECATED_lastmod()]);
@@ -1442,7 +1429,7 @@ namespace mongo {
                             dbexit( EXIT_SHARDING_ERROR );
                         }
 
-                        conn->done();
+                        conn.done();
 
                     }
                     catch ( ... ) {
@@ -1563,9 +1550,7 @@ namespace mongo {
             string errmsg;
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , errmsg );
 
-            scoped_ptr<ScopedDbConnection> connPtr(
-                    ScopedDbConnection::getScopedDbConnection( from ) );
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(from);
             conn->getLastError(); // just test connection
 
             {

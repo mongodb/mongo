@@ -66,13 +66,10 @@ namespace mongo {
         string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        scoped_ptr<ScopedDbConnection> connPtr;
-
         string workingSuffix = genWorkingSuffix(lastUpgradeId);
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(configLoc, 30);
 
             // Drop old upgrade collections on config server
 
@@ -118,6 +115,7 @@ namespace mongo {
                          BSON("$set" << BSON(LocksType::state(0))),
                          false, true); // multi
             _checkGLE(conn);
+            conn.done();
 
         }
         catch (const DBException& e) {
@@ -128,7 +126,6 @@ namespace mongo {
             return false;
         }
 
-        connPtr->done();
         return true;
     }
 
@@ -281,29 +278,23 @@ namespace mongo {
         newVersionInfo.setUpgradeState(BSONObj());
 
         // Write our upgrade id and state
-        {
-            scoped_ptr<ScopedDbConnection> connPtr;
+        try {
+            ScopedDbConnection conn(configLoc, 30);
 
-            try {
-                connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-                ScopedDbConnection& conn = *connPtr;
+            verify(newVersionInfo.isValid(NULL));
 
-                verify(newVersionInfo.isValid(NULL));
+            conn->update(VersionType::ConfigNS,
+                         BSON("_id" << 1 << VersionType::version_DEPRECATED(3)),
+                         newVersionInfo.toBSON());
+            _checkGLE(conn);
+            conn.done();
+        }
+        catch (const DBException& e) {
 
-                conn->update(VersionType::ConfigNS,
-                             BSON("_id" << 1 << VersionType::version_DEPRECATED(3)),
-                             newVersionInfo.toBSON());
-                _checkGLE(conn);
-            }
-            catch (const DBException& e) {
+            *errMsg = stream() << "could not initialize version info for upgrade"
+                               << causedBy(e);
 
-                *errMsg = stream() << "could not initialize version info for upgrade"
-                                   << causedBy(e);
-
-                return false;
-            }
-
-            connPtr->done();
+            return false;
         }
 
         //
@@ -477,16 +468,13 @@ namespace mongo {
                 log() << "writing new epoch " << newEpoch << " for " << collection.getNS()
                       << " collection..." << endl;
 
-                scoped_ptr<ScopedDbConnection> connPtr;
-
                 try {
-                    connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-                    ScopedDbConnection& conn = *connPtr;
-
+                    ScopedDbConnection conn(configLoc, 30);
                     conn->update(CollectionType::ConfigNS + workingSuffix,
                                  BSON(CollectionType::ns(collection.getNS())),
                                  BSON("$set" << BSON(CollectionType::DEPRECATED_lastmodEpoch(newEpoch))));
                     _checkGLE(conn);
+                    conn.done();
                 }
                 catch (const DBException& e) {
 
@@ -496,7 +484,6 @@ namespace mongo {
                     return false;
                 }
 
-                connPtr->done();
                 collection.setEpoch(newEpoch);
             }
 
@@ -510,106 +497,95 @@ namespace mongo {
             log() << "writing epoch " << epoch << " for " << chunks.size() << " chunks in "
                   << collection.getNS() << " collection..." << endl;
 
-            {
-                scoped_ptr<ScopedDbConnection> connPtr;
+            try {
+                ScopedDbConnection conn(configLoc, 30);
 
-                try {
-                    connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-                    ScopedDbConnection& conn = *connPtr;
+                // Multi-update of all chunks
+                conn->update(ChunkType::ConfigNS + workingSuffix,
+                             BSON(ChunkType::ns(collection.getNS())),
+                             BSON("$set" << BSON(ChunkType::DEPRECATED_epoch(epoch))),
+                             false,
+                             true); // multi
+                _checkGLE(conn);
+                conn.done();
+            }
+            catch (const DBException& e) {
 
-                    // Multi-update of all chunks
-                    conn->update(ChunkType::ConfigNS + workingSuffix,
-                                 BSON(ChunkType::ns(collection.getNS())),
-                                 BSON("$set" << BSON(ChunkType::DEPRECATED_epoch(epoch))),
-                                 false,
-                                 true); // multi
-                    _checkGLE(conn);
-                }
-                catch (const DBException& e) {
+                *errMsg = stream() << "could not write a new epoch " << epoch.toString()
+                                   << " for chunks in " << collection.getNS() << causedBy(e);
 
-                    *errMsg = stream() << "could not write a new epoch " << epoch.toString()
-                                       << " for chunks in " << collection.getNS() << causedBy(e);
-
-                    return false;
-                }
-
-                connPtr->done();
+                return false;
             }
         }
 
         //
         // Paranoid verify the collection writes
         //
+        try {
+            ScopedDbConnection conn(configLoc, 30);
 
-        {
-            scoped_ptr<ScopedDbConnection> connPtr;
+            // Find collections with no epochs
+            BSONObj emptyDoc =
+                    conn->findOne(CollectionType::ConfigNS + workingSuffix,
+                                  BSON("$unset" <<
+                                       BSON(CollectionType::DEPRECATED_lastmodEpoch() << 1)));
 
-            try {
-                connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-                ScopedDbConnection& conn = *connPtr;
+            if (!emptyDoc.isEmpty()) {
 
-                // Find collections with no epochs
-                BSONObj emptyDoc =
-                        conn->findOne(CollectionType::ConfigNS + workingSuffix,
-                                      BSON("$unset" << BSON(CollectionType::DEPRECATED_lastmodEpoch() << 1)));
+                *errMsg = stream() << "collection " << emptyDoc
+                                   << " is still missing epoch after config upgrade";
 
-                if (!emptyDoc.isEmpty()) {
-
-                    *errMsg = stream() << "collection " << emptyDoc
-                                       << " is still missing epoch after config upgrade";
-
-                    connPtr->done();
-                    return false;
-                }
-
-                // Find collections with empty epochs
-                emptyDoc = conn->findOne(CollectionType::ConfigNS + workingSuffix,
-                                         BSON(CollectionType::DEPRECATED_lastmodEpoch(OID())));
-
-                if (!emptyDoc.isEmpty()) {
-
-                    *errMsg = stream() << "collection " << emptyDoc
-                                       << " still has empty epoch after config upgrade";
-
-                    connPtr->done();
-                    return false;
-                }
-
-                // Find chunks with no epochs
-                emptyDoc =
-                        conn->findOne(ChunkType::ConfigNS + workingSuffix,
-                                      BSON("$unset" << BSON(ChunkType::DEPRECATED_epoch() << 1)));
-
-                if (!emptyDoc.isEmpty()) {
-
-                    *errMsg = stream() << "chunk " << emptyDoc
-                                       << " is still missing epoch after config upgrade";
-
-                    connPtr->done();
-                    return false;
-                }
-
-                // Find chunks with empty epochs
-                emptyDoc = conn->findOne(ChunkType::ConfigNS + workingSuffix,
-                                         BSON(ChunkType::DEPRECATED_epoch(OID())));
-
-                if (!emptyDoc.isEmpty()) {
-
-                    *errMsg = stream() << "chunk " << emptyDoc
-                                       << " still has empty epoch after config upgrade";
-
-                    connPtr->done();
-                    return false;
-                }
-            }
-            catch (const DBException& e) {
-
-                *errMsg = stream() << "could not verify epoch writes" << causedBy(e);
-
+                conn.done();
                 return false;
             }
 
-            connPtr->done();
+            // Find collections with empty epochs
+            emptyDoc = conn->findOne(CollectionType::ConfigNS + workingSuffix,
+                                     BSON(CollectionType::DEPRECATED_lastmodEpoch(OID())));
+
+            if (!emptyDoc.isEmpty()) {
+
+                *errMsg = stream() << "collection " << emptyDoc
+                                   << " still has empty epoch after config upgrade";
+
+                conn.done();
+                return false;
+            }
+
+            // Find chunks with no epochs
+            emptyDoc =
+                    conn->findOne(ChunkType::ConfigNS + workingSuffix,
+                                  BSON("$unset" << BSON(ChunkType::DEPRECATED_epoch() << 1)));
+
+            if (!emptyDoc.isEmpty()) {
+
+                *errMsg = stream() << "chunk " << emptyDoc
+                                   << " is still missing epoch after config upgrade";
+
+                conn.done();
+                return false;
+            }
+
+            // Find chunks with empty epochs
+            emptyDoc = conn->findOne(ChunkType::ConfigNS + workingSuffix,
+                                     BSON(ChunkType::DEPRECATED_epoch(OID())));
+
+            if (!emptyDoc.isEmpty()) {
+
+                *errMsg = stream() << "chunk " << emptyDoc
+                                   << " still has empty epoch after config upgrade";
+
+                conn.done();
+                return false;
+            }
+
+            conn.done();
+        }
+        catch (const DBException& e) {
+
+            *errMsg = stream() << "could not verify epoch writes" << causedBy(e);
+
+            return false;
         }
 
         //
@@ -647,36 +623,30 @@ namespace mongo {
 
         newVersionInfo.setUpgradeState(BSON(inCriticalSectionField(true)));
 
-        {
-            scoped_ptr<ScopedDbConnection> connPtr;
+        try {
+            ScopedDbConnection conn(configLoc, 30);
 
-            try {
-                connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-                ScopedDbConnection& conn = *connPtr;
+            verify(newVersionInfo.isValid(NULL));
 
-                verify(newVersionInfo.isValid(NULL));
+            conn->update(VersionType::ConfigNS,
+                         BSON("_id" << 1 << VersionType::version_DEPRECATED(3)),
+                         newVersionInfo.toBSON());
+            _checkGLE(conn);
+            conn.done();
+        }
+        catch (const DBException& e) {
 
-                conn->update(VersionType::ConfigNS,
-                             BSON("_id" << 1 << VersionType::version_DEPRECATED(3)),
-                             newVersionInfo.toBSON());
-                _checkGLE(conn);
-            }
-            catch (const DBException& e) {
+            // No cleanup message here since we're not sure if we wrote or not, and
+            // not dangerous either way except to prevent further updates (at which point
+            // the message is printed)
+            *errMsg = stream()
+                    << "could not update version info to enter critical update section"
+                    << causedBy(e);
 
-                // No cleanup message here since we're not sure if we wrote or not, and
-                // not dangerous either way except to prevent further updates (at which point
-                // the message is printed)
-                *errMsg = stream()
-                        << "could not update version info to enter critical update section"
-                        << causedBy(e);
-
-                return false;
-            }
-
-            // AT THIS POINT ANY FAILURE REQUIRES MANUAL INTERVENTION!
-            connPtr->done();
+            return false;
         }
 
+        // AT THIS POINT ANY FAILURE REQUIRES MANUAL INTERVENTION!
         log() << "entered critical section for config upgrade" << endl;
 
         Status overwriteStatus = overwriteCollection(configLoc,
@@ -729,30 +699,25 @@ namespace mongo {
 
         log() << "writing new version info and clusterId " << newClusterId << "..." << endl;
 
-        {
-            scoped_ptr<ScopedDbConnection> connPtr;
+        try {
+            ScopedDbConnection conn(configLoc, 30);
 
-            try {
-                connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-                ScopedDbConnection& conn = *connPtr;
+            verify(newVersionInfo.isValid(NULL));
 
-                verify(newVersionInfo.isValid(NULL));
+            conn->update(VersionType::ConfigNS,
+                         BSON("_id" << 1 <<
+                              VersionType::version_DEPRECATED(UpgradeHistory_NoEpochVersion)),
+                         newVersionInfo.toBSON());
+            _checkGLE(conn);
+            conn.done();
+        }
+        catch (const DBException& e) {
 
-                conn->update(VersionType::ConfigNS,
-                             BSON("_id" << 1 << VersionType::version_DEPRECATED(UpgradeHistory_NoEpochVersion)),
-                             newVersionInfo.toBSON());
-                _checkGLE(conn);
-            }
-            catch (const DBException& e) {
+            error() << cleanupMessage << endl;
+            *errMsg = stream() << "could not write new version info "
+                               << "and exit critical upgrade section" << causedBy(e);
 
-                error() << cleanupMessage << endl;
-                *errMsg = stream() << "could not write new version info "
-                                   << "and exit critical upgrade section" << causedBy(e);
-
-                return false;
-            }
-
-            connPtr->done();
+            return false;
         }
 
         //

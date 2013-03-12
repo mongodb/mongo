@@ -242,8 +242,7 @@ namespace mongo_test {
                 size_t newConnsToCreate) {
             vector<ScopedDbConnection*> newConnList;
             for (size_t x = 0; x < newConnsToCreate; x++) {
-                ScopedDbConnection* newConn =
-                        ScopedDbConnection::getScopedDbConnection(TARGET_HOST);
+                ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
                 checkFunc(newConn->get()->getSockCreationMicroSec(), arg2);
                 newConnList.push_back(newConn);
             }
@@ -260,8 +259,7 @@ namespace mongo_test {
 
             // Check that connections created after the purge was put back to the pool.
             for (size_t x = 0; x < newConnsToCreate; x++) {
-                ScopedDbConnection* newConn =
-                        ScopedDbConnection::getScopedDbConnection(TARGET_HOST);
+                ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
                 ASSERT_LESS_THAN(newConn->get()->getSockCreationMicroSec(), oldCreationTime);
                 newConnList.push_back(newConn);
             }
@@ -283,32 +281,26 @@ namespace mongo_test {
     };
 
     TEST_F(DummyServerFixture, BasicScopedDbConnection) {
-        scoped_ptr<ScopedDbConnection> conn1(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        scoped_ptr<ScopedDbConnection> conn2(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
+        ScopedDbConnection conn1(TARGET_HOST);
+        ScopedDbConnection conn2(TARGET_HOST);
 
-        DBClientBase* conn1Ptr = conn1->get();
-        conn1->done();
+        DBClientBase* conn1Ptr = conn1.get();
+        conn1.done();
 
-        scoped_ptr<ScopedDbConnection> conn3(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        ASSERT_EQUALS(conn1Ptr, conn3->get());
+        ScopedDbConnection conn3(TARGET_HOST);
+        ASSERT_EQUALS(conn1Ptr, conn3.get());
 
-        conn2->done();
-        conn3->done();
+        conn2.done();
+        conn3.done();
     }
 
     TEST_F(DummyServerFixture, InvalidateBadConnInPool) {
-        scoped_ptr<ScopedDbConnection> conn1(
-            ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        scoped_ptr<ScopedDbConnection> conn2(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        scoped_ptr<ScopedDbConnection> conn3(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
+        ScopedDbConnection conn1(TARGET_HOST);
+        ScopedDbConnection conn2(TARGET_HOST);
+        ScopedDbConnection conn3(TARGET_HOST);
 
-        conn1->done();
-        conn3->done();
+        conn1.done();
+        conn3.done();
 
         const uint64_t badCreationTime = mongo::curTimeMicros64();
 
@@ -316,33 +308,30 @@ namespace mongo_test {
                 setMode(FailPoint::alwaysOn);
 
         try {
-            conn2->get()->query("test.user", mongo::Query());
+            conn2->query("test.user", mongo::Query());
         }
         catch (const mongo::SocketException&) {
         }
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
                 setMode(FailPoint::off);
-        conn2->done();
+        conn2.done();
 
         checkNewConns(assertGreaterThan, badCreationTime, 10);
     }
 
     TEST_F(DummyServerFixture, DontReturnKnownBadConnToPool) {
-        scoped_ptr<ScopedDbConnection> conn1(
-            ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        scoped_ptr<ScopedDbConnection> conn2(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        scoped_ptr<ScopedDbConnection> conn3(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
+        ScopedDbConnection conn1(TARGET_HOST);
+        ScopedDbConnection conn2(TARGET_HOST);
+        ScopedDbConnection conn3(TARGET_HOST);
 
-        conn1->done();
+        conn1.done();
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
                 setMode(FailPoint::alwaysOn);
 
         try {
-            conn3->get()->query("test.user", mongo::Query());
+            conn3->query("test.user", mongo::Query());
         }
         catch (const mongo::SocketException&) {
         }
@@ -350,10 +339,10 @@ namespace mongo_test {
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
                 setMode(FailPoint::off);
 
-        const uint64_t badCreationTime = conn3->get()->getSockCreationMicroSec();
-        conn3->done();
+        const uint64_t badCreationTime = conn3->getSockCreationMicroSec();
+        conn3.done();
         // attempting to put a 'bad' connection back to the pool
-        conn2->done();
+        conn2.done();
 
         checkNewConns(assertGreaterThan, badCreationTime, 10);
     }
@@ -361,15 +350,12 @@ namespace mongo_test {
     TEST_F(DummyServerFixture, InvalidateBadConnEvenWhenPoolIsFull) {
         mongo::PoolForHost::setMaxPerHost(2);
 
-        scoped_ptr<ScopedDbConnection> conn1(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        scoped_ptr<ScopedDbConnection> conn2(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        scoped_ptr<ScopedDbConnection> conn3(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
+        ScopedDbConnection conn1(TARGET_HOST);
+        ScopedDbConnection conn2(TARGET_HOST);
+        ScopedDbConnection conn3(TARGET_HOST);
 
-        conn1->done();
-        conn3->done();
+        conn1.done();
+        conn3.done();
 
         const uint64_t badCreationTime = mongo::curTimeMicros64();
 
@@ -377,32 +363,30 @@ namespace mongo_test {
                 setMode(FailPoint::alwaysOn);
 
         try {
-            conn2->get()->query("test.user", mongo::Query());
+            conn2->query("test.user", mongo::Query());
         }
         catch (const mongo::SocketException&) {
         }
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
                 setMode(FailPoint::off);
-        conn2->done();
+        conn2.done();
 
         checkNewConns(assertGreaterThan, badCreationTime, 2);
     }
 
     TEST_F(DummyServerFixture, DontReturnConnGoneBadToPool) {
-        scoped_ptr<ScopedDbConnection> conn1(
-            ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
+        ScopedDbConnection conn1(TARGET_HOST);
 
-        const uint64_t conn1CreationTime = conn1->get()->getSockCreationMicroSec();
+        const uint64_t conn1CreationTime = conn1->getSockCreationMicroSec();
 
         uint64_t conn2CreationTime = 0;
 
         {
-            scoped_ptr<ScopedDbConnection> conn2(
-                    ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-            conn2CreationTime = conn2->get()->getSockCreationMicroSec();
+            ScopedDbConnection conn2(TARGET_HOST);
+            conn2CreationTime = conn2->getSockCreationMicroSec();
 
-            conn1->done();
+            conn1.done();
             // conn2 gets out of scope without calling done()
         }
 
@@ -410,12 +394,11 @@ namespace mongo_test {
         // also not invalidate older connections since it didn't encounter
         // a socket exception.
 
-        scoped_ptr<ScopedDbConnection> conn1Again(
-                ScopedDbConnection::getScopedDbConnection(TARGET_HOST));
-        ASSERT_EQUALS(conn1CreationTime, conn1Again->get()->getSockCreationMicroSec());
+        ScopedDbConnection conn1Again(TARGET_HOST);
+        ASSERT_EQUALS(conn1CreationTime, conn1Again->getSockCreationMicroSec());
 
         checkNewConns(assertNotEqual, conn2CreationTime, 10);
 
-        conn1Again->done();
+        conn1Again.done();
     }
 }

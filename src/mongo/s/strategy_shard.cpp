@@ -206,15 +206,14 @@ namespace mongo {
                 // we used ScopedDbConnection because we don't get about config versions
                 // not deleting data is handled elsewhere
                 // and we don't want to call setShardVersion
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( host ) );
+                ScopedDbConnection conn(host);
 
                 Message response;
-                bool ok = conn->get()->callRead( r.m() , response);
+                bool ok = conn->callRead( r.m() , response);
                 uassert( 10204 , "dbgrid: getmore: error calling db", ok);
                 r.reply( response , "" /*conn->getServerAddress() */ );
 
-                conn->done();
+                conn.done();
                 return;
             }
             else {

@@ -164,14 +164,10 @@ namespace mongo {
 
     // Gets the config version information from the config server
     Status getConfigVersion(const ConnectionString& configLoc, VersionType* versionInfo) {
-
-        scoped_ptr<ScopedDbConnection> connPtr;
-
         try {
             versionInfo->clear();
 
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(configLoc, 30);
 
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version",
                                                                       BSONObj())));
@@ -192,7 +188,7 @@ namespace mongo {
                     versionInfo->setCurrentVersion(UpgradeHistory_EmptyVersion);
                 }
 
-                connPtr->done();
+                conn.done();
                 return Status::OK();
             }
 
@@ -200,7 +196,7 @@ namespace mongo {
             string errMsg;
 
             if (!versionInfo->parseBSON(versionDoc, &errMsg) || !versionInfo->isValid(&errMsg)) {
-                connPtr->done();
+                conn.done();
 
                 return Status(ErrorCodes::UnsupportedFormat,
                               stream() << "invalid config version document " << versionDoc
@@ -208,18 +204,18 @@ namespace mongo {
             }
 
             if (cursor->more()) {
-                connPtr->done();
+                conn.done();
 
                 return Status(ErrorCodes::RemoteValidationError,
                               stream() << "should only have 1 document "
                                        << "in config.version collection");
             }
+            conn.done();
         }
         catch (const DBException& e) {
             return e.toStatus();
         }
 
-        connPtr->done();
         return Status::OK();
     }
 
@@ -282,22 +278,17 @@ namespace mongo {
     bool _isBalancerStopped(const ConnectionString& configLoc, string* errMsg) {
         
         // Get the balancer information
-        scoped_ptr<ScopedDbConnection> connPtr;
-        
         BSONObj balancerDoc;
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-            
+            ScopedDbConnection conn(configLoc, 30);
             balancerDoc = conn->findOne(SettingsType::ConfigNS,
                                         BSON(SettingsType::key("balancer")));
+            conn.done();
         }
         catch (const DBException& e) {
             *errMsg = e.toString();
             return false;
         }
-
-        connPtr->done();
         
         return balancerDoc[SettingsType::balancerStopped()].trueValue();
     }
@@ -305,14 +296,10 @@ namespace mongo {
     // Checks that all config servers are online
     bool _checkConfigServersAlive(const ConnectionString& configLoc, string* errMsg) {
         
-        scoped_ptr<ScopedDbConnection> connPtr;
-
         bool resultOk;
         BSONObj result;
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-            
+            ScopedDbConnection conn(configLoc, 30);
             if (conn->type() == ConnectionString::SYNC) {
                 // TODO: Dynamic cast is bad, we need a better way of managing this op
                 // via the heirarchy (or not)
@@ -323,13 +310,12 @@ namespace mongo {
             else {
                 resultOk = conn->runCommand("admin", BSON( "fsync" << 1 ), result); 
             }
+            conn.done();
         }
         catch (const DBException& e) {
             *errMsg = e.toString();
             return false;
         }
-
-        connPtr->done();
         
         if (!resultOk) {
             *errMsg = DBClientWithCommands::getLastErrorString(result);

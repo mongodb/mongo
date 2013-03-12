@@ -630,19 +630,18 @@ namespace mongo {
         /* replSetGetStatus requires admin auth so use a connection from the pool,
          * and tell it to use the internal credentials.
          */
-        scoped_ptr<ScopedDbConnection> authenticatedConn(
-                ScopedDbConnection::getInternalScopedDbConnection( hostAddr, 5.0 ) );
+        ScopedDbConnection authenticatedConn(hostAddr, 5.0);
 
-        if ( !authenticatedConn->get()->runCommand( "admin",
-                                                    BSON( "replSetGetStatus" << 1 ),
-                                                    status )) {
+        if ( !authenticatedConn->runCommand( "admin",
+                                             BSON( "replSetGetStatus" << 1 ),
+                                             status )) {
             LOG(1) << "dbclient_rs replSetGetStatus failed" << status << endl;
-            authenticatedConn->done(); // connection worked properly, but we got an error from server
+            authenticatedConn.done(); // connection worked properly, but we got an error from server
             return;
         }
 
         // Make sure we return when finished
-        authenticatedConn->done();
+        authenticatedConn.done();
 
         if( !status.hasField("members") ) { 
             log() << "dbclient_rs error expected members field in replSetGetStatus result" << endl;

@@ -596,25 +596,23 @@ namespace mongo {
             string shard;
             ChunkInfo origChunk;
             {
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection(
-                                shardingState.getConfigServer(), 30));
+                ScopedDbConnection conn(shardingState.getConfigServer(), 30);
 
-                BSONObj x = conn->get()->findOne(ChunkType::ConfigNS,
-                                                 Query(BSON(ChunkType::ns(ns)))
-                                                     .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+                BSONObj x = conn->findOne(ChunkType::ConfigNS,
+                                          Query(BSON(ChunkType::ns(ns)))
+                                              .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
 
                 maxVersion = ChunkVersion::fromBSON(x, ChunkType::DEPRECATED_lastmod());
 
                 BSONObj currChunk =
-                    conn->get()->findOne(ChunkType::ConfigNS,
-                                         shardId.wrap(ChunkType::name().c_str())).getOwned();
+                    conn->findOne(ChunkType::ConfigNS,
+                                  shardId.wrap(ChunkType::name().c_str())).getOwned();
 
                 verify(currChunk[ChunkType::shard()].type());
                 verify(currChunk[ChunkType::min()].type());
                 verify(currChunk[ChunkType::max()].type());
                 shard = currChunk[ChunkType::shard()].String();
-                conn->done();
+                conn.done();
 
                 BSONObj currMin = currChunk[ChunkType::min()].Obj();
                 BSONObj currMax = currChunk[ChunkType::max()].Obj();
@@ -744,11 +742,9 @@ namespace mongo {
             bool ok;
             BSONObj cmdResult;
             {
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection(
-                                shardingState.getConfigServer(), 30));
-                ok = conn->get()->runCommand( "config" , cmd , cmdResult );
-                conn->done();
+                ScopedDbConnection conn(shardingState.getConfigServer(), 30);
+                ok = conn->runCommand( "config" , cmd , cmdResult );
+                conn.done();
             }
 
             if ( ! ok ) {

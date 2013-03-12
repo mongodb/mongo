@@ -107,10 +107,7 @@ namespace mongo {
                 Date_t pingTime;
 
                 try {
-                    scoped_ptr<ScopedDbConnection> connPtr(
-                            ScopedDbConnection::getInternalScopedDbConnection( addr.toString(),
-                                                                               30.0 ) );
-                    ScopedDbConnection& conn = *connPtr;
+                    ScopedDbConnection conn(addr.toString(), 30.0);
 
                     pingTime = jsTime();
 
@@ -376,17 +373,16 @@ namespace mongo {
     Date_t DistributedLock::remoteTime( const ConnectionString& cluster, unsigned long long maxNetSkew ) {
 
         ConnectionString server( *cluster.getServers().begin() );
-        scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getInternalScopedDbConnection( server.toString() ) );
+        ScopedDbConnection conn(server.toString());
 
         BSONObj result;
         long long delay;
 
         try {
             Date_t then = jsTime();
-            bool success = conn->get()->runCommand( string("admin"),
-                                                    BSON( "serverStatus" << 1 ),
-                                                    result );
+            bool success = conn->runCommand( string("admin"),
+                                             BSON( "serverStatus" << 1 ),
+                                             result );
             delay = jsTime() - then;
 
             if( !success )
@@ -403,11 +399,11 @@ namespace mongo {
                                              << maxNetSkew << "ms", 13648 );
         }
         catch(...) {
-            conn->done();
+            conn.done();
             throw;
         }
 
-        conn->done();
+        conn.done();
 
         return result["localTime"].Date() - (delay / 2);
 
@@ -519,9 +515,7 @@ namespace mongo {
         if ( other == NULL )
             other = &dummyOther;
 
-        scoped_ptr<ScopedDbConnection> connPtr(
-                ScopedDbConnection::getInternalScopedDbConnection( _conn.toString() ) );
-        ScopedDbConnection& conn = *connPtr;
+        ScopedDbConnection conn(_conn.toString());
 
         BSONObjBuilder queryBuilder;
         queryBuilder.append( LocksType::name() , _name );
@@ -806,9 +800,7 @@ namespace mongo {
             //   our own safe ts value and not be unlocked afterward.
             for ( unsigned i = 0; i < up.size(); i++ ) {
 
-                scoped_ptr<ScopedDbConnection> indDBPtr(
-                        ScopedDbConnection::getInternalScopedDbConnection( up[i].first ) );
-                ScopedDbConnection& indDB = *indDBPtr;
+                ScopedDbConnection indDB(up[i].first);
                 BSONObj indUpdate;
 
                 try {
@@ -965,9 +957,7 @@ namespace mongo {
 
         while ( ++attempted <= maxAttempts ) {
 
-            scoped_ptr<ScopedDbConnection> connPtr(
-                    ScopedDbConnection::getInternalScopedDbConnection( _conn.toString() ) );
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(_conn.toString());
 
             try {
 

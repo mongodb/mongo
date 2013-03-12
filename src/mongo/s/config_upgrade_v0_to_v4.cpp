@@ -58,17 +58,14 @@ namespace mongo {
 
         verify(versionInfo.isValid(NULL));
 
-        scoped_ptr<ScopedDbConnection> connPtr;
-
         // If the cluster has not previously been initialized, we need to set the version before
         // using so subsequent mongoses use the config data the same way.  This requires all three
         // config servers online initially.
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-
+            ScopedDbConnection conn(configLoc, 30);
             conn->update(VersionType::ConfigNS, BSON("_id" << 1), versionInfo.toBSON(), true);
             _checkGLE(conn);
+            conn.done();
         }
         catch (const DBException& e) {
 
@@ -77,7 +74,6 @@ namespace mongo {
             return false;
         }
 
-        connPtr->done();
         return true;
     }
 

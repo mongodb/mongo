@@ -46,15 +46,13 @@ namespace mongo {
 
             list<BSONObj> all;
             {
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection(
-                                configServer.getPrimary().getConnString(), 30));
-                auto_ptr<DBClientCursor> c = conn->get()->query(ShardType::ConfigNS , Query());
+                ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
+                auto_ptr<DBClientCursor> c = conn->query(ShardType::ConfigNS , Query());
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
                 while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
                 }
-                conn->done();
+                conn.done();
             }
 
             scoped_lock lk( _mutex );
@@ -342,23 +340,17 @@ namespace mongo {
     }
 
     BSONObj Shard::runCommand( const string& db , const BSONObj& cmd , bool internal ) const {
-        scoped_ptr<ScopedDbConnection> conn;
-
-        if ( internal ) {
-            conn.reset( ScopedDbConnection::getInternalScopedDbConnection( getConnString() ) );
-        } else {
-            conn.reset( ScopedDbConnection::getScopedDbConnection( getConnString() ) );
-        }
+        ScopedDbConnection conn(getConnString());
         BSONObj res;
-        bool ok = conn->get()->runCommand( db , cmd , res );
+        bool ok = conn->runCommand( db , cmd , res );
         if ( ! ok ) {
             stringstream ss;
             ss << "runCommand (" << cmd << ") on shard (" << _name << ") failed : " << res;
-            conn->done();
+            conn.done();
             throw UserException( 13136 , ss.str() );
         }
         res = res.getOwned();
-        conn->done();
+        conn.done();
         return res;
     }
 

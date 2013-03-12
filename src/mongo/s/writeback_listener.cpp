@@ -158,23 +158,22 @@ namespace mongo {
                     needsToReloadShardInfo = false;
                 }
 
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection( _addr ) );
+                ScopedDbConnection conn(_addr);
 
                 BSONObj result;
 
                 {
                     BSONObjBuilder cmd;
                     cmd.appendOID( "writebacklisten" , &serverID ); // Command will block for data
-                    if ( ! conn->get()->runCommand( "admin" , cmd.obj() , result ) ) {
+                    if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ) {
                         result = result.getOwned();
                         log() <<  "writebacklisten command failed!  "  << result << endl;
-                        conn->done();
+                        conn.done();
                         continue;
                     }
 
                 }
-                conn->done();
+                conn.done();
 
                 LOG(1) << "writebacklisten result: " << result << endl;
 
