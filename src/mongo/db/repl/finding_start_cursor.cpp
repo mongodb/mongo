@@ -18,7 +18,7 @@
 
 #include "mongo/db/cursor.h"
 #include "mongo/db/matcher.h"
-
+#include "mongo/db/query_plan.h"
 
 namespace mongo {
 

@@ -22,7 +22,6 @@
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/queryoptimizer.h"
 
 namespace mongo {
     
