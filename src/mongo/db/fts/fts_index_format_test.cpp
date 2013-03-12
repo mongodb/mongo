@@ -91,6 +91,18 @@ namespace mongo {
             ASSERT( i.next().numberDouble() > 0 );
         }
 
+        TEST( FTSIndexFormat, StopWords1 ) {
+            FTSSpec spec( FTSSpec::fixSpec( BSON( "key" << BSON( "data" << "text" ) ) ) );
+
+            BSONObjSet keys1;
+            FTSIndexFormat::getKeys( spec, BSON( "data" << "computer" ), &keys1 );
+            ASSERT_EQUALS( 1U, keys1.size() );
+
+            BSONObjSet keys2;
+            FTSIndexFormat::getKeys( spec, BSON( "data" << "any computer" ), &keys2 );
+            ASSERT_EQUALS( 1U, keys2.size() );
+        }
+
 
     }
 }

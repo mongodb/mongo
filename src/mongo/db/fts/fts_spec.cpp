@@ -216,9 +216,9 @@ namespace mongo {
 
                 string term = t.data.toString();
                 makeLower( &term );
-                term = tools.stemmer->stem( term );
                 if ( tools.stopwords->isStopWord( term ) )
                     continue;
+                term = tools.stemmer->stem( term );
 
                 ScoreHelperStruct& data = terms[term];
 
