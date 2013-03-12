@@ -1462,6 +1462,14 @@ namespace mongo {
             if( d )
                 result.appendNumber( "nsSizeMB", (int) d->namespaceIndex.fileLength() / 1024 / 1024 );
 
+            BSONObjBuilder dataFileVersion( result.subobjStart( "dataFileVersion" ) );
+            if ( d && !d->isEmpty() ) {
+                DataFileHeader* header = d->getFile( 0 )->getHeader();
+                dataFileVersion.append( "major", header->version );
+                dataFileVersion.append( "minor", header->versionMinor );
+            }
+            dataFileVersion.done();
+
             return true;
         }
     } cmdDBStats;
