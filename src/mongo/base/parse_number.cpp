@@ -13,11 +13,15 @@
  *    limitations under the License.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/parse_number.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <limits>
+#include <string>
 
 #include "mongo/platform/cstdint.h"
 
@@ -185,6 +189,24 @@ namespace mongo {
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(uint8_t);
 #undef DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE
 
+#ifdef _WIN32
+
+namespace {
+
+    /**
+     * Converts ascii c-locale uppercase characters to lower case, leaves other char values
+     * unchanged.
+     */
+    char toLowerAscii(char c) {
+        if (isascii(c) && isupper(c))
+            return _tolower(c);
+        return c;
+    }
+
+}  // namespace
+
+#endif  // defined(_WIN32)
+
     template <>
     Status parseNumberFromStringWithBase<double>(const StringData& stringValue,
                                                  int base,
@@ -205,8 +227,28 @@ namespace mongo {
         errno = 0;
         double d = strtod(cStr, &endp);
         int actualErrno = errno;
-        if (endp != stringValue.size() + cStr)
+        if (endp != stringValue.size() + cStr) {
+#ifdef _WIN32
+            // The Windows libc implementation of strtod cannot parse +/-infinity or nan,
+            // so handle that here.
+            std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
+            if (str == StringData("nan", StringData::LiteralTag())) {
+                *result = std::numeric_limits<double>::quiet_NaN();
+                return Status::OK();
+            }
+            else if (str == StringData("+infinity", StringData::LiteralTag()) ||
+                     str == StringData("infinity", StringData::LiteralTag())) {
+                *result = std::numeric_limits<double>::infinity();
+                return Status::OK();
+            }
+            else if (str == StringData("-infinity", StringData::LiteralTag())) {
+                *result = -std::numeric_limits<double>::infinity();
+                return Status::OK();
+            }
+#endif  // defined(_WIN32)
+
             return Status(ErrorCodes::FailedToParse, "Did not consume whole number.");
+        }
         if (actualErrno == ERANGE)
             return Status(ErrorCodes::FailedToParse, "Out of range");
         *result = d;

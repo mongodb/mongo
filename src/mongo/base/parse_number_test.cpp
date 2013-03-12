@@ -246,6 +246,10 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1e6 ", &d));
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>(" 1e6", &d));
         ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("0xabcab.defPa", &d));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString<double>(StringData("1.0\0garbage",
+                                                               StringData::LiteralTag()),
+                              &d));
     }
 
     TEST(Double, TestParsingOverflow) {
@@ -275,16 +279,20 @@ namespace {
         ASSERT_PARSES(double, "10", 10);
         ASSERT_PARSES(double, "0", 0);
         ASSERT_PARSES(double, "1", 1);
-        ASSERT_PARSES(double, "0xff", 0xff);
         ASSERT_PARSES(double, "-10", -10);
-        ASSERT_PARSES(double, "-0xff", -0xff);
-
         ASSERT_PARSES(double, "1e8", 1e8);
         ASSERT_PARSES(double, "1e-8", 1e-8);
         ASSERT_PARSES(double, "12e-8", 12e-8);
         ASSERT_PARSES(double, "-485.381e-8", -485.381e-8);
 
+#ifndef _WIN32
+        // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
+        // not parseable by the Windows SDK libc.
+
+        ASSERT_PARSES(double, "0xff", 0xff);
+        ASSERT_PARSES(double, "-0xff", -0xff);
         ASSERT_PARSES(double, "0xabcab.defdefP-10", 0xabcab.defdefP-10);
+#endif
     }
 
 }  // namespace
