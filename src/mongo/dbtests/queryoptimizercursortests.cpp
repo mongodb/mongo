@@ -20,7 +20,8 @@
 #include "pch.h"
 
 #include "../db/queryoptimizercursorimpl.h"
-#include "../db/queryoptimizer.h"
+
+#include "mongo/db/query_optimizer_internal.h"
 #include "../db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/clientcursor.h"

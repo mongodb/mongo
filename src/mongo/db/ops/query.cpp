@@ -26,7 +26,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_plan_summary.h"
-#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/query_optimizer_internal.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/oplog.h"
