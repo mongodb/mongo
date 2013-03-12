@@ -655,7 +655,8 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size = WT_ALIGN((a * btree->split_pct) / 100, btree->allocsize);
+	split_size =
+	    (uint32_t)WT_ALIGN((a * btree->split_pct) / 100, btree->allocsize);
 
 	/*
 	 * If the result of that calculation is the same as the allocation unit
