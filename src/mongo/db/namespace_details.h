@@ -27,7 +27,7 @@
 #include "mongo/db/mongommf.h"
 #include "mongo/db/namespace.h"
 #include "mongo/db/namespacestring.h"
-#include "mongo/db/queryoptimizercursor.h"
+#include "mongo/db/query_plan_selection_policy.h"
 #include "mongo/db/querypattern.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/hashtab.h"

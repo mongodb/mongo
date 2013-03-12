@@ -1,5 +1,3 @@
-// @file queryoptimizercursorimpl.cpp - A cursor interleaving multiple candidate cursors.
-
 /**
  *    Copyright (C) 2011 10gen Inc.
  *
@@ -16,7 +14,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include "pch.h"
 
 #include "mongo/db/queryoptimizercursorimpl.h"
@@ -27,30 +24,6 @@
 namespace mongo {
     
     extern bool useHints;
-    
-    QueryPlanSelectionPolicy::Any QueryPlanSelectionPolicy::__any;
-    const QueryPlanSelectionPolicy &QueryPlanSelectionPolicy::any() { return __any; }
-    
-    bool QueryPlanSelectionPolicy::IndexOnly::permitPlan( const QueryPlan &plan ) const {
-        return !plan.willScanTable();
-    }
-    QueryPlanSelectionPolicy::IndexOnly QueryPlanSelectionPolicy::__indexOnly;
-    const QueryPlanSelectionPolicy &QueryPlanSelectionPolicy::indexOnly() { return __indexOnly; }
-    
-    bool QueryPlanSelectionPolicy::IdElseNatural::permitPlan( const QueryPlan &plan ) const {
-        return !plan.indexed() || plan.index()->isIdIndex();
-    }
-    BSONObj QueryPlanSelectionPolicy::IdElseNatural::planHint( const StringData& ns ) const {
-        NamespaceDetails *nsd = nsdetails( ns );
-        if ( !nsd || !nsd->haveIdIndex() ) {
-            return BSON( "$hint" << BSON( "$natural" << 1 ) );
-        }
-        return BSON( "$hint" << nsd->idx( nsd->findIdIndex() ).indexName() );
-    }
-    QueryPlanSelectionPolicy::IdElseNatural QueryPlanSelectionPolicy::__idElseNatural;
-    const QueryPlanSelectionPolicy &QueryPlanSelectionPolicy::idElseNatural() {
-        return __idElseNatural;
-    }
 
     QueryOptimizerCursorImpl* QueryOptimizerCursorImpl::make
             ( auto_ptr<MultiPlanScanner>& mps,
@@ -420,6 +393,10 @@ namespace mongo {
         }
     }
     
+    BSONObj CursorGenerator::hint() const {
+        return _argumentsHint.isEmpty() ? _planPolicy.planHint( _ns ) : _argumentsHint;
+    }
+
     void CursorGenerator::setArgumentsHint() {
         if ( useHints && _parsedQuery ) {
             _argumentsHint = _parsedQuery->getHint();

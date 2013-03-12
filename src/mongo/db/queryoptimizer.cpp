@@ -26,6 +26,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/intervalbtreecursor.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/query_plan_selection_policy.h"
 #include "mongo/server.h"
 
 //#define DEBUGQO(x) cout << x << endl;

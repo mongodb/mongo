@@ -23,7 +23,6 @@
 #include "mongo/db/cursor.h"
 #include "mongo/db/explain.h"
 #include "mongo/db/matcher.h"
-#include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/querypattern.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -34,6 +33,7 @@ namespace mongo {
 
     class IndexDetails;
     class IndexType;
+    class QueryPlanSelectionPolicy;
     class QueryPlanSummary;
     
     /**

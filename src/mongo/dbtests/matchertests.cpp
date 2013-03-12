@@ -18,11 +18,14 @@
  */
 
 #include "pch.h"
-#include "../util/timer.h"
-#include "../db/matcher.h"
-#include "../db/json.h"
-#include "dbtests.h"
-#include "../db/namespace_details.h"
+
+#include "mongo/db/matcher.h"
+
+#include "mongo/db/cursor.h"
+#include "mongo/db/json.h"
+#include "mongo/db/namespace_details.h"
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/util/timer.h"
 
 namespace MatcherTests {
 

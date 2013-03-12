@@ -20,7 +20,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/queryoptimizercursor.h"
+#include "mongo/db/query_plan_selection_policy.h"
 
 namespace mongo {
 
