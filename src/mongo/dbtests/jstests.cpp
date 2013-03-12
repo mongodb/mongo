@@ -452,6 +452,22 @@ namespace JSTests {
                 ASSERT_EQUALS( Array, out.firstElement().type() );
             }
 
+            // symbol
+            {
+                // test mutable object with symbol type
+                BSONObjBuilder builder;
+                builder.appendSymbol("sym", "value");
+                BSONObj in = builder.done();
+                s->setObject( "x", in, false );
+                BSONObj out = s->getObject( "x" );
+                ASSERT_EQUALS( Symbol, out.firstElement().type() );
+
+                // readonly
+                s->setObject( "x", in, true );
+                out = s->getObject( "x" );
+                ASSERT_EQUALS( Symbol, out.firstElement().type() );
+            }
+
             delete s;
         }
     };
