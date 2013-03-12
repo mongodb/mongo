@@ -101,9 +101,11 @@ def use_system_version_of_library(name):
     return has_option('use-system-all') or has_option('use-system-' + name)
 
 def get_variant_dir():
-    
+
+    substitute = lambda x: re.sub( "[:,\\\\/]" , "_" , x )
+
     a = []
-    
+
     for name in options:
         o = options[name]
         if not has_option( o["dest"] ):
@@ -112,15 +114,22 @@ def get_variant_dir():
             continue
         if get_option(o["dest"]) == o["default"]:
             continue
-        
+
         if o["nargs"] == 0:
             a.append( name )
         else:
-            x = get_option( name )
-            x = re.sub( "[:,\\\\/]" , "_" , x )
+            x = substitute( get_option( name ) )
             a.append( name + "_" + x )
-            
+
     s = "#build/${PYSYSPLATFORM}/"
+
+    extras = []
+    if has_option("extra-variant-dirs"):
+        extras = [substitute(x) for x in get_option( 'extra-variant-dirs' ).split( ',' )]
+
+    if has_option("add-branch-to-variant-dir"):
+        extras += ["branch_" + substitute( utils.getGitBranch() )]
+    a += extras
 
     if len(a) > 0:
         a.sort()
@@ -128,7 +137,7 @@ def get_variant_dir():
     else:
         s += "normal/"
     return s
-        
+
 # build output
 add_option( "mute" , "do not display commandlines for compiling and linking, to reduce screen noise", 0, False )
 
@@ -137,6 +146,8 @@ add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTAL
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
 add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
+add_option( "extra-variant-dirs", "extra variant dir components, separated by commas", 1, False)
+add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
 
 add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
 add_option( "full", "include client and headers when doing scons install", 0 , False )
