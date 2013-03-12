@@ -1294,6 +1294,12 @@ zzz
                 c.setProperty( obj, "i", c.toval( 0.0 ) );
             }
             else {
+                smuassert( cx,
+                           "Timestamp time must be a number",
+                           JSVAL_IS_NUMBER( argv[ 0 ] ) );
+                smuassert( cx,
+                           "Timestamp increment must be a number",
+                           JSVAL_IS_NUMBER( argv[ 1 ] ) );
                 long long t = parseLL(c.toString(argv[0]).c_str());
                 long long largestVal = ((2039LL-1970LL) *365*24*60*60); //seconds between 1970=2038
                 smuassert(  cx,

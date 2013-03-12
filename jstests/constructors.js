@@ -141,15 +141,28 @@ var timestampConstructors = {
     "valid" : [
         'Timestamp()',
         'Timestamp(0,0)',
-        'Timestamp("test","test")',
         'new Timestamp()',
-        'new Timestamp(0,0)'
+        'new Timestamp(0,0)',
+        'Timestamp(1.0,1.0)',
+        'new Timestamp(1.0,1.0)',
         ],
     "invalid" : [
         'Timestamp(0)',
         'Timestamp(0,0,0)',
         'new Timestamp(0)',
-        'new Timestamp(0,0,0)'
+        'new Timestamp(0,0,0)',
+        'Timestamp("test","test")',
+        'Timestamp("test",0)',
+        'Timestamp(0,"test")',
+        'new Timestamp("test","test")',
+        'new Timestamp("test",0)',
+        'new Timestamp(0,"test")',
+        'Timestamp(true,true)',
+        'Timestamp(true,0)',
+        'Timestamp(0,true)',
+        'new Timestamp(true,true)',
+        'new Timestamp(true,0)',
+        'new Timestamp(0,true)'
         ]
 }
 
