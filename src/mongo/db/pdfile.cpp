@@ -449,10 +449,12 @@ namespace mongo {
         verify( sz % 4096 == 0 );
         if( sz < 64*1024*1024 && !cmdLine.smallfiles ) { 
             if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) { 
-                log() << "info openExisting file size " << sz << " but cmdLine.smallfiles=false" << endl;
+                log() << "info openExisting file size " << sz << " but cmdLine.smallfiles=false: "
+                      << filename << endl;
             }
             else {
-                log() << "openExisting size " << sz << " less then minimum file size expectation " << filename << endl;
+                log() << "openExisting size " << sz << " less then minimum file size expectation "
+                      << filename << endl;
                 verify(false);
             }
         }
