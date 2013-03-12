@@ -28,7 +28,7 @@ namespace mongo {
     class MultiPlanScanner;
     class QueryPlanRunner;
     class QueryPlanSelectionPolicy;
-    class QueryPlanSummary;
+    struct QueryPlanSummary;
     
     /** Dup tracking class, optimizing one common case with small set and few initial reads. */
     class SmallDupSet {

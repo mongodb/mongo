@@ -25,7 +25,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/query_plan_summary.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/oplog.h"
@@ -430,7 +430,7 @@ namespace mongo {
         verify( _cursor->ok() );
         const FieldRangeSet *fieldRangeSet = 0;
         if ( queryPlan.valid() ) {
-            fieldRangeSet = queryPlan._fieldRangeSetMulti.get();
+            fieldRangeSet = queryPlan.fieldRangeSetMulti.get();
         }
         else {
             verify( _queryOptimizerCursor );
@@ -615,8 +615,8 @@ namespace mongo {
         }
         shared_ptr<ExplainRecordingStrategy> ret
         ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
-        ret->notePlan( queryPlan.valid() && queryPlan._scanAndOrderRequired,
-                      queryPlan._keyFieldsOnly );
+        ret->notePlan( queryPlan.valid() && queryPlan.scanAndOrderRequired,
+                       queryPlan.keyFieldsOnly );
         return ret;
     }
 
@@ -626,7 +626,7 @@ namespace mongo {
         bool empty = !_cursor->ok();
         bool singlePlan = !_queryOptimizerCursor;
         bool singleOrderedPlan =
-        singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
+                singlePlan && ( !queryPlan.valid() || !queryPlan.scanAndOrderRequired );
         CandidatePlanCharacter queryOptimizerPlans;
         if ( _queryOptimizerCursor ) {
             queryOptimizerPlans = _queryOptimizerCursor->initialCandidatePlans();

@@ -1,5 +1,3 @@
-// @file queryoptimizer.h
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -34,7 +32,7 @@ namespace mongo {
     class IndexDetails;
     class IndexType;
     class QueryPlanSelectionPolicy;
-    class QueryPlanSummary;
+    struct QueryPlanSummary;
     
     /**
      * A plan for executing a query using the given index spec and FieldRangeSet.  An object of this
@@ -165,26 +163,6 @@ namespace mongo {
     };
 
     std::ostream &operator<< ( std::ostream &out, const QueryPlan::Utility &utility );
-
-    /**
-     * A QueryPlanSummary owns its own attributes and may be shared.  Currently a QueryPlan
-     * should only be owned by a QueryPlanSet.
-     */
-    class QueryPlanSummary {
-    public:
-        QueryPlanSummary() :
-        _scanAndOrderRequired() {
-        }
-        QueryPlanSummary( const QueryPlan &queryPlan ) :
-        _fieldRangeSetMulti( new FieldRangeSet( queryPlan.multikeyFrs() ) ),
-        _keyFieldsOnly( queryPlan.keyFieldsOnly() ),
-        _scanAndOrderRequired( queryPlan.scanAndOrderRequired() ) {
-        }
-        bool valid() const { return _fieldRangeSetMulti; }
-        shared_ptr<FieldRangeSet> _fieldRangeSetMulti;
-        shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
-        bool _scanAndOrderRequired;
-    };
 
     /**
      * Helper class for a QueryPlanRunner to cache and count matches.  One object of this type is

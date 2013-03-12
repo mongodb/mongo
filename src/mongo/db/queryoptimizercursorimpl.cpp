@@ -19,6 +19,7 @@
 #include "mongo/db/queryoptimizercursorimpl.h"
 
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/query_plan_summary.h"
 #include "mongo/db/queryoptimizer.h"
 
 namespace mongo {

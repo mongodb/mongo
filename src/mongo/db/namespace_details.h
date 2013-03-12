@@ -436,7 +436,7 @@ namespace mongo {
 #pragma pack()
 
     class ParsedQuery;
-    class QueryPlanSummary;
+    struct QueryPlanSummary;
     
     /* NamespaceDetailsTransient
 
