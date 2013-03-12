@@ -3,20 +3,32 @@
 function clientEvalConstructorTest (constructorList) {
     var i;
     constructorList.valid.forEach(function (constructor) {
-        assert(eval(constructor));
+        try {
+            eval(constructor);
+        }
+        catch (e) {
+            throw ("valid constructor: " + constructor + " failed in eval context: " + e);
+        }
     });
     constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { eval(constructor) });
+        assert.throws(function () { eval(constructor) },
+                      [], "invalid constructor did not throw error in eval context: " + constructor);
     });
 }
 
 function dbEvalConstructorTest (constructorList) {
     var i;
     constructorList.valid.forEach(function (constructor) {
-        assert(db.eval(constructor));
+        try {
+            db.eval(constructor);
+        }
+        catch (e) {
+            throw ("valid constructor: " + constructor + " failed in db.eval context: " + e);
+        }
     });
     constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { db.eval(constructor) });
+        assert.throws(function () { db.eval(constructor) },
+                      [], "invalid constructor did not throw error in db.eval context: " + constructor);
     });
 }
 
@@ -32,11 +44,16 @@ function mapReduceConstructorTest (constructorList) {
     t.save( { "partner" : 2, "visits" : 41 } )
 
     constructorList.valid.forEach(function (constructor) {
-        m = eval("dummy = function(){ emit( \"test\" , " + constructor + " ) }");
+        try {
+            m = eval("dummy = function(){ emit( \"test\" , " + constructor + " ) }");
 
-        r = eval("dummy = function( k , v ){ return { test : " + constructor + " } }");
+            r = eval("dummy = function( k , v ){ return { test : " + constructor + " } }");
 
-        res = t.mapReduce( m , r , { out : "mr_constructors_out" , scope : { xx : 1 } } );
+            res = t.mapReduce( m , r , { out : "mr_constructors_out" , scope : { xx : 1 } } );
+        }
+        catch (e) {
+            throw ("valid constructor: " + constructor + " failed in mapReduce context: " + e);
+        }
     });
     constructorList.invalid.forEach(function (constructor) {
         m = eval("dummy = function(){ emit( \"test\" , " + constructor + " ) }");
@@ -44,7 +61,8 @@ function mapReduceConstructorTest (constructorList) {
         r = eval("dummy = function( k , v ){ return { test : " + constructor + " } }");
 
         assert.throws(function () { res = t.mapReduce( m , r ,
-                                    { out : "mr_constructors_out" , scope : { xx : 1 } } ) });
+                                    { out : "mr_constructors_out" , scope : { xx : 1 } } ) },
+                      [], "invalid constructor did not throw error in mapReduce context: " + constructor);
     });
 
     db.mr_constructors_out.drop();
@@ -55,12 +73,19 @@ function whereConstructorTest (constructorList) {
     t = db.where_constructors;
     t.drop();
     t.insert({ x : 1 });
+    assert(!db.getLastError());
 
     constructorList.valid.forEach(function (constructor) {
-        t.findOne({ $where : constructor });
+        try {
+            t.findOne({ $where : constructor });
+        }
+        catch (e) {
+            throw ("valid constructor: " + constructor + " failed in $where query: " + e);
+        }
     });
     constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { t.findOne({ $where : constructor }) });
+        assert.throws(function () { t.findOne({ $where : constructor }) },
+                      [], "invalid constructor did not throw error in $where query: " + constructor);
     });
 }
 
