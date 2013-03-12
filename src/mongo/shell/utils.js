@@ -796,7 +796,11 @@ shellHelper.show = function (what) {
         if ( args.length > 0 )
             n = args[0]
         
-        var res = db.adminCommand( { getLog : n } )
+        var res = db.adminCommand( { getLog : n } );
+        if ( ! res.ok ) {
+            print("Error while trying to show " + n + " log: " + res.errmsg);
+            return "";
+        }
         for ( var i=0; i<res.log.length; i++){
             print( res.log[i] )
         }
@@ -805,6 +809,10 @@ shellHelper.show = function (what) {
 
     if (what == "logs" ) {
         var res = db.adminCommand( { getLog : "*" } )
+        if ( ! res.ok ) {
+            print("Error while trying to show logs: " + res.errmsg);
+            return "";
+        }
         for ( var i=0; i<res.names.length; i++){
             print( res.names[i] )
         }
