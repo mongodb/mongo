@@ -33,7 +33,7 @@ namespace mongo {
 
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
             massert( 16739, "found invalid spec for text index",
-                     indexInfo.hasField("weights") );
+                     indexInfo["weights"].isABSONObj() );
 
             _defaultLanguage = indexInfo["default_language"].valuestrsafe();
             _languageOverrideField = indexInfo["language_override"].valuestrsafe();
