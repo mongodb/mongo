@@ -726,8 +726,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			/* Write dirty pages if nobody beat us to it. */
 			if (__wt_page_is_modified(page)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
-					__wt_txn_get_snapshot(
-					    session, WT_TXN_NONE, WT_TXN_NONE);
+					__wt_txn_get_snapshot(session,
+					    WT_TXN_NONE, WT_TXN_NONE, 0);
 				ret = __wt_rec_write(session, page, NULL, 0);
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_release_snapshot(session);
