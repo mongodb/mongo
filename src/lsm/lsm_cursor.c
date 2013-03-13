@@ -778,7 +778,6 @@ __clsm_put(
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	uint32_t memsize;
 
 	lsm_tree = clsm->lsm_tree;
 
@@ -826,8 +825,7 @@ __clsm_put(
 	 */
 	saved_btree = session->btree;
 	WT_SET_BTREE_IN_SESSION(session, ((WT_CURSOR_BTREE *)primary)->btree);
-	if (__wt_btree_memsize(session, &memsize) == 0 &&
-	    memsize > lsm_tree->chunk_size) {
+	if (__wt_btree_size_overflow(session, lsm_tree->chunk_size)) {
 		/*
 		 * Take the LSM lock first: we can't acquire it while
 		 * holding the schema lock, or we will deadlock.

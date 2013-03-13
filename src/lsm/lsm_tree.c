@@ -530,11 +530,9 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	uint32_t memsize, new_id;
+	uint32_t new_id;
 
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
-
-	(void)__wt_btree_memsize(session, &memsize);
 	WT_VERBOSE_RET(session, lsm, "Tree switch to: %d", new_id);
 
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
