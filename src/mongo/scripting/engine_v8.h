@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/engine.h"
@@ -180,7 +181,7 @@ namespace mongo {
         virtual BSONObj getObject(const char* field);
 
         virtual void setNumber(const char* field, double val);
-        virtual void setString(const char* field, const char* val);
+        virtual void setString(const char* field, const StringData& val);
         virtual void setBoolean(const char* field, bool val);
         virtual void setElement(const char* field, const BSONElement& e);
         virtual void setObject(const char* field, const BSONObj& obj, bool readOnly);
@@ -356,7 +357,7 @@ namespace mongo {
         /**
          * Create a new function; primarily used for BSON/V8 conversion.
          */
-        v8::Local<v8::Value> newFunction(const char *code);
+        v8::Local<v8::Value> newFunction(const StringData& code);
 
         template <typename _HandleType>
         bool checkV8ErrorState(const _HandleType& resultHandle,

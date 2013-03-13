@@ -1494,7 +1494,7 @@ namespace spidermonkey {
             verify( JS_SetProperty( _context , _global , field , &v ) );
     }
 
-    void SMScope::setString( const char *field , const char * val ) {
+    void SMScope::setString( const char *field , const StringData& val ) {
             smlock;
             jsval v = _convertor->toval( val );
             verify( JS_SetProperty( _context , _global , field , &v ) );

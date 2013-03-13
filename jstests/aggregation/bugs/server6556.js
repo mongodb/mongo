@@ -1,8 +1,5 @@
 // ensure strings containing null characters dont end at that null
 
-if (typeof(_threadInject) == "undefined") {
-// this is only true on spidermonkey. due to server-6646 this test doesn't work on V8
-
 c = db.s6556;
 c.drop();
 
@@ -17,9 +14,6 @@ assert.eq(c.aggregate({$project: {_id: 0, matches: {$eq:["as", "$foo"]}}}).resul
 // neither should one that differs after the null
 assert.eq(c.aggregate({$project: {_id: 0, matches: {$eq:["as\0de", "$foo"]}}}).result, [{matches:false}]);
 // should assert on fieldpaths with a null
-assert.eq(c.aggregate({$project: {_id: 0, matches: {$eq:["as\0df", "$f\0oo"]}}}).code, 16419);
-
-}
-else {
-    print('skipping server6556 on v8');
-}
+assert.throws( function() {
+    c.aggregate({$project: {_id: 0, matches: {$eq:["as\0df", "$f\0oo"]}}})
+});

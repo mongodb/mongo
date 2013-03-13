@@ -363,7 +363,7 @@ namespace mongo {
         bool getBoolean(const char* field) { return _real->getBoolean(field); }
         BSONObj getObject(const char* field) { return _real->getObject(field); }
         void setNumber(const char* field, double val) { _real->setNumber(field, val); }
-        void setString(const char* field, const char* val) { _real->setString(field, val); }
+        void setString(const char* field, const StringData& val) { _real->setString(field, val); }
         void setElement(const char* field, const BSONElement& val) {
             _real->setElement(field, val);
         }
