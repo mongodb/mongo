@@ -453,8 +453,7 @@ int main(int argc, char **argv, char** envp) {
     pcap_t *handle;
 
     struct bpf_program fp;
-    bpf_u_int32 mask;
-    bpf_u_int32 net;
+    bpf_u_int32 mask = PCAP_NETMASK_UNKNOWN;
 
     bool source = false;
     bool replay = false;
@@ -523,6 +522,7 @@ int main(int argc, char **argv, char** envp) {
             }
             cout << "found device: " << dev << endl;
         }
+        bpf_u_int32 net;
         if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
             cerr << "can't get netmask: " << errbuf << endl;
             return -1;
@@ -545,7 +545,7 @@ int main(int argc, char **argv, char** envp) {
         cerr << "don't know how to handle datalink type: " << pcap_datalink( handle ) << endl;
     }
 
-    verify( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
+    verify( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, mask) != -1 );
     verify( pcap_setfilter(handle, &fp) != -1 );
 
     cout << "sniffing... ";
