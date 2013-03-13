@@ -553,14 +553,14 @@ __wt_btree_memsize(
 	WT_PAGE *child;
 
 	btree = session->btree;
-        /*
-         * Only return success if:
-         * - We have a valid btree
-         * - The btree has only a single leaf page
-         * - The single leaf page is in memory
-         */
+	/*
+	 * Only return success if:
+	 * - We have a valid btree
+	 * - The btree has only a single leaf page
+	 * - The single leaf page is in memory
+	 */
 	if (btree == NULL || btree->root_page->entries != 1 ||
-            btree->root_page->u.intl.t->page == NULL) {
+	    btree->root_page->u.intl.t->page == NULL) {
 		*memsizep = 0;
 		return (WT_ERROR);
 	}
