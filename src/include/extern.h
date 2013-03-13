@@ -315,6 +315,10 @@ __wt_page_in_func(
  , const char *file, int line
 #endif
  );
+extern int __wt_page_alloc(WT_SESSION_IMPL *session,
+    uint8_t type,
+    uint32_t alloc_entries,
+    WT_PAGE **pagep);
 extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *parent_ref,

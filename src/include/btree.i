@@ -100,31 +100,6 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, size_t size)
 }
 
 /*
- * __wt_cache_page_new --
- *	Create or read a page into the cache.
- */
-static inline int
-__wt_cache_page_new(WT_SESSION_IMPL *session, WT_PAGE **pagep)
-{
-	WT_CACHE *cache;
-	WT_PAGE *page;
-
-	cache = S2C(session)->cache;
-
-	/*
-	 * Encapsulated because we're going to "discard" the page on error,
-	 * and we need to make sure we've incremented the page count.
-	 */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	__wt_cache_page_inmem_incr(session, page, sizeof(WT_PAGE));
-
-	(void)WT_ATOMIC_ADD(cache->pages_inmem, 1);
-
-	*pagep = page;
-	return (0);
-}
-
-/*
  * __wt_cache_page_evict --
  *	Evict pages from the cache.
  */

@@ -1087,17 +1087,13 @@ __slvg_col_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
-	/* Allocate a column-store internal page. */
-	WT_RET(__wt_cache_page_new(session, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
-
-	/* Fill it in. */
+	/* Allocate a column-store root (internal) page and fill it in. */
+	WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT, leaf_cnt, &page));
 	page->parent = NULL;				/* Root page */
 	page->ref = NULL;
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
-	page->type = WT_PAGE_COL_INT;
 	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
@@ -1665,16 +1661,12 @@ __slvg_row_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
-	/* Allocate a row-store internal page. */
-	WT_RET(__wt_cache_page_new(session, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
-
-	/* Fill it in. */
-	page->parent = NULL;				/* Root page */
+	/* Allocate a row-store root (internal) page and fill it in. */
+	WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, &page));
+	page->parent = NULL;
 	page->ref = NULL;
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = leaf_cnt;
-	page->type = WT_PAGE_ROW_INT;
 	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {

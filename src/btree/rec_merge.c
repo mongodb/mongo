@@ -199,14 +199,10 @@ __merge_new_page(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE *newpage;
 
-	WT_RET(__wt_cache_page_new(session, &newpage));
-	WT_ERR(__wt_calloc_def(session, (size_t)entries, &newpage->u.intl.t));
-	__wt_cache_page_inmem_incr(session, newpage, entries * sizeof(WT_REF));
-
-	/* Fill it in. */
+	/* Allocate a new internal page and fill it in. */
+	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
 	newpage->read_gen = WT_READ_GEN_NOTSET;
 	newpage->entries = entries;
-	newpage->type = type;
 
 	WT_ERR(__wt_page_modify_init(session, newpage));
 	if (merge)
