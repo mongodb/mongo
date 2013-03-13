@@ -15,24 +15,3 @@
 #include "time.h"
 
 #include "logging.h"
-
-namespace google_base {
-DateLogger::DateLogger() {
-#if defined(_MSC_VER)
-  _tzset();
-#endif
-}
-
-char* const DateLogger::HumanDate() {
-#if defined(_MSC_VER)
-  _strtime_s(buffer_, sizeof(buffer_));
-#else
-  time_t time_value = time(NULL);
-  struct tm now;
-  localtime_r(&time_value, &now);
-  snprintf(buffer_, sizeof(buffer_), "%02d:%02d:%02d",
-           now.tm_hour, now.tm_min, now.tm_sec);
-#endif
-  return buffer_;
-}
-}  // namespace google_base

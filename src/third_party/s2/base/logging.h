@@ -17,14 +17,20 @@
 #include <stdlib.h>
 #include <stdlib.h>
 #include <iostream>
-using std::ostream;
-using std::cout;
-using std::endl;
 
 #include "macros.h"
+#include "util/log.h"
+
+#define INFO 1
+#define FATAL 0
+#define DFATAL 0
+
+#define S2LOG(x) LOG(x)
+#define VLOG(x) LOG(x)
+
 
 // Always-on checking
-#define CHECK(x)	if(x){}else LogMessageFatal(__FILE__, __LINE__).stream() << "Check failed: " #x
+#define CHECK(x)	if(x){}else VLOG(2) << __FILE__ << ":" << __LINE__ << ": Check failed: " #x
 #define CHECK_LT(x, y)	CHECK((x) < (y))
 #define CHECK_GT(x, y)	CHECK((x) > (y))
 #define CHECK_LE(x, y)	CHECK((x) <= (y))
@@ -53,47 +59,6 @@ using std::endl;
 #endif
 
 #include "base/port.h"
-#define INFO std::cout
-#define FATAL std::cerr
-#define DFATAL std::cerr
 
-#define S2LOG(x) x
-#define VLOG(x) if (x>0) {} else S2LOG(INFO)
-
-namespace google_base {
-class DateLogger {
- public:
-  DateLogger();
-  char* const HumanDate();
- private:
-  char buffer_[9];
-};
-}  // namespace google_base
-
-class LogMessage {
- public:
-  LogMessage(const char* file, int line) {
-    std::cerr << "[" << pretty_date_.HumanDate() << "] "
-              << file << ":" << line << ": ";
-  }
-  ~LogMessage() { std::cerr << "\n"; }
-  std::ostream& stream() { return std::cerr; }
-
- private:
-  google_base::DateLogger pretty_date_;
-  DISALLOW_COPY_AND_ASSIGN(LogMessage);
-};
-
-class LogMessageFatal : public LogMessage {
- public:
-  LogMessageFatal(const char* file, int line)
-    : LogMessage(file, line) { }
-  ~LogMessageFatal() {
-    std::cerr << "\n";
-    ::abort();
-  }
- private:
-  DISALLOW_COPY_AND_ASSIGN(LogMessageFatal);
-};
 
 #endif  // BASE_LOGGING_H

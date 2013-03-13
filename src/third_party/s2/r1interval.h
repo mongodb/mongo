@@ -42,6 +42,12 @@ class R1Interval {
   //   lat_bounds_ = R1Interval(lat_lo, lat_hi);
   R1Interval() : bounds_(1, 0) {}
 
+  inline std::string toString() const{
+    std::stringstream out;
+    out << this;
+    return out.str();
+  }
+
   // Returns an empty interval.
   static inline R1Interval Empty() { return R1Interval(); }
 
