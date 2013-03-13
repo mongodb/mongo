@@ -26,7 +26,7 @@ object configuration cursor (key=config string\,
 value=config value),}
   @row{<tt>file:\<filename\></tt>,
 file cursor (key=file key\, value=file value),}
-  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+  @row{<tt>index:\<tablename\>:\<indexname\></tt>,
 index cursor (key=index key\, value=table value),}
   @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
 join cursor, @notyet{join cursors}}
