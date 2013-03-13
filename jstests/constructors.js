@@ -211,16 +211,22 @@ dbEvalConstructorTest(timestampConstructors);
 dbEvalConstructorTest(bindataConstructors);
 dbEvalConstructorTest(dateConstructors);
 
-mapReduceConstructorTest(dbrefConstructors);
-mapReduceConstructorTest(dbpointerConstructors);
-mapReduceConstructorTest(objectidConstructors);
-mapReduceConstructorTest(timestampConstructors);
-mapReduceConstructorTest(bindataConstructors);
+// SERVER-8963
+if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
+    mapReduceConstructorTest(dbrefConstructors);
+    mapReduceConstructorTest(dbpointerConstructors);
+    mapReduceConstructorTest(objectidConstructors);
+    mapReduceConstructorTest(timestampConstructors);
+    mapReduceConstructorTest(bindataConstructors);
+}
 mapReduceConstructorTest(dateConstructors);
 
-whereConstructorTest(dbrefConstructors);
-whereConstructorTest(dbpointerConstructors);
-whereConstructorTest(objectidConstructors);
-whereConstructorTest(timestampConstructors);
-whereConstructorTest(bindataConstructors);
+// SERVER-8963
+if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
+    whereConstructorTest(dbrefConstructors);
+    whereConstructorTest(dbpointerConstructors);
+    whereConstructorTest(objectidConstructors);
+    whereConstructorTest(timestampConstructors);
+    whereConstructorTest(bindataConstructors);
+}
 whereConstructorTest(dateConstructors);
