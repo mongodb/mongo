@@ -2298,13 +2298,12 @@ namespace mongo {
                     BSONObj n = e.embeddedObject();
                     e = n.firstElement();
 
-                    const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
                     GeoDistType type;
-                    if (suffix[0] == '\0') {
-                        type = GEO_PLAIN;
-                    }
-                    else if (strcmp(suffix, "Sphere") == 0) {
+                    if (strcmp(e.fieldName(), "$nearSphere") == 0) {
                         type = GEO_SPHERE;
+                    }
+                    else if ( (strcmp(e.fieldName(), "$near") == 0) || (strcmp(e.fieldName(), "$geoNear") == 0) ) {
+                        type = GEO_PLAIN;
                     }
                     else {
                         uassert(13464, string("invalid $near search type: ") + e.fieldName(), false);
