@@ -1242,7 +1242,8 @@ extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_oldest(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot( WT_SESSION_IMPL *session,
     wt_txnid_t my_id,
-    wt_txnid_t max_id);
+    wt_txnid_t max_id,
+    int force);
 extern void __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session);
 extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_txn_release(WT_SESSION_IMPL *session);

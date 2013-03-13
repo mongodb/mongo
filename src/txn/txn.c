@@ -51,13 +51,9 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
-	WT_TXN *txn;
 	WT_TXN_STATE *txn_state;
 
-	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
-
-	txn->snapshot_count = 0;
 	txn_state->snap_min = WT_TXN_NONE;
 }
 
@@ -106,7 +102,7 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
  */
 void
 __wt_txn_get_snapshot(
-    WT_SESSION_IMPL *session, wt_txnid_t my_id, wt_txnid_t max_id)
+    WT_SESSION_IMPL *session, wt_txnid_t my_id, wt_txnid_t max_id, int force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -121,9 +117,11 @@ __wt_txn_get_snapshot(
 	txn_state = &txn_global->states[session->id];
 
 	/* If nothing has changed since last time, we're done. */
-	if (txn->last_id == txn_global->current &&
-	    txn->last_gen == txn_global->gen)
+	if (!force && txn->last_id == txn_global->current &&
+	    txn->last_gen == txn_global->gen) {
+		txn_state->snap_min = txn->snap_min;
 		return;
+	}
 
 	do {
 		/* Take a copy of the current session ID. */
@@ -292,11 +290,13 @@ void
 __wt_txn_release(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
 	txn->mod_count = txn->modref_count = 0;
-	txn_state = &S2C(session)->txn_global.states[session->id];
+	txn_global = &S2C(session)->txn_global;
+	txn_state = &txn_global->states[session->id];
 
 	/* Clear the transaction's ID from the global table. */
 	WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
@@ -316,7 +316,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	F_CLR(txn, TXN_ERROR | TXN_OLDEST | TXN_RUNNING);
 
 	/* Update the global generation number. */
-	++S2C(session)->txn_global.gen;
+	++txn_global->gen;
 }
 
 /*
@@ -345,7 +345,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * commit.
 	 */
 	if (session->ncursors > 0)
-		__wt_txn_get_snapshot(session, txn->id, WT_TXN_NONE);
+		__wt_txn_get_snapshot(session, txn->id, WT_TXN_NONE, 1);
 	__wt_txn_release(session);
 	return (0);
 }
