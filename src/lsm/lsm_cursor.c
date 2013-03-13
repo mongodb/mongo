@@ -214,14 +214,7 @@ __clsm_open_cursors(
 		clsm->primary_chunk = chunk;
 		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
-		/*
-		 * Peek into the btree layer to track the in-memory size.
-		 * Ignore error returns since it is OK for the btree to be
-		 * empty in this code path (and that is an error condition).
-		 */
-		if (lsm_tree->memsizep == NULL)
-			(void)__wt_btree_get_memsize(
-			    session, &lsm_tree->memsizep);
+		__wt_btree_evictable(session, 0);
 	}
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
@@ -781,11 +774,10 @@ static inline int
 __clsm_put(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
 {
-	WT_BTREE *btree;
+	WT_BTREE *saved_btree;
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	uint32_t *memsizep;
 
 	lsm_tree = clsm->lsm_tree;
 
@@ -826,13 +818,19 @@ __clsm_put(
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	clsm->current = primary;
 
-	if ((memsizep = lsm_tree->memsizep) != NULL &&
-	    *memsizep > lsm_tree->chunk_size) {
+	/*
+	 * In LSM there are multiple btrees active at one time. The tree
+	 * switch code needs to use btree API methods, and it wants to
+	 * operate on the btree for the primary chunk. Set that up now.
+	 */
+	saved_btree = session->btree;
+	WT_SET_BTREE_IN_SESSION(session, ((WT_CURSOR_BTREE *)primary)->btree);
+	if (__wt_btree_size_overflow(session, lsm_tree->chunk_size)) {
 		/*
 		 * Take the LSM lock first: we can't acquire it while
 		 * holding the schema lock, or we will deadlock.
 		 */
-		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
+		WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 		/* Make sure we don't race. */
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
@@ -844,12 +842,12 @@ __clsm_put(
 		 * in switching: if something went wrong, we should keep
 		 * trying to switch.
 		 */
-		btree = ((WT_CURSOR_BTREE *)primary)->btree;
 		if (ret == 0)
-			ret = __wt_btree_release_memsize(session, btree);
+			__wt_btree_evictable(session, 1);
 
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
+err:	WT_SET_BTREE_IN_SESSION(session, saved_btree);
 
 	return (ret);
 }

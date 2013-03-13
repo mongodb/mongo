@@ -542,6 +542,32 @@ __wt_skip_choose_depth(void)
 }
 
 /*
+ * __wt_btree_size_overflow --
+ *      Check if the size of an in-memory tree with a single leaf page is
+ *      over a specified maximum.
+ */
+static inline int
+__wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
+{
+	WT_BTREE *btree;
+	WT_PAGE *child;
+
+	/*
+	 * Only return true if:
+	 * - We have a valid btree
+	 * - The btree has only a single leaf page
+	 * - The single leaf page is in memory
+	 */
+	btree = session->btree;
+	if (btree == NULL || btree->root_page->entries != 1 ||
+	    btree->root_page->u.intl.t->page == NULL)
+		return (0);
+
+	child = btree->root_page->u.intl.t->page;
+	return (child->memory_footprint > maxsize);
+}
+
+/*
  * __wt_btree_lex_compare --
  *	Lexicographic comparison routine.
  *
