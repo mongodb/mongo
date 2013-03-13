@@ -60,12 +60,17 @@ column_meta = [
 
 source_meta = [
 	Config('source', '', r'''
-		override the default data source URI derived from the object
-		name'''),
+		set a custom data source URI for a column group, index or simple
+		table.  By default, the data source URI is derived from the \c
+		type and the column group or index name.  Applications can
+		create tables from existing data sources by supplying a \c
+		source configuration'''),
 	Config('type', 'file', r'''
-		set the data source type.  This setting overrides the URI
-		prefix for the data source, if no \c source configuration
-		setting is provided''',
+		set the type of data source used to store a column group, index
+		or simple table.  By default, a \c "file:" URI is derived from
+		the object name.  The \c type configuration can be used to
+		switch to a different storage format, such as LSM.  Ignored if
+		an explicit URI is supplied with a \c source configuration''',
 		choices=['file', 'lsm']),
 ]
 

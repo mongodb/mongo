@@ -730,17 +730,23 @@ struct __wt_session {
 	 * cache.,an integer greater than or equal to 0; default \c 0.}
 	 * @config{prefix_compression, configure row-store format key prefix
 	 * compression.,a boolean flag; default \c true.}
-	 * @config{source, override the default data source URI derived from the
-	 * object name.,a string; default empty.}
+	 * @config{source, set a custom data source URI for a column group\,
+	 * index or simple table.  By default\, the data source URI is derived
+	 * from the \c type and the column group or index name.  Applications
+	 * can create tables from existing data sources by supplying a \c source
+	 * configuration.,a string; default empty.}
 	 * @config{split_pct, the Btree page split size as a percentage of the
 	 * maximum Btree page size\, that is\, when a Btree page is split\, it
 	 * will be split into smaller pages\, where each page is the specified
 	 * percentage of the maximum Btree page size.,an integer between 25 and
 	 * 100; default \c 75.}
-	 * @config{type, set the data source type.  This setting overrides the
-	 * URI prefix for the data source\, if no \c source configuration
-	 * setting is provided.,a string\, chosen from the following options: \c
-	 * "file"\, \c "lsm"; default \c file.}
+	 * @config{type, set the type of data source used to store a column
+	 * group\, index or simple table.  By default\, a \c "file:" URI is
+	 * derived from the object name.  The \c type configuration can be used
+	 * to switch to a different storage format\, such as LSM.  Ignored if an
+	 * explicit URI is supplied with a \c source configuration.,a string\,
+	 * chosen from the following options: \c "file"\, \c "lsm"; default \c
+	 * file.}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * value_format is \c 'u' and applications use a WT_ITEM structure to
