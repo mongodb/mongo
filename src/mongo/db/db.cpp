@@ -666,7 +666,7 @@ namespace mongo {
         CmdLine::launchOk();
 #endif
 
-        if( !noauth ) {
+        if(AuthorizationManager::isAuthEnabled()) {
             // open admin db in case we need to use it later. TODO this is not the right way to
             // resolve this.
             Client::WriteContext c("admin", dbpath);
@@ -908,10 +908,10 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             cmdLine.cpu = true;
         }
         if (params.count("noauth")) {
-            noauth = true;
+            AuthorizationManager::setAuthEnabled(false);
         }
         if (params.count("auth")) {
-            noauth = false;
+            AuthorizationManager::setAuthEnabled(true);
         }
         if (params.count("quota")) {
             cmdLine.quota = true;

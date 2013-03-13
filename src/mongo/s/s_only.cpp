@@ -108,7 +108,7 @@ namespace mongo {
         std::string dbname = nsToDatabase(ns);
 
         // Access control checks
-        if (!noauth) {
+        if (AuthorizationManager::isAuthEnabled()) {
             std::vector<Privilege> privileges;
             c->addRequiredPrivileges(dbname, cmdObj, &privileges);
             AuthorizationManager* authManager = client.getAuthorizationManager();
@@ -119,7 +119,9 @@ namespace mongo {
                 return;
             }
         }
-        if (c->adminOnly() && c->localHostOnlyIfNoAuth(cmdObj) && noauth &&
+        if (c->adminOnly() &&
+                c->localHostOnlyIfNoAuth(cmdObj) &&
+                !AuthorizationManager::isAuthEnabled() &&
                 !client.getIsLocalHostConnection()) {
             log() << "command denied: " << cmdObj.toString() << endl;
             appendCommandStatus(result,

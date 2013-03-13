@@ -296,7 +296,7 @@ namespace mongo {
                             r.d().reservedField() |= Reserved_FromWriteback;
 
                             ClientInfo * ci = r.getClientInfo();
-                            if (!noauth) {
+                            if (AuthorizationManager::isAuthEnabled()) {
                                 ci->getAuthorizationManager()->grantInternalAuthorization(
                                         "_writebackListener");
                             }

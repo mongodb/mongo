@@ -35,7 +35,7 @@ namespace {
     AuthExternalStateServerCommon::~AuthExternalStateServerCommon() {}
 
     void AuthExternalStateServerCommon::_checkShouldAllowLocalhost() {
-        if (noauth)
+        if (!AuthorizationManager::isAuthEnabled())
             return;
         // If we know that an admin user exists, don't re-check.
         if (!_allowLocalhost)
@@ -57,7 +57,7 @@ namespace {
 
     bool AuthExternalStateServerCommon::shouldIgnoreAuthChecks() const {
         ClientBasic* client = ClientBasic::getCurrent();
-        return noauth ||
+        return !AuthorizationManager::isAuthEnabled() ||
                 (enableLocalhostAuthBypass &&client->getIsLocalHostConnection() && _allowLocalhost);
     }
 

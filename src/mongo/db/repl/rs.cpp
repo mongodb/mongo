@@ -860,7 +860,7 @@ namespace mongo {
     }
 
     void replLocalAuth() {
-        if ( noauth )
+        if (!AuthorizationManager::isAuthEnabled())
             return;
         cc().getAuthorizationManager()->grantInternalAuthorization("_repl");
     }

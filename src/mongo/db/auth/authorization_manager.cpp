@@ -37,9 +37,6 @@
 
 namespace mongo {
 
-    // this is a config setting, set at startup and not changing after initialization.
-    bool noauth = true;
-
     AuthInfo::AuthInfo() {
         user = "__system";
     }
@@ -52,6 +49,7 @@ namespace mongo {
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
 
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
+    bool AuthorizationManager::_authEnabled = false;
 
 namespace {
     const std::string ADMIN_DBNAME = "admin";
@@ -241,6 +239,14 @@ namespace {
 
     void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
         _doesSupportOldStylePrivileges = enabled;
+    }
+
+    void AuthorizationManager::setAuthEnabled(bool enabled) {
+        _authEnabled = enabled;
+    }
+
+    bool AuthorizationManager::isAuthEnabled() {
+        return _authEnabled;
     }
 
     static inline Status _oldPrivilegeFormatNotSupported() {

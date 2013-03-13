@@ -740,7 +740,7 @@ namespace mongo {
         Client::initThread((string(cleanUpThreadName) + string("-") +
                                                         OID::gen().toString()).c_str());
 
-        if (!noauth) {
+        if (AuthorizationManager::isAuthEnabled()) {
             cc().getAuthorizationManager()->grantInternalAuthorization("_cleanupOldData");
         }
 
@@ -1960,7 +1960,7 @@ namespace mongo {
 
     void migrateThread() {
         Client::initThread( "migrateThread" );
-        if (!noauth) {
+        if (AuthorizationManager::isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
             cc().getAuthorizationManager()->grantInternalAuthorization("_migrateThread");
         }
