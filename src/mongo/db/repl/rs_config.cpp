@@ -20,7 +20,6 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
