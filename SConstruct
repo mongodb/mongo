@@ -885,9 +885,9 @@ def doConfigure(myenv):
             env.Append(**mutation)
         return available
 
-    # TOOD(acm): For clang, for instance, we need -Werror or invalid
-    # flags are only warnings. This should be handled more flexibly, but I'm
-    # leaving it here just to demonstrate.
+    def AddToCFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C', '.c', flag, CFLAGS=[flag])
+
     def AddToCCFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C', '.c', flag, CCFLAGS=[flag])
 
@@ -932,6 +932,9 @@ def doConfigure(myenv):
                 if not use_system_version_of_library('tcmalloc'):
                     print( 'TCMalloc is not currently compatible with C++11' )
                     Exit(1)
+
+            if not AddToCFLAGSIfSupported(myenv, '-std=c99'):
+                print( 'C++11 mode selected for C++ files, but failed to enable C99 for C files' )
 
     # This needs to happen before we check for libc++, since it affects whether libc++ is available.
     if darwin and has_option('osx-version-min'):
