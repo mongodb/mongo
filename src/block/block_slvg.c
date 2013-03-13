@@ -52,7 +52,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * Start with the entire file on the allocation list, we'll "free"
 	 * any blocks we don't want as we process the file.
 	 */
-	WT_RET(__wt_block_insert_ext(session, &block->live.alloc,
+	WT_RET(__wt_block_insert_ext(session, block, &block->live.alloc,
 	    WT_BLOCK_DESC_SECTOR, len - WT_BLOCK_DESC_SECTOR));
 
 	return (0);

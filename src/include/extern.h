@@ -40,7 +40,8 @@ extern int __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
 extern int __wt_block_checkpoint_unload( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     int checkpoint);
-extern void __wt_block_ckpt_destroy(WT_SESSION_IMPL *session,
+extern void __wt_block_ckpt_destroy( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_BLOCK_CKPT *ci);
 extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -58,12 +59,14 @@ extern int __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size,
     int *skipp);
+extern void __wt_block_ext_cleanup(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_misplaced(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const char *tag,
     off_t offset,
     uint32_t size);
-extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
+extern int __wt_block_off_remove_overlap(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_EXTLIST *el,
     off_t off,
     off_t size);
@@ -85,10 +88,12 @@ extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
 extern int __wt_block_extlist_overlap( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_CKPT *ci);
-extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_merge( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_EXTLIST *a,
     WT_EXTLIST *b);
-extern int __wt_block_insert_ext( WT_SESSION_IMPL *session,
+extern int __wt_block_insert_ext(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_EXTLIST *el,
     off_t off,
     off_t size);
@@ -111,7 +116,9 @@ extern int __wt_block_extlist_init(WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     const char *name,
     const char *extname);
-extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
+extern void __wt_block_extlist_free( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_EXTLIST *el);
 extern int __wt_block_map( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     void *mapp,
