@@ -45,5 +45,6 @@ assert.lt( 3 , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(50) ) , "C1"
 assert.gt( 3 , a( t.find( { loc : { $near : [ 50 , 50 , 3 ] } } ).limit(50) ) , "C2" )
 assert.gt( 3 , a( t.find( { loc : { $near : [ 50 , 50 ] , $maxDistance : 3 } } ).limit(50) ) , "C3" )
 
-
-
+// SERVER-8974 - test if $geoNear operator works with 2d index as well
+var geoNear_cursor = t.find( { loc : { $geoNear : [50, 50] } } ); 
+assert.eq( geoNear_cursor.count(), 100 )
