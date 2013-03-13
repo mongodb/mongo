@@ -245,10 +245,9 @@ struct __wt_page {
 			 * WT_PAGE structure as small as possible for read-only
 			 * pages.  For consistency, we could move the row-store
 			 * modification structures into WT_PAGE_MODIFY too, but
-			 * it doesn't shrink WT_PAGE any further, and avoiding
-			 * ugly naming in WT_PAGE_MODIFY to avoid growing it
-			 * won't be pretty.  So far, avoiding ugly naming has
-			 * overridden consistency.
+			 * that doesn't shrink WT_PAGE any further and it would
+			 * require really ugly naming inside of WT_PAGE_MODIFY
+			 * to avoid growing that structure.
 			 */
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
