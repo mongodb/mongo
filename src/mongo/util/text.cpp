@@ -307,14 +307,14 @@ namespace mongo {
         vector<size_t> utf8envLength;
         blockSize = (envCount + 1) * sizeof(char*);
         blockPtr = blockSize;
-        for (int i = 0; i < envCount; ++i) {
+        for (size_t i = 0; i < envCount; ++i) {
             utf8envs.push_back( toUtf8String(envpW[i]) );
             size_t envLength = utf8envs[i].length() + 1;
             utf8envLength.push_back(envLength);
             blockSize += envLength;
         }
         _envp = static_cast<char**>(malloc(blockSize));
-        int i;
+        size_t i;
         for (i = 0; i < envCount; ++i) {
             _envp[i] = reinterpret_cast<char*>(_envp) + blockPtr;
             strcpy_s(_envp[i], utf8envLength[i], utf8envs[i].c_str());
