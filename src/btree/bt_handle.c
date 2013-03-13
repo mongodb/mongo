@@ -473,29 +473,6 @@ __wt_btree_leaf_create(
 }
 
 /*
- * __wt_btree_memsize --
- *      Access the size of an in-memory tree with a single leaf page.
- */
-int
-__wt_btree_memsize(
-    WT_SESSION_IMPL *session, uint32_t *memsizep)
-{
-	WT_BTREE *btree;
-	WT_PAGE *child;
-
-	btree = session->btree;
-	if (btree == NULL || btree->root_page->entries != 1) {
-		*memsizep = 0;
-		return (WT_ERROR);
-	}
-
-	child = btree->root_page->u.intl.t->page;
-
-	*memsizep = child->memory_footprint;
-	return (0);
-}
-
-/*
  * __wt_btree_no_eviction --
  *      Setup or release a cache-resident tree.
  */
