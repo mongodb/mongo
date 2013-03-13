@@ -67,7 +67,7 @@ static int
 __rec_track_extend(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
-	size_t bytes_allocated, newlen;
+	size_t bytes_allocated;
 
 	mod = page->modify;
 
@@ -81,10 +81,9 @@ __rec_track_extend(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * page.
 	 */
 	bytes_allocated = mod->track_entries * sizeof(*mod->track);
-	newlen = WT_MAX(2 * mod->track_entries, mod->track_entries + 20);
 	WT_RET(__wt_realloc(session, &bytes_allocated,
-	    newlen * sizeof(*mod->track), &mod->track));
-	mod->track_entries = newlen;
+	    (mod->track_entries + 20) * sizeof(*mod->track), &mod->track));
+	mod->track_entries += 20;
 	return (0);
 }
 
