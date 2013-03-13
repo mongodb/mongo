@@ -21,6 +21,7 @@
 #include "mongo/bson/inline_decls.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
@@ -79,5 +80,19 @@ namespace mongo {
                 return; // timed out
         }
     }
+
+    struct TestOpTime : public StartupTest {
+        void run() {
+            OpTime t;
+            for ( int i = 0; i < 10; i++ ) {
+                OpTime s = OpTime::_now();
+                verify( s != t );
+                t = s;
+            }
+            OpTime q = t;
+            verify( q == t );
+            verify( !(q != t) );
+        }
+    } testoptime;
 
 }

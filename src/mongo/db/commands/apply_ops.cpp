@@ -23,7 +23,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/matcher.h"
-#include "mongo/db/oplog.h"
+#include "mongo/db/repl/oplog.h"
 
 namespace mongo {
     class ApplyOpsCmd : public Command {

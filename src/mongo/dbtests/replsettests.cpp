@@ -17,17 +17,15 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "../db/db.h"
-#include "../db/instance.h"
-#include "../db/json.h"
-
-#include "dbtests.h"
-#include "../db/oplog.h"
-
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/db.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
     void createOplog();

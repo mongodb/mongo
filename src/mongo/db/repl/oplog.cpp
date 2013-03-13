@@ -18,7 +18,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/oplog.h"
+#include "mongo/db/repl/oplog.h"
 
 #include <vector>
 
@@ -411,19 +411,6 @@ namespace mongo {
 
     // -------------------------------------
 
-    struct TestOpTime : public StartupTest {
-        void run() {
-            OpTime t;
-            for ( int i = 0; i < 10; i++ ) {
-                OpTime s = OpTime::_now();
-                verify( s != t );
-                t = s;
-            }
-            OpTime q = t;
-            verify( q == t );
-            verify( !(q != t) );
-        }
-    } testoptime;
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */

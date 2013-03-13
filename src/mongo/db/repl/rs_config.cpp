@@ -16,16 +16,18 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "rs.h"
-#include "../../client/syncclusterconnection.h"
-#include "../../util/net/hostandport.h"
-#include "../dbhelpers.h"
-#include "connections.h"
-#include "../oplog.h"
-#include "../instance.h"
-#include "../../util/text.h"
+#include "mongo/pch.h"
+
 #include <boost/algorithm/string.hpp>
+
+#include "mongo/client/syncclusterconnection.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/text.h"
 
 using namespace bson;
 

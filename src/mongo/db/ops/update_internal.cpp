@@ -16,17 +16,17 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/ops/update_internal.h"
 
 #include <algorithm> // for max
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/oplog.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/util/mongoutils/str.h"
-
-#include "update_internal.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)

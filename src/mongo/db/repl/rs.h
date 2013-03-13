@@ -20,7 +20,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
-#include "mongo/db/oplog.h"
+//#include "mongo/db/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rs_config.h"

@@ -51,6 +51,7 @@
 #include "mongo/db/queryoptimizer.h"
 #include "mongo/db/repl_block.h"
 #include "mongo/db/replutil.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/s/d_writeback.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException

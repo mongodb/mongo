@@ -21,6 +21,7 @@
 #include <map>
 
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/repl/rs.h" // extern Tee* rslog
 
 namespace mongo {
 

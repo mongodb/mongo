@@ -14,15 +14,15 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/repl/rs.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/oplog.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings

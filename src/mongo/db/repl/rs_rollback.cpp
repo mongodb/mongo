@@ -21,6 +21,7 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 
 /* Scenarios

@@ -25,11 +25,12 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespacestring.h"
-#include "mongo/db/oplog.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/sort_phase_one.h"
 
