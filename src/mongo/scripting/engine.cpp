@@ -443,8 +443,24 @@ namespace mongo {
         if (x == string::npos)
             return false;
 
-        return (x == 0 || !isalpha(code[x-1])) &&
-               !isalpha(code[x+6]);
+        int quoteCount = 0;
+        int singleQuoteCount = 0;
+        for (size_t i = 0; i < x; i++) {
+            if (code[i] == '"') {
+                quoteCount++;
+            } else if(code[i] == '\'') {
+                singleQuoteCount++;
+            }
+        }
+        // if we are in either single quotes or double quotes return false
+        if (quoteCount % 2 != 0 || singleQuoteCount % 2 != 0) {
+            return false;
+        }
+
+        // return is at start OR preceded by space
+        // AND return is not followed by digit or letter
+        return (x == 0 || isspace(code[x-1])) &&
+               !(isalpha(code[x+6]) || isdigit(code[x+6]));
     }
 
     const char* jsSkipWhiteSpace(const char* raw) {
