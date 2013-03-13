@@ -276,27 +276,56 @@ namespace mongo {
         return true;
     }
 
-    WindowsCommandLine::WindowsCommandLine( int argc, wchar_t* argvW[] ) {
-        vector < string >   utf8args;
-        vector < size_t >   utf8argLength;
-        size_t blockSize = argc * sizeof( char * );
+    WindowsCommandLine::WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envpW[]) :
+            _argv(NULL), _envp(NULL) {
+
+        // Construct UTF-8 copy of arguments
+        vector<string> utf8args;
+        vector<size_t> utf8argLength;
+        size_t blockSize = argc * sizeof(char*);
         size_t blockPtr = blockSize;
-        for ( int i = 0; i < argc; ++i ) {
-            utf8args.push_back( toUtf8String( argvW[ i ] ) );
-            size_t argLength = utf8args[ i ].length() + 1;
-            utf8argLength.push_back( argLength );
+        for (int i = 0; i < argc; ++i) {
+            utf8args.push_back( toUtf8String(argvW[i]) );
+            size_t argLength = utf8args[i].length() + 1;
+            utf8argLength.push_back(argLength);
             blockSize += argLength;
         }
-        _argv = reinterpret_cast< char** >( malloc( blockSize ) );
-        for ( int i = 0; i < argc; ++i ) {
-            _argv[ i ] = reinterpret_cast< char * >( _argv ) + blockPtr;
-            strcpy_s( _argv[ i ], utf8argLength[ i ], utf8args[ i ].c_str() );
-            blockPtr += utf8argLength[ i ];
+        _argv = static_cast<char**>(malloc(blockSize));
+        for (int i = 0; i < argc; ++i) {
+            _argv[i] = reinterpret_cast<char*>(_argv) + blockPtr;
+            strcpy_s(_argv[i], utf8argLength[i], utf8args[i].c_str());
+            blockPtr += utf8argLength[i];
         }
+
+        // Construct UTF-8 copy of environment strings
+        size_t envCount = 0;
+        wchar_t** envpWptr = &envpW[0];
+        while (*envpWptr++) {
+            ++envCount;
+        }
+        vector<string> utf8envs;
+        vector<size_t> utf8envLength;
+        blockSize = (envCount + 1) * sizeof(char*);
+        blockPtr = blockSize;
+        for (int i = 0; i < envCount; ++i) {
+            utf8envs.push_back( toUtf8String(envpW[i]) );
+            size_t envLength = utf8envs[i].length() + 1;
+            utf8envLength.push_back(envLength);
+            blockSize += envLength;
+        }
+        _envp = static_cast<char**>(malloc(blockSize));
+        int i;
+        for (i = 0; i < envCount; ++i) {
+            _envp[i] = reinterpret_cast<char*>(_envp) + blockPtr;
+            strcpy_s(_envp[i], utf8envLength[i], utf8envs[i].c_str());
+            blockPtr += utf8envLength[i];
+        }
+        _envp[i] = NULL;
     }
 
     WindowsCommandLine::~WindowsCommandLine() {
-        free( _argv );
+        free(_argv);
+        free(_envp);
     }
 
 #endif // #if defined(_WIN32)

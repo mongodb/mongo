@@ -1041,7 +1041,7 @@ int _main( int argc, char* argv[], char **envp ) {
 }
 
 #ifdef _WIN32
-int wmain( int argc, wchar_t* argvW[] ) {
+int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     static mongo::StaticObserver staticObserver;
     UINT initialConsoleInputCodePage = GetConsoleCP();
     UINT initialConsoleOutputCodePage = GetConsoleOutputCP();
@@ -1049,8 +1049,8 @@ int wmain( int argc, wchar_t* argvW[] ) {
     SetConsoleOutputCP( CP_UTF8 );
     int returnCode;
     try {
-        WindowsCommandLine wcl( argc, argvW );
-        returnCode = _main( argc, wcl.argv(), NULL );  // TODO: Convert wide env to utf8 env.
+        WindowsCommandLine wcl(argc, argvW, envpW);
+        returnCode = _main(argc, wcl.argv(), wcl.envp());
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;
