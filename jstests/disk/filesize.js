@@ -1,5 +1,4 @@
 // test for SERVER-7430: Warning about smallfiles should include filename
-
 var port = allocatePorts( 1 )[ 0 ];
 var baseName = "filesize";
 
@@ -9,27 +8,33 @@ var m = startMongod(
     "--bind_ip", "127.0.0.1" , "--nojournal" , "--smallfiles" );
 
 var db = m.getDB( baseName );
-db.collection.insert( { x : 1 } );
 
-// Restart mongod without --smallFiles
-stopMongod( port );
-m = startMongodNoReset(
-    "--port", port, "--dbpath", "/data/db/" + baseName,
-    "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" );
+// Skip on 32 bits, since 32-bit servers don't warn about small files
+if (db.serverBuildInfo().bits == 32) {
+    print("Skip on 32-bit");
+} else {
+    db.collection.insert( { x : 1 } );
 
-db = m.getDB( baseName );
-var log = db.adminCommand( { getLog : "global" } ).log
+    // Restart mongod without --smallFiles
+    stopMongod( port );
+    m = startMongodNoReset(
+        "--port", port, "--dbpath", "/data/db/" + baseName,
+        "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" );
 
-// Find log message like:
-// "openExisting file size 16777216 but cmdLine.smallfiles=false: /data/db/filesize/local.0"
-var found = false, logline = '';
-for ( i=log.length - 1; i>= 0; i-- ) {
-    logline = log[i];
-    if ( logline.indexOf( "openExisting file" ) >= 0
-        && logline.indexOf( baseName + ".0" ) >= 0 ) {
-        found = true;
-        break;
+    db = m.getDB( baseName );
+    var log = db.adminCommand( { getLog : "global" } ).log
+
+    // Find log message like:
+    // "openExisting file size 16777216 but cmdLine.smallfiles=false: /data/db/filesize/local.0"
+    var found = false, logline = '';
+    for ( i=log.length - 1; i>= 0; i-- ) {
+        logline = log[i];
+        if ( logline.indexOf( "openExisting file" ) >= 0
+            && logline.indexOf( baseName + ".0" ) >= 0 ) {
+            found = true;
+            break;
+        }
     }
-}
 
-assert( found );
+    assert( found );
+}
