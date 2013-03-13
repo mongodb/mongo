@@ -1819,8 +1819,9 @@ namespace mongo {
                     // Insert all
                     int erased = 0;
                     while(_points.size() > 0 && (maybePointIt->distance() >= approxMin || erased < numToErase)){
-
-                        Holder::iterator current = maybePointIt--;
+                        Holder::iterator current = maybePointIt;
+                        if (current != _points.begin())
+                            --maybePointIt;
 
                         addExactPoints(*current, tested, true);
                         _points.erase(current);
