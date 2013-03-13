@@ -1,5 +1,3 @@
-// repl_block.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -16,13 +14,15 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "repl_block.h"
-#include "instance.h"
-#include "dbhelpers.h"
-#include "../util/background.h"
-#include "../util/mongoutils/str.h"
-#include "replutil.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/repl/write_concern.h"
+
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/replutil.h"
+#include "mongo/util/background.h"
+#include "mongo/util/mongoutils/str.h"
 
 //#define REPLDEBUG(x) log() << "replBlock: "  << x << endl;
 #define REPLDEBUG(x)

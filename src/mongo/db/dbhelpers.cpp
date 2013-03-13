@@ -34,7 +34,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl_block.h"
+#include "mongo/db/repl/write_concern.h"
 #include "mongo/s/d_logic.h"
 
 namespace mongo {

@@ -1,5 +1,3 @@
-// repl_block.h - blocking on writes for replication
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -18,15 +16,18 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-#include "client.h"
-#include "curop.h"
+#include <vector>
+
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/jsobj.h"
 
 /**
    local.slaves  - current location for all slaves
 
  */
 namespace mongo {
+
+    class CurOp;
 
     void updateSlaveLocation( CurOp& curop, const char * oplog_ns , OpTime lastOp );
 

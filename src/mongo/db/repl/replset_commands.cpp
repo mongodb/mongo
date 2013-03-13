@@ -21,15 +21,15 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbwebserver.h"
+#include "mongo/db/repl/health.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
-#include "../cmdline.h"
-#include "../commands.h"
-#include "health.h"
-#include "rs.h"
-#include "rs_config.h"
-#include "../dbwebserver.h"
-#include "../../util/mongoutils/html.h"
-#include "../repl_block.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_config.h"
+#include "mongo/db/repl/write_concern.h"
+#include "mongo/util/mongoutils/html.h"
 
 using namespace bson;
 

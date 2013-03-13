@@ -43,7 +43,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/repl_block.h"
+#include "mongo/db/repl/write_concern.h"
 #include "mongo/db/scanandorder.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/processinfo.h"
