@@ -74,7 +74,6 @@ namespace mongo {
     }
 
     template Status ExportedServerParameter<int>::setFromString( const string& str );
-    template Status ExportedServerParameter<long>::setFromString( const string& str );
     template Status ExportedServerParameter<long long>::setFromString( const string& str );
     template Status ExportedServerParameter<double>::setFromString( const string& str );
 
