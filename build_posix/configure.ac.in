@@ -53,7 +53,7 @@ AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
 # Java and Python APIs
 if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
 	AX_PKG_SWIG(2.0.4, [],
-	    [ AC_MSG_ERROR([SWIG is required to build Java or Python APIs.]) ])
+	    [AC_MSG_WARN([SWIG is required to rebuild Java or Python APIs.])])
 fi
 
 if test "$wt_cv_enable_java" = "yes"; then
@@ -72,14 +72,6 @@ fi
 
 if test "$wt_cv_enable_python" = "yes"; then
 	AM_PATH_PYTHON([2.6])
-        AX_PKG_SWIG(2.0.4, [],
-	    [ AC_MSG_ERROR([SWIG is required to build Python support.]) ])
-
-	# Check that SWIG supports Python.
-	touch swigtest.i
-	$SWIG -python -module swigtest swigtest.i > /dev/null 2>&1 || \
-	    AC_MSG_ERROR([$SWIG does not include Python support.])
-	rm -f swigtest*
 fi
 
 AM_TYPES
