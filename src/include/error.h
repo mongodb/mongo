@@ -98,8 +98,9 @@
 
 /*
  * WT_ASSERT
- *	Assert an expression, abort in diagnostic mode, otherwise, don't
- *	evaluate the expression.
+ *	Assert an expression, aborting in diagnostic mode.  Otherwise,
+ * "use" the session to keep the compiler quiet and don't evaluate the
+ * expression.
  */
 #ifdef HAVE_DIAGNOSTIC
 #define	WT_ASSERT(session, exp) do {					\
@@ -107,5 +108,6 @@
 		__wt_assert(session, 0, __FILE__, __LINE__, "%s", #exp);\
 } while (0)
 #else
-#define	WT_ASSERT(session, exp)
+#define	WT_ASSERT(session, exp)						\
+	WT_UNUSED(session)
 #endif
