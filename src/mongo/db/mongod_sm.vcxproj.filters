@@ -668,9 +668,6 @@
     <ClCompile Include="namespace_details.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
-    <ClCompile Include="oplog.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
     <ClCompile Include="tests.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
@@ -696,9 +693,6 @@
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="record.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="repl_block.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="restapi.cpp">
@@ -1494,6 +1488,12 @@
       <Filter>db\repl</Filter>
     </ClCompile>
     <ClCompile Include="repl\sync.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\oplog.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\write_concern.cpp">
       <Filter>db\repl</Filter>
     </ClCompile>
   </ItemGroup>
@@ -2805,9 +2805,6 @@
     <ClInclude Include="module.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="oplog.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="pdfile_private.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -2821,9 +2818,6 @@
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="record.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="repl_block.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="replutil.h">
@@ -3055,6 +3049,12 @@
       <Filter>db\repl</Filter>
     </ClInclude>
     <ClInclude Include="repl\sync.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\oplog.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\write_concern.h">
       <Filter>db\repl</Filter>
     </ClInclude>
   </ItemGroup>

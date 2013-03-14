@@ -1366,9 +1366,6 @@
     <ClInclude Include="..\db\namespacestring.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\oplog.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\pdfile.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>

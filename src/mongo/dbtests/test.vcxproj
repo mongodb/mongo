@@ -709,6 +709,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\repl\health.h" />
     <ClInclude Include="..\db\repl\master_slave.h" />
     <ClInclude Include="..\db\repl\multicmd.h" />
+    <ClInclude Include="..\db\repl\oplog.h" />
     <ClInclude Include="..\db\repl\oplogreader.h" />
     <ClInclude Include="..\db\repl\optime.h" />
     <ClInclude Include="..\db\repl\replication_server_status.h" />
@@ -720,6 +721,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\repl\rs_member.h" />
     <ClInclude Include="..\db\repl\rs_sync.h" />
     <ClInclude Include="..\db\repl\sync.h" />
+    <ClInclude Include="..\db\repl\write_concern.h" />
     <ClInclude Include="..\db\server_parameters.h" />
     <ClInclude Include="..\db\server_parameters_inline.h" />
     <ClInclude Include="..\db\stats\counters.h" />
@@ -2615,6 +2617,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\repl\heartbeat.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
     <ClCompile Include="..\db\repl\master_slave.cpp" />
+    <ClCompile Include="..\db\repl\oplog.cpp" />
     <ClCompile Include="..\db\repl\oplogreader.cpp" />
     <ClCompile Include="..\db\repl\optime.cpp" />
     <ClCompile Include="..\db\repl\replication_server_status.cpp" />
@@ -2626,6 +2629,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\repl\rs_rollback.cpp" />
     <ClCompile Include="..\db\repl\rs_sync.cpp" />
     <ClCompile Include="..\db\repl\sync.cpp" />
+    <ClCompile Include="..\db\repl\write_concern.cpp" />
     <ClCompile Include="..\db\restapi.cpp" />
     <ClCompile Include="..\db\scanandorder.cpp" />
     <ClCompile Include="..\db\server_parameters.cpp" />
@@ -2802,9 +2806,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\matcher_covered.cpp" />
-    <ClCompile Include="..\db\oplog.cpp" />
     <ClCompile Include="..\db\queryutil.cpp" />
-    <ClCompile Include="..\db\repl_block.cpp" />
     <ClCompile Include="..\util\assert_util.cpp" />
     <ClCompile Include="..\util\background.cpp" />
     <ClCompile Include="..\util\base64.cpp" />

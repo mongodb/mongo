@@ -1382,7 +1382,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\namespace-inl.h" />
     <ClInclude Include="..\db\namespace.h" />
     <ClInclude Include="..\db\namespacestring.h" />
-    <ClInclude Include="..\db\oplog.h" />
     <ClInclude Include="..\db\pdfile.h" />
     <ClInclude Include="..\db\projection.h" />
     <ClInclude Include="..\db\querypattern.h" />

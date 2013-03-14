@@ -2186,7 +2186,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="lockstate.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="namespace_details.cpp" />
-    <ClCompile Include="oplog.cpp" />
     <ClCompile Include="ops\count.cpp" />
     <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\query.cpp" />
@@ -2227,12 +2226,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\bgsync.cpp" />
     <ClCompile Include="repl\finding_start_cursor.cpp" />
     <ClCompile Include="repl\master_slave.cpp" />
+    <ClCompile Include="repl\oplog.cpp" />
     <ClCompile Include="repl\oplogreader.cpp" />
     <ClCompile Include="repl\optime.cpp" />
     <ClCompile Include="repl\replication_server_status.cpp" />
     <ClCompile Include="repl\repl_reads_ok.cpp" />
     <ClCompile Include="repl\repl_start.cpp" />
     <ClCompile Include="repl\sync.cpp" />
+    <ClCompile Include="repl\write_concern.cpp" />
     <ClCompile Include="server_extra_log_context.cpp" />
     <ClCompile Include="server_parameters.cpp" />
     <ClCompile Include="stats\timer_stats.cpp" />
@@ -2582,7 +2583,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="module.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
-    <ClInclude Include="oplog.h" />
     <ClInclude Include="field_ref.h" />
     <ClInclude Include="ops\modifier_base.h" />
     <ClInclude Include="ops\query.h" />
@@ -2603,7 +2603,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\rs_initiate.cpp" />
     <ClCompile Include="repl\rs_rollback.cpp" />
     <ClCompile Include="repl\rs_sync.cpp" />
-    <ClCompile Include="repl_block.cpp" />
     <ClCompile Include="restapi.cpp" />
     <ClCompile Include="..\client\connpool.cpp" />
     <ClCompile Include="..\client\dbclient.cpp" />
@@ -2687,6 +2686,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="repl\bgsync.h" />
     <ClInclude Include="repl\finding_start_cursor.h" />
     <ClInclude Include="repl\master_slave.h" />
+    <ClInclude Include="repl\oplog.h" />
     <ClInclude Include="repl\oplogreader.h" />
     <ClInclude Include="repl\optime.h" />
     <ClInclude Include="repl\replication_server_status.h" />
@@ -2696,7 +2696,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="repl\rs_member.h" />
     <ClInclude Include="repl\rs_sync.h" />
     <ClInclude Include="repl\sync.h" />
-    <ClInclude Include="repl_block.h" />
+    <ClInclude Include="repl\write_concern.h" />
     <ClInclude Include="restapi.h" />
     <ClInclude Include="server_parameters.h" />
     <ClInclude Include="server_parameters_inline.h" />
