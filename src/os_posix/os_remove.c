@@ -33,6 +33,9 @@ __remove_file_check(WT_SESSION_IMPL *session, const char *name)
 	__wt_spin_unlock(session, &conn->fh_lock);
 
 	WT_ASSERT(session, fh == NULL);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(name);
 #endif
 }
 
