@@ -1,62 +1,355 @@
-.TH MONGODUMP "1" "June 2009" "10gen" "Mongo Database"
-.SH "NAME"
-mongodump \- the Mongo dump tool
-.SH "SYNOPSIS"
-\fBmongodump [\fIOPTIONS\fR]\fR
-.SH "DESCRIPTION"
-.PP
-\fBmongodump\fR
-is a tool to output a binary representation of a database.  It is mostly used for doing hot backups of a database.
-.SH "OPTIONS"
+.TH "MONGODUMP" "1" "March 14, 2013" "2.2.3" "mongodb-manual"
+.SH NAME
+mongodump \- MongoDB
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.\" Man page generated from reStructuredText.
+.
+.SH SYNOPSIS
+.sp
+\fI\%mongodump\fP is a utility for creating a binary export of the
+contents of a database. Consider using this utility as part an
+effective \fBbackup strategy\fP. Use in
+conjunction with \fBmongorestore\fP to provide restore
+functionality.
+.IP Note
+The format of data created by \fI\%mongodump\fP tool from the
+2.2 distribution or later is different and incompatible with
+earlier versions of \fBmongod\fP.
+.RE
+.IP "See also"
+.sp
+"\fBmongorestore\fP" and "\fB/administration/backups\fP".
+.RE
+.SH OPTIONS
+.INDENT 0.0
+.TP
+.B mongodump
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-help
-show usage information
+Returns a basic help and usage text.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-verbose, \-v
+Increases the amount of internal reporting returned on the command
+line. Increase the verbosity with the \fB\-v\fP form by including the
+option multiple times, (e.g. \fB\-vvvvv\fP.)
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-version
-show version information
+Returns the version of the \fI\%mongodump\fP utility and exits.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-h, \-\-host HOST
-server to connect to (default HOST=localhost)
+.B \-\-host <hostname><:port>
+Specifies a resolvable hostname for the \fBmongod\fP that you wish to
+use to create the database dump. By default \fI\%mongodump\fP will
+attempt to connect to a MongoDB process ruining on the localhost
+port number \fB27017\fP.
+.sp
+Optionally, specify a port number to connect a MongoDB instance
+running on a port other than \fB27017\fP.
+.sp
+To connect to a replica set, use the \fI\%--host\fP
+argument with a setname, followed by a slash and a comma\-separated
+list of host names and port numbers. The \fI\%mongodump\fP
+utility will, given the seed of at least one connected set member,
+connect to the primary member of that set. This option would resemble:
+.sp
+.nf
+.ft C
+mongodump \-\-host repl0/mongo0.example.net,mongo0.example.net:27018,mongo1.example.net,mongo2.example.net
+.ft P
+.fi
+.sp
+You can always connect directly to a single MongoDB instance by
+specifying the host and port number directly.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B\-\-port arg
-server port. Can also use \-\-host hostname:port
+.B \-\-port <port>
+Specifies the port number, if the MongoDB instance is not running
+on the standard port. (i.e. \fB27017\fP) You may also specify a port
+number using the \fI\%--host\fP option.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-ipv6
-enable IPv6 support (disabled by default)
+Enables IPv6 support that allows \fI\%mongodump\fP to connect to
+the MongoDB instance using an IPv6 network. All MongoDB programs
+and processes, including \fI\%mongodump\fP, disable IPv6 support
+by default.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-u|\-\-username USERNAME
-specify user to log in as
+.B \-\-ssl
+New in version 2.4: MongoDB added support for SSL connections to \fBmongod\fP
+instances in mongodump.
+.IP Note
+SSL support in mongodump is not compiled into the default
+distribution of MongoDB. See \fB/administration/ssl\fP for more
+information on SSL and MongoDB.
+.sp
+Additionally, mongodump does not support connections to
+\fBmongod\fP instances that require client certificate
+validation.
+.RE
+.sp
+Allows \fI\%mongodump\fP to connect to \fBmongod\fP
+instance over an SSL connection.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-p|\-\-password PASSWORD
-specify password of user (notice there is no space)
+.B \-\-username <username>, \-u <username>
+Specifies a username to authenticate to the MongoDB instance, if
+your database requires authentication. Use in conjunction with the
+\fI\%--password\fP option to supply a
+password.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-d, \-\-db DATABASE
-database to use
+.B \-\-password <password>, \-p <password>
+Specifies a password to authenticate to the MongoDB instance. Use
+in conjunction with the \fI\%--username\fP
+option to supply a username.
+.sp
+If you specify a \fI\%--username\fP
+without the \fI\%--password\fP option, \fI\%mongodump\fP will
+prompt for a password interactively.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-c, \-\-c COLLECTION
-collection to use
+.B \-\-authenticationDatabase <dbname>
+New in version 2.4.
+.sp
+Specifies the database that holds the user\(aqs (e.g
+\fI\%--username\fP) credentials.
+.sp
+By default, \fI\%mongodump\fP assumes that the database specified to the
+\fI\%--db\fP argument holds the user\(aqs credentials, unless you
+specify \fI\%--authenticationDatabase\fP.
+.sp
+See \fBuserSource\fP,
+\fB/reference/privilege\-documents\fP and
+\fB/reference/user\-privileges\fP for more information about
+delegated authentication in MongoDB.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-o, \-\-out DIRECTORY
-output directory or - for stdout.
+.B \-\-authenticationMechanism <name>
+New in version 2.4.
+.sp
+Specifies the authentication mechanism. By default, the
+authentication mechanism is \fBMONGODB\-CR\fP, which is the MongoDB
+challenge/response authentication mechanism. In the MongoDB Subscriber Edition,
+\fI\%mongodump\fP also includes support for \fBGSSAPI\fP to handle
+Kerberos authentication.
+.sp
+See \fB/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication\fP
+for more information about Kerberos authentication.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-dbpath PATH
-directly access mongod data files in this path, instead of connecting to a mongod instance
+.B \-\-dbpath <path>
+Specifies the directory of the MongoDB data files. If used, the
+\fI\%--dbpath\fP option enables \fI\%mongodump\fP to attach
+directly to local data files and copy the data without the
+\fBmongod\fP. To run with \fI\%--dbpath\fP,
+\fI\%mongodump\fP needs to restrict access to the data
+directory: as a result, no \fBmongod\fP can access the same
+path while the process runs.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-directoryperdb
-if dbpath specified, each db is in a separate directory
+Use the \fI\%--directoryperdb\fP in conjunction with the
+corresponding option to \fBmongod\fP. This option allows
+\fI\%mongodump\fP to read data files organized with each
+database located in a distinct directory. This option is only
+relevant when specifying the \fI\%--dbpath\fP option.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-query
-JSON query filter
+.B \-\-journal
+Allows \fI\%mongodump\fP operations to use the durability
+\fIjournal\fP to ensure that the export is in a
+consistent state. This option is only relevant when specifying the
+\fI\%--dbpath\fP option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-db <db>, \-d <db>
+Use the \fI\%--db\fP option to specify a database for
+\fI\%mongodump\fP to backup. If you do not specify a DB,
+\fI\%mongodump\fP copies all databases in this instance into the
+dump files. Use this option to backup or copy a smaller subset of
+your data.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-collection <collection>, \-c <collection>
+Use the \fI\%--collection\fP option to specify a collection for
+\fI\%mongodump\fP to backup. If you do not specify a collection,
+this option copies all collections in the specified database or
+instance to the dump files. Use this option to backup or copy a
+smaller subset of your data.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-out <path>, \-o <path>
+Specifies a path where \fI\%mongodump\fP and store the output
+the database dump. To output the database dump to standard output,
+specify a \fB\-\fP rather than a path.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-query <json>, \-q <json>
+Provides a query to limit (optionally) the documents included in
+the output of \fI\%mongodump\fP.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-oplog
-Use oplog for point-in-time snapshotting
+Use this option to ensure that \fI\%mongodump\fP creates a dump
+of the database that includes an \fIoplog\fP, to create a
+point\-in\-time snapshot of the state of a \fBmongod\fP instance. To
+restore to a specific point\-in\-time backup, use the output created
+with this option in conjunction with \fImongorestore \-\-oplogReplay\fP.
+.sp
+Without \fI\%--oplog\fP, if there are write operations during the
+dump operation, the dump will not reflect a single moment in
+time. Changes made to the database during the update process can
+affect the output of the backup.
+.sp
+\fI\%--oplog\fP has no effect when running \fI\%mongodump\fP
+against a \fBmongos\fP instance to dump the entire contents of
+a sharded cluster. However, you can use \fI\%--oplog\fP to dump
+individual shards.
+.IP Note
+\fI\%--oplog\fP only works against nodes that maintain a
+\fIoplog\fP. This includes all members of a replica set, as
+well as \fImaster\fP nodes in master/slave replication
+deployments.
+.RE
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-repair
-try to recover a crashed database (needs \-\-dbpath)
-.SH "COPYRIGHT"
-.PP
-Copyright 2007\-2011 10gen
-.SH "SEE ALSO"
-For more information, please refer to the mongodump page in the MongoDB manual, available at http://dochub.mongodb.org/core/mongodumpmanpage
-.SH "AUTHOR"
-Kristina Chodorow
+Use this option to run a repair option in addition to dumping the
+database. The repair option attempts to repair a database that may
+be in an inconsistent state as a result of an improper shutdown or
+\fBmongod\fP crash.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-forceTableScan
+Forces \fI\%mongodump\fP to scan the data store directly:
+typically, \fI\%mongodump\fP saves entries as they appear in the
+index of the \fB_id\fP field. Use \fI\%--forceTableScan\fP to skip
+the index and scan the data directly. Typically there are two cases
+where this behavior is preferable to the default:
+.INDENT 7.0
+.IP 1. 3
+If you have key sizes over 800 bytes that would not be present
+in the \fB_id\fP index.
+.IP 2. 3
+Your database uses a custom \fB_id\fP field.
+.UNINDENT
+.sp
+When you run with \fI\%--forceTableScan\fP, \fI\%mongodump\fP
+does not use \fB$snapshot\fP. As a result, the dump produced
+by \fI\%mongodump\fP can reflect the state of the database at
+many different points in time.
+.IP Warning
+Use \fI\%--forceTableScan\fP with extreme caution
+and consideration.
+.RE
+.IP Warning
+Changed in version 2.2: When used in combination with \fBfsync\fP or
+\fBdb.fsyncLock()\fP, \fBmongod\fP may block some
+reads, including those from \fI\%mongodump\fP, when
+queued write operation waits behind the \fBfsync\fP
+lock.
+.RE
+.UNINDENT
+.SH BEHAVIOR
+.sp
+When running \fI\%mongodump\fP against a \fBmongos\fP instance
+where the \fIsharded cluster\fP consists of \fIreplica sets\fP, the \fIread preference\fP of the operation will prefer reads
+from \fIsecondary\fP members of the set.
+.SH USAGE
+.sp
+See the \fB/tutorial/backup\-databases\-with\-binary\-database\-dumps\fP
+for a larger overview of \fI\%mongodump\fP usage. Also see the
+"\fBmongorestore\fP" document for an overview of the
+\fBmongorestore\fP, which provides the related inverse
+functionality.
+.sp
+The following command, creates a dump file that contains only the
+collection named \fBcollection\fP in the database named \fBtest\fP. In
+this case the database is running on the local interface on port
+\fB27017\fP:
+.sp
+.nf
+.ft C
+mongodump \-\-collection collection \-\-db test
+.ft P
+.fi
+.sp
+In the next example, \fI\%mongodump\fP creates a backup of the
+database instance stored in the \fB/srv/mongodb\fP directory on the
+local machine. This requires that no \fBmongod\fP instance is
+using the \fB/srv/mongodb\fP directory.
+.sp
+.nf
+.ft C
+mongodump \-\-dbpath /srv/mongodb
+.ft P
+.fi
+.sp
+In the final example, \fI\%mongodump\fP creates a database dump
+located at \fB/opt/backup/mongodump\-2011\-10\-24\fP, from a database
+running on port \fB37017\fP on the host \fBmongodb1.example.net\fP and
+authenticating using the username \fBuser\fP and the password
+\fBpass\fP, as follows:
+.sp
+.nf
+.ft C
+mongodump \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-password pass /opt/backup/mongodump\-2011\-10\-24
+.ft P
+.fi
+.SH AUTHOR
+MongoDB Documentation Project
+.SH COPYRIGHT
+2011-2013, 10gen, Inc.
+.\" Generated by docutils manpage writer.
+.
