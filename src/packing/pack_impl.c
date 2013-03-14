@@ -105,6 +105,7 @@ __wt_struct_packv(WT_SESSION_IMPL *session,
 		WT_RET(__pack_write(session, &pv, &p, (size_t)(end - p)));
 	}
 
+	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
 
 	if (ret != WT_NOTFOUND)
@@ -154,6 +155,7 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 		WT_UNPACK_PUT(session, pv, ap);
 	}
 
+	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
 
 	if (ret != WT_NOTFOUND)

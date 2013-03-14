@@ -8,23 +8,23 @@
 #include "wt_internal.h"
 
 /*
- * __wt_remove --
- *	Remove a file.
+ * __remove_file_check --
+ *	Check if the file is currently open before removing it.
  */
-int
-__wt_remove(WT_SESSION_IMPL *session, const char *name)
+static inline void
+__remove_file_check(WT_SESSION_IMPL *session, const char *name)
 {
+#ifdef HAVE_DIAGNOSTIC
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_FH *fh;
-	const char *path;
 
 	conn = S2C(session);
 	fh = NULL;
 
-	WT_VERBOSE_RET(session, fileops, "%s: remove", name);
-
-	/* If the file is open, close/free it. */
+	/*
+	 * Check if the file is open: it's an error if it is, since a higher
+	 * level should have closed it before removing.
+	 */
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (strcmp(name, fh->name) == 0)
@@ -32,8 +32,26 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 	}
 	__wt_spin_unlock(session, &conn->fh_lock);
 
-	/* This should be caught at a higher level. */
 	WT_ASSERT(session, fh == NULL);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(name);
+#endif
+}
+
+/*
+ * __wt_remove --
+ *	Remove a file.
+ */
+int
+__wt_remove(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_DECL_RET;
+	const char *path;
+
+	WT_VERBOSE_RET(session, fileops, "%s: remove", name);
+
+	__remove_file_check(session, name);
 
 	WT_RET(__wt_filename(session, name, &path));
 
