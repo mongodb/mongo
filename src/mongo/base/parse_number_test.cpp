@@ -285,9 +285,9 @@ namespace {
         ASSERT_PARSES(double, "12e-8", 12e-8);
         ASSERT_PARSES(double, "-485.381e-8", -485.381e-8);
 
-#ifndef _WIN32
+#if !(defined(_WIN32) || defined(__sunos))
         // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
-        // not parseable by the Windows SDK libc.
+        // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
 
         ASSERT_PARSES(double, "0xff", 0xff);
         ASSERT_PARSES(double, "-0xff", -0xff);
