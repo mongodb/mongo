@@ -123,10 +123,6 @@ __wt_page_inmem(
 	WT_PAGE *page;
 	size_t size;
 
-	if (dsk->u.entries == 0)
-		WT_RET_MSG(session, WT_ERROR,
-		    "Attempt to read a page with no entries from disk.");
-
 	*pagep = NULL;
 
 	/* Allocate and initialize a new WT_PAGE. */
