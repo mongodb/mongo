@@ -265,8 +265,13 @@ static bool runMongosServer( bool doUpgrade ) {
     VersionType initVersionInfo;
     VersionType versionInfo;
     string errMsg;
-    bool upgraded = checkAndUpgradeConfigVersion(ConnectionString(configServer.getPrimary()
-                                                         .getConnString()),
+    string configServerURL = configServer.getPrimary().getConnString();
+    ConnectionString configServerConnString = ConnectionString::parse(configServerURL, errMsg);
+    if (!configServerConnString.isValid()) {
+        error() << "Invalid connection string for config servers: " << configServerURL << endl;
+        return false;
+    }
+    bool upgraded = checkAndUpgradeConfigVersion(configServerConnString,
                                                  doUpgrade,
                                                  &initVersionInfo,
                                                  &versionInfo,

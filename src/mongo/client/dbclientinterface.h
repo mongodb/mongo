@@ -192,6 +192,8 @@ namespace mongo {
             _type = INVALID;
         }
 
+        // Note: This should only be used for direct connections to a single server.  For replica
+        // set and SyncClusterConnections, use ConnectionString::parse.
         ConnectionString( const HostAndPort& server ) {
             _type = MASTER;
             _servers.push_back( server );
