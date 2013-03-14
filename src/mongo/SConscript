@@ -113,7 +113,7 @@ env.CppUnitTest('descriptive_stats_test',
                 LIBDEPS=['foundation', 'bson']);
 
 env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
-                LIBDEPS=['mongocommon', 'notmongodormongos'],
+                LIBDEPS=['mongocommon'],
                 NO_CRUTCH=True)
 
 env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
@@ -613,8 +613,7 @@ Default( mongod )
 
 # tools
 allToolFiles = [ "tools/tool.cpp", "tools/stat_util.cpp" ]
-env.StaticLibrary("alltools", allToolFiles, LIBDEPS=["serveronly", "coreserver", "coredb",
-                                                     "notmongodormongos"])
+env.StaticLibrary("alltools", allToolFiles, LIBDEPS=["serveronly", "coreserver", "coredb"])
 
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + x + "${PROGSUFFIX}" for x in normalTools ] )
@@ -644,8 +643,7 @@ env.Install( '#/', mongos )
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
                               LIBDEPS=["mongocommon",
                                        "defaultversion",
-                                       "gridfs",
-                                       "notmongodormongos"])
+                                       "gridfs"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 if has_option( "sharedclient" ):
@@ -674,14 +672,13 @@ test = testEnv.Install(
                        "coredb",
                        "testframework",
                        "gridfs",
-                       "notmongodormongos",
                        "s/upgrade",
                        "mocklib"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
 
-env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework", "notmongodormongos" ] ) )
+env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
 
 # --- sniffer ---
 mongosniff_built = False
@@ -696,7 +693,7 @@ if darwin or env["_HAVEPCAP"]:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
 
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
-                                              LIBDEPS=["gridfs", "serveronly", "coreserver", "coredb", "notmongodormongos"]))
+                                              LIBDEPS=["gridfs", "serveronly", "coreserver", "coredb"]))
 
 # --- shell ---
 
