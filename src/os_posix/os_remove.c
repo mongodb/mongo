@@ -16,15 +16,21 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *fh;
 	const char *path;
+#ifdef HAVE_DIAGNOSTIC
+	WT_FH *fh;
+#endif
 
 	conn = S2C(session);
-	fh = NULL;
 
 	WT_VERBOSE_RET(session, fileops, "%s: remove", name);
 
-	/* If the file is open, close/free it. */
+#ifdef HAVE_DIAGNOSTIC
+	fh = NULL;
+	/*
+	 * Check if the file is open - it is an error if it is, since a
+	 * higher level should have closed it before removing.
+	 */
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (strcmp(name, fh->name) == 0)
@@ -32,8 +38,8 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 	}
 	__wt_spin_unlock(session, &conn->fh_lock);
 
-	/* This should be caught at a higher level. */
 	WT_ASSERT(session, fh == NULL);
+#endif
 
 	WT_RET(__wt_filename(session, name, &path));
 

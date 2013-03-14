@@ -1819,7 +1819,10 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * least one cell on the page we want.  This is a change from previous
 	 * behavior, so I'm asserting it.
 	 */
-	WT_ASSERT_ERR(session, skip_start + skip_stop < page->entries);
+	if (skip_start + skip_stop >= page->entries)
+		WT_ERR_MSG(session, WT_ERROR,
+		    "Salvage encountered an empty page, all pages should "
+		    "contain at least one entry");
 
 	/*
 	 * Take a copy of this page's first key to define the start of

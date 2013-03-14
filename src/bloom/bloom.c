@@ -65,7 +65,8 @@ static int
 __bloom_setup(
     WT_BLOOM *bloom, uint64_t n, uint64_t m, uint32_t factor, uint32_t k)
 {
-	WT_ASSERT(bloom->session, k > 1);
+	if (k < 2)
+		return (EINVAL);
 
 	bloom->k = k;
 	bloom->factor = factor;
