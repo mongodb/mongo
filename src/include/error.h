@@ -107,5 +107,5 @@
 		__wt_assert(session, 0, __FILE__, __LINE__, "%s", #exp);\
 } while (0)
 #else
-#define WT_ASSERT(session, exp)
+#define	WT_ASSERT(session, exp)
 #endif
