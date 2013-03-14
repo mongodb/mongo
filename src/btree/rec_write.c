@@ -1191,9 +1191,9 @@ __rec_split_row_promote_cell(
 	 */
 	cell = WT_PAGE_HEADER_BYTE(btree, dsk);
 	__wt_cell_unpack(cell, unpack);
-	if (unpack->raw == WT_CELL_VALUE_COPY || unpack->prefix != 0)
-		WT_RET_MSG(session, WT_ERROR,
-		    "Reconciliation split generated unexpected record.");
+	WT_ASSERT(session,
+	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
+
 	WT_RET(__wt_cell_unpack_copy(session, unpack, copy));
 	return (0);
 }
@@ -1797,12 +1797,8 @@ __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * entries to 0, is because there's another entry to write, which then
 	 * sets entries to 1).  If the page was empty, we eventually delete it.
 	 */
-	if (r->entries == 0) {
-		if (r->bnd_next != 0)
-			WT_RET_MSG(session, WT_ERROR,
-			    "Invalid record count in reconciliation split.");
+	if (r->entries == 0)
 		return (0);
-	}
 
 	return (r->raw_compression ?
 	    __rec_split_finish_raw(session, r) :
@@ -1872,8 +1868,8 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
 	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
-		WT_ERR_MSG(session, WT_ERROR,
-		    "Reconciliation split would overflow page.");
+		WT_PANIC_ERR(session, ret = WT_PANIC,
+		    "Reconciliation remnant too large for the split buffer");
 
 	dsk = r->dsk.mem;
 	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
