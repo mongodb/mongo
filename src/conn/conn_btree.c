@@ -421,12 +421,10 @@ int
 __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	int inuse;
 
 	btree = session->btree;
-	conn = S2C(session);
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
@@ -453,7 +451,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 		 */
 		WT_ASSERT(session,
 		    btree != session->metafile ||
-		    session == conn->default_session);
+		    session == S2C(session)->default_session);
 
 		if (F_ISSET(btree, WT_BTREE_OPEN))
 			WT_TRET(__wt_conn_btree_sync_and_close(session));
