@@ -241,6 +241,7 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 	uint64_t h1, h2;
 	uint8_t bit;
 
+	/* Get operations are only supported by finalized bloom filters. */
 	WT_ASSERT(bloom->session, bloom->bitstring == NULL);
 
 	wt_session = (WT_SESSION *)bloom->session;
