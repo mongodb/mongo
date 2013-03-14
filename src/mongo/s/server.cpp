@@ -104,6 +104,12 @@ namespace mongo {
             try {
                 r.init();
                 r.process();
+
+                // Release connections after non-write op 
+                if ( ShardConnection::releaseConnectionsAfterResponse && r.expectResponse() ) {
+                    LOG(2) << "release thread local connections back to pool" << endl;
+                    ShardConnection::releaseMyConnections();
+                }
             }
             catch ( AssertionException & e ) {
                 LOG( e.isUserAssertion() ? 1 : 0 ) << "AssertionException while processing op type : " << m.operation() << " to : " << r.getns() << causedBy(e) << endl;

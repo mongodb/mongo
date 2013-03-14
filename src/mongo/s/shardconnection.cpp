@@ -22,6 +22,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
@@ -131,7 +132,15 @@ namespace mongo {
             // Stop tracking these client connections
             activeClientConnections.remove( this );
 
-            // No longer need spinlock protection
+            releaseAll( true );
+        }
+
+        void releaseAll( bool fromDestructor = false ) {
+
+            // Don't need spinlock protection because if not in the destructor, we don't 
+            // modify _hosts, and if in the destructor we are not accessible to external
+            // threads.
+
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
@@ -147,9 +156,9 @@ namespace mongo {
                         release( addr , ss->avail );
                     ss->avail = 0;
                 }
-                delete ss;
+                if ( fromDestructor ) delete ss;
             }
-            _hosts.clear();
+            if ( fromDestructor ) _hosts.clear();
         }
 
         DBClientBase * get( const string& addr , const string& ns ) {
@@ -458,6 +467,20 @@ namespace mongo {
                 kill();
             }
         }
+    }
+
+    bool ShardConnection::releaseConnectionsAfterResponse( false );
+
+    ExportedServerParameter<bool> ReleaseConnectionsAfterResponse(
+        ServerParameterSet::getGlobal(),
+        "releaseConnectionsAfterResponse",
+         &ShardConnection::releaseConnectionsAfterResponse,
+        true,
+        true
+    );
+
+    void ShardConnection::releaseMyConnections() {
+        ClientConnections::threadInstance()->releaseAll();
     }
 
     void ShardConnection::clearPool() {
