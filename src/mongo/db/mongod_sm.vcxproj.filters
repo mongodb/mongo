@@ -881,9 +881,6 @@
     <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
       <Filter>third_party\MurmurHash3</Filter>
     </ClCompile>
-    <ClCompile Include="connection_factory.cpp">
-      <Filter>db\Source Files\a to d</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\document_source_cursor.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>

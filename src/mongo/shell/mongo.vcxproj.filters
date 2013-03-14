@@ -452,9 +452,6 @@
     <ClCompile Include="..\db\dbmessage.cpp">
       <Filter>db\Source FIles</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\connection_factory.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>

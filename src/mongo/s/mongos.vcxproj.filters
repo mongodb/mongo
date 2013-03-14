@@ -1164,9 +1164,6 @@
     <ClCompile Include="..\db\server_extra_log_context.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\connection_factory.cpp">
-      <Filter>db\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\v8\src\experimental-libraries.cc">
       <Filter>third_party\v8\Generated from JavaScript source</Filter>
     </ClCompile>
