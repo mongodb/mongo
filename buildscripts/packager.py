@@ -924,9 +924,9 @@ fi
 %{_mandir}/man1/mongostat.1*
 # FIXME: uncomment when mongosniff is back in the package
 #%{_mandir}/man1/mongosniff.1*
-%{_mandir}/man1/mongotop.1*
-%{_mandir}/man1/mongoperf.1*
-%{_mandir}/man1/mongooplog.1*
+#@@VERSION>2.4.0@@%{_mandir}/man1/mongotop.1*
+#@@VERSION>2.4.0@@%{_mandir}/man1/mongoperf.1*
+#@@VERSION>2.4.0@@%{_mandir}/man1/mongooplog.1*
 
 %files server
 %defattr(-,root,root,-)
