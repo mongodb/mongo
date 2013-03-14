@@ -49,7 +49,7 @@ struct __wt_txn_state {
 
 struct __wt_txn_global {
 	volatile wt_txnid_t current;	/* Current transaction ID. */
-	volatile uint32_t gen;		/* Completed transaction genertion */
+	volatile uint32_t gen;		/* Completed transaction generation */
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
 
