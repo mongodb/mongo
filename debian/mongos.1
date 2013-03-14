@@ -1,89 +1,400 @@
-.TH MONGOS "1" "June 2009" "10gen" "Mongo Database"
-.SH "NAME"
-mongos \- the Mongo sharding server
-.SH "SYNOPSIS"
-\fBmongos [\fIOPTIONS\fR]\fR
-.SH "DESCRIPTION"
-.PP
-\fBmongos\fR
-is used to setup, configure, and get information about sharded databases.
-.SH "EXAMPLES"
-.PP
-.B ./mongod --port 9999 --dbpath /data/db/a # first server
-.PP
-.B ./mongod --port 9998 --dbpath /data/db/b # second server
-.PP
-.B ./mongos --configdb localhost:9999 # mongos
-.PP
-starts three servers to set up sharding
-.SH "OPTIONS"
+.TH "MONGOS" "1" "March 14, 2013" "2.2.3" "mongodb-manual"
+.SH NAME
+mongos \- MongoDB Shard Utility
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.\" Man page generated from reStructuredText.
+.
+.SH SYNOPSIS
+.sp
+\fI\%mongos\fP for "MongoDB Shard," is a routing service for
+MongoDB shard configurations that processes queries from the
+application layer, and determines the location of this data in the
+\fIsharded cluster\fP, in order to complete these operations.
+From the perspective of the application, a
+\fI\%mongos\fP instance behaves identically to any other MongoDB
+instance.
+.IP Note
+Changed in version 2.1.
+.sp
+Some aggregation operations using the \fBaggregate\fP will
+cause \fI\%mongos\fP instances to require more CPU resources
+than in previous versions. This modified performance profile may
+dictate alternate architecture decisions if you use the
+\fIaggregation framework\fP extensively in a sharded environment.
+.RE
+.IP "See also"
+.sp
+\fB/sharding\fP and \fB/core/sharded\-clusters\fP.
+.RE
+.SH OPTIONS
+.INDENT 0.0
 .TP
-.B \-\-help
-show usage information
+.B mongos
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-h, \-\-help
-show this usage information
+.B \-\-help, \-h
+Returns a basic help and usage text.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-version
-show version information
+Returns the version of the \fBmongod\fP daemon.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-f, \-\-config arg
-configuration file specifying additional options
+.B \-\-config <filename>, \-f <filename>
+Specifies a configuration file, that you can use to specify
+runtime\-configurations. While the options are equivalent and
+accessible via the other command line arguments, the configuration
+file is the preferred method for runtime configuration of
+mongod. See the "\fB/reference/configuration\-options\fP" document
+for more information about these options.
+.sp
+Not all configuration options for \fBmongod\fP make sense in
+the context of \fI\%mongos\fP.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-v, \-\-verbose
-be more verbose (include multiple times for more verbosity
-e.g. -vvvvv)
+.B \-\-verbose, \-v
+Increases the amount of internal reporting returned on standard
+output or in the log file specified by \fI\%--logpath\fP. Use the
+\fB\-v\fP form to control the level of verbosity by including the
+option multiple times, (e.g. \fB\-vvvvv\fP.)
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-quiet                quieter output
+.B \-\-quiet
+Runs the \fI\%mongos\fP instance in a quiet mode that attempts to limit
+the amount of output.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-port arg             specify port number
+.B \-\-port <port>
+Specifies a TCP port for the \fI\%mongos\fP to listen for client
+connections. By default \fI\%mongos\fP listens for connections on
+port 27017.
+.sp
+UNIX\-like systems require root access to access ports with numbers
+lower than 1024.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-bind_ip arg
-comma separated list of ip addresses to listen on - all local ips by
-default
+.B \-\-bind_ip <ip address>
+The IP address that the \fI\%mongos\fP process will bind to and
+listen for connections. By default \fI\%mongos\fP listens for
+connections on the localhost (i.e. \fB127.0.0.1\fP address.) You may
+attach \fI\%mongos\fP to any interface; however, if you attach
+\fI\%mongos\fP to a publicly accessible interface you must
+implement proper authentication or firewall restrictions to protect
+the integrity of your database.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-logpath arg
-log file to send write to instead of stdout - has to be a file, not
-directory
+.B \-\-maxConns <number>
+Specifies the maximum number of simultaneous connections that
+\fI\%mongos\fP will accept. This setting will have no effect if
+the value of this setting is higher than your operating system\(aqs
+configured maximum connection tracking threshold.
+.sp
+This is particularly useful for \fI\%mongos\fP if you have a
+client that creates a number of collections but allows them to
+timeout rather than close the collections. When you set
+\fBmaxConns\fP, ensure the value is slightly higher than the
+size of the connection pool or the total number of connections to
+prevent erroneous connection spikes from propagating to the members
+of a \fIshard\fP cluster.
+.IP Note
+You cannot set \fBmaxConns\fP to a value higher
+than \fI20000\fP.
+.RE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-objcheck
+Forces the \fI\%mongos\fP to validate all requests from clients
+upon receipt to ensure that invalid objects are never inserted into
+the database. This option has a performance impact, and is not
+enabled by default.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-logpath <path>
+Specify a path for the log file that will hold all diagnostic
+logging information.
+.sp
+Unless specified, \fI\%mongos\fP will output all log information
+to the standard output. Additionally, unless you also specify
+\fI\%--logappend\fP, the logfile will be overwritten when the
+process restarts.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-logappend
-append to logpath instead of over-writing
+Specify to ensure that \fI\%mongos\fP appends additional logging
+data to the end of the logfile rather than overwriting the content
+of the log when the process restarts.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-pidfilepath arg
-full path to pidfile (if not set, no pidfile is created)
+.B \-\-syslog
+New in version 2.1.0.
+.sp
+Sends all logging output to the host\(aqs \fIsyslog\fP system rather
+than to standard output or a log file as with \fI\%--logpath\fP.
+.IP Warning
+You cannot use \fI\%--syslog\fP with \fI\%--logpath\fP.
+.RE
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-keyFile arg
-private key for cluster authentication (only for replica sets)
+.B \-\-pidfilepath <path>
+Specify a file location to hold the "\fIPID\fP" or process ID of the
+\fI\%mongos\fP process. Useful for tracking the \fI\%mongos\fP process in
+combination with the \fI\%mongos --fork\fP option.
+.sp
+Without a specified \fI\%--pidfilepath\fP option,
+\fI\%mongos\fP creates no PID file.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-unixSocketPrefix arg
-alternative directory for UNIX domain sockets (defaults to /tmp)
+.B \-\-keyFile <file>
+Specify the path to a key file to store authentication
+information. This option is only useful for the connection between
+\fI\%mongos\fP instances and components of the \fIsharded cluster\fP.
+.IP "See also"
+.sp
+\fIsharding\-security\fP
+.RE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-nounixsocket
+Disables listening on the UNIX socket. Without this option
+\fI\%mongos\fP creates a UNIX socket.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-unixSocketPrefix <path>
+Specifies a path for the UNIX socket. Unless specified,
+\fI\%mongos\fP creates a socket in the \fB/tmp\fP path.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-fork
-fork server process
-
-.SH "SHARDING OPTIONS"
+Enables a \fIdaemon\fP mode for \fBmongod\fP which forces the
+process to the background. This is the normal mode of operation, in
+production and production\-like environments, but may \fInot\fP be
+desirable for testing.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-configdb arg
-1 or 3 comma separated config servers
+.B \-\-configdb <config1>,<config2><:port>,<config3>
+Set this option to specify a configuration database
+(i.e. \fIconfig database\fP) for the \fIsharded cluster\fP. You must
+specify either 1 configuration server or 3 configuration servers,
+in a comma separated list.
+.IP Note
+\fI\%mongos\fP instances read from the first \fIconfig
+server\fP in the list provided. All
+\fI\%mongos\fP instances \fBmust\fP specify the hosts to the
+\fI\%--configdb\fP setting in the same order.
+.sp
+If your configuration databases reside in more that one data
+center, order the hosts in the \fI\%--configdb\fP argument so
+that the config database that is closest to the majority of your
+\fI\%mongos\fP instances is first servers in the list.
+.RE
+.IP Warning
+Never remove a config server from the \fI\%--configdb\fP parameter, even if
+the config server or servers are not available, or offline.
+.RE
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-test
-just run unit tests
+This option is for internal testing use only, and runs unit tests
+without starting a \fI\%mongos\fP instance.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-upgrade
-upgrade meta data version
+This option updates the meta data format used by the
+\fIconfig database\fP.
+.UNINDENT
+.INDENT 0.0
 .TP
-.B \-\-chunkSize arg
-maximum amount of data per chunk
+.B \-\-chunkSize <value>
+The value of the \fI\%--chunkSize\fP determines the size of each
+\fIchunk\fP, \fIin megabytes\fP, of data distributed around the
+\fIsharded cluster\fP. The default value is 64 megabytes, which
+is the ideal size for chunks in most deployments: larger chunk size
+can lead to uneven data distribution, smaller chunk size often
+leads to inefficient movement of chunks between nodes. However, in
+some circumstances it may be necessary to set a different chunk
+size.
+.sp
+This option \fIonly\fP sets the chunk size when initializing the
+cluster for the first time. If you modify the run\-time option
+later, the new value will have no effect. See the
+"\fIsharding\-balancing\-modify\-chunk\-size\fP" procedure if you
+need to change the chunk size on an existing sharded cluster.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-ipv6
-enable IPv6 support (disabled by default)
+Enables IPv6 support to allow clients to connect to \fI\%mongos\fP
+using IPv6 networks. MongoDB disables IPv6 support by default in
+\fBmongod\fP and all utilities.
+.UNINDENT
+.INDENT 0.0
 .TP
 .B \-\-jsonp
-allow JSONP access via http (has security implications)
-.SH "COPYRIGHT"
-.PP
-Copyright 2007\-2011 10gen
-.SH "SEE ALSO"
-For more information, please refer to the mongos page in the MongoDB manual, available at http://dochub.mongodb.org/core/mongosmanpage
-.SH "AUTHOR"
-Kristina Chodorow
+Permits \fIJSONP\fP access via an HTTP interface. Consider the
+security implications of allowing this activity before enabling
+this option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-noscripting
+Disables the scripting engine.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-nohttpinterface
+New in version 2.1.2.
+.sp
+Disables the HTTP interface.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-localThreshold
+New in version 2.2.
+.sp
+\fI\%--localThreshold\fP affects the logic that \fI\%mongos\fP
+uses when selecting \fIreplica set\fP members to pass read
+operations to from clients. Specify a value to
+\fI\%--localThreshold\fP in milliseconds. The default value is
+\fB15\fP, which corresponds to the default value in all of the client
+\fBdrivers\fP.
+.sp
+When \fI\%mongos\fP receives a request that permits reads to
+\fIsecondary\fP members, the \fI\%mongos\fP will:
+.INDENT 7.0
+.INDENT 3.5
+.INDENT 0.0
+.IP \(bu 2
+find the member of the set with the lowest ping time.
+.IP \(bu 2
+construct a list of replica set members that is within a ping
+time of 15 milliseconds of the nearest suitable member of the
+set.
+.sp
+If you specify a value for \fI\%--localThreshold\fP,
+\fI\%mongos\fP will construct the list of replica members
+that are within the latency allowed by this value.
+.IP \(bu 2
+The \fI\%mongos\fP will select a member to read from at
+random from this list.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+The ping time used for a set member compared by the
+\fI\%--localThreshold\fP setting is a moving average of recent
+ping times, calculated, at most, every 10 seconds. As a result, some queries
+may reach members above the threshold until the \fI\%mongos\fP
+recalculates the average.
+.sp
+See the \fIreplica\-set\-read\-preference\-behavior\-member\-selection\fP
+section of the \fIread preference\fP
+documentation for more information.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-noAutoSplit
+New in version 2.0.7.
+.sp
+\fI\%--noAutoSplit\fP prevents \fI\%mongos\fP from
+automatically inserting metadata splits in a \fIsharded
+collection\fP. If set on all \fI\%mongos\fP, this will prevent
+MongoDB from creating new chunks as the data in a collection
+grows.
+.sp
+Because any \fI\%mongos\fP in a cluster can create a split,
+to totally disable splitting in a cluster you must
+set \fI\%--noAutoSplit\fP on all \fI\%mongos\fP.
+.IP Warning
+With \fI\%--noAutoSplit\fP enabled, the data in your sharded
+cluster may become imbalanced over time. Enable with caution.
+.RE
+.UNINDENT
+.SS SSL Options
+.IP "See"
+.sp
+\fB/administration/ssl\fP for full documentation of
+MongoDB\(aqs support.
+.RE
+.INDENT 0.0
+.TP
+.B \-\-authenticationDatabase <dbname>
+New in version 2.4.
+.sp
+Specifies the database that holds the user\(aqs (e.g
+\fI\-\-username\fP) credentials.
+.sp
+By default, \fI\%mongos\fP assumes that the database specified to the
+\fI\-\-db\fP argument holds the user\(aqs credentials, unless you
+specify \fI\%--authenticationDatabase\fP.
+.sp
+See \fBuserSource\fP,
+\fB/reference/privilege\-documents\fP and
+\fB/reference/user\-privileges\fP for more information about
+delegated authentication in MongoDB.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationMechanism <name>
+New in version 2.4.
+.sp
+Specifies the authentication mechanism. By default, the
+authentication mechanism is \fBMONGODB\-CR\fP, which is the MongoDB
+challenge/response authentication mechanism. In the MongoDB Subscriber Edition,
+\fI\%mongos\fP also includes support for \fBGSSAPI\fP to handle
+Kerberos authentication.
+.sp
+See \fB/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication\fP
+for more information about Kerberos authentication.
+.UNINDENT
+.SH AUTHOR
+MongoDB Documentation Project
+.SH COPYRIGHT
+2011-2013, 10gen, Inc.
+.\" Generated by docutils manpage writer.
+.
