@@ -243,6 +243,8 @@ add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\""
 add_option('client-dist-basename', "Name of the client source archive.", 1, False,
            default='mongo-cxx-driver')
 
+add_option('build-fast-and-loose', "NEVER for production builds", 0, False)
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -324,6 +326,12 @@ env = Environment( BUILD_DIR=variantDir,
                    )
 
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
+
+if has_option('build-fast-and-loose'):
+    # See http://www.scons.org/wiki/GoFastButton for details
+    env.Decider('MD5-timestamp')
+    env.SetOption('max_drift', 1)
+    env.SourceCode('.', None)
 
 if has_option('mute'):
     env.Append( CCCOMSTR = "Compiling $TARGET" )
