@@ -53,11 +53,21 @@ int main( int argc, const char **argv ) {
     conn->insert( "test.system.users" , BSON( "user" << "eliot" << "pwd" << conn->createPasswordDigest( "eliot" , "bar" ) ) );
 
     errmsg.clear();
-    bool ok = conn->auth( "test" , "eliot" , "bar" , errmsg );
-    if ( ! ok )
-        cout << errmsg << endl;
-    MONGO_verify( ok );
+    conn->auth(BSON("user" << "eliot" <<
+                    "userSource" << "test" <<
+                    "pwd" << "bar" <<
+                    "mechanism" << "MONGODB-CR"));
 
-    MONGO_verify( ! conn->auth( "test" , "eliot" , "bars" , errmsg ) );
+    try {
+        conn->auth(BSON("user" << "eliot" <<
+                        "userSource" << "test" <<
+                        "pwd" << "bars" << // incorrect password
+                        "mechanism" << "MONGODB-CR"));
+        // Shouldn't get here.
+        cout << "Authentication with invalid password should have failed but didn't" << endl;
+        return EXIT_FAILURE;
+    } catch (const DBException& e) {
+        // expected
+    }
     return EXIT_SUCCESS;
 }
