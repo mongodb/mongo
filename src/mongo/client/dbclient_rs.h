@@ -201,7 +201,7 @@ namespace mongo {
          * checks all sets for current master and new secondaries
          * usually only called from a BackgroundJob
          */
-        static void checkAll( bool checkAllSecondaries );
+        static void checkAll();
 
         /**
          * Removes the ReplicaSetMonitor for the given set name from _sets, which will delete it.
@@ -252,7 +252,7 @@ namespace mongo {
         /**
          * checks for current master and new secondaries
          */
-        void check( bool checkAllSecondaries );
+        void check();
 
         string getName() const { return _name; }
 
@@ -296,17 +296,8 @@ namespace mongo {
         /**
          * Checks all connections from the host list and sets the current
          * master.
-         * 
-         * @param checkAllSecondaries if set to false, stop immediately when
-         *    the master is found or when _master is not -1.
          */
-        void _check( bool checkAllSecondaries );
-
-        /**
-         * Use replSetGetStatus command to make sure hosts in host list are up
-         * and readable.  Sets Node::ok appropriately.
-         */
-        void _checkStatus( const string& hostAddr );
+        void _check();
 
         /**
          * Add array of hosts to host list. Doesn't do anything if hosts are

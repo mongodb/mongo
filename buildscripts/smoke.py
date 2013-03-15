@@ -375,17 +375,14 @@ def skipTest(path):
         if parentDir == "disk": # SERVER-7356
             return True
 
-        authTestsToSkip = [("sharding", "gle_with_conf_servers.js"), # SERVER-6972
-                           ("sharding", "read_pref.js"), # SERVER-6972
-                           ("sharding", "read_pref_cmd.js"), # SERVER-6972
-                           ("sharding", "read_pref_rs_client.js"), # SERVER-6972
+        authTestsToSkip = [("jstests", "drop2.js"), # SERVER-8589,
+                           ("sharding", "read_pref_rs_client.js"), # SERVER-6495
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "sync6.js"),
                            ("sharding", "parallel.js"),
                            ("jstests", "bench_test1.js"),
                            ("jstests", "bench_test2.js"),
                            ("jstests", "bench_test3.js"),
-                           ("jstests", "drop2.js") # SERVER-8589
                            ]
 
         if os.path.join(parentDir,basename) in [ os.path.join(*test) for test in authTestsToSkip ]:
