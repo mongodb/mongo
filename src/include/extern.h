@@ -40,8 +40,7 @@ extern int __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
 extern int __wt_block_checkpoint_unload( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     int checkpoint);
-extern void __wt_block_ckpt_destroy( WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
+extern void __wt_block_ckpt_destroy(WT_SESSION_IMPL *session,
     WT_BLOCK_CKPT *ci);
 extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -116,9 +115,7 @@ extern int __wt_block_extlist_init(WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     const char *name,
     const char *extname);
-extern void __wt_block_extlist_free( WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    WT_EXTLIST *el);
+extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
 extern int __wt_block_map( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     void *mapp,

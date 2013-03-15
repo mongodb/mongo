@@ -1255,8 +1255,7 @@ __wt_block_extlist_init(WT_SESSION_IMPL *session,
  *	Discard an extent list.
  */
 void
-__wt_block_extlist_free(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+__wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 {
 	WT_EXT *ext, *next;
 	WT_SIZE *szp, *nszp;
