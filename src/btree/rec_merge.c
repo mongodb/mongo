@@ -451,8 +451,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
-	 * Before swapping in the new page, make sure we're going to just discard
-	 * a set of split-merge pages.
+	 * Before swapping in the new page, make sure we're only discarding
+	 * split-merge pages.
 	 */
 	__merge_check_discard(session, top);
 #endif
