@@ -991,7 +991,7 @@ err:	if (cbuf != NULL)
 	__wt_buf_free(session, &exconfig);
 
 	if (ret != 0 && conn != NULL)
-		WT_TRET(__wt_connection_destroy(conn));
+		WT_TRET(__wt_connection_close(conn));
 
 	/* Let the server threads proceed. */
 	if (ret == 0)
