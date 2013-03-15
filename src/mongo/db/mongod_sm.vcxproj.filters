@@ -680,9 +680,6 @@
     <ClCompile Include="projection.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="queryoptimizer.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
     <ClCompile Include="queryoptimizercursorimpl.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
@@ -1496,6 +1493,18 @@
     <ClCompile Include="repl\write_concern.cpp">
       <Filter>db\repl</Filter>
     </ClCompile>
+    <ClCompile Include="query_optimizer.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="query_optimizer_internal.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="query_plan.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="query_plan_selection_policy.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1972,9 +1981,6 @@
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="projection.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="queryoptimizer.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="queryoptimizercursorimpl.h">
@@ -3056,6 +3062,21 @@
     </ClInclude>
     <ClInclude Include="repl\write_concern.h">
       <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="query_optimizer.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="query_optimizer_internal.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="query_plan.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="query_plan_selection_policy.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="query_plan_summary.h">
+      <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

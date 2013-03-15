@@ -490,9 +490,6 @@
     <ClInclude Include="..\db\pdfile.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\queryoptimizer.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\queryoptimizercursorimpl.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -2262,6 +2259,21 @@
     <ClInclude Include="..\db\repl\write_concern.h">
       <Filter>db\repl</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\query_optimizer.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query_optimizer_internal.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query_plan.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query_plan_selection_policy.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query_plan_summary.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -2683,9 +2695,6 @@
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="..\db\projection.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\queryoptimizer.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp">
@@ -4278,6 +4287,18 @@
     </ClCompile>
     <ClCompile Include="..\db\repl\write_concern.cpp">
       <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query_optimizer.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query_optimizer_internal.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query_plan.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query_plan_selection_policy.cpp">
+      <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

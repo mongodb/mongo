@@ -2616,6 +2616,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="pipeline\value.cpp" />
     <ClCompile Include="prefetch.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="query_optimizer.cpp" />
+    <ClCompile Include="query_optimizer_internal.cpp" />
+    <ClCompile Include="query_plan.cpp" />
+    <ClCompile Include="query_plan_selection_policy.cpp" />
     <ClCompile Include="repl\bgsync.cpp" />
     <ClCompile Include="repl\finding_start_cursor.cpp" />
     <ClCompile Include="repl\master_slave.cpp" />
@@ -3290,7 +3294,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="namespace.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="pdfile.cpp" />
-    <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="scanandorder.cpp" />
     <ClCompile Include="stats\service_stats.cpp" />
     <ClCompile Include="tests.cpp" />
@@ -3333,6 +3336,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\rs_config.cpp" />
     <ClInclude Include="querypattern.h" />
     <ClInclude Include="queryutil-inl.h" />
+    <ClInclude Include="query_optimizer.h" />
+    <ClInclude Include="query_optimizer_internal.h" />
+    <ClInclude Include="query_plan.h" />
+    <ClInclude Include="query_plan_selection_policy.h" />
+    <ClInclude Include="query_plan_summary.h" />
     <ClInclude Include="record.h" />
     <ClInclude Include="replutil.h" />
     <ClInclude Include="repl\bgsync.h" />
@@ -3578,7 +3586,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="namespace.h" />
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="pdfile.h" />
-    <ClInclude Include="queryoptimizer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
     <ClInclude Include="..\util\allocator.h" />

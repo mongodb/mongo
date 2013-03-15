@@ -703,6 +703,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\pipeline\value.h" />
     <ClInclude Include="..\db\pipeline\value_internal.h" />
     <ClInclude Include="..\db\prefetch.h" />
+    <ClInclude Include="..\db\query_optimizer.h" />
+    <ClInclude Include="..\db\query_optimizer_internal.h" />
+    <ClInclude Include="..\db\query_plan.h" />
+    <ClInclude Include="..\db\query_plan_selection_policy.h" />
+    <ClInclude Include="..\db\query_plan_summary.h" />
     <ClInclude Include="..\db\repl\bgsync.h" />
     <ClInclude Include="..\db\repl\connections.h" />
     <ClInclude Include="..\db\repl\finding_start_cursor.h" />
@@ -827,7 +832,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\namespace.h" />
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="..\db\pdfile.h" />
-    <ClInclude Include="..\db\queryoptimizer.h" />
     <ClInclude Include="..\db\resource.h" />
     <ClInclude Include="..\db\scanandorder.h" />
     <ClInclude Include="..\..\third_party\snappy\config.h" />
@@ -2610,6 +2614,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp" />
     <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
     <ClCompile Include="..\db\querypattern.cpp" />
+    <ClCompile Include="..\db\query_optimizer.cpp" />
+    <ClCompile Include="..\db\query_optimizer_internal.cpp" />
+    <ClCompile Include="..\db\query_plan.cpp" />
+    <ClCompile Include="..\db\query_plan_selection_policy.cpp" />
     <ClCompile Include="..\db\record.cpp" />
     <ClCompile Include="..\db\repl\bgsync.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
@@ -2789,7 +2797,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\mmap_win.cpp" />
     <ClCompile Include="..\db\namespace.cpp" />
     <ClCompile Include="..\db\pdfile.cpp" />
-    <ClCompile Include="..\db\queryoptimizer.cpp" />
     <ClCompile Include="..\util\net\ssl_manager.cpp" />
     <ClCompile Include="..\util\platform_init.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
