@@ -58,12 +58,14 @@ extern int __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size,
     int *skipp);
+extern void __wt_block_ext_cleanup(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_misplaced(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const char *tag,
     off_t offset,
     uint32_t size);
-extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
+extern int __wt_block_off_remove_overlap(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_EXTLIST *el,
     off_t off,
     off_t size);
@@ -85,10 +87,12 @@ extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
 extern int __wt_block_extlist_overlap( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_CKPT *ci);
-extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_merge( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_EXTLIST *a,
     WT_EXTLIST *b);
-extern int __wt_block_insert_ext( WT_SESSION_IMPL *session,
+extern int __wt_block_insert_ext(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_EXTLIST *el,
     off_t off,
     off_t size);
@@ -315,6 +319,10 @@ __wt_page_in_func(
  , const char *file, int line
 #endif
  );
+extern int __wt_page_alloc(WT_SESSION_IMPL *session,
+    uint8_t type,
+    uint32_t alloc_entries,
+    WT_PAGE **pagep);
 extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *parent_ref,

@@ -71,6 +71,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_DECL_RET;
 
 	conn = S2C(session);
+	TAILQ_REMOVE(&conn->blockqh, block, q);
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);
@@ -80,7 +81,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	__wt_spin_destroy(session, &block->live_lock);
 
-	TAILQ_REMOVE(&conn->blockqh, block, q);
+	__wt_block_ext_cleanup(session, block);
 
 	__wt_overwrite_and_free(session, block);
 

@@ -370,13 +370,11 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	 * __wt_page_out on error, we require a correct page setup at each point
 	 * where we might fail.
 	 */
-	WT_ERR(__wt_cache_page_new(session, &root));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		root->type = WT_PAGE_COL_INT;
+		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, &root));
 		root->u.intl.recno = 1;
-		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
 		ref = root->u.intl.t;
 		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
 		ref->addr = NULL;
@@ -384,8 +382,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		ref->u.recno = 1;
 		break;
 	case BTREE_ROW:
-		root->type = WT_PAGE_ROW_INT;
-		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
+		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 1, &root));
 		ref = root->u.intl.t;
 		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
 		ref->addr = NULL;
@@ -451,19 +448,19 @@ __wt_btree_leaf_create(
 
 	btree = session->btree;
 
-	WT_RET(__wt_cache_page_new(session, &leaf));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
+		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_FIX, 0, &leaf));
 		leaf->u.col_fix.recno = 1;
-		leaf->type = WT_PAGE_COL_FIX;
 		break;
 	case BTREE_COL_VAR:
+		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_VAR, 0, &leaf));
 		leaf->u.col_var.recno = 1;
-		leaf->type = WT_PAGE_COL_VAR;
 		break;
 	case BTREE_ROW:
-		leaf->type = WT_PAGE_ROW_LEAF;
+		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, &leaf));
 		break;
+	WT_ILLEGAL_VALUE(session);
 	}
 	leaf->entries = 0;
 	WT_LINK_PAGE(parent, ref, leaf);

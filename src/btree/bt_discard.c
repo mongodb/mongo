@@ -148,9 +148,6 @@ __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
-
-	/* Free the subtree-reference array. */
-	__wt_free(session, page->u.intl.t);
 }
 
 /*
@@ -160,9 +157,6 @@ __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/* Free the in-memory index array. */
-	__wt_free(session, page->u.col_var.d);
-
 	/* Free the RLE lookup array. */
 	__wt_free(session, page->u.col_var.repeats);
 }
@@ -193,9 +187,6 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, ref->addr);
 		}
 	}
-
-	/* Free the subtree-reference array. */
-	__wt_free(session, page->u.intl.t);
 }
 
 /*
@@ -221,7 +212,6 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (ikey != NULL && __wt_off_page(page, ikey))
 			__wt_free(session, ikey);
 	}
-	__wt_free(session, page->u.row.d);
 
 	/*
 	 * Free the insert array.

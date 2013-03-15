@@ -3986,20 +3986,20 @@ __rec_split_merge_new(WT_SESSION_IMPL *session,
 {
 	WT_PAGE *page;
 
-	/* Allocate a new internal page and fill it in. */
-	WT_RET(__wt_cache_page_new(session, &page));
-	*pagep = page;
-
-	/* Fill it in. */
+	/*
+	 * Allocate a new internal page and fill it in.
+	 *
+	 * Our caller cleans up, make sure we return a valid page reference,
+	 * even on error.
+	 */
+	WT_RET(__wt_page_alloc(session, type, r->bnd_next, pagep));
+	page = *pagep;
 	page->parent = orig->parent;
 	page->ref = orig->ref;
 	if (type == WT_PAGE_COL_INT)
 		page->u.intl.recno = r->bnd[0].recno;
-	WT_RET(__wt_calloc_def(session, (size_t)r->bnd_next, &page->u.intl.t));
-	__wt_cache_page_inmem_incr(session, page, r->bnd_next * sizeof(WT_REF));
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = r->bnd_next;
-	page->type = type;
 	page->flags_atomic = WT_PAGE_DISK_NOT_ALLOC;
 
 	/*
