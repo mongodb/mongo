@@ -1837,9 +1837,10 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                nsd()->setPaddingFactor( 1.2 );
-                ASSERT_EQUALS( 1.2, nsd()->paddingFactor() );
-                ASSERT_EQUALS( static_cast<int>( 300 * 1.2 ),
+                double paddingFactor = 1.2;
+                nsd()->setPaddingFactor( paddingFactor );
+                ASSERT_EQUALS( paddingFactor, nsd()->paddingFactor() );
+                ASSERT_EQUALS( static_cast<int>( 300 * paddingFactor ),
                                nsd()->getRecordAllocationSize( 300 ) );
             }
             virtual string spec() const { return ""; }
