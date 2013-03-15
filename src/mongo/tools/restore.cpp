@@ -178,8 +178,8 @@ public:
 
                     BSONObjBuilder tsRestrictBldr;
                     if (!tsOptime.isNull())
-                        tsRestrictBldr << "$gt" << tsOptime;
-                    tsRestrictBldr << "$lt" << *_oplogLimitTS.get();
+                        tsRestrictBldr.appendTimestamp("$gt", tsOptime.asDate());
+                    tsRestrictBldr.appendTimestamp("$lt", _oplogLimitTS->asDate());
 
                     BSONObj query = BSON("ts" << tsRestrictBldr.obj());
 
