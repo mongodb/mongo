@@ -463,7 +463,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	top->modify->flags = WT_PM_REC_SPLIT;
 	top->modify->u.split = newtop;
 
-
 	WT_VERBOSE_ERR(session, evict,
 	    "Successfully %s %" PRIu32
 	    " split-merge pages containing %" PRIu32 " keys\n",
