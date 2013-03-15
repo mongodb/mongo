@@ -46,10 +46,20 @@ assert.neq( t.find({c : 1}).explain().cursor ,
 		cursorname ,
 		"using irrelevant hashed cursor");
 
-assert.eq( t.find({a : {$in : [1,2]}}).explain()["cursor"] ,
-           "BtreeCursor a_hashed multi" ,
+// Hash index used with a $in set membership predicate.
+assert.eq( t.find({a : {$in : [1,2]}}).explain()["cursor"],
+           "BtreeCursor a_hashed multi",
            "not using hashed cursor");
 
+// Hash index used with a singleton $and predicate conjunction.
+assert.eq( t.find({$and : [{a : 1}]}).explain()["cursor"],
+           "BtreeCursor a_hashed",
+           "not using hashed cursor");
+
+// Hash index used with a non singleton $and predicate conjunction.
+assert.eq( t.find({$and : [{a : {$in : [1,2]}},{a : {$gt : 1}}]}).explain()["cursor"],
+           "BtreeCursor a_hashed",
+           "not using hashed cursor");
 
 //test creation of index based on hash of _id index
 var goodspec2 = {'_id' : "hashed"};
