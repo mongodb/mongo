@@ -1070,6 +1070,44 @@ namespace NamespaceTests {
                 b.append( "a", as );
                 return b.obj();
             }
+
+            /** Return the smallest DeletedRecord in deletedList, or DiskLoc() if none. */
+            DiskLoc smallestDeletedRecord() {
+                for( int i = 0; i < Buckets; ++i ) {
+                    if ( !nsd()->deletedList[ i ].isNull() ) {
+                        return nsd()->deletedList[ i ];
+                    }
+                }
+                return DiskLoc();
+            }
+
+            /**
+             * 'cook' the deletedList by shrinking the smallest deleted record to size
+             * 'newDeletedRecordSize'.
+             */
+            void cookDeletedList( int newDeletedRecordSize ) {
+
+                // Extract the first DeletedRecord from the deletedList.
+                DiskLoc deleted;
+                for( int i = 0; i < Buckets; ++i ) {
+                    if ( !nsd()->deletedList[ i ].isNull() ) {
+                        deleted = nsd()->deletedList[ i ];
+                        nsd()->deletedList[ i ].writing().Null();
+                        break;
+                    }
+                }
+                ASSERT( !deleted.isNull() );
+
+                // Shrink the DeletedRecord's size to newDeletedRecordSize.
+                ASSERT_GREATER_THAN_OR_EQUALS( deleted.drec()->lengthWithHeaders(),
+                                               newDeletedRecordSize );
+                getDur().writingInt( deleted.drec()->lengthWithHeaders() ) = newDeletedRecordSize;
+
+                // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
+                // new size.
+                nsd()->deletedList[ NamespaceDetails::bucket( newDeletedRecordSize ) ].writing() =
+                        deleted;
+            }
         };
 
         class Create : public Base {
@@ -1216,6 +1254,314 @@ namespace NamespaceTests {
             }
         };
 
+        /**
+         * Except for the largest bucket, quantizePowerOf2AllocationSpace quantizes to the nearest
+         * bucket size.
+         */
+        class QuantizePowerOf2ToBucketSize : public Base {
+        public:
+            void run() {
+                create();
+                for( int iBucket = 0; iBucket < MaxBucket - 1; ++iBucket ) {
+                    int bucketSize = bucketSizes[ iBucket ];
+                    int nextBucketSize = bucketSizes[ iBucket + 1 ];
+
+                    // bucketSize - 1 is quantized to bucketSize.
+                    ASSERT_EQUALS( bucketSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace
+                                           ( bucketSize - 1 ) );
+
+                    // bucketSize is quantized to nextBucketSize.
+                    // Descriptive rather than normative test.
+                    // SERVER-8311 A pre quantized size is rounded to the next quantum level.
+                    ASSERT_EQUALS( nextBucketSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace
+                                           ( bucketSize ) );
+
+                    // bucketSize + 1 is quantized to nextBucketSize.
+                    ASSERT_EQUALS( nextBucketSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace
+                                           ( bucketSize + 1 ) );
+                }
+
+                // The next to largest bucket size - 1 is quantized to the next to largest bucket
+                // size.
+                ASSERT_EQUALS( bucketSizes[ MaxBucket - 1 ],
+                               NamespaceDetails::quantizePowerOf2AllocationSpace
+                                       ( bucketSizes[ MaxBucket - 1 ] - 1 ) );
+            }
+        };
+
+        /**
+         * Within the largest bucket, quantizePowerOf2AllocationSpace quantizes to the nearest
+         * megabyte boundary.
+         */
+        class QuantizeLargePowerOf2ToMegabyteBoundary : public Base {
+        public:
+            void run() {
+                create();
+                
+                // Iterate iSize over all 1mb boundaries from the size of the next to largest bucket
+                // to the size of the largest bucket + 1mb.
+                for( int iSize = bucketSizes[ MaxBucket - 1 ];
+                     iSize <= bucketSizes[ MaxBucket ] + 0x100000;
+                     iSize += 0x100000 ) {
+
+                    // iSize - 1 is quantized to iSize.
+                    ASSERT_EQUALS( iSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize - 1 ) );
+
+                    // iSize is quantized to iSize + 1mb.
+                    // Descriptive rather than normative test.
+                    // SERVER-8311 A pre quantized size is rounded to the next quantum level.
+                    ASSERT_EQUALS( iSize + 0x100000,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize ) );
+
+                    // iSize + 1 is quantized to iSize + 1mb.
+                    ASSERT_EQUALS( iSize + 0x100000,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize + 1 ) );
+                }
+            }
+        };
+
+        /** getRecordAllocationSize() returns its argument when the padding factor is 1.0. */
+        class GetRecordAllocationSizeNoPadding : public Base {
+        public:
+            void run() {
+                create();
+                ASSERT_EQUALS( 1.0, nsd()->paddingFactor() );
+                ASSERT_EQUALS( 300, nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** getRecordAllocationSize() multiplies by a padding factor > 1.0. */
+        class GetRecordAllocationSizeWithPadding : public Base {
+        public:
+            void run() {
+                create();
+                nsd()->setPaddingFactor( 1.2 );
+                ASSERT_EQUALS( 1.2, nsd()->paddingFactor() );
+                ASSERT_EQUALS( static_cast<int>( 300 * 1.2 ),
+                               nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /**
+         * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
+         * is set.
+         */
+        class GetRecordAllocationSizePowerOf2 : public Base {
+        public:
+            void run() {
+                create();
+                ASSERT( nsd()->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                ASSERT_EQUALS( 512, nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        
+        /**
+         * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
+         * is set, ignoring the padding factor.
+         */
+        class GetRecordAllocationSizePowerOf2PaddingIgnored : public Base {
+        public:
+            void run() {
+                create();
+                ASSERT( nsd()->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                nsd()->setPaddingFactor( 2.0 );
+                ASSERT_EQUALS( 2.0, nsd()->paddingFactor() );
+                ASSERT_EQUALS( 512, nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** alloc() quantizes the requested size using quantizeAllocationSpace() rules. */
+        class AllocQuantized : public Base {
+        public:
+            void run() {
+                create();
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+
+                // The expected location returned by allocWillBeAt() matches alloc().
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+
+                // The length of the allocated record is quantized.
+                ASSERT_EQUALS( 320, actualLocation.rec()->lengthWithHeaders() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** alloc() does not quantize records in capped collections. */
+        class AllocCappedNotQuantized : public Base {
+        public:
+            void run() {
+                create();
+                DiskLoc loc = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( 300, loc.rec()->lengthWithHeaders() );
+            }
+            virtual string spec() const { return "{capped:true,size:2048}"; }
+        };
+
+        /**
+         * alloc() does not quantize records in index collections using quantizeAllocationSpace()
+         * rules.
+         */
+        class AllocIndexNamespaceNotQuantized : public Base {
+        public:
+            void run() {
+                create();
+
+                // Find the indexNamespace name and indexNsd metadata pointer.
+                int idIndexNo = nsd()->findIdIndex();
+                IndexDetails& idx = nsd()->idx( idIndexNo );
+                string indexNamespace = idx.indexNamespace();
+                ASSERT( !NamespaceString::normal( indexNamespace.c_str() ) );
+                NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
+
+                // Check that no quantization is performed.
+                DiskLoc expectedLocation = indexNsd->allocWillBeAt( indexNamespace.c_str(), 300 );
+                DiskLoc actualLocation = indexNsd->alloc( indexNamespace.c_str(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
+            }
+        };
+
+        /** alloc() quantizes records in index collections to the nearest multiple of 4. */
+        class AllocIndexNamespaceSlightlyQuantized : public Base {
+        public:
+            void run() {
+                create();
+
+                // Find the indexNamespace name and indexNsd metadata pointer.
+                int idIndexNo = nsd()->findIdIndex();
+                IndexDetails& idx = nsd()->idx( idIndexNo );
+                string indexNamespace = idx.indexNamespace();
+                ASSERT( !NamespaceString::normal( indexNamespace.c_str() ) );
+                NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
+
+                // Check that multiple of 4 quantization is performed.
+                DiskLoc expectedLocation = indexNsd->allocWillBeAt( indexNamespace.c_str(), 298 );
+                DiskLoc actualLocation = indexNsd->alloc( indexNamespace.c_str(), 298 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
+            }
+        };
+
+        /** alloc() returns a non quantized record larger than the requested size. */
+        class AllocUseNonQuantizedDeletedRecord : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 310 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 310, actualLocation.rec()->lengthWithHeaders() );
+
+                // No deleted records remain after alloc returns the non quantized record.
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** alloc() returns a non quantized record equal to the requested size. */
+        class AllocExactSizeNonQuantizedDeletedRecord : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 300 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /**
+         * alloc() returns a non quantized record equal to the quantized size plus some extra space
+         * too small to make a DeletedRecord.
+         */
+        class AllocQuantizedWithExtra : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 343 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 343, actualLocation.rec()->lengthWithHeaders() );
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+        
+        /**
+         * alloc() returns a quantized record when the extra space in the reclaimed deleted record
+         * is large enough to form a new deleted record.
+         */
+        class AllocQuantizedWithoutExtra : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 344 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+
+                // The returned record is quantized from 300 to 320.
+                ASSERT_EQUALS( 320, actualLocation.rec()->lengthWithHeaders() );
+
+                // A new 24 byte deleted record is split off.
+                ASSERT_EQUALS( 24, smallestDeletedRecord().drec()->lengthWithHeaders() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /**
+         * A non quantized deleted record within 1/8 of the requested size is returned as is, even
+         * if a quantized portion of the deleted record could be used instead.
+         */
+        class AllocNotQuantizedNearDeletedSize : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 344 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 319 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 319 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+
+                // Even though 319 would be quantized to 320 and 344 - 320 == 24 could become a new
+                // deleted record, the entire deleted record is returned because
+                // ( 344 - 320 ) < ( 320 >> 3 ).
+                ASSERT_EQUALS( 344, actualLocation.rec()->lengthWithHeaders() );
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** An attempt to allocate a record larger than the largest deleted record fails. */
+        class AllocFailsWithTooSmallDeletedRecord : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 299 );
+
+                // allocWillBeAt() and alloc() fail.
+                ASSERT( nsd()->allocWillBeAt( ns(), 300 ).isNull() );
+                ASSERT( nsd()->alloc( ns(), 300 ).isNull() );
+            }
+            virtual string spec() const { return ""; }
+        };
+        
         /* test  NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc)
         */
         class TruncateCapped : public Base {
@@ -1496,6 +1842,22 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::QuantizeMinMaxBound >();
             add< NamespaceDetailsTests::QuantizeFixedBuckets >();
             add< NamespaceDetailsTests::QuantizeRecordBoundary >();
+            add< NamespaceDetailsTests::QuantizePowerOf2ToBucketSize >();
+            add< NamespaceDetailsTests::QuantizeLargePowerOf2ToMegabyteBoundary >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizeNoPadding >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizeWithPadding >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizePowerOf2 >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizePowerOf2PaddingIgnored >();
+            add< NamespaceDetailsTests::AllocQuantized >();
+            add< NamespaceDetailsTests::AllocCappedNotQuantized >();
+            add< NamespaceDetailsTests::AllocIndexNamespaceNotQuantized >();
+            add< NamespaceDetailsTests::AllocIndexNamespaceSlightlyQuantized >();
+            add< NamespaceDetailsTests::AllocUseNonQuantizedDeletedRecord >();
+            add< NamespaceDetailsTests::AllocExactSizeNonQuantizedDeletedRecord >();
+            add< NamespaceDetailsTests::AllocQuantizedWithExtra >();
+            add< NamespaceDetailsTests::AllocQuantizedWithoutExtra >();
+            add< NamespaceDetailsTests::AllocNotQuantizedNearDeletedSize >();
+            add< NamespaceDetailsTests::AllocFailsWithTooSmallDeletedRecord >();
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::TruncateCapped >();
             add< NamespaceDetailsTests::Migrate >();
