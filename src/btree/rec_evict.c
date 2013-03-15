@@ -37,9 +37,12 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * it.  During close, it will be merged into its parent.
 	 */
 	mod = page->modify;
-	merge = (mod != NULL && F_ISSET(mod, WT_PM_REC_SPLIT_MERGE));
+	merge = __wt_btree_mergeable(page);
 	if (merge && exclusive)
 		return (EBUSY);
+
+	WT_ASSERT(session, merge || mod == NULL ||
+	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE));
 
 	/*
 	 * Get exclusive access to the page and review the page and its subtree

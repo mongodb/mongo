@@ -452,8 +452,13 @@ struct __wt_ref {
  * WT_MERGE_STACK_MIN --
  * When stacks of in-memory pages become this deep, they are considered for
  * merging.
+ *
+ * WT_MERGE_FULL_PAGE --
+ * When the result of a merge contains more than this number of keys, it is
+ * considered "done" and will not be merged again.
  */
 #define	WT_MERGE_STACK_MIN	3
+#define	WT_MERGE_FULL_PAGE	100
 
 /*
  * WT_ROW --

@@ -59,8 +59,7 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 	 * that make reads faster, so don't make them too unlikely.
 	 */
 	if ((page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) &&
-	    (page->modify == NULL ||
-	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
+	    !__wt_btree_mergeable(page))
 		read_gen += WT_EVICT_INT_SKEW;
 
 	return (read_gen);
@@ -185,12 +184,11 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * stack instead.
 	 */
 	for (top = page, levels = 0;
-	    !WT_PAGE_IS_ROOT(top) && top->parent->modify != NULL &&
-	    F_ISSET(top->parent->modify, WT_PM_REC_SPLIT_MERGE);
-	    ++levels)
-		top = top->parent;
+	    __wt_btree_mergeable(top->parent);
+	    top = top->parent, ++levels)
+		;
 
-	if (levels > WT_MERGE_STACK_MIN)
+	if (levels >= WT_MERGE_STACK_MIN)
 		page = top;
 
 	/*
@@ -1004,15 +1002,21 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 
 		WT_CSTAT_INCR(session, cache_eviction_walk);
 
-#define	WT_IS_SPLIT_MERGE(p)						\
-	((p)->modify != NULL && F_ISSET((p)->modify, WT_PM_REC_SPLIT_MERGE))
+		/* Ignore root pages entirely. */
+		if (WT_PAGE_IS_ROOT(page))
+			continue;
 
 		/* Look for a split-merge (grand)parent page to merge. */
-		for (levels = 0;
-		    levels < WT_MERGE_STACK_MIN && page != NULL &&
-		    WT_IS_SPLIT_MERGE(page);
-		    page = page->parent, levels++)
-			;
+		levels = 0;
+		if (__wt_btree_mergeable(page))
+			for (levels = 1;
+			    levels < WT_MERGE_STACK_MIN &&
+			    __wt_btree_mergeable(page->parent);
+			    page = page->parent, levels++)
+				;
+		else if (page->modify != NULL &&
+		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
+			continue;
 
 		/*
 		 * Only look for a parent at exactly the right height above: if
@@ -1020,19 +1024,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * don't want to do too much work on every level.
 		 *
 		 * !!!
-		 * We don't restrict ourselves to only the top-most page.  If
-		 * there are split-merge pages under the root page in a big,
-		 * busy tree, the merge will only happen if we can lock the
-		 * whole tree exclusively.  Consider subtrees if locking the
+		 * Don't restrict ourselves to only the top-most page (that is,
+		 * don't require that page->parent is not mergeable).  If there
+		 * is a big, busy enough split-merge tree, the top-level merge
+		 * will only happen if we can lock the whole subtree
+		 * exclusively.  Consider smaller merges in case locking the
 		 * whole tree fails.
 		 */
-		if (page == NULL ||
-		    (levels != 0 && levels != WT_MERGE_STACK_MIN) ||
-		    (levels == WT_MERGE_STACK_MIN && !WT_IS_SPLIT_MERGE(page)))
-			continue;
-
-		/* Ignore root pages entirely. */
-		if (WT_PAGE_IS_ROOT(page))
+		if (levels != 0 && levels != WT_MERGE_STACK_MIN)
 			continue;
 
 		/*
@@ -1077,7 +1076,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * If the oldest transaction hasn't changed since the last time
 		 * this page was written, there's no chance to make progress...
 		 */
-		if (modified &&
+		if (modified && levels == 0 &&
 		    TXNID_LE(oldest_txn, page->modify->disk_txn))
 			continue;
 

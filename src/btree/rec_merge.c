@@ -43,12 +43,6 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 	WT_REF_FOREACH(page, ref, i)
 		switch (ref->state) {
 		case WT_REF_LOCKED:
-			/*
-			 * Don't allow eviction until it is properly hooked
-			 * into the tree.
-			 */
-			__wt_evict_list_clr_page(session, ref->page);
-
 			child = ref->page;
 
 			/*
@@ -57,8 +51,7 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 			 * have to unlock everything.
 			 */
 			if (child->type == page->type &&
-			    child->modify != NULL &&
-			    F_ISSET(child->modify, WT_PM_REC_SPLIT_MERGE)) {
+			    __wt_btree_mergeable(child)) {
 				WT_RET(__merge_walk(
 				    session, child, depth + 1, visit, state));
 				break;
@@ -137,6 +130,33 @@ __merge_unlock(WT_PAGE *page)
 			WT_PUBLISH(ref->state, WT_REF_MEM);
 		}
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __merge_check_discard --
+ *	Make sure we are only discarding split-merge pages.
+ */
+static void
+__merge_check_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_REF *ref;
+	uint32_t i;
+
+	WT_ASSERT(session, page->type == WT_PAGE_ROW_INT ||
+	    page->type == WT_PAGE_COL_INT);
+	WT_ASSERT(session, page->modify != NULL &&
+	    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE));
+
+	WT_REF_FOREACH(page, ref, i) {
+		if (ref->state == WT_REF_DISK ||
+		    ref->state == WT_REF_DELETED)
+			continue;
+
+		WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+		__merge_check_discard(session, ref->page);
+	}
+}
+#endif
 
 /*
  * __merge_switch_page --
@@ -272,14 +292,14 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	lchild = newtop = rchild = NULL;
 	page_type = top->type;
 
-	WT_ASSERT(session, !WT_PAGE_IS_ROOT(top));
+	WT_ASSERT(session, __wt_btree_mergeable(top));
 	WT_ASSERT(session, top->ref->state == WT_REF_LOCKED);
 
 	/*
 	 * Walk the subtree, count the references at the bottom level and
 	 * calculate the maximum depth.
 	 */
-	WT_RET(__merge_walk(session, top, 0, __merge_count, &visit_state));
+	WT_RET(__merge_walk(session, top, 1, __merge_count, &visit_state));
 
 	/* If there aren't enough useful levels, give up. */
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
@@ -304,13 +324,9 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 * isn't big enough to justify the cost of evicting it.  If splits
 	 * continue, it will be merged again until it gets over this limit.
 	 */
+	promote = 0;
 	refcnt = (uint32_t)visit_state.refcnt;
-	promote = (refcnt > 100);
-
-	if (promote) {
-		/* Create a new top-level split-merge page with two entries. */
-		WT_ERR(__merge_new_page(session, page_type, 2, 1, &newtop));
-
+	if (refcnt >= WT_MERGE_FULL_PAGE) {
 		/*
 		 * In the normal case where there are live children spread
 		 * through the subtree, create two child pages.
@@ -326,10 +342,26 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		if (visit_state.first_live == visit_state.last_live &&
 		    (visit_state.first_live == 0 ||
 		    visit_state.first_live == refcnt - 1))
-			visit_state.split = split =
-			    (visit_state.first_live == 0) ? 1 : refcnt - 1;
+			split = (visit_state.first_live == 0) ? 1 : refcnt - 1;
 		else
-			visit_state.split = split = (refcnt + 1) / 2;
+			split = (refcnt + 1) / 2;
+
+		/* Only promote if we can create a real page. */
+		if (split == 1 || split == refcnt - 1)
+			promote = 1;
+		else if (split >= WT_MERGE_FULL_PAGE &&
+		    visit_state.first_live >= split)
+			promote = 1;
+		else if (refcnt - split >= WT_MERGE_FULL_PAGE &&
+		    visit_state.last_live < split)
+			promote = 1;
+	}
+
+	if (promote) {
+		/* Create a new top-level split-merge page with two entries. */
+		WT_ERR(__merge_new_page(session, page_type, 2, 1, &newtop));
+
+		visit_state.split = split;
 
 		/* Left split. */
 		if (split == 1)
@@ -353,8 +385,18 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 			    &visit_state.second->u.intl.t[0];
 		}
 	} else {
-		WT_ERR(__merge_new_page(
-		    session, page_type, refcnt, 1, &newtop));
+		/*
+		 * Create a new split-merge page for small merges, or if the
+		 * page above is a split merge page.  When we do a big enough
+		 * merge, we create a real page at the top and don't consider
+		 * it as a merge candidate again.  Over time with an insert
+		 * workload the tree will grow deeper, but that's inevitable,
+		 * and this keeps individual merges small.
+		 */
+		WT_ERR(__merge_new_page(session, page_type, refcnt,
+		    refcnt < WT_MERGE_FULL_PAGE ||
+		    __wt_btree_mergeable(top->parent),
+		    &newtop));
 
 		visit_state.first = newtop;
 	}
@@ -407,12 +449,20 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	newtop->parent = top->parent;
 	newtop->ref = top->ref;
 
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * Before swapping in the new page, make sure we're going to just discard
+	 * a set of split-merge pages.
+	 */
+	__merge_check_discard(session, top);
+#endif
 	/*
 	 * Set up the new top-level page as a split so that it will be swapped
 	 * into place by our caller.
 	 */
-	top->modify->u.split = newtop;
 	top->modify->flags = WT_PM_REC_SPLIT;
+	top->modify->u.split = newtop;
+
 
 	WT_VERBOSE_ERR(session, evict,
 	    "Successfully %s %" PRIu32
