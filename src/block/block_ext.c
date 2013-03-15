@@ -1265,7 +1265,7 @@ __wt_block_extlist_free(
 
 	for (ext = el->off[0]; ext != NULL; ext = next) {
 		next = ext->next[0];
-		__block_ext_free(session, block, ext);
+		__wt_free(session, ext);
 	}
 	for (szp = el->sz[0]; szp != NULL; szp = nszp) {
 		nszp = szp->next[0];
