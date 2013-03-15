@@ -278,7 +278,9 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	/* We're shouldn't get called with a clean page, that's an error. */
-	WT_ASSERT_RET(session, __wt_page_is_modified(page));
+	if (!__wt_page_is_modified(page))
+		WT_RET_MSG(session, WT_ERROR,
+		    "Attempt to reconcile a clean page.");
 
 	/*
 	 * We can't do anything with a split-merge page, it must be merged into
@@ -1189,8 +1191,9 @@ __rec_split_row_promote_cell(
 	 */
 	cell = WT_PAGE_HEADER_BYTE(btree, dsk);
 	__wt_cell_unpack(cell, unpack);
-	WT_ASSERT_RET(session,
-	    unpack->raw != WT_CELL_VALUE_COPY && unpack->prefix == 0);
+	WT_ASSERT(session,
+	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
+
 	WT_RET(__wt_cell_unpack_copy(session, unpack, copy));
 	return (0);
 }
@@ -1794,10 +1797,8 @@ __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * entries to 0, is because there's another entry to write, which then
 	 * sets entries to 1).  If the page was empty, we eventually delete it.
 	 */
-	if (r->entries == 0) {
-		WT_ASSERT_RET(session, r->bnd_next == 0);
+	if (r->entries == 0)
 		return (0);
-	}
 
 	return (r->raw_compression ?
 	    __rec_split_finish_raw(session, r) :
@@ -1866,8 +1867,9 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * Fix up our caller's information.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
-	WT_ASSERT_ERR(
-	    session, len < r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree));
+	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
+		WT_PANIC_ERR(session, ret = WT_PANIC,
+		    "Reconciliation remnant too large for the split buffer");
 
 	dsk = r->dsk.mem;
 	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);

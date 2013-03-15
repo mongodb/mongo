@@ -196,8 +196,6 @@ __wt_page_inmem(
 
 	*pagep = NULL;
 
-	WT_ASSERT_RET(session, dsk->u.entries > 0);
-
 	/*
 	 * Figure out how many underlying objects the page references so
 	 * we can allocate them along with the page.

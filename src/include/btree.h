@@ -9,12 +9,9 @@
 #define	WT_BTREE_MINOR_VERSION	0
 
 /*
- * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
- * (The maximum of 512MB is enforced by the software, it could be set as high
- * as 4GB.)
+ * The maximum btree leaf and internal page size is 512MB. (The maximum of
+ * 512MB is enforced by the software, it could be set as high as 4GB.)
  */
-#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
-#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 
 /*

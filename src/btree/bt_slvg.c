@@ -1805,13 +1805,10 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			++skip_stop;
 		}
 
-	/*
-	 * I believe it's no longer possible for a salvaged page to be entirely
-	 * empty, that is, if we selected the page for salvage, there is at
-	 * least one cell on the page we want.  This is a change from previous
-	 * behavior, so I'm asserting it.
-	 */
-	WT_ASSERT_ERR(session, skip_start + skip_stop < page->entries);
+	/* We should have selected some entries, but not the entire page. */
+	WT_ASSERT(session,
+	    skip_start + skip_stop > 0 &&
+	    skip_start + skip_stop < page->entries);
 
 	/*
 	 * Take a copy of this page's first key to define the start of

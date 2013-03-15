@@ -1,3 +1,63 @@
+WiredTiger release 1.5.0, 2013-03-14
+------------------------------------
+
+This release contains some major new features along with numerous bug fixes
+and performance improvements. The significant changes are highlighted
+below:
+
+* Add a Java API.
+
+* Create a thread to do automatic checkpoints, configured by passing
+  "checkpoint=(wait=X)" to wiredtiger_open.
+
+* Add support for periodically logging statistics to a file and a tool to
+  generate graphs based on those logs.  Configured by passing
+  "statistics_log=(wait=X)" to wiredtiger_open.
+
+* Several changes to minimize the impact of checkpoints on other threads.
+
+* When reading from checkpoints, use mmap by default.
+
+* Enhance eviction so that internal pages take up less space.
+
+* Add maximum filesystem buffer cache settings to wiredtiger_open called
+  "os_cache_max" and "os_cache_dirty_max".  After doing the specified
+  amount of reads or writes, WiredTiger will call fadvise and/or
+  sync_file_range to drop pages from the filesystem cache.  This is an
+  alternative to direct I/O with less impact on performance.
+
+* Make run-time statistics optional, defaulted to "off".
+
+* Change how we detect if shared cache is used. It used to rely on a name,
+  now it will be used if the shared_cache configuration option is included. 
+
+* Add the ability to specify a per-connection reserved size for cache
+  pools.  Ensure cache pool reconfiguration is honoured quickly.
+
+* Rework hazard pointer coupling during cursor walks to be more efficient.
+
+* Add a cache_eviction_walk statistic to track the pages we walk and a
+  cache_eviction_force statistic to track the count of pages queued for
+  forced eviction.
+
+* Fixes to reduce the number of operations on shared data that were causing
+  bottlenecks in read only workloads.
+
+* Add streaming pack / unpack to the API.
+
+* Add some basic reconciliation stats to the connection stats.
+
+* In LSM, keep trying to switch if there is an error: it may be transient.
+
+* Minor clean up and enhancement for the reconciliation statistics, add a
+  set of compression statistics, both to the data-source statistics.
+
+* Compaction cannot run at the same time as a checkpoint: the problem is
+  that checkpoints review page reconciliation information and checkpoints
+  update page reconciliation information.   Lock out checkpoints while
+  compaction is running.
+
+
 WiredTiger release 1.4.2, 2013-01-14
 ------------------------------------
 

@@ -102,6 +102,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 		    "expected a 'colgroup:' or 'index:' source: '%s'", name);
 
 	suffix = strchr(name, ':');
+	/* An existing table should have a well formed name. */
 	WT_ASSERT(session, suffix != NULL);
 	suffix = strchr(suffix + 1, ':');
 

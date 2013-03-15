@@ -509,26 +509,26 @@ struct __wt_session {
 	 *  @row{<tt>backup:</tt>,
 	 *	hot backup cursor,
 	 *	key=<code>string</code>\, see @ref hot_backup for details}
-	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
+	 *  @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
 	 *  @row{<tt>config:[\<uri\>]</tt>,
 	 *	object configuration cursor, (key=config string\,
 	 *	value=config value)}
-	 *  @row{<tt>file:\<filename\></tt>,
+	 *  @row{<tt>file:\<file name\></tt>,
 	 *	file cursor,
 	 *	file key\, file value(s)}
-	 *  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+	 *  @row{<tt>index:\<table name\>:\<index name\></tt>,
 	 *	index cursor,
 	 *	key=index key\, value=table value(s)}
 	 *  @row{<tt>lsm:\<name\></tt>,
 	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
-	 *  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
-	 *	database or file statistics cursor,
+	 *  @row{<tt>statistics:[\<data source URI\>]</tt>,
+	 *	database or data source statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
 	 *	string value\, uint64_t value</code>)\,
 	 *	see @ref data_statistics for details}
-	 *  @row{<tt>table:\<tablename\></tt>,
+	 *  @row{<tt>table:\<table name\></tt>,
 	 *	table cursor,
 	 *	table key\, table value(s)}
 	 *  </table>
@@ -597,7 +597,9 @@ struct __wt_session {
 	 * @snippet ex_all.c Create a table
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the object to create, such as \c "table:stock"
+	 * @param name the URI of the object to create, such as
+	 * \c "table:stock". For a description of URI formats
+	 * see @ref data_sources.
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, the file unit allocation size\, in bytes\,
 	 * must a power-of-two; smaller values decrease the file space required
