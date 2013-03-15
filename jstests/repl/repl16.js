@@ -7,7 +7,7 @@ function doTest( insert ) {
         
     rt = new ReplTest( "repl16tests" );
     master = rt.start( true );
-    master.getDB( 'd' ).createCollection( 'c', { capped:true, size:5*1024 } );
+    master.getDB( 'd' ).createCollection( 'c', { capped:true, size:5*1024, autoIndexId:false } );
     mc = master.getDB( 'd' )[ 'c' ];
 
     insert( {a:1} );
@@ -36,7 +36,9 @@ function insertWithIds( obj ) {
 }
 
 function insertWithoutIds( obj ) {
-    mc._mongo.insert( mc._fullName, obj );
+    // Insert 'obj' via an upsert operation with a match expression that cannot match any documents.
+    // The insert operation is avoided because the mongo shell adds an _id on insert.
+    mc.update( { $where:'false' }, obj, true );
 }
 
 doTest( insertWithIds );
