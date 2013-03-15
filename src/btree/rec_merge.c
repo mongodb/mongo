@@ -338,7 +338,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		 * children: they can't be evicted, so there is no point
 		 * permanently deepening the tree.
 		 */
-
 		if (visit_state.first_live == visit_state.last_live &&
 		    (visit_state.first_live == 0 ||
 		    visit_state.first_live == refcnt - 1))
