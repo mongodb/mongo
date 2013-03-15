@@ -194,6 +194,7 @@ __wt_page_inmem(
 	uint32_t alloc_entries;
 	size_t size;
 
+	alloc_entries = 0;
 	*pagep = NULL;
 
 	/*
@@ -202,7 +203,6 @@ __wt_page_inmem(
 	 */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
-		alloc_entries = 0;
 		break;
 	case WT_PAGE_COL_INT:
 		/*
