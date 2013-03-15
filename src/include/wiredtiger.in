@@ -597,7 +597,9 @@ struct __wt_session {
 	 * @snippet ex_all.c Create a table
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the object to create, such as \c "table:stock"
+	 * @param name the URI of the object to create, such as
+	 * \c "table:stock". For a description of URI formats
+	 * see @ref data_sources.
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, the file unit allocation size\, in bytes\,
 	 * must a power-of-two; smaller values decrease the file space required
