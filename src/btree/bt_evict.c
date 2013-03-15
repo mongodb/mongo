@@ -53,10 +53,10 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 	read_gen = page->read_gen + entry->btree->evict_priority;
 
 	/*
-	 * Skew the read generation a for internal pages that are not split
-	 * merge pages.  We want to consider leaf pages in preference to real
-	 * internal pages, but merges are relatively cheap in-memory operations
-	 * that make reads faster, so don't make them too unlikely.
+	 * Skew the read generation for internal pages that aren't split merge
+	 * pages.  We want to consider leaf pages in preference to real internal
+	 * pages, but merges are relatively cheap in-memory operations that make
+	 * reads faster, so don't make them too unlikely.
 	 */
 	if ((page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) &&
 	    !__wt_btree_mergeable(page))
