@@ -509,9 +509,9 @@ namespace mongo {
 
           This is used after filter analysis has moved as many filters to
           as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated wiki documentation for the
-          format.  This conversion is used to move back to the low-level
-          find() Cursor mechanism.
+          See db/Matcher.h and the associated documentation for the format.
+          This conversion is used to move back to the low-level find()
+          Cursor mechanism.
 
           @param pBuilder the builder to write to
          */
@@ -576,9 +576,9 @@ namespace mongo {
 
           This is used after filter analysis has moved as many filters to
           as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated wiki documentation for the
-          format.  This conversion is used to move back to the low-level
-          find() Cursor mechanism.
+          See db/Matcher.h and the associated documentation for the format.
+          This conversion is used to move back to the low-level find()
+          Cursor mechanism.
 
           @param pBuilder the builder to write to
          */
@@ -739,9 +739,9 @@ namespace mongo {
 
           This is used after filter analysis has moved as many filters to
           as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated wiki documentation for the
-          format.  This conversion is used to move back to the low-level
-          find() Cursor mechanism.
+          See db/Matcher.h and the associated documentation for the format.
+          This conversion is used to move back to the low-level find()
+          Cursor mechanism.
 
           @param pBuilder the builder to write to
          */

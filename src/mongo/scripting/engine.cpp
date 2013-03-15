@@ -219,16 +219,16 @@ namespace mongo {
             }
         }
 
-        map<string, ScriptingFunction>::iterator i = _cachedFunctions.find(code);
+        FunctionCacheMap::iterator i = _cachedFunctions.find(code);
         if (i != _cachedFunctions.end())
             return i->second;
         // NB: we calculate the function number for v8 so the cache can be utilized to
         //     lookup the source on an exception, but SpiderMonkey uses the value
         //     returned by JS_CompileFunction.
-        ScriptingFunction functionNumber = getFunctionCache().size() + 1;
-        _cachedFunctions[code] = functionNumber;
-        ScriptingFunction f = _createFunction(code, functionNumber);
-        return f;
+        ScriptingFunction defaultFunctionNumber = getFunctionCache().size() + 1;
+        ScriptingFunction& actualFunctionNumber = _cachedFunctions[code];
+        actualFunctionNumber = _createFunction(code, defaultFunctionNumber);
+        return actualFunctionNumber;
     }
 
     namespace JSFiles {
@@ -349,6 +349,8 @@ namespace mongo {
         void reset() { _real->reset(); }
         void init(const BSONObj* data) { _real->init(data); }
         void localConnect(const char* dbName) { _real->localConnect(dbName); }
+        void setLocalDB(const string& dbName) { _real->setLocalDB(dbName); }
+        void loadStored(bool ignoreNotConnected = false) { _real->loadStored(ignoreNotConnected); }
         void externalSetup() { _real->externalSetup(); }
         void gc() { _real->gc(); }
         bool isKillPending() const { return _real->isKillPending(); }
@@ -361,7 +363,7 @@ namespace mongo {
         bool getBoolean(const char* field) { return _real->getBoolean(field); }
         BSONObj getObject(const char* field) { return _real->getObject(field); }
         void setNumber(const char* field, double val) { _real->setNumber(field, val); }
-        void setString(const char* field, const char* val) { _real->setString(field, val); }
+        void setString(const char* field, const StringData& val) { _real->setString(field, val); }
         void setElement(const char* field, const BSONElement& val) {
             _real->setElement(field, val);
         }
@@ -406,16 +408,18 @@ namespace mongo {
     };
 
     /** Get a scope from the pool of scopes matching the supplied pool name */
-    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool) {
+    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool, const string& scopeType) {
         if (!scopeCache.get())
             scopeCache.reset(new ScopeCache());
 
-        Scope* s = scopeCache->get(pool);
+        Scope* s = scopeCache->get(pool + scopeType);
         if (!s)
             s = newScope();
 
         auto_ptr<Scope> p;
-        p.reset(new PooledScope(pool, s));
+        p.reset(new PooledScope(pool + scopeType, s));
+        p->setLocalDB(pool);
+        p->loadStored(true);
         return p;
     }
 

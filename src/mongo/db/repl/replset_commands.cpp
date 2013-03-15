@@ -21,15 +21,15 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "../cmdline.h"
-#include "../commands.h"
-#include "../repl.h"
-#include "health.h"
-#include "rs.h"
-#include "rs_config.h"
-#include "../dbwebserver.h"
-#include "../../util/mongoutils/html.h"
-#include "../repl_block.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbwebserver.h"
+#include "mongo/db/repl/health.h"
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_config.h"
+#include "mongo/db/repl/write_concern.h"
+#include "mongo/util/mongoutils/html.h"
 
 using namespace bson;
 
@@ -52,7 +52,6 @@ namespace mongo {
             help << "Just for regression tests.\n";
         }
         // No auth needed because it only works when enabled via command line.
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}

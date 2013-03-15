@@ -127,7 +127,7 @@ namespace mongo {
         }
 
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.Holder());
-        self.MakeWeak(conn, deleteOnCollect<DBClientWithCommands>);
+        scope->dbClientWithCommandsTracker.track(self, conn);
 
         ScriptEngine::runConnectCallback(*conn);
 
@@ -143,7 +143,7 @@ namespace mongo {
 
         DBClientBase* conn = createDirectClient();
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
-        self.MakeWeak(conn, deleteOnCollect<DBClientBase>);
+        scope->dbClientBaseTracker.track(self, conn);
 
         args.This()->SetInternalField(0, v8::External::New(conn));
         args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
@@ -194,7 +194,7 @@ namespace mongo {
 
         v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
         c->SetInternalField(0, v8::External::New(cursor.get()));
-        c.MakeWeak(cursor.release(), deleteOnCollect<DBClientCursor>);
+        scope->dbClientCursorTracker.track(c, cursor.release());
         return c;
     }
 
@@ -618,6 +618,18 @@ namespace mongo {
             it->ForceSet(scope->v8StringData("i"), v8::Number::New(0));
         }
         else if (args.Length() == 2) {
+            if (!args[0]->IsNumber()) {
+                return v8AssertionException("Timestamp time must be a number");
+            }
+            if (!args[1]->IsNumber()) {
+                return v8AssertionException("Timestamp increment must be a number");
+            }
+            int64_t t = args[0]->IntegerValue();
+            int64_t largestVal = ((2039LL-1970LL) *365*24*60*60); //seconds between 1970-2038
+            if( t > largestVal )
+                return v8AssertionException( str::stream()
+                        << "The first argument must be in seconds;"
+                        << t << " is too large (max " << largestVal << ")");
             it->ForceSet(scope->v8StringData("t"), args[0]);
             it->ForceSet(scope->v8StringData("i"), args[1]);
         }
@@ -638,65 +650,43 @@ namespace mongo {
         }
 
         v8::Handle<v8::Value> type;
-        v8::Handle<v8::Value> len;
-        int rlen;
-        char* data;
         if (args.Length() == 2) {
             // 2 args: type, base64 string
             type = args[0];
             v8::String::Utf8Value utf(args[1]);
-            string decoded = base64::decode(*utf);
-            const char* tmp = decoded.data();
-            rlen = decoded.length();
-            data = new char[rlen];
-            memcpy(data, tmp, rlen);
-            len = v8::Number::New(rlen);
+            // uassert if invalid base64 string
+            string tmpBase64 = base64::decode(*utf);
+            // length property stores the decoded length
+            it->ForceSet(scope->v8StringData("len"), v8::Number::New(tmpBase64.length()));
+            it->ForceSet(scope->v8StringData("type"), type);
+            it->SetHiddenValue(v8::String::New("__BinData"), v8::Number::New(1));
+            it->SetInternalField(0, args[1]);
         }
-        else if (args.Length() == 0) {
-            // this is called by subclasses that will fill properties
-            return it;
-        }
-        else {
+        else if (args.Length() != 0) {
             return v8AssertionException("BinData takes 2 arguments -- BinData(subtype,data)");
         }
 
-        it->ForceSet(scope->v8StringData("len"), len);
-        it->ForceSet(scope->v8StringData("type"), type);
-        it->SetHiddenValue(v8::String::New("__BinData"), v8::Number::New(1));
-        v8::Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
-        return res;
+        return it;
     }
 
     v8::Handle<v8::Value> binDataToString(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
-        int len = it->Get(v8::String::New("len"))->Int32Value();
         int type = it->Get(v8::String::New("type"))->Int32Value();
-        v8::Local<v8::External> c = v8::External::Cast(*(it->GetInternalField(0)));
-        char* data = (char*)(c->Value());
 
         stringstream ss;
-        ss << "BinData(" << type << ",\"";
-        base64::encode(ss, data, len);
-        ss << "\")";
-        string ret = ss.str();
-        return v8::String::New(ret.c_str());
+        ss << "BinData(" << type << ",\"" << toSTLString(it->GetInternalField(0)) << "\")";
+        return v8::String::New(ss.str().c_str());
     }
 
     v8::Handle<v8::Value> binDataToBase64(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
-        int len = v8::Handle<v8::Number>::Cast(it->Get(v8::String::New("len")))->Int32Value();
-        v8::Local<v8::External> c = v8::External::Cast(*(it->GetInternalField(0)));
-        char* data = (char*)(c->Value());
-        stringstream ss;
-        base64::encode(ss, (const char*)data, len);
-        return v8::String::New(ss.str().c_str());
+        return it->GetInternalField(0);
     }
 
     v8::Handle<v8::Value> binDataToHex(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
         int len = v8::Handle<v8::Number>::Cast(it->Get(v8::String::New("len")))->Int32Value();
-        v8::Local<v8::External> c = v8::External::Cast(*(it->GetInternalField(0)));
-        char* data = (char*)(c->Value());
+        string data = base64::decode(toSTLString(it->GetInternalField(0)));
         stringstream ss;
         ss.setf (ios_base::hex, ios_base::basefield);
         ss.fill ('0');
@@ -711,17 +701,18 @@ namespace mongo {
     static v8::Handle<v8::Value> hexToBinData(V8Scope* scope, v8::Local<v8::Object> it, int type,
                                               string hexstr) {
         int len = hexstr.length() / 2;
-        char* data = new char[len];
+        scoped_array<char> data(new char[16]);
         const char* src = hexstr.c_str();
         for(int i = 0; i < 16; i++) {
             data[i] = fromHex(src + i * 2);
         }
 
+        string encoded = base64::encode(data.get(), 16);
         it->ForceSet(v8::String::New("len"), v8::Number::New(len));
         it->ForceSet(v8::String::New("type"), v8::Number::New(type));
         it->SetHiddenValue(v8::String::New("__BinData"), v8::Number::New(1));
-        v8::Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
-        return res;
+        it->SetInternalField(0, v8::String::New(encoded.c_str(), encoded.length()));
+        return it;
     }
 
     v8::Handle<v8::Value> uuidInit(V8Scope* scope, const v8::Arguments& args) {

@@ -113,7 +113,8 @@ files.forEach(function(x) {
         'mr_auth|' +
         'queryoptimizera|' +
         'indexStatsCommand|' +
-        'reversecursor' +
+        'reversecursor|' +
+        'stats' + // tests db.stats().dataFileVersion, which doesn't appear in sharded db.stats()
         ')\.js$');
 
     if (failsInShardingPattern.test(x.name)) {

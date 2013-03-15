@@ -19,6 +19,9 @@ var options = {
 
 var st = new ShardingTest({ shards : 1, mongos : 1, other : options });
 
+// Turn balancer off, don't wait
+st.setBalancer(false);
+
 var mongos = st.s0;
 
 jsTest.log( "Starting v2.0 mongos..." );

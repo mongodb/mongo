@@ -5,6 +5,12 @@
 //
 
 #include <errno.h>
+
+// 10gen: Include at least one C++ header here so that the absolutely unacceptable 'using
+// namespace std' from port.h actually has a namespace to refer to, since clang at least
+// objects otherwise.
+#include <new>
+
 #include "base/port.h"
 #include "base/basictypes.h"
 #include "base/strtoint.h"

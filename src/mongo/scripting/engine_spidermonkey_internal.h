@@ -216,7 +216,7 @@ namespace spidermonkey {
 
         void setElement( const char *field , const BSONElement& val );
         void setNumber( const char *field , double val );
-        void setString( const char *field , const char * val );
+        void setString( const char *field , const StringData& val );
         void setObject( const char *field , const BSONObj& obj , bool readOnly );
         void setBoolean( const char *field , bool val );
         void setThis( const BSONObj * obj );

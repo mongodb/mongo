@@ -1,7 +1,7 @@
-// index_set.h
+// index_set.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2013 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -24,10 +24,10 @@ namespace mongo {
     void IndexPathSet::addPath( const StringData& path ) {
         string s;
         if ( getCanonicalIndexField( path, &s ) ) {
-            _canonical.push_back( s );
+            _canonical.insert( s );
         }
         else {
-            _canonical.push_back( path.toString() );
+            _canonical.insert( path.toString() );
         }
     }
 
@@ -39,23 +39,40 @@ namespace mongo {
         StringData use = path;
         string x;
         if ( getCanonicalIndexField( path, &x ) )
-            use = StringData(x);
+            use = StringData( x );
 
-        for ( unsigned i = 0; i < _canonical.size(); i++ ) {
-            StringData idx( _canonical[i] );
+        for ( std::set<string>::const_iterator i = _canonical.begin();
+              i != _canonical.end();
+              ++i ) {
 
-            if ( use.startsWith( idx ) )
+            StringData idx( *i );
+
+            if ( _startsWith( use, idx ) )
                 return true;
 
-            if ( idx.startsWith( use ) )
+            if ( _startsWith( idx, use ) )
                 return true;
         }
 
         return false;
     }
 
+    bool IndexPathSet::_startsWith( const StringData& a, const StringData& b ) const {
+        if ( !a.startsWith( b ) )
+            return false;
+
+        // make sure there is a dot or EOL right after
+
+        if ( a.size() == b.size() )
+            return true;
+
+        return a[b.size()] == '.';
+    }
+
     bool getCanonicalIndexField( const StringData& fullName, string* out ) {
         // check if fieldName contains ".$" or ".###" substrings (#=digit) and skip them
+        // however do not skip the first field even if it meets these criteria
+
         if ( fullName.find( '.' ) == string::npos )
             return false;
 
@@ -71,11 +88,20 @@ namespace mongo {
                 continue;
             }
 
+            if ( i + 1 == fullName.size() ) {
+                // ends with '.'
+                buf << c;
+                continue;
+            }
+
             // check for ".$", skip if present
             if ( fullName[i+1] == '$' ) {
-                i++;
-                modified = true;
-                continue;
+                // only do this if its not something like $a
+                if ( i + 2 >= fullName.size() || fullName[i+2] == '.' ) {
+                    i++;
+                    modified = true;
+                    continue;
+                }
             }
 
             // check for ".###" for any number of digits (no letters)
@@ -106,40 +132,3 @@ namespace mongo {
 
 }
 
-#if 0
-        /**
-         * checks if mod is in the index by inspecting fieldName, and removing
-         * .$ or .### substrings (#=digit) with any number of digits.
-         *
-         * @return true iff the mod is indexed
-         */
-        bool isIndexed( const set<string>& idxKeys ) const {
-
-            // first, check if full name is in idxKeys
-            if ( isIndexed( fieldName , idxKeys ) )
-                return true;
-
-            string x;
-            if ( getCanonicalIndexField( fieldName, &x ) ) {
-                if ( isIndexed( x, idxKeys ) )
-                    return true;
-            }
-
-            return false;
-        }
-
-
-        static bool isIndexed( const string& fullName , const set<string>& idxKeys ) {
-            const char * fieldName = fullName.c_str();
-            // check if there is an index key that is a parent of mod
-            for( const char* dot = strchr( fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
-                if ( idxKeys.count( string( fieldName, dot - fieldName ) ) )
-                    return true;
-
-            // check if there is an index key equal to mod
-            if ( idxKeys.count(fullName) )
-                return true;
-
-            return false;
-        }
-#endif

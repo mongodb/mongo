@@ -44,6 +44,11 @@ namespace mongo {
         const string& getConfigServer() const { return _configServer; }
         void enable( const string& server );
 
+        // Initialize sharding state and begin authenticating outgoing connections and handling
+        // shard versions.  If this is not run before sharded operations occur auth will not work
+        // and versions will not be tracked.
+        static void initialize(const string& server);
+
         void gotShardName( const string& name );
         void gotShardHost( string host );
 

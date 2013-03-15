@@ -24,7 +24,6 @@
 #include "instance.h"
 #include "dbwebserver.h"
 #include "dbhelpers.h"
-#include "repl.h"
 #include "replutil.h"
 #include "clientcursor.h"
 #include "background.h"

@@ -241,7 +241,7 @@ namespace mongo {
        scopeddbconnection goes out of scope).
     */
     class ScopedDbConnection : public AScopedConnection {
-    private:
+    public:
         /** the main constructor you want to use
             throws UserException if can't connect
             */
@@ -259,25 +259,6 @@ namespace mongo {
         ScopedDbConnection(const string& host, DBClientBase* conn, double socketTimeout = 0 ) : _host( host ) , _conn( conn ), _socketTimeout( socketTimeout ) {
             _setSocketTimeout();
         }
-    public:
-
-        // Factory functions for getting ScopedDbConnections.  The caller owns the resulting object
-        // and is responsible for deleting it when finished. This should be used when running a
-        // command on a shard from the mongos and the command should run with the client's
-        // authentication.  If the command should be run with full permissions regardless
-        // of whether or not the user is authorized, then use getInternalScopedDbConnection().
-        static ScopedDbConnection* getScopedDbConnection(const string& host,
-                                                         double socketTimeout = 0);
-        static ScopedDbConnection* getScopedDbConnection(const ConnectionString& host,
-                                                         double socketTimeout = 0);
-        static ScopedDbConnection* getScopedDbConnection();
-
-        // DEPRECATED. This is now just a synonym for getScopedDbConnection.
-        static ScopedDbConnection* getInternalScopedDbConnection(const string& host,
-                                                                 double socketTimeout = 0);
-        static ScopedDbConnection* getInternalScopedDbConnection(const ConnectionString& host,
-                                                                 double socketTimeout = 0);
-        static ScopedDbConnection* getInternalScopedDbConnection();
 
         static void clearPool();
 

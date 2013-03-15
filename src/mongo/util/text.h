@@ -21,6 +21,8 @@
 #include <vector>
 #include <string>
 
+#include "mongo/base/disallow_copying.h"
+
 namespace mongo {
 
     class StringSplitter {
@@ -79,12 +81,15 @@ namespace mongo {
 # endif
 
     class WindowsCommandLine {
+        MONGO_DISALLOW_COPYING(WindowsCommandLine);
         char**  _argv;
+        char**  _envp;
 
     public:
-        WindowsCommandLine( int argc, wchar_t* argvW[] );
+        WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envpW[]);
         ~WindowsCommandLine();
-        char** argv( void ) const { return _argv; };
+        char** argv(void) const { return _argv; };
+        char** envp(void) const { return _envp; };
     };
 
 #endif // #if defined(_WIN32)

@@ -57,7 +57,6 @@ namespace mongo {
             _random = SecureRandom::create();
         }
 
-        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const {
             return true;

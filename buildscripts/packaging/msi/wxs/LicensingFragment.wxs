@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Fragment>
+    
+    <DirectoryRef Id="INSTALLLOCATION">      
+      <Component Id="c_License" Guid="54C0700D-A294-4F40-A396-04CC606A7299">
+        <File Id="f_GnuLicense" Name="GNU-AGPL-3.0" Source="$(var.LicenseSource)\GNU-AGPL-3.0"
+              DiskId ="1" KeyPath="yes" />
+        <File Id="f_Readme" Name="README" Source="$(var.LicenseSource)\README"
+              DiskId ="1" />
+        <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.LicenseSource)\THIRD-PARTY-NOTICES"
+              DiskId ="1" />
+      </Component>
+    </DirectoryRef>
+
+    <WixVariable Id="WixUILicenseRtf" Value=".\GNU-AGPL-3.0.rtf" />
+
+  </Fragment>
+</Wix>

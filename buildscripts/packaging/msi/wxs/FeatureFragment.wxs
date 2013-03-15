@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <FeatureGroup Id="fg_MongoDBAll">
+      <Feature Id="ProductFeature"
+               Title="!(wix.ProductName)"
+               Description="!(wix.ProductName)"
+               Level="1">
+        <ComponentRef Id="c_License" />
+        <Feature Id="Server"
+                 Title ="Server"
+                 Description="The MongoDB server (mongod)"
+                 Level ="1">
+          <ComponentRef Id="c_mongod"/>
+          <ComponentRef Id="c_mongodPdb"/>
+        </Feature>
+        <Feature Id="Client"
+                 Title ="Client"
+                 Description="The MongoDB client/shell (mongo)"
+                 Level ="1">
+          <ComponentRef Id="c_mongo"/>
+        </Feature>
+        <Feature Id="MonitoringTools"
+                 Title ="Monitoring Tools"
+                 Description="MongoDB monitoring tools (mongostat, mongotop)"
+                 Level ="1">
+          <ComponentRef Id="c_mongostat"/>
+          <ComponentRef Id="c_mongotop"/>
+        </Feature>
+        <Feature Id="ImportExportTools"
+                 Title ="Import/Export Tools"
+                 Description="MongoDB import/export tools (mongodump/mongorestore and mongoexport/mongoimport)"
+                 Level ="1">
+          <ComponentRef Id="c_mongodump"/>
+          <ComponentRef Id="c_mongorestore"/>
+          <ComponentRef Id="c_mongoexport"/>
+          <ComponentRef Id="c_mongoimport"/>
+        </Feature>
+        <Feature Id="Router"
+                 Title ="Router"
+                 Description="The MongoDB Router (mongos)"
+                 Level ="1000">
+          <ComponentRef Id="c_mongos"/>
+          <ComponentRef Id="c_mongosPdb"/>
+        </Feature>     
+        <Feature Id="MiscellaneousTools"
+                Title ="Miscellaneous Tools"
+                Description="Miscellaneous MongoDB tools (bsondump, mongofiles, mongooplog, mongoperf)"
+                Level ="1000">
+          <ComponentRef Id="c_bsondump"/>
+          <ComponentRef Id="c_mongofiles"/>
+          <ComponentRef Id="c_mongooplog"/>
+          <ComponentRef Id="c_mongoperf"/>
+        </Feature>
+      </Feature>
+    </FeatureGroup>
+  </Fragment>
+</Wix>
+

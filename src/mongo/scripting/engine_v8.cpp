@@ -54,27 +54,10 @@ namespace mongo {
 
     v8::Persistent<v8::Object> V8Scope::wrapBSONObject(v8::Local<v8::Object> obj,
                                                        BSONHolder* data) {
+        data->_scope = this;
         obj->SetInternalField(0, v8::External::New(data));
         v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
-        p.MakeWeak(data, deleteOnCollect<BSONHolder>);
-        return p;
-    }
-
-    static void weakRefArrayCallback(v8::Persistent<v8::Value> p, void* scope) {
-        v8::HandleScope handle_scope;
-        if (!p.IsNearDeath())
-            return;
-        v8::Handle<v8::External> field =
-                v8::Handle<v8::External>::Cast(p->ToObject()->GetInternalField(0));
-        char* data = (char*) field->Value();
-        delete [] data;
-        p.Dispose();
-    }
-
-    v8::Persistent<v8::Object> V8Scope::wrapArrayObject(v8::Local<v8::Object> obj, char* data) {
-        obj->SetInternalField(0, v8::External::New(data));
-        v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
-        p.MakeWeak(this, weakRefArrayCallback);
+        bsonHolderTracker.track(p, data);
         return p;
     }
 
@@ -574,6 +557,8 @@ namespace mongo {
             _context.Dispose();
         }
         _isolate->Dispose();
+        // set the isolate to NULL so ObjTracker destructors know that v8 is no longer reachable
+        _isolate = NULL;
     }
 
     bool V8Scope::hasOutOfMemoryException() {
@@ -674,9 +659,9 @@ namespace mongo {
         _global->ForceSet(v8StringData(field), v8::Number::New(val));
     }
 
-    void V8Scope::setString(const char * field, const char * val) {
+    void V8Scope::setString(const char * field, const StringData& val) {
         V8_SIMPLE_HEADER
-        _global->ForceSet(v8StringData(field), v8::String::New(val));
+        _global->ForceSet(v8StringData(field), v8::String::New(val.rawData(), val.size()));
     }
 
     void V8Scope::setBoolean(const char * field, bool val) {
@@ -912,8 +897,9 @@ namespace mongo {
         string fn = str::stream() << "_funcs" << functionNumber;
         code = str::stream() << fn << " = " << code;
 
-        v8::Handle<v8::Script> script = v8::Script::Compile(v8::String::New(code.c_str()),
-                                        v8::String::New(fn.c_str()));
+        v8::Handle<v8::Script> script = v8::Script::Compile(
+                                            v8::String::New(code.c_str(), code.length()),
+                                            v8::String::New(fn.c_str()));
 
         // throw on error
         checkV8ErrorState(script, try_catch);
@@ -1027,7 +1013,7 @@ namespace mongo {
 
         v8::Handle<v8::Script> script =
                 v8::Script::Compile(v8::String::New(code.rawData(), code.size()),
-                                    v8::String::New(name.c_str()));
+                                    v8::String::New(name.c_str(), name.length()));
 
         if (checkV8ErrorState(script, try_catch, reportError, assertOnError))
             return false;
@@ -1239,12 +1225,13 @@ namespace mongo {
         registerOpId();
     }
 
-    v8::Local<v8::Value> V8Scope::newFunction(const char *code) {
+    v8::Local<v8::Value> V8Scope::newFunction(const StringData& code) {
         v8::HandleScope handle_scope;
         v8::TryCatch try_catch;
         string codeStr = str::stream() << "____MongoToV8_newFunction_temp = " << code;
 
-        v8::Local<v8::Script> compiled = v8::Script::New(v8::String::New(codeStr.c_str()));
+        v8::Local<v8::Script> compiled = v8::Script::New(v8::String::New(codeStr.c_str(),
+                                                                         codeStr.length()));
 
         // throw on compile error
         checkV8ErrorState(compiled, try_catch);
@@ -1261,7 +1248,8 @@ namespace mongo {
         v8::HandleScope handle_scope;
         v8::Function* idCons = this->getObjectIdCons();
         v8::Handle<v8::Value> argv[1];
-        argv[0] = v8::String::New(id.str().c_str());
+        const string& idString = id.str();
+        argv[0] = v8::String::New(idString.c_str(), idString.length());
         return handle_scope.Close(idCons->NewInstance(1, argv));
     }
 
@@ -1326,19 +1314,21 @@ namespace mongo {
 
             switch (f.type()) {
             case mongo::Code:
-                o->ForceSet(name, newFunction(f.valuestr()));
+                o->ForceSet(name, newFunction(StringData(f.valuestr(), f.valuestrsize() - 1)));
                 break;
             case CodeWScope:
                 if (!f.codeWScopeObject().isEmpty())
                     log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
-                o->ForceSet(name, newFunction(f.codeWScopeCode()));
+                o->ForceSet(name, newFunction(StringData(f.codeWScopeCode(), f.codeWScopeCodeLen() - 1)));
                 break;
+            case mongo::Symbol:
             case mongo::String:
-                o->ForceSet(name, v8::String::New(f.valuestr()));
+                o->ForceSet(name, v8::String::New(f.valuestr(), f.valuestrsize() - 1));
                 break;
             case mongo::jstOID: {
                 v8::Function * idCons = getObjectIdCons();
-                argv[0] = v8::String::New(f.__oid().str().c_str());
+                const string& oidString = f.__oid().str();
+                argv[0] = v8::String::New(oidString.c_str(), oidString.length());
                 o->ForceSet(name, idCons->NewInstance(1, argv));
                 break;
             }
@@ -1384,7 +1374,7 @@ namespace mongo {
             case mongo::Timestamp: {
                 v8::Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() :
                                                        internalFieldObjects->NewInstance();
-                sub->ForceSet(v8::String::New("t"), v8::Number::New(f.timestampTime()));
+                sub->ForceSet(v8::String::New("t"), v8::Number::New(f.timestampTime() / 1000));
                 sub->ForceSet(v8::String::New("i"), v8::Number::New(f.timestampInc()));
                 sub->SetInternalField(0, v8::Uint32::New(f.type()));
                 o->ForceSet(name, sub);
@@ -1529,13 +1519,14 @@ namespace mongo {
 
         switch (elem.type()) {
         case mongo::Code:
-            return newFunction(elem.valuestr());
+            return newFunction(StringData(elem.valuestr(), elem.valuestrsize() - 1));
         case CodeWScope:
             if (!elem.codeWScopeObject().isEmpty())
                 log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
-            return newFunction(elem.codeWScopeCode());
+            return newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1));
+        case mongo::Symbol:
         case mongo::String:
-            return v8::String::New(elem.valuestr());
+            return v8::String::New(elem.valuestr(), elem.valuestrsize() - 1);
         case mongo::jstOID:
             return newId(elem.__oid());
         case mongo::NumberDouble:
@@ -1574,7 +1565,7 @@ namespace mongo {
         }
         case mongo::Timestamp:
             instance = internalFieldObjects->NewInstance();
-            instance->ForceSet(v8::String::New("t"), v8::Number::New(elem.timestampTime()));
+            instance->ForceSet(v8::String::New("t"), v8::Number::New(elem.timestampTime() / 1000 ));
             instance->ForceSet(v8::String::New("i"), v8::Number::New(elem.timestampInc()));
             instance->SetInternalField(0, v8::Uint32::New(elem.type()));
             return instance;
@@ -1648,12 +1639,13 @@ namespace mongo {
     void V8Scope::v8ToMongoInternal(BSONObjBuilder& b,
                                     const string& elementName,
                                     v8::Handle<v8::Object> obj) {
-        uint32_t bsonType = obj->GetInternalField(0)->ToUint32()->Value();
+        uint32_t bsonTypeRaw = obj->GetInternalField(0)->ToUint32()->Value();
+        BSONType bsonType = static_cast<BSONType>(bsonTypeRaw);
         switch(bsonType) {
         case Timestamp:
             b.appendTimestamp(elementName,
                               Date_t(static_cast<uint64_t>(
-                                    obj->Get(v8::String::New("t"))->ToNumber()->Value())),
+                                    obj->Get(v8::String::New("t"))->ToNumber()->Value() * 1000 )),
                               obj->Get(v8::String::New("i"))->ToInt32()->Value());
             return;
         case MinKey:
@@ -1691,12 +1683,10 @@ namespace mongo {
                                    const string& elementName,
                                    v8::Handle<v8::Object> obj) {
         int len = obj->Get(v8StringData("len"))->ToInt32()->Value();
-        v8::Local<v8::External> c = v8::External::Cast(*(obj->GetInternalField(0)));
-        const char* dataArray = static_cast <const char*>(c->Value());
         b.appendBinData(elementName,
                         len,
                         mongo::BinDataType(obj->Get(v8StringData("type"))->ToInt32()->Value()),
-                        dataArray);
+                        base64::decode(toSTLString(obj->GetInternalField(0))).c_str());
     }
 
     void V8Scope::v8ToMongoObjectID(BSONObjBuilder& b,
@@ -1812,7 +1802,7 @@ namespace mongo {
             }
         }
 
-        v8::Local<v8::Array> names = o->GetPropertyNames();
+        v8::Local<v8::Array> names = o->GetOwnPropertyNames();
         for (unsigned int i=0; i<names->Length(); i++) {
             v8::Local<v8::String> name = names->Get(i)->ToString();
             v8::Local<v8::Value> value = o->Get(name);

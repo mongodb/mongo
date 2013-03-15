@@ -36,7 +36,7 @@
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/optime.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
 

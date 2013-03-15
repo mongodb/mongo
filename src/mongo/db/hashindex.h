@@ -87,6 +87,10 @@ namespace mongo {
          */
         void getKeys( const BSONObj &obj, BSONObjSet &keys ) const;
 
+        /* A field missing from a document is represented by the hash value of a null BSONElement.
+         */
+        BSONElement missingField() const { return _missingKey.firstElement(); }
+
         /* The newCursor method works for suitable queries by generating a BtreeCursor
          * using the hash of point-intervals parsed by FieldRangeSet.
          * For unsuitable queries it just instantiates a btree cursor over the whole tree
@@ -115,6 +119,7 @@ namespace mongo {
         HashSeed _seed; //defaults to zero if not in the IndexSpec
         HashVersion _hashVersion; //defaults to zero if not in the IndexSpec
         bool _isSparse;
+        BSONObj _missingKey;
     };
 
 }

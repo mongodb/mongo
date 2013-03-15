@@ -41,7 +41,8 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/module.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/repl.h"
+#include "mongo/db/repl/repl_start.h"
+#include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/stats/counters.h"
@@ -81,7 +82,6 @@ namespace mongo {
 
     static void setupSignalHandlers();
     static void startInterruptThread();
-    void startReplication();
     void exitCleanly( ExitCode code );
 
 #ifdef _WIN32
@@ -293,7 +293,7 @@ namespace mongo {
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
             verify( PDFILE_VERSION == 4 );
-            verify( PDFILE_VERSION_MINOR == 5 );
+            verify( PDFILE_VERSION_MINOR_22_AND_OLDER == 5 );
 
             list<string> colls = db.getCollectionNames( dbName );
             for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
@@ -308,7 +308,7 @@ namespace mongo {
                 }
             }
 
-            h->versionMinor = 5;
+            getDur().writingInt(h->versionMinor) = 5;
             return true;
         }
 
@@ -341,8 +341,11 @@ namespace mongo {
 
                 log() << "****" << endl;
                 log() << "****" << endl;
-                log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                      << "new version: " << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR << endl;
+                log() << "need to upgrade database " << dbName << " "
+                      << "with pdfile version " << h->version << "." << h->versionMinor << ", "
+                      << "new version: "
+                      << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR_22_AND_OLDER
+                      << endl;
                 if ( shouldRepairDatabases ) {
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;
@@ -359,6 +362,23 @@ namespace mongo {
                 }
             }
             else {
+                if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
+                    const string systemIndexes = cc().database()->name + ".system.indexes";
+                    shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
+                    for ( ; cursor && cursor->ok(); cursor->advance()) {
+                        const BSONObj index = cursor->current();
+                        const BSONObj key = index.getObjectField("key");
+                        const string plugin = IndexPlugin::findPluginName(key);
+                        if (IndexPlugin::existedBefore24(plugin))
+                            continue;
+
+                        log() << "Index " << index << " claims to be of type '" << plugin << "', "
+                              << "which is either invalid or did not exist before v2.4. "
+                              << "See the upgrade section: "
+                              << "http://dochub.mongodb.org/core/upgrade-2.4"
+                              << startupWarningsLog;
+                    }
+                }
                 Database::closeDatabase( dbName.c_str(), dbpath );
             }
         }
@@ -537,7 +557,7 @@ namespace mongo {
                     log() << "**          We suggest setting it to 256KB (512 sectors) or less"
                             << startupWarningsLog;
 
-                    log() << "**          http://www.mongodb.org/display/DOCS/Readahead"
+                    log() << "**          http://dochub.mongodb.org/core/readahead"
                             << startupWarningsLog;
                 }
             }
@@ -612,7 +632,7 @@ namespace mongo {
             log() << "**          Restart with --replSet unless you are doing maintenance and no"
                   << " other clients are connected." << startupWarningsLog;
             log() << "**          The TTL collection monitor will not start because of this." << startupWarningsLog;
-            log() << "**          For more info see http://www.mongodb.org/display/DOCS/TTL+Monitor" << startupWarningsLog;
+            log() << "**          For more info see http://dochub.mongodb.org/core/ttlcollections" << startupWarningsLog;
             log() << startupWarningsLog;
         }
 
@@ -646,7 +666,7 @@ namespace mongo {
         CmdLine::launchOk();
 #endif
 
-        if( !noauth ) {
+        if(AuthorizationManager::isAuthEnabled()) {
             // open admin db in case we need to use it later. TODO this is not the right way to
             // resolve this.
             Client::WriteContext c("admin", dbpath);
@@ -657,8 +677,6 @@ namespace mongo {
         // listen() will return when exit code closes its socket.
         exitCleanly(EXIT_NET_ERROR);
     }
-
-    void testPretouch();
 
     void initAndListen(int listenPort) {
         try {
@@ -705,10 +723,23 @@ void show_help_text(po::options_description options) {
 
 static int mongoDbMain(int argc, char* argv[], char** envp);
 
+#if defined(_WIN32)
+// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
+// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
+// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
+// and makes them available through the argv() and envp() members.  This enables mongoDbMain()
+// to process UTF-8 encoded arguments and environment variables without regard to platform.
+int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+    WindowsCommandLine wcl(argc, argvW, envpW);
+    int exitCode = mongoDbMain(argc, wcl.argv(), wcl.envp());
+    ::_exit(exitCode);
+}
+#else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = mongoDbMain(argc, argv, envp);
     ::_exit(exitCode);
 }
+#endif
 
 static void buildOptionsDescriptions(po::options_description *pVisible,
                                      po::options_description *pHidden,
@@ -805,7 +836,7 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
 
     hidden_options.add_options()
     ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-    ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations") // experimental
+    ("pretouch", po::value<int>(), "n pretouch threads for applying master/slave operations")
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     ("nodur", "disable journaling")
@@ -890,10 +921,10 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             cmdLine.cpu = true;
         }
         if (params.count("noauth")) {
-            noauth = true;
+            AuthorizationManager::setAuthEnabled(false);
         }
         if (params.count("auth")) {
-            noauth = false;
+            AuthorizationManager::setAuthEnabled(true);
         }
         if (params.count("quota")) {
             cmdLine.quota = true;

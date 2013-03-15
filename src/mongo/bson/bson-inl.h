@@ -289,12 +289,10 @@ dodouble:
 
     /* add all the fields from the object specified to this object */
     inline BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
-        BSONObjIterator it(x);
-        while ( it.moreWithEOO() ) {
-            BSONElement e = it.next();
-            if ( e.eoo() ) break;
-            append(e);
-        }
+        if (!x.isEmpty())
+            _b.appendBuf(
+                x.objdata() + 4,   // skip over leading length
+                x.objsize() - 5);  // ignore leading length and trailing \0
         return *this;
     }
 

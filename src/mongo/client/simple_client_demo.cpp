@@ -15,7 +15,7 @@
 
 /* simple_client_demo.cpp
 
-   See also : http://www.mongodb.org/pages/viewpage.action?pageId=133415
+   See also : http://dochub.mongodb.org/core/cppdrivertutorial
 
    How to build and run:
 

@@ -25,11 +25,13 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/sort_phase_one.h"
 
 namespace mongo {
@@ -138,7 +140,7 @@ namespace mongo {
 
                 BSONObj js = tmp;
                 if ( isindex ) {
-                    verify( strstr(from_collection, "system.indexes") );
+                    verify(NamespaceString(from_collection).coll == "system.indexes");
                     js = fixindex(tmp);
                     storedForLater->push_back( js.getOwned() );
                     continue;
@@ -819,7 +821,6 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual bool requiresAuth() { return true; }
         virtual bool slaveOk() const {
             return false;
         }

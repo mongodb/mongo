@@ -40,7 +40,7 @@
  * Provides the geoHaystack index type and the command "geoSearch."
  * Examines all documents in a given radius of a given point.
  * Returns all documents that match a given search restriction.
- * See http://www.mongodb.org/display/DOCS/Geospatial+Haystack+Indexing
+ * See http://dochub.mongodb.org/core/haystackindexes
  *
  * Use when you want to look for restaurants within 25 miles with a certain name.
  * Don't use when you want to find the closest open restaurants; see 2d.cpp for that.

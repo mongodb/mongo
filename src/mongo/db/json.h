@@ -27,10 +27,10 @@ namespace mongo {
      * Create a BSONObj from a JSON <http://www.json.org>,
      * <http://www.ietf.org/rfc/rfc4627.txt> string.  In addition to the JSON
      * extensions extensions described here
-     * <http://mongodb.onconfluence.com/display/DOCS/Mongo+Extended+JSON>, this
-     * function accepts unquoted field names and allows single quotes to
-     * optionally be used when specifying field names and string values instead
-     * of double quotes.  JSON unicode escape sequences (of the form \uXXXX) are
+     * <http://dochub.mongodb.org/core/mongodbextendedjson>, this function
+     * accepts unquoted field names and allows single quotes to optionally be
+     * used when specifying field names and string values instead of double
+     * quotes.  JSON unicode escape sequences (of the form \uXXXX) are
      * converted to utf8.
      *
      * @throws MsgAssertionException if parsing fails.  The message included with

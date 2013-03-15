@@ -30,7 +30,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> cursor;
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            connPtr.reset(new ScopedDbConnection(configLoc, 30));
             ScopedDbConnection& conn = *connPtr;
 
             scoped_ptr<DBClientCursor> cursorA(_safeCursor(conn->query(nsA,
@@ -88,23 +88,18 @@ namespace mongo {
         // Check the sizes first, b/c if one collection is empty the hash check will fail
         //
 
-        scoped_ptr<ScopedDbConnection> connPtr;
-
         unsigned long long countA;
         unsigned long long countB;
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-
+            ScopedDbConnection conn(configLoc, 30);
             countA = conn->count(nsA, BSONObj());
             countB = conn->count(nsB, BSONObj());
+            conn.done();
         }
         catch (const DBException& e) {
             return e.toStatus();
         }
-
-        connPtr->done();
 
         if (countA == 0 && countB == 0) {
             return Status::OK();
@@ -126,16 +121,13 @@ namespace mongo {
         NamespaceString nssA(nsA);
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-
+            ScopedDbConnection conn(configLoc, 30);
             resultOk = conn->runCommand(nssA.db, BSON("dbHash" << true), result);
+            conn.done();
         }
         catch (const DBException& e) {
             return e.toStatus();
         }
-
-        connPtr->done();
 
         if (!resultOk) {
             return Status(ErrorCodes::UnknownError,
@@ -158,16 +150,13 @@ namespace mongo {
         NamespaceString nssB(nsB);
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-
+            ScopedDbConnection conn(configLoc, 30);
             resultOk = conn->runCommand(nssB.db, BSON("dbHash" << true), result);
+            conn.done();
         }
         catch (const DBException& e) {
             return e.toStatus();
         }
-
-        connPtr->done();
 
         if (!resultOk) {
             return Status(ErrorCodes::UnknownError,
@@ -204,7 +193,7 @@ namespace mongo {
         BSONObj createResult;
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            connPtr.reset(new ScopedDbConnection(configLoc, 30));
             ScopedDbConnection& conn = *connPtr;
 
             resultOk = conn->createCollection(toNS, 0, false, 0, &createResult);
@@ -285,7 +274,6 @@ namespace mongo {
                                const string& fromNS,
                                const string& overwriteNS)
     {
-        scoped_ptr<ScopedDbConnection> connPtr;
 
         // TODO: Also a bit awkward to deal with command results
         bool resultOk;
@@ -293,8 +281,7 @@ namespace mongo {
 
         // Create new collection
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(configLoc, 30);
 
             BSONObjBuilder bob;
             bob.append("renameCollection", fromNS);
@@ -303,12 +290,11 @@ namespace mongo {
             BSONObj renameCommand = bob.obj();
 
             resultOk = conn->runCommand("admin", renameCommand, renameResult);
+            conn.done();
         }
         catch (const DBException& e) {
             return e.toStatus();
         }
-
-        connPtr->done();
 
         if (!resultOk) {
             return Status(ErrorCodes::UnknownError,

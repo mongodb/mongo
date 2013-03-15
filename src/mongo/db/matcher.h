@@ -162,7 +162,7 @@ namespace mongo {
        e.g.
            db.foo.find( { a : 3 } );
 
-       { a : 3 } is the pattern object.  See wiki documentation for full info.
+       { a : 3 } is the pattern object.  See manual for full info.
 
        GT/LT:
          { a : { $gt : 3 } }

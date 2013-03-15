@@ -24,12 +24,8 @@ namespace mongo {
     std::vector<std::string> _makeStringVector(int ignored, ...) {
         va_list ap;
         va_start(ap, ignored);
-        const char* arg = va_arg(ap, const char *);
-        if (arg) {
-            std::cerr << "Internal error!\n";
-            std::abort();
-        }
         std::vector<std::string> result;
+        const char* arg = NULL;
         while ((arg = va_arg(ap, const char *)))
             result.push_back(arg);
         va_end(ap);

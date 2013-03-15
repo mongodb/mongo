@@ -24,7 +24,6 @@ namespace mongo {
     public:
         static void disableCommand();
 
-        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
         }

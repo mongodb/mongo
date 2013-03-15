@@ -31,29 +31,63 @@ namespace mongo {
 #endif
 
     namespace dur {
-       void ThreadLocalIntents::push(const WriteIntent& x) { 
+
+        ThreadLocalIntents::~ThreadLocalIntents() {
+            fassert( 16731, intents.size() == 0 );
+        }
+
+        void ThreadLocalIntents::push(const WriteIntent& x) {
             if( !commitJob._hasWritten )
                 commitJob._hasWritten = true;
-            if( n == 21 )
-                unspool();
-            i[n++] = x;
+
+            if( intents.size() == N ) {
+                if ( !condense() ) {
+                    unspool();
+                }
+            }
+
+            intents.push_back( x );
 #if( CHECK_SPOOLING )
             nSpooled++;
 #endif
         }
         void ThreadLocalIntents::_unspool() {
-            if( n ) { 
-                for( int j = 0; j < n; j++ )
-                    commitJob.note(i[j].start(), i[j].length());
-#if( CHECK_SPOOLING )
-                nSpooled.signedAdd(-n);
-#endif
-                n = 0;
-                dassert( cmdLine.dur );
+            if ( intents.size() == 0 )
+                return;
+
+            for( unsigned j = 0; j < intents.size(); j++ ) {
+                commitJob.note(intents[j].start(), intents[j].length());
             }
+
+#if( CHECK_SPOOLING )
+            nSpooled.signedAdd( -1 * static_cast<int>(intents.size()) );
+#endif
+
+            intents.clear();
         }
+
+        bool ThreadLocalIntents::condense() {
+            std::sort( intents.begin(), intents.end() );
+
+            bool didAnything = false;
+
+            for ( unsigned x = 0; x < intents.size() - 1 ; x++ ) {
+                if ( intents[x].overlaps( intents[x+1] ) ) {
+                    intents[x].absorb( intents[x+1] );
+                    intents.erase( intents.begin() + x + 1 );
+                    x--;
+                    didAnything = true;
+#if( CHECK_SPOOLING )
+                    nSpooled.signedAdd(-1);
+#endif
+                }
+            }
+
+            return didAnything;
+        }
+
         void ThreadLocalIntents::unspool() {
-            if( n ) { 
+            if ( intents.size() ) {
                 SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
                 _unspool();
             }

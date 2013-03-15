@@ -357,8 +357,11 @@ def skipTest(path):
     parentPath = os.path.dirname(path)
     parentDir = os.path.basename(parentPath)
     if small_oplog: # For tests running in parallel
-        if basename in ["cursor8.js", "indexh.js", "dropdb.js", "connections_opened.js"]:
+        if basename in ["cursor8.js", "indexh.js", "dropdb.js", "connections_opened.js", "opcounters.js"]:
             return True
+        if os.sys.platform == "sunos5":
+            if basename == "geo_update_btree.js":
+                return True
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly
         if parentDir == "auth" or "auth" in basename:
@@ -376,7 +379,6 @@ def skipTest(path):
                            ("sharding", "read_pref.js"), # SERVER-6972
                            ("sharding", "read_pref_cmd.js"), # SERVER-6972
                            ("sharding", "read_pref_rs_client.js"), # SERVER-6972
-                           ("sharding", "sync_conn_cmd.js"), #SERVER-6327
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "sync6.js"),
                            ("sharding", "parallel.js"),

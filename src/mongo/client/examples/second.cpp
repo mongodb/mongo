@@ -33,9 +33,7 @@ int main( int argc, const char **argv ) {
         port = argv[ 2 ];
     }
 
-    scoped_ptr<ScopedDbConnection> connPtr( ScopedDbConnection::getScopedDbConnection(
-            string( "127.0.0.1:" ) + port ) );
-    ScopedDbConnection& conn = *connPtr;
+    ScopedDbConnection conn(string( "127.0.0.1:" ) + port);
 
     const char * ns = "test.second";
 

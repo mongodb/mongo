@@ -539,7 +539,7 @@ tojson = function(x, indent, nolint){
     case "object":{
         var s = tojsonObject(x, indent, nolint);
         if ((nolint == null || nolint == true) && s.length < 80 && (indent == null || indent.length == 0)){
-            s = s.replace(/[\s\r\n ]+/gm, " ");
+            s = s.replace(/[\t\r\n]+/gm, " ");
         }
         return s;
     }
@@ -614,6 +614,14 @@ tojsonObject = function(x, indent, nolint){
     // pop one level of indent
     indent = indent.substring(1);
     return s + indent + "}";
+}
+
+printjson = function(x){
+    print( tojson( x ) );
+}
+
+printjsononeline = function(x){
+    print( tojsononeline( x ) );
 }
 
 isString = function(x){

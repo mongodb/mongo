@@ -27,7 +27,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/oplog.h"
+#include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/scanandorder.h"
 #include "mongo/util/timer.h"
 

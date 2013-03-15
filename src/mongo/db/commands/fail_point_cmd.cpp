@@ -63,10 +63,6 @@ namespace mongo {
         }
 
         // No auth needed because it only works when enabled via command line.
-        virtual bool requiresAuth() {
-            return false;
-        }
-
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}

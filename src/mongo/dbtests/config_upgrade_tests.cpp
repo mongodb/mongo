@@ -22,6 +22,7 @@
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/s/type_settings.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/version.h"
@@ -33,6 +34,15 @@ namespace mongo {
      */
     class ConfigUpgradeFixture: public ConfigServerFixture {
     public:
+
+        void stopBalancer() {
+            // Note: The balancer key is needed in the update portion, for some reason related to 
+            // DBDirectClient
+            client().update(SettingsType::ConfigNS, 
+                            BSON(SettingsType::key("balancer")),
+                            BSON(SettingsType::key("balancer") << SettingsType::balancerStopped(true)),
+                            true, false);
+        }
 
         /**
          * Stores a legacy { version : X } config server entry
@@ -304,6 +314,8 @@ namespace mongo {
         // Tests that we can't upgrade from a config version we don't have an upgrade path for
         //
 
+        stopBalancer();
+
         storeLegacyConfigVersion(1);
 
         // Default version (not upgradeable)
@@ -345,6 +357,8 @@ namespace mongo {
         // not set.
         //
 
+        stopBalancer();
+
         storeConfigVersion(MIN_COMPATIBLE_CONFIG_VERSION);
 
         string collectionA("foo.barA");
@@ -374,6 +388,8 @@ namespace mongo {
         //
         // Tests adding epochs during upgrade to collections and chunks.
         //
+
+        stopBalancer();
 
         storeConfigVersion(MIN_COMPATIBLE_CONFIG_VERSION);
 

@@ -23,7 +23,6 @@ namespace mongo {
     class CmdConnectionStatus : public Command {
     public:
         CmdConnectionStatus() : Command("connectionStatus") {}
-        virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }

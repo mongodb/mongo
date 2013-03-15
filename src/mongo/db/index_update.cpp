@@ -522,6 +522,11 @@ namespace mongo {
         BackgroundIndexBuildJob(const char *ns) : BackgroundOperation(ns) { }
 
         unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx) {
+
+            // clear cached things since we are changing state
+            // namely what fields are indexed
+            NamespaceDetailsTransient::get(ns.c_str()).addedIndex();
+
             unsigned long long n = 0;
 
             prep(ns.c_str(), d);

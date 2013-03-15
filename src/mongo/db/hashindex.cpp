@@ -55,6 +55,14 @@ namespace mongo {
         massert( 16243 , "error: no hashed index field" ,
                 firstElt.str().compare( HASHED_INDEX_TYPE_IDENTIFIER ) == 0 );
         _hashedField = firstElt.fieldName();
+
+        // Explicit null valued fields and missing fields are both represented in hashed indexes
+        // using the hash value of the null BSONElement.  This is partly for historical reasons
+        // (hash of null was used in the initial release of hashed indexes and changing would alter
+        // the data format).  Additionally, in certain places the hashed index code and the index
+        // bound calculation code assume null and missing are indexed identically.
+        BSONObj nullObj = BSON( "" << BSONNULL );
+        _missingKey = BSON( "" << makeSingleKey( nullObj.firstElement(), _seed, _hashVersion ) );
     }
 
     HashedIndexType::~HashedIndexType() { }
@@ -78,10 +86,7 @@ namespace mongo {
             keys.insert( key );
         }
         else if (! _isSparse ) {
-            BSONObj nullobj = BSON( _hashedField << BSONNULL );
-            BSONElement nullElt = nullobj.firstElement();
-            BSONObj key = BSON( "" << makeSingleKey( nullElt , _seed , _hashVersion  ) );
-            keys.insert( key );
+            keys.insert( _missingKey.copy() );
         }
     }
 

@@ -19,9 +19,11 @@
 
 #include "mongo/util/net/ssl_manager.h"
 
-#include <vector>
-#include <string>
+#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/tss.hpp>
+#include <string>
+#include <vector>
+
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
@@ -70,7 +72,7 @@ namespace mongo {
         
         static void init() {
             while ( (int)_mutex.size() < CRYPTO_num_locks() )
-                _mutex.push_back( new SimpleMutex("SSLThreadInfo") );
+                _mutex.push_back( new boost::recursive_mutex );
         }
 
         static SSLThreadInfo* get() {
@@ -86,7 +88,10 @@ namespace mongo {
         unsigned _id;
         
         static AtomicUInt _next;
-        static std::vector<SimpleMutex*> _mutex;
+        // Note: see SERVER-8734 for why we are using a recursive mutex here.
+        // Once the deadlock fix in OpenSSL is incorporated into most distros of
+        // Linux, this can be changed back to a nonrecursive mutex.
+        static std::vector<boost::recursive_mutex*> _mutex;
         static boost::thread_specific_ptr<SSLThreadInfo> _thread;
     };
 
@@ -98,7 +103,7 @@ namespace mongo {
     }
 
     AtomicUInt SSLThreadInfo::_next;
-    std::vector<SimpleMutex*> SSLThreadInfo::_mutex;
+    std::vector<boost::recursive_mutex*> SSLThreadInfo::_mutex;
     boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
     
     ////////////////////////////////////////////////////////////////
@@ -268,8 +273,9 @@ namespace mongo {
     }
 
     int SSLManager::_ssl_connect(SSL* ssl) {
+        int ret = 0;
         for (int i=0; i<3; ++i) {
-            int ret = SSL_connect(ssl);
+            ret = SSL_connect(ssl);
             if (ret == 1) 
                 return ret;
             int code = SSL_get_error(ssl, ret);
@@ -278,7 +284,8 @@ namespace mongo {
             if (code != SSL_ERROR_WANT_READ)
                 return ret;
         }
-        fassertFailed(16697);
+        // Give up and return connection-failure error to user
+        return ret;
     }
     SSL* SSLManager::connect(int fd) {
         SSL* ssl = _secure(fd);
@@ -342,8 +349,11 @@ namespace mongo {
         case SSL_ERROR_WANT_READ:
         case SSL_ERROR_WANT_WRITE:
             // should not happen because we turned on AUTO_RETRY
-            error() << "SSL error: " << code << endl;
-            fassertFailed( 16676 );
+            // However, it turns out this CAN happen during a connect, if the other side
+            // accepts the socket connection but fails to do the SSL handshake in a timely
+            // manner.
+            error() << "SSL error: " << code << ", possibly timed out during connect" << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
 
         case SSL_ERROR_SYSCALL:

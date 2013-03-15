@@ -62,10 +62,8 @@ env.CppUnitTest( "stringutils_test", [ "util/stringutils_test.cpp" ],
                  LIBDEPS=["stringutils"] )
 
 env.StaticLibrary('bson', [
-        'bson/mutable/mutable_bson.cpp',
-        'bson/mutable/mutable_bson_builder.cpp',
-        'bson/mutable/mutable_bson_heap.cpp',
-        'bson/mutable/mutable_bson_internal.cpp',
+        'bson/mutable/document.cpp',
+        'bson/mutable/element.cpp',
         'bson/util/bson_extract.cpp',
         'util/safe_num.cpp',
         'bson/bson_validate.cpp',
@@ -84,12 +82,6 @@ env.CppUnitTest('builder_test', ['bson/util/builder_test.cpp'],
 
 env.CppUnitTest('mutable_bson_test', ['bson/mutable/mutable_bson_test.cpp'],
                  LIBDEPS=['bson'])
-
-env.CppUnitTest('mutable_bson_heap_test', ['bson/mutable/mutable_bson_heap_test.cpp'],
-                 LIBDEPS=['bson'])
-
-env.CppUnitTest('mutable_bson_builder_test', ['bson/mutable/mutable_bson_builder_test.cpp'],
-                LIBDEPS=['bson'])
 
 env.CppUnitTest('mutable_bson_algo_test', ['bson/mutable/mutable_bson_algo_test.cpp'],
                 LIBDEPS=['bson'])
@@ -121,7 +113,7 @@ env.CppUnitTest('descriptive_stats_test',
                 LIBDEPS=['foundation', 'bson']);
 
 env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
-                LIBDEPS=['mongocommon', 'notmongodormongos'],
+                LIBDEPS=['mongocommon'],
                 NO_CRUTCH=True)
 
 env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
@@ -284,7 +276,6 @@ env.StaticLibrary("coredb", [
                            '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",
-                    "db/common.cpp",
                     "util/net/miniwebserver.cpp",
                     "db/indexkey.cpp",
                     "db/stats/counters.cpp",
@@ -373,7 +364,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/btree_stats.cpp",
                     "db/clientcursor.cpp",
                     "db/tests.cpp",
-                    "db/repl.cpp",
+                    "db/repl/repl_start.cpp",
                     "db/repl/rs.cpp",
                     "db/repl/consensus.cpp",
                     "db/repl/rs_initiate.cpp",
@@ -386,9 +377,16 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/repl/rs_sync.cpp",
                     "db/repl/rs_initialsync.cpp",
                     "db/repl/bgsync.cpp",
-                    "db/oplog.cpp",
+                    "db/repl/master_slave.cpp",
+                    "db/repl/finding_start_cursor.cpp",
+                    "db/repl/sync.cpp",
+                    "db/repl/optime.cpp",
+                    "db/repl/oplogreader.cpp",
+                    "db/repl/replication_server_status.cpp",
+                    "db/repl/repl_reads_ok.cpp",
+                    "db/repl/oplog.cpp",
                     "db/prefetch.cpp",
-                    "db/repl_block.cpp",
+                    "db/repl/write_concern.cpp",
                     "db/btreecursor.cpp",
                     "db/intervalbtreecursor.cpp",
                     "db/btreeposition.cpp",
@@ -430,6 +428,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/dbcommands_admin.cpp",
 
                     # most commands are only for mongod
+                    "db/commands/apply_ops.cpp",
                     "db/commands/fsync.cpp",
                     "db/commands/distinct.cpp",
                     "db/commands/find_and_modify.cpp",
@@ -452,7 +451,7 @@ env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.
 env.Library('stacktrace', 'util/stacktrace.cpp')
 
 env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
-            LIBDEPS=['stacktrace',
+            LIBDEPS=['stacktrace', 'foundation', 'unittest/unittest_crutch',
                      '$BUILD_DIR/mongo/base/base'])
 
 serverOnlyFiles += mmapFiles
@@ -583,18 +582,11 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
 
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [
-    "db/connection_factory.cpp",
     "db/initialize_server_global_state.cpp",
     "db/server_extra_log_context.cpp",
     "util/net/message_server_port.cpp",
     ]
 env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)
-
-# These files go into the tools, tests, shell, etc. but not mongod or mongos
-everythingButMongodAndMongosFiles = [
-    "client/connection_factory.cpp",
-    ]
-env.StaticLibrary("notmongodormongos", everythingButMongodAndMongosFiles)
 
 mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp", "db/commands/touch.cpp" ]
 
@@ -621,8 +613,7 @@ Default( mongod )
 
 # tools
 allToolFiles = [ "tools/tool.cpp", "tools/stat_util.cpp" ]
-env.StaticLibrary("alltools", allToolFiles, LIBDEPS=["serveronly", "coreserver", "coredb",
-                                                     "notmongodormongos"])
+env.StaticLibrary("alltools", allToolFiles, LIBDEPS=["serveronly", "coreserver", "coredb"])
 
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + x + "${PROGSUFFIX}" for x in normalTools ] )
@@ -652,8 +643,7 @@ env.Install( '#/', mongos )
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
                               LIBDEPS=["mongocommon",
                                        "defaultversion",
-                                       "gridfs",
-                                       "notmongodormongos"])
+                                       "gridfs"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 if has_option( "sharedclient" ):
@@ -682,14 +672,13 @@ test = testEnv.Install(
                        "coredb",
                        "testframework",
                        "gridfs",
-                       "notmongodormongos",
                        "s/upgrade",
                        "mocklib"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
 
-env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework", "notmongodormongos" ] ) )
+env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
 
 # --- sniffer ---
 mongosniff_built = False
@@ -704,7 +693,7 @@ if darwin or env["_HAVEPCAP"]:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
 
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
-                                              LIBDEPS=["gridfs", "serveronly", "coreserver", "coredb", "notmongodormongos"]))
+                                              LIBDEPS=["gridfs", "serveronly", "coreserver", "coredb"]))
 
 # --- shell ---
 

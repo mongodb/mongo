@@ -19,7 +19,7 @@ load('jstests/aggregation/extras/utils.js');
 // Clear db
 db.s6121.drop();
 // Populate db
-db.s6121.save({date:new Timestamp(1341337661000, 1)});
+db.s6121.save({date:new Timestamp(1341337661, 1)});
 db.s6121.save({date:new Date(1341337661000)});
 // Aggregate checking various combinations of the constant and the field
 var s6121 = db.s6121.aggregate(
@@ -45,7 +45,7 @@ assert.eq(s6121.result[0], s6121.result[1], 's6121 failed');
 // That means that the Timestamp has an "inc" that is the same as the Date has millis.
 db.s6121.drop();
 db.s6121.save({time:new Timestamp(   0, 1234), date:new Date(1234)});
-db.s6121.save({time:new Timestamp(1000, 1234), date:new Date(1234)});
+db.s6121.save({time:new Timestamp(   1, 1234), date:new Date(1234)});
 printjson(db.s6121.find().toArray());
 var s6121 = db.s6121.aggregate(
         {$project: {
@@ -61,7 +61,7 @@ assert.eq(s6121.result, [{ts_date: true, date_ts: true}
 
 // Clear db for timestamp comparison tests
 db.s6121.drop();
-db.s6121.save({time:new Timestamp(1341337661000, 1), time2:new Timestamp(1341337661000, 2)});
+db.s6121.save({time:new Timestamp(1341337661, 1), time2:new Timestamp(1341337661, 2)});
 var s6121 = db.s6121.aggregate(
         {$project: {
             _id: 0,

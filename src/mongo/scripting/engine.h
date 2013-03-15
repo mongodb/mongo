@@ -45,7 +45,7 @@ namespace mongo {
 
         virtual void localConnect(const char* dbName) = 0;
         virtual void externalSetup() = 0;
-
+        virtual void setLocalDB(const string& localDBName) { _localDBName = localDBName; }
         virtual BSONObj getObject(const char* field) = 0;
         virtual string getString(const char* field) = 0;
         virtual bool getBoolean(const char* field) = 0;
@@ -57,7 +57,7 @@ namespace mongo {
 
         virtual void setElement(const char* field, const BSONElement& e) = 0;
         virtual void setNumber(const char* field, double val) = 0;
-        virtual void setString(const char* field, const char* val) = 0;
+        virtual void setString(const char* field, const StringData& val) = 0;
         virtual void setObject(const char* field, const BSONObj& obj, bool readOnly=true) = 0;
         virtual void setBoolean(const char* field, bool val) = 0;
         virtual void setFunction(const char* field, const char* code) = 0;
@@ -124,7 +124,7 @@ namespace mongo {
 
         void execCoreFiles();
 
-        void loadStored(bool ignoreNotConnected = false);
+        virtual void loadStored(bool ignoreNotConnected = false);
 
         /**
          * if any changes are made to .system.js, call this
@@ -191,7 +191,7 @@ namespace mongo {
          * @param pool An identifier for the pool, usually the db name
          * @return the scope
          */
-        auto_ptr<Scope> getPooledScope(const string& pool);
+        auto_ptr<Scope> getPooledScope(const string& pool, const string& scopeType);
 
         /**
          * call this method to release some JS resources when a thread is done

@@ -27,6 +27,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -43,7 +44,7 @@ namespace mongo {
     class ShardStrategy : public Strategy {
 
         bool _isSystemIndexes( const char* ns ) {
-            return strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) && strchr( ns , '.' );
+            return NamespaceString(ns).coll == "system.indexes";
         }
 
         virtual void queryOp( Request& r ) {
@@ -205,15 +206,14 @@ namespace mongo {
                 // we used ScopedDbConnection because we don't get about config versions
                 // not deleting data is handled elsewhere
                 // and we don't want to call setShardVersion
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( host ) );
+                ScopedDbConnection conn(host);
 
                 Message response;
-                bool ok = conn->get()->callRead( r.m() , response);
+                bool ok = conn->callRead( r.m() , response);
                 uassert( 10204 , "dbgrid: getmore: error calling db", ok);
                 r.reply( response , "" /*conn->getServerAddress() */ );
 
-                conn->done();
+                conn.done();
                 return;
             }
             else {
@@ -613,6 +613,8 @@ namespace mongo {
                             // error gets checked on a different connection!
                             //
                             dbcon.done();
+
+                            globalOpCounters.incInsertInWriteLock(group.inserts.size());
 
                             //
                             // CHECK INTERMEDIATE ERROR

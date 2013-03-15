@@ -111,26 +111,20 @@ namespace mongo {
 
         BSONObj collObj;
         {
-            scoped_ptr<ScopedDbConnection> connPtr;
-
             try {
-                connPtr.reset(
-                    ScopedDbConnection::getInternalScopedDbConnection(_configLoc.toString(), 30));
-                ScopedDbConnection& conn = *connPtr;
-
+                ScopedDbConnection conn(_configLoc.toString(), 30);
                 collObj = conn->findOne(CollectionType::ConfigNS, QUERY(CollectionType::ns()<<ns));
+                conn.done();
             }
             catch (const DBException& e) {
                 *errMsg = str::stream() << "caught exception accessing the config servers "
                                         << causedBy(e);
 
-                // We deliberately do not return connPtr to the pool, since it was involved
+                // We deliberately do not return conn to the pool, since it was involved
                 // with the error here.
 
                 return false;
             }
-
-            connPtr->done();
         }
 
         CollectionType collDoc;
@@ -212,9 +206,7 @@ namespace mongo {
 
         try {
 
-            scoped_ptr<ScopedDbConnection> connPtr(
-                ScopedDbConnection::getInternalScopedDbConnection(_configLoc.toString(), 30));
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(_configLoc.toString(), 30);
 
             auto_ptr<DBClientCursor> cursor = conn->query(ChunkType::ConfigNS,
                                                           differ.configDiffQuery());
@@ -223,7 +215,7 @@ namespace mongo {
                 // 'errMsg' was filled by the getChunkCursor() call.
                 manager->_maxCollVersion = ChunkVersion();
                 manager->_chunksMap.clear();
-                connPtr->done();
+                conn.done();
                 return false;
             }
 
@@ -237,7 +229,7 @@ namespace mongo {
 
                 manager->_maxShardVersion = versionMap[shard];
                 manager->fillRanges();
-                connPtr->done();
+                conn.done();
                 return true;
             }
             else if(diffsApplied == 0) {
@@ -248,7 +240,7 @@ namespace mongo {
 
                 manager->_maxCollVersion = ChunkVersion();
                 manager->_chunksMap.clear();
-                connPtr->done();
+                conn.done();
                 return true;
             }
             else{
@@ -265,7 +257,7 @@ namespace mongo {
 
                 manager->_maxCollVersion = ChunkVersion();
                 manager->_chunksMap.clear();
-                connPtr->done();
+                conn.done();
                 return false;
             }
         }

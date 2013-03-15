@@ -23,6 +23,9 @@
 
 #include "mongo/platform/windows_basic.h"
 
+#include <intrin.h>
+#pragma intrinsic(_InterlockedCompareExchange64)
+
 namespace mongo {
 
     /**
@@ -84,16 +87,14 @@ namespace mongo {
     template <typename T>
     class AtomicIntrinsics<T, typename boost::enable_if_c<sizeof(T) == sizeof(LONGLONG)>::type> {
     public:
+        static const bool kHaveInterlocked64 = (_WIN32_WINNT >= _WIN32_WINNT_VISTA);
 
         static T compareAndSwap(volatile T* dest, T expected, T newValue) {
-            return InterlockedCompareExchange64(reinterpret_cast<volatile LONGLONG*>(dest),
-                                                LONGLONG(newValue),
-                                                LONGLONG(expected));
+            return InterlockedImpl<kHaveInterlocked64>::compareAndSwap(dest, expected, newValue);
         }
 
         static T swap(volatile T* dest, T newValue) {
-            return InterlockedExchange64(reinterpret_cast<volatile LONGLONG*>(dest),
-                                         LONGLONG(newValue));
+            return InterlockedImpl<kHaveInterlocked64>::swap(dest, newValue);
         }
 
         static T load(volatile const T* value) {
@@ -105,19 +106,87 @@ namespace mongo {
         }
 
         static T fetchAndAdd(volatile T* dest, T increment) {
-            return InterlockedExchangeAdd64(reinterpret_cast<volatile LONGLONG*>(dest),
-                                            LONGLONG(increment));
+            return InterlockedImpl<kHaveInterlocked64>::fetchAndAdd(dest, increment);
         }
 
     private:
         AtomicIntrinsics();
         ~AtomicIntrinsics();
 
+        template <bool>
+        struct InterlockedImpl;
+
+        // Implementation of 64-bit Interlocked operations via Windows API calls.
+        template<>
+        struct InterlockedImpl<true> {
+            static T compareAndSwap(volatile T* dest, T expected, T newValue) {
+                return InterlockedCompareExchange64(
+                    reinterpret_cast<volatile LONGLONG*>(dest),
+                    LONGLONG(newValue),
+                    LONGLONG(expected));
+            }
+
+            static T swap(volatile T* dest, T newValue) {
+                return InterlockedExchange64(
+                    reinterpret_cast<volatile LONGLONG*>(dest),
+                    LONGLONG(newValue));
+            }
+
+            static T fetchAndAdd(volatile T* dest, T increment) {
+                return InterlockedExchangeAdd64(
+                    reinterpret_cast<volatile LONGLONG*>(dest),
+                    LONGLONG(increment));
+            }
+        };
+
+        // Implementation of 64-bit Interlocked operations for systems where the API does not
+        // yet provide the Interlocked...64 operations.
+        template<>
+        struct InterlockedImpl<false> {
+            static T compareAndSwap(volatile T* dest, T expected, T newValue) {
+                // NOTE: We must use the compiler intrinsic here: WinXP does not offer
+                // InterlockedCompareExchange64 as an API call.
+                return _InterlockedCompareExchange64(
+                    reinterpret_cast<volatile LONGLONG*>(dest),
+                    LONGLONG(newValue),
+                    LONGLONG(expected));
+            }
+
+            static T swap(volatile T* dest, T newValue) {
+                // NOTE: You may be tempted to replace this with
+                // 'InterlockedExchange64'. Resist! It will compile just fine despite not being
+                // listed in the docs as available on XP, but the compiler may replace it with
+                // calls to the non-intrinsic 'InterlockedCompareExchange64', which does not
+                // exist on XP. We work around this by rolling our own synthetic in terms of
+                // compareAndSwap which we have explicitly formulated in terms of the compiler
+                // provided _InterlockedCompareExchange64 intrinsic.
+                T currentValue = *dest;
+                while (true) {
+                    const T result = compareAndSwap(dest, currentValue, newValue);
+                    if (result == currentValue)
+                        return result;
+                    currentValue = result;
+                }
+            }
+
+            static T fetchAndAdd(volatile T* dest, T increment) {
+                // NOTE: See note for 'swap' on why we roll this ourselves.
+                T currentValue = *dest;
+                while (true) {
+                    const T incremented = currentValue + increment;
+                    const T result = compareAndSwap(dest, currentValue, incremented);
+                    if (result == currentValue)
+                        return result;
+                    currentValue = result;
+                }
+            }
+        };
+
         // On 32-bit IA-32 systems, 64-bit load and store must be implemented in terms of
         // Interlocked operations, but on 64-bit systems they support a simpler, native
         // implementation.  The LoadStoreImpl type represents the abstract implementation of
         // loading and storing 64-bit values.
-        template <typename T, typename _IsTTooBig=void>
+        template <typename U, typename _IsTTooBig=void>
         class LoadStoreImpl{};
 
         // Implementation on 64-bit systems.

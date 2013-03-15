@@ -1414,6 +1414,33 @@ namespace mongo_test {
         ASSERT_EQUALS("b", lastHost.host());
     }
 
+    TEST(TagSet, CopyConstructor) {
+        TagSet* copy;
+
+        {
+            BSONArrayBuilder builder;
+            builder.append(BSON("dc" << "nyc"));
+            builder.append(BSON("priority" << "1"));
+            TagSet original(builder.arr());
+
+            original.next();
+
+            copy = new TagSet(original);
+        }
+
+        ASSERT_FALSE(copy->isExhausted());
+        ASSERT(copy->getCurrentTag().equal(BSON("dc" << "nyc")));
+        copy->next();
+
+        ASSERT_FALSE(copy->isExhausted());
+        ASSERT(copy->getCurrentTag().equal(BSON("priority" << "1")));
+        copy->next();
+
+        ASSERT(copy->isExhausted());
+
+        delete copy;
+    }
+
     TEST(TagSet, NearestMultiTagsNoMatch) {
         vector<ReplicaSetMonitor::Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();

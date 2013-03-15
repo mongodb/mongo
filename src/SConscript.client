@@ -32,7 +32,6 @@ clientSourceBasic = [
     'mongo/buildinfo.cpp',
     'mongo/client/clientAndShell.cpp',
     'mongo/client/clientOnly.cpp',
-    'mongo/client/connection_factory.cpp',
     'mongo/client/connpool.cpp',
     'mongo/client/dbclient.cpp',
     'mongo/client/dbclient_rs.cpp',

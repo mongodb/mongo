@@ -108,11 +108,6 @@ namespace mongo {
 
         virtual void help( stringstream& help ) const;
 
-        /* Return true if authentication and security applies to the commands.  Some commands
-           (e.g., getnonce, authenticate) can be done by anyone even unauthorized.
-        */
-        virtual bool requiresAuth() { return true; }
-
         /**
          * Appends to "*out" the privileges required to run this command on database "dbname" with
          * the invocation described by "cmdObj".

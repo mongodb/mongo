@@ -16,14 +16,15 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/pch.h"
-
-#include "mongo/bson/bson_builder_base.h"
+#include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/matcher.h"
 #include "mongo/util/embedded_builder.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
+
+using namespace mongoutils;
 
 namespace mongo {
 

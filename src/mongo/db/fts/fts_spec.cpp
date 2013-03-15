@@ -32,6 +32,9 @@ namespace mongo {
         const double MAX_WORD_WEIGHT = MAX_WEIGHT / 10000;
 
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
+            massert( 16739, "found invalid spec for text index",
+                     indexInfo["weights"].isABSONObj() );
+
             _defaultLanguage = indexInfo["default_language"].valuestrsafe();
             _languageOverrideField = indexInfo["language_override"].valuestrsafe();
 
@@ -213,9 +216,9 @@ namespace mongo {
 
                 string term = t.data.toString();
                 makeLower( &term );
-                term = tools.stemmer->stem( term );
                 if ( tools.stopwords->isStopWord( term ) )
                     continue;
+                term = tools.stemmer->stem( term );
 
                 ScoreHelperStruct& data = terms[term];
 
@@ -379,8 +382,10 @@ namespace mongo {
                 }
                 else if ( str::equals( e.fieldName(), "textIndexVersion" ) ) {
                     textIndexVersion = e.numberInt();
+                    uassert( 16730,
+                             str::stream() << "bad textIndexVersion: " << textIndexVersion,
+                             textIndexVersion == 1 );
                 }
-
                 else {
                     b.append( e );
                 }

@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 #include "../bson/util/builder.h"
-#include "../util/optime.h"
+#include "mongo/db/repl/optime.h"
 #include "../bson/bsontypes.h"
 #include "../bson/oid.h"
 #include "../bson/bsonelement.h"

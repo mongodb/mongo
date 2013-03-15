@@ -16,17 +16,17 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/ops/update_internal.h"
 
 #include <algorithm> // for max
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/oplog.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/util/mongoutils/str.h"
-
-#include "update_internal.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -922,12 +922,13 @@ namespace mongo {
             modState.fixedOpName = "$unset";
             return;
 
-        // $rename may involve dotted path creation, so we want to make sure we're not
-        // creating a path here for a rename that's a no-op. In other words if we're
-        // issuing a {$rename: {a.b : c.d} } that's a no-op, we don't want to create
-        // the a and c paths here. See test NestedNoName in the 'repl' suite.
+        // $rename/$setOnInsert may involve dotted path creation, so we want to make sure we're
+        // not creating a path here for a rename that's a no-op. In other words if we're
+        // issuing a {$rename: {a.b : c.d} } that's a no-op, we don't want to create the a and
+        // c paths here. See test NestedNoName in the 'repl' suite.
         case Mod::RENAME_FROM:
         case Mod::RENAME_TO:
+        case Mod::SET_ON_INSERT:
             if (modState.dontApply) {
                 return;
             }

@@ -1,0 +1,304 @@
+.TH "MONGOTOP" "1" "March 14, 2013" "2.2.3" "mongodb-manual"
+.SH NAME
+mongotop \- MongoDB
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.\" Man page generated from reStructuredText.
+.
+.SH SYNOPSIS
+.sp
+\fI\%mongotop\fP provides a method to track the amount of time a
+MongoDB instance spends reading and writing data. \fI\%mongotop\fP
+provides statistics on a per\-collection level. By default,
+\fI\%mongotop\fP returns values every second.
+.IP "See also"
+.sp
+For more information about monitoring MongoDB, see
+\fB/administration/monitoring\fP.
+.sp
+For additional background on various other MongoDB status outputs
+see:
+.INDENT 0.0
+.IP \(bu 2
+\fB/reference/server\-status\fP
+.IP \(bu 2
+\fB/reference/replica\-status\fP
+.IP \(bu 2
+\fB/reference/database\-statistics\fP
+.IP \(bu 2
+\fB/reference/collection\-statistics\fP
+.UNINDENT
+.sp
+For an additional utility that provides MongoDB metrics
+see "\fBmongostat\fP."
+.RE
+.SH OPTIONS
+.INDENT 0.0
+.TP
+.B mongotop
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-help
+Returns a basic help and usage text.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-verbose, \-v
+Increases the amount of internal reporting returned on the command
+line. Increase the verbosity with the \fB\-v\fP form by including the
+option multiple times, (e.g. \fB\-vvvvv\fP.)
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-version
+Print the version of the \fI\%mongotop\fP utility and exit.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-host <hostname><:port>
+Specifies a resolvable hostname for the \fBmongod\fP from which you
+want to export data. By default \fI\%mongotop\fP attempts to
+connect to a MongoDB process running on the localhost port number
+\fB27017\fP.
+.sp
+Optionally, specify a port number to connect a MongoDB instance
+running on a port other than \fB27017\fP.
+.sp
+To connect to a replica set, you can specify the replica set seed
+name, and a seed list of set members, in the following format:
+.sp
+.nf
+.ft C
+<replica_set_name>/<hostname1><:port>,<hostname2:<port>,...
+.ft P
+.fi
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-port <port>
+Specifies the port number, if the MongoDB instance is not running on
+the standard port. (i.e. \fB27017\fP) You may also specify a port
+number using the \fI\%mongotop --host\fP command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ipv6
+Enables IPv6 support that allows \fI\%mongotop\fP to connect
+to the MongoDB instance using an IPv6 network. All MongoDB programs
+and processes, including \fI\%mongotop\fP, disable IPv6
+support by default.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-username <username>, \-u <username>
+Specifies a username to authenticate to the MongoDB instance, if
+your database requires authentication. Use in conjunction with the
+\fI\%mongotop\fP option to supply a
+password.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-password <password>, \-p <password>
+Specifies a password to authenticate to the MongoDB instance. Use
+in conjunction with the \fI\%--username\fP
+option to supply a username.
+.sp
+If you specify a \fI\%--username\fP without
+the \fI\%--password\fP option, \fI\%mongotop\fP will prompt
+for a password interactively.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationDatabase <dbname>
+New in version 2.4.
+.sp
+Specifies the database that holds the user\(aqs (e.g
+\fI\%--username\fP) credentials.
+.sp
+By default, \fI\%mongotop\fP assumes that the database specified to the
+\fI\-\-db\fP argument holds the user\(aqs credentials, unless you
+specify \fI\%--authenticationDatabase\fP.
+.sp
+See \fBuserSource\fP,
+\fB/reference/privilege\-documents\fP and
+\fB/reference/user\-privileges\fP for more information about
+delegated authentication in MongoDB.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationMechanism <name>
+New in version 2.4.
+.sp
+Specifies the authentication mechanism. By default, the
+authentication mechanism is \fBMONGODB\-CR\fP, which is the MongoDB
+challenge/response authentication mechanism. In the MongoDB Subscriber Edition,
+\fI\%mongotop\fP also includes support for \fBGSSAPI\fP to handle
+Kerberos authentication.
+.sp
+See \fB/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication\fP
+for more information about Kerberos authentication.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-locks
+New in version 2.2.
+.sp
+Toggles the mode of \fI\%mongotop\fP to report on use of
+per\-database \fIlocks\fP. These data are useful for
+measuring concurrent operations and lock percentage.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B <sleeptime>
+The final argument is the length of time, in seconds, that
+\fI\%mongotop\fP waits in between calls. By default
+\fI\%mongotop\fP returns data every second.
+.UNINDENT
+.SH FIELDS
+.sp
+\fI\%mongotop\fP returns time values specified in milliseconds
+(ms.)
+.sp
+\fI\%mongotop\fP only reports active namespaces or databases,
+depending on the \fI\%--locks\fP option. If you don\(aqt see a database
+or collection, it has received no recent activity. You can issue a
+simple operation in the \fBmongo\fP shell to generate activity to
+affect the output of \fI\%mongotop\fP.
+.INDENT 0.0
+.TP
+.B mongotop.ns
+Contains the database namespace, which combines the database name
+and collection.
+.sp
+Changed in version 2.2: If you use the \fI\%--locks\fP, the \fI\%ns\fP field does not
+appear in the \fI\%mongotop\fP output.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.db
+New in version 2.2.
+.sp
+Contains the name of the database. The database named \fB.\fP refers
+to the global lock, rather than a specific database.
+.sp
+This field does not appear unless you have invoked
+\fI\%mongotop\fP with the \fI\%--locks\fP option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.total
+Provides the total amount of time that this \fBmongod\fP spent
+operating on this namespace.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.read
+Provides the amount of time that this \fBmongod\fP spent
+performing read operations on this namespace.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.write
+Provides the amount of time that this \fBmongod\fP spent
+performing write operations on this namespace.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.<timestamp>
+Provides a time stamp for the returned data.
+.UNINDENT
+.SH USE
+.sp
+By default \fI\%mongotop\fP connects to the MongoDB instance
+running on the localhost port \fB27017\fP. However, \fI\%mongotop\fP can optionally
+connect to remote \fBmongod\fP
+instances. See the \fI\%mongotop options\fP for more
+information.
+.sp
+To force \fI\%mongotop\fP to return less frequently specify a number, in
+seconds at the end of the command. In this example, \fI\%mongotop\fP will
+return every 15 seconds.
+.sp
+.nf
+.ft C
+mongotop 15
+.ft P
+.fi
+.sp
+This command produces the following output:
+.sp
+.nf
+.ft C
+connected to: 127.0.0.1
+
+                    ns       total        read       write           2012\-08\-13T15:45:40
+test.system.namespaces         0ms         0ms         0ms
+  local.system.replset         0ms         0ms         0ms
+  local.system.indexes         0ms         0ms         0ms
+  admin.system.indexes         0ms         0ms         0ms
+                admin.         0ms         0ms         0ms
+
+                    ns       total        read       write           2012\-08\-13T15:45:55
+test.system.namespaces         0ms         0ms         0ms
+  local.system.replset         0ms         0ms         0ms
+  local.system.indexes         0ms         0ms         0ms
+  admin.system.indexes         0ms         0ms         0ms
+                admin.         0ms         0ms         0ms
+.ft P
+.fi
+.sp
+To return a \fI\%mongotop\fP report every 5 minutes, use the
+following command:
+.sp
+.nf
+.ft C
+mongotop 300
+.ft P
+.fi
+.sp
+To report the use of per\-database locks, use \fI\%mongotop --locks\fP,
+which produces the following output:
+.sp
+.nf
+.ft C
+$ mongotop \-\-locks
+connected to: 127.0.0.1
+
+                  db       total        read       write          2012\-08\-13T16:33:34
+               local         0ms         0ms         0ms
+               admin         0ms         0ms         0ms
+                   .         0ms         0ms         0ms
+.ft P
+.fi
+.SH AUTHOR
+MongoDB Documentation Project
+.SH COPYRIGHT
+2011-2013, 10gen, Inc.
+.\" Generated by docutils manpage writer.
+.

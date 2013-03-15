@@ -36,7 +36,6 @@ namespace mongo {
             _context = c.getContext();
             verify( Lock::isLocked() );
             if( Lock::nested() ) {
-                Lock::nested();
                 massert(10298 , "can't temprelease nested lock", false);
             }
             if ( _context ) {

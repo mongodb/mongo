@@ -72,7 +72,7 @@ namespace mongo {
                     string& errmsg,
                     BSONObjBuilder& result ) {
 
-            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname + "group");
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname, "group");
 
             if ( reduceScope )
                 s->init( reduceScope );

@@ -250,4 +250,20 @@ namespace mongo_test {
             ASSERT_NOT_EQUALS(dest, newDest);
         }
     }
+
+    // Note: slaveConn is dangerous and should be deprecated! Also see SERVER-7801.
+    TEST_F(TaggedFiveMemberRS, SlaveConnReturnsSecConn) {
+        MockReplicaSet* replSet = getReplSet();
+        vector<HostAndPort> seedList;
+        seedList.push_back(HostAndPort(replSet->getPrimary()));
+
+        DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+
+        string dest;
+        mongo::DBClientConnection& secConn = replConn.slaveConn();
+        auto_ptr<DBClientCursor> cursor = secConn.query(IdentityNS, Query());
+        BSONObj doc = cursor->next();
+        dest = doc[HostField.name()].str();
+        ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
+    }
 }

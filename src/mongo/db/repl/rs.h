@@ -20,12 +20,12 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
-#include "mongo/db/oplog.h"
-#include "mongo/db/oplogreader.h"
+//#include "mongo/db/oplog.h"
+#include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_exception.h"
 #include "mongo/db/repl/rs_member.h"
-#include "mongo/db/repl/rs_optime.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/util/concurrency/list.h"
 #include "mongo/util/concurrency/msg.h"
@@ -50,12 +50,15 @@ namespace mongo {
     class Cloner;
     class DBClientConnection;
     struct HowToFixUp;
-    class OplogReader;
     class ReplSetImpl;
     struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
+    class ReplSetCmdline;
+
+    // Main entry point for replica sets
+    void startReplSets(ReplSetCmdline *replSetCmdline);
 
     /* member of a replica set */
     class Member : public List1<Member>::Base {

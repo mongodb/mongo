@@ -46,7 +46,7 @@ namespace mongo {
     BSONObj StatUtil::doRow( const BSONObj& a , const BSONObj& b ) {
         BSONObjBuilder result;
 
-        bool isMongos =  b["shardCursorType"].type() == Object; // TODO: should have a better check
+        bool isMongos =  b["shardCursorType"].type() == Object || b["process"].String() == "mongos";
 
         if ( a["opcounters"].isABSONObj() && b["opcounters"].isABSONObj() ) {
             BSONObj ax = a["opcounters"].embeddedObject();

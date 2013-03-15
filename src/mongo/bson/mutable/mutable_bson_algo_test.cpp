@@ -15,9 +15,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/mutable/mutable_bson_algo.h"
+#include "mongo/bson/mutable/algorithm.h"
 
-#include "mongo/bson/mutable/mutable_bson_heap.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/platform/basic.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -28,23 +29,21 @@ namespace {
     class DocumentTest : public mongo::unittest::Test {
     public:
         DocumentTest()
-            : _heap()
-            , _doc(&_heap) {}
+            : _doc() {}
 
         Document& doc() { return _doc; }
 
     private:
-        BasicHeap _heap;
         Document _doc;
     };
 
     TEST_F(DocumentTest, FindInEmptyObject) {
-        const SiblingIterator children = doc().root().children();
-        ASSERT_TRUE(children.done());
-        SiblingIterator next = findElementNamed(children, "X");
-        ASSERT_TRUE(next.done());
-        ASSERT_EQUALS(children.getDocument(), next.getDocument());
-        ASSERT_EQUALS(children.getRep(), next.getRep());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_FALSE(leftChild.ok());
+        Element found = findElementNamed(leftChild, "X");
+        ASSERT_FALSE(found.ok());
+        ASSERT_EQUALS(&leftChild.getDocument(), &found.getDocument());
+        ASSERT_EQUALS(leftChild.getIdx(), found.getIdx());
     }
 
     class OneChildTest : public DocumentTest {
@@ -54,23 +53,23 @@ namespace {
     };
 
     TEST_F(OneChildTest, FindNoMatch) {
-        const SiblingIterator children = doc().root().children();
-        ASSERT_FALSE(children.done());
-        SiblingIterator next = findElementNamed(children, "f");
-        ASSERT_TRUE(next.done());
-        ASSERT_EQUALS(children.getDocument(), next.getDocument());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        Element found = findElementNamed(leftChild, "f");
+        ASSERT_FALSE(found.ok());
+        ASSERT_EQUALS(&leftChild.getDocument(), &found.getDocument());
     }
 
     TEST_F(OneChildTest, FindMatch) {
-        const SiblingIterator children = doc().root().children();
-        ASSERT_FALSE(children.done());
-        SiblingIterator next = findElementNamed(children, "t");
-        ASSERT_FALSE(next.done());
-        ASSERT_EQUALS(children.getDocument(), next.getDocument());
-        ASSERT_EQUALS((*next).getFieldName(), "t");
-        next = findElementNamed(++next, "t");
-        ASSERT_TRUE(next.done());
-        ASSERT_EQUALS(children.getDocument(), next.getDocument());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        Element found = findElementNamed(leftChild, "t");
+        ASSERT_TRUE(found.ok());
+        ASSERT_EQUALS(&leftChild.getDocument(), &found.getDocument());
+        ASSERT_EQUALS(found.getFieldName(), "t");
+        found = findElementNamed(found.rightSibling(), "t");
+        ASSERT_FALSE(found.ok());
+        ASSERT_EQUALS(&leftChild.getDocument(), &found.getDocument());
     }
 
     class ManyChildrenTest : public DocumentTest {
@@ -87,78 +86,78 @@ namespace {
 
     TEST_F(ManyChildrenTest, FindAtStart) {
         static const char kName[] = "begin";
-        const SiblingIterator children = doc().root().children();
-        ASSERT_FALSE(children.done());
-        SiblingIterator next = findElementNamed(children, kName);
-        ASSERT_FALSE(next.done());
-        ASSERT_EQUALS((*next).getFieldName(), kName);
-        ASSERT_EQUALS(children.getDocument(), next.getDocument());
-        ASSERT_TRUE(findElementNamed(++next, kName).done());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        Element found = findElementNamed(leftChild, kName);
+        ASSERT_TRUE(found.ok());
+        ASSERT_EQUALS(found.getFieldName(), kName);
+        ASSERT_EQUALS(&leftChild.getDocument(), &found.getDocument());
+        ASSERT_FALSE(findElementNamed(found.rightSibling(), kName).ok());
     }
 
     TEST_F(ManyChildrenTest, FindInMiddle) {
         static const char kName[] = "middle";
-        const SiblingIterator children = doc().root().children();
-        ASSERT_FALSE(children.done());
-        SiblingIterator next = findElementNamed(children, kName);
-        ASSERT_FALSE(next.done());
-        ASSERT_EQUALS((*next).getFieldName(), kName);
-        ASSERT_EQUALS(children.getDocument(), next.getDocument());
-        ASSERT_TRUE(findElementNamed(++next, kName).done());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        Element found = findElementNamed(leftChild, kName);
+        ASSERT_TRUE(found.ok());
+        ASSERT_EQUALS(found.getFieldName(), kName);
+        ASSERT_EQUALS(&leftChild.getDocument(), &found.getDocument());
+        ASSERT_FALSE(findElementNamed(found.rightSibling(), kName).ok());
     }
 
     TEST_F(ManyChildrenTest, FindAtEnd) {
         static const char kName[] = "end";
-        const SiblingIterator children = doc().root().children();
-        ASSERT_FALSE(children.done());
-        SiblingIterator next = findElementNamed(children, kName);
-        ASSERT_FALSE(next.done());
-        ASSERT_EQUALS((*next).getFieldName(), kName);
-        ASSERT_EQUALS(children.getDocument(), next.getDocument());
-        ASSERT_TRUE(findElementNamed(++next, kName).done());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        Element found = findElementNamed(leftChild, kName);
+        ASSERT_TRUE(found.ok());
+        ASSERT_EQUALS(found.getFieldName(), kName);
+        ASSERT_EQUALS(&leftChild.getDocument(), &found.getDocument());
+        ASSERT_FALSE(findElementNamed(found.rightSibling(), kName).ok());
     }
 
     TEST_F(ManyChildrenTest, FindRepeatedSparse) {
         static const char kName[] = "repeated_sparse";
-        const SiblingIterator children = doc().root().children();
-        ASSERT_FALSE(children.done());
-        SiblingIterator first = findElementNamed(children, kName);
-        ASSERT_FALSE(first.done());
-        ASSERT_EQUALS((*first).getFieldName(), kName);
-        ASSERT_EQUALS(children.getDocument(), first.getDocument());
-        SiblingIterator second = findElementNamed(++SiblingIterator(first), kName);
-        ASSERT_FALSE(second.done());
-        ASSERT_EQUALS(first.getDocument(), second.getDocument());
-        ASSERT_NOT_EQUALS(first.getRep(), second.getRep());
-        SiblingIterator none = findElementNamed(++SiblingIterator(second), kName);
-        ASSERT_TRUE(none.done());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        Element first = findElementNamed(leftChild, kName);
+        ASSERT_TRUE(first.ok());
+        ASSERT_EQUALS(first.getFieldName(), kName);
+        ASSERT_EQUALS(&leftChild.getDocument(), &first.getDocument());
+        Element second = findElementNamed(first.rightSibling(), kName);
+        ASSERT_TRUE(second.ok());
+        ASSERT_EQUALS(&first.getDocument(), &second.getDocument());
+        ASSERT_NOT_EQUALS(first.getIdx(), second.getIdx());
+        Element none = findElementNamed(second.rightSibling(), kName);
+        ASSERT_FALSE(none.ok());
     }
 
     TEST_F(ManyChildrenTest, FindRepeatedDense) {
         static const char kName[] = "repeated_dense";
-        const SiblingIterator children = doc().root().children();
-        ASSERT_FALSE(children.done());
-        SiblingIterator first = findElementNamed(children, kName);
-        ASSERT_FALSE(first.done());
-        ASSERT_EQUALS((*first).getFieldName(), kName);
-        ASSERT_EQUALS(children.getDocument(), first.getDocument());
-        SiblingIterator second = findElementNamed(++SiblingIterator(first), kName);
-        ASSERT_FALSE(second.done());
-        ASSERT_EQUALS(first.getDocument(), second.getDocument());
-        ASSERT_NOT_EQUALS(first.getRep(), second.getRep());
-        SiblingIterator none = findElementNamed(++SiblingIterator(second), kName);
-        ASSERT_TRUE(none.done());
+        Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        Element first = findElementNamed(leftChild, kName);
+        ASSERT_TRUE(first.ok());
+        ASSERT_EQUALS(first.getFieldName(), kName);
+        ASSERT_EQUALS(&leftChild.getDocument(), &first.getDocument());
+        Element second = findElementNamed(first.rightSibling(), kName);
+        ASSERT_TRUE(second.ok());
+        ASSERT_EQUALS(&first.getDocument(), &second.getDocument());
+        ASSERT_NOT_EQUALS(first.getIdx(), second.getIdx());
+        Element none = findElementNamed(second.rightSibling(), kName);
+        ASSERT_FALSE(none.ok());
     }
 
     TEST_F(ManyChildrenTest, FindDoesNotSearchWithinChildren) {
         static const char kName[] = "in_child";
-        SiblingIterator found_before_add = findElementNamed(doc().root().children(), kName);
-        ASSERT_TRUE(found_before_add.done());
-        Element subdoc = doc().makeObjElement("child");
-        ASSERT_EQUALS(Status::OK(), doc().root().addChild(subdoc));
+        Element found_before_add = findElementNamed(doc().root().leftChild(), kName);
+        ASSERT_FALSE(found_before_add.ok());
+        Element subdoc = doc().makeElementObject("child");
+        ASSERT_EQUALS(Status::OK(), doc().root().pushBack(subdoc));
         ASSERT_EQUALS(Status::OK(), subdoc.appendBool(kName, true));
-        SiblingIterator found_after_add = findElementNamed(doc().root().children(), kName);
-        ASSERT_TRUE(found_after_add.done());
+        Element found_after_add = findElementNamed(doc().root().leftChild(), kName);
+        ASSERT_FALSE(found_after_add.ok());
     }
 
 } // namespace

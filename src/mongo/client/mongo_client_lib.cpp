@@ -89,7 +89,6 @@ extern "C" {
 
 // in client/ directory:
 #include "clientAndShell.cpp"
-#include "connection_factory.cpp"
 
 #include "../util/time_support.cpp"
 #include "../util/timer.cpp"

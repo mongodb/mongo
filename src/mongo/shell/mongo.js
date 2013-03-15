@@ -98,26 +98,58 @@ Mongo.prototype.getReadPrefTagSet = function () {
     return this._readPrefTagSet;
 };
 
-connect = function( url , user , pass ){
-    chatty( "connecting to: " + url )
+connect = function(url, user, pass) {
+    if (user && !pass)
+        throw Error("you specified a user and not a password.  " +
+                    "either you need a password, or you're using the old connect api");
 
-    if ( user && ! pass )
-        throw "you specified a user and not a password.  either you need a password, or you're using the old connect api";
-
-    var idx = url.lastIndexOf( "/" );
-    
-    var db;
-    
-    if ( idx < 0 )
-        db = new Mongo().getDB( url );
-    else 
-        db = new Mongo( url.substring( 0 , idx ) ).getDB( url.substring( idx + 1 ) );
-    
-    if ( user && pass ){
-        if ( ! db.auth( user , pass ) ){
-            throw "couldn't login";
+    // Validate connection string "url" as "hostName:portNumber/databaseName"
+    //                                  or "hostName/databaseName"
+    //                                  or "databaseName"
+    // hostName may be an IPv6 address (with colons), in which case ":portNumber" is required
+    //
+    var urlType = typeof url;
+    if (urlType == "undefined") {
+        throw Error("Missing connection string");
+    }
+    if (urlType != "string") {
+        throw Error("Incorrect type \"" + urlType +
+                    "\" for connection string \"" + tojson(url) + "\"");
+    }
+    url = url.trim();
+    if (0 == url.length) {
+        throw Error("Empty connection string");
+    }
+    var colon = url.lastIndexOf(":");
+    var slash = url.lastIndexOf("/");
+    if (0 == colon || 0 == slash) {
+        throw Error("Missing host name in connection string \"" + url + "\"");
+    }
+    if (colon == slash - 1 || colon == url.length - 1) {
+        throw Error("Missing port number in connection string \"" + url + "\"");
+    }
+    if (colon != -1 && colon < slash) {
+        var portNumber = url.substring(colon + 1, slash);
+        if (portNumber.length > 5 || !/^\d*$/.test(portNumber) || parseInt(portNumber) > 65535) {
+            throw Error("Invalid port number \"" + portNumber +
+                        "\" in connection string \"" + url + "\"");
         }
     }
-    
+    if (slash == url.length - 1) {
+        throw Error("Missing database name in connection string \"" + url + "\"");
+    }
+
+    chatty("connecting to: " + url)
+    var db;
+    if (slash == -1)
+        db = new Mongo().getDB(url);
+    else 
+        db = new Mongo(url.substring(0, slash)).getDB(url.substring(slash + 1));
+
+    if (user && pass) {
+        if (!db.auth(user, pass)) {
+            throw Error("couldn't login");
+        }
+    }
     return db;
 }

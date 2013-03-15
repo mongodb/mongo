@@ -32,9 +32,6 @@
 
 namespace mongo {
 
-    // --noauth cmd line option
-    extern bool noauth;
-
     /**
      * Internal secret key info.
      */
@@ -64,6 +61,12 @@ namespace mongo {
         static const std::string PASSWORD_FIELD_NAME;
 
         static void setSupportOldStylePrivilegeDocuments(bool enabled);
+
+        // Sets whether or not access control enforcement is enabled for this whole server..
+        static void setAuthEnabled(bool enabled);
+
+        // Returns true if access control is enabled on this server.
+        static bool isAuthEnabled();
 
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
@@ -205,6 +208,11 @@ namespace mongo {
         Privilege _modifyPrivilegeForSpecialCases(const Privilege& privilege);
 
         static bool _doesSupportOldStylePrivileges;
+
+        // True if access control enforcement is enabled on this node (ie it was started with
+        // --auth or --keyFile).
+        // This is a config setting, set at startup and not changing after initialization.
+        static bool _authEnabled;
 
         scoped_ptr<AuthExternalState> _externalState;
 

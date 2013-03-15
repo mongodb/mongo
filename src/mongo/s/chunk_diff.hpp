@@ -83,19 +83,18 @@ namespace mongo {
         // Get the diff query required
         Query diffQuery = configDiffQuery( extraMinorVersions );
 
-        scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getInternalScopedDbConnection( config ) );
+        ScopedDbConnection conn(config);
 
         try {
 
             // Open a cursor for the diff chunks
-            auto_ptr<DBClientCursor> cursor = conn->get()->query(
+            auto_ptr<DBClientCursor> cursor = conn->query(
                     ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( DEBUG_BUILD ? 2 : 1000000 ) );
             verify( cursor.get() );
 
             int diff = calculateConfigDiff( *cursor.get() );
 
-            conn->done();
+            conn.done();
 
             return diff;
         }
