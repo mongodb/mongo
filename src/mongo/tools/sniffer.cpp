@@ -451,7 +451,14 @@ int toolMain(int argc, char **argv, char** envp) {
     pcap_t *handle;
 
     struct bpf_program fp;
+
+// PCAP_NETMASK_UNKNOWN was introduced in pcap 1.1.0, so work around earlier versions. See
+// http://anonsvn.wireshark.org/viewvc?revision=33461&view=revision for details.
+#if defined(PCAP_NETMASK_UNKNOWN)
     bpf_u_int32 mask = PCAP_NETMASK_UNKNOWN;
+#else
+    bpf_u_int32 mask = 0;
+#endif
 
     bool source = false;
     bool replay = false;
