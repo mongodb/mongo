@@ -22,7 +22,7 @@ namespace mongo {
 
     class Cursor;
     class ParsedQuery;
-    class QueryPlanSummary;
+    struct QueryPlanSummary;
     
     /**
      * @return a cursor interface to the query optimizer.  The implementation may utilize a
