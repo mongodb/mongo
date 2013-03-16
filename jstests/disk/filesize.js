@@ -13,8 +13,6 @@ var db = m.getDB( baseName );
 if (db.serverBuildInfo().bits == 32) {
     print("Skip on 32-bit");
 } else {
-    db.collection.insert( { x : 1 } );
-
     // Restart mongod without --smallFiles
     stopMongod( port );
     m = startMongodNoReset(
@@ -30,7 +28,7 @@ if (db.serverBuildInfo().bits == 32) {
     for ( i=log.length - 1; i>= 0; i-- ) {
         logline = log[i];
         if ( logline.indexOf( "openExisting file" ) >= 0
-            && logline.indexOf( baseName + ".0" ) >= 0 ) {
+            && logline.indexOf( "local.0" ) >= 0 ) {
             found = true;
             break;
         }
