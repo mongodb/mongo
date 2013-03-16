@@ -707,8 +707,6 @@ if nix:
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux or darwin:
         env.Append( CCFLAGS=["-Werror", "-pipe"] )
-        # Don't make deprecated declarations errors.
-        env.Append( CCFLAGS=["-Wno-error=deprecated-declarations"] )
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
@@ -956,6 +954,11 @@ def doConfigure(myenv):
     # glibc's memcmp is faster than gcc's
     if nix and linux:
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
+
+    # Really, should be if using gcc or clang.
+    if linux or darwin:
+        # If possible, don't make deprecated declarations errors.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-error=deprecated-declarations")
 
     conf = Configure(myenv)
 
