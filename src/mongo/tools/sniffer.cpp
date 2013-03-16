@@ -1,4 +1,3 @@
-// sniffer.cpp
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -15,48 +14,47 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 /*
   TODO:
     large messages - need to track what's left and ignore
-    single object over packet size - can only display begging of object
+    single object over packet size - can only display beginning of object
 
     getmore
     delete
     killcursors
 
  */
-#include "../pch.h"
-#include <pcap.h>
+#include "mongo/pch.h"
 
 #ifdef _WIN32
 #undef min
 #undef max
 #endif
 
-#include "mongo/base/initializer.h"
-#include "../bson/util/builder.h"
-#include "../util/net/message.h"
-#include "../util/mmap.h"
-#include "../db/dbmessage.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <boost/shared_ptr.hpp>
 #include <ctype.h>
 #include <errno.h>
-#include <sys/types.h>
-#ifndef _WIN32
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#endif
-
 #include <iostream>
 #include <map>
+#include <pcap.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string>
+#include <string.h>
+#include <sys/types.h>
 
-#include <boost/shared_ptr.hpp>
+#ifndef _WIN32
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#endif
+
+#include "mongo/base/initializer.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/text.h"
 
 using namespace std;
 using mongo::Message;
@@ -442,7 +440,7 @@ void usage() {
          << endl;
 }
 
-int main(int argc, char **argv, char** envp) {
+int toolMain(int argc, char **argv, char** envp) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     stringstream nullStream;
@@ -561,3 +559,20 @@ int main(int argc, char **argv, char** envp) {
     return 0;
 }
 
+#if defined(_WIN32)
+// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
+// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
+// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
+// and makes them available through the argv() and envp() members.  This enables toolMain()
+// to process UTF-8 encoded arguments and environment variables without regard to platform.
+int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+    WindowsCommandLine wcl(argc, argvW, envpW);
+    int exitCode = toolMain(argc, wcl.argv(), wcl.envp());
+    ::_exit(exitCode);
+}
+#else
+int main(int argc, char* argv[], char** envp) {
+    int exitCode = toolMain(argc, argv, envp);
+    ::_exit(exitCode);
+}
+#endif

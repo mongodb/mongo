@@ -14,9 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-
-#include "mongo/tools/tool.h"
+#include "mongo/pch.h"
 
 #include <boost/program_options.hpp>
 #include <boost/thread/thread.hpp>
@@ -29,6 +27,7 @@
 #include "mongo/db/json.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/tools/stat_util.h"
+#include "mongo/tools/tool.h"
 #include "mongo/util/net/httpclient.h"
 #include "mongo/util/text.h"
 
@@ -575,8 +574,26 @@ namespace mongo {
 
 }
 
-int main( int argc , char ** argv, char ** envp ) {
+int toolMain( int argc , char ** argv, char ** envp ) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::Stat stat;
     return stat.main( argc , argv );
 }
+
+#if defined(_WIN32)
+// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
+// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
+// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
+// and makes them available through the argv() and envp() members.  This enables toolMain()
+// to process UTF-8 encoded arguments and environment variables without regard to platform.
+int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
+    int exitCode = toolMain(argc, wcl.argv(), wcl.envp());
+    ::_exit(exitCode);
+}
+#else
+int main(int argc, char* argv[], char** envp) {
+    int exitCode = toolMain(argc, argv, envp);
+    ::_exit(exitCode);
+}
+#endif
