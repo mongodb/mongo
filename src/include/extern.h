@@ -380,10 +380,6 @@ extern int __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_rec_track_onpage_ref( WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    WT_PAGE *refpage,
-    WT_REF *ref);
 extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,
