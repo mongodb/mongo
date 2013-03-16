@@ -793,63 +793,105 @@ env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 
 # --- check system ---
 
-
 def doConfigure(myenv):
 
-    def CheckToolIsClang(context, tool_name, tool, extension):
-        test_body = """
-                    #ifndef __clang__
-                    #error
-                    #endif
-                    """
-        context.Message('Checking if %s compiler "%s" is clang ...' % (tool_name, tool))
-        ret = context.TryCompile(test_body, extension)
-        context.Result(ret)
-        return ret
-
-    conf = Configure(myenv, clean=False, help=False, custom_tests = {
-        'CheckCCIsClang'  : lambda(ctx): CheckToolIsClang(ctx, "C", ctx.env["CC"], ".c"),
-        'CheckCXXIsClang' : lambda(ctx): CheckToolIsClang(ctx, "C++", ctx.env["CXX"], ".cpp"),
-    })
-
-    if 'CheckCC' in dir( conf ):
-        if not conf.CheckCC():
-            print( "C compiler not installed!" )
-            Exit(1)
-    cc_is_clang = conf.CheckCCIsClang()
+    # Check that the compilers work.
+    #
+    # TODO: Currently, we have some flags already injected. Eventually, this should test the
+    # bare compilers, and we should re-check at the very end that TryCompile and TryLink still
+    # work with the flags we have selected.
+    conf = Configure(myenv, clean=False, help=False)
 
     if 'CheckCXX' in dir( conf ):
         if not conf.CheckCXX():
-            print( "C++ compiler not installed!" )
+            print("C++ compiler %s does not work" % (conf.env["CXX"]))
             Exit(1)
-    cxx_is_clang = conf.CheckCXXIsClang()
 
-    if not cc_is_clang == cxx_is_clang:
-        print("C and C++ compiler should either both be from clang, or both not from clang!")
+    # Only do C checks if CC != CXX
+    check_c = (myenv["CC"] != myenv["CXX"])
+
+    if check_c and 'CheckCC' in dir( conf ):
+        if not conf.CheckCC():
+            print("C compiler %s does not work" % (conf.env["CC"]))
+            Exit(1)
+    myenv = conf.Finish()
+
+    # Identify the toolchain in use. We currently support the following:
+    # TODO: Goes in the env?
+    toolchain_gcc = "GCC"
+    toolchain_clang = "clang"
+    toolchain_msvc = "MSVC"
+
+    def CheckForToolchain(context, toolchain, lang_name, compiler_var, source_suffix):
+        test_bodies = {
+            toolchain_gcc : (
+                # Clang also defines __GNUC__
+                """
+                #if !defined(__GNUC__) || defined(__clang__)
+                #error
+                #endif
+                """),
+            toolchain_clang : (
+                """
+                #if !defined(__clang__)
+                #error
+                #endif
+                """),
+            toolchain_msvc : (
+                """
+                #if !defined(_MSC_VER)
+                #error
+                #endif
+                """),
+        }
+        print_tuple = (lang_name, context.env[compiler_var], toolchain)
+        context.Message('Checking if %s compiler "%s" is %s... ' % print_tuple)
+        result = context.TryCompile(test_bodies[toolchain], source_suffix)
+        context.Result(result)
+        return result
+
+    conf = Configure(myenv, clean=False, help=False, custom_tests = {
+        'CheckForToolchain' : CheckForToolchain,
+    })
+
+    toolchain = None
+    have_toolchain = lambda: toolchain != None
+    using_msvc = lambda: toolchain == toolchain_msvc
+    using_gcc = lambda: toolchain == toolchain_gcc
+    using_clang = lambda: toolchain == toolchain_clang
+
+    if windows:
+        toolchain_search_sequence = [toolchain_msvc]
+    else:
+        toolchain_search_sequence = [toolchain_gcc, toolchain_clang]
+
+    for candidate_toolchain in toolchain_search_sequence:
+        if conf.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
+            toolchain = candidate_toolchain
+            break
+
+    if not have_toolchain():
+        print("Couldn't identify the toolchain")
+        Exit(1)
+
+    if check_c and not conf.CheckForToolchain(toolchain, "C", "CC", ".c"):
+        print("C toolchain doesn't match identified C++ toolchain")
         Exit(1)
 
     myenv = conf.Finish()
 
-    # TODO: OK, so where do we store our clangy-ness so we can ask for it later? I'm hoping
-    # that the answer is *not* in some global and that we can attach it to our Vars, Options,
-    # or Env. For now, it only seems to be needed within this method though.
-    using_clang = cc_is_clang
-
-    # Enable PCH if we are on 'NIX, the 'Gch' tool is enabled, and if we are not using
-    # clang. Otherwise, remove any pre-compiled header since gcc will try to use it if it
-    # exists.
-    if nix and usePCH and 'Gch' in dir( myenv ):
-        if using_clang:
-            # clang++ uses pch.h.pch rather than pch.h.gch
-            myenv['GCHSUFFIX'] = '.pch'
-            # clang++ only uses pch from command line
-            myenv.Prepend( CXXFLAGS=' -include pch.h ' )
-            # But it doesn't appear to work, so error out for now.
-            print( "ERROR: clang pch is broken for now" )
-            Exit(1)
-        myenv['Gch'] = myenv.Gch( "$BUILD_DIR/mongo/pch.h$GCHSUFFIX",
-                                    "src/mongo/pch.h" )[0]
-        myenv['GchSh'] = myenv[ 'Gch' ]
+    # Enable PCH if we are on using gcc or clang and the 'Gch' tool is enabled. Otherwise,
+    # remove any pre-compiled header since the compiler may try to use it if it exists.
+    if usePCH and (using_gcc() or using_clang()):
+        if 'Gch' in dir( myenv ):
+            if using_clang():
+                # clang++ uses pch.h.pch rather than pch.h.gch
+                myenv['GCHSUFFIX'] = '.pch'
+                # clang++ only uses pch from command line
+                myenv.Prepend( CXXFLAGS=['-include pch.h'] )
+            myenv['Gch'] = myenv.Gch( "$BUILD_DIR/mongo/pch.h$GCHSUFFIX",
+                                        "src/mongo/pch.h" )[0]
+            myenv['GchSh'] = myenv[ 'Gch' ]
     elif os.path.exists( myenv.File("$BUILD_DIR/mongo/pch.h$GCHSUFFIX").abspath ):
         print( "removing precompiled headers" )
         os.unlink( myenv.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath )
@@ -857,7 +899,7 @@ def doConfigure(myenv):
     def AddFlagIfSupported(env, tool, extension, flag, **mutation):
         def CheckFlagTest(context, tool, extension, flag):
             test_body = ""
-            context.Message('Checking if %s compiler supports %s ...' % (tool, flag))
+            context.Message('Checking if %s compiler supports %s... ' % (tool, flag))
             ret = context.TryCompile(test_body, extension)
             context.Result(ret)
             return ret
@@ -865,9 +907,8 @@ def doConfigure(myenv):
         cloned = env.Clone()
         cloned.Append(**mutation)
 
-        if windows:
-            # TODO: Should be checking for MSVC, not windows here.
-            print("AddFlagIfSupported is not currently supported on Windows")
+        if using_msvc():
+            print("AddFlagIfSupported is not currently supported with MSVC")
             Exit(1)
 
         # For GCC, we don't need anything since bad flags are already errors, but
@@ -892,7 +933,7 @@ def doConfigure(myenv):
     def AddToCXXFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C++', '.cpp', flag, CXXFLAGS=[flag])
 
-    if using_clang:
+    if using_clang():
         # Clang likes to warn about unused functions, which seems a tad aggressive and breaks
         # -Werror, which we want to be able to use.
         AddToCCFLAGSIfSupported(myenv, '-Wno-unused-function')
@@ -915,7 +956,7 @@ def doConfigure(myenv):
     if has_option('c++11'):
         # The Microsoft compiler does not need a switch to enable C++11. Again we should be
         # checking for MSVC, not windows. In theory, we might be using clang or icc on windows.
-        if not windows:
+        if not using_msvc():
             # For our other compilers (gcc and clang) we need to pass -std=c++0x or -std=c++11,
             # but we prefer the latter. Try that first, and fall back to c++0x if we don't
             # detect that --std=c++11 works.
@@ -942,7 +983,7 @@ def doConfigure(myenv):
             Exit(1)
 
     if has_option('libc++'):
-        if not using_clang:
+        if not using_clang():
             print( 'libc++ is currently only supported for clang')
             Exit(1)
         if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
@@ -952,11 +993,10 @@ def doConfigure(myenv):
             Exit(1)
 
     # glibc's memcmp is faster than gcc's
-    if nix and linux:
+    if linux:
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
 
-    # Really, should be if using gcc or clang.
-    if linux or darwin:
+    if using_gcc() or using_clang():
         # If possible, don't make deprecated declarations errors.
         AddToCCFLAGSIfSupported(myenv, "-Wno-error=deprecated-declarations")
 
