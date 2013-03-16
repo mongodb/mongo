@@ -2274,6 +2274,15 @@
     <ClInclude Include="..\db\query_plan_summary.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics_gcc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler_gcc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\hash_namespace.h">
+      <Filter>platform</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -4300,6 +4309,15 @@
     <ClCompile Include="..\db\query_plan_selection_policy.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\atomic_word_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\bits_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\random_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">
@@ -4484,6 +4502,9 @@
     </None>
     <None Include="..\shell\servers_misc.js">
       <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\platform\SConscript">
+      <Filter>platform</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -1230,6 +1230,15 @@
     <ClCompile Include="..\bson\mutable\mutable_bson_test.cpp">
       <Filter>bson\mutable</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\atomic_word_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\bits_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\random_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -2355,6 +2364,15 @@
     <ClInclude Include="..\bson\mutable\element-inl.h">
       <Filter>bson\mutable</Filter>
     </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics_gcc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler_gcc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\hash_namespace.h">
+      <Filter>platform</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">
@@ -2470,6 +2488,9 @@
     </None>
     <None Include="..\shell\servers_misc.js">
       <Filter>JavaScript source files\Included in shell only</Filter>
+    </None>
+    <None Include="..\platform\SConscript">
+      <Filter>platform</Filter>
     </None>
   </ItemGroup>
 </Project>
