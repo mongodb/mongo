@@ -1,6 +1,8 @@
 /*! @page tuning Performance Tuning
 
-@section tuning_cache_size Cache size
+@section tuning_cache WiredTiger's cache
+
+@subsection tuning_cache_size Cache size
 
 The cache size for the database is configurable by setting the \c
 cache_size configuration string when calling the ::wiredtiger_open
@@ -13,7 +15,46 @@ An example of setting a cache size to 500MB:
 
 @snippet ex_config.c configure cache size
 
-@section tuning_memory_allocation Memory allocation
+@subsection tuning_read_only_objects Read-only objects
+
+Cursors opened on checkpoints (either named, or using the special "last
+checkpoint" name "WiredTigerCheckpoint") are read-only objects.  Unless
+memory mapping is configured off (using the "mmap" configuration string
+to ::wiredtiger_open), read-only objects are mapped into process memory
+instead of being read through the WiredTiger cache.  Using read-only
+objects where possible minimizes the amount of buffer cache memory
+required by WiredTiger applications and the work required for buffer
+cache management, as well as reducing the number of memory copies from
+the operating system buffer cache into application memory.
+
+To open a named checkpoint, use the configuration string "checkpoint"
+to the WT_SESSION::open_cursor method:
+@snippet ex_all.c open a named checkpoint
+
+To open the last checkpoint taken in the object, use the configuration
+string "checkpoint" with the name "WiredTigerCheckpoint" to the
+WT_SESSION::open_cursor method:
+@snippet ex_all.c open the default checkpoint
+
+@subsection tuning_cache_resident Cache resident objects
+
+Cache resident objects (objects never considered for the purposes of
+cache eviction), can be configured with the WT_SESSION::create
+"cache_resident" configuration string.
+
+Configuring a cache resident object has two effects: first, once the
+object's page have been instantiated in memory, no further I/O cost is
+ever paid for object access, minimizing potential latency.  Second,
+in-memory objects can be accessed faster than objects tracked for
+potential eviction, and applications able to guarantee sufficient memory
+that an object need never be evicted can significantly increase their
+performance.
+
+An example of configuring a cache-resident object:
+
+@snippet ex_all.c Create a cache-resident object
+
+@section tuning_memory_allocator Memory allocator
 
 The performance of heavily-threaded WiredTiger applications can be
 dominated by memory allocation because the WiredTiger engine has to free
@@ -42,45 +83,6 @@ WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction, all
 open cursors are automatically reset, there is no need to call the
 WT_CURSOR::reset method explicitly, and the cursor can be immediately
 reused.
-
-@section tuning_read_only_objects Read-only objects
-
-Cursors opened on checkpoints (either named, or using the special "last
-checkpoint" name "WiredTigerCheckpoint") are read-only objects.  Unless
-memory mapping is configured off (using the "mmap" configuration string
-to ::wiredtiger_open), read-only objects are mapped into process memory
-instead of being read through the WiredTiger cache.  Using read-only
-objects where possible minimizes the amount of buffer cache memory
-required by WiredTiger applications and the work required for buffer
-cache management, as well as reducing the number of memory copies from
-the operating system buffer cache into application memory.
-
-To open a named checkpoint, use the configuration string "checkpoint"
-to the WT_SESSION::open_cursor method:
-@snippet ex_all.c open a named checkpoint
-
-To open the last checkpoint taken in the object, use the configuration
-string "checkpoint" with the name "WiredTigerCheckpoint" to the
-WT_SESSION::open_cursor method:
-@snippet ex_all.c open the default checkpoint
-
-@section tuning_cache_resident Cache resident objects
-
-Cache resident objects (objects never considered for the purposes of
-cache eviction), can be configured with the WT_SESSION::create
-"cache_resident" configuration string.
-
-Configuring a cache resident object has two effects: first, once the
-object's page have been instantiated in memory, no further I/O cost is
-ever paid for object access, minimizing potential latency.  Second,
-in-memory objects can be accessed faster than objects tracked for
-potential eviction, and applications able to guarantee sufficient memory
-that an object need never be evicted can significantly increase their
-performance.
-
-An example of configuring a cache-resident object:
-
-@snippet ex_all.c Create a cache-resident object
 
 @section tuning_page_size  Page and overflow sizes
 
@@ -255,24 +257,29 @@ blocks which are not compressed:
 
 @section tuning_compression Compression
 
-WiredTiger configures key prefix compression for row-store objects, and
-column-store compression for both row-store and column-store objects,
-by default.
-These forms of compression minimize in-memory and on-disk space, but at
-some CPU cost when rows are read and written.   Turning these forms of
-compression off may increase application throughput.
+WiredTiger configures key prefix compression for row-store objects by
+default.  Additional forms of compression for both row- and column-store
+objects, including dictionary and block compression, and Huffman
+encoding, are optional.  Compression minimizes in-memory and on-disk
+resource requirements and decreases the amount of I/O, at some CPU cost
+when rows are read and written.
+
+Configuring compression on or off may change application throughput.
+For example, in applications using solid-state drives (where I/O is less
+expensive), turning off compression may increase application performance
+by reducing CPU costs; in applications where I/O costs are more
+expensive, turning on compression may increase application performance
+by reducing the overall number of I/O operations.
 
 For example, turning off row-store key prefix compression:
 
 @snippet ex_all.c Configure key prefix compression off
 
-For example, turning off row-store or column-store dictionary compression:
+For example, turning on row-store or column-store dictionary compression:
 
-@snippet ex_all.c Configure dictionary compression off
+@snippet ex_all.c Configure dictionary compression on
 
-WiredTiger does not configure Huffman encoding or block compression by
-default, but these forms of compression can also impact overall
-throughput.  See @ref file_formats_compression for more information.
+See @ref file_formats_compression for more information.
 
 @section tuning_statistics Performance monitoring with statistics
 

@@ -487,10 +487,10 @@ session_ops(WT_SESSION *session)
 	    "key_format=S,value_format=S,checksum=uncompressed");
 	/*! [Configure checksums to uncompressed] */
 
-	/*! [Configure dictionary compression off] */
+	/*! [Configure dictionary compression on] */
 	ret = session->create(session, "table:mytable",
-	    "key_format=S,value_format=S,dictionary=false");
-	/*! [Configure dictionary compression off] */
+	    "key_format=S,value_format=S,dictionary=1000");
+	/*! [Configure dictionary compression on] */
 
 	/*! [Configure key prefix compression off] */
 	ret = session->create(session, "table:mytable",

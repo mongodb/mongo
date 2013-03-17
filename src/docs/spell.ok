@@ -41,6 +41,7 @@ WiredTigerCheckpoint
 aR
 ack'ed
 alloc
+allocator
 allocsize
 ao
 api
