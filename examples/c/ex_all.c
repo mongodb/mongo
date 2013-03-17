@@ -447,11 +447,13 @@ session_ops(WT_SESSION *session)
 	ret = session->create(session,
 	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a column-store table] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S");
 	/*! [Create a column-store table] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a table with columns] */
 	/*
@@ -462,6 +464,7 @@ session_ops(WT_SESSION *session)
 	    "key_format=r,value_format=SiH,"
 	    "columns=(id,department,salary,year-started)");
 	/*! [Create a table with columns] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*
 	 * This example code gets run, and the compression libraries might not
@@ -474,50 +477,63 @@ session_ops(WT_SESSION *session)
 	    "table:mytable",
 	    "block_compressor=bzip2,key_format=S,value_format=S");
 	/*! [Create a bzip2 compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a snappy compressed table] */
 	ret = session->create(session,
 	    "table:mytable",
 	    "block_compressor=snappy,key_format=S,value_format=S");
 	/*! [Create a snappy compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 #endif
 
 	/*! [Configure checksums to uncompressed] */
 	ret = session->create(session, "table:mytable",
 	    "key_format=S,value_format=S,checksum=uncompressed");
 	/*! [Configure checksums to uncompressed] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Configure dictionary compression on] */
 	ret = session->create(session, "table:mytable",
 	    "key_format=S,value_format=S,dictionary=1000");
 	/*! [Configure dictionary compression on] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Configure key prefix compression off] */
 	ret = session->create(session, "table:mytable",
 	    "key_format=S,value_format=S,prefix_compression=false");
 	/*! [Configure key prefix compression off] */
+	ret = session->drop(session, "table:mytable", NULL);
 
+#ifdef MIGHT_NOT_RUN
+						/* Requires sync_file_range */
 	/*! [os_cache_dirty_max configuration] */
 	ret = session->create(
 	    session, "table:mytable", "os_cache_dirty_max=500MB");
 	/*! [os_cache_dirty_max configuration] */
+	ret = session->drop(session, "table:mytable", NULL);
 
+						/* Requires posix_fadvise */
 	/*! [os_cache_max configuration] */
 	ret = session->create(session, "table:mytable", "os_cache_max=1GB");
 	/*! [os_cache_max configuration] */
+	ret = session->drop(session, "table:mytable", NULL);
+#endif
 
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
 	/*! [Create a cache-resident object] */
+	ret = session->drop(session, "table:mytable", NULL);
+
+	{
+	/* Create a table for the session operations. */
+	ret = session->create(
+	    session, "table:mytable", "key_format=S,value_format=S");
 
 	/*! [Compact a table] */
 	ret = session->compact(session, "table:mytable", NULL);
 	/*! [Compact a table] */
-
-	/*! [Drop a table] */
-	ret = session->drop(session, "table:mytable", NULL);
-	/*! [Drop a table] */
 
 	/*! [Print to the message stream] */
 	ret = session->msg_printf(
@@ -537,9 +553,6 @@ session_ops(WT_SESSION *session)
 	/*! [Truncate a table] */
 
 	{
-	ret = session->create(
-	    session, "table:mytable", "key_format=S,value_format=S");
-
 	/*! [Truncate a range] */
 	WT_CURSOR *start, *stop;
 
@@ -564,6 +577,11 @@ session_ops(WT_SESSION *session)
 	/*! [Verify a table] */
 	ret = session->verify(session, "table:mytable", NULL);
 	/*! [Verify a table] */
+
+	/*! [Drop a table] */
+	ret = session->drop(session, "table:mytable", NULL);
+	/*! [Drop a table] */
+	}
 
 	/*! [Close a session] */
 	ret = session->close(session, NULL);
