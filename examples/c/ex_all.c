@@ -499,12 +499,11 @@ session_ops(WT_SESSION *session)
 
 	/*! [os_cache_dirty_max configuration] */
 	ret = session->create(
-	    session, "table:mytable", "create,os_cache_dirty_max=500MB");
+	    session, "table:mytable", "os_cache_dirty_max=500MB");
 	/*! [os_cache_dirty_max configuration] */
 
 	/*! [os_cache_max configuration] */
-	ret = session->create(
-	    session, "table:mytable", "create,os_cache_max=1GB");
+	ret = session->create(session, "table:mytable", "os_cache_max=1GB");
 	/*! [os_cache_max configuration] */
 
 	/*! [Create a cache-resident object] */
@@ -538,6 +537,9 @@ session_ops(WT_SESSION *session)
 	/*! [Truncate a table] */
 
 	{
+	ret = session->create(
+	    session, "table:mytable", "key_format=S,value_format=S");
+
 	/*! [Truncate a range] */
 	WT_CURSOR *start, *stop;
 
@@ -885,9 +887,11 @@ connection_ops(WT_CONNECTION *conn)
 {
 	int ret;
 
+#ifdef MIGHT_NOT_RUN
 	/*! [Load an extension] */
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
 	/*! [Load an extension] */
+#endif
 
 	add_collator(conn);
 	add_data_source(conn);
@@ -1007,8 +1011,12 @@ main(void)
 	/*! [Open a connection] */
 	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
+
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		connection_ops(conn);
+	/*
+	 * The connection has been closed.
+	 */
 
 #ifdef MIGHT_NOT_RUN
 	/*
