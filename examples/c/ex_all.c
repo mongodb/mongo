@@ -497,6 +497,16 @@ session_ops(WT_SESSION *session)
 	    "key_format=S,value_format=S,prefix_compression=false");
 	/*! [Configure key prefix compression off] */
 
+	/*! [os_cache_dirty_max configuration] */
+	ret = session->create(
+	    session, "table:mytable", "create,os_cache_dirty_max=500MB");
+	/*! [os_cache_dirty_max configuration] */
+
+	/*! [os_cache_max configuration] */
+	ret = session->create(
+	    session, "table:mytable", "create,os_cache_max=1GB");
+	/*! [os_cache_max configuration] */
+
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
@@ -1034,20 +1044,6 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 #endif
-
-	/*! [os_cache_dirty_max configuration] */
-	ret =
-	    wiredtiger_open(home, NULL, "create,os_cache_dirty_max=1GB", &conn);
-	/*! [os_cache_dirty_max configuration] */
-	if (ret == 0)
-		(void)conn->close(conn, NULL);
-
-	/*! [os_cache_max configuration] */
-	ret =
-	    wiredtiger_open(home, NULL, "create,os_cache_max=1GB", &conn);
-	/*! [os_cache_max configuration] */
-	if (ret == 0)
-		(void)conn->close(conn, NULL);
 
 	/*! [Statistics configuration] */
 	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
