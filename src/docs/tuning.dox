@@ -24,6 +24,25 @@ example, Google's
 or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
 can dramatically improve throughput.
 
+@section tuning_cursor_persistence Cursor persistence
+
+Opening a new cursor is a relatively expensive operation in WiredTiger
+(especially in table objects and Log-Structured Merge Trees (LSM) trees,
+where a logical cursor may require multiple, underlying object cursors),
+and caching cursors can improve performance.  On the other hand, cursors
+hold positions in objects, and therefore long-lived cursor positions can
+decrease performance.  The best combination is to cache cursors, but use
+the WT_CURSOR::reset method to discard the cursor's position in the
+object when the position is no longer needed.
+
+Additionally, cursors are automatically reset whenever a transaction
+boundary is crossed; when a transaction is started with the
+WT_SESSION::begin_transaction or ended with either
+WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction, all
+open cursors are automatically reset, there is no need to call the
+WT_CURSOR::reset method explicitly, and the cursor can be immediately
+reused.
+
 @section tuning_read_only_objects Read-only objects
 
 Cursors opened on checkpoints (either named, or using the special "last
@@ -140,6 +159,19 @@ An example of configuring page sizes:
 
 @snippet ex_file.c file create
 
+@section tuning_direct_io Direct I/O
+
+WiredTiger optionally supports direct I/O, based on the non-standard \c
+O_DIRECT flag to the POSIX 1003.1 open system call.   Configuring direct
+I/O may be useful for applications wanting to minimize the operating
+system cache effects of I/O to and from WiredTiger's buffer cache.
+
+Direct I/O is configured using the "direct_io" configuration string to
+the ::wiredtiger_open function.  An example of configuring direct I/O
+for WiredTiger's data files:
+
+@snippet ex_all.c Configure direct_io for data files
+
 @section tuning_checksums Checksums
 
 WiredTiger checksums file reads and writes, by default.  In read-only
@@ -157,19 +189,6 @@ configuration value to "uncompressed" causes WiredTiger to checksum the
 blocks which are not compressed:
 
 @snippet ex_all.c Configure checksums to uncompressed
-
-@section tuning_direct_io Direct I/O
-
-WiredTiger optionally supports direct I/O, based on the non-standard \c
-O_DIRECT flag to the POSIX 1003.1 open system call.   Configuring direct
-I/O may be useful for applications wanting to minimize the operating
-system cache effects of I/O to and from WiredTiger's buffer cache.
-
-Direct I/O is configured using the "direct_io" configuration string to
-the ::wiredtiger_open function.  An example of configuring direct I/O
-for WiredTiger's data files:
-
-@snippet ex_all.c Configure direct_io for data files
 
 @section tuning_compression Compression
 
