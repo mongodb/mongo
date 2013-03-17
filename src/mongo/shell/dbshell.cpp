@@ -299,6 +299,35 @@ bool isUseCmd( const std::string& code ) {
     return cmd == "use";
 }
 
+/**
+ * Skip over a quoted string, including quotes escaped with backslash
+ * 
+ * @param code      String
+ * @param start     Starting position within string, always > 0
+ * @param quote     Quote character (single or double quote)
+ * @return          Position of ending quote, or code.size() if no quote found
+ */
+size_t skipOverString(const std::string& code, size_t start, char quote) {
+    size_t pos = start;
+    while (pos < code.size()) {
+        pos = code.find(quote, pos);
+        if (pos == std::string::npos) {
+            return code.size();
+        }
+        // We want to break if the quote we found is not escaped, but we need to make sure
+        // that the escaping backslash is not itself escaped.  Comparisons of start and pos
+        // are to keep us from reading beyond the beginning of the quoted string.
+        //
+        if (start == pos     || code[pos - 1] != '\\' || // previous char was backslash
+            start == pos - 1 || code[pos - 2] == '\\'    // char before backslash was not another
+        ) {
+            break;  // The quote we found was not preceded by an unescaped backslash; it is real
+        }
+        ++pos;      // The quote we found was escaped with backslash, so it doesn't count
+    }
+    return pos;
+}
+
 bool isBalanced( const std::string& code ) {
     if (isUseCmd( code ))
         return true;  // don't balance "use <dbname>" in case dbname contains special chars
@@ -340,12 +369,11 @@ bool isBalanced( const std::string& code ) {
             parens--;
             break;
         case '"':
-            i++;
-            while ( i < code.size() && code[i] != '"' ) i++;
-            break;
         case '\'':
-            i++;
-            while ( i < code.size() && code[i] != '\'' ) i++;
+            i = skipOverString(code, i + 1, code[i]);
+            if (i >= code.size()) {
+                return true;            // Do not let unterminated strings enter multi-line mode
+            }
             break;
         case '\\':
             if ( i + 1 < code.size() && code[i+1] == '/' ) i++;
@@ -382,15 +410,29 @@ public:
         verify( ! isBalanced( "\"//\" {" ) );
         verify( isBalanced( "{x:/x\\//}" ) );
         verify( ! isBalanced( "{ \\/// }" ) );
-        verify( isBalanced( "x = 5 + y ") );
-        verify( ! isBalanced( "x = ") );
-        verify( ! isBalanced( "x = // hello") );
-        verify( ! isBalanced( "x = 5 +") );
-        verify( isBalanced( " x ++") );
-        verify( isBalanced( "-- x") );
-        verify( !isBalanced( "a.") );
-        verify( !isBalanced( "a. ") );
-        verify( isBalanced( "a.b") );
+        verify( isBalanced( "x = 5 + y " ) );
+        verify( ! isBalanced( "x = " ) );
+        verify( ! isBalanced( "x = // hello" ) );
+        verify( ! isBalanced( "x = 5 +" ) );
+        verify( isBalanced( " x ++" ) );
+        verify( isBalanced( "-- x" ) );
+        verify( !isBalanced( "a." ) );
+        verify( !isBalanced( "a. " ) );
+        verify( isBalanced( "a.b" ) );
+
+        // SERVER-5809 and related cases -- 
+        verify( isBalanced( "a = {s:\"\\\"\"}" ) );             // a = {s:"\""}
+        verify( isBalanced( "db.test.save({s:\"\\\"\"})" ) );   // db.test.save({s:"\""})
+        verify( isBalanced( "printjson(\" \\\" \")" ) );        // printjson(" \" ") -- SERVER-8554
+        verify( isBalanced( "var a = \"\\\\\";" ) );            // var a = "\\";
+        verify( isBalanced( "var a = (\"\\\\\") //\"" ) );      // var a = ("\\") //"
+        verify( isBalanced( "var a = (\"\\\\\") //\\\"" ) );    // var a = ("\\") //\"
+        verify( isBalanced( "var a = (\"\\\\\") //" ) );        // var a = ("\\") //
+        verify( isBalanced( "var a = (\"\\\\\")" ) );           // var a = ("\\")
+        verify( isBalanced( "var a = (\"\\\\\\\"\")" ) );       // var a = ("\\\"")
+        verify( ! isBalanced( "var a = (\"\\\\\" //\"" ) );     // var a = ("\\" //"
+        verify( ! isBalanced( "var a = (\"\\\\\" //" ) );       // var a = ("\\" //
+        verify( ! isBalanced( "var a = (\"\\\\\"" ) );          // var a = ("\\"
     }
 } balanced_test;
 
