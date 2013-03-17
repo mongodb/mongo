@@ -1037,6 +1037,18 @@ main(void)
 	(void)conn->close(conn, NULL);
 #endif
 
+	/*! [os_cache_dirty_max configuration] */
+	ret =
+	    wiredtiger_open(home, NULL, "create,os_cache_dirty_max=1GB", &conn);
+	/*! [os_cache_dirty_max configuration] */
+	(void)conn->close(conn, NULL);
+
+	/*! [os_cache_max configuration] */
+	ret =
+	    wiredtiger_open(home, NULL, "create,os_cache_max=1GB", &conn);
+	/*! [os_cache_max configuration] */
+	(void)conn->close(conn, NULL);
+
 	/*! [Statistics configuration] */
 	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
 	/*! [Statistics configuration] */

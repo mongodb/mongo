@@ -117,6 +117,7 @@ env
 eof
 erlang
 errno
+fadvise
 failchk
 fd's
 fieldname
@@ -225,6 +226,7 @@ objectsin
 ol
 oltp
 oob
+os
 ovfl
 pcoll
 pdf
