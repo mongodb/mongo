@@ -61,6 +61,11 @@ addShard = function(st, replTest) {
         return x < 2;
     } , "no balance happened", 60000 );
 
+    // NOTE: To avoid getMore problems stranding cursors b/c of our current conn
+    // pool behavior, this needs to be run.
+    // TODO: Remove once conn pooling behavior is better
+    printjson( coll.getMongo().getDB("admin").runCommand({ connPoolSync : true }) );
+
     try {
         assert.eq( 300, coll.find().itcount() );
     } catch (e) {
