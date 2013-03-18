@@ -446,6 +446,11 @@ namespace mongo {
                 bb.append("authenticated", false);
             }
 
+            string syncingTo = m->hbinfo().syncingTo;
+            if (!syncingTo.empty()) {
+                bb.append("syncingTo", syncingTo);
+            }
+
             v.push_back(bb.obj());
             m = m->next();
         }
