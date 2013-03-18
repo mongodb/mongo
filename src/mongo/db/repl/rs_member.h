@@ -84,6 +84,7 @@ namespace mongo {
         // This is the last time we got a heartbeat request from a given member.
         time_t lastHeartbeatRecv;
         DiagStr lastHeartbeatMsg;
+        DiagStr syncingTo;
         OpTime opTime;
         int skew;
         bool authIssue;
