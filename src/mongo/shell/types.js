@@ -68,9 +68,29 @@ ISODate = function(isoDateStr){
     var date = parseInt(res[3],10) || 0;
     var hour = parseInt(res[5],10) || 0;
     var min = parseInt(res[7],10) || 0;
-    var sec = parseFloat(res[9]) || 0;
-    var ms = Math.round((sec%1) * 1000)
-    sec -= ms/1000
+    var sec = parseInt((res[9] && res[9].substr(0,2)),10) || 0;
+    var ms = Math.round((parseFloat(res[10]) || 0) * 1000);
+    if (ms == 1000) {
+        ms = 0;
+        ++sec;
+    }
+    if (sec == 60) {
+        sec = 0;
+        ++min;
+    }
+    if (min == 60) {
+        min = 0;
+        ++hour;
+    }
+    if (hour == 24) {
+        hour = 0;   // the day wrapped, let JavaScript figure out the rest
+        var tempTime = Date.UTC(year, month, date, hour, min, sec, ms);
+        tempTime += 24 * 60 * 60 * 1000;    // milliseconds in a day
+        var tempDate = new Date(tempTime);
+        year = tempDate.getUTCFullYear();
+        month = tempDate.getUTCMonth();
+        date = tempDate.getUTCDate();
+    }
 
     var time = Date.UTC(year, month, date, hour, min, sec, ms);
 
