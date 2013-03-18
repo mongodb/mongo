@@ -41,6 +41,14 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * Estimate the per-allocation overhead.  All allocators have some kind of
+ * header and pad for alignment.  We can't know for sure what that adds up
+ * to, but this is an estimate based on some measurements of heap size versus
+ * bytes in use.
+ */
+#define	WT_ALLOC_OVERHEAD      32
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -48,6 +56,8 @@ static inline void
 __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
+
+	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
@@ -64,6 +74,8 @@ static inline void
 __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
+
+	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
