@@ -58,7 +58,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	conn->stat_clear = cval.val != 0;
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->stat_path));
+	WT_RET(__wt_nfilename(session, cval.str, cval.len, &conn->stat_path));
 
 	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.timestamp", &cval));
@@ -84,7 +84,7 @@ __stat_server(void *arg)
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 	uint64_t value;
-	const char *config, *desc, *pdesc, *p;
+	const char *config, *desc, *pdesc;
 
 	session = arg;
 	conn = S2C(session);
@@ -94,16 +94,6 @@ __stat_server(void *arg)
 	WT_CLEAR(tmp);
 	config = conn->stat_clear ? "statistics_clear" : NULL;
 	fp = NULL;
-
-	/*
-	 * If the logging file name beings with an absolute path, use it as is,
-	 * otherwise build a version relative to the database home directory.
-	 */
-	if (!__wt_absolute_path(conn->stat_path)) {
-		WT_ERR(__wt_filename(session, conn->stat_path, &p));
-		__wt_free(session, conn->stat_path);
-		conn->stat_path = p;
-	}
 
 	/*
 	 * We need a temporary place to build a path and an entry prefix.
