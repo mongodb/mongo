@@ -856,6 +856,31 @@ my_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 /*! [WT_COMPRESSOR presize] */
 
+static int
+my_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    size_t page_max, u_int split_pct, size_t extra,
+    uint8_t *src, uint32_t *offsets, uint32_t slots,
+    uint8_t *dst, size_t dst_len, int final,
+    size_t *result_lenp, uint32_t *result_slotsp)
+{
+	/* Unused parameters */
+	(void)compressor;
+	(void)session;
+	(void)page_max;
+	(void)split_pct;
+	(void)extra;
+	(void)src;
+	(void)offsets;
+	(void)slots;
+	(void)dst;
+	(void)dst_len;
+	(void)final;
+	(void)result_lenp;
+	(void)result_slotsp;
+
+	return (0);
+}
+
 int
 add_compressor(WT_CONNECTION *conn)
 {
@@ -863,7 +888,11 @@ add_compressor(WT_CONNECTION *conn)
 
 	/*! [WT_COMPRESSOR register] */
 	static WT_COMPRESSOR my_compressor = {
-	    my_compress, NULL, my_decompress, my_pre_size };
+	    my_compress,
+	    my_compress_raw,		/* NULL, if no raw compression */
+	    my_decompress,
+	    my_pre_size			/* NULL, if pre-sizing not needed */
+	};
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [WT_COMPRESSOR register] */
 
