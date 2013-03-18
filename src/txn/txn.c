@@ -461,6 +461,6 @@ __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn)
 	session = conn->default_session;
 	txn_global = &conn->txn_global;
 
-	if (txn_global && txn_global->states != NULL)
+	if (txn_global != NULL)
 		__wt_free(session, txn_global->states);
 }
