@@ -13,7 +13,7 @@ def jsToH(target, source, env):
          ]
 
     def cppEscape(s):
-        s = s.strip()
+        s = s.rstrip()
         s = s.replace( '\\', '\\\\' )
         s = s.replace( '"', r'\"' )
         return s
