@@ -23,7 +23,7 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_INT_SKEW  (1<<20)	/* Prefer leaf pages over internal
+#define	WT_EVICT_INT_SKEW  (1<<12)	/* Prefer leaf pages over internal
 					   pages by this many increments of the
 					   read generation. */
 #define	WT_EVICT_WALK_PER_FILE	 5	/* Pages to visit per file */
