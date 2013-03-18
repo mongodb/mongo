@@ -477,10 +477,14 @@ void show_help_text( const char* name, po::options_description options ) {
          << "unless --shell is specified" << endl;
 };
 
-bool fileExists( string file ) {
+bool fileExists(const std::string& file) {
     try {
-        boost::filesystem::path p( file );
-        return boost::filesystem::exists( file );
+#ifdef _WIN32
+        boost::filesystem::path p(toWideString(file.c_str()));
+#else
+        boost::filesystem::path p(file);
+#endif
+        return boost::filesystem::exists(p);
     }
     catch ( ... ) {
         return false;
@@ -929,7 +933,9 @@ int _main( int argc, char* argv[], char **envp ) {
                 rcLocation = str::stream() << getenv( "HOME" ) << "/.mongorc.js" ;
 #else
             if ( getenv( "HOMEDRIVE" ) != NULL && getenv( "HOMEPATH" ) != NULL )
-                rcLocation = str::stream() << getenv( "HOMEDRIVE" ) << getenv( "HOMEPATH" ) << "\\.mongorc.js";
+                rcLocation = str::stream() << toUtf8String(_wgetenv(L"HOMEDRIVE"))
+                                           << toUtf8String(_wgetenv(L"HOMEPATH"))
+                                           << "\\.mongorc.js";
 #endif
             if ( !rcLocation.empty() && fileExists(rcLocation) ) {
                 hasMongoRC = true;
@@ -941,13 +947,12 @@ int _main( int argc, char* argv[], char **envp ) {
         }
 
         if ( !hasMongoRC && isatty(fileno(stdin)) ) {
-           cout << "Welcome to the MongoDB shell.\n"
-                   "For interactive help, type \"help\".\n"
-                   "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
-                   "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user" << endl;
-           fstream f;
-           f.open(rcLocation.c_str(), ios_base::out );
-           f.close();
+            cout << "Welcome to the MongoDB shell.\n"
+                    "For interactive help, type \"help\".\n"
+                    "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
+                    "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user" << endl;
+            File f;
+            f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
         }
 
         if ( !nodb && !mongo::cmdLine.quiet && isatty(fileno(stdin)) ) {
