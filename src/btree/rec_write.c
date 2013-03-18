@@ -4118,6 +4118,7 @@ __rec_split_row(
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		*addr = bnd->addr;
 		bnd->addr.addr = NULL;
+		size += bnd->addr.size;
 
 		ref->page = NULL;
 		WT_ERR(__wt_row_ikey(session, 0,
@@ -4126,8 +4127,9 @@ __rec_split_row(
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}
-	__wt_cache_page_inmem_incr(
-	    session, page, r->bnd_next * sizeof(WT_ADDR) + size);
+
+	page->u.intl.refsize = r->bnd_next * sizeof(WT_ADDR) + size;
+	__wt_cache_page_inmem_incr(session, page, page->u.intl.refsize);
 
 	*splitp = page;
 	return (0);

@@ -510,6 +510,7 @@ memcpy
 memfree
 memmove
 memsize
+mergeable
 metaconf
 metadata
 metafile
