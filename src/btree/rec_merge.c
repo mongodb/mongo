@@ -14,6 +14,7 @@
  *	reference when moving reference into the new tree.
  */
 typedef struct {
+	WT_SESSION_IMPL *session;
 	WT_PAGE *first, *page, *second;		/* New pages to be populated. */
 	WT_REF *ref, *second_ref;		/* Insert and split point. */
 
@@ -82,6 +83,9 @@ static void
 __merge_count(WT_REF *ref, WT_VISIT_STATE *state)
 {
 	if (ref->state == WT_REF_LOCKED) {
+		/* Prevent eviction until it is hooked into the new tree. */
+		__wt_evict_list_clr_page(state->session, ref->page);
+
 		if (!state->seen_live) {
 			state->first_live = state->refcnt;
 			state->seen_live = 1;
@@ -289,6 +293,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	uint8_t page_type;
 
 	WT_CLEAR(visit_state);
+	visit_state.session = session;
 	lchild = newtop = rchild = NULL;
 	page_type = top->type;
 
@@ -326,7 +331,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 */
 	promote = 0;
 	refcnt = (uint32_t)visit_state.refcnt;
-	if (refcnt >= WT_MERGE_FULL_PAGE) {
+	if (refcnt >= WT_MERGE_FULL_PAGE && visit_state.seen_live) {
 		/*
 		 * In the normal case where there are live children spread
 		 * through the subtree, create two child pages.
