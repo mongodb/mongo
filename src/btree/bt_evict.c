@@ -26,7 +26,7 @@ static int  __evict_worker(WT_SESSION_IMPL *);
 #define	WT_EVICT_INT_SKEW  (1<<12)	/* Prefer leaf pages over internal
 					   pages by this many increments of the
 					   read generation. */
-#define	WT_EVICT_WALK_PER_FILE	 5	/* Pages to visit per file */
+#define	WT_EVICT_WALK_PER_FILE	10	/* Pages to visit per file */
 #define	WT_EVICT_WALK_BASE     100	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
 
@@ -933,7 +933,7 @@ retry:	file_count = 0;
 	cache->evict_file_next = (btree == NULL) ? 0 : file_count;
 
 	/* Walk the files a few times if we don't find enough pages. */
-	if (ret == 0 && i < cache->evict_entries && retries++ < 3)
+	if (ret == 0 && i < cache->evict_entries && retries++ < 10)
 		goto retry;
 
 	*entriesp = i;
@@ -1051,34 +1051,39 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 			continue;
 
-		/*
-		 * If the file is being checkpointed, there's a period of time
-		 * where we can't discard any page with a modification
-		 * structure because it might race with the checkpointing
-		 * thread.
-		 *
-		 * During this phase, there is little point trying to evict
-		 * dirty pages: we might be lucky and find an internal page
-		 * that has not yet been checkpointed, but much more likely is
-		 * that we will waste effort considering dirty leaf pages that
-		 * cannot be evicted because they have modifications more
-		 * recent than the checkpoint.
-		 */
-		modified = __wt_page_is_modified(page);
-		if (modified && btree->checkpointing)
-			continue;
+		/* The following checks apply to eviction but not merges. */
+		if (levels == 0) {
+			/*
+			 * If the file is being checkpointed, there's a period
+			 * of time where we can't discard any page with a
+			 * modification structure because it might race with
+			 * the checkpointing thread.
+			 *
+			 * During this phase, there is little point trying to
+			 * evict dirty pages: we might be lucky and find an
+			 * internal page that has not yet been checkpointed,
+			 * but much more likely is that we will waste effort
+			 * considering dirty leaf pages that cannot be evicted
+			 * because they have modifications more recent than the
+			 * checkpoint.
+			 */
+			modified = __wt_page_is_modified(page);
+			if (modified && btree->checkpointing)
+				continue;
 
-		/* Optionally ignore clean pages. */
-		if (!modified && !clean)
-			continue;
+			/* Optionally ignore clean pages. */
+			if (!modified && !clean)
+				continue;
 
-		/*
-		 * If the oldest transaction hasn't changed since the last time
-		 * this page was written, there's no chance to make progress...
-		 */
-		if (modified && levels == 0 &&
-		    TXNID_LE(oldest_txn, page->modify->disk_txn))
-			continue;
+			/*
+			 * If the oldest transaction hasn't changed since the
+			 * last time this page was written, there's no chance
+			 * to make progress...
+			 */
+			if (modified &&
+			    TXNID_LE(oldest_txn, page->modify->disk_txn))
+				continue;
+		}
 
 		WT_ASSERT(session, evict->page == NULL);
 		__evict_init_candidate(session, evict, page);

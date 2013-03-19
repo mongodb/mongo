@@ -375,16 +375,19 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * we find a page which can't be merged into its parent, and failing if
 	 * we never find such a page.
 	 */
-	if (btree->checkpointing && __wt_page_is_modified(page))
+	if (btree->checkpointing && !merge && __wt_page_is_modified(page)) {
+ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
+		WT_DSTAT_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
+	}
 
 	if (btree->checkpointing && top)
 		for (t = page->parent;; t = t->parent) {
 			if (t == NULL || t->ref == NULL)	/* root */
-				return (EBUSY);
+				goto ckpt;
 			if (t->ref->state != WT_REF_MEM)	/* scary */
-				return (EBUSY);
-			if (t->modify == NULL ||		/* not merged */
+				goto ckpt;
+			if (merge || t->modify == NULL ||	/* not merged */
 			    !F_ISSET(t->modify, WT_PM_REC_EMPTY |
 			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
 				break;
