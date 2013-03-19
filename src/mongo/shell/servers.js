@@ -729,20 +729,32 @@ startMongos = function(args){
 }
 
 /**
+ * Returns a new argArray with any test-specific arguments added.
+ */
+getTestArgs = function(argArray) {
+    var programName = argArray[0];
+    if (programName.endsWith('mongod') || programName.endsWith('mongos')) {
+        if (jsTest.options().enableTestCommands) {
+            argArray.push.apply(argArray, ['--setParameter', "enableTestCommands=1"]);
+        }
+        if (jsTest.options().authMechanism) {
+            argArray.push.apply(argArray,
+                                ['--setParameter',
+                                 "authenticationMechanisms=" + jsTest.options().authMechanism]);
+        }
+    }
+    return argArray;
+};
+
+/**
  * Start a mongo process with a particular argument array.  If we aren't waiting for connect, 
  * return null.
  */
 MongoRunner.startWithArgs = function(argArray, waitForConnect) {
-
-    var port = _parsePort.apply(null, argArray);
-    
-    // Enable test commands.
     // TODO: Make there only be one codepath for starting mongo processes
-    var programName = argArray[0];
-    if (jsTest.options().enableTestCommands && (programName.endsWith('mongod') || programName.endsWith('mongos'))) {
-        argArray.push.apply(argArray, ['--setParameter', 'enableTestCommands=1']);
-    }
-    
+
+    argArray = getTestArgs(argArray);
+    var port = _parsePort.apply(null, argArray);
     var pid = _startMongoProgram.apply(null, argArray);
 
     var conn = null;
@@ -782,11 +794,7 @@ startMongoProgram = function(){
     // TODO: Make this work better with multi-version testing so that we can support
     // enabling this on 2.4 when testing 2.6
     var args = argumentsToArray( arguments );
-    var programName = args[0];
-    if (jsTest.options().enableTestCommands && (programName.endsWith('mongod') || programName.endsWith('mongos'))) {
-        args.push.apply(args, ['--setParameter', 'enableTestCommands=1']);
-    }
-
+    args = getTestArgs(args);
     var pid = _startMongoProgram.apply( null, args );
 
     var m;

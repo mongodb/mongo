@@ -855,42 +855,42 @@ int _main( int argc, char* argv[], char **envp ) {
 
         if ( params.count( "password" ) && password.empty() )
             password = mongo::askPassword();
-
-        // Construct the authentication-related code to execute on shell startup.
-        //
-        // This constructs and immediately executes an anonymous function, to avoid
-        // the shell's default behavior of printing statement results to the console.
-        //
-        // It constructs a statement of the following form:
-        //
-        // (function() {
-        //    // Set default authentication mechanism and, maybe, authenticate.
-        //  }())
-        stringstream authStringStream;
-        authStringStream << "(function() { " << endl;
-        if ( !authenticationMechanism.empty() ) {
-            authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
-                authenticationMechanism << "\";" << endl;
-        }
-
-        if ( username.size() ) {
-            authStringStream << "var username = \"" << username << "\";" << endl;
-            authStringStream << "var password = \"" << password << "\";" << endl;
-            if (authenticationDatabase.empty()) {
-                authStringStream << "var authDb = db;" << endl;
-            }
-            else {
-                authStringStream << "var authDb = db.getSiblingDB(\"" << authenticationDatabase <<
-                    "\");" << endl;
-            }
-            authStringStream << "authDb._authOrThrow({ " <<
-                saslCommandPrincipalFieldName << ": username, " <<
-                saslCommandPasswordFieldName << ": password });" << endl;
-        }
-        authStringStream << "}())";
-
-        mongo::shell_utils::_dbAuth = authStringStream.str();
     }
+
+    // Construct the authentication-related code to execute on shell startup.
+    //
+    // This constructs and immediately executes an anonymous function, to avoid
+    // the shell's default behavior of printing statement results to the console.
+    //
+    // It constructs a statement of the following form:
+    //
+    // (function() {
+    //    // Set default authentication mechanism and, maybe, authenticate.
+    //  }())
+    stringstream authStringStream;
+    authStringStream << "(function() { " << endl;
+    if ( !authenticationMechanism.empty() ) {
+        authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
+            authenticationMechanism << "\";" << endl;
+    }
+
+    if (!nodb && username.size()) {
+        authStringStream << "var username = \"" << username << "\";" << endl;
+        authStringStream << "var password = \"" << password << "\";" << endl;
+        if (authenticationDatabase.empty()) {
+            authStringStream << "var authDb = db;" << endl;
+        }
+        else {
+            authStringStream << "var authDb = db.getSiblingDB(\"" << authenticationDatabase <<
+                "\");" << endl;
+        }
+        authStringStream << "authDb._authOrThrow({ " <<
+            saslCommandPrincipalFieldName << ": username, " <<
+            saslCommandPasswordFieldName << ": password });" << endl;
+    }
+    authStringStream << "}())";
+    mongo::shell_utils::_dbAuth = authStringStream.str();
+
 
     mongo::ScriptEngine::setConnectCallback( mongo::shell_utils::onConnect );
     mongo::ScriptEngine::setup();

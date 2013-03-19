@@ -464,7 +464,8 @@ def runTest(test):
                      'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
                      'TestData.auth = ' + ternary( auth ) + ";" + \
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
-                     'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
+                     'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";" + \
+                     'TestData.authMechanism = ' + ternary( authMechanism, '"' + str(authMechanism) + '"', 'null') + ";"
         if os.sys.platform == "win32":
             # double quotes in the evalString on windows; this
             # prevents the backslashes from being removed when
