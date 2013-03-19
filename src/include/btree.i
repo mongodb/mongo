@@ -41,6 +41,14 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * Estimate the per-allocation overhead.  All implementations of malloc / free
+ * have some kind of header and pad for alignment.  We can't know for sure what
+ * that adds up to, but this is an estimate based on some measurements of heap
+ * size versus bytes in use.
+ */
+#define	WT_ALLOC_OVERHEAD      32
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -48,6 +56,8 @@ static inline void
 __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
+
+	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
@@ -64,6 +74,8 @@ static inline void
 __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
+
+	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
@@ -579,3 +591,18 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
 	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
 	    (k1), (k2), &(cmp)))
+
+/*
+ * __wt_btree_mergeable --
+ *      Determines whether the given page is a candidate for merging.
+ */
+static inline int
+__wt_btree_mergeable(WT_PAGE *page)
+{
+	if (WT_PAGE_IS_ROOT(page) ||
+	    page->modify == NULL ||
+	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
+		return (0);
+
+	return (!WT_PAGE_IS_ROOT(page->parent));
+}

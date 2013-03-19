@@ -43,6 +43,8 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->btree_row_leaf.desc = "row-store leaf pages";
 	stats->cache_bytes_read.desc = "bytes read into cache";
 	stats->cache_bytes_write.desc = "bytes written from cache";
+	stats->cache_eviction_checkpoint.desc =
+	    "cache: checkpoint blocked page eviction";
 	stats->cache_eviction_clean.desc = "unmodified pages evicted";
 	stats->cache_eviction_dirty.desc = "modified pages evicted";
 	stats->cache_eviction_fail.desc =
@@ -148,6 +150,7 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->btree_row_leaf.v = 0;
 	stats->cache_bytes_read.v = 0;
 	stats->cache_bytes_write.v = 0;
+	stats->cache_eviction_checkpoint.v = 0;
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
@@ -215,6 +218,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
 	stats->cache_bytes_read.desc = "cache: bytes read into cache";
 	stats->cache_bytes_write.desc = "cache: bytes written from cache";
+	stats->cache_eviction_checkpoint.desc =
+	    "cache: checkpoint blocked page eviction";
 	stats->cache_eviction_clean.desc = "cache: unmodified pages evicted";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
@@ -278,6 +283,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_bytes_dirty.v = 0;
 	stats->cache_bytes_read.v = 0;
 	stats->cache_bytes_write.v = 0;
+	stats->cache_eviction_checkpoint.v = 0;
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;

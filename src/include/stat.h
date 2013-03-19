@@ -110,6 +110,7 @@ struct __wt_dsrc_stats {
 	WT_STATS btree_row_leaf;
 	WT_STATS cache_bytes_read;
 	WT_STATS cache_bytes_write;
+	WT_STATS cache_eviction_checkpoint;
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;
@@ -176,6 +177,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_bytes_max;
 	WT_STATS cache_bytes_read;
 	WT_STATS cache_bytes_write;
+	WT_STATS cache_eviction_checkpoint;
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;

@@ -814,10 +814,11 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * If no such transactions exist, we can discard the leaf page to the
 	 * block manager and no cell needs to be written at all.  We do this
 	 * outside of the underlying tracking routines because this action is
-	 * permanent and irrevocable.  (Setting the WT_REF.addr value to NULL
-	 * means we've lost track of the disk address in a permanent way.  If
-	 * we ever read into this chunk of the name space again, the cache read
-	 * function instantiates a new page.)
+	 * permanent and irrevocable.  (Clearing the address means we've lost
+	 * track of the disk address in a permanent way.  This is safe because
+	 * there's no path to reading the leaf page again: if reconciliation
+	 * fails, and we ever read into this part of the name space again, the
+	 * cache read function instantiates a new page.)
 	 *
 	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
 	 * it means this WT_REF is the re-creation of a deleted node (we wrote
@@ -3728,8 +3729,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
 	WT_PAGE_MODIFY *mod;
-	uint32_t page_size;
+	WT_REF *ref;
+	uint32_t size;
 	int was_modified;
+	const uint8_t *addr;
 
 	btree = session->btree;
 	bm = btree->bm;
@@ -3743,17 +3746,34 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 */
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case 0:	/*
-		 * The page has never been reconciled before, track the original
-		 * address blocks (if any).  The "if any" is for empty trees we
-		 * create when a new tree is opened, and for previously deleted
-		 * pages that are instantiated in memory.
+		 * The page has never been reconciled before, free the original
+		 * address blocks (if any).  The "if any" is for empty trees
+		 * created when a new tree is opened, previously deleted pages
+		 * instantiated in memory, or pages reconciled into split-merge
+		 * pages and then replaced by other pages because the tree grew
+		 * too deep.
 		 *
 		 * The exception is root pages are never tracked or free'd, they
 		 * are checkpoints, and must be explicitly dropped.
 		 */
-		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL)
-			WT_RET(__wt_rec_track_onpage_ref(
-			    session, page, page->parent, page->ref));
+		if (WT_PAGE_IS_ROOT(page))
+			break;
+
+		ref = page->ref;
+		if (ref->addr != NULL) {
+			/*
+			 * Free the page and clear the address (so we don't free
+			 * it twice).  Logically, this is the same as adding the
+			 * address to the reconciliation tracking information
+			 * and freeing it when reconciliation ends as part of
+			 * cleaning up the track information, but that is going
+			 * to happen right at the end of this switch statement,
+			 * might as well save the work.
+			 */
+			__wt_get_addr(page->parent, ref, &addr, &size);
+			WT_RET(bm->free(bm, session, addr, size));
+			ref->addr = NULL;
+		}
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
@@ -3935,10 +3955,10 @@ err:			__wt_scr_free(&tkey);
 	 */
 	if (!r->upd_skipped) {
 		was_modified = __wt_page_is_modified(page);
-		WT_ORDERED_READ(page_size, page->memory_footprint);
+		WT_ORDERED_READ(size, page->memory_footprint);
 		mod->disk_gen = r->orig_write_gen;
 		if (was_modified && !__wt_page_is_modified(page))
-			__wt_cache_dirty_decr(session, page_size);
+			__wt_cache_dirty_decr(session, size);
 	}
 
 	/* Record the most recent transaction ID we could have written. */
@@ -4098,6 +4118,7 @@ __rec_split_row(
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		*addr = bnd->addr;
 		bnd->addr.addr = NULL;
+		size += bnd->addr.size;
 
 		ref->page = NULL;
 		WT_ERR(__wt_row_ikey(session, 0,

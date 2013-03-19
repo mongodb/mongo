@@ -1818,7 +1818,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	rip = page->u.row.d + skip_start;
 	WT_ERR(__wt_row_key(session, page, rip, key, 0));
 	WT_ERR(__wt_row_ikey_incr(
-	    session, page, 0, key->data, key->size, &ref->u.key));
+	    session, parent, 0, key->data, key->size, &ref->u.key));
 
 	/*
 	 * Discard backing overflow pages for any items being discarded that

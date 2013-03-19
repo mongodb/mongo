@@ -307,11 +307,12 @@ __wt_block_misplaced(WT_SESSION_IMPL *session,
 	else if (__block_off_match(&block->live.discard, offset, size))
 		name = "discard";
 	__wt_spin_unlock(session, &block->live_lock);
-	if (name != NULL)
-		WT_RET_MSG(session, WT_ERROR,
+	if (name != NULL) {
+		__wt_errx(session,
 		    "%s failed: %" PRIuMAX "/%" PRIu32 " is on the %s list",
 		    tag, (uintmax_t)offset, size, name);
-
+		return (__wt_panic(session));
+	}
 	return (0);
 }
 #endif
