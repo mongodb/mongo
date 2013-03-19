@@ -41,6 +41,7 @@ WiredTigerCheckpoint
 aR
 ack'ed
 alloc
+allocator
 allocsize
 ao
 api
@@ -117,6 +118,7 @@ env
 eof
 erlang
 errno
+fadvise
 failchk
 fd's
 fieldname
@@ -225,6 +227,7 @@ objectsin
 ol
 oltp
 oob
+os
 ovfl
 pcoll
 pdf

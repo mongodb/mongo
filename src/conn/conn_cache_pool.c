@@ -254,7 +254,15 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		cp->currently_used -= conn->cache_size;
 	}
 
-	WT_ASSERT(session, cp->refs > 0);
+	/*
+	 * If there are no references, we are cleaning up after a failed
+	 * wiredtiger_open, there is nothing further to do.
+	 */
+	if (cp->refs < 1) {
+		__wt_spin_unlock(session, &cp->cache_pool_lock);
+		return (0);
+	}
+
 	if (--cp->refs == 0) {
 		WT_ASSERT(session, TAILQ_EMPTY(&cp->cache_pool_qh));
 		F_CLR(cp, WT_CACHE_POOL_RUN);

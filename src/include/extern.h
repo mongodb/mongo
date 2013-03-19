@@ -1140,6 +1140,10 @@ extern int __wt_absolute_path(const char *path);
 extern int __wt_filename(WT_SESSION_IMPL *session,
     const char *name,
     const char **path);
+extern int __wt_nfilename(WT_SESSION_IMPL *session,
+    const char *name,
+    size_t namelen,
+    const char **path);
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
