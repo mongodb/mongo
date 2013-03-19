@@ -41,10 +41,10 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * Estimate the per-allocation overhead.  All allocators have some kind of
- * header and pad for alignment.  We can't know for sure what that adds up
- * to, but this is an estimate based on some measurements of heap size versus
- * bytes in use.
+ * Estimate the per-allocation overhead.  All implementations of malloc / free
+ * have some kind of header and pad for alignment.  We can't know for sure what
+ * that adds up to, but this is an estimate based on some measurements of heap
+ * size versus bytes in use.
  */
 #define	WT_ALLOC_OVERHEAD      32
 

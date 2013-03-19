@@ -233,7 +233,6 @@ struct __wt_page {
 		struct {
 			uint64_t    recno;	/* Starting recno */
 			WT_REF     *t;		/* Subtree */
-			size_t      refsize;    /* Size of child addresses */
 		} intl;
 
 		/* Row-store leaf page. */

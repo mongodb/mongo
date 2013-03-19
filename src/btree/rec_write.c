@@ -4127,9 +4127,8 @@ __rec_split_row(
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}
-
-	page->u.intl.refsize = r->bnd_next * sizeof(WT_ADDR) + size;
-	__wt_cache_page_inmem_incr(session, page, page->u.intl.refsize);
+	__wt_cache_page_inmem_incr(
+	    session, page, r->bnd_next * sizeof(WT_ADDR) + size);
 
 	*splitp = page;
 	return (0);

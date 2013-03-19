@@ -31,7 +31,7 @@ typedef struct {
  */
 static int
 __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
-	void (*visit)(WT_REF *, WT_VISIT_STATE *),
+	void (*visit)(WT_PAGE *, WT_REF *, WT_VISIT_STATE *),
 	WT_VISIT_STATE *state)
 {
 	WT_PAGE *child;
@@ -61,7 +61,7 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 
 		case WT_REF_DELETED:
 		case WT_REF_DISK:
-			(*visit)(ref, state);
+			(*visit)(page, ref, state);
 			break;
 
 		case WT_REF_EVICT_FORCE:
@@ -80,8 +80,10 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
  *	the first/last "live" reference.
  */
 static void
-__merge_count(WT_REF *ref, WT_VISIT_STATE *state)
+__merge_count(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 {
+	WT_UNUSED(parent);
+
 	if (ref->state == WT_REF_LOCKED) {
 		/* Prevent eviction until it is hooked into the new tree. */
 		__wt_evict_list_clr_page(state->session, ref->page);
@@ -105,9 +107,11 @@ __merge_count(WT_REF *ref, WT_VISIT_STATE *state)
  *	Copy a child reference from the locked subtree to a new page.
  */
 static void
-__merge_copy_ref(WT_REF *ref, WT_VISIT_STATE *state)
+__merge_copy_ref(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 {
 	WT_REF *newref;
+
+	WT_UNUSED(parent);
 
 	if (state->split != 0 && state->refcnt++ == state->split)
 		state->ref = state->second_ref;
@@ -136,11 +140,27 @@ __merge_unlock(WT_PAGE *page)
 }
 
 /*
+ * __merge_transfer_footprint --
+ *	Transfer the size of references from an old page to a new page.
+ *
+ *	Note that both pages are locked and there is no net change, so avoid
+ *	__wt_cache_page_inmem_incr.
+ */
+static void
+__merge_transfer_footprint(
+    WT_SESSION_IMPL *session, WT_PAGE *newpage, WT_PAGE *oldpage, size_t size)
+{
+	WT_ASSERT(session, size < (size_t)oldpage->memory_footprint);
+	oldpage->memory_footprint -= size;
+	newpage->memory_footprint += size;
+}
+
+/*
  * __merge_switch_page --
  *	Switch a page from the locked tree into the new tree.
  */
 static void
-__merge_switch_page(WT_REF *ref, WT_VISIT_STATE *state)
+__merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 {
 	WT_PAGE *child;
 	WT_PAGE_MODIFY *modify;
@@ -152,6 +172,16 @@ __merge_switch_page(WT_REF *ref, WT_VISIT_STATE *state)
 	}
 
 	newref = state->ref++;
+
+	if (ref->addr != NULL)
+		__merge_transfer_footprint(
+		    state->session, state->page, parent,
+		    sizeof(WT_ADDR) + ((WT_ADDR *)ref->addr)->size);
+
+	if (ref->u.key != NULL)
+		__merge_transfer_footprint(
+		    state->session, state->page, parent,
+		    sizeof(WT_IKEY) + ((WT_IKEY *)ref->u.key)->size);
 
 	if (ref->state == WT_REF_LOCKED) {
 		child = ref->page;
@@ -185,12 +215,13 @@ __merge_switch_page(WT_REF *ref, WT_VISIT_STATE *state)
 	WT_CLEAR(*ref);
 }
 
+#ifdef HAVE_DIAGNOSTIC
 /*
- * __merge_walk_discard --
+ * __merge_check_discard --
  *	Make sure we are only discarding split-merge pages.
  */
 static void
-__merge_walk_discard(WT_SESSION_IMPL *session, WT_PAGE *mainpage, WT_PAGE *page)
+__merge_check_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_REF *ref;
 	uint32_t i;
@@ -200,23 +231,16 @@ __merge_walk_discard(WT_SESSION_IMPL *session, WT_PAGE *mainpage, WT_PAGE *page)
 	WT_ASSERT(session, page->modify != NULL &&
 	    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE));
 
-	/* Transfer the size of references from an old page to a new page. */
-	WT_ASSERT(session,
-	    page->u.intl.refsize < (size_t)page->memory_footprint);
-	mainpage->u.intl.refsize += page->u.intl.refsize;
-	mainpage->memory_footprint += page->u.intl.refsize;
-	page->memory_footprint -= page->u.intl.refsize;
-	page->u.intl.refsize = 0;
-
 	WT_REF_FOREACH(page, ref, i) {
 		if (ref->state == WT_REF_DISK ||
 		    ref->state == WT_REF_DELETED)
 			continue;
 
 		WT_ASSERT(session, ref->state == WT_REF_LOCKED);
-		__merge_walk_discard(session, mainpage, ref->page);
+		__merge_check_discard(session, ref->page);
 	}
 }
+#endif
 
 /*
  * __merge_new_page --
@@ -290,7 +314,7 @@ int
 __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 {
 	WT_DECL_RET;
-	WT_PAGE *lchild, *mainpage, *newtop, *rchild;
+	WT_PAGE *lchild, *newtop, *rchild;
 	WT_REF *newref;
 	WT_VISIT_STATE visit_state;
 	uint32_t refcnt, split;
@@ -300,7 +324,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 
 	WT_CLEAR(visit_state);
 	visit_state.session = session;
-	lchild = mainpage = newtop = rchild = NULL;
+	lchild = newtop = rchild = NULL;
 	page_type = top->type;
 
 	WT_ASSERT(session, __wt_btree_mergeable(top));
@@ -379,7 +403,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		else {
 			WT_ERR(__merge_new_page(session, page_type, split,
 			    visit_state.first_live < split, &lchild));
-			visit_state.first = mainpage = lchild;
+			visit_state.first = lchild;
 		}
 
 		/* Right split. */
@@ -390,7 +414,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 			WT_ERR(__merge_new_page(session, page_type,
 			    refcnt - split, visit_state.last_live >= split,
 			    &rchild));
-			visit_state.second = mainpage = rchild;
+			visit_state.second = rchild;
 			visit_state.second_ref =
 			    &visit_state.second->u.intl.t[0];
 		}
@@ -408,7 +432,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		    __wt_btree_mergeable(top->parent),
 		    &newtop));
 
-		visit_state.first = mainpage = newtop;
+		visit_state.first = newtop;
 	}
 
 	/*
@@ -459,12 +483,13 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	newtop->parent = top->parent;
 	newtop->ref = top->ref;
 
+#ifdef HAVE_DIAGNOSTIC
 	/*
 	 * Before swapping in the new tree, walk the pages we are discarding,
-	 * check everything looks right and transfer the size to the main page.
+	 * check that everything looks right.
 	 */
-	WT_ASSERT(session, mainpage != NULL);
-	__merge_walk_discard(session, mainpage, top);
+	__merge_check_discard(session, top);
+#endif
 
 	/*
 	 * Set up the new top-level page as a split so that it will be swapped

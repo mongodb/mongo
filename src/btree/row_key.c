@@ -391,8 +391,6 @@ __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_RET(__wt_row_ikey(session, cell_offset, key, size, ikeyp));
 
 	__wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + size);
-	WT_ASSERT(session, page->type == WT_PAGE_ROW_INT);
-	page->u.intl.refsize += sizeof(WT_IKEY) + size;
 
 	return (0);
 }
