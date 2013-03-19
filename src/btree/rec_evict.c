@@ -387,7 +387,7 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 				goto ckpt;
 			if (t->ref->state != WT_REF_MEM)	/* scary */
 				goto ckpt;
-			if (merge || t->modify == NULL ||	/* not merged */
+			if (t->modify == NULL ||		/* not merged */
 			    !F_ISSET(t->modify, WT_PM_REC_EMPTY |
 			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
 				break;
