@@ -178,7 +178,7 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 		    state->session, state->page, parent,
 		    sizeof(WT_ADDR) + ((WT_ADDR *)ref->addr)->size);
 
-	if (ref->u.key != NULL)
+	if (parent->type == WT_PAGE_ROW_INT)
 		__merge_transfer_footprint(
 		    state->session, state->page, parent,
 		    sizeof(WT_IKEY) + ((WT_IKEY *)ref->u.key)->size);
