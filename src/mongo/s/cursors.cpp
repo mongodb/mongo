@@ -362,7 +362,7 @@ namespace mongo {
     };
 
     void CursorCache::startTimeoutThread() {
-        task::repeat( new CursorTimeoutTask , 400 );
+        task::repeat( new CursorTimeoutTask , 4000 );
     }
 
     class CmdCursorInfo : public Command {
