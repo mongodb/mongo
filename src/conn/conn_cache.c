@@ -151,8 +151,7 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	if (cache == NULL)
 		return (0);
 
-	if (cache->evict_cond != NULL)
-		WT_TRET(__wt_cond_destroy(session, cache->evict_cond));
+	WT_TRET(__wt_cond_destroy(session, &cache->evict_cond));
 	__wt_spin_destroy(session, &cache->evict_lock);
 	__wt_spin_destroy(session, &cache->evict_walk_lock);
 

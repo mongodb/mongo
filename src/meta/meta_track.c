@@ -93,7 +93,6 @@ static int
 __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 {
 	WT_BM *bm;
-	WT_BTREE *saved_btree;
 	WT_DECL_RET;
 	int tret;
 
@@ -108,21 +107,17 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_EMPTY:	/* Unused slot */
 		break;
 	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
-		saved_btree = session->btree;
-		session->btree = trk->btree;
 		if (!unroll) {
 			bm = trk->btree->bm;
-			WT_TRET(bm->checkpoint_resolve(bm, session));
+			WT_WITH_BTREE(session, trk->btree,
+			    WT_TRET(bm->checkpoint_resolve(bm, session)));
 		}
-		session->btree = saved_btree;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
-		saved_btree = session->btree;
-		session->btree = trk->btree;
 		if (unroll && trk->created)
-			F_SET(session->btree, WT_BTREE_DISCARD);
-		WT_TRET(__wt_session_release_btree(session));
-		session->btree = saved_btree;
+			F_SET(trk->btree, WT_BTREE_DISCARD);
+		WT_WITH_BTREE(session, trk->btree,
+		    WT_TRET(__wt_session_release_btree(session)));
 		break;
 	case WT_ST_FILEOP:	/* File operation */
 		/*
@@ -189,7 +184,6 @@ free:	trk->op = WT_ST_EMPTY;
 int
 __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
-	WT_BTREE *saved_btree;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
 
@@ -208,12 +202,9 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 		WT_TRET(__meta_track_apply(session, trk, unroll));
 
 	/* If the operation succeeded, checkpoint the metadata. */
-	if (!unroll && ret == 0 && session->metafile != NULL) {
-		saved_btree = session->btree;
-		session->btree = session->metafile;
-		ret = __wt_checkpoint(session, NULL);
-		session->btree = saved_btree;
-	}
+	if (!unroll && ret == 0 && session->metafile != NULL)
+		WT_WITH_BTREE(session, session->metafile,
+		    ret = __wt_checkpoint(session, NULL));
 
 	return (ret);
 }

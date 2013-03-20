@@ -49,6 +49,13 @@
 #define	WT_SET_BTREE_IN_SESSION(s, b)	((s)->btree = (b))
 #define	WT_CLEAR_BTREE_IN_SESSION(s)	((s)->btree = NULL)
 
+#define	WT_WITH_BTREE(s, b, e)	do {					\
+	WT_BTREE *old_btree = (s)->btree;				\
+	WT_SET_BTREE_IN_SESSION(s, b);					\
+	e;								\
+	(s)->btree = old_btree;						\
+} while (0)
+
 /*
  * WT_BTREE --
  *	A btree handle.

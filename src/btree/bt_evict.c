@@ -387,11 +387,9 @@ __evict_worker(WT_SESSION_IMPL *session)
 		__wt_spin_unlock(session, &cache->evict_lock);
 		WT_RET(ret);
 
-		if (force_page != NULL) {
-			WT_SET_BTREE_IN_SESSION(session, force_btree);
-			(void)__evict_page(session, force_page);
-			WT_CLEAR_BTREE_IN_SESSION(session);
-		}
+		if (force_page != NULL)
+			WT_WITH_BTREE(session, force_btree,
+			    (void)__evict_page(session, force_page));
 
 		/*
 		 * Keep evicting until we hit the target cache usage and the
@@ -921,9 +919,8 @@ retry:	file_count = 0;
 		__wt_spin_lock(session, &cache->evict_walk_lock);
 
 		/* Reference the correct WT_BTREE handle. */
-		WT_SET_BTREE_IN_SESSION(session, btree);
-		ret = __evict_walk_file(session, &i, clean);
-		WT_CLEAR_BTREE_IN_SESSION(session);
+		WT_WITH_BTREE(session, btree,
+		    ret = __evict_walk_file(session, &i, clean));
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
@@ -1219,25 +1216,18 @@ __evict_get_page(
 int
 __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 {
-	WT_BTREE *btree, *saved_btree;
+	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 
 	WT_RET(__evict_get_page(session, is_app, &btree, &page));
-
 	WT_ASSERT(session, page->ref->state == WT_REF_LOCKED);
 
-	/* Reference the correct WT_BTREE handle. */
-	saved_btree = session->btree;
-	WT_SET_BTREE_IN_SESSION(session, btree);
-
-	ret = __evict_page(session, page);
+	WT_WITH_BTREE(session, btree,
+	    ret = __evict_page(session, page));
 
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
-
-	WT_CLEAR_BTREE_IN_SESSION(session);
-	session->btree = saved_btree;
 
 	cache = S2C(session)->cache;
 	if (ret == 0 && F_ISSET(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK))

@@ -774,10 +774,10 @@ static inline int
 __clsm_put(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
 {
-	WT_BTREE *saved_btree;
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
+	int full;
 
 	lsm_tree = clsm->lsm_tree;
 
@@ -823,35 +823,22 @@ __clsm_put(
 	 * switch code needs to use btree API methods, and it wants to
 	 * operate on the btree for the primary chunk. Set that up now.
 	 */
-	saved_btree = session->btree;
-	WT_SET_BTREE_IN_SESSION(session, ((WT_CURSOR_BTREE *)primary)->btree);
-	if (__wt_btree_size_overflow(session, lsm_tree->chunk_size)) {
+	WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+	    full = __wt_btree_size_overflow(session, lsm_tree->chunk_size));
+
+	if (full) {
 		/*
 		 * Take the LSM lock first: we can't acquire it while
 		 * holding the schema lock, or we will deadlock.
 		 */
-		WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 		/* Make sure we don't race. */
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_lsm_tree_switch(session, lsm_tree));
 
-		/*
-		 * Clear the "cache resident" flag so the primary can be
-		 * evicted and eventually closed.  Make sure we succeeded
-		 * in switching: if something went wrong, we should keep
-		 * trying to switch.
-		 */
-		if (ret == 0) {
-			WT_SET_BTREE_IN_SESSION(session,
-			    ((WT_CURSOR_BTREE *)primary)->btree);
-			__wt_btree_evictable(session, 1);
-		}
-
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
-err:	WT_SET_BTREE_IN_SESSION(session, saved_btree);
-
 	return (ret);
 }
 

@@ -159,7 +159,7 @@ err:	__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_free(session, pool_name);
 	if (ret != 0 && created) {
 		__wt_free(session, cp->name);
-		WT_TRET(__wt_cond_destroy(session, cp->cache_pool_cond));
+		WT_TRET(__wt_cond_destroy(session, &cp->cache_pool_cond));
 		__wt_free(session, cp);
 	}
 	return (ret);
@@ -310,7 +310,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		/* Now free the pool. */
 		__wt_free(session, cp->name);
 		__wt_spin_destroy(session, &cp->cache_pool_lock);
-		WT_TRET(__wt_cond_destroy(session, cp->cache_pool_cond));
+		WT_TRET(__wt_cond_destroy(session, &cp->cache_pool_cond));
 		__wt_free(session, cp);
 	}
 

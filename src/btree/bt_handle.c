@@ -150,8 +150,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
-	if (btree->val_ovfl_lock != NULL)
-		WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
+	WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
 
 	btree->bulk_load_ok = 0;
 

@@ -128,8 +128,7 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	if (ret == 0)
 		session->btree = btree;
 	else if (btree != NULL) {
-		if (btree->rwlock != NULL)
-			WT_TRET(__wt_rwlock_destroy(session, &btree->rwlock));
+		WT_TRET(__wt_rwlock_destroy(session, &btree->rwlock));
 		__wt_free(session, btree->name);
 		__wt_free(session, btree->checkpoint);
 		__wt_overwrite_and_free(session, btree);
@@ -354,12 +353,11 @@ int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
-	WT_BTREE *btree, *saved_btree;
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	saved_btree = session->btree;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
@@ -372,11 +370,11 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 			 * handle locking here, or pulling every tree into this
 			 * session's handle cache.
 			 */
-			session->btree = btree;
-			WT_ERR(func(session, cfg));
+			WT_WITH_BTREE(session, btree,
+			    ret = func(session, cfg));
+			WT_RET(ret);
 		}
 
-err:	session->btree = saved_btree;
 	return (ret);
 }
 

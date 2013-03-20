@@ -85,7 +85,7 @@ int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_BTREE *btree, *saved_btree;
+	WT_BTREE *btree;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -151,10 +151,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
-	saved_btree = session->btree;
-	session->btree = btree;
-	ret = __wt_checkpoint(session, cfg);
-	session->btree = saved_btree;
+	WT_WITH_BTREE(session, btree,
+	    ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
 

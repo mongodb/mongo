@@ -227,7 +227,6 @@ int
 __wt_curfile_truncate(
     WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
 {
-	WT_BTREE *saved_btree;
 	WT_CURSOR_BTREE *cursor;
 	WT_DECL_RET;
 
@@ -238,11 +237,9 @@ __wt_curfile_truncate(
 	 * do any of the other "standard" cursor API setup.
 	 */
 	cursor = (WT_CURSOR_BTREE *)(start == NULL ? stop : start);
-	saved_btree = session->btree;
-	session->btree = cursor->btree;
-	ret = __wt_btcur_truncate(
-	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop);
-	session->btree = saved_btree;
+	WT_WITH_BTREE(session, cursor->btree,
+	    ret = __wt_btcur_truncate(
+	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
 
 	return (ret);
 }

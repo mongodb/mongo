@@ -57,7 +57,7 @@ __wt_lsm_merge_worker(void *vargs)
 		if (progress)
 			stalls = 0;
 		else {
-			__wt_sleep(0, 1000);
+			__wt_sleep(0, 10000);
 			++stalls;
 		}
 	}
@@ -108,7 +108,7 @@ __wt_lsm_bloom_worker(void *arg)
 				continue;
 
 			/*
-			 * If a bloom filter create fails restart at the
+			 * If a bloom filter create fails, restart at the
 			 * beginning of the chunk array. Don't exit the thread.
 			 */
 			if (__lsm_bloom_create(session, lsm_tree, chunk) != 0)
@@ -116,7 +116,7 @@ __wt_lsm_bloom_worker(void *arg)
 			++j;
 		}
 		if (j == 0)
-			__wt_sleep(0, 100000);
+			__wt_sleep(0, 10000);
 	}
 
 err:	__wt_free(session, cookie.chunk_array);
@@ -176,7 +176,14 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 */
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
-			WT_TRET(__wt_sync_file(session, WT_SYNC_WRITE_LEAVES));
+			ret = __wt_sync_file(session, WT_SYNC_WRITE_LEAVES);
+
+			/*
+			 * Clear the "cache resident" flag so the primary can
+			 * be evicted and eventually closed.
+			 */
+			if (ret == 0)
+				__wt_btree_evictable(session, 1);
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
 
@@ -207,7 +214,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			     "LSM worker checkpointed %u", i);
 		}
 		if (j == 0)
-			__wt_sleep(0, 10000);
+			WT_ERR(__wt_cond_wait(
+			    session, lsm_tree->ckpt_cond, 10000));
 	}
 err:	__wt_free(session, cookie.chunk_array);
 	/*
