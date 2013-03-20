@@ -21,12 +21,67 @@
 #include "config.h"
 #include "request.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/security.h"
 #include <set>
 
 namespace mongo {
 
     DBConnectionPool shardConnectionPool;
+
+    class ClientConnections;
+
+    /**
+     * Class which tracks ClientConnections (the client connection pool) for each incoming
+     * connection, allowing stats access.
+     */
+
+    class ActiveClientConnections {
+     public:
+
+        ActiveClientConnections() : _mutex( "ActiveClientConnections" ) {
+        }
+
+        void add( const ClientConnections* cc ) {
+            scoped_lock lock( _mutex );
+            _clientConnections.insert( cc );
+        }
+
+        void remove( const ClientConnections* cc ) {
+            scoped_lock lock( _mutex );
+            _clientConnections.erase( cc );
+        }
+
+        // Implemented after ClientConnections
+        void appendInfo( BSONObjBuilder& b );
+
+    private:
+        mongo::mutex _mutex;
+        set<const ClientConnections*> _clientConnections;
+
+    } activeClientConnections;
+
+    /**
+     * Command to allow access to the sharded conn pool information in mongos.
+     * TODO: Refactor with other connection pooling changes
+     */
+    class ShardedPoolStats : public Command {
+    public:
+
+        ShardedPoolStats() : Command( "shardConnPoolStats" ) {}
+        virtual void help( stringstream &help ) const { help << "stats about the shard connection pool"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool slaveOk() const { return true; }
+
+        virtual bool run ( const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool ) {
+            // Base pool info
+            shardConnectionPool.appendInfo( result );
+            // Thread connection info
+            activeClientConnections.appendInfo( result );
+            return true;
+        }
+
+    } shardedPoolStatsCmd;
 
     /**
      * holds all the actual db connections for a client to various servers
@@ -37,14 +92,31 @@ namespace mongo {
         struct Status : boost::noncopyable {
             Status() : created(0), avail(0) {}
 
+            // May be read concurrently, but only written from
+            // this thread.
             long long created;
             DBClientBase* avail;
         };
 
+        // Gets or creates the status object for the host
+        Status* _getStatus( const string& addr ) {
+            scoped_spinlock lock( _lock );
+            Status* &temp = _hosts[addr];
+            if ( ! temp )
+                temp = new Status();
+            return temp;
+        }
 
-        ClientConnections() {}
+        ClientConnections() {
+            // Start tracking client connections
+            activeClientConnections.add( this );
+        }
 
         ~ClientConnections() {
+            // Stop tracking these client connections
+            activeClientConnections.remove( this );
+
+            // No longer need spinlock protection
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
@@ -68,9 +140,7 @@ namespace mongo {
         DBClientBase * get( const string& addr , const string& ns ) {
             _check( ns );
 
-            Status* &s = _hosts[addr];
-            if ( ! s )
-                s = new Status();
+            Status* s = _getStatus( addr );
 
             auto_ptr<DBClientBase> c; // Handles cleanup if there's an exception thrown
             if ( s->avail ) {
@@ -78,8 +148,8 @@ namespace mongo {
                 s->avail = 0;
                 shardConnectionPool.onHandedOut( c.get() ); // May throw an exception
             } else {
-                s->created++;
                 c.reset( shardConnectionPool.get( addr ) );
+                s->created++; // After, so failed creation doesn't get counted
             }
             if ( !noauth ) {
                 c->setAuthenticationTable( ClientBasic::getCurrent()->getAuthenticationInfo()->
@@ -115,19 +185,24 @@ namespace mongo {
 
             // Now only check top-level shard connections
             for ( unsigned i=0; i<all.size(); i++ ) {
+                
+                Shard& shard = all[i];
+                try {
+                    string sconnString = shard.getConnString();
+                    Status* s = _getStatus( sconnString );
 
-                string sconnString = all[i].getConnString();
-                Status* &s = _hosts[sconnString];
+                    if( ! s->avail ) {
+                        s->avail = shardConnectionPool.get( sconnString );
+                        s->created++; // After, so failed creation doesn't get counted
+                    }
 
-                if ( ! s ){
-                    s = new Status();
+                    versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
                 }
-
-                if( ! s->avail )
-                    s->avail = shardConnectionPool.get( sconnString );
-
-                versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
-
+                catch ( const std::exception& e ) {
+                    warning() << "problem while initially checking shard versions on"
+                              << " " << shard.getName() << causedBy(e) << endl;
+                    throw;
+                }
             }
         }
 
@@ -137,12 +212,47 @@ namespace mongo {
         }
 
         void _check( const string& ns ) {
-            if ( ns.size() == 0 || _seenNS.count( ns ) )
-                return;
-            _seenNS.insert( ns );
+
+            {
+                // We want to report ns stats too
+                scoped_spinlock lock( _lock );
+                if ( ns.size() == 0 || _seenNS.count( ns ) )
+                    return;
+                _seenNS.insert( ns );
+            }
+
             checkVersions( ns );
         }
         
+        /**
+         * Appends info about the client connection pool to a BOBuilder
+         * Safe to call with activeClientConnections lock
+         */
+        void appendInfo( BSONObjBuilder& b ) const {
+
+            scoped_spinlock lock( _lock );
+
+            BSONArrayBuilder hostsArrB( b.subarrayStart( "hosts" ) );
+            for ( HostMap::const_iterator i = _hosts.begin(); i != _hosts.end(); ++i ) {
+                BSONObjBuilder bb( hostsArrB.subobjStart() );
+                bb.append( "host", i->first );
+                bb.append( "created", i->second->created );
+                bb.appendBool( "avail", static_cast<bool>( i->second->avail ) );
+                bb.done();
+            }
+            hostsArrB.done();
+
+            BSONArrayBuilder nsArrB( b.subarrayStart( "seenNS" ) );
+            for ( set<string>::const_iterator i = _seenNS.begin(); i != _seenNS.end(); ++i ) {
+                nsArrB.append(*i);
+            }
+            nsArrB.done();
+        }
+        
+        // Protects only the creation of new entries in the _hosts and _seenNS map
+        // from external threads.  Reading _hosts / _seenNS in this thread doesn't
+        // need protection.
+        mutable SpinLock _lock;
         typedef map<string,Status*,DBConnectionPool::serverNameCompare> HostMap;
         HostMap _hosts;
         set<string> _seenNS;
@@ -161,6 +271,27 @@ namespace mongo {
     };
 
     thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
+
+    /**
+     * Appends info about all active client shard connections to a BOBuilder
+     */
+    void ActiveClientConnections::appendInfo( BSONObjBuilder& b ) {
+
+        BSONArrayBuilder arr( 64 * 1024 ); // There may be quite a few threads
+
+        {
+            scoped_lock lock( _mutex );
+            for ( set<const ClientConnections*>::const_iterator i = _clientConnections.begin();
+                  i != _clientConnections.end(); ++i )
+            {
+                BSONObjBuilder bb( arr.subobjStart() );
+                (*i)->appendInfo( bb );
+                bb.done();
+            }
+        }
+
+        b.appendArray( "threads", arr.obj() );
+    }
 
     ShardConnection::ShardConnection( const Shard * s , const string& ns, ChunkManagerPtr manager )
         : _addr( s->getConnString() ) , _ns( ns ), _manager( manager ) {
