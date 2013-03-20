@@ -148,6 +148,7 @@ struct __wt_connection_impl {
 	int		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	int		 stat_clear;	/* Statistics log clear */
+	char	       **stat_objects;	/* Statistics list of objects */
 	const char	*stat_path;	/* Statistics log path format */
 	const char	*stat_stamp;	/* Statistics log timestamp format */
 	long		 stat_usecs;	/* Statistics log period */

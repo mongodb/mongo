@@ -1113,6 +1113,15 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
+	/*! [Statistics logging with objects] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "statistics_log=(objects=(\"table:table1\",\"table:table2\"))",
+	    &conn);
+	/*! [Statistics logging with objects] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
 #ifdef MIGHT_NOT_RUN
 	/*
 	 * This example code gets run, and a non-existent log file path might

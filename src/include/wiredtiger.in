@@ -1305,12 +1305,15 @@ struct __wt_connection {
  * statistics_log for more information.,a set of related configuration options
  * defined below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;clear, reset statistics
  * counters after each set of log records are written.,a boolean flag; default
- * \c true.}@config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
- * which the log records are written\, may contain strftime conversion
- * specifications.  If the value is not an absolute path name\, the file is
- * created relative to the database home.,a string; default \c
- * "WiredTigerStat.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp
- * prepended to each log record\, may contain strftime conversion
+ * \c true.}@config{&nbsp;&nbsp;&nbsp;&nbsp;objects, if non-empty\, include
+ * statistics for the list of objects.  No statistics that require traversing a
+ * tree are reported\, as if the \c statistics_fast configuration string were
+ * set.,a list of strings; default empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;path,
+ * the pathname to a file into which the log records are written\, may contain
+ * strftime conversion specifications.  If the value is not an absolute path
+ * name\, the file is created relative to the database home.,a string; default
+ * \c "WiredTigerStat.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a
+ * timestamp prepended to each log record\, may contain strftime conversion
  * specifications.,a string; default \c "%b %d
  * %H:%M:%S".}@config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
  * write of the log records; setting this value configures \c statistics and

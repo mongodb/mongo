@@ -32,7 +32,7 @@ from subprocess import call
 
 # Plot a set of entries for a title.
 def plot(title, entries, num):
-    # Ignore entries with identical values.
+    # Ignore entries where the value never changes.
     skip = 1
     v = entries[0][1]
     for entry in entries:

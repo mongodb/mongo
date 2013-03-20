@@ -20,22 +20,41 @@ The following example logs statistics every 30 seconds:
 
 @snippet ex_all.c Statistics logging
 
-Each statistics record is formatted as a space-separated timestamp,
-unsigned 64-bit value and a variable length string which describes
-the statistic.  For example:
-
-@code
-Mar 08 11:38:23 463 pthread mutex condition wait calls
-Mar 08 11:38:23 0 files currently open
-Mar 08 11:38:23 1855437 total heap memory allocations
-Mar 08 11:38:23 1856622 total heap memory frees
-Mar 08 11:38:23 1 total heap memory re-allocations
-Mar 08 11:38:23 472 total read I/Os
-@endcode
+Each record is formatted as a space-separated timestamp, unsigned 64-bit
+value and a variable length string which describes the statistic.
 
 The timestamp format may be changed with the \c statistics_log.timestamp
 configuration string.  The \c timestamp value may contain ISO C90 standard
 strftime conversion specifications.
+
+By default, only the system's connection statistics are logged, but
+statistics may be optionally reported for underlying objects by adding
+a list of URIs to the \c statistics_log configuration string:
+
+@snippet ex_all.c Statistics logging with objects
+
+When database statistics are logged, the database home will be the first
+space-separated entry for each record in the log file.  For example:
+
+@code
+Mar 08 11:38:23 463 /database/home pthread mutex condition wait calls
+Mar 08 11:38:23 0 /database/home files currently open
+Mar 08 11:38:23 1855437 /database/home total heap memory allocations
+Mar 08 11:38:23 1856622 /database/home total heap memory frees
+Mar 08 11:38:23 1 /database/home total heap memory re-allocations
+Mar 08 11:38:23 472 /database/home total read I/Os
+@endcode
+
+When object statistics are logged, the object URI will be the first
+space-separated entry for each record in the log file.  For example:
+
+@code
+Mar 20 10:42:36 21 table:mytable compressed pages written
+Mar 20 10:42:36 0 table:mytable page written failed to compress
+Mar 20 10:42:36 5 table:mytable page written was too small to compress
+Mar 20 10:42:36 586 table:mytable cursor insert calls
+Mar 20 10:42:36 0 table:mytable bulk-loaded cursor-insert calls
+@endcode
 
 The location of the log files may be changed with the \c statistics_log.path
 configuration string.  The \c path value value may contain ISO C90 standard

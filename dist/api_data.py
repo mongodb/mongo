@@ -578,6 +578,11 @@ methods = {
 		Config('clear', 'true', r'''
 		reset statistics counters after each set of log records are
 		written''', type='boolean'),
+		Config('objects', '', r'''
+		if non-empty, include statistics for the list of objects.  No
+		statistics that require traversing a tree are reported, as if
+		the \c statistics_fast configuration string were set''',
+		type='list'),
 		Config('path', '"WiredTigerStat.%H"', r'''
 		the pathname to a file into which the log records are written,
 		may contain strftime conversion specifications.  If the value
