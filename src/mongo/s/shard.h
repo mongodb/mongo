@@ -284,6 +284,18 @@ namespace mongo {
         /** checks all of my thread local connections for the version of this ns */
         static void checkMyConnectionVersions( const string & ns );
 
+        /**
+         * Whether or not we should release all connections after an operation with
+         * a response.
+         */
+        static bool releaseConnectionsAfterResponse;
+
+        /**
+         * Returns all the current sharded connections to the pool.
+         * Note: This is *dangerous* if we have GLE state.
+         */
+        static void releaseMyConnections();
+
     private:
         void _init();
         void _finishInit();

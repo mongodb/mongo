@@ -41,6 +41,7 @@
 #include "../util/version.h"
 #include "../util/ramlog.h"
 #include "repl/multicmd.h"
+#include "mongo/s/shard.h"
 #include "server.h"
 
 namespace mongo {
@@ -165,6 +166,10 @@ namespace mongo {
             if (all || cmdObj.hasElement("replIndexPrefetch")) {
                 result.append("replIndexPrefetch", fetchReplIndexPrefetchParam());
             }
+            if (all || cmdObj.hasElement("releaseConnectionsAfterResponse")) {
+                result.append("releaseConnectionsAfterResponse", 
+                              ShardConnection::releaseConnectionsAfterResponse);
+            }
             if ( before == result.len() ) {
                 errmsg = "no option found to get";
                 return false;
@@ -252,6 +257,15 @@ namespace mongo {
                 if( s == 0 ) result.append( "was", ReplicaSetMonitor::getMaxFailedChecks() );
                 ReplicaSetMonitor::setMaxFailedChecks(
                         cmdObj["replMonitorMaxFailedChecks"].numberInt() );
+                s++;
+            }
+            if( cmdObj.hasElement( "releaseConnectionsAfterResponse" ) ) {
+                if ( s == 0 ) {
+                    result.append( "was", 
+                                   ShardConnection::releaseConnectionsAfterResponse );
+                }
+                ShardConnection::releaseConnectionsAfterResponse = 
+                    cmdObj["releaseConnectionsAfterResponse"].trueValue();
                 s++;
             }
 
