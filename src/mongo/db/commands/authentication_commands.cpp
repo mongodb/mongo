@@ -16,6 +16,7 @@
 
 #include "mongo/db/commands/authentication_commands.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/md5.hpp"
 
 namespace mongo {
@@ -53,8 +55,10 @@ namespace mongo {
 
     class CmdGetNonce : public Command {
     public:
-        CmdGetNonce() : Command("getnonce") {
-            _random = SecureRandom::create();
+        CmdGetNonce() :
+            Command("getnonce"),
+            _randMutex("getnonce"),
+            _random(SecureRandom::create()) {
         }
 
         virtual bool requiresAuth() { return false; }
@@ -68,7 +72,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            nonce64 n = _random->nextInt64();
+            nonce64 n = getNextNonce();
             stringstream ss;
             ss << hex << n;
             result.append("nonce", ss.str() );
@@ -77,7 +81,14 @@ namespace mongo {
             return true;
         }
 
-        SecureRandom* _random;
+    private:
+        nonce64 getNextNonce() {
+            SimpleMutex::scoped_lock lk(_randMutex);
+            return _random->nextInt64();
+        }
+
+        SimpleMutex _randMutex;  // Synchronizes accesses to _random.
+        boost::scoped_ptr<SecureRandom> _random;
     } cmdGetNonce;
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
