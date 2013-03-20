@@ -169,6 +169,17 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
 
+			/*
+			 * Flush the file before checkpointing: this is the
+			 * expensive part in terms of I/O: do it without
+			 * holding the schema lock.
+			 */
+			WT_ERR(__wt_session_get_btree(
+			    session, chunk->uri, NULL, NULL, 0));
+			WT_TRET(__wt_sync_file(session, WT_SYNC_WRITE_LEAVES));
+			WT_TRET(__wt_session_release_btree(session));
+			WT_ERR(ret);
+
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, NULL, WT_BTREE_DISCARD_CLOSE));
