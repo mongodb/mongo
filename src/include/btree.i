@@ -531,26 +531,30 @@ __wt_skip_choose_depth(void)
 /*
  * __wt_btree_size_overflow --
  *      Check if the size of an in-memory tree with a single leaf page is
- *      over a specified maximum.
+ *      over a specified maximum.  If called on anything other than a simple
+ *      tree with a single leaf page, returns true so the calling code will
+ *      switch to a new tree.
  */
 static inline int
 __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
 {
 	WT_BTREE *btree;
-	WT_PAGE *child;
+	WT_PAGE *child, *root;
 
-	/*
-	 * Only return true if:
-	 * - We have a valid btree
-	 * - The btree has only a single leaf page
-	 * - The single leaf page is in memory
-	 */
 	btree = session->btree;
-	if (btree == NULL || btree->root_page->entries != 1 ||
-	    btree->root_page->u.intl.t->page == NULL)
+	root = btree->root_page;
+
+	if (btree == NULL || root == NULL ||
+	    (child = root->u.intl.t->page) == NULL)
 		return (0);
 
-	child = btree->root_page->u.intl.t->page;
+	/* Make sure this is a simple tree, or LSM should switch. */
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    root->entries != 1 ||
+	    root->u.intl.t->state != WT_REF_MEM ||
+	    child->type != WT_PAGE_ROW_LEAF)
+		return (1);
+
 	return (child->memory_footprint > maxsize);
 }
 

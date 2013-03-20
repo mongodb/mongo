@@ -477,9 +477,9 @@ void
 __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 {
 	if (on)
-		F_SET(session->btree, WT_BTREE_NO_EVICTION);
-	else
 		F_CLR(session->btree, WT_BTREE_NO_EVICTION);
+	else
+		F_SET(session->btree, WT_BTREE_NO_EVICTION);
 }
 
 /*

@@ -341,9 +341,9 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
 			continue;
 		if (!locked) {
-			locked = 1;
 			/* TODO: Do we need the lsm_tree lock for all drops? */
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+			locked = 1;
 		}
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_drop(

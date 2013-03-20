@@ -842,8 +842,11 @@ __clsm_put(
 		 * in switching: if something went wrong, we should keep
 		 * trying to switch.
 		 */
-		if (ret == 0)
+		if (ret == 0) {
+			WT_SET_BTREE_IN_SESSION(session,
+			    ((WT_CURSOR_BTREE *)primary)->btree);
 			__wt_btree_evictable(session, 1);
+		}
 
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
