@@ -359,7 +359,7 @@ namespace mongo {
                                                               (int)ceil(_statUtil.getSeconds()) ) ) );
             state->authParams = BSON( "user" << _username <<
                                       "pwd" << _password <<
-                                      "userSource" << _authenticationDatabase <<
+                                      "userSource" << getAuthenticationDatabase() <<
                                       "mechanism" << _authenticationMechanism );
             return true;
         }
