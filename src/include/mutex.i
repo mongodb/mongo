@@ -71,9 +71,17 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline void
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
-	WT_UNUSED(session);
+#ifdef HAVE_MUTEX_ADAPTIVE
+	pthread_mutexattr_t attr;
 
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP);
+	(void)pthread_mutex_init(t, &attr);
+#else
 	(void)pthread_mutex_init(t, NULL);
+#endif
+
+	WT_UNUSED(session);
 }
 
 static inline void

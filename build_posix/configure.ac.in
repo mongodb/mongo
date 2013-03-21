@@ -87,6 +87,16 @@ AC_CHECK_FUNCS([\
 	posix_memalign strtouq sync_file_range])
 AC_SYS_LARGEFILE
 
+AC_MSG_CHECKING([if the adaptive mutex type is available])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <pthread.h>]],[[
+	pthread_mutexattr_t attr;
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP);]])],
+    [AC_MSG_RESULT([yes])
+     AC_DEFINE([HAVE_MUTEX_ADAPTIVE], [1],
+        [Define if adaptive mutexes are supported.])],
+    [AC_MSG_RESULT([no])])
+
 AC_C_BIGENDIAN
 
 # Linux requires _GNU_SOURCE to be defined and buffers aligned to 512 byte
