@@ -114,27 +114,34 @@ namespace mongo {
             a.append( members[i].asBson() );
         b.append("members", a.arr());
 
-        if( !ho.isDefault() || !getLastErrorDefaults.isEmpty() || !rules.empty()) {
-            bob settings;
-            if( !rules.empty() ) {
-                bob modes;
-                for (map<string,TagRule*>::const_iterator it = rules.begin(); it != rules.end(); it++) {
-                    bob clauses;
-                    vector<TagClause*> r = (*it).second->clauses;
-                    for (vector<TagClause*>::iterator it2 = r.begin(); it2 < r.end(); it2++) {
-                        clauses << (*it2)->name << (*it2)->target;
-                    }
-                    modes << (*it).first << clauses.obj();
+        BSONObjBuilder settings;
+        bool empty = true;
+
+        if (!rules.empty()) {
+            bob modes;
+            for (map<string,TagRule*>::const_iterator it = rules.begin(); it != rules.end(); it++) {
+                bob clauses;
+                vector<TagClause*> r = (*it).second->clauses;
+                for (vector<TagClause*>::iterator it2 = r.begin(); it2 < r.end(); it2++) {
+                    clauses << (*it2)->name << (*it2)->target;
                 }
-                settings << "getLastErrorModes" << modes.obj();
+                modes << (*it).first << clauses.obj();
             }
-            if( !getLastErrorDefaults.isEmpty() )
-                settings << "getLastErrorDefaults" << getLastErrorDefaults;
+            settings << "getLastErrorModes" << modes.obj();
+            empty = false;
+        }
 
-            if (!_chainingAllowed) {
-                settings << "chainingAllowed" << _chainingAllowed;
-            }
+        if (!getLastErrorDefaults.isEmpty()) {
+            settings << "getLastErrorDefaults" << getLastErrorDefaults;
+            empty = false;
+        }
 
+        if (!_chainingAllowed) {
+            settings << "chainingAllowed" << _chainingAllowed;
+            empty = false;
+        }
+
+        if (!empty) {
             b << "settings" << settings.obj();
         }
 
