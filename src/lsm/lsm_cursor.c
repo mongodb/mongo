@@ -823,23 +823,17 @@ __clsm_put(
 	 * switch code needs to use btree API methods, and it wants to
 	 * operate on the btree for the primary chunk. Set that up now.
 	 */
-	WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-	    full = __wt_btree_size_overflow(session, lsm_tree->chunk_size));
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+		    full = __wt_btree_size_overflow(
+		    session, lsm_tree->chunk_size));
 
-	if (full) {
-		/*
-		 * Take the LSM lock first: we can't acquire it while
-		 * holding the schema lock, or we will deadlock.
-		 */
-		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
-		/* Make sure we don't race. */
-		if (clsm->dsk_gen == lsm_tree->dsk_gen)
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_lsm_tree_switch(session, lsm_tree));
-
-		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+		if (full) {
+			F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+			WT_RET(__wt_cond_signal(session, lsm_tree->ckpt_cond));
+		}
 	}
-	return (ret);
+	return (0);
 }
 
 /*

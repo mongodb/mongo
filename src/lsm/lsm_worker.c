@@ -196,6 +196,17 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_CLEAR(cookie);
 
 	for (;;) {
+		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+				WT_WITH_SCHEMA_LOCK(session, ret =
+				    __wt_lsm_tree_switch(session, lsm_tree));
+				F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+			}
+			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+			WT_ERR(ret);
+		}
+
 		WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			goto err;
@@ -204,6 +215,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 		for (i = 0, j = 0; i < cookie.nchunks - 1; i++) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 				goto err;
+
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+				break;
 
 			chunk = cookie.chunk_array[i];
 			/* Stop if a thread is still active in the chunk. */
@@ -257,7 +271,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointed %u", i);
 		}
-		if (j == 0)
+		if (j == 0 && !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 			WT_ERR(__wt_cond_wait(
 			    session, lsm_tree->ckpt_cond, 10000));
 	}
