@@ -270,7 +270,7 @@ namespace mongo {
 
         int ret = -1;
         try {
-            if (!useDirectClient)
+            if (!useDirectClient && !_noconnection)
                 auth();
             ret = run();
         }
@@ -406,6 +406,18 @@ namespace mongo {
         throw UserException( 9998 , "you need to specify fields" );
     }
 
+    std::string Tool::getAuthenticationDatabase() {
+        if (!_authenticationDatabase.empty()) {
+            return _authenticationDatabase;
+        }
+
+        if (!_db.empty()) {
+            return _db;
+        }
+
+        return "admin";
+    }
+
     /**
      * Validate authentication on the server for the given dbname.
      */
@@ -422,17 +434,7 @@ namespace mongo {
             return;
         }
 
-        std::string userSource = _authenticationDatabase;
-        if ( userSource.empty() ) {
-            if ( !_db.empty() ) {
-                userSource = _db;
-            }
-            else {
-                userSource = "admin";
-            }
-        }
-
-        _conn->auth( BSON( saslCommandPrincipalSourceFieldName << userSource <<
+        _conn->auth( BSON( saslCommandPrincipalSourceFieldName << getAuthenticationDatabase() <<
                            saslCommandPrincipalFieldName << _username <<
                            saslCommandPasswordFieldName << _password  <<
                            saslCommandMechanismFieldName << _authenticationMechanism ) );
