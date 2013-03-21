@@ -309,6 +309,7 @@ int _main(int argc, char* argv[]) {
     ("nohttpinterface", "disable http interface");
 
     hidden_options.add_options()
+    ("releaseConnectionsAfterResponse", "" )
     ("noAutoSplit", "do not send split commands with writes");
 
 #if defined(_WIN32)
@@ -400,6 +401,11 @@ int _main(int argc, char* argv[]) {
     if (params.count("noAutoSplit")) {
         warning() << "running with auto-splitting disabled" << endl;
         Chunk::ShouldAutoSplit = false;
+    }
+
+    if (params.count("releaseConnectionsAfterResponse")) {
+        warning() << "releaseConnectionsAfterResponse set to true" << endl;
+        ShardConnection::releaseConnectionsAfterResponse = true;
     }
 
     if ( ! params.count( "configdb" ) ) {
