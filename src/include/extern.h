@@ -754,9 +754,6 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 extern void *__wt_lsm_merge_worker(void *vargs);
 extern void *__wt_lsm_bloom_worker(void *arg);
 extern void *__wt_lsm_checkpoint_worker(void *arg);
-extern int __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree,
-    WT_LSM_WORKER_COOKIE *cookie);
 extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);

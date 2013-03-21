@@ -368,6 +368,9 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
+	Config('remove_files', 'true', r'''
+		should the underlying files be removed?''',
+		type='boolean'),
 	]),
 
 'session.log_printf' : Method([]),

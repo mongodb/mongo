@@ -189,11 +189,15 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 
 	WT_ASSERT(session,
 	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
-	if (--session->meta_track_nest != 0)
-		return (0);
 
 	trk_orig = session->meta_track;
 	trk = session->meta_track_next;
+
+	/*
+	 * If it was a nested transaction or there were no changes, we're done.
+	 */
+	if (--session->meta_track_nest != 0 || trk == NULL)
+		return (0);
 
 	/* Turn off tracking for unroll. */
 	session->meta_track_next = session->meta_track_sub = NULL;

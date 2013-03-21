@@ -296,11 +296,12 @@ __wt_confchk_session_create[] = {
 
 const char *
 __wt_confdfl_session_drop =
-	"force=0";
+	"force=0,remove_files=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_drop[] = {
 	{ "force", "boolean", NULL, NULL},
+	{ "remove_files", "boolean", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 

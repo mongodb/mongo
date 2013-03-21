@@ -15,9 +15,13 @@ static int
 __drop_file(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int exist;
+	int exist, remove_files;
 	const char *filename;
+
+	WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
+	remove_files = (cval.val != 0);
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -38,6 +42,9 @@ __drop_file(
 	WT_TRET(__wt_metadata_remove(session, uri));
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
+
+	if (!remove_files)
+		return (ret);
 
 	/* Remove the underlying physical file. */
 	exist = 0;

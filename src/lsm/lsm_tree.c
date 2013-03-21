@@ -210,6 +210,7 @@ __wt_lsm_tree_setup_chunk(
 {
 	WT_ITEM buf;
 	const char *cfg[] = API_CONF_DEFAULTS(session, drop, "force");
+	int exists;
 
 	WT_CLEAR(buf);
 
@@ -217,16 +218,20 @@ __wt_lsm_tree_setup_chunk(
 	chunk->uri = __wt_buf_steal(session, &buf, NULL);
 
 	/*
-	 * Drop the chunk first - there may be some content hanging over from
-	 * an aborted merge or checkpoint.
+	 * If the underlying file exists, drop the chunk first - there may be
+	 * some content hanging over from an aborted merge or checkpoint.
 	 *
 	 * Don't do this for the very first chunk: we are called during
 	 * WT_SESSION::create, and doing a drop inside there does interesting
 	 * things with handle locks and metadata tracking.  It can never have
 	 * been the result of an interrupted merge, anyway.
 	 */
-	if (chunk->id > 1)
-		WT_RET(__wt_schema_drop(session, chunk->uri, cfg));
+	if (chunk->id > 1) {
+		WT_RET(__wt_exist(
+		    session, chunk->uri + strlen("file:"), &exists));
+		if (exists)
+			WT_RET(__wt_schema_drop(session, chunk->uri, cfg));
+	}
 	return (__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
 }
 
