@@ -39,8 +39,9 @@ var checkNoChaining = function() {
         }
     );
 
-    var endTime = (new Date()).getTime()+10;
+    var endTime = (new Date()).getTime()+10000;
     while ((new Date()).getTime() < endTime) {
+        print('CHAINING IS NOT HAPPENING');
         assert(nodes[2].getDB("test").foo.findOne() == null,
                'Check that 2 does not catch up');
     }
@@ -49,7 +50,9 @@ var checkNoChaining = function() {
 var forceSync = function() {
     assert.soon(
         function() {
-            nodes[2].getDB("admin").runCommand({replSetSyncFrom : hostnames[1]});
+            var config = nodes[2].getDB("local").system.replset.findOne();
+            var targetHost = config.members[1].host;
+            printjson(nodes[2].getDB("admin").runCommand({replSetSyncFrom : targetHost}));
             return nodes[2].getDB("test").foo.findOne() != null;
         },
         'Check force sync still works'
@@ -65,4 +68,7 @@ if (!_isWindows()) {
 
     print("check that forcing sync target still works");
     forceSync();
+
+    var config = master.getDB("local").system.replset.findOne();
+    assert.eq(false, config.settings.chainingAllowed, tojson(config));
 }
