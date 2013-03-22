@@ -1794,6 +1794,9 @@
     <ClInclude Include="..\platform\hash_namespace.h">
       <Filter>platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\parsed_query.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3489,6 +3492,9 @@
     </ClCompile>
     <ClCompile Include="..\platform\random_test.cpp">
       <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\parsed_query.cpp">
+      <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

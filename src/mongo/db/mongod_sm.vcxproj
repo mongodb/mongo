@@ -2178,6 +2178,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
     <ClCompile Include="field_ref.cpp" />
+    <ClCompile Include="parsed_query.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
@@ -2642,6 +2643,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="ops\modifier_base.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
+    <ClInclude Include="parsed_query.h" />
     <ClInclude Include="pdfile_private.h" />
     <ClInclude Include="pipeline\document_internal.h" />
     <ClInclude Include="pipeline\value_internal.h" />

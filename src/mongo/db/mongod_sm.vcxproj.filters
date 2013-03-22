@@ -1514,6 +1514,9 @@
     <ClCompile Include="..\platform\random_test.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="parsed_query.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -3095,6 +3098,9 @@
     </ClInclude>
     <ClInclude Include="..\platform\hash_namespace.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="parsed_query.h">
+      <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
