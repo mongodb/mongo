@@ -39,7 +39,7 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 	txn->snapshot_count = n;
 	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
 	txn->snap_max = id;
-	WT_ASSERT(session, txn->snap_min != WT_TXN_NONE);
+	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
 	txn->oldest_snap_min = TXNID_LT(oldest_snap_min, txn->snap_min) ?
 	    oldest_snap_min : txn->snap_min;
 }
