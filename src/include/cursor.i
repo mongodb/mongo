@@ -86,7 +86,7 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 		 * make progress.
 		 */
 		if (F_ISSET(&session->txn, TXN_AUTOCOMMIT))
-			__wt_cache_full_check(session);
+			WT_RET(__wt_cache_full_check(session));
 	}
 	return (0);
 }
