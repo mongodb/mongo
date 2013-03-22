@@ -1,3 +1,9 @@
+mongodb (2.4.1) unstable; urgency=low
+
+  * see http://docs.mongodb.org/manual/release-notes/2.4/
+
+ -- Richard Kreuter <richard@10gen.com>  Fri, 23 Mar 2013 16:56:28 -0500
+
 mongodb (2.4.0) unstable; urgency=low
 
   * see http://docs.mongodb.org/manual/release-notes/2.4/
