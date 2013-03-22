@@ -394,6 +394,7 @@ namespace mongo {
             mayInterrupt( opts.mayBeInterrupted );
             dbtempreleaseif r( opts.mayYield );
 
+#if 0
             // fetch index info
             auto_ptr<DBClientCursor> cur = _conn->query(idxns.c_str(), BSONObj(), 0, 0, 0,
                                                        opts.slaveOk ? QueryOption_SlaveOk : 0 );
@@ -420,7 +421,7 @@ namespace mongo {
                 _sortersForNS[idxEntry["ns"].String()].insert(make_pair(idxEntry["name"].String(),
                                                                         details));
             }
-
+#endif
             // just using exhaust for collection copying right now
             
             // todo: if snapshot (bool param to this func) is true, we need to snapshot this query?
