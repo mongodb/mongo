@@ -64,10 +64,7 @@
 			ret = __wt_txn_commit((s), NULL);		\
 		else {							\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\
-			if (ret == 0 || ret == WT_DEADLOCK) {		\
-				ret = __wt_cache_full_check(s);		\
-				continue;				\
-			}						\
+			continue;					\
 		}							\
 	} else if (F_ISSET(&(s)->txn, TXN_RUNNING) && (ret) != 0 &&	\
 	    (ret) != WT_NOTFOUND &&					\
