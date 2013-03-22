@@ -60,14 +60,14 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.clear", &cval));
 	conn->stat_clear = cval.val != 0;
 
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.objects", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
 	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
 		;
 	WT_RET_NOTFOUND_OK(ret);
 	if (cnt != 0) {
 		WT_RET(
-		    __wt_calloc_def(session, cnt * 2 + 1, &conn->stat_objects));
+		    __wt_calloc_def(session, cnt * 2 + 1, &conn->stat_sources));
 		WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 		for (cnt = 0;
 		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0;) {
@@ -81,14 +81,14 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 			 * the enhanced uri used to open the statistics cursor.
 			 */
 			WT_RET(__wt_strndup(session,
-			    k.str, k.len, &conn->stat_objects[cnt]));
+			    k.str, k.len, &conn->stat_sources[cnt]));
 			++cnt;
 
 			WT_RET(__wt_calloc_def(session,
 			    strlen("statistics:") + k.len + 1,
-			    &conn->stat_objects[cnt]));
-			strcpy(conn->stat_objects[cnt], "statistics:");
-			strncat(conn->stat_objects[cnt], k.str, k.len);
+			    &conn->stat_sources[cnt]));
+			strcpy(conn->stat_sources[cnt], "statistics:");
+			strncat(conn->stat_sources[cnt], k.str, k.len);
 			++cnt;
 		}
 		WT_RET_NOTFOUND_OK(ret);
@@ -231,7 +231,7 @@ __stat_server(void *arg)
 		    session, conn->home, "statistics:", tmp.mem, fp));
 
 		/* Dump the object list statistics. */
-		if ((p = conn->stat_objects) != NULL)
+		if ((p = conn->stat_sources) != NULL)
 			for (; *p != NULL; p += 2)
 				WT_ERR(__stat_server_dump(
 				    session, p[0], p[1], tmp.mem, fp));
@@ -319,10 +319,10 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 	if (conn->stat_cond != NULL)
 		WT_TRET(__wt_cond_destroy(session, conn->stat_cond));
 
-	if ((p = conn->stat_objects) != NULL) {
+	if ((p = conn->stat_sources) != NULL) {
 		for (; *p != NULL; ++p)
 			__wt_free(session, *p);
-		__wt_free(session, conn->stat_objects);
+		__wt_free(session, conn->stat_sources);
 	}
 	__wt_free(session, conn->stat_path);
 	__wt_free(session, conn->stat_stamp);

@@ -78,7 +78,7 @@ wts_open(void)
 	    "create,cache_size=%" PRIu32 "MB,"
 	    "error_prefix=\"%s\","
 	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s,"
-	    "statistics=true,statistics_log=(objects=(\"%s\"),wait=5),"
+	    "statistics=true,statistics_log=(sources=(\"%s\"),wait=5),"
 	    "sync=false,",
 	    g.c_cache,
 	    g.progname,

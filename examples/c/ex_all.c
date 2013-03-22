@@ -1116,7 +1116,7 @@ main(void)
 	/*! [Statistics logging with objects] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "statistics_log=(objects=(\"table:table1\",\"table:table2\"))",
+	    "statistics_log=(sources=(\"table:table1\",\"table:table2\"))",
 	    &conn);
 	/*! [Statistics logging with objects] */
 	if (ret == 0)
