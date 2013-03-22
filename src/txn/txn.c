@@ -76,13 +76,15 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
-	/* If nothing has changed since last time, we're done. */
-	if (txn->last_oldest_gen == txn_global->gen)
-		return;
-	txn->last_oldest_gen = txn_global->gen;
-
 	oldest_snap_min =
 	    (txn->id != WT_TXN_NONE) ? txn->id : txn_global->current;
+
+	/* If nothing has changed since last time, we're done. */
+	if (txn->last_oldest_gen == txn_global->gen &&
+	    txn->last_oldest_id == oldest_snap_min)
+		return;
+	txn->last_oldest_gen = txn_global->gen;
+	txn->last_oldest_id = oldest_snap_min;
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states;
