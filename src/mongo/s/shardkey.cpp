@@ -49,8 +49,10 @@ namespace mongo {
 
         for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it) {
             BSONElement e = obj.getFieldDotted(it->c_str());
-            if(e.eoo() || e.type() == Array || (e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$')) {
-                // cant use getGtLtOp here as it returns Equality for unknown $ops and we want to reject them
+            if(     e.eoo() ||
+                    e.type() == Array ||
+                    (e.type() == Object && !e.embeddedObject().okForStorage())) {
+                // Don't allow anything for a shard key we can't store -- like $gt/$lt ops
                 return false;
             }
         }
@@ -143,16 +145,26 @@ namespace mongo {
     public:
 
         void hasshardkeytest() {
-            BSONObj x = fromjson("{ zid : \"abcdefg\", num: 1.0, name: \"eliot\" }");
             ShardKeyPattern k( BSON( "num" << 1 ) );
+
+            BSONObj x = fromjson("{ zid : \"abcdefg\", num: 1.0, name: \"eliot\" }");
             verify( k.hasShardKey(x) );
             verify( !k.hasShardKey( fromjson("{foo:'a'}") ) );
             verify( !k.hasShardKey( fromjson("{x: {$gt: 1}}") ) );
+            verify( !k.hasShardKey( fromjson("{num: {$gt: 1}}") ) );
+            BSONObj obj = BSON( "num" << BSON( "$ref" << "coll" << "$id" << 1));
+            verify( k.hasShardKey(obj));
 
             // try compound key
             {
                 ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
                 verify( k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',b:9,k:99}") ) );
+                BSONObj obj = BSON( "foo" << "a" <<
+                                    "a" << BSON("$ref" << "coll" << "$id" << 1) <<
+                                    "c" << 1 << "b" << 9 << "k" << 99 );
+                verify( k.hasShardKey(  obj ) );
+                verify( !k.hasShardKey( fromjson("{foo:'a',a:[1,2],c:'z',b:9,k:99}") ) );
+                verify( !k.hasShardKey( fromjson("{foo:'a',a:{$gt:1},c:'z',b:9,k:99}") ) );
                 verify( !k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',bb:9,k:99}") ) );
                 verify( !k.hasShardKey( fromjson("{k:99}") ) );
             }
@@ -162,7 +174,16 @@ namespace mongo {
                 ShardKeyPattern k( fromjson("{'a.b':1}") );
                 verify( k.hasShardKey( fromjson("{a:{b:1,c:1},d:1}") ) );
                 verify( k.hasShardKey( fromjson("{'a.b':1}") ) );
+                BSONObj obj = BSON( "c" << "a" <<
+                                    "a" << BSON("$ref" << "coll" << "$id" << 1) );
+                verify( !k.hasShardKey(  obj ) );
+                obj = BSON( "c" << "a" <<
+                            "a" << BSON( "b" << BSON("$ref" << "coll" << "$id" << 1) <<
+                                         "c" << 1));
+                verify( k.hasShardKey(  obj ) );
                 verify( !k.hasShardKey( fromjson("{'a.c':1}") ) );
+                verify( !k.hasShardKey( fromjson("{'a':[{b:1}, {c:1}]}") ) );
+                verify( !k.hasShardKey( fromjson("{a:{b:[1,2]},d:1}") ) );
                 verify( !k.hasShardKey( fromjson("{a:{c:1},d:1}") ) );
                 verify( !k.hasShardKey( fromjson("{a:1}") ) );
                 verify( !k.hasShardKey( fromjson("{b:1}") ) );
