@@ -20,6 +20,7 @@
 #include "mongo/db/explain.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/query_plan.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/util/elapsed_tracker.h"
 
 #pragma once
