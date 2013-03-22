@@ -17,7 +17,7 @@
 #include "mongo/db/repl/repl_reads_ok.h"
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/queryutil.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/replutil.h"

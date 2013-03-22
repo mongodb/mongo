@@ -22,14 +22,16 @@
 #include "mongo/db/matcher.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/querypattern.h"
-#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
     class Cursor;
+    class FieldRangeSet;
+    class FieldRangeSetPair;
     class IndexDetails;
     class IndexType;
     class NamespaceDetails;
+    class ParsedQuery;
     struct QueryPlanSummary;
 
     /**
@@ -110,7 +112,7 @@ namespace mongo {
 
         int idxNo() const { return _idxNo; }
 
-        const char* ns() const { return _frs.ns(); }
+        const char* ns() const;
 
         NamespaceDetails* nsd() const { return _d; }
 

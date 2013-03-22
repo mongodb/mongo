@@ -20,6 +20,7 @@
 #include "mongo/db/index.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {

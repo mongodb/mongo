@@ -22,6 +22,7 @@
 #include "mongo/db/query_plan_selection_policy.h"
 #include "mongo/db/query_plan_summary.h"
 #include "mongo/db/query_optimizer_internal.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
     

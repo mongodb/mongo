@@ -20,10 +20,11 @@
 
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query_optimizer.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/query.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/dbtests/dbtests.h"
 
 

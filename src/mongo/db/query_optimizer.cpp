@@ -18,6 +18,7 @@
 
 #include "mongo/db/query_optimizer_internal.h"
 #include "mongo/db/queryoptimizercursorimpl.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 

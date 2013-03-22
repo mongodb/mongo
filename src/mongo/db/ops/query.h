@@ -33,6 +33,8 @@ namespace mongo {
     class ParsedQuery;
     class QueryOptimizerCursor;
     struct QueryPlanSummary;
+
+    extern const int32_t MaxBytesToReturnToClientAtOnce;
     
     /**
      * Return a batch of results from a client OP_GET_MORE request.

@@ -20,7 +20,9 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/intervalbtreecursor.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/query_plan_summary.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/server.h"
 
 namespace mongo {
@@ -324,6 +326,10 @@ doneCheckOrder:
         if ( !_index )
             return BSON( "$natural" << 1 );
         return _index->keyPattern();
+    }
+
+    const char* QueryPlan::ns() const {
+        return _frs.ns();
     }
 
     void QueryPlan::registerSelf( long long nScanned,

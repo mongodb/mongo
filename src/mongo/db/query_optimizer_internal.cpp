@@ -21,7 +21,9 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/db.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/query_plan_selection_policy.h"
+#include "mongo/db/queryutil.h"
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -1262,6 +1264,10 @@ namespace mongo {
             return 0;
         }
         return _currentQps->firstPlan().get();
+    }
+
+    bool MultiPlanScanner::hasMoreClauses() const {
+        return _or ? ( !_tableScanned && !_org->orRangesExhausted() ) : _i == 0;
     }
 
     bool MultiPlanScanner::haveUselessOr() const {

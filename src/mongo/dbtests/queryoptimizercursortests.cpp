@@ -21,14 +21,15 @@
 
 #include "../db/queryoptimizercursorimpl.h"
 
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_optimizer_internal.h"
-#include "../db/instance.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/json.h"
-#include "mongo/client/dbclientcursor.h"
-#include "dbtests.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
     void __forceLinkGeoPlugin();

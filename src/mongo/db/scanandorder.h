@@ -26,6 +26,8 @@
 
 namespace mongo {
 
+    class ParsedQuery;
+
     static const int ScanAndOrderMemoryLimitExceededAssertionCode = 10128;
 
     class KeyType : boost::noncopyable {

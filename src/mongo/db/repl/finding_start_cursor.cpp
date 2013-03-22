@@ -16,9 +16,11 @@
 
 #include "mongo/db/repl/finding_start_cursor.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cursor.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/query_plan.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 

@@ -24,6 +24,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query_plan.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"

@@ -15,15 +15,16 @@
  */
 
 #include "pch.h"
+
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 
-#include "mongo/db/cursor.h"
-#include "mongo/db/query_optimizer.h"
-#include "mongo/db/queryutil.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/cursor.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/parsed_query.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/query_optimizer.h"
 
 
 namespace mongo {
