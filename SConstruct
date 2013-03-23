@@ -21,6 +21,7 @@ import re
 import shutil
 import stat
 import sys
+import textwrap
 import types
 import urllib
 import urllib2
@@ -849,7 +850,12 @@ def doConfigure(myenv):
         }
         print_tuple = (lang_name, context.env[compiler_var], toolchain)
         context.Message('Checking if %s compiler "%s" is %s... ' % print_tuple)
-        result = context.TryCompile(test_bodies[toolchain], source_suffix)
+        # Strip indentation from the test body to ensure that the newline at the end of the
+        # endif is the last character in the file (rather than a line of spaces with no
+        # newline), and that all of the preprocessor directives start at column zero. Both of
+        # these issues can trip up older toolchains.
+        test_body = textwrap.dedent(test_bodies[toolchain])
+        result = context.TryCompile(test_body, source_suffix)
         context.Result(result)
         return result
 
