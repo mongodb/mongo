@@ -509,7 +509,10 @@
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table.cpp">
+    <ClCompile Include="..\client\authentication_table_common.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_client.cpp">
       <Filter>client</Filter>
     </ClCompile>
   </ItemGroup>

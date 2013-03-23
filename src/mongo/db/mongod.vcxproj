@@ -1014,7 +1014,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4141</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\bson\oid.cpp" />
-    <ClCompile Include="..\client\authentication_table.cpp" />
+    <ClCompile Include="..\client\authentication_table_common.cpp" />
+    <ClCompile Include="..\client\authentication_table_server.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />

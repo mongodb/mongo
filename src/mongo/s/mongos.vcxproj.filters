@@ -717,9 +717,6 @@
     <ClCompile Include="..\util\time_support.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
     <ClCompile Include="..\client\connection_factory.cpp">
       <Filter>client</Filter>
     </ClCompile>
@@ -731,6 +728,12 @@
     </ClCompile>
     <ClCompile Include="..\db\pipeline\pipeline.cpp">
       <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_common.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_server.cpp">
+      <Filter>client</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

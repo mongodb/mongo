@@ -875,9 +875,6 @@
     <ClCompile Include="..\util\touch_pages.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="hashindex.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -913,6 +910,12 @@
     </ClCompile>
     <ClCompile Include="pipeline\pipeline_d.cpp">
       <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_common.cpp">
+      <Filter>client\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_server.cpp">
+      <Filter>client\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
