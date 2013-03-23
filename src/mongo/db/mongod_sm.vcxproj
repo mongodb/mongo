@@ -1615,7 +1615,37 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\client\distlock_test.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\sasl_client_authenticate.cpp" />
+    <ClCompile Include="..\platform\atomic_word_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\platform\bits_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\platform\random.cpp" />
+    <ClCompile Include="..\platform\random_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -2148,6 +2178,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
     <ClCompile Include="field_ref.cpp" />
+    <ClCompile Include="parsed_query.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
@@ -2223,6 +2254,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="pipeline\value.cpp" />
     <ClCompile Include="prefetch.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="query_optimizer.cpp" />
+    <ClCompile Include="query_optimizer_internal.cpp" />
+    <ClCompile Include="query_plan.cpp" />
+    <ClCompile Include="query_plan_selection_policy.cpp" />
     <ClCompile Include="repl\bgsync.cpp" />
     <ClCompile Include="repl\finding_start_cursor.cpp" />
     <ClCompile Include="repl\master_slave.cpp" />
@@ -2414,14 +2449,35 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\client\sasl_client_authenticate.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
+    <ClInclude Include="..\platform\atomic_intrinsics_gcc.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
     <ClInclude Include="..\platform\atomic_word.h" />
     <ClInclude Include="..\platform\basic.h" />
     <ClInclude Include="..\platform\bits.h" />
     <ClInclude Include="..\platform\compiler.h" />
+    <ClInclude Include="..\platform\compiler_gcc.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\platform\compiler_msvc.h" />
     <ClInclude Include="..\platform\cstdint.h" />
     <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\hash_namespace.h" />
     <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
@@ -2587,6 +2643,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="ops\modifier_base.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
+    <ClInclude Include="parsed_query.h" />
     <ClInclude Include="pdfile_private.h" />
     <ClInclude Include="pipeline\document_internal.h" />
     <ClInclude Include="pipeline\value_internal.h" />
@@ -2637,7 +2694,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="namespace.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="pdfile.cpp" />
-    <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="scanandorder.cpp" />
     <ClCompile Include="stats\service_stats.cpp" />
     <ClCompile Include="tests.cpp" />
@@ -2681,6 +2737,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\rs_config.cpp" />
     <ClInclude Include="querypattern.h" />
     <ClInclude Include="queryutil-inl.h" />
+    <ClInclude Include="query_optimizer.h" />
+    <ClInclude Include="query_optimizer_internal.h" />
+    <ClInclude Include="query_plan.h" />
+    <ClInclude Include="query_plan_selection_policy.h" />
+    <ClInclude Include="query_plan_summary.h" />
     <ClInclude Include="record.h" />
     <ClInclude Include="replutil.h" />
     <ClInclude Include="repl\bgsync.h" />
@@ -2717,6 +2778,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="..\..\third_party\s2\LICENSE-2.0.txt" />
     <None Include="..\base\error_codes.err" />
     <None Include="..\base\generate_error_codes.py" />
+    <None Include="..\platform\SConscript" />
     <None Include="..\shell\assert.js" />
     <None Include="..\shell\collection.js" />
     <None Include="..\shell\db.js" />
@@ -2909,7 +2971,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="namespace.h" />
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="pdfile.h" />
-    <ClInclude Include="queryoptimizer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
     <ClInclude Include="..\util\allocator.h" />

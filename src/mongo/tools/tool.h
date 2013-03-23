@@ -81,6 +81,8 @@ namespace mongo {
             return _db + "." + _coll;
         }
 
+        string getAuthenticationDatabase();
+
         void useStandardOutput( bool mode ) {
             _usesstdout = mode;
         }

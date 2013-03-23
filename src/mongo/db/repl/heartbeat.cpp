@@ -121,6 +121,11 @@ namespace mongo {
             result.append("hbmsg", theReplSet->hbmsg());
             result.append("time", (long long) time(0));
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+            const Member *syncTarget = replset::BackgroundSync::get()->getSyncTarget();
+            if (syncTarget) {
+                result.append("syncingTo", syncTarget->fullName());
+            }
+
             int v = theReplSet->config().version;
             result.append("v", v);
             if( v > cmdObj["v"].Int() )
@@ -395,6 +400,10 @@ namespace mongo {
             }
             mem.health = 1.0;
             mem.lastHeartbeatMsg = info["hbmsg"].String();
+            if (info.hasElement("syncingTo")) {
+                mem.syncingTo = info["syncingTo"].String();
+            }
+
             if( info.hasElement("opTime") )
                 mem.opTime = info["opTime"].Date();
 

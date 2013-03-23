@@ -21,6 +21,7 @@ import re
 import shutil
 import stat
 import sys
+import textwrap
 import types
 import urllib
 import urllib2
@@ -101,9 +102,11 @@ def use_system_version_of_library(name):
     return has_option('use-system-all') or has_option('use-system-' + name)
 
 def get_variant_dir():
-    
+
+    substitute = lambda x: re.sub( "[:,\\\\/]" , "_" , x )
+
     a = []
-    
+
     for name in options:
         o = options[name]
         if not has_option( o["dest"] ):
@@ -112,15 +115,22 @@ def get_variant_dir():
             continue
         if get_option(o["dest"]) == o["default"]:
             continue
-        
+
         if o["nargs"] == 0:
             a.append( name )
         else:
-            x = get_option( name )
-            x = re.sub( "[:,\\\\/]" , "_" , x )
+            x = substitute( get_option( name ) )
             a.append( name + "_" + x )
-            
+
     s = "#build/${PYSYSPLATFORM}/"
+
+    extras = []
+    if has_option("extra-variant-dirs"):
+        extras = [substitute(x) for x in get_option( 'extra-variant-dirs' ).split( ',' )]
+
+    if has_option("add-branch-to-variant-dir"):
+        extras += ["branch_" + substitute( utils.getGitBranch() )]
+    a += extras
 
     if len(a) > 0:
         a.sort()
@@ -128,7 +138,7 @@ def get_variant_dir():
     else:
         s += "normal/"
     return s
-        
+
 # build output
 add_option( "mute" , "do not display commandlines for compiling and linking, to reduce screen noise", 0, False )
 
@@ -137,6 +147,8 @@ add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTAL
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
 add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
+add_option( "extra-variant-dirs", "extra variant dir components, separated by commas", 1, False)
+add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
 
 add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
 add_option( "full", "include client and headers when doing scons install", 0 , False )
@@ -145,6 +157,7 @@ add_option( "full", "include client and headers when doing scons install", 0 , F
 add_option( "release" , "release build" , 0 , True )
 add_option( "static" , "fully static build" , 0 , False )
 add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
+add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
 
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
@@ -153,6 +166,7 @@ add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
 add_option( "cxx", "compiler to use" , 1 , True )
 add_option( "cc", "compiler to use for c" , 1 , True )
 add_option( "ld", "linker to use" , 1 , True )
+add_option( "c++11", "enable c++11 support (experimental)", 0, True )
 
 add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , True )
 add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , True )
@@ -174,6 +188,7 @@ add_option( "ssl" , "Enable SSL" , 0 , True )
 # library choices
 add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
 add_option( "usev8" , "use v8 for javascript" , 0 , True )
+add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
@@ -188,7 +203,6 @@ add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
 
 add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
-add_option( "clang" , "use clang++ rather than g++ (experimental)" , 0 , True )
 
 # debugging/profiling help
 if os.sys.platform.startswith("linux") and (os.uname()[-1] == 'x86_64'):
@@ -230,6 +244,8 @@ add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\""
 
 add_option('client-dist-basename', "Name of the client source archive.", 1, False,
            default='mongo-cxx-driver')
+
+add_option('build-fast-and-loose', "NEVER for production builds", 0, False)
 
 # don't run configure if user calls --help
 if GetOption('help'):
@@ -313,6 +329,12 @@ env = Environment( BUILD_DIR=variantDir,
 
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
 
+if has_option('build-fast-and-loose'):
+    # See http://www.scons.org/wiki/GoFastButton for details
+    env.Decider('MD5-timestamp')
+    env.SetOption('max_drift', 1)
+    env.SourceCode('.', None)
+
 if has_option('mute'):
     env.Append( CCCOMSTR = "Compiling $TARGET" )
     env.Append( CXXCOMSTR = env["CCCOMSTR"] )
@@ -337,10 +359,6 @@ else:
 if has_option( "cxx" ):
     env["CC"] = get_option( "cxx" )
     env["CXX"] = get_option( "cxx" )
-elif has_option("clang"):
-    env["CC"] = 'clang'
-    env["CXX"] = 'clang++'
-
 if has_option( "cc" ):
     env["CC"] = get_option( "cc" )
 
@@ -491,6 +509,12 @@ if "darwin" == os.sys.platform:
     darwin = True
     platform = "osx" # prettier than darwin
 
+    # Unfortunately, we are too late here to affect the variant dir. We could maybe make this
+    # flag available on all platforms and complain if it is used on non-darwin targets.
+    osx_version_choices = ['10.6', '10.7', '10.8']
+    add_option("osx-version-min", "minimum OS X version to support", 1, False,
+               type = 'choice', default = osx_version_choices[0], choices = osx_version_choices)
+
     if env["CXX"] is None:
         if os.path.exists( "/usr/bin/g++-4.2" ):
             env["CXX"] = "g++-4.2"
@@ -614,12 +638,6 @@ elif "win32" == os.sys.platform:
         # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
         env.Append( CCFLAGS= ["/O2", "/Oy-", "/MT"] )
 
-        # TODO: this has caused some linking problems :
-        # /GL whole program optimization
-        # /LTCG link time code generation
-        env.Append( CCFLAGS= ["/GL"] )
-        env.Append( LINKFLAGS=" /LTCG " )
-        env.Append( ARFLAGS=" /LTCG " ) # for the Library Manager
         # /DEBUG will tell the linker to create a .pdb file
         # which WinDbg and Visual Studio will use to resolve
         # symbols if you want to debug a release-mode image.
@@ -691,10 +709,8 @@ if nix:
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
-    if linux:
+    if linux or darwin:
         env.Append( CCFLAGS=["-Werror", "-pipe"] )
-        if not has_option('clang'):
-            env.Append( CCFLAGS=["-fno-builtin-memcmp"] ) # glibc's memcmp is faster than gcc's
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
@@ -734,21 +750,6 @@ if nix:
 
     if has_option( "gdbserver" ):
         env.Append( CPPDEFINES=["USE_GDBSERVER"] )
-
-    # pre-compiled headers
-    if usePCH and 'Gch' in dir( env ):
-        print( "using precompiled headers" )
-        if has_option('clang'):
-            #env['GCHSUFFIX']  = '.pch' # clang++ uses pch.h.pch rather than pch.h.gch
-            #env.Prepend( CXXFLAGS=' -include pch.h ' ) # clang++ only uses pch from command line
-            print( "ERROR: clang pch is broken for now" )
-            Exit(1)
-        env['Gch'] = env.Gch( "$BUILD_DIR/mongo/pch.h$GCHSUFFIX",
-                              "src/mongo/pch.h" )[0]
-        env['GchSh'] = env[ 'Gch' ]
-    elif os.path.exists( env.File("$BUILD_DIR/mongo/pch.h$GCHSUFFIX").abspath ):
-        print( "removing precompiled headers" )
-        os.unlink( env.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath ) # gcc uses the file if it exists
 
 if usesm:
     env.Append( CPPDEFINES=["JS_C_STRINGS_ARE_UTF8"] )
@@ -796,14 +797,244 @@ env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 
 # --- check system ---
 
-
 def doConfigure(myenv):
-    conf = Configure(myenv)
+
+    # Check that the compilers work.
+    #
+    # TODO: Currently, we have some flags already injected. Eventually, this should test the
+    # bare compilers, and we should re-check at the very end that TryCompile and TryLink still
+    # work with the flags we have selected.
+    conf = Configure(myenv, clean=False, help=False)
 
     if 'CheckCXX' in dir( conf ):
-        if  not conf.CheckCXX():
-            print( "c++ compiler not installed!" )
+        if not conf.CheckCXX():
+            print("C++ compiler %s does not work" % (conf.env["CXX"]))
             Exit(1)
+
+    # Only do C checks if CC != CXX
+    check_c = (myenv["CC"] != myenv["CXX"])
+
+    if check_c and 'CheckCC' in dir( conf ):
+        if not conf.CheckCC():
+            print("C compiler %s does not work" % (conf.env["CC"]))
+            Exit(1)
+    myenv = conf.Finish()
+
+    # Identify the toolchain in use. We currently support the following:
+    # TODO: Goes in the env?
+    toolchain_gcc = "GCC"
+    toolchain_clang = "clang"
+    toolchain_msvc = "MSVC"
+
+    def CheckForToolchain(context, toolchain, lang_name, compiler_var, source_suffix):
+        test_bodies = {
+            toolchain_gcc : (
+                # Clang also defines __GNUC__
+                """
+                #if !defined(__GNUC__) || defined(__clang__)
+                #error
+                #endif
+                """),
+            toolchain_clang : (
+                """
+                #if !defined(__clang__)
+                #error
+                #endif
+                """),
+            toolchain_msvc : (
+                """
+                #if !defined(_MSC_VER)
+                #error
+                #endif
+                """),
+        }
+        print_tuple = (lang_name, context.env[compiler_var], toolchain)
+        context.Message('Checking if %s compiler "%s" is %s... ' % print_tuple)
+        # Strip indentation from the test body to ensure that the newline at the end of the
+        # endif is the last character in the file (rather than a line of spaces with no
+        # newline), and that all of the preprocessor directives start at column zero. Both of
+        # these issues can trip up older toolchains.
+        test_body = textwrap.dedent(test_bodies[toolchain])
+        result = context.TryCompile(test_body, source_suffix)
+        context.Result(result)
+        return result
+
+    conf = Configure(myenv, clean=False, help=False, custom_tests = {
+        'CheckForToolchain' : CheckForToolchain,
+    })
+
+    toolchain = None
+    have_toolchain = lambda: toolchain != None
+    using_msvc = lambda: toolchain == toolchain_msvc
+    using_gcc = lambda: toolchain == toolchain_gcc
+    using_clang = lambda: toolchain == toolchain_clang
+
+    if windows:
+        toolchain_search_sequence = [toolchain_msvc]
+    else:
+        toolchain_search_sequence = [toolchain_gcc, toolchain_clang]
+
+    for candidate_toolchain in toolchain_search_sequence:
+        if conf.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
+            toolchain = candidate_toolchain
+            break
+
+    if not have_toolchain():
+        print("Couldn't identify the toolchain")
+        Exit(1)
+
+    if check_c and not conf.CheckForToolchain(toolchain, "C", "CC", ".c"):
+        print("C toolchain doesn't match identified C++ toolchain")
+        Exit(1)
+
+    myenv = conf.Finish()
+
+    # Enable PCH if we are on using gcc or clang and the 'Gch' tool is enabled. Otherwise,
+    # remove any pre-compiled header since the compiler may try to use it if it exists.
+    if usePCH and (using_gcc() or using_clang()):
+        if 'Gch' in dir( myenv ):
+            if using_clang():
+                # clang++ uses pch.h.pch rather than pch.h.gch
+                myenv['GCHSUFFIX'] = '.pch'
+                # clang++ only uses pch from command line
+                myenv.Prepend( CXXFLAGS=['-include pch.h'] )
+            myenv['Gch'] = myenv.Gch( "$BUILD_DIR/mongo/pch.h$GCHSUFFIX",
+                                        "src/mongo/pch.h" )[0]
+            myenv['GchSh'] = myenv[ 'Gch' ]
+    elif os.path.exists( myenv.File("$BUILD_DIR/mongo/pch.h$GCHSUFFIX").abspath ):
+        print( "removing precompiled headers" )
+        os.unlink( myenv.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath )
+
+    def AddFlagIfSupported(env, tool, extension, flag, **mutation):
+        def CheckFlagTest(context, tool, extension, flag):
+            test_body = ""
+            context.Message('Checking if %s compiler supports %s... ' % (tool, flag))
+            ret = context.TryCompile(test_body, extension)
+            context.Result(ret)
+            return ret
+
+        cloned = env.Clone()
+        cloned.Append(**mutation)
+
+        if using_msvc():
+            print("AddFlagIfSupported is not currently supported with MSVC")
+            Exit(1)
+
+        # For GCC, we don't need anything since bad flags are already errors, but
+        # adding -Werror won't hurt. For clang, bad flags are only warnings, so we need -Werror
+        # to make them real errors.
+        cloned.Append(CCFLAGS=['-Werror'])
+        conf = Configure(cloned, clean=False, help=False, custom_tests = {
+                'CheckFlag' : lambda(ctx) : CheckFlagTest(ctx, tool, extension, flag)
+        })
+        available = conf.CheckFlag()
+        conf.Finish()
+        if available:
+            env.Append(**mutation)
+        return available
+
+    def AddToCFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C', '.c', flag, CFLAGS=[flag])
+
+    def AddToCCFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C', '.c', flag, CCFLAGS=[flag])
+
+    def AddToCXXFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C++', '.cpp', flag, CXXFLAGS=[flag])
+
+    if using_clang():
+        # Clang likes to warn about unused functions, which seems a tad aggressive and breaks
+        # -Werror, which we want to be able to use.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-function')
+
+        # TODO: Note that the following two flags are added to CCFLAGS even though they are
+        # really C++ specific. We need to do this because SCons passes CXXFLAGS *before*
+        # CCFLAGS, but CCFLAGS contains -Wall, which re-enables the warnings we are trying to
+        # suppress. In the future, we should move all warning flags to CCWARNFLAGS and
+        # CXXWARNFLAGS and add these to CCOM and CXXCOM as appropriate.
+        #
+        # Clang likes to warn about unused private fields, but some of our third_party
+        # libraries have such things.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-private-field')
+        # Clang warns about struct/class tag mismatch, but most people think that that is not
+        # really an issue, see
+        # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. We disable the
+        # warning so it doesn't become an error.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-mismatched-tags')
+
+    if has_option('c++11'):
+        # The Microsoft compiler does not need a switch to enable C++11. Again we should be
+        # checking for MSVC, not windows. In theory, we might be using clang or icc on windows.
+        if not using_msvc():
+            # For our other compilers (gcc and clang) we need to pass -std=c++0x or -std=c++11,
+            # but we prefer the latter. Try that first, and fall back to c++0x if we don't
+            # detect that --std=c++11 works.
+            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++11'):
+                if not AddToCXXFLAGSIfSupported(myenv, '-std=c++0x'):
+                    print( 'C++11 mode requested, but cannot find a flag to enable it' )
+                    Exit(1)
+            # Our current builtin tcmalloc is not compilable in C++11 mode. Remove this
+            # check when our builtin release of tcmalloc contains the resolution to
+            # http://code.google.com/p/gperftools/issues/detail?id=477.
+            if get_option('allocator') == 'tcmalloc':
+                if not use_system_version_of_library('tcmalloc'):
+                    print( 'TCMalloc is not currently compatible with C++11' )
+                    Exit(1)
+
+            if not AddToCFLAGSIfSupported(myenv, '-std=c99'):
+                print( 'C++11 mode selected for C++ files, but failed to enable C99 for C files' )
+
+    # This needs to happen before we check for libc++, since it affects whether libc++ is available.
+    if darwin and has_option('osx-version-min'):
+        min_version = get_option('osx-version-min')
+        if not AddToCCFLAGSIfSupported(myenv, '-mmacosx-version-min=%s' % (min_version)):
+            print( "Can't set minimum OS X version with this compiler" )
+            Exit(1)
+
+    if has_option('libc++'):
+        if not using_clang():
+            print( 'libc++ is currently only supported for clang')
+            Exit(1)
+        if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
+            myenv.Append(LINKFLAGS=['-stdlib=libc++'])
+        else:
+            print( 'libc++ requested, but compiler does not support -stdlib=libc++' )
+            Exit(1)
+
+    # Apply any link time optimization settings as selected by the 'lto' option.
+    if has_option('lto'):
+        if using_msvc():
+            # Note that this is actually more aggressive than LTO, it is whole program
+            # optimization due to /GL. However, this is historically what we have done for
+            # windows, so we are keeping it.
+            #
+            # /GL implies /LTCG, so no need to say it in CCFLAGS, but we do need /LTCG on the
+            # link flags.
+            myenv.Append(CCFLAGS=['/GL'])
+            myenv.Append(LINKFLAGS=['/LTCG'])
+            myenv.Append(ARFLAGS=['/LTCG'])
+        elif using_gcc() or using_clang():
+            # For GCC and clang, the flag is -flto, and we need to pass it both on the compile
+            # and link lines.
+            if AddToCCFLAGSIfSupported(myenv, '-flto'):
+                myenv.Append(LINKFLAGS=['-flto'])
+            else:
+                print( "Link time optimization requested, " +
+                       "but selected compiler does not honor -flto" )
+                Exit(1)
+        else:
+            printf("Don't know how to enable --lto on current toolchain")
+            Exit(1)
+
+    # glibc's memcmp is faster than gcc's
+    if linux:
+        AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
+
+    if using_gcc() or using_clang():
+        # If possible, don't make deprecated declarations errors.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-error=deprecated-declarations")
+
+    conf = Configure(myenv)
 
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
@@ -817,7 +1048,7 @@ def doConfigure(myenv):
                 Exit(1)
 
     if conf.CheckHeader('unistd.h'):
-        myenv.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
+        conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
 
     if solaris or conf.CheckDeclaration('clock_gettime', includes='#include <time.h>'):
         conf.CheckLib('rt')
@@ -826,9 +1057,9 @@ def doConfigure(myenv):
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
 
-        myenv.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
+        conf.env.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
 
-    myenv["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
+    conf.env["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
     if solaris:
         conf.CheckLib( "nsl" )
@@ -841,8 +1072,8 @@ def doConfigure(myenv):
         if not conf.CheckLib( v8_lib_choices ):
             Exit(1)
 
-    env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
-    if env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
+    conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
+    if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
         "gsasl", "gsasl.h", "C", "gsasl_check_version(GSASL_VERSION);", autoadd=False):
 
         Exit(1)
@@ -877,11 +1108,11 @@ def doConfigure(myenv):
             print( "--heapcheck neads header 'google/heap-checker.h'" )
             Exit( 1 )
 
-        myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
-        myenv.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
+        conf.env.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
+        conf.env.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
 
     # ask each module to configure itself and the build environment.
-    moduleconfig.configure_modules(mongo_modules, conf, env)
+    moduleconfig.configure_modules(mongo_modules, conf)
 
     return conf.Finish()
 

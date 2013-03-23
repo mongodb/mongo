@@ -1,51 +1,40 @@
-// @file queryoptimizer.cpp
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ *    Copyright (C) 2008 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "mongo/pch.h"
 
-#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/query_optimizer_internal.h"
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/btreecursor.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/db.h"
-#include "mongo/db/intervalbtreecursor.h"
 #include "mongo/db/pagefault.h"
-#include "mongo/server.h"
+#include "mongo/db/parsed_query.h"
+#include "mongo/db/query_plan_selection_policy.h"
+#include "mongo/db/queryutil.h"
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
 
 namespace mongo {
 
-    QueryPlanSummary QueryPlan::summary() const { return QueryPlanSummary( *this ); }
-
-    double elementDirection( const BSONElement &e ) {
-        if ( e.isNumber() )
-            return e.number();
-        return 1;
-    }
-
-    // returns an IndexDetails * for a hint, 0 if hint is $natural.
+    // returns an IndexDetails* for a hint, 0 if hint is $natural.
     // hint must not be eoo()
-    IndexDetails *parseHint( const BSONElement &hint, NamespaceDetails *d ) {
+    IndexDetails* parseHint( const BSONElement& hint, NamespaceDetails* d ) {
         massert( 13292, "hint eoo", !hint.eoo() );
-        if( hint.type() == String ) {
+        if ( hint.type() == String ) {
             string hintstr = hint.valuestr();
             NamespaceDetails::IndexIterator i = d->ii();
             while( i.more() ) {
@@ -55,9 +44,9 @@ namespace mongo {
                 }
             }
         }
-        else if( hint.type() == Object ) {
+        else if ( hint.type() == Object ) {
             BSONObj hintobj = hint.embeddedObject();
-            uassert( 10112 ,  "bad hint", !hintobj.isEmpty() );
+            uassert( 10112, "bad hint", !hintobj.isEmpty() );
             if ( !strcmp( hintobj.firstElementFieldName(), "$natural" ) ) {
                 return 0;
             }
@@ -69,466 +58,8 @@ namespace mongo {
                 }
             }
         }
-        uassert( 10113 ,  "bad hint", false );
+        uassert( 10113, "bad hint", false );
         return 0;        
-    }
-
-    QueryPlan *QueryPlan::make( NamespaceDetails *d,
-                               int idxNo,
-                               const FieldRangeSetPair &frsp,
-                               const FieldRangeSetPair *originalFrsp,
-                               const BSONObj &originalQuery,
-                               const BSONObj &order,
-                               const shared_ptr<const ParsedQuery> &parsedQuery,
-                               const BSONObj &startKey,
-                               const BSONObj &endKey,
-                               const std::string& special ) {
-        auto_ptr<QueryPlan> ret( new QueryPlan( d, idxNo, frsp, originalQuery, order, parsedQuery,
-                                               special ) );
-        ret->init( originalFrsp, startKey, endKey );
-        return ret.release();
-    }
-    
-    QueryPlan::QueryPlan( NamespaceDetails *d,
-                         int idxNo,
-                         const FieldRangeSetPair &frsp,
-                         const BSONObj &originalQuery,
-                         const BSONObj &order,
-                         const shared_ptr<const ParsedQuery> &parsedQuery,
-                         const std::string& special ) :
-        _d(d),
-        _idxNo(idxNo),
-        _frs( frsp.frsForIndex( _d, _idxNo ) ),
-        _frsMulti( frsp.frsForIndex( _d, -1 ) ),
-        _originalQuery( originalQuery ),
-        _order( order ),
-        _parsedQuery( parsedQuery ),
-        _index( 0 ),
-        _scanAndOrderRequired( true ),
-        _matcherNecessary( true ),
-        _direction( 0 ),
-        _endKeyInclusive(),
-        _utility( Helpful ),
-        _special( special ),
-        _type(0),
-        _startOrEndSpec() {
-    }
-    
-    void QueryPlan::init( const FieldRangeSetPair *originalFrsp,
-                         const BSONObj &startKey,
-                         const BSONObj &endKey ) {
-        _endKeyInclusive = endKey.isEmpty();
-        _startOrEndSpec = !startKey.isEmpty() || !endKey.isEmpty();
-        
-        BSONObj idxKey = _idxNo < 0 ? BSONObj() : _d->idx( _idxNo ).keyPattern();
-
-        if ( !_frs.matchPossibleForIndex( idxKey ) ) {
-            _utility = Impossible;
-            _scanAndOrderRequired = false;
-            return;
-        }
-            
-        if ( willScanTable() ) {
-            if ( _order.isEmpty() || !strcmp( _order.firstElementFieldName(), "$natural" ) )
-                _scanAndOrderRequired = false;
-            return;
-        }
-
-        _index = &_d->idx(_idxNo);
-
-        // If the parsing or index indicates this is a special query, don't continue the processing
-        if (!_special.empty() ||
-            ( _index->getSpec().getType() &&
-             _index->getSpec().getType()->suitability( _frs, _order ) != USELESS ) ) {
-
-            _type  = _index->getSpec().getType();
-            if (_special.empty()) _special = _index->getSpec().getType()->getPlugin()->getName();
-
-            massert( 13040 , (string)"no type for special: " + _special , _type );
-            // hopefully safe to use original query in these contexts;
-            // don't think we can mix special with $or clause separation yet
-            _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , _order );
-            return;
-        }
-
-        const IndexSpec &idxSpec = _index->getSpec();
-        BSONObjIterator o( _order );
-        BSONObjIterator k( idxKey );
-        if ( !o.moreWithEOO() )
-            _scanAndOrderRequired = false;
-        while( o.moreWithEOO() ) {
-            BSONElement oe = o.next();
-            if ( oe.eoo() ) {
-                _scanAndOrderRequired = false;
-                break;
-            }
-            if ( !k.moreWithEOO() )
-                break;
-            BSONElement ke;
-            while( 1 ) {
-                ke = k.next();
-                if ( ke.eoo() )
-                    goto doneCheckOrder;
-                if ( strcmp( oe.fieldName(), ke.fieldName() ) == 0 )
-                    break;
-                if ( !_frs.range( ke.fieldName() ).equality() )
-                    goto doneCheckOrder;
-            }
-            int d = elementDirection( oe ) == elementDirection( ke ) ? 1 : -1;
-            if ( _direction == 0 )
-                _direction = d;
-            else if ( _direction != d )
-                break;
-        }
-doneCheckOrder:
-        if ( _scanAndOrderRequired )
-            _direction = 0;
-        BSONObjIterator i( idxKey );
-        int exactIndexedQueryCount = 0;
-        int optimalIndexedQueryCount = 0;
-        bool awaitingLastOptimalField = true;
-        set<string> orderFieldsUnindexed;
-        _order.getFieldNames( orderFieldsUnindexed );
-        while( i.moreWithEOO() ) {
-            BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
-            const FieldRange &fr = _frs.range( e.fieldName() );
-            if ( awaitingLastOptimalField ) {
-                if ( !fr.universal() )
-                    ++optimalIndexedQueryCount;
-                if ( !fr.equality() )
-                    awaitingLastOptimalField = false;
-            }
-            else {
-                if ( !fr.universal() )
-                    optimalIndexedQueryCount = -1;
-            }
-            if ( fr.equality() ) {
-                BSONElement e = fr.max();
-                if ( !e.isNumber() && !e.mayEncapsulate() && e.type() != RegEx )
-                    ++exactIndexedQueryCount;
-            }
-            orderFieldsUnindexed.erase( e.fieldName() );
-        }
-        if ( !_scanAndOrderRequired &&
-                ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
-            _utility = Optimal;
-        _frv.reset( new FieldRangeVector( _frs, idxSpec, _direction ) );
-
-        if ( // If all field range constraints are on indexed fields and ...
-             _utility == Optimal &&
-             // ... the field ranges exactly represent the query and ...
-             _frs.mustBeExactMatchRepresentation() &&
-             // ... all indexed ranges are represented in the field range vector ...
-             _frv->hasAllIndexedRanges() ) {
-
-            // ... then the field range vector is sufficient to perform query matching against index
-            // keys.  No matcher is required.
-            _matcherNecessary = false;
-        }
-
-        if ( originalFrsp ) {
-            _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ),
-                                                     idxSpec, _direction ) );
-        }
-        else {
-            _originalFrv = _frv;
-        }
-        if ( _startOrEndSpec ) {
-            BSONObj newStart, newEnd;
-            if ( !startKey.isEmpty() )
-                _startKey = startKey;
-            else
-                _startKey = _frv->startKey();
-            if ( !endKey.isEmpty() )
-                _endKey = endKey;
-            else
-                _endKey = _frv->endKey();
-        }
-
-        if ( ( _scanAndOrderRequired || _order.isEmpty() ) && 
-            _frs.range( idxKey.firstElementFieldName() ).universal() ) { // NOTE SERVER-2140
-            _utility = Unhelpful;
-        }
-            
-        if ( idxSpec.isSparse() && hasPossibleExistsFalsePredicate() ) {
-            _utility = Disallowed;
-        }
-
-        if ( _parsedQuery && _parsedQuery->getFields() && !_d->isMultikey( _idxNo ) ) { // Does not check modifiedKeys()
-            _keyFieldsOnly.reset( _parsedQuery->getFields()->checkKey( _index->keyPattern() ) );
-        }
-    }
-
-    shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc& startLoc,
-                                             bool requestIntervalCursor ) const {
-
-        if ( _type ) {
-            // hopefully safe to use original query in these contexts - don't think we can mix type with $or clause separation yet
-            int numWanted = 0;
-            if ( _parsedQuery ) {
-                // SERVER-5390
-                numWanted = _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
-            }
-            return _type->newCursor( _originalQuery , _order , numWanted );
-        }
-
-        if ( _utility == Impossible ) {
-            // Dummy table scan cursor returning no results.  Allowed in --notablescan mode.
-            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
-        }
-
-        if ( willScanTable() ) {
-            checkTableScanAllowed();
-            return findTableScan( _frs.ns(), _order, startLoc );
-        }
-                
-        massert( 10363 ,  "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
-
-        if ( _startOrEndSpec ) {
-            // we are sure to spec _endKeyInclusive
-            return shared_ptr<Cursor>( BtreeCursor::make( _d,
-                                                          *_index,
-                                                          _startKey,
-                                                          _endKey,
-                                                          _endKeyInclusive,
-                                                          _direction >= 0 ? 1 : -1 ) );
-        }
-
-        if ( _index->getSpec().getType() ) {
-            return shared_ptr<Cursor>( BtreeCursor::make( _d,
-                                                          *_index,
-                                                          _frv->startKey(),
-                                                          _frv->endKey(),
-                                                          true,
-                                                          _direction >= 0 ? 1 : -1 ) );
-        }
-
-        // An IntervalBtreeCursor is returned if explicitly requested AND _frv is exactly
-        // represented by a single interval within the btree.
-        if ( // If an interval cursor is requested and ...
-             requestIntervalCursor &&
-             // ... equalities come before ranges (a requirement of Optimal) and ...
-             _utility == Optimal &&
-             // ... the field range vector exactly represents a single interval ...
-             _frv->isSingleInterval() ) {
-            // ... and an interval cursor can be created ...
-            shared_ptr<Cursor> ret( IntervalBtreeCursor::make( _d,
-                                                               *_index,
-                                                               _frv->startKey(),
-                                                               _frv->startKeyInclusive(),
-                                                               _frv->endKey(),
-                                                               _frv->endKeyInclusive() ) );
-            if ( ret ) {
-                // ... then return the interval cursor.
-                return ret;
-            }
-        }
-
-        return shared_ptr<Cursor>( BtreeCursor::make( _d,
-                                                      *_index,
-                                                      _frv,
-                                                      independentRangesSingleIntervalLimit(),
-                                                      _direction >= 0 ? 1 : -1 ) );
-    }
-
-    shared_ptr<Cursor> QueryPlan::newReverseCursor() const {
-        if ( willScanTable() ) {
-            int orderSpec = _order.getIntField( "$natural" );
-            if ( orderSpec == INT_MIN )
-                orderSpec = 1;
-            return findTableScan( _frs.ns(), BSON( "$natural" << -orderSpec ) );
-        }
-        massert( 10364 ,  "newReverseCursor() not implemented for indexed plans", false );
-        return shared_ptr<Cursor>();
-    }
-
-    BSONObj QueryPlan::indexKey() const {
-        if ( !_index )
-            return BSON( "$natural" << 1 );
-        return _index->keyPattern();
-    }
-
-    void QueryPlan::registerSelf( long long nScanned,
-                                 CandidatePlanCharacter candidatePlans ) const {
-        // Impossible query constraints can be detected before scanning and historically could not
-        // generate a QueryPattern.
-        if ( _utility == Impossible ) {
-            return;
-        }
-
-        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        QueryPattern queryPattern = _frs.pattern( _order );
-        CachedQueryPlan queryPlanToCache( indexKey(), nScanned, candidatePlans );
-        NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( ns() );
-        nsdt.registerCachedQueryPlanForPattern( queryPattern, queryPlanToCache );
-    }
-    
-    void QueryPlan::checkTableScanAllowed() const {
-        if ( likely( !cmdLine.noTableScan ) )
-            return;
-
-        // TODO - is this desirable?  See SERVER-2222.
-        if ( _frs.numNonUniversalRanges() == 0 )
-            return;
-
-        if ( strstr( ns() , ".system." ) ) 
-            return;
-
-        if( str::startsWith(ns(), "local.") )
-            return;
-
-        if ( ! nsdetails( ns() ) )
-            return;
-
-        uassert( 10111 ,  (string)"table scans not allowed:" + ns() , ! cmdLine.noTableScan );
-    }
-
-    int QueryPlan::independentRangesSingleIntervalLimit() const {
-        if ( _scanAndOrderRequired &&
-            _parsedQuery &&
-            !_parsedQuery->wantMore() &&
-            !isMultiKey() &&
-            queryBoundsExactOrderSuffix() ) {
-            verify( _direction == 0 );
-            // Limit the results for each compound interval. SERVER-5063
-            return _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
-        }
-        return 0;
-    }
-
-    /**
-     * Detects $exists:false predicates in a matcher.  All $exists:false predicates will be
-     * detected.  Some $exists:true predicates may be incorrectly reported as $exists:false due to
-     * the approximate nature of the implementation.
-     */
-    class ExistsFalseDetector : public MatcherVisitor {
-    public:
-        ExistsFalseDetector( const Matcher& originalMatcher );
-        bool hasFoundExistsFalse() const { return _foundExistsFalse; }
-        void visitMatcher( const Matcher& matcher ) { _currentMatcher = &matcher; }
-        void visitElementMatcher( const ElementMatcher& elementMatcher );
-    private:
-        const Matcher* _originalMatcher;
-        const Matcher* _currentMatcher;
-        bool _foundExistsFalse;
-    };
-
-    ExistsFalseDetector::ExistsFalseDetector( const Matcher& originalMatcher ) :
-        _originalMatcher( &originalMatcher ),
-        _currentMatcher( 0 ),
-        _foundExistsFalse() {
-    }
-
-    /** Matches $exists:false and $not:{$exists:true} exactly. */
-    static bool isExistsFalsePredicate( const ElementMatcher& elementMatcher ) {
-        bool hasTrueValue = elementMatcher._toMatch.trueValue();
-        bool hasNotModifier = elementMatcher._isNot;
-        return hasNotModifier ? hasTrueValue : !hasTrueValue;
-    }
-    
-    void ExistsFalseDetector::visitElementMatcher( const ElementMatcher& elementMatcher ) {
-        if ( elementMatcher._compareOp != BSONObj::opEXISTS ) {
-            // Only consider $exists predicates.
-            return;
-        }
-        if ( _currentMatcher != _originalMatcher ) {
-            // Treat all $exists predicates nested below the original matcher as $exists:false.
-            // This approximation is used because a nesting operator may change the matching
-            // semantics of $exists:true.
-            _foundExistsFalse = true;
-            return;
-        }
-        if ( isExistsFalsePredicate( elementMatcher ) ) {
-            // Top level $exists operators are matched exactly.
-            _foundExistsFalse = true;
-        }
-    }
-
-    bool QueryPlan::hasPossibleExistsFalsePredicate() const {
-        ExistsFalseDetector detector( matcher()->docMatcher() );
-        matcher()->docMatcher().visit( detector );
-        return detector.hasFoundExistsFalse();
-    }
-    
-    bool QueryPlan::queryBoundsExactOrderSuffix() const {
-        if ( !indexed() ||
-             !_frs.matchPossible() ||
-             !_frs.mustBeExactMatchRepresentation() ) {
-            return false;
-        }
-        BSONObj idxKey = indexKey();
-        BSONObjIterator index( idxKey );
-        BSONObjIterator order( _order );
-        int coveredNonUniversalRanges = 0;
-        while( index.more() ) {
-            const FieldRange& indexFieldRange = _frs.range( (*index).fieldName() );
-            if ( !indexFieldRange.isPointIntervalSet() ) {
-                if ( !indexFieldRange.universal() ) {
-                    // The last indexed range may be a non point set containing a single interval.
-                    // SERVER-5777
-                    if ( indexFieldRange.intervals().size() > 1 ) {
-                        return false;
-                    }
-                    ++coveredNonUniversalRanges;
-                }
-                break;
-            }
-            ++coveredNonUniversalRanges;
-            if ( order.more() && str::equals( (*index).fieldName(), (*order).fieldName() ) ) {
-                ++order;
-            }
-            ++index;
-        }
-        if ( coveredNonUniversalRanges != _frs.numNonUniversalRanges() ) {
-            return false;
-        }
-        while( index.more() && order.more() ) {
-            if ( !str::equals( (*index).fieldName(), (*order).fieldName() ) ) {
-                return false;
-            }
-            if ( ( elementDirection( *index ) < 0 ) != ( elementDirection( *order ) < 0 ) ) {
-                return false;
-            }
-            ++order;
-            ++index;
-        }
-        return !order.more();
-    }
-
-    string QueryPlan::toString() const {
-        return BSON(
-                    "index" << indexKey() <<
-                    "frv" << ( _frv ? _frv->toString() : "" ) <<
-                    "order" << _order
-                    ).jsonString();
-    }
-    
-    shared_ptr<CoveredIndexMatcher> QueryPlan::matcher() const {
-        if ( !_matcher ) {
-            _matcher.reset( new CoveredIndexMatcher( originalQuery(), indexKey() ) );
-        }
-        return _matcher;
-    }
-    
-    bool QueryPlan::isMultiKey() const {
-        if ( _idxNo < 0 )
-            return false;
-        return _d->isMultikey( _idxNo );
-    }
-
-    std::ostream &operator<< ( std::ostream &out, const QueryPlan::Utility &utility ) {
-        out << "QueryPlan::";
-        switch( utility ) {
-            case QueryPlan::Impossible: return out << "Impossible";
-            case QueryPlan::Optimal:    return out << "Optimal";
-            case QueryPlan::Helpful:    return out << "Helpful";
-            case QueryPlan::Unhelpful:  return out << "Unhelpful";
-            case QueryPlan::Disallowed: return out << "Disallowed";
-            default:
-                return out << "UNKNOWN(" << utility << ")";
-        }
     }
 
     CachedMatchCounter::CachedMatchCounter( long long& aggregateNscanned,
@@ -769,7 +300,7 @@ doneCheckOrder:
         _matchCounter.updateNscanned( _c->nscanned() );
     }
 
-    void QueryPlanRunner::setException( const DBException &e ) {
+    void QueryPlanRunner::setException( const DBException& e ) {
         _error = true;
         _exception = e.getInfo();
     }
@@ -779,7 +310,8 @@ doneCheckOrder:
             return shared_ptr<ExplainPlanInfo>( new ExplainPlanInfo() );
         }
         _explainPlanInfo.reset( new ExplainPlanInfo() );
-        _explainPlanInfo->notePlan( *_c, queryPlan().scanAndOrderRequired(),
+        _explainPlanInfo->notePlan( *_c,
+                                    queryPlan().scanAndOrderRequired(),
                                     queryPlan().keyFieldsOnly() );
         return _explainPlanInfo;
     }
@@ -860,14 +392,14 @@ doneCheckOrder:
         }
     }
 
-    QueryPlanGenerator::QueryPlanGenerator( QueryPlanSet &qps,
-                                           auto_ptr<FieldRangeSetPair> originalFrsp,
-                                           const shared_ptr<const ParsedQuery> &parsedQuery,
-                                           const BSONObj &hint,
-                                           RecordedPlanPolicy recordedPlanPolicy,
-                                           const BSONObj &min,
-                                           const BSONObj &max,
-                                           bool allowSpecial ) :
+    QueryPlanGenerator::QueryPlanGenerator( QueryPlanSet& qps,
+                                            auto_ptr<FieldRangeSetPair> originalFrsp,
+                                            const shared_ptr<const ParsedQuery>& parsedQuery,
+                                            const BSONObj& hint,
+                                            RecordedPlanPolicy recordedPlanPolicy,
+                                            const BSONObj& min,
+                                            const BSONObj& max,
+                                            bool allowSpecial ) :
         _qps( qps ),
         _originalFrsp( originalFrsp ),
         _parsedQuery( parsedQuery ),
@@ -879,8 +411,8 @@ doneCheckOrder:
     }
 
     void QueryPlanGenerator::addInitialPlans() {
-        const char *ns = _qps.frsp().ns();
-        NamespaceDetails *d = nsdetails( ns );
+        const char* ns = _qps.frsp().ns();
+        NamespaceDetails* d = nsdetails( ns );
         
         if ( addShortCircuitPlan( d ) ) {
             return;
@@ -891,8 +423,8 @@ doneCheckOrder:
     }
     
     void QueryPlanGenerator::addFallbackPlans() {
-        const char *ns = _qps.frsp().ns();
-        NamespaceDetails *d = nsdetails( ns );
+        const char* ns = _qps.frsp().ns();
+        NamespaceDetails* d = nsdetails( ns );
         verify( d );
         
         vector<shared_ptr<QueryPlan> > plans;
@@ -934,7 +466,7 @@ doneCheckOrder:
             // that will be ignored.
             optimalPlan->registerSelf
                     ( 0, CandidatePlanCharacter( !optimalPlan->scanAndOrderRequired(),
-                                                optimalPlan->scanAndOrderRequired() ) );
+                                                 optimalPlan->scanAndOrderRequired() ) );
             return;
         }
         
@@ -952,7 +484,7 @@ doneCheckOrder:
         _qps.addCandidatePlan( newPlan( d, -1 ) );
     }
     
-    bool QueryPlanGenerator::addShortCircuitPlan( NamespaceDetails *d ) {
+    bool QueryPlanGenerator::addShortCircuitPlan( NamespaceDetails* d ) {
         return
             // The collection is missing.
             setUnindexedPlanIf( !d, d ) ||
@@ -966,13 +498,14 @@ doneCheckOrder:
             setUnindexedPlanIf( _qps.frsp().noNonUniversalRanges() && _qps.order().isEmpty(), d ) ||
             // $natural sort is requested.
             setUnindexedPlanIf( !_qps.order().isEmpty() &&
-                               str::equals( _qps.order().firstElementFieldName(), "$natural" ), d );
+                                str::equals( _qps.order().firstElementFieldName(), "$natural" ),
+                                d );
     }
     
-    bool QueryPlanGenerator::addHintPlan( NamespaceDetails *d ) {
+    bool QueryPlanGenerator::addHintPlan( NamespaceDetails* d ) {
         BSONElement hint = _hint.firstElement();
         if ( !hint.eoo() ) {
-            IndexDetails *id = parseHint( hint, d );
+            IndexDetails* id = parseHint( hint, d );
             if ( id ) {
                 setHintedPlanForIndex( *id );
             }
@@ -987,9 +520,12 @@ doneCheckOrder:
         if ( !_min.isEmpty() || !_max.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern;
-            IndexDetails *idx = indexDetailsForRange( _qps.frsp().ns(), errmsg, _min, _max,
-                                                     keyPattern );
-            uassert( 10367 ,  errmsg, idx );
+            IndexDetails *idx = indexDetailsForRange( _qps.frsp().ns(),
+                                                      errmsg,
+                                                      _min,
+                                                      _max,
+                                                      keyPattern );
+            uassert( 10367, errmsg, idx );
             validateAndSetHintedPlan( newPlan( d, d->idxNo( *idx ), _min, _max ) );
             return true;
         }
@@ -997,7 +533,7 @@ doneCheckOrder:
         return false;
     }
     
-    bool QueryPlanGenerator::addSpecialPlan( NamespaceDetails *d ) {
+    bool QueryPlanGenerator::addSpecialPlan( NamespaceDetails* d ) {
         DEBUGQO( "\t special : " << _qps.frsp().getSpecial().toString() );
         SpecialIndices special = _qps.frsp().getSpecial();
         if (!special.empty()) {
@@ -1025,13 +561,13 @@ doneCheckOrder:
         return false;
     }
     
-    void QueryPlanGenerator::addStandardPlans( NamespaceDetails *d ) {
+    void QueryPlanGenerator::addStandardPlans( NamespaceDetails* d ) {
         if ( !addCachedPlan( d ) ) {
             addFallbackPlans();
         }
     }
     
-    bool QueryPlanGenerator::addCachedPlan( NamespaceDetails *d ) {
+    bool QueryPlanGenerator::addCachedPlan( NamespaceDetails* d ) {
         if ( _recordedPlanPolicy == Ignore ) {
             return false;
         }
@@ -1056,10 +592,10 @@ doneCheckOrder:
             }
         }
         
-        massert( 10368 ,  "Unable to locate previously recorded index", p );
+        massert( 10368, "Unable to locate previously recorded index", p );
 
         if ( p->utility() == QueryPlan::Unhelpful ||
-            p->utility() == QueryPlan::Disallowed ) {
+             p->utility() == QueryPlan::Disallowed ) {
             return false;
         }
         
@@ -1075,25 +611,32 @@ doneCheckOrder:
         return true;
     }
 
-    shared_ptr<QueryPlan> QueryPlanGenerator::newPlan( NamespaceDetails *d,
-                                                      int idxNo,
-                                                      const BSONObj &min,
-                                                      const BSONObj &max,
-                                                      const string &special ) const {
-        shared_ptr<QueryPlan> ret( QueryPlan::make( d, idxNo, _qps.frsp(), _originalFrsp.get(),
-                                                   _qps.originalQuery(), _qps.order(), _parsedQuery,
-                                                   min, max, special ) );
+    shared_ptr<QueryPlan> QueryPlanGenerator::newPlan( NamespaceDetails* d,
+                                                       int idxNo,
+                                                       const BSONObj& min,
+                                                       const BSONObj& max,
+                                                       const string& special ) const {
+        shared_ptr<QueryPlan> ret( QueryPlan::make( d,
+                                                    idxNo,
+                                                    _qps.frsp(),
+                                                    _originalFrsp.get(),
+                                                    _qps.originalQuery(),
+                                                    _qps.order(),
+                                                    _parsedQuery,
+                                                    min,
+                                                    max,
+                                                    special ) );
         return ret;
     }
 
-    bool QueryPlanGenerator::setUnindexedPlanIf( bool set, NamespaceDetails *d ) {
+    bool QueryPlanGenerator::setUnindexedPlanIf( bool set, NamespaceDetails* d ) {
         if ( set ) {
             setSingleUnindexedPlan( d );
         }
         return set;
     }
     
-    void QueryPlanGenerator::setSingleUnindexedPlan( NamespaceDetails *d ) {
+    void QueryPlanGenerator::setSingleUnindexedPlan( NamespaceDetails* d ) {
         _qps.setSinglePlan( newPlan( d, -1 ) );
     }
     
@@ -1102,10 +645,13 @@ doneCheckOrder:
             string errmsg;
             BSONObj keyPattern = id.keyPattern();
             // This reformats _min and _max to be used for index lookup.
-            massert( 10365 ,  errmsg, indexDetailsForRange( _qps.frsp().ns(), errmsg, _min, _max,
-                                                           keyPattern ) );
+            massert( 10365 ,  errmsg, indexDetailsForRange( _qps.frsp().ns(),
+                                                            errmsg,
+                                                            _min,
+                                                            _max,
+                                                            keyPattern ) );
         }
-        NamespaceDetails *d = nsdetails( _qps.frsp().ns() );
+        NamespaceDetails* d = nsdetails( _qps.frsp().ns() );
         validateAndSetHintedPlan( newPlan( d, d->idxNo( id ), _min, _max ) );
     }
 
@@ -1120,15 +666,15 @@ doneCheckOrder:
         // and it's a capped collection
         // we warn as it's a common user error
         // .system. and local collections are exempt
-        const char *ns = _qps.frsp().ns();
-        NamespaceDetails *d = nsdetails( ns );
+        const char* ns = _qps.frsp().ns();
+        NamespaceDetails* d = nsdetails( ns );
         if ( d &&
-            d->isCapped() &&
-            _qps.nPlans() == 1 &&
-            ( _qps.firstPlan()->utility() != QueryPlan::Impossible ) &&
-            !_qps.firstPlan()->indexed() &&
-            !_qps.firstPlan()->multikeyFrs().range( "_id" ).universal() ) {
-            if (!str::contains( ns , ".system." ) && !str::startsWith( ns , "local." )) {
+             d->isCapped() &&
+             _qps.nPlans() == 1 &&
+             ( _qps.firstPlan()->utility() != QueryPlan::Impossible ) &&
+             !_qps.firstPlan()->indexed() &&
+             !_qps.firstPlan()->multikeyFrs().range( "_id" ).universal() ) {
+            if ( !str::contains( ns , ".system." ) && !str::startsWith( ns , "local." ) ) {
                 warning() << "unindexed _id query on capped collection, "
                           << "performance will be poor collection: " << ns << endl;
             }
@@ -1146,26 +692,40 @@ doneCheckOrder:
                                       const BSONObj& min,
                                       const BSONObj& max,
                                       bool allowSpecial ) {
-        auto_ptr<QueryPlanSet> ret( new QueryPlanSet( ns, frsp, originalFrsp, originalQuery, order,
-                                                     parsedQuery, hint, recordedPlanPolicy, min,
-                                                     max, allowSpecial ) );
+        auto_ptr<QueryPlanSet> ret( new QueryPlanSet( ns,
+                                                      frsp,
+                                                      originalFrsp,
+                                                      originalQuery,
+                                                      order,
+                                                      parsedQuery,
+                                                      hint,
+                                                      recordedPlanPolicy,
+                                                      min,
+                                                      max,
+                                                      allowSpecial ) );
         ret->init();
         return ret.release();
     }
 
 
-    QueryPlanSet::QueryPlanSet( const char *ns,
-                               auto_ptr<FieldRangeSetPair> frsp,
-                               auto_ptr<FieldRangeSetPair> originalFrsp,
-                               const BSONObj &originalQuery,
-                               const BSONObj &order,
-                               const shared_ptr<const ParsedQuery> &parsedQuery,
-                               const BSONObj &hint,
-                               QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
-                               const BSONObj &min,
-                               const BSONObj &max,
-                               bool allowSpecial ) :
-        _generator( *this, originalFrsp, parsedQuery, hint, recordedPlanPolicy, min, max,
+    QueryPlanSet::QueryPlanSet( const char* ns,
+                                auto_ptr<FieldRangeSetPair> frsp,
+                                auto_ptr<FieldRangeSetPair> originalFrsp,
+                                const BSONObj& originalQuery,
+                                const BSONObj& order,
+                                const shared_ptr<const ParsedQuery>& parsedQuery,
+                                const BSONObj& hint,
+                                QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
+                                const BSONObj& min,
+                                const BSONObj& max,
+                                bool allowSpecial ) :
+        _generator( *this,
+                    originalFrsp,
+                    parsedQuery,
+                    hint,
+                    recordedPlanPolicy,
+                    min,
+                    max,
                     allowSpecial ),
         _originalQuery( originalQuery ),
         _frsp( frsp ),
@@ -1192,14 +752,14 @@ doneCheckOrder:
         _generator.addInitialPlans();
     }
 
-    void QueryPlanSet::setSinglePlan( const QueryPlanPtr &plan ) {
+    void QueryPlanSet::setSinglePlan( const QueryPlanPtr& plan ) {
         if ( nPlans() == 0 ) {
             pushPlan( plan );
         }
     }
     
-    void QueryPlanSet::setCachedPlan( const QueryPlanPtr &plan,
-                                     const CachedQueryPlan &cachedPlan ) {
+    void QueryPlanSet::setCachedPlan( const QueryPlanPtr& plan,
+                                      const CachedQueryPlan& cachedPlan ) {
         verify( nPlans() == 0 );
         _usingCachedPlan = true;
         _oldNScanned = cachedPlan.nScanned();
@@ -1207,7 +767,7 @@ doneCheckOrder:
         pushPlan( plan );
     }
 
-    void QueryPlanSet::addCandidatePlan( const QueryPlanPtr &plan ) {
+    void QueryPlanSet::addCandidatePlan( const QueryPlanPtr& plan ) {
         // If _plans is nonempty, the new plan may be supplementing a recorded plan at the first
         // position of _plans.  It must not duplicate the first plan.
         if ( nPlans() > 0 && plan->indexKey() == firstPlan()->indexKey() ) {
@@ -1242,7 +802,8 @@ doneCheckOrder:
                     return _plans[i];
             }
 
-            warning() << "best guess query plan requested, but scan and order are required for all plans "
+            warning() << "best guess query plan requested, but scan and order are required for all "
+                         "plans "
             		  << " query: " << _originalQuery
             		  << " order: " << _order
             		  << " choices: ";
@@ -1306,16 +867,19 @@ doneCheckOrder:
     }
     
     MultiPlanScanner *MultiPlanScanner::make( const StringData& ns,
-                                             const BSONObj &query,
-                                             const BSONObj &order,
-                                             const shared_ptr<const ParsedQuery> &parsedQuery,
-                                             const BSONObj &hint,
-                                             QueryPlanGenerator::RecordedPlanPolicy
-                                                    recordedPlanPolicy,
-                                             const BSONObj &min,
-                                             const BSONObj &max ) {
-        auto_ptr<MultiPlanScanner> ret( new MultiPlanScanner( ns, query, parsedQuery, hint,
-                                                             recordedPlanPolicy ) );
+                                              const BSONObj& query,
+                                              const BSONObj& order,
+                                              const shared_ptr<const ParsedQuery>& parsedQuery,
+                                              const BSONObj& hint,
+                                              QueryPlanGenerator::RecordedPlanPolicy
+                                                      recordedPlanPolicy,
+                                              const BSONObj& min,
+                                              const BSONObj& max ) {
+        auto_ptr<MultiPlanScanner> ret( new MultiPlanScanner( ns,
+                                                              query,
+                                                              parsedQuery,
+                                                              hint,
+                                                              recordedPlanPolicy ) );
         ret->init( order, min, max );
         return ret.release();
     }
@@ -1335,7 +899,7 @@ doneCheckOrder:
         
         shared_ptr<QueryPlanRunner> runner = _runnerQueue->next();
         if ( runner->error() &&
-            _currentQps->prepareToRetryQuery() ) {
+             _currentQps->prepareToRetryQuery() ) {
 
             // Avoid an infinite loop here - this should never occur.
             verify( !retried );
@@ -1349,7 +913,7 @@ doneCheckOrder:
         return runner;
     }
 
-    void MultiPlanScanner::updateCurrentQps( QueryPlanSet *qps ) {
+    void MultiPlanScanner::updateCurrentQps( QueryPlanSet* qps ) {
         _currentQps.reset( qps );
         _runnerQueue.reset();
     }
@@ -1376,7 +940,7 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryPlanRunner> QueryPlanRunnerQueue::init() {
-        massert( 10369 ,  "no plans", _plans.plans().size() > 0 );
+        massert( 10369, "no plans", _plans.plans().size() > 0 );
         
         if ( _plans.plans().size() > 1 )
             LOG(1) << "  running multiple plans" << endl;
@@ -1540,10 +1104,10 @@ doneCheckOrder:
      */
     
     MultiPlanScanner::MultiPlanScanner( const StringData& ns,
-                                       const BSONObj &query,
-                                       const shared_ptr<const ParsedQuery> &parsedQuery,
-                                       const BSONObj &hint,
-                                       QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy ) :
+                                        const BSONObj& query,
+                                        const shared_ptr<const ParsedQuery>& parsedQuery,
+                                        const BSONObj& hint,
+                                        QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy ) :
         _ns( ns.toString() ),
         _or( !query.getField( "$or" ).eoo() ),
         _query( query.getOwned() ),
@@ -1555,7 +1119,7 @@ doneCheckOrder:
         _doneRunners() {
     }
     
-    void MultiPlanScanner::init( const BSONObj &order, const BSONObj &min, const BSONObj &max ) {
+    void MultiPlanScanner::init( const BSONObj& order, const BSONObj& min, const BSONObj& max ) {
         if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
         }
@@ -1574,25 +1138,35 @@ doneCheckOrder:
         if ( !_or ) {
             ++_i;
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
-            updateCurrentQps( QueryPlanSet::make( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
-                                                 _query, order, _parsedQuery, _hint,
-                                                 _recordedPlanPolicy,
-                                                 min, max, true ) );
+            updateCurrentQps( QueryPlanSet::make( _ns.c_str(),
+                                                  frsp,
+                                                  auto_ptr<FieldRangeSetPair>(),
+                                                  _query,
+                                                  order,
+                                                  _parsedQuery,
+                                                  _hint,
+                                                  _recordedPlanPolicy,
+                                                  min,
+                                                  max,
+                                                  true ) );
         }
         else {
             BSONElement e = _query.getField( "$or" );
-            massert( 13268, "invalid $or spec",
-                    e.type() == Array && e.embeddedObject().nFields() > 0 );
+            massert( 13268,
+                     "invalid $or spec",
+                     e.type() == Array && e.embeddedObject().nFields() > 0 );
             handleBeginningOfClause();
         }
     }
 
-    void MultiPlanScanner::handleEndOfClause( const QueryPlan &clausePlan ) {
+    void MultiPlanScanner::handleEndOfClause( const QueryPlan& clausePlan ) {
         if ( clausePlan.willScanTable() ) {
             _tableScanned = true;   
-        } else {
-            _org->popOrClause( clausePlan.nsd(), clausePlan.idxNo(),
-                              clausePlan.indexed() ? clausePlan.indexKey() : BSONObj() );
+        }
+        else {
+            _org->popOrClause( clausePlan.nsd(),
+                               clausePlan.idxNo(),
+                               clausePlan.indexed() ? clausePlan.indexKey() : BSONObj() );
         }
     }
     
@@ -1601,11 +1175,18 @@ doneCheckOrder:
         ++_i;
         auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-        updateCurrentQps( QueryPlanSet::make( _ns.c_str(), frsp, originalFrsp, _query,
-                                             BSONObj(), _parsedQuery, _hint, _recordedPlanPolicy,
-                                             BSONObj(), BSONObj(),
-                                             // 'Special' plans are not supported within $or.
-                                             false ) );
+        updateCurrentQps( QueryPlanSet::make( _ns.c_str(),
+                                              frsp,
+                                              originalFrsp,
+                                              _query,
+                                              BSONObj(),
+                                              _parsedQuery,
+                                              _hint,
+                                              _recordedPlanPolicy,
+                                              BSONObj(),
+                                              BSONObj(),
+                                              // 'Special' plans are not supported within $or.
+                                              false ) );
     }
 
     bool MultiPlanScanner::mayHandleBeginningOfClause() {
@@ -1642,7 +1223,7 @@ doneCheckOrder:
         return runner;
     }
     
-    const QueryPlan *MultiPlanScanner::nextClauseBestGuessPlan( const QueryPlan &currentPlan ) {
+    const QueryPlan *MultiPlanScanner::nextClauseBestGuessPlan( const QueryPlan& currentPlan ) {
         assertHasMoreClauses();
         handleEndOfClause( currentPlan );
         if ( !hasMoreClauses() ) {
@@ -1678,21 +1259,25 @@ doneCheckOrder:
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {
         if ( _or ||
-            _currentQps->nPlans() != 1 ||
-            _currentQps->hasPossiblyExcludedPlans() ) {
+             _currentQps->nPlans() != 1 ||
+             _currentQps->hasPossiblyExcludedPlans() ) {
             return 0;
         }
         return _currentQps->firstPlan().get();
     }
 
+    bool MultiPlanScanner::hasMoreClauses() const {
+        return _or ? ( !_tableScanned && !_org->orRangesExhausted() ) : _i == 0;
+    }
+
     bool MultiPlanScanner::haveUselessOr() const {
-        NamespaceDetails *nsd = nsdetails( _ns );
+        NamespaceDetails* nsd = nsdetails( _ns );
         if ( !nsd ) {
             return true;
         }
         BSONElement hintElt = _hint.firstElement();
         if ( !hintElt.eoo() ) {
-            IndexDetails *id = parseHint( hintElt, nsd );
+            IndexDetails* id = parseHint( hintElt, nsd );
             if ( !id ) {
                 return true;
             }
@@ -1707,8 +1292,8 @@ doneCheckOrder:
         }
         QueryPlanSet::QueryPlanPtr plan = _currentQps->firstPlan();
         shared_ptr<Cursor> cursor = plan->newCursor();
-        return BSON( "cursor" << cursor->toString()
-                    << "indexBounds" << cursor->prettyIndexBounds() );
+        return BSON( "cursor" << cursor->toString() <<
+                     "indexBounds" << cursor->prettyIndexBounds() );
     }
     
     void MultiPlanScanner::clearIndexesForPatterns() const {
@@ -1734,16 +1319,18 @@ doneCheckOrder:
                     ).jsonString();
     }
     
-    MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c,
-                             const shared_ptr<CoveredIndexMatcher> &matcher,
-                             const shared_ptr<ExplainPlanInfo> &explainPlanInfo,
-                             const QueryPlanRunner& runner, long long nscanned ) :
-    _mps( mps ),
-    _c( c ),
-    _matcher( matcher ),
-    _queryPlan( &runner.queryPlan() ),
-    _nscanned( nscanned ),
-    _explainPlanInfo( explainPlanInfo ) {
+    MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps,
+                              const shared_ptr<Cursor>& c,
+                              const shared_ptr<CoveredIndexMatcher>& matcher,
+                              const shared_ptr<ExplainPlanInfo>& explainPlanInfo,
+                              const QueryPlanRunner& runner,
+                              long long nscanned ) :
+        _mps( mps ),
+        _c( c ),
+        _matcher( matcher ),
+        _queryPlan( &runner.queryPlan() ),
+        _nscanned( nscanned ),
+        _explainPlanInfo( explainPlanInfo ) {
         _mps->clearRunnerQueue();
         _mps->setRecordedPlanPolicy( QueryPlanGenerator::UseIfInOrder );
         if ( !ok() ) {
@@ -1777,7 +1364,8 @@ doneCheckOrder:
             verify( _c->supportYields() );
             if ( _explainPlanInfo ) {
                 _explainPlanInfo.reset( new ExplainPlanInfo() );
-                _explainPlanInfo->notePlan( *_c, _queryPlan->scanAndOrderRequired(),
+                _explainPlanInfo->notePlan( *_c,
+                                            _queryPlan->scanAndOrderRequired(),
                                            _queryPlan->keyFieldsOnly() );
                 shared_ptr<ExplainClauseInfo> clauseInfo( new ExplainClauseInfo() );
                 clauseInfo->addPlanInfo( _explainPlanInfo );
@@ -1796,7 +1384,10 @@ doneCheckOrder:
         if ( _explainPlanInfo ) _explainPlanInfo->noteIterate( match, loadedRecord, *_c );
     }
     
-    bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
+    bool indexWorks( const BSONObj& idxPattern,
+                     const BSONObj& sampleKey,
+                     int direction,
+                     int firstSignificantField ) {
         BSONObjIterator p( idxPattern );
         BSONObjIterator k( sampleKey );
         int i = 0;
@@ -1816,7 +1407,7 @@ doneCheckOrder:
         return false;
     }
 
-    BSONObj extremeKeyForIndex( const BSONObj &idxPattern, int baseDirection ) {
+    BSONObj extremeKeyForIndex( const BSONObj& idxPattern, int baseDirection ) {
         BSONObjIterator i( idxPattern );
         BSONObjBuilder b;
         while( i.moreWithEOO() ) {
@@ -1839,7 +1430,7 @@ doneCheckOrder:
         return b.obj();
     }
 
-    pair<int,int> keyAudit( const BSONObj &min, const BSONObj &max ) {
+    pair<int,int> keyAudit( const BSONObj& min, const BSONObj& max ) {
         int direction = 0;
         int firstSignificantField = 0;
         BSONObjIterator i( min );
@@ -1864,7 +1455,7 @@ doneCheckOrder:
         return make_pair( direction, firstSignificantField );
     }
 
-    pair<int,int> flexibleKeyAudit( const BSONObj &min, const BSONObj &max ) {
+    pair<int,int> flexibleKeyAudit( const BSONObj& min, const BSONObj& max ) {
         if ( min.isEmpty() || max.isEmpty() ) {
             return make_pair( 1, -1 );
         }
@@ -1874,15 +1465,19 @@ doneCheckOrder:
     }
 
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
-    IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
+    IndexDetails* indexDetailsForRange( const char* ns,
+                                        string& errmsg,
+                                        BSONObj& min,
+                                        BSONObj& max,
+                                        BSONObj& keyPattern ) {
         if ( min.isEmpty() && max.isEmpty() ) {
             errmsg = "one of min or max must be specified";
             return 0;
         }
 
         Client::Context ctx( ns );
-        IndexDetails *id = 0;
-        NamespaceDetails *d = nsdetails( ns );
+        IndexDetails* id = 0;
+        NamespaceDetails* d = nsdetails( ns );
         if ( !d ) {
             errmsg = "ns not found";
             return 0;
@@ -1937,7 +1532,8 @@ doneCheckOrder:
         }
 
         if ( !id ) {
-            errmsg = str::stream() << "no index found for specified keyPattern: " << keyPattern.toString() 
+            errmsg = str::stream() << "no index found for specified keyPattern: "
+                                   << keyPattern.toString()
                                    << " min: " << min << " max: " << max;
             return 0;
         }
@@ -1948,29 +1544,10 @@ doneCheckOrder:
         return id;
     }
     
-    shared_ptr<Cursor> NamespaceDetailsTransient::bestGuessCursor( const char *ns,
-                                                                  const BSONObj &query,
-                                                                  const BSONObj &sort ) {
-        auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( ns, query, true ) );
-        auto_ptr<FieldRangeSetPair> origFrsp( new FieldRangeSetPair( *frsp ) );
-
-        scoped_ptr<QueryPlanSet> qps( QueryPlanSet::make( ns, frsp, origFrsp, query, sort,
-                                                         shared_ptr<const ParsedQuery>(), BSONObj(),
-                                                         QueryPlanGenerator::UseIfInOrder,
-                                                         BSONObj(), BSONObj(), true ) );
-        QueryPlanSet::QueryPlanPtr qpp = qps->getBestGuess();
-        if( ! qpp.get() ) return shared_ptr<Cursor>();
-
-        shared_ptr<Cursor> ret = qpp->newCursor();
-
-        // If we don't already have a matcher, supply one.
-        if ( !query.isEmpty() && ! ret->matcher() ) {
-            ret->setMatcher( qpp->matcher() );
-        }
-        return ret;
-    }
-
-    bool QueryUtilIndexed::indexUseful( const FieldRangeSetPair &frsp, NamespaceDetails *d, int idxNo, const BSONObj &order ) {
+    bool QueryUtilIndexed::indexUseful( const FieldRangeSetPair& frsp,
+                                        NamespaceDetails* d,
+                                        int idxNo,
+                                        const BSONObj& order ) {
         DEV frsp.assertValidIndex( d, idxNo );
         BSONObj keyPattern = d->idx( idxNo ).keyPattern();
         if ( !frsp.matchPossibleForIndex( d, idxNo, keyPattern ) ) {
@@ -1982,17 +1559,19 @@ doneCheckOrder:
                != USELESS;
     }
     
-    void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
+    void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair& frsp,
+                                                    const BSONObj& order ) {
         SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
+        NamespaceDetailsTransient& nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         CachedQueryPlan noCachedPlan;
         nsdt.registerCachedQueryPlanForPattern( frsp._singleKey.pattern( order ), noCachedPlan );
         nsdt.registerCachedQueryPlanForPattern( frsp._multiKey.pattern( order ), noCachedPlan );
     }
     
-    CachedQueryPlan QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
-        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
+    CachedQueryPlan QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair& frsp,
+                                                            const BSONObj& order ) {
+        SimpleMutex::scoped_lock lk( NamespaceDetailsTransient::_qcMutex );
+        NamespaceDetailsTransient& nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.
         {
@@ -2012,8 +1591,12 @@ doneCheckOrder:
         return CachedQueryPlan();
     }
     
-    bool QueryUtilIndexed::uselessOr( const OrRangeGenerator &org, NamespaceDetails *d, int hintIdx ) {
-        for( list<FieldRangeSetPair>::const_iterator i = org._originalOrSets.begin(); i != org._originalOrSets.end(); ++i ) {
+    bool QueryUtilIndexed::uselessOr( const OrRangeGenerator& org,
+                                      NamespaceDetails* d,
+                                      int hintIdx ) {
+        for( list<FieldRangeSetPair>::const_iterator i = org._originalOrSets.begin();
+             i != org._originalOrSets.end();
+             ++i ) {
             if ( hintIdx != -1 ) {
                 if ( !indexUseful( *i, d, hintIdx, BSONObj() ) ) {
                     return true;   

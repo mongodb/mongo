@@ -33,7 +33,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/queryoptimizer.h"
 #include "mongo/s/chunk.h" // for static genID only
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"

@@ -108,12 +108,12 @@ MongoRunner.VersionSub = function(regex, version) {
 // These patterns allow substituting the binary versions used for each
 // version string to support the dev/stable MongoDB release cycle.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
-                               new MongoRunner.VersionSub(/^last-stable$/, "2.2"),
+                               new MongoRunner.VersionSub(/^last-stable$/, "2.4"),
                                new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
                                // Latest unstable and next stable are effectively the
                                // same release
-                               new MongoRunner.VersionSub(/^2\.3(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^2\.4(\..*){0,1}/, "") ];
+                               new MongoRunner.VersionSub(/^2\.5(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^2\.6(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
  

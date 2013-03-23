@@ -1282,6 +1282,60 @@ namespace JSTests {
             ASSERT_EQUALS( 17 , ret.number() );
         }
     };
+    class NoReturnSpecified {
+        public:
+            void run() {
+                Scope * s = globalScriptEngine->newScope();
+
+                s->invoke("x=5;" , 0, 0 );
+                ASSERT_EQUALS(5, s->getNumber("__returnValue"));
+
+                s->invoke("x='test'", 0, 0);
+                ASSERT_EQUALS("test", s->getString("__returnValue"));
+
+                s->invoke("x='return'", 0, 0);
+                ASSERT_EQUALS("return", s->getString("__returnValue"));
+
+                s->invoke("return 'return'", 0, 0);
+                ASSERT_EQUALS("return", s->getString("__returnValue"));
+
+                s->invoke("x = ' return '", 0, 0);
+                ASSERT_EQUALS(" return ", s->getString("__returnValue"));
+
+                s->invoke("x = \" return \"", 0, 0);
+                ASSERT_EQUALS(" return ", s->getString("__returnValue"));
+
+                s->invoke("x = \"' return '\"", 0, 0);
+                ASSERT_EQUALS("' return '", s->getString("__returnValue"));
+
+                s->invoke("x = '\" return \"'", 0, 0);
+                ASSERT_EQUALS("\" return \"", s->getString("__returnValue"));
+
+                s->invoke(";return 5", 0, 0);
+                ASSERT_EQUALS(5, s->getNumber("__returnValue"));
+
+                s->invoke("String('return')", 0, 0);
+                ASSERT_EQUALS("return", s->getString("__returnValue"));
+
+                s->invoke("String(' return ')", 0, 0);
+                ASSERT_EQUALS(" return ", s->getString("__returnValue"));
+
+                // This should fail so we set the expected __returnValue to undefined
+                s->invoke(";x = 5", 0, 0);
+                ASSERT_EQUALS("undefined", s->getString("__returnValue"));
+
+                s->invoke("String(\"'return\")", 0, 0);
+                ASSERT_EQUALS("'return", s->getString("__returnValue"));
+
+                s->invoke("String('\"return')", 0, 0);
+                ASSERT_EQUALS("\"return", s->getString("__returnValue"));
+
+                // A fail case
+                s->invoke("return$ = 0", 0, 0);
+                // Checks to confirm that the result is NaN
+                ASSERT(s->getNumber("__returnValue") != s->getNumber("__returnValue"));
+            }
+    };
 
     class All : public Suite {
     public:
@@ -1334,6 +1388,7 @@ namespace JSTests {
             add< RoundTripTests::DBPointerTest >();
             add< RoundTripTests::InformalDBRefTest >();
             add< RoundTripTests::InformalDBRefExtraFieldTest >();
+            add< NoReturnSpecified >();
         }
     } myall;
 

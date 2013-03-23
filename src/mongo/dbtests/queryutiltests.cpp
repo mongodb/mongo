@@ -18,13 +18,15 @@
  */
 
 #include "pch.h"
-#include "../db/queryutil.h"
-#include "mongo/db/queryoptimizer.h"
-#include "../db/querypattern.h"
-#include "../db/instance.h"
-#include "../db/pdfile.h"
+
+#include "mongo/db/queryutil.h"
+
+#include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "dbtests.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/query_optimizer_internal.h"
+#include "mongo/db/querypattern.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace QueryUtilTests {
 

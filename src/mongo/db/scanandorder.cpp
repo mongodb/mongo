@@ -21,6 +21,7 @@
 #include "pch.h"
 #include "scanandorder.h"
 #include "mongo/db/matcher.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

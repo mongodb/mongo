@@ -290,8 +290,16 @@ namespace mongo {
          */
         bool runCommand( const string& db , const BSONObj& cmd , BSONObj& res );
 
+        static bool releaseConnectionsAfterResponse;
+
         /** checks all of my thread local connections for the version of this ns */
         static void checkMyConnectionVersions( const string & ns );
+
+        /**
+         * Returns all the current sharded connections to the pool.
+         * Note: This is *dangerous* if we have GLE state.
+         */
+        static void releaseMyConnections();
 
         /**
          * Clears all connections in the sharded pool, including connections in the

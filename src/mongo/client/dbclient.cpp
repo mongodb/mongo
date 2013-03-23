@@ -500,11 +500,19 @@ namespace mongo {
         return getLastErrorString( info );
     }
 
-    string DBClientWithCommands::getLastErrorString( const BSONObj& info ) {
-        BSONElement e = info["err"];
-        if( e.eoo() ) return "";
-        if( e.type() == Object ) return e.toString();
-        return e.str();
+    string DBClientWithCommands::getLastErrorString(const BSONObj& info) {
+        if (info["ok"].trueValue()) {
+            BSONElement e = info["err"];
+            if (e.eoo()) return "";
+            if (e.type() == Object) return e.toString();
+            return e.str();
+        } else {
+            // command failure
+            BSONElement e = info["errmsg"];
+            if (e.eoo()) return "";
+            if (e.type() == Object) return "getLastError command failed: " + e.toString();
+            return "getLastError command failed: " + e.str();
+        }
     }
 
     const BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");

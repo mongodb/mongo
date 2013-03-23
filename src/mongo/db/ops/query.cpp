@@ -24,8 +24,11 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/query_plan_summary.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/query_optimizer_internal.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/oplog.h"
@@ -41,7 +44,7 @@ namespace mongo {
     /* We cut off further objects once we cross this threshold; thus, you might get
        a little bit more than this, it is a threshold rather than a limit.
     */
-    const int MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+    const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
     bool runCommands(const char *ns, BSONObj& jsobj, CurOp& curop, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
         try {
@@ -430,7 +433,7 @@ namespace mongo {
         verify( _cursor->ok() );
         const FieldRangeSet *fieldRangeSet = 0;
         if ( queryPlan.valid() ) {
-            fieldRangeSet = queryPlan._fieldRangeSetMulti.get();
+            fieldRangeSet = queryPlan.fieldRangeSetMulti.get();
         }
         else {
             verify( _queryOptimizerCursor );
@@ -615,8 +618,8 @@ namespace mongo {
         }
         shared_ptr<ExplainRecordingStrategy> ret
         ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
-        ret->notePlan( queryPlan.valid() && queryPlan._scanAndOrderRequired,
-                      queryPlan._keyFieldsOnly );
+        ret->notePlan( queryPlan.valid() && queryPlan.scanAndOrderRequired,
+                       queryPlan.keyFieldsOnly );
         return ret;
     }
 
@@ -626,7 +629,7 @@ namespace mongo {
         bool empty = !_cursor->ok();
         bool singlePlan = !_queryOptimizerCursor;
         bool singleOrderedPlan =
-        singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
+                singlePlan && ( !queryPlan.valid() || !queryPlan.scanAndOrderRequired );
         CandidatePlanCharacter queryOptimizerPlans;
         if ( _queryOptimizerCursor ) {
             queryOptimizerPlans = _queryOptimizerCursor->initialCandidatePlans();
@@ -690,14 +693,13 @@ namespace mongo {
             cursor = FindingStartCursor::getCursor( ns.c_str(), query, order );
         }
         else {
-            cursor =
-                NamespaceDetailsTransient::getCursor( ns.c_str(),
-                                                      query,
-                                                      order,
-                                                      QueryPlanSelectionPolicy::any(),
-                                                      pq_shared,
-                                                      false,
-                                                      &queryPlan );
+            cursor = getOptimizedCursor( ns.c_str(),
+                                         query,
+                                         order,
+                                         QueryPlanSelectionPolicy::any(),
+                                         pq_shared,
+                                         false,
+                                         &queryPlan );
         }
         verify( cursor );
         

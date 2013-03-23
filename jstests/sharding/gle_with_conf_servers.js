@@ -10,6 +10,14 @@ function writeToConfigTest(){
     var gleObj = confDB.runCommand({ getLastError: 1, w: 'majority' });
 
     assert( gleObj.ok );
+    assert.eq("norepl", gleObj.err);
+
+    // w:1 should still work
+    confDB.settings.update({ _id: 'balancer' }, { $set: { stopped: true }});
+    var gleObj = confDB.runCommand({ getLastError: 1, w: 1 });
+
+    assert(gleObj.ok);
+    assert.eq(null, gleObj.err);
 
     st.stop();
 }

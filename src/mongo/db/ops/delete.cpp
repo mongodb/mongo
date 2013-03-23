@@ -21,6 +21,7 @@
 #include "mongo/db/ops/delete.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/stacktrace.h"
@@ -56,7 +57,7 @@ namespace mongo {
 
         long long nDeleted = 0;
 
-        shared_ptr< Cursor > creal = NamespaceDetailsTransient::getCursor( ns, pattern );
+        shared_ptr< Cursor > creal = getOptimizedCursor( ns, pattern );
 
         if( !creal->ok() )
             return nDeleted;

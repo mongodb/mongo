@@ -20,12 +20,13 @@
 #include "mongo/db/cursor.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/matcher.h"
-#include "mongo/db/queryutil.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {
+
     class BtreeCursor;
+    class IndexDetails;
 
     class S2Cursor : public Cursor {
     public:
