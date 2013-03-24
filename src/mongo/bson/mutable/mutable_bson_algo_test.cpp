@@ -160,4 +160,48 @@ namespace {
         ASSERT_FALSE(found_after_add.ok());
     }
 
+    class CountTest : public DocumentTest {
+        virtual void setUp() {
+            Element root = doc().root();
+
+            ASSERT_OK(root.appendInt("leaf", 0));
+
+            Element one = doc().makeElementObject("oneChild");
+            ASSERT_TRUE(one.ok());
+            ASSERT_OK(one.appendInt("one", 1));
+            ASSERT_OK(root.pushBack(one));
+
+            Element threeChildren = doc().makeElementObject("threeChildren");
+            ASSERT_TRUE(one.ok());
+            ASSERT_OK(threeChildren.appendInt("one", 1));
+            ASSERT_OK(threeChildren.appendInt("two", 2));
+            ASSERT_OK(threeChildren.appendInt("three", 3));
+            ASSERT_OK(root.pushBack(threeChildren));
+        }
+    };
+
+    TEST_F(CountTest, EmptyDocument) {
+        // Doesn't use the fixture but belongs in the same group of tests.
+        Document doc;
+        ASSERT_EQUALS(countChildren(doc.root()), 0u);
+    }
+
+    TEST_F(CountTest, EmptyElement) {
+        Element leaf = findFirstChildNamed(doc().root(), "leaf");
+        ASSERT_TRUE(leaf.ok());
+        ASSERT_EQUALS(countChildren(leaf), 0u);
+    }
+
+    TEST_F(CountTest, OneChildElement) {
+        Element oneChild = findFirstChildNamed(doc().root(), "oneChild");
+        ASSERT_TRUE(oneChild.ok());
+        ASSERT_EQUALS(countChildren(oneChild), 1u);
+    }
+
+    TEST_F(CountTest, ManyChildren) {
+        Element threeChildren = findFirstChildNamed(doc().root(), "threeChildren");
+        ASSERT_TRUE(threeChildren.ok());
+        ASSERT_EQUALS(countChildren(threeChildren), 3u);
+    }
+
 } // namespace
