@@ -53,10 +53,13 @@ options = {}
 options_topass = {}
 
 def add_option( name, help, nargs, contributesToVariantDir,
-                dest=None, default = None, type="string", choices=None ):
+                dest=None, default = None, type="string", choices=None, metavar=None ):
 
     if dest is None:
         dest = name
+
+    if type == 'choice' and not metavar:
+        metavar = '[' + '|'.join(choices) + ']'
 
     AddOption( "--" + name , 
                dest=dest,
@@ -65,6 +68,7 @@ def add_option( name, help, nargs, contributesToVariantDir,
                action="store",
                choices=choices,
                default=default,
+               metavar=metavar,
                help=help )
 
     options[name] = { "help" : help ,
@@ -198,6 +202,11 @@ add_option( "win2008plus", "use newer operating system API features" , 0 , False
 # dev options
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
 add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , True , "debugBuildAndLogging" )
+
+sanitizer_choices = ["address", "memory", "thread", "undefined"]
+add_option( "sanitize", "enable selected sanitizer", 1, True,
+            type="choice", choices=sanitizer_choices, default=None )
+
 add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
 add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
 
@@ -999,6 +1008,17 @@ def doConfigure(myenv):
             myenv.Append(LINKFLAGS=['-stdlib=libc++'])
         else:
             print( 'libc++ requested, but compiler does not support -stdlib=libc++' )
+            Exit(1)
+
+    if has_option('sanitize'):
+        if not (using_clang() or using_gcc()):
+            print( 'sanitize is only supported with clang or gcc')
+            Exit(1)
+        sanitizer_option = '-fsanitize=' + GetOption('sanitize')
+        if AddToCCFLAGSIfSupported(myenv, sanitizer_option):
+            myenv.Append(LINKFLAGS=[sanitizer_option])
+        else:
+            print( 'Failed to enable sanitizer with flag: ' + sanitizer_option )
             Exit(1)
 
     # Apply any link time optimization settings as selected by the 'lto' option.
