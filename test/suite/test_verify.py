@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -140,7 +140,7 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         self.session = self.setUpSessionOpen(self.conn)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.verify('table:' + self.tablename, None),
-            "/read checksum error/")
+            "/session.verify/")
 
     def test_verify_process_75pct_null(self):
         """

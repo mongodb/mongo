@@ -13,7 +13,7 @@ session.
 WT_SESSION and WT_CURSOR methods may be accessed by different threads
 serially (for example, a pool of threads managed by the application with
 a set of shared session or cursor handles).  There is no thread-local
-state in WiredTiger, but no built-in synchronization of session or
+state in WiredTiger, and no built-in synchronization of session or
 cursor handles, either, so if multiple threads access a session or
 cursor handle, access must be serialized by the application.
 

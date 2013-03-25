@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -35,35 +35,40 @@
 #include <inttypes.h>
 #include <wiredtiger.h>
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 
-/*! [schema decl] */
-/* The C struct for the data we are storing with WiredTiger. */
+/*! [schema declaration] */
+/* The C struct for the data we are storing in a WiredTiger table. */
 typedef struct {
 	char country[5];
 	uint16_t year;
 	uint64_t population;
 } POP_RECORD;
-/*! [schema decl] */
 
 POP_RECORD pop_data[] = {
-	{ "USA", 1980, 226542250 },
-	{ "USA", 2009, 307006550 },
-	{ "UK", 2008, 61414062 },
-	{ "CAN", 2008, 33311400 },
-	{ "AU", 2008, 21431800 }
+	{ "AU",  1900,	  4000000 },
+	{ "AU",  2000,	 19053186 },
+	{ "CAN", 1900,	  5500000 },
+	{ "CAN", 2000,	 31099561 },
+	{ "UK",  1900,	369000000 },
+	{ "UK",  2000,	 59522468 },
+	{ "USA", 1900,	 76212168 },
+	{ "USA", 2000,	301279593 },
+	{ "", 0, 0 }
 };
+/*! [schema declaration] */
 
-int main(void)
+int
+main(void)
 {
-	int ret;
+	POP_RECORD *p;
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	POP_RECORD *p, *endp;
+	WT_SESSION *session;
 	const char *country;
-	uint64_t recno;
+	uint64_t recno, population;
 	uint16_t year;
+	int ret;
 
 	ret = wiredtiger_open(home, NULL, "create", &conn);
 	if (ret != 0)
@@ -71,61 +76,164 @@ int main(void)
 		    home, wiredtiger_strerror(ret));
 	/* Note: error checking omitted for clarity. */
 
-	/*! [schema work] */
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
+	/*! [Create a table with column groups] */
 	/*
 	 * Create the population table.
-	 * Keys are record numbers, the format for values is
-	 * (5-byte string, short, long).
+	 * Keys are record numbers, the format for values is (5-byte string,
+	 * uint16_t, uint64_t).
 	 * See ::wiredtiger_struct_pack for details of the format strings.
-	 *
-	 * If this program is run multiple times so the table already exists,
-	 * this call will verify that the table exists.  It is not required in
-	 * that case, but is a safety check that the schema matches what the
-	 * program expects.
 	 */
-	ret = session->create(session, "table:population",
+	ret = session->create(session, "table:poptable",
 	    "key_format=r,"
 	    "value_format=5sHQ,"
 	    "columns=(id,country,year,population),"
 	    "colgroups=(main,population)");
 
-	/* Create the column groups to store population in its own file. */
-	ret = session->create(session, "colgroup:population:main",
-	    "columns=(country,year)");
+	/*
+	 * Create two column groups: a primary column group with the country
+	 * code, year and population (named "main"), and a population column
+	 * group with the population by itself (named "population").
+	 */
+	ret = session->create(session,
+	    "colgroup:poptable:main", "columns=(country,year,population)");
+	ret = session->create(session,
+	    "colgroup:poptable:population", "columns=(population)");
+	/*! [Create a table with column groups] */
 
-	ret = session->create(session, "colgroup:population:population",
-	    "columns=(population)");
+	/*! [Create an index] */
+	/* Create an index with a simple key. */
+	ret = session->create(session,
+	    "index:poptable:country", "columns=(country)");
+	/*! [Create an index] */
 
-	/* Create an index with composite key (country,year). */
-	ret = session->create(session, "index:population:country_year",
-	    "columns=(country,year)");
+	/*! [Create an index with a composite key] */
+	/* Create an index with a composite key (country,year). */
+	ret = session->create(session,
+	    "index:poptable:country_plus_year", "columns=(country,year)");
+	/*! [Create an index with a composite key] */
 
-	ret = session->open_cursor(session, "table:population",
-	    NULL, "append", &cursor);
-
-	endp = pop_data + (sizeof (pop_data) / sizeof(pop_data[0]));
-	for (p = pop_data; p < endp; p++) {
+	/* Insert the records into the table. */
+	ret = session->open_cursor(
+	    session, "table:poptable", NULL, "append", &cursor);
+	for (p = pop_data; p->year != 0; p++) {
 		cursor->set_value(cursor, p->country, p->year, p->population);
 		ret = cursor->insert(cursor);
 	}
 	ret = cursor->close(cursor);
 
-	/* Now just read through the countries we know about */
+	/* List the records in the table. */
 	ret = session->open_cursor(session,
-	    "index:population:country_year(id)",
-	    NULL, NULL, &cursor);
-
+	    "table:poptable", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &country, &year);
-		cursor->get_value(cursor, &recno);
-
-		printf("Got country %s : row ID %d\n", country, (int)recno);
+		ret = cursor->get_key(cursor, &recno);
+		ret = cursor->get_value(cursor, &country, &year, &population);
+		printf("ID %" PRIu64, recno);
+		printf(": country %s, year %u, population %" PRIu64 "\n",
+		    country, year, population);
 	}
+	ret = cursor->close(cursor);
+
+	/*! [Read population from the primary column group] */
+	/*
+	 * Open a cursor on the main column group, and return the information
+	 * for a particular country.
+	 */
+	ret = session->open_cursor(
+	    session, "colgroup:poptable:main", NULL, NULL, &cursor);
+	cursor->set_key(cursor, 2);
+	if ((ret = cursor->search(cursor)) == 0) {
+		ret = cursor->get_value(cursor, &country, &year, &population);
+		printf("ID 2: country %s, year %u, population %" PRIu64 "\n",
+		    country, year, population);
+	}
+	/*! [Read population from the primary column group] */
+	ret = cursor->close(cursor);
+
+	/*! [Read population from the standalone column group] */
+	/*
+	 * Open a cursor on the population column group, and return the
+	 * population of a particular country.
+	 */
+	ret = session->open_cursor(session,
+	    "colgroup:poptable:population", NULL, NULL, &cursor);
+	cursor->set_key(cursor, 2);
+	if ((ret = cursor->search(cursor)) == 0) {
+		ret = cursor->get_value(cursor, &population);
+		printf("ID 2: population %" PRIu64 "\n", population);
+	}
+	/*! [Read population from the standalone column group] */
+	ret = cursor->close(cursor);
+
+	/*! [Search in a simple index] */
+	/* Search in a simple index. */
+	ret = session->open_cursor(session,
+	    "index:poptable:country", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "AU\0\0\0");
+	ret = cursor->search(cursor);
+	ret = cursor->get_value(cursor, &country, &year, &population);
+	printf("AU: country %s, year %u, population %" PRIu64 "\n",
+	    country, (unsigned int)year, population);
+	/*! [Search in a simple index] */
+	ret = cursor->close(cursor);
+
+	/*! [Search in a composite index] */
+	/* Search in a composite index. */
+	ret = session->open_cursor(session,
+	    "index:poptable:country_plus_year", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "USA\0\0", (uint16_t)1900);
+	ret = cursor->search(cursor);
+	ret = cursor->get_value(cursor, &country, &year, &population);
+	printf("US 1900: country %s, year %u, population %" PRIu64 "\n",
+	    country, (unsigned int)year, population);
+	/*! [Search in a composite index] */
+	ret = cursor->close(cursor);
+
+	/*! [Return the table's record number key using an index] */
+	/* Return the table's record number key using an index. */
+	ret = session->open_cursor(session,
+	    "index:poptable:country_plus_year(id)", NULL, NULL, &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_key(cursor, &country, &year);
+		ret = cursor->get_value(cursor, &recno);
+		printf(
+		    "row ID %" PRIu64 ": country %s, year %u\n",
+		    recno, country, year);
+	}
+	/*! [Return the table's record number key using an index] */
+	ret = cursor->close(cursor);
+
+	/*! [Return a subset of the value columns from an index] */
+	/* Return just the population column using an index. */
+	ret = session->open_cursor(session,
+	    "index:poptable:country_plus_year(population)",
+	    NULL, NULL, &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_key(cursor, &country, &year);
+		ret = cursor->get_value(cursor, &population);
+		printf("population %" PRIu64 ": country %s, year %u\n",
+		    population, country, year);
+	}
+	/*! [Return a subset of the value columns from an index] */
+	ret = cursor->close(cursor);
+
+	/*! [Access only the index] */
+	/*
+	 * Avoid accessing any other column groups when using an index: supply
+	 * an empty list of value columns.
+	 */
+	ret = session->open_cursor(session,
+	    "index:poptable:country_plus_year()", NULL, NULL, &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_key(cursor, &country, &year);
+		printf("country %s, year %u\n", country, year);
+	}
+	/*! [Access only the index] */
+	ret = cursor->close(cursor);
+	/*! [schema complete] */
 
 	ret = conn->close(conn, NULL);
-	/*! [schema work] */
 
 	return (ret);
 }

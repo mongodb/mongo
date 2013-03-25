@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -113,7 +113,7 @@ class test_config03(test_base03.test_base03):
             # we know that trigger >= 1
             repfrom = ',eviction_target=' + str(self.s_eviction_target)
             repto = ',eviction_target=' + str(self.s_eviction_trigger - 1)
-            successargs = successargs.replace(repfrom, repto);
+            successargs = successargs.replace(repfrom, repto)
             expect_fail = True
 
         if expect_fail:

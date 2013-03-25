@@ -1,0 +1,7 @@
+This is a benchmark program for testing the performance of WiredTiger.
+
+Scripts for running the benchmark can be found in the runners directory.
+
+The scripts should generally be copied to build/bench/wtperf/ before they
+are run.
+

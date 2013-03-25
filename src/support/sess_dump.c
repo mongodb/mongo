@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -56,7 +56,7 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 		if (hp->page == NULL)
 			continue;
 		if (++first == 1)
-			(void)__wt_msg(session, "\thazard references:");
+			(void)__wt_msg(session, "\thazard pointers:");
 #ifdef HAVE_DIAGNOSTIC
 		(void)__wt_msg(session,
 		    "\t\t%p (%s, line %d)", hp->page, hp->file, hp->line);

@@ -1,34 +1,40 @@
 /*! @page huffman Huffman Encoding
 
 Keys in row-stores and variable-length values in either row- or
-column-stores can be compressed with Huffman encoding.  The additional
-CPU cost of Huffman coding can be high, and should be considered.
+column-stores can be compressed with Huffman encoding.
 
 Huffman compression is maintained in memory as well as on disk, and can
 increase the amount of usable data the cache can hold as well as
-decrease the size of the data on disk.
+decrease the size of the data on disk.  The additional CPU cost of
+Huffman coding can be high, and should be considered.
 
 To configure Huffman encoding for the key in a row-store, specify \c
-"huffman_key=english", \c "huffman_key=utf8<file>" or \c
-"huffman_key=utf16<file>" in the configuration passed to \c
+huffman_key=english, \c huffman_key=utf8<file> or \c
+huffman_key=utf16<file> in the configuration passed to \c
 WT_SESSION::create.
 
 To configure Huffman encoding for a variable-length value in either a
-row-store or a column-store, specify "huffman_value=english", \c
-"huffman_value=utf8<file>" or \c "huffman_value=utf16<file>" in the
+row-store or a column-store, specify \c huffman_value=english, \c
+huffman_value=utf8<file> or \c huffman_value=utf16<file> in the
 configuration passed to \c WT_SESSION::create.
 
-Setting Huffman encoding to \c "english" configures WiredTiger to use a
-built-in English language frequency table.
+Setting Huffman encoding to \c english configures WiredTiger to use a
+built-in English language frequency table.  The English language
+frequency table is based on \c "Case-sensitive letter and bigram
+frequency counts from large-scale English corpora", by Michael N. Jones
+and D.J.K. Mewhort, modified to support space and tab characters.
 
-Setting Huffman encoding to \c "utf8<file>" or \c "utf16<file>"
-configures WiredTiger to use a frequency table read from a file.  The
-frequency table file format is lines containing pairs of unsigned
+Setting Huffman encoding to \c utf8<file> or \c utf16<file> configures
+WiredTiger to use a frequency table read from a file.  (Note: the \c <
+and \c > characters are not literal, and should not appear in the
+string.)
+
+The frequency table file format is lines containing pairs of unsigned
 integers separated by whitespace.  The first integer is the symbol
 value, the second integer is the frequency value.  Symbol values may be
-specified as hexadecimal numbers (with a leading \c "0x" prefix), or as
+specified as hexadecimal numbers (with a leading \c 0x prefix), or as
 integers.  For example, an English-language frequency table for the
-characters '0' through '9' might look like this:
+characters \c 0 through \c 9 might look like this:
 
 @code
 0x30 546233
@@ -56,10 +62,5 @@ in the frequency table (or appeared in the frequency table, but with
 frequency values of 0), are accepted, but will not compress as well as
 if they are listed in the frequency table, with frequency values other
 than 0.
-
-The English language frequency table is based on \c "Case-sensitive
-letter and bigram frequency counts from large-scale English corpora",
-by Michael N. Jones and D.J.K. Mewhort, modified to support space and
-tab characters.
 
 */

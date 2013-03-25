@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -268,7 +268,7 @@ config_update(WT_SESSION *session, char **list)
 			if ((t = strchr(p, ',')) == NULL)
 				*p = '\0';
 			else
-				strcpy(p, t + 1);
+				memmove(p, t + 1, strlen(t + 1) + 1);
 		}
 
 	/*

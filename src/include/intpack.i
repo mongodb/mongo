@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -43,7 +43,8 @@
 #define	POS_2BYTE_MAX ((1 << 13) + POS_1BYTE_MAX)
 
 /* Extract bits <start> to <end> from a value (counting from LSB == 0). */
-#define	GET_BITS(x, start, end) (((x) & ((1 << (start)) - 1)) >> (end))
+#define	GET_BITS(x, start, end)                                         \
+	(((uint64_t)(x) & ((1U << (start)) - 1U)) >> (end))
 
 #define	WT_SIZE_CHECK(l, maxl)						\
 	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), ENOMEM)
@@ -278,7 +279,7 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 	case NEG_2BYTE_MARKER:
 	case NEG_2BYTE_MARKER | 0x10:
 		WT_SIZE_CHECK(2, maxlen);
-		*xp = GET_BITS(*p++, 5, 0) << 8;
+		*xp = (int64_t)(GET_BITS(*p++, 5, 0) << 8);
 		*xp |= *p++;
 		*xp += NEG_2BYTE_MIN;
 		p += 2;
@@ -287,7 +288,7 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 	case NEG_1BYTE_MARKER | 0x10:
 	case NEG_1BYTE_MARKER | 0x20:
 	case NEG_1BYTE_MARKER | 0x30:
-		*xp = NEG_1BYTE_MIN + GET_BITS(*p, 6, 0);
+		*xp = NEG_1BYTE_MIN + (int64_t)GET_BITS(*p, 6, 0);
 		p += 1;
 		break;
 	default:
@@ -309,7 +310,7 @@ __wt_vsize_posint(uint64_t x)
 	int lz;
 
 	WT_LEADING_ZEROS(x, lz);
-	return (WT_INTPACK64_MAXSIZE - lz);
+	return ((size_t)(WT_INTPACK64_MAXSIZE - lz));
 }
 
 /*

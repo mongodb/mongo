@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -37,6 +37,15 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	__wt_spin_init(session, &conn->schema_lock);
 	__wt_spin_init(session, &conn->serial_lock);
 
+	/*
+	 * Block manager.
+	 * XXX
+	 * If there's ever a second block manager, we'll want to make this
+	 * more opaque, but for now this is simpler.
+	 */
+	__wt_spin_init(session, &conn->block_lock);
+	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
+
 	return (0);
 }
 
@@ -44,16 +53,17 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
  * __wt_connection_destroy --
  *	Destroy the connection's underlying WT_CONNECTION_IMPL structure.
  */
-void
+int
 __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = conn->default_session;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
-		return;
+		return (0);
 
 	/*
 	 * Close remaining open files (before discarding the mutex, the
@@ -61,10 +71,10 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	 * open files.
 	 */
 	if (conn->lock_fh != NULL)
-		(void)__wt_close(session, conn->lock_fh);
+		WT_TRET(__wt_close(session, conn->lock_fh));
 
 	if (conn->log_fh != NULL)
-		(void)__wt_close(session, conn->log_fh);
+		WT_TRET(__wt_close(session, conn->log_fh));
 
 	/* Remove from the list of connections. */
 	__wt_spin_lock(session, &__wt_process.spinlock);
@@ -76,6 +86,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->serial_lock);
+	__wt_spin_destroy(session, &conn->block_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);
@@ -83,4 +94,5 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_free(session, conn->stats);
 
 	__wt_free(NULL, conn);
+	return (ret);
 }

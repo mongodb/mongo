@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -86,11 +86,14 @@
 #define	WT_CELL_ADDR_LNO	(2 << 4)	/* Block location (lno) */
 #define	WT_CELL_DEL		(3 << 4)	/* Deleted value */
 #define	WT_CELL_KEY		(4 << 4)	/* Key */
-#define	WT_CELL_KEY_OVFL	(5 << 4)	/* Key overflow */
+#define	WT_CELL_KEY_OVFL	(5 << 4)	/* Overflow key */
 #define	WT_CELL_VALUE		(6 << 4)	/* Value */
 #define	WT_CELL_VALUE_COPY	(7 << 4)	/* Value copy */
-#define	WT_CELL_VALUE_OVFL	(8 << 4)	/* Value overflow */
-#define	WT_CELL_TYPE(v)		((v) & 0x0f << 4)
+#define	WT_CELL_VALUE_OVFL	(8 << 4)	/* Removed overflow value */
+#define	WT_CELL_VALUE_OVFL_RM	(9 << 4)	/* Cached overflow value */
+
+#define	WT_CELL_TYPE_MASK	(0x0fU << 4)
+#define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
 
 /*
  * WT_CELL --
@@ -115,6 +118,8 @@ struct __wt_cell {
  *	Unpacked cell.
  */
 struct __wt_cell_unpack {
+	WT_CELL *cell;			/* Cell's disk image address */
+
 	uint64_t v;			/* RLE count or recno */
 
 	const void *data;		/* Data */
@@ -325,21 +330,6 @@ __wt_cell_pack_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 }
 
 /*
- * __wt_cell_pack_key_empty --
- *	Write an empty key cell.
- */
-static inline void
-__wt_cell_pack_key_empty(WT_CELL *cell)
-{
-	/*
-	 * At the end of a row-store leaf page we have to write an empty key to
-	 * act as a marker in case the last value on the page is zero-length.
-	 * See the caller of this function for details.
-	 */
-	cell->__chunk[0] = WT_CELL_KEY;
-}
-
-/*
  * __wt_cell_pack_ovfl --
  *	Pack an overflow cell.
  */
@@ -397,6 +387,17 @@ __wt_cell_total_len(WT_CELL_UNPACK *unpack)
 }
 
 /*
+ * __wt_cell_type_reset --
+ *	Reset the cell's type.
+ */
+static inline void
+__wt_cell_type_reset(WT_CELL *cell, u_int type)
+{
+	cell->__chunk[0] =
+	    (cell->__chunk[0] & ~WT_CELL_TYPE_MASK) | WT_CELL_TYPE(type);
+}
+
+/*
  * __wt_cell_type --
  *	Return the cell's type (collapsing special types).
  */
@@ -417,8 +418,27 @@ __wt_cell_type(WT_CELL *cell)
 
 	if (type == WT_CELL_ADDR_DEL || type == WT_CELL_ADDR_LNO)
 		return (WT_CELL_ADDR);
+	if (type == WT_CELL_VALUE_OVFL_RM)
+		return (WT_CELL_VALUE_OVFL);
 
 	return (type);
+}
+
+/*
+ * __wt_cell_type_raw --
+ *	Return the cell's type.
+ */
+static inline u_int
+__wt_cell_type_raw(WT_CELL *cell)
+{
+	/*
+	 * NOTE: WT_CELL_VALUE_SHORT MUST BE CHECKED BEFORE WT_CELL_KEY_SHORT.
+	 */
+	if (cell->__chunk[0] & WT_CELL_VALUE_SHORT)
+		return (WT_CELL_VALUE_SHORT);
+	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
+		return (WT_CELL_KEY_SHORT);
+	return (WT_CELL_TYPE(cell->__chunk[0]));
 }
 
 /*
@@ -448,6 +468,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 } while (0)
 
 	memset(unpack, 0, sizeof(*unpack));
+	unpack->cell = cell;
 
 	/*
 	 * Check the cell description byte, then get the cell type.
@@ -466,6 +487,8 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		if (unpack->raw == WT_CELL_ADDR_DEL ||
 		    unpack->raw == WT_CELL_ADDR_LNO)
 			unpack->type = WT_CELL_ADDR;
+		else if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
+			unpack->type = WT_CELL_VALUE_OVFL;
 		else
 			unpack->type = unpack->raw;
 	}
@@ -545,6 +568,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_OVFL_RM:
 		/*
 		 * Set overflow flags.
 		 */
@@ -590,14 +614,67 @@ __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 }
 
 /*
- * __wt_cell_next --
- *	Return the next WT_CELL on the page.
+ * __wt_cell_unpack_ref --
+ *	Set a buffer to reference the data from an unpacked cell.
  */
-static inline WT_CELL *
-__wt_cell_next(WT_CELL *cell)
+static inline int
+__wt_cell_unpack_ref(
+    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
-	WT_CELL_UNPACK unpack;
+	WT_BTREE *btree;
+	void *huffman;
 
-	__wt_cell_unpack(cell, &unpack);
-	return ((WT_CELL *)((uint8_t *)cell + unpack.__len));
+	btree = S2BT(session);
+
+	/* Reference the cell's data, optionally decode it. */
+	switch (unpack->type) {
+	case WT_CELL_KEY:
+		store->data = unpack->data;
+		store->size = unpack->size;
+		huffman = btree->huffman_key;
+		break;
+	case WT_CELL_VALUE:
+		store->data = unpack->data;
+		store->size = unpack->size;
+		huffman = btree->huffman_value;
+		break;
+	case WT_CELL_KEY_OVFL:
+		WT_RET(__wt_ovfl_read(session, unpack, store));
+		huffman = btree->huffman_key;
+		break;
+	case WT_CELL_VALUE_OVFL:
+		WT_RET(__wt_ovfl_read(session, unpack, store));
+		huffman = btree->huffman_value;
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	return (huffman == NULL ? 0 :
+	    __wt_huffman_decode(
+	    session, huffman, store->data, store->size, store));
+}
+
+/*
+ * __wt_cell_unpack_copy --
+ *	Copy the data from an unpacked cell into a buffer.
+ */
+static inline int
+__wt_cell_unpack_copy(
+    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+{
+	/*
+	 * We have routines to both copy and reference a cell's information.  In
+	 * most cases, all we need is a reference and we prefer that, especially
+	 * when returning key/value items.  In a few we need a real copy: call
+	 * the standard reference function and get a reference.  In some cases,
+	 * a copy will be made (for example, when reading an overflow item from
+	 * the underlying object.  If that happens, we're done, otherwise make
+	 * a copy.
+	 */
+	WT_RET(__wt_cell_unpack_ref(session, unpack, store));
+	if (store->mem != NULL &&
+	    store->data >= store->mem &&
+	    WT_PTRDIFF(store->data, store->mem) < store->memsize)
+		return (0);
+	return (__wt_buf_set(session, store, store->data, store->size));
 }

@@ -54,8 +54,8 @@ indicate the database should be created if it does not already exist.
 The code block above also shows simple error handling with
 ::wiredtiger_strerror (a function that returns a string describing an
 error code passed as its argument).  More complex error handling can be
-configured by passing an implementation of WT_ERROR_HANDLER to
-wiredtiger_open or WT_CONNECTION::open_session.
+configured by passing an implementation of WT_EVENT_HANDLER to
+::wiredtiger_open or WT_CONNECTION::open_session.
 
 @section basic_create_table Creating a table
 

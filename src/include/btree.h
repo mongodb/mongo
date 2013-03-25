@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -44,7 +44,7 @@
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */
 #define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
+	WT_ALIGN32(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
 
 /*
  * XXX
@@ -65,7 +65,7 @@
  */
 struct __wt_data_handle {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
-	uint32_t   refcnt;		/* Sessions using this tree. */
+	uint32_t   refcnt;		/* Sessions using this tree */
 	TAILQ_ENTRY(__wt_data_handle) q;/* Linked list of handles */
 
 	const char *name;		/* Object name as a URI */
@@ -73,13 +73,16 @@ struct __wt_data_handle {
 	const char *config;		/* Configuration string */
 
 	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */
-	void *handle;			/* Current handle. */
+	void *handle;			/* Generic handle */
+
+	WT_DSRC_STATS *stats;		/* Data source statistics */
 
 	/* Flags values over 0xff are reserved for WT_BTREE_* */
-#define	WT_DHANDLE_DISCARD	0x01	/* Discard on release */
-#define	WT_DHANDLE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
-#define	WT_DHANDLE_LOCK_ONLY	0x04	/* Handle is only needed for locking */
-#define	WT_DHANDLE_OPEN		0x08	/* Handle is open */
+#define	WT_DHANDLE_DISCARD	        0x01	/* Discard on release */
+#define	WT_DHANDLE_DISCARD_CLOSE	0x02	/* Close on release */
+#define	WT_DHANDLE_EXCLUSIVE	        0x04	/* Need exclusive access */
+#define	WT_DHANDLE_LOCK_ONLY	        0x08	/* Handle only used as a lock */
+#define	WT_DHANDLE_OPEN		        0x10	/* Handle is open */
 	uint32_t flags;
 };
 
@@ -111,14 +114,23 @@ struct __wt_btree {
 	uint32_t maxintlitem;		/* Internal page max item size */
 	uint32_t maxleafpage;		/* Leaf page max size */
 	uint32_t maxleafitem;		/* Leaf page max item size */
+	uint64_t maxmempage;		/* In memory page max size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
+	enum {	CKSUM_ON=1,		/* On */
+		CKSUM_OFF=2,		/* Off */
+		CKSUM_UNCOMPRESSED=3	/* Uncompressed blocks only */
+	} checksum;			/* Checksum configuration */
+
 	u_int dictionary;		/* Reconcile: dictionary slots */
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */
+	int   maximum_depth;		/* Reconcile: maximum tree depth */
 	int   prefix_compression;	/* Reconcile: key prefix compression */
 	u_int split_pct;		/* Reconcile: split page percent */
+	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
+	WT_RWLOCK *val_ovfl_lock;	/* Reconcile: overflow value lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 
@@ -126,29 +138,30 @@ struct __wt_btree {
 	int modified;			/* If the tree ever modified */
 	int bulk_load_ok;		/* Bulk-load is a possibility */
 
-	void *block;			/* Block manager */
-	u_int block_header;		/* Block manager header length */
+	WT_BM	*bm;			/* Block manager reference */
+	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
+
+	uint64_t write_gen;		/* Write generation */
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
+	uint64_t evict_priority;	/* Relative priority of cached pages. */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
 
-	WT_BTREE_STATS *stats;		/* Btree statistics */
+	volatile int checkpointing;	/* Checkpoint in progress */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
-#define	WT_BTREE_NO_CACHE	0x00200	/* Disable caching */
-#define	WT_BTREE_NO_EVICTION	0x00400	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x00800	/* Disable hazard references */
-#define	WT_BTREE_SALVAGE	0x01000	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x02000	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x04000	/* Handle is for verify */
+#define	WT_BTREE_NO_EVICTION	0x00200	/* Disable eviction */
+#define	WT_BTREE_NO_HAZARD	0x00400	/* Disable hazard references */
+#define	WT_BTREE_SALVAGE	0x00800	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x01000	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x02000	/* Handle is for verify */
 	uint32_t flags;
 };
 
 /* Flags that make a btree handle special (not for normal use). */
 #define	WT_BTREE_SPECIAL_FLAGS	 					\
-	(WT_BTREE_BULK | WT_BTREE_NO_CACHE |				\
-	WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
+	(WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
 
 /*
  * WT_SALVAGE_COOKIE --

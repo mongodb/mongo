@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -12,9 +12,9 @@
  *	Return the size of the block-specific header.
  */
 u_int
-__wt_block_header(WT_SESSION_IMPL *session)
+__wt_block_header(WT_BLOCK *block)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(block);
 
 	return ((u_int)WT_BLOCK_HEADER_SIZE);
 }
@@ -24,8 +24,7 @@ __wt_block_header(WT_SESSION_IMPL *session)
  *	Return the buffer size required to write a block.
  */
 int
-__wt_block_write_size(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t *sizep)
+__wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
 {
 	WT_UNUSED(session);
 
@@ -38,8 +37,8 @@ __wt_block_write_size(
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int data_cksum)
 {
 	off_t offset;
 	uint32_t size, cksum;
@@ -48,7 +47,7 @@ __wt_block_write(WT_SESSION_IMPL *session,
 	WT_UNUSED(addr_size);
 
 	WT_RET(__wt_block_write_off(
-	    session, block, buf, &offset, &size, &cksum, 0));
+	    session, block, buf, &offset, &size, &cksum, data_cksum, 0));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -63,41 +62,23 @@ __wt_block_write(WT_SESSION_IMPL *session,
  * checksum.
  */
 int
-__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
-    off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int force_extend)
+__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
+    int data_cksum, int locked)
 {
 	WT_BLOCK_HEADER *blk;
-	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
 	off_t offset;
-	uint32_t align_size, size;
-	int compression_failed;
-	uint8_t *src, *dst;
-	size_t len, src_len, dst_len, result_len;
+	uint32_t align_size;
 
-	/*
-	 * Set the block's in-memory size.
-	 *
-	 * XXX
-	 * Should be set by our caller, it's part of the WT_PAGE_HEADER?
-	 */
-	dsk = buf->mem;
-	dsk->size = buf->size;
+	blk = WT_BLOCK_HEADER_REF(buf->mem);
 
-	/*
-	 * We're passed a table's page image: WT_ITEM->{mem,size} are the image
-	 * and byte count.
-	 *
-	 * Diagnostics: verify the disk page: this violates layering, but it's
-	 * the place we can ensure we never write a corrupted page.  Note that
-	 * we are verifying the extent list pages, too.  (We created a "page"
-	 * type for the extent lists, it was simpler than creating another type
-	 * of object in the file.)
-	 */
-#ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_verify_dsk(session, "[write-check]", buf));
-#endif
+	/* Buffers should be aligned for writing. */
+	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
+		WT_ASSERT(session, F_ISSET(buf, WT_ITEM_ALIGNED));
+		WT_RET_MSG(session, EINVAL,
+		    "direct I/O check: write buffer incorrectly allocated");
+	}
 
 	/*
 	 * Align the size to an allocation unit.
@@ -106,162 +87,70 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
 	 * boundary, this is one of the reasons the btree layer must find out
 	 * from the block-manager layer the maximum size of the eventual write.
 	 */
-	align_size = WT_ALIGN(buf->size, block->allocsize);
-	if (align_size > buf->memsize)
+	align_size = WT_ALIGN32(buf->size, block->allocsize);
+	if (align_size > buf->memsize) {
+		WT_ASSERT(session, align_size <= buf->memsize);
 		WT_RET_MSG(session, EINVAL,
-		    "write buffer was incorrectly allocated");
-
-	/*
-	 * Optionally stream-compress the data, but don't compress blocks that
-	 * are already as small as they're going to get.
-	 */
-	if (block->compressor == NULL || align_size == block->allocsize) {
-not_compressed:	/*
-		 * If not compressing the buffer, we need to zero out any unused
-		 * bytes at the end.
-		 */
-		memset(
-		    (uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
-		buf->size = align_size;
-
-		/*
-		 * Set the in-memory size to the on-page size (we check the size
-		 * to decide if a block is compressed: if the sizes match, the
-		 * block is NOT compressed).
-		 */
-		dsk = buf->mem;
-	} else {
-		/* Skip the header bytes of the source data. */
-		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
-		src_len = buf->size - WT_BLOCK_COMPRESS_SKIP;
-
-		/*
-		 * Compute the size needed for the destination buffer.  We only
-		 * allocate enough memory for a copy of the original by default,
-		 * if any compressed version is bigger than the original, we
-		 * won't use it.  However, some compression engines (snappy is
-		 * one example), may need more memory because they don't stop
-		 * just because there's no more memory into which to compress.
-		 */
-		if (block->compressor->pre_size == NULL)
-			len = src_len;
-		else
-			WT_RET(block->compressor->pre_size(block->compressor,
-			    &session->iface, src, src_len, &len));
-		WT_RET(__wt_scr_alloc(
-		    session, (uint32_t)len + WT_BLOCK_COMPRESS_SKIP, &tmp));
-
-		/* Skip the header bytes of the destination data. */
-		dst = (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP;
-		dst_len = len;
-
-		/*
-		 * If compression fails, fallback to the original version.  This
-		 * isn't unexpected: if compression doesn't work for some chunk
-		 * of bytes for some reason (noting there's likely additional
-		 * format/header information which compressed output requires),
-		 * it just means the uncompressed version is as good as it gets,
-		 * and that's what we use.
-		 */
-		compression_failed = 0;
-		WT_ERR(block->compressor->compress(block->compressor,
-		    &session->iface,
-		    src, src_len,
-		    dst, dst_len,
-		    &result_len, &compression_failed));
-		if (compression_failed)
-			goto not_compressed;
-
-		/*
-		 * Set the final data size and see if compression gave us back
-		 * at least one allocation unit (if we don't get at least one
-		 * file allocation unit, use the uncompressed version because
-		 * it will be faster to read).
-		 */
-		tmp->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
-		size = WT_ALIGN(tmp->size, block->allocsize);
-		if (size >= align_size)
-			goto not_compressed;
-		align_size = size;
-
-		/* Copy in the skipped header bytes, zero out unused bytes. */
-		memcpy(tmp->mem, buf->mem, WT_BLOCK_COMPRESS_SKIP);
-		memset(
-		    (uint8_t *)tmp->mem + tmp->size, 0, align_size - tmp->size);
-
-		dsk = tmp->mem;
+		    "buffer size check: write buffer incorrectly allocated");
 	}
 
-	blk = WT_BLOCK_HEADER_REF(dsk);
+	/* Zero out any unused bytes at the end of the buffer. */
+	memset((uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
 
 	/*
-	 * We increment the block's write generation so it's easy to identify
-	 * newer versions of blocks during salvage: it's common in WiredTiger
-	 * for multiple blocks to be internally consistent with identical
-	 * first and last keys, so we need a way to know the most recent state
-	 * of the block.  (We could check to see which leaf is referenced by
-	 * by the internal page, which implies salvaging internal pages (which
-	 * I don't want to do), and it's not quite as good anyway, because the
-	 * internal page may not have been written to disk after the leaf page
-	 * was updated.  So, write generations it is.)
+	 * Set the disk size so we don't have to incrementally read blocks
+	 * during salvage.
 	 */
-	blk->write_gen = ++block->live.write_gen;
-
 	blk->disk_size = align_size;
 
 	/*
-	 * Update the block's checksum: checksum the compressed contents, not
-	 * the uncompressed contents.  If the computed checksum happens to be
-	 * equal to the special "not set" value, increment it.  We do the same
-	 * on the checking side.
+	 * Update the block's checksum: if our caller specifies, checksum the
+	 * complete data, otherwise checksum the leading WT_BLOCK_COMPRESS_SKIP
+	 * bytes.  The assumption is applications with good compression support
+	 * turn off checksums and assume corrupted blocks won't decompress
+	 * correctly.  However, if compression failed to shrink the block, the
+	 * block wasn't compressed, in which case our caller will tell us to
+	 * checksum the data to detect corruption.   If compression succeeded,
+	 * we still need to checksum the first WT_BLOCK_COMPRESS_SKIP bytes
+	 * because they're not compressed, both to give salvage a quick test
+	 * of whether a block is useful and to give us a test so we don't lose
+	 * the first WT_BLOCK_COMPRESS_SKIP bytes without noticing.
 	 */
-	if (block->checksum) {
-		blk->cksum = 0;
-		blk->cksum = __wt_cksum(dsk, align_size);
-		if (blk->cksum == WT_BLOCK_CHECKSUM_NOT_SET)
-			++blk->cksum;
-	} else
-		blk->cksum = WT_BLOCK_CHECKSUM_NOT_SET;
+	blk->flags = 0;
+	if (data_cksum)
+		F_SET(blk, WT_BLOCK_DATA_CKSUM);
+	blk->cksum = 0;
+	blk->cksum = __wt_cksum(
+	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
 
-	/*
-	 * Allocate space from the underlying file and write the block.  Always
-	 * extend the file when writing checkpoint extents, that's easier than
-	 * distinguishing between extents allocated from the live avail list,
-	 * and those which can't be allocated from the live avail list such as
-	 * blocks for writing the live avail list itself.
-	 *
-	 * In the case of forced extension, we're holding the necessary locks,
-	 * don't re-acquire them (and note that if we have to free the blocks
-	 * should the write fail).
-	 */
-	if (force_extend)
-		WT_ERR(__wt_block_extend(
-		    session, block, &offset, (off_t)align_size));
-	else
-		WT_ERR(__wt_block_alloc(
-		    session, block, &offset, (off_t)align_size));
-	if ((ret =
-	    __wt_write(session, block->fh, offset, align_size, dsk)) != 0) {
-		if (!force_extend)
+	if (!locked)
+		__wt_spin_lock(session, &block->live_lock);
+	ret = __wt_block_alloc(session, block, &offset, (off_t)align_size);
+	if (!locked)
+		__wt_spin_unlock(session, &block->live_lock);
+	WT_RET(ret);
+
+	if ((ret = __wt_write(
+	    session, block->fh, offset, align_size, buf->mem)) != 0) {
+		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
-		(void)__wt_block_off_free(session, block, offset, align_size);
-		if (!force_extend)
+		WT_TRET(
+		    __wt_block_off_free(session, block, offset, align_size));
+		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
-		WT_ERR(ret);
+		WT_RET(ret);
 	}
 
-	WT_BSTAT_INCR(session, page_write);
 	WT_CSTAT_INCR(session, block_write);
+	WT_CSTAT_INCRV(session, block_byte_write, align_size);
 
-	WT_VERBOSE_ERR(session, write,
-	    "%s (off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32 ")",
-	    __wt_page_type_string(dsk->type),
+	WT_VERBOSE_RET(session, write,
+	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
 	    (uintmax_t)offset, align_size, blk->cksum);
 
 	*offsetp = offset;
 	*sizep = align_size;
 	*cksump = blk->cksum;
 
-err:	__wt_scr_free(&tmp);
 	return (ret);
 }

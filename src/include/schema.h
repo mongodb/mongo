@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -31,6 +31,8 @@ struct __wt_index {
 	const char *key_format;		/* Key format */
 	const char *key_plan;		/* Key projection plan */
 	const char *value_plan;		/* Value projection plan */
+
+	int need_value;			/* Index must have a non-empty value. */
 };
 
 /*
@@ -53,7 +55,7 @@ struct __wt_table {
 	TAILQ_ENTRY(__wt_table) q;
 
 	int cg_complete, idx_complete, is_simple;
-	int ncolgroups, nindices, nkey_columns;
+	u_int ncolgroups, nindices, nkey_columns;
 };
 
 /*

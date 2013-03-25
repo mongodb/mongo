@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -9,12 +9,12 @@
  * __wt_eviction_check --
  *	Wake the eviction server if necessary.
  */
-static inline void
+static inline int
 __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	uint64_t bytes_inuse, bytes_max;
+	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -26,54 +26,48 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 	 * don't run on the edge all the time.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
+	dirty_inuse = __wt_cache_bytes_dirty(cache);
 	bytes_max = conn->cache_size;
 	if (read_lockoutp != NULL)
 		*read_lockoutp = (bytes_inuse > bytes_max);
 
 	/* Wake eviction when we're over the trigger cache size. */
-	if (wake && bytes_inuse > cache->eviction_trigger * (bytes_max / 100))
-		__wt_evict_server_wake(session);
+	if (wake &&
+	    (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
+	    dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100))
+		WT_RET(__wt_evict_server_wake(session));
+	return (0);
 }
 
 /*
- * __wt_eviction_page_check --
- *	Return if a page should be forcibly evicted.
+ * __wt_cache_full_check --
+ *	Wait for there to be space in the cache before a read or update.
  */
 static inline int
-__wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_cache_full_check(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_PAGE_MODIFY *mod;
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	int lockout, wake;
 
-	conn = S2C(session);
-	mod = page->modify;
-
-	/*
-	 * Root pages and clean pages are never forcibly evicted.
-	 * Nor are pages from files that are purely cache resident.
-	 */
-	if (WT_PAGE_IS_ROOT(page) ||
-	    !__wt_page_is_modified(page) ||
-	    F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
-		return (0);
+	btree = S2BT(session);
 
 	/*
-	 * Check the page's memory footprint - evict pages that take up more
-	 * than their fair share of the cache. We define a fair share as
-	 * approximately half the cache size per open writable btree handle.
+	 * Only wake the eviction server the first time through here (if the
+	 * cache is too full), or every hundred times after that.  Otherwise,
+	 * we are just wasting effort and making a busy condition variable
+	 * busier.
 	 */
-	if ((int64_t)page->memory_footprint >
-	    conn->cache_size / (2 * (conn->open_btree_count + 1)))
-		return (1);
-
-	/*
-	 * If the page's write-generation has wrapped and caught up with the
-	 * page's disk generation (wildly unlikely as it requires 4B updates
-	 * between page reconciliations, but is technically possible), forcibly
-	 * evict the page.
-	 */
-	if (mod != NULL && mod->write_gen + 1 == mod->disk_gen)
-		return (1);
-
-	return (0);
+	for (wake = 0;; wake = (wake + 1) % 100) {
+		WT_RET(__wt_eviction_check(session, &lockout, wake == 0));
+		if (!lockout || F_ISSET(session,
+		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
+			return (0);
+		if (F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
+			return (0);
+		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
+			__wt_yield();
+		else
+			WT_RET_NOTFOUND_OK(ret);
+	}
 }

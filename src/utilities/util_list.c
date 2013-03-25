@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -151,7 +151,6 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 	size_t len;
 	time_t t;
 	uint64_t v;
-	char buf[256];
 
 	/*
 	 * We may not find any checkpoints for this file, in which case we don't
@@ -169,8 +168,12 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 	++len;
 
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		/*
+		 * Call ctime, not ctime_r; ctime_r has portability problems,
+		 * the Solaris version is different from the POSIX standard.
+		 */
 		t = (time_t)ckpt->sec;
-		printf("\t%*s: %.24s", (int)len, ckpt->name, ctime_r(&t, buf));
+		printf("\t%*s: %.24s", (int)len, ckpt->name, ctime(&t));
 
 		v = ckpt->ckpt_size;
 		if (v >= WT_PETABYTE)

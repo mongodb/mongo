@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -11,6 +11,8 @@ static int dump_config(WT_SESSION *, const char *, int);
 static int dump_prefix(int);
 static int dump_suffix(void);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
+static int dump_table_config_type(WT_SESSION *,
+    WT_CURSOR *, WT_CURSOR *, const char *, const char *, const char *);
 static int print_config(WT_SESSION *, const char *, const char *, const char *);
 static int usage(void);
 
@@ -130,7 +132,7 @@ err:		ret = 1;
 }
 
 /*
- * config --
+ * dump_config --
  *	Dump the config for the uri.
  */
 static int
@@ -168,8 +170,11 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 		else
 			ret = util_err(ret, "%s", uri);
 
-		if (cursor != NULL && (tret = cursor->close(cursor)) != 0)
-			ret = util_cerr(uri, "close", tret);
+		if ((tret = cursor->close(cursor)) != 0) {
+			tret = util_cerr(uri, "close", tret);
+			if (ret == 0)
+				ret = tret;
+		}
 	} else {
 		/*
 		 * We want to be able to dump the metadata file itself, but the
@@ -201,58 +206,17 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 static int
 dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 {
-	struct {
-		char *key;			/* Metadata key */
-		char *value;			/* Metadata value */
-	} *list;
+	WT_CURSOR *srch;
 	WT_DECL_RET;
-	int i, elem, list_elem;
+	int tret;
 	const char *key, *name, *value;
-	char *buf, *filename, *p, *t, *sep;
 
-	/* Get the name. */
+	/* Get the table name. */
 	if ((name = strchr(uri, ':')) == NULL) {
 		fprintf(stderr, "%s: %s: corrupted uri\n", progname, uri);
 		return (1);
 	}
 	++name;
-
-	list = NULL;
-	elem = list_elem = 0;
-	for (; (ret = cursor->next(cursor)) == 0; free(buf)) {
-		/* Get the key and duplicate it, we want to overwrite it. */
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(uri, "get_key", ret));
-		if ((buf = strdup(key)) == NULL)
-			return (util_err(errno, NULL));
-
-		/* Check for the dump table's column groups or indices. */
-		if ((p = strchr(buf, ':')) == NULL)
-			continue;
-		*p++ = '\0';
-		if (strcmp(buf, "index") != 0 && strcmp(buf, "colgroup") != 0)
-			continue;
-		if ((t = strchr(p, ':')) == NULL)
-			continue;
-		*t++ = '\0';
-		if (strcmp(p, name) != 0)
-			continue;
-
-		/* Found one, save it for review. */
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(uri, "get_value", ret));
-		if (elem == list_elem && (list = realloc(list,
-		    (size_t)(list_elem += 20) * sizeof(*list))) == NULL)
-			return (util_err(errno, NULL));
-		if ((list[elem].key = strdup(key)) == NULL)
-			return (util_err(errno, NULL));
-		if ((list[elem].value = strdup(value)) == NULL)
-			return (util_err(errno, NULL));
-		++elem;
-	}
-	if (ret != WT_NOTFOUND)
-		return (util_cerr(uri, "next", ret));
-	ret = 0;
 
 	/*
 	 * Dump out the config information: first, dump the uri entry itself
@@ -269,53 +233,104 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		return (1);
 
 	/*
-	 * Second, dump the column group and index key/value pairs: for each
-	 * one, look up the related file information and append it to the base
-	 * record.
+	 * The underlying table configuration function needs a second cursor:
+	 * open one before calling it, it makes error handling hugely simpler.
 	 */
-	for (i = 0; i < elem; ++i) {
-		if ((filename = strstr(list[i].value, "filename=")) == NULL) {
-			fprintf(stderr,
-			    "%s: %s: has no underlying file configuration\n",
-			    progname, list[i].key);
-			return (1);
-		}
+	if ((ret =
+	    session->open_cursor(session, NULL, cursor, NULL, &srch)) != 0)
+		return (util_cerr(uri, "open_cursor", ret));
 
-		/*
-		 * Nul-terminate the filename if necessary, create the file
-		 * URI, then look it up.
-		 */
-		if ((sep = strchr(filename, ',')) != NULL)
-			*sep = '\0';
-		if ((t = strdup(filename)) == NULL)
-			return (util_err(errno, NULL));
-		if (sep != NULL)
-			*sep = ',';
-		p = t + strlen("filename=");
-		p -= strlen("file:");
-		memcpy(p, "file:", strlen("file:"));
-		cursor->set_key(cursor, p);
-		if ((ret = cursor->search(cursor)) != 0) {
-			fprintf(stderr,
-			    "%s: %s: unable to find metadata for the "
-			    "underlying file %s\n",
-			    progname, list[i].key, p);
-			return (1);
-		}
+	if ((ret = dump_table_config_type(
+	    session, cursor, srch, uri, name, "colgroup:")) == 0)
+		ret = dump_table_config_type(
+		    session, cursor, srch, uri, name, "index:");
+
+	if ((tret = srch->close(srch)) != 0) {
+		tret = util_cerr(uri, "close", tret);
+		if (ret == 0)
+			ret = tret;
+	}
+
+	return (ret);
+}
+
+/*
+ * dump_table_config_type --
+ *	Dump the column groups or indices for a table.
+ */
+static int
+dump_table_config_type(WT_SESSION *session,
+    WT_CURSOR *cursor, WT_CURSOR *srch,
+    const char *uri, const char *name, const char *entry)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	const char *key, *skip, *value, *value_source;
+	int exact;
+	char *p;
+
+	/*
+	 * Search the file looking for column group and index key/value pairs:
+	 * for each one, look up the related source information and append it
+	 * to the base record.
+	 */
+	cursor->set_key(cursor, entry);
+	if ((ret = cursor->search_near(cursor, &exact)) != 0) {
+		if (ret == WT_NOTFOUND)
+			return (0);
+		return (util_cerr(uri, "search_near", ret));
+	}
+	if (exact >= 0)
+		goto match;
+	while ((ret = cursor->next(cursor)) == 0) {
+match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			return (util_cerr(uri, "get_key", ret));
+
+		/* Check if we've finished the list of entries. */
+		if (!WT_PREFIX_MATCH(key, entry))
+			return (0);
+
+		/* Check for a table name match. */
+		skip = key + strlen(entry);
+		if (strncmp(
+		    skip, name, strlen(name)) != 0 || skip[strlen(name)] != ':')
+			continue;
+
+		/* Get the value. */
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (util_cerr(uri, "get_value", ret));
+
+		/* Crack it and get the underlying source. */
+		if ((ret = __wt_config_getones(
+		    (WT_SESSION_IMPL *)session, value, "source", &cval)) != 0)
+			return (util_err(ret, "%s: source entry", key));
+
+		/* Nul-terminate the source entry. */
+		if ((p = malloc(cval.len + 10)) == NULL)
+			return (util_err(errno, NULL));
+		(void)strncpy(p, cval.str, cval.len);
+		p[cval.len] = '\0';
+		srch->set_key(srch, p);
+		if ((ret = srch->search(srch)) != 0)
+			ret = util_err(ret, "%s: %s", key, p);
+		free(p);
+		if (ret != 0)
+			return (1);
+
+		/* Get the source's value. */
+		if ((ret = srch->get_value(srch, &value_source)) != 0)
 			return (util_cerr(uri, "get_value", ret));
 
 		/*
 		 * The dumped configuration string is the original key plus the
-		 * file's configuration.
+		 * source's configuration.
 		 */
-		if (print_config(
-		    session, list[i].key, list[i].value, value) != 0)
+		if (print_config(session, key, value, value_source) != 0)
 			return (util_err(EIO, NULL));
 	}
-
-	/* Leak the memory, I don't care. */
-	return (0);
+	if (ret == 0 || ret == WT_NOTFOUND)
+		return (0);
+	return (util_cerr(uri, "next", ret));
 }
 
 /*

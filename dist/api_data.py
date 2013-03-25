@@ -11,21 +11,23 @@ errors = [
 	Error('WT_DEADLOCK', 'conflict between concurrent operations', '''
 		This error is generated when an operation cannot be completed
 		due to a conflict with concurrent operations.  The operation
-		should be retried.  If a transaction is in progress, it should
-		be rolled back and the operation retried in a new
-		transaction.'''),
+		may be retried; if a transaction is in progress, it should be
+		rolled back and the operation retried in a new transaction.'''),
 	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
 		This error is generated when the application attempts to insert
 		a record with the same key as an existing record without the
 		'overwrite' configuration to WT_SESSION::open_cursor.'''),
 	Error('WT_ERROR', 'non-specific WiredTiger error', '''
-		This error is generated for cases that are not covered by
-		specific error returns.'''),
+		This error is returned when an error is not covered by a
+		specific error return.'''),
 	Error('WT_NOTFOUND', 'cursor item not found', '''
 		This error indicates a cursor operation did not find a
 		record to return.  This includes search and other
 		operations where no record matched the cursor's search
 		key such as WT_CURSOR::update or WT_CURSOR::remove.'''),
+	Error('WT_PANIC', 'WiredTiger library panic', '''
+		This error indicates an underlying problem that requires the
+		application exit and restart.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
 ]
 
@@ -35,10 +37,11 @@ class Method:
 		self.flags = flags
 
 class Config:
-	def __init__(self, name, default, desc, **flags):
+	def __init__(self, name, default, desc, subconfig=None, **flags):
 		self.name = name
 		self.default = default
 		self.desc = desc
+		self.subconfig = subconfig
 		self.flags = flags
 
 	def __cmp__(self, other):
@@ -55,9 +58,15 @@ column_meta = [
 		type='list'),
 ]
 
-filename_meta = [
-	Config('filename', '', r'''
-		override the default filename derived from the object name'''),
+source_meta = [
+	Config('source', '', r'''
+		override the default data source URI derived from the object
+		name'''),
+	Config('type', 'file', r'''
+		set the data source type.  This setting overrides the URI
+		prefix for the data source, if no \c source configuration
+		setting is provided''',
+		choices=['file', 'lsm']),
 ]
 
 format_meta = column_meta + [
@@ -80,18 +89,36 @@ format_meta = column_meta + [
 ]
 
 lsm_config = [
-	Config('lsm_bloom_hash_count', '4', r'''
-		the number of hash values per item used for LSM bloom filters.''',
-		min='2', max='100'),
+	Config('lsm_bloom', 'true', r'''
+		create bloom filters on LSM tree chunks as they are merged''',
+		type='boolean'),
+	Config('lsm_bloom_config', '', r'''
+		config string used when creating Bloom filter files, passed to
+		WT_SESSION::create'''),
 	Config('lsm_bloom_bit_count', '8', r'''
-		the number of bits used per item for LSM bloom filters.''',
+		the number of bits used per item for LSM bloom filters''',
 		min='2', max='1000'),
+	Config('lsm_bloom_hash_count', '4', r'''
+		the number of hash values per item used for LSM bloom
+		filters''',
+		min='2', max='100'),
+	Config('lsm_bloom_newest', 'false', r'''
+		create a bloom filter on an LSM tree chunk before it's first merge.
+		Only supported if bloom filters are enabled''',
+		type='boolean'),
+	Config('lsm_bloom_oldest', 'false', r'''
+		create a bloom filter on the oldest LSM tree chunk. Only supported if
+		bloom filters are enabled''',
+		type='boolean'),
 	Config('lsm_chunk_size', '2MB', r'''
 		the maximum size of the in-memory chunk of an LSM tree''',
 		min='512K', max='500MB'),
 	Config('lsm_merge_max', '15', r'''
 		the maximum number of chunks to include in a merge operation''',
 		min='2', max='100'),
+	Config('lsm_merge_threads', '1', r'''
+		the number of thread to perform merge operations''',
+		min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
 ]
 
 # Per-file configuration
@@ -111,13 +138,16 @@ file_config = format_meta + lsm_config + [
 		do not ever evict the object's pages; see @ref
 		tuning_cache_resident for more information''',
 		type='boolean'),
-	Config('checksum', 'true', r'''
-		configure file block checksums; if false, the block
-		manager is free to not write or check block checksums.
-		This can increase performance in applications where
-		compression provides checksum functionality or read-only
-		applications where blocks require no verification''',
-		type='boolean'),
+	Config('checksum', 'on', r'''
+		configure file block checksums; permitted values are
+		<code>on</code> (checksum all file blocks),
+		<code>off</code> (checksum no file blocks) and
+		<code>uncompresssed</code> (checksum only file blocks
+		which are not compressed for some reason).  The \c
+		uncompressed value is for applications which can
+		reasonably rely on decompression to fail if a block has
+		been corrupted''',
+		choices=['on', 'off', 'uncompressed']),
 	Config('collator', '', r'''
 		configure custom collation for keys.  Value must be a collator
 		name created with WT_CONNECTION::add_collator'''),
@@ -126,6 +156,9 @@ file_config = format_meta + lsm_config + [
 		row-store leaf page value dictionary; see
 		@ref file_formats_compression for more information''',
 		min='0'),
+	Config('format', 'btree', r'''
+		the file format''',
+		choices=['btree']),
 	Config('huffman_key', '', r'''
 		configure Huffman encoding for keys.  Permitted values
 		are empty (off), \c "english", \c "utf8<file>" or \c
@@ -143,12 +176,16 @@ file_config = format_meta + lsm_config + [
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size and is significant
 		for applications wanting to avoid excessive L2 cache misses
-		while searching the tree''',
+		while searching the tree.  The page maximum is the bytes of
+		uncompressed data, that is, the limit is applied before any
+		block compression is done''',
 		min='512B', max='512MB'),
 	Config('internal_item_max', '0', r'''
-		the maximum key size stored on internal nodes, in bytes.  If
-		zero, a maximum is calculated to permit at least 8 keys per
-		internal page''',
+		the largest key stored within an internal node, in bytes.  If
+		non-zero, any key larger than the specified size will be
+		stored as an overflow item (which may require additional I/O
+		to access).  If zero, a default size is chosen that permits at
+		least 8 keys per internal page''',
 		min=0),
 	Config('key_gap', '10', r'''
 		the maximum gap between instantiated keys in a Btree leaf page,
@@ -159,13 +196,24 @@ file_config = format_meta + lsm_config + [
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size, and is significant for
 		applications wanting to maximize sequential data transfer from
-		a storage device''',
+		a storage device.  The page maximum is the bytes of uncompressed
+		data, that is, the limit is applied before any block compression
+		is done''',
 		min='512B', max='512MB'),
 	Config('leaf_item_max', '0', r'''
-		the maximum key or value size stored on leaf nodes, in bytes.
-		If zero, a size is calculated to permit at least 8 items
-		(values or row store keys) per leaf page''',
+		the largest key or value stored within a leaf node, in bytes.
+		If non-zero, any key or value larger than the specified size
+		will be stored as an overflow item (which may require additional
+		I/O to access).  If zero, a default size is chosen that permits
+		at least 4 key and value pairs per leaf page''',
 		min=0),
+	Config('memory_page_max', '5MB', r'''
+		the maximum size a page can grow to in memory before being
+		reconciled to disk.  The specified size will be adjusted to a
+		lower bound of <code>50 * leaf_page_max</code>.  This limit is
+		soft - it is possible for pages to be temporarily larger than
+		this value''',
+		min='512B', max='10TB'),
 	Config('prefix_compression', 'true', r'''
 		configure row-store format key prefix compression''',
 		type='boolean'),
@@ -175,9 +223,6 @@ file_config = format_meta + lsm_config + [
 		split into smaller pages, where each page is the specified
 		percentage of the maximum Btree page size''',
 		min='25', max='100'),
-	Config('type', 'btree', r'''
-		the file type''',
-		choices=['btree']),
 ]
 
 # File metadata, including both configurable and non-configurable (internal)
@@ -199,19 +244,43 @@ table_only_meta = [
 		WT_SESSION::create''', type='list'),
 ]
 
-colgroup_meta = column_meta + filename_meta
+colgroup_meta = column_meta + source_meta
 
-index_meta = column_meta + format_meta + filename_meta
+index_meta = format_meta + source_meta
 
 table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
+	Config('shared_cache', '', r'''
+		shared cache configuration options. A database should configure either
+		a cache_size or a shared_cache not both''',
+		type='category', subconfig=[
+		Config('chunk', '10MB', r'''
+			the granularity that a shared cache is redistributed''',
+			min='1MB', max='10TB'),
+		Config('reserve', '0', r'''
+			amount of cache this database is guaranteed to have available
+			from the shared cache. This setting is per database. Defaults
+			to the chunk size'''),
+		Config('name', '', r'''
+			name of a cache that is shared between databases'''),
+		Config('size', '500MB', r'''
+			maximum memory to allocate for the shared cache. Setting this
+			will update the value if one is already set''',
+			min='1MB', max='10TB')
+		]),
 	Config('cache_size', '100MB', r'''
-		maximum heap memory to allocate for the cache''',
+		maximum heap memory to allocate for the cache. A database should
+		configure either a cache_size or a shared_cache not both''',
 		min='1MB', max='10TB'),
 	Config('error_prefix', '', r'''
 		prefix string for error messages'''),
+	Config('eviction_dirty_target', '80', r'''
+		continue evicting until the cache has less dirty pages than this
+		(as a percentage). Dirty pages will only be evicted if the cache
+		is full enough to trigger eviction''',
+		min=10, max=99),
 	Config('eviction_target', '80', r'''
 		continue evicting until the cache becomes less full than this
 		(as a percentage).  Must be less than \c eviction_trigger''',
@@ -225,6 +294,7 @@ connection_runtime_config = [
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
+		    'shared_cache',
 		    'ckpt',
 		    'evict',
 		    'evictserver',
@@ -259,7 +329,15 @@ methods = {
 
 'session.close' : Method([]),
 
-'session.create' : Method(table_meta + file_config + filename_meta + [
+'session.compact' : Method([
+	Config('trigger', '30', r'''
+		Compaction will not be attempted unless the specified
+		percentage of the underlying objects is expected to be
+		recovered by compaction''',
+		min='10', max='50'),
+]),
+
+'session.create' : Method(table_only_meta + file_config + source_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
 		object exists, check that its settings match the specified
@@ -273,7 +351,6 @@ methods = {
 		type='boolean'),
 	]),
 
-'session.dumpfile' : Method([]),
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method([
@@ -282,11 +359,20 @@ methods = {
 		number key; valid only for cursors with record number keys''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
-		configure the cursor for bulk loads, a fast load path
-		that may only be used for newly created objects. Cursors
-		configured for bulk load only support the WT_CURSOR::insert
-		and WT_CURSOR::close methods''',
-		type='boolean'),
+		configure the cursor for bulk loads, a fast, initial load
+		path.  Bulk load may only be used for newly created objects,
+		and in the case of row-store objects, key/value items must
+		be loaded in sorted order.  Cursors configured for bulk load
+		only support the WT_CURSOR::insert and WT_CURSOR::close
+		methods.  The value is usually a true/false flag, but the the
+		special value \c "bitmap" is for use with fixed-length column
+		stores, and allows chunks of a memory resident bitmap to be
+		loaded directly into a file by passing a \c WT_ITEM to
+		WT_CURSOR::set_value where the \c size field indicates the
+		number of records in the bitmap (as specified by the file's
+		\c value_format). Bulk load bitmap values must end on a byte
+		boundary relative to the bit count (except for the last set
+		of values loaded)'''),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name
 		"WiredTigerCheckpoint" opens the most recent internal
@@ -306,10 +392,6 @@ methods = {
 		and WT_CURSOR::close methods.  See @ref cursor_random for
 		details''',
 		type='boolean'),
-	Config('no_cache', 'false', r'''
-		do not cache pages from the underlying object.  The cursor
-		does not support data modification''',
-		type='boolean', undoc=True),
 	Config('overwrite', 'false', r'''
 		change the behavior of the cursor's insert method to overwrite
 		previously existing values''',
@@ -318,12 +400,13 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
-	Config('statistics', 'false', r'''
-		configure the cursor for statistics''',
-		type='boolean'),
 	Config('statistics_clear', 'false', r'''
 		reset statistics counters when the cursor is closed; valid
 		only for statistics cursors''',
+		type='boolean'),
+	Config('statistics_fast', 'false', r'''
+		only gather statistics that don't require traversing the tree;
+		valid only for statistics cursors''',
 		type='boolean'),
 	Config('target', '', r'''
 		if non-empty, backup the list of objects; valid only for a
@@ -340,7 +423,20 @@ methods = {
 ]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
-'session.verify' : Method([]),
+'session.verify' : Method([
+	Config('dump_address', 'false', r'''
+	Display addresses and page types as pages are verified, using
+	the application's message handler, intended for debugging''',
+	type='boolean'),
+	Config('dump_blocks', 'false', r'''
+	Display the contents of on-disk blocks as they are verified, using
+	the application's message handler, intended for debugging''',
+	type='boolean'),
+	Config('dump_pages', 'false', r'''
+	Display the contents of in-memory pages as they are verified, using
+	the application's message handler, intended for debugging''',
+	type='boolean')
+]),
 
 'session.begin_transaction' : Method([
 	Config('isolation', '', r'''
@@ -372,6 +468,10 @@ methods = {
 		including the named checkpoint.  Checkpoints cannot be
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
+	Config('force', 'false', r'''
+		checkpoints may be skipped if the underlying object has not
+		been modified, this option forces the checkpoint''',
+		type='boolean'),
 	Config('name', '', r'''
 		if non-empty, specify a name for the checkpoint'''),
 	Config('target', '', r'''
@@ -399,9 +499,9 @@ methods = {
 
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
-		in-memory alignment (in bytes) for buffers used for I/O.  By
-		default, a platform-specific alignment value is used (512 bytes
-		on Linux systems, zero elsewhere)''',
+		in-memory alignment (in bytes) for buffers used for I/O.  The default
+		value of -1 indicates that a platform-specific alignment value should
+		be used (512 bytes on Linux systems, zero elsewhere)''',
 		min='-1', max='1MB'),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
@@ -411,16 +511,24 @@ methods = {
 		list, such as <code>"direct_io=[data]"</code>''',
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
-		list of extensions to load.  Optional values are passed as the
-		\c config parameter to WT_CONNECTION::load_extension.  Complex
-		paths may need quoting, for example,
-		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
+		list of shared library extensions to load (using dlopen).
+		Optional values are passed as the \c config parameter to
+		WT_CONNECTION::load_extension.  Complex paths may require
+		quoting, for example,
+		<code>extensions=("/path/ext.so"="entry=my_entry")</code>''',
 		type='list'),
 	Config('hazard_max', '1000', r'''
-		maximum number of simultaneous hazard references per session handle''',
+		maximum number of simultaneous hazard pointers per session
+		handle''',
 		min='15'),
 	Config('logging', 'false', r'''
 		enable logging''',
+		type='boolean'),
+	Config('lsm_merge', 'true', r'''
+		merge LSM chunks where possible''',
+		type='boolean'),
+	Config('mmap', 'true', r'''
+		Use memory mapping to access files when possible''',
 		type='boolean'),
 	Config('multiprocess', 'false', r'''
 		permit sharing between processes (will automatically start an
@@ -444,43 +552,4 @@ methods = {
 		with special privileges.  See @ref home for more information''',
 		type='boolean'),
 ]),
-}
-
-flags = {
-###################################################
-# Internal routine flag declarations
-###################################################
-	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
-	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
-	'rec_evict' : [ 'REC_SINGLE' ],
-	'verbose' : [
-		'VERB_block',
-		'VERB_ckpt',
-		'VERB_evict',
-		'VERB_evictserver',
-		'VERB_fileops',
-		'VERB_lsm',
-		'VERB_hazard',
-		'VERB_mutex',
-		'VERB_read',
-		'VERB_readserver',
-		'VERB_reconcile',
-		'VERB_salvage',
-		'VERB_verify',
-		'VERB_write'
-	],
-
-###################################################
-# Structure flag declarations
-###################################################
-	'conn' : [
-		'CONN_NOSYNC',
-		'CONN_TRANSACTIONAL',
-		'SERVER_RUN'
-	],
-	'session' : [
-		'SESSION_SCHEMA_LOCKED',
-		'SESSION_INTERNAL',
-		'SESSION_SALVAGE_QUIET_ERR'
-	],
 }

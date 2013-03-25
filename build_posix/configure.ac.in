@@ -67,10 +67,13 @@ AM_TYPES
 
 AC_PROG_INSTALL
 
+AC_CHECK_HEADERS([pthread_np.h])
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
-AC_CHECK_FUNCS([clock_gettime gettimeofday fcntl posix_memalign])
+AC_CHECK_FUNCS([\
+	clock_gettime fcntl gettimeofday pthread_timedjoin_np posix_fadvise\
+	posix_memalign strtouq])
 AC_SYS_LARGEFILE
 
 AC_C_BIGENDIAN

@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -22,13 +42,16 @@ wts_load(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== bulk load start ===============");
+
 	/*
 	 * Avoid bulk load with a custom collator, because the order of
 	 * insertion will not match the collation order.
 	 */
 	if ((ret = session->open_cursor(session, g.uri, NULL,
-	    (g.type == ROW && g.c_reverse) ? NULL : "bulk",
-	    &cursor)) != 0)
+	    (g.type == ROW && g.c_reverse) ? NULL : "bulk", &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Set up the default key buffer. */
@@ -96,6 +119,10 @@ wts_load(void)
 
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
+
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== bulk load stop ===============");
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");

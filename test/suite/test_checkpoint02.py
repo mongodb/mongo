@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -54,24 +54,19 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
         for i in xrange(self.nops):
             if i % 191 == 0 and i != 0:
                 queue.put_nowait(('b', i, my_data))
-#            if i % 257 == 0 and i != 0:
-#                queue.put_nowait(('t', i, my_data))
-#            # Wait another 200 operations, then delete the above table. This
-#            # not guarantee that the initial operations on the table will have
-#            # been finished.
-#            if (i - 100) % 257 == 0 and (i - 100) != 0:
-#                queue.put_nowait(('d', i - 100, my_data))
             queue.put_nowait(('i', i, my_data))
 
+        opthreads = []
         for i in xrange(self.nthreads):
             t = op_thread(self.conn, uris, self.fmt, queue, done)
+            opthreads.append(t)
             t.start()
 
         queue.join()
         done.set()
-        # Wait for checkpoint thread to notice status change.
-        while ckpt.is_alive():
-            time.sleep(0.01)
+        for t in opthreads:
+            t.join()
+        ckpt.join()
 
         # Create a cursor - ensure all items have been put.
         cursor = self.session.open_cursor(self.uri, None, None)

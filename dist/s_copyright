@@ -68,8 +68,6 @@ check()
 	echo "$1: copyright information is incorrect"
 }
 
-l="LICENSE COPYING"
-
 # Search for files, ignoring test/3rdparty.
 for i in `cd .. &&
     find [a-z]* -name '*.[chi]' \
@@ -88,9 +86,9 @@ for i in $f; do
 	echo "$i: copyright information is incorrect"
 done
 
-# The wt utility has a copyright it displays.
-s="printf.*Copyright (c) 2008-$year WiredTiger, Inc."
-f="src/utilities/util_cpyright.c"
+# The wt utility and LICENSE files have a copyright.
+s="Copyright (c) 2008-$year WiredTiger, Inc."
+f="LICENSE src/utilities/util_cpyright.c"
 for i in $f; do
 	if `grep "$s" ../$i > /dev/null`; then
 		continue;

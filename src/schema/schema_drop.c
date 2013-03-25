@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -54,88 +54,25 @@ __drop_file(
 }
 
 /*
- * __drop_tree --
- *	Drop an index or colgroup reference.
- */
-static int
-__drop_tree(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
-{
-	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
-	WT_ITEM *buf;
-	const char *name;
-
-	dhandle = session->dhandle;
-	buf = NULL;
-
-	/* Remove the metadata entry (ignore missing items). */
-	WT_TRET(__wt_metadata_remove(session, uri));
-	if (force && ret == WT_NOTFOUND)
-		ret = 0;
-
-	/*
-	 * Drop the file.
-	 * __drop_file closes the btree handle, so we copy the name field to
-	 * save the URI.
-	 */
-	name = dhandle->name;
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_set(session, buf, name, strlen(name) + 1));
-	WT_TRET(__drop_file(session, buf->data, force, cfg));
-
-	if (0) {
-err:		session->dhandle = dhandle;
-		(void)__wt_session_release_btree(session);
-	}
-	__wt_scr_free(&buf);
-
-	return (ret);
-}
-
-/*
  * __drop_colgroup --
  *	WT_SESSION::drop for a colgroup.
  */
 static int
 __drop_colgroup(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
+	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
 	WT_TABLE *table;
-	const char *cgname, *tablename;
-	size_t tlen;
 
-	tablename = uri;
-	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
-		return (EINVAL);
-	cgname = strchr(tablename, ':');
-	if (cgname != NULL) {
-		tlen = (size_t)(cgname - tablename);
-		++cgname;
-	} else
-		tlen = strlen(tablename);
-
-	/*
-	 * Try to get the btree handle.  It will be unlocked by
-	 * __wt_conn_btree_close_all.
-	 */
-	if ((ret = __wt_schema_get_btree(session, uri, strlen(uri), cfg,
-	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
-		if (ret == WT_NOTFOUND || ret == ENOENT)
-			ret = 0;
-		return (ret);
+	/* If we can get the colgroup, detach it from the table. */
+	if ((ret = __wt_schema_get_colgroup(
+	    session, uri, &table, &colgroup)) == 0) {
+		table->cg_complete = 0;
+		WT_TRET(__wt_schema_drop(session, colgroup->source, cfg));
 	}
 
-	/* If we can get the table, detach the colgroup from it. */
-	if ((ret = __wt_schema_get_table(
-	    session, tablename, tlen, 1, &table)) == 0)
-		table->cg_complete = 0;
-	else if (ret == WT_NOTFOUND)
-		ret = 0;
-
-	WT_TRET(__drop_tree(session, uri, force, cfg));
-
+	WT_TRET(__wt_metadata_remove(session, uri));
 	return (ret);
 }
 
@@ -145,40 +82,20 @@ __drop_colgroup(
  */
 static int
 __drop_index(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
+	WT_INDEX *idx;
 	WT_DECL_RET;
 	WT_TABLE *table;
-	const char *idxname, *tablename;
-	size_t tlen;
 
-	tablename = uri;
-	if (!WT_PREFIX_SKIP(tablename, "index:") ||
-	    (idxname = strchr(tablename, ':')) == NULL)
-		return (EINVAL);
-	tlen = (size_t)(idxname - tablename);
-	++idxname;
-
-	/*
-	 * Try to get the btree handle.  It will be unlocked by
-	 * __wt_conn_btree_close_all.
-	 */
-	if ((ret = __wt_schema_get_btree(session, uri, strlen(uri), cfg,
-	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
-		if (ret == WT_NOTFOUND || ret == ENOENT)
-			ret = 0;
-		return (ret);
+	/* If we can get the colgroup, detach it from the table. */
+	if ((ret = __wt_schema_get_index(
+	    session, uri, &table, &idx)) == 0) {
+		table->idx_complete = 0;
+		WT_TRET(__wt_schema_drop(session, idx->source, cfg));
 	}
 
-	/* If we can get the table, detach the index from it. */
-	if ((ret = __wt_schema_get_table(
-	    session, tablename, tlen, 1, &table)) == 0)
-		table->idx_complete = 0;
-	else if (ret == WT_NOTFOUND)
-		ret = 0;
-
-	WT_TRET(__drop_tree(session, uri, force, cfg));
-
+	WT_TRET(__wt_metadata_remove(session, uri));
 	return (ret);
 }
 
@@ -190,10 +107,12 @@ static int
 __drop_table(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
+	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
+	WT_INDEX *idx;
 	WT_TABLE *table;
-	int i;
 	const char *name;
+	u_int i;
 
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");
@@ -202,19 +121,19 @@ __drop_table(
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		if (table->cgroups[i] == NULL)
+		if ((colgroup = table->cgroups[i]) == NULL)
 			continue;
-		WT_ERR(__drop_colgroup(
-		    session, table->cgroups[i]->name, force, cfg));
+		WT_ERR(__wt_metadata_remove(session, colgroup->name));
+		WT_ERR(__wt_schema_drop(session, colgroup->source, cfg));
 	}
 
 	/* Drop the indices. */
 	WT_ERR(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++) {
-		if (table->indices[i] == NULL)
+		if ((idx = table->indices[i]) == NULL)
 			continue;
-		WT_TRET(__drop_index(
-		    session, table->indices[i]->name, force, cfg));
+		WT_ERR(__wt_metadata_remove(session, idx->name));
+		WT_ERR(__wt_schema_drop(session, idx->source, cfg));
 	}
 
 	WT_ERR(__wt_schema_remove_table(session, table));
@@ -235,11 +154,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_DECL_RET;
 	int force;
 
-	cval.val = 0;
-	ret = __wt_config_gets(session, cfg, "force", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	force = cval.val == 0 ? 0 : 1;
+	WT_RET(__wt_config_gets_defno(session, cfg, "force", &cval));
+	force = (cval.val != 0);
 
 	/* Disallow drops from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
@@ -250,11 +166,11 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_CLEAR_BTREE_IN_SESSION(session);
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		ret = __drop_colgroup(session, uri, force, cfg);
+		ret = __drop_colgroup(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __drop_file(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __drop_index(session, uri, force, cfg);
+		ret = __drop_index(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __drop_table(session, uri, force, cfg);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)

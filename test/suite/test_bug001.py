@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -45,7 +45,7 @@ class test_bug001(wttest.WiredTigerTestCase):
             cursor.set_key(r)
             cursor.set_value(0xab)
             cursor.insert()
-        r += trailing;
+        r += trailing
         cursor.set_key(r + 1)
         cursor.set_value(0xbb)
         cursor.insert()
@@ -58,10 +58,7 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         # Check search inside trailing implicit keys.
         for i in range(0, 5):
-            cursor.set_key(60 + i)
-            self.assertEqual(cursor.search(), 0)
-            self.assertEqual(cursor.get_key(), 60 + i)
-            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEqual(cursor[60 + i], 0x00)
 
         # Check cursor next inside trailing implicit keys.
         cursor.set_key(60)
@@ -85,10 +82,7 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         # Check search inside leading implicit keys.
         for i in range(0, 5):
-            cursor.set_key(10 + i)
-            self.assertEqual(cursor.search(), 0)
-            self.assertEqual(cursor.get_key(), 10 + i)
-            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEqual(cursor[10 + i], 0x00)
 
         # Check cursor next inside leading implicit keys.
         cursor.set_key(10)

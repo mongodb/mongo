@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -23,7 +23,7 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 static inline void
 __cursor_position_clear(WT_CURSOR_BTREE *cbt)
 {
-        F_CLR(&cbt->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	F_CLR(&cbt->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 }
 
 /*
@@ -57,7 +57,7 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
  * __cursor_leave --
  *	Clear a cursor's position.
  */
-static inline void
+static inline int
 __cursor_leave(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
@@ -66,16 +66,29 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
+	/* The key and value may be gone, clear the flags here. */
+	F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+
 	/* Release any page references we're holding. */
-	__wt_stack_release(session, cbt->page);
+	WT_RET(__wt_page_release(session, cbt->page));
 	cbt->page = NULL;
 
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		WT_ASSERT(session, session->ncursors > 0);
-		if (--session->ncursors == 0)
+		if (--session->ncursors == 0) {
 			__wt_txn_read_last(session);
+
+			/*
+			 * We no longer have any active cursors, check if our
+			 * operation overflowed the cache.  We don't care if we
+			 * fail to evict pages: our operation is done
+			 * regardless.
+			 */
+			(void)__wt_cache_full_check(session);
+		}
 		F_CLR(cbt, WT_CBT_ACTIVE);
 	}
+	return (0);
 }
 
 /*
@@ -98,20 +111,21 @@ __cursor_enter(WT_CURSOR_BTREE *cbt)
  * __cursor_func_init --
  *	Cursor call setup.
  */
-static inline void
+static inline int
 __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 {
 	if (reenter)
-		__cursor_leave(cbt);
+		WT_RET(__cursor_leave(cbt));
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
 		__cursor_enter(cbt);
+	return (0);
 }
 
 /*
  * __cursor_func_resolve --
  *	Resolve the cursor's state for return.
  */
-static inline void
+static inline int
 __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 {
 	WT_CURSOR *cursor;
@@ -123,12 +137,14 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 	 * On error, we're not returning anything, we can't iterate, and
 	 * we should release any page references we're holding.
 	 */
-	if (ret == 0)
-		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	else {
-		__cursor_leave(cbt);
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	} else {
+		WT_RET(__cursor_leave(cbt));
 		__cursor_search_clear(cbt);
 	}
+	return (0);
 }
 
 /*
@@ -233,12 +249,7 @@ slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
 		vb->size = 0;
 	} else {
 		__wt_cell_unpack(cell, unpack);
-		if (unpack->type == WT_CELL_VALUE &&
-		    btree->huffman_value == NULL) {
-			vb->data = unpack->data;
-			vb->size = unpack->size;
-		} else
-			WT_RET(__wt_cell_unpack_copy(session, unpack, vb));
+		WT_RET(__wt_cell_unpack_ref(session, unpack, vb));
 	}
 
 	return (0);

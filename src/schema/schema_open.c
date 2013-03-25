@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -29,59 +29,6 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_schema_get_btree --
- *	Get the btree (into session->btree) for the named schema object
- *	(either a column group or an index).
- */
-int
-__wt_schema_get_btree(WT_SESSION_IMPL *session,
-    const char *objname, size_t len, const char *cfg[], uint32_t flags)
-{
-	WT_CONFIG_ITEM cval;
-	WT_CURSOR *cursor;
-	WT_DECL_RET;
-	WT_ITEM *uribuf;
-	const char *fileuri, *name, *objconf;
-
-	cursor = NULL;
-	uribuf = NULL;
-
-	name = objname;
-	if (len != strlen(objname))
-		WT_ERR(__wt_strndup(session, objname, len, &name));
-
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
-	cursor->set_key(cursor, name);
-	WT_ERR(cursor->search(cursor));
-	WT_ERR(cursor->get_value(cursor, &objconf));
-
-	/* Get the filename from the metadata. */
-	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
-	WT_ERR(__wt_config_getones(session, objconf, "filename", &cval));
-	WT_ERR(__wt_buf_fmt(
-	    session, uribuf, "file:%.*s", (int)cval.len, cval.str));
-	fileuri = uribuf->data;
-
-	/* !!! Close the schema cursor first, this overwrites session->btree. */
-	ret = cursor->close(cursor);
-	cursor = NULL;
-	if (ret != 0)
-		goto err;
-
-	ret = __wt_session_get_btree_ckpt(session, fileuri, cfg, flags);
-	if (ret == ENOENT)
-		__wt_errx(session,
-		    "%s created but '%s' is missing", objname, fileuri);
-
-err:	__wt_scr_free(&uribuf);
-	if (name != objname)
-		__wt_free(session, name);
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
-	return (ret);
-}
-
-/*
  * __wt_schema_open_colgroups --
  *	Open the column groups for a table.
  */
@@ -94,7 +41,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_DECL_RET;
 	WT_DECL_ITEM(buf);
 	const char *cgconfig;
-	int i;
+	u_int i;
 
 	if (table->cg_complete)
 		return (0);
@@ -137,8 +84,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_ERR(__wt_config_getones(session,
 		    colgroup->config, "columns", &colgroup->colconf));
 		WT_ERR(__wt_config_getones(
-		    session, colgroup->config, "filename", &cval));
-		WT_ERR(__wt_buf_fmt(session, buf, "file:%.*s",
+		    session, colgroup->config, "source", &cval));
+		WT_ERR(__wt_buf_fmt(session, buf, "%.*s",
 		    (int)cval.len, cval.str));
 		colgroup->source = __wt_buf_steal(session, buf, NULL);
 		table->cgroups[i] = colgroup;
@@ -173,16 +120,16 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_DECL_ITEM(buf);
 	WT_DECL_ITEM(plan);
 	WT_DECL_RET;
-	u_int cursor_key_cols;
-	int i;
+	u_int cursor_key_cols, i;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
-	/* Get the filename from the index config. */
-	WT_ERR(__wt_config_getones(session, idx->config, "filename", &cval));
+	/* Get the data source from the index config. */
+	WT_ERR(__wt_config_getones(session, idx->config, "source", &cval));
 	WT_ERR(__wt_buf_fmt(
-	    session, buf, "file:%.*s", (int)cval.len, cval.str));
+	    session, buf, "%.*s", (int)cval.len, cval.str));
 	idx->source = __wt_buf_steal(session, buf, NULL);
+	idx->need_value = WT_PREFIX_MATCH(idx->source, "lsm:");
 
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
 	WT_ERR(__wt_buf_fmt(
@@ -252,7 +199,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 err:	__wt_scr_free(&buf);
 	__wt_scr_free(&plan);
-
 	return (ret);
 }
 
@@ -268,7 +214,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_INDEX *idx;
-	int cmp, i, match;
+	u_int i;
+	int cmp, match;
 	const char *idxconf, *name, *tablename, *uri;
 
 	/* Check if we've already done the work. */
@@ -457,4 +404,88 @@ err:		if (table != NULL)
 		WT_TRET(cursor->close(cursor));
 	__wt_free(session, tablename);
 	return (ret);
+}
+
+/*
+ * __wt_schema_get_colgroup --
+ *	Find a column group by URI.
+ */
+int
+__wt_schema_get_colgroup(WT_SESSION_IMPL *session,
+    const char *uri, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
+{
+	WT_COLGROUP *colgroup;
+	WT_TABLE *table;
+	const char *tablename, *tend;
+	u_int i;
+
+	*colgroupp = NULL;
+
+	tablename = uri;
+	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
+		return (__wt_bad_object_type(session, uri));
+
+	if ((tend = strchr(tablename, ':')) == NULL)
+		tend = tablename + strlen(tablename);
+
+	WT_RET(__wt_schema_get_table(session,
+	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
+
+	if (tablep != NULL)
+		*tablep = table;
+
+	for (i = 0; i < WT_COLGROUPS(table); i++) {
+		colgroup = table->cgroups[i];
+		if (strcmp(colgroup->name, uri) == 0) {
+			*colgroupp = colgroup;
+			return (0);
+		}
+	}
+
+	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
+}
+
+/*
+ * __wt_schema_get_index --
+ *	Find a column group by URI.
+ */
+int
+__wt_schema_get_index(WT_SESSION_IMPL *session,
+    const char *uri, WT_TABLE **tablep, WT_INDEX **indexp)
+{
+	WT_INDEX *idx;
+	WT_TABLE *table;
+	const char *tablename, *tend;
+	u_int i;
+
+	*indexp = NULL;
+
+	tablename = uri;
+	if (!WT_PREFIX_SKIP(tablename, "index:") ||
+	    (tend = strchr(tablename, ':')) == NULL)
+		return (__wt_bad_object_type(session, uri));
+
+	WT_RET(__wt_schema_get_table(session,
+	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
+
+	if (tablep != NULL)
+		*tablep = table;
+
+	/* Try to find the index in the table. */
+	for (i = 0; i < table->nindices; i++) {
+		idx = table->indices[i];
+		if (strcmp(idx->name, uri) == 0) {
+			*indexp = idx;
+			return (0);
+		}
+	}
+
+	/* Otherwise, open it. */
+	WT_RET(__wt_schema_open_index(
+	    session, table, tend + 1, strlen(tend + 1), indexp));
+
+	if (*indexp != NULL)
+		return (0);
+
+	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }

@@ -1,7 +1,95 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_13 Upgrading to Version 1.3
+@section version_139 Upgrading to Version 1.3.9
+<dl>
 
+<dt>Compression</dt>
+<dd>
+A new member, WT_COMPRESSOR::compress_raw, was added to the WT_COMPRESSOR
+extension API.  Applications using the WT_COMPRESSOR extension API should
+add a NULL as the second field of that structure.
+</dd>
+
+<dt>Checksums</dt>
+<dd>
+The WT_SESSION::create method's \c checksum configuration string has
+been changed from a boolean type to a string type.  Applications using
+the checksum configuration string should change a value of \c true to
+the string \c on, and a value of \c false to the string \c off or the
+string \c uncompressed.
+</dd>
+
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.3.9 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+</dl>
+<hr>
+@section version_138 Upgrading to Version 1.3.8
+<dl>
+
+<dt>Statistics keys</dt>
+<dd>
+The @ref statistics_keys "statistics key constants" have been renamed to use
+all capitals, and use consistent prefixes to distinguish between connection
+statistics and statistics for data sources.
+</dd>
+
+</dl>
+<hr>
+@section version_136 Upgrading to Version 1.3.6
+<dl>
+
+<dt>Installed library names</dt>
+<dd>
+The installed WiredTiger extension library names changed to limit
+namespace pollution:
+
+<table>
+@hrow{Library, Previous Name, New Name}
+@row{Bzip2 compression, bzip2_compress.a, libwiredtiger_bzip2.a}
+@row{, bzip2_compress.la, libwiredtiger_bzip2.la}
+@row{, bzip2_compress.so, libwiredtiger_bzip2.so}
+@row{Snappy compression, snappy_compress.a, libwiredtiger_snappy.a}
+@row{, snappy_compress.la, libwiredtiger_snappy.la}
+@row{, snappy_compress.so, libwiredtiger_snappy.so}
+@row{No-op compression, nop_compress.a, No longer installed}
+@row{, nop_compress.la, No longer installed}
+@row{, nop_compress.so, No longer installed}
+@row{Reverse order collator, reverse_collator.a, No longer installed}
+@row{, reverse_collator.la, No longer installed}
+@row{, reverse_collator.so, No longer installed}
+</table>
+</dd>
+
+<dt>Built-in compression names</dt>
+<dd>
+The built-in compression name arguments to the WT_SESSION:create
+\c block_compressor configuration string changed for consistency:
+
+<table>
+@hrow{Extension, Previous Name, New Name}
+@row{Bzip2 compression, "bzip2_compress", "bzip2"}
+@row{Snappy compression, "snappy_compress", "snappy"}
+</table>
+</dd>
+
+</dl>
+<hr>
+@section version_135 Upgrading to Version 1.3.5
+<dl>
+
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.3.5 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+</dl>
+<hr>
+@section version_13 Upgrading to Version 1.3
 <dl>
 
 <dt>Checkpoint and Snapshot</dt>
@@ -89,7 +177,7 @@ returns a cursor comparison status (less than 0, equal to 0, or greater than
 0) depending on the cursors' key order.
 </dd>
 
-<dt>Version 1.3 file format changes</dt>
+<dt>File format changes</dt>
 <dd>
 The underlying file formats changed in the 1.3 release; tables and files
 should be dumped and re-loaded into a new database.

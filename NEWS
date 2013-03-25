@@ -1,3 +1,479 @@
+WiredTiger release 1.4.2, 2013-01-14
+------------------------------------
+
+[#387] Fast-path "S" and "u" formats in cursor.get_key and cursor.get_value.
+
+[#407] Allow non-conflicting updates to complete concurrently.
+
+[#418] Add code in to prioritize eviction of pages that are larger than a
+certain threshold. This avoids taking a performance hit when a huge page
+needs to be reconciled.  Add a new memory_max_page configuration option.
+
+[#419] If a page splits, it potentially creates a merge-split internal page
+and we potentially walk that page during fast-delete.  The WT_REF.addr field
+doesn't point to a cell in that case and we'll drop core.
+
+[#424] Add clarification wording for boolean configuration strings.
+
+[#425] Perform checkpoints in the calling thread, don't block eviction: when
+evicting in a file that is being checkpointed, only evict clean pages.  Also
+Do compaction in the calling thread instead of interrupting the eviction
+thread to do the work.
+
+[#426] Fixes for automake 1.3.x.  Allow examples to run in parallel: give
+each a unique home directory.
+
+Make the tree build without HAVE_VERBOSE.
+
+Fix some issues with LSM rename and add a Python test.
+
+Track when cursors refer to memory returned by WiredTiger, copy it if
+required before dropping hazard pointers that might be protecting it.
+
+Verify shouldn't ever modify the file -- don't bother checking for dirty
+pages, just discard everything.
+
+When rolling forward to resolve key prefix compression, don't copy the key,
+we only need a reference to it, should speed up tables with lots of key
+prefix compression.
+
+Requested changes for the WT_COMPRESSOR::compress_raw method API: pass in the
+configured object's page size as a convenience, and if
+WT_COMPRESSOR::pre_size is set, use it to determine the size of the
+destination buffer, rather than using the object's page size as the maximum
+needed.
+
+
+WiredTiger release 1.4.1, 2012-12-12
+------------------------------------
+
+This is a bugfix, cleanup and performance tuning release. The significant
+changes are highlighted below:
+
+[215] Add a __wt_panic function that shuts down all of the WiredTiger APIs.
+      Also add a new error return WT_PANIC which means there has been an error
+      in the WiredTiger engine, and it should be restarted.
+
+[409] Fix a bug populating column groups with complex schema. Also allow empty
+      column lists in projection cursors.
+
+[150] Add description of how to do index-only searches to the documentation.
+
+[392] Move examples/c/ex_test_perf.c to bench/wtperf.
+
+[322] Add support for statistics on schema-level objects i.e tables,
+      column groups, indices. 
+
+* Enhance statistics, including changing the name of some statistics.
+
+* Fix a bug in the eviction server that could cause it to abort, leaving the
+  system unusable.
+
+
+WiredTiger release 1.4.0, 2012-12-03
+------------------------------------
+
+This release adds several major new features, a number of performance
+improvements and bug fixes. The significant changes are outlined below:
+
+New features and API changes:
+
+[242] Track the percentage of cache that is dirty, trigger eviction to bound
+      it. This can be used to bound how much data checkpoints write.
+
+[324] Add support for WT_COMPRESS::compress_raw, which lets the compression
+      routine select how many rows are included in each disk block.
+
+[381] Add statistics to track read and write amplification (application data
+      size versus I/O size)
+
+* Add a trigger configuration option to WT_SESSION::compact API.
+
+* Make WT_SESSION::create's checksum configuration 3-state: on, off, or
+  uncompressed blocks only.
+
+Bug fixes:
+
+* Fix build issues on Solaris.
+
+* Fix a bug calculating the generation of an LSM merge.
+
+* Fix WiredTiger dump and load for tables.
+
+* Fix a memory leak in checkpoints.
+
+* Improve accuracy of cache memory tracking with overflow items.
+
+
+WiredTiger release 1.3.8, 2012-11-22
+------------------------------------
+
+This release improves the performance of LSM trees, changes how statistics are
+reported and adds a shared cache implementation:
+
+New features and API changes:
+
+[232] Add a "size of checkpoint" statistic.
+
+* Add a shared cache pool implemention.  Manages a single cache among
+  multiple databases within a process.
+
+* Merge statistics from file and LSM sources into a "data source" statistic
+  structure.  Rename and regroup some shared stastistics.  Add a helper to
+  the Python API to lookup in a cursor in a simple expression.
+
+* Add support for sub groups of options in configuration strings.
+
+Performance tuning for LSM trees:
+
+* Don't try to merge with a chunk that is much larger than a small chunk.
+
+* After an LSM merge, fault in some pages before the new tree goes live to
+  avoid stalling application threads.
+
+* Don't automatically fail inserts if the write generation check fails:
+  compare keys instead.
+
+* Switch the LSM tree lock to a read/write lock, so cursors can read the
+  state of the tree in parallel.
+
+Bug fixes:
+
+* Fix a bug where we could write past the end of a buffer after it was grown.
+
+
+WiredTiger release 1.3.7, 2012-11-09
+------------------------------------
+
+This release fixes a bug and improves performance with Bloom filters:
+
+* Drop any old Bloom filter before creating a new one -- we may have been
+  interrupted in between creating it and updating the metadata.  Write the
+  metadata after creating missing Bloom filters.
+
+* Use a separate thread for creation of Bloom filters for the newest,
+  unmerged LSM chunks.
+
+* Changes to the ex_test_perf example: change the default configuration to
+  4KB pages and disable prefix compression.  Change the "-i" command line
+  option to be a simple count of records to insert.  Clean up error
+  handling and add option to populate using multiple threads.
+
+* Clarify the docs for the default buffer_alignment setting.
+
+
+WiredTiger release 1.3.6, 2012-11-06
+------------------------------------
+
+This is a bugfix and performance tuning release. The changes are as follows:
+
+* Rename the WiredTiger installed modules to libwiredtiger_XXX.  Don't install
+  the nop and reverse collator modules.
+
+* Replace test/format's bzip configuration string with compression, which can
+  take one of four arguments (none, bzip, ext, snappy), change format to run
+  snappy compression if the library is available.
+
+* Rename the builtin block compressor names from "bzip2_compress" to "bzip2",
+  and from "snappy_compress" to "snappy".
+
+* Support multiple LSM merge threads with the "lsm_merge_threads" config key.
+  Use IDs rather than array index to mark the start chunk in a merge, in case
+  we race with another thread.
+
+* Cache the hash values used for Bloom filter lookups, rather than hashing for
+  each Bloom filter in an LSM tree.
+
+* Only switch trees in an LSM cursor if the primary chunk is on disk.
+
+* Add a per-btree cache priority, currently only used to make it more likely
+  for Bloom filter pages to stay in cache.
+
+* Only evict pages with read generations in the bottom quarter of the range we
+  see.  Fix a 32-bit wrapping bug in assigning read generations.
+
+* For update-only LSM cursors, only open a cursor in the primary chunk.
+
+* LSM: Report errors from the checkpoint thread.
+
+* LSM: only save a Bloom URI in the metadata after it is successfully created.
+
+* LSM: Create missing Bloom filters when reading from an LSM tree if
+  "lsm_bloom_newest"is set.
+
+* LSM: Include all of the chosen chunks in a merge.  Only pin the current chunk
+  in an LSM cursor if it is writeable.
+
+
+WiredTiger release 1.3.5, 2012-10-26
+------------------------------------
+
+This is a bugfix and performance tuning release. The changes are as follows:
+
+[#370] Document that applications are responsible for figuring out their
+       upgrade path if they might swap out compression engines.
+
+[#371] When a single session was used to reconcile multiple btrees, one of
+       which had dictionaries configured and one of which didn't, we failed to
+       clear the dictionary when starting page reconciliation.   Be consistent,
+       never use anything other than the btree handle's configuration to decide
+       if we're using a dictionary in a reconcilation run.
+
+[#372] Fix several potential integer overflow bugs.
+
+[#373] Fix a bug where calls that performed an operation on multiple objects
+       (such as creating a table that implicitly creates a column group)
+       could leave the metadata incomplete if a process exited without
+       calling `WT_CONNECTION::close`.
+       Hold the schema lock while opening tables. Fixes the error "cannot be
+       opened until all column groups are created" message when create calls
+       race with open_cursor.
+
+[#374] Fix a race that caused crashes when using the Python API with
+       multi-threaded code.
+
+[#375] Fix a bug in __wt_cond_wait - so that it returns after timeout expires.
+
+* Protect the list of LSM trees with the schema lock to avoid races during
+  create.
+
+* Update ex_test_perf to output statistics during populate and improve timing
+  accuracy.
+
+* Skew eviction in favor of leaf pages - which improves read-only performance
+  for large LSM trees.
+
+* Hold the LSM tree lock while gathering statistics.
+
+* Fix a bug in bulk load of bitmap files.
+
+* Fix a related bug in the bloom code that uses bitmap stores.
+
+* Don't attempt to drop the first chunk of an LSM tree before creating it.
+
+* Instead of entering a fake key cell after the last cell on the page just
+  in case the page ends with a key cell which has no value, use the end of
+  the page to detect that case.
+
+* Cache cursor key/value formats in Python, to save a native call from every
+  get_key/value.
+
+* Don't sync the directory after open if the global "sync" flag is false.
+
+* Fix a race for LSM trees that could happen if two threads race to open a
+  cursor and drop the LSM tree.
+
+WiredTiger release 1.3.4, 2012-10-19
+------------------------------------
+
+This release includes several important new features, including:
+
+* support for online compaction of files;
+* support for tables, column groups and indices that use LSM trees for
+  storage; and
+* improved statistics and configuration for LSM trees and Bloom filters.
+
+In addition, there are some significant performance improvements and bug
+fixes.  The full list of changes is:
+
+[#248]	Add support for online compaction.
+
+[#310]	Fixed a bug where overflow blocks could be accessed by a
+	long-running reader after they had been freed in a checkpoint.
+
+[#358]	Allocate checkpoint blocks from the live system's list of available
+	blocks rather than always extending the file.
+
+[#361]	Sync the directory after creating a file: this is apparently
+	required for durability on Linux, according to the Linux fsync man
+	page.
+
+[#362]	Don't check if a page is on the avail or discard lists if we're
+	salvaging the file, that is okay.
+
+[#363]	Remove obsolete code dealing with forced eviction.
+
+[#366]	Fake checkpoints may have the delete flag set, ignore them when
+	rolling checkpoints forward.
+
+[#367]	All metadata reads should ignore the application's transactional
+	context.
+
+[#369]	Support LSM as a data source for tables, column groups and indices.
+
+* Add tuning options for LSM bloom filters, including controlling whether
+  the oldest level in the tree has a Bloom filter, whether newly-created
+  (level 0) files have Bloom filters, and passing arbitrary file
+  configuration for Bloom filters.
+
+* Add a merge generation to LSM chunks.  Add a statistic that reports the
+  highest merge generation in a tree.
+
+* Add a new LSM statistic tracking searches that could benefit from bloom
+  filters.
+
+* Enable LSM statistics in the "wt stat" utility.
+
+* Interrupt LSM merge operations, rather than waiting on close.
+
+* Wait for a while before looking for LSM major merges, in case merges
+  catch up with inserts.
+
+* Fix LSM index searches.  The main issue was LSM search_near was not
+  always returning the closest key to the search key, which calling code
+  expects.  It now tries hard to find the smallest cursor larger than the
+  search key, and only if no larger record exists does it return the
+  largest record smaller than the search key.
+
+* Reset any old cursor position before an LSM search.  This limits hazard
+  references in an LSM search to a single chunk.
+
+* Fix a memory leak in an error path in Bloom filters.
+
+* Tweak the search loops in hazard_{set,clear} in favor of
+  last-in-first-out ordering.
+
+* If there are many files open, some hotter than others, walk more files
+  looking for pages to evict.
+
+* Don't stop evicting until we reach the target, have eviction wake up
+  periodically regardless of whether the application signals it.  This
+  latter requires a "timed condition wait" operation.
+
+* Tweaks to file handle flags for out-of-cache read performance on Linux
+  (disable readahead and access time updates).
+
+* Replace the WT_SESSION::dumpfile method with configuration strings to
+  WT_SESSION::verify.
+
+* Fix a bug where we weren't skipping unnecessary default checkpoints
+  because we weren't handling the generational number included in the
+  internal checkpoint name.
+
+* Add a "force" configuration flag to WT_SESSION::checkpoint, object
+  compaction needs it because the work it wants done is done by the block
+  manager.
+
+* Make compact and checkpoint operate on a table's indices.
+
+* When doing a page truncate, lock down the page before we unpack the
+  on-page cell -- it's possible the page could be instantiated, modified
+  and reconciled while we're sleeping, in which case the WT_REF.addr field
+  would no longer point on-page.
+
+
+WiredTiger release 1.3.3, 2012-10-11
+------------------------------------
+
+This is a bugfix and performance tuning release, primarily related to LSM
+trees.  The changes are as follows:
+
+[#350] Checkpoint the metadata after successful schema-level operations.
+       Otherwise, if process exits without closing the connection or
+       running a checkpoint, created objects exist but there is no record
+       in the metadata.
+
+[#351] Don't put checkpoint extent blocks on the available list, blocks on
+       it are considered for truncation; they have to go on the "checkpoint
+       available" list.
+
+* Choose LSM merges based on a measure of efficiency (levels collapsed per
+  record), rather than simply choosing a minor or a major merge.  Tweak the
+  merge heuristic so we don't end up with runs of smaller chunks in the
+  middle of the tree.
+
+* Add a connection-wide flag to disable LSM merges.
+
+* Don't create Bloom filters for the oldest chunk in the system.  Add the
+  ability to disable Bloom filters entirely.
+
+* Fix fast-path for bit values in WT_CURSOR::set_value.
+
+* Clean up allocation of LSM chunk IDs.
+
+* Update bloom_get so that it doesn't hold a cursor position.
+
+* Respect the page size for fixed-length column stores, remembering there
+  are 8 bits per byte.
+
+* Support bulk loading a bitmap into a fixed-length column store, update
+  Bloom filter code to use this.
+
+* Add an example program, ex_test_perf, to demonstrate basic LSM usage.
+
+* Add a new statistics cursor type "statistics:lsm".  Update ex_stat.c to
+  demonstrate usage.
+
+* Add a statistics_fast flag to file statistics cursors.  Update LSM
+  statistics so that they aggregate some cache statistics.  Add ability to
+  open a statistics cursor on a checkpoint.
+
+* Walk a constant number of pages for LRU eviction.
+
+* Move the cache full check to after an update operation completes, when it
+  is no longer holding hazard references.  This improves behavior with
+  small caches.
+
+
+WiredTiger release 1.3.2, 2012-10-03
+------------------------------------
+
+This is a bugfix and performance tuning release, primarily related to LSM
+trees.  The changes are as follows:
+
+* Implement minor merges for LSM trees, prefer them to major merges.
+
+* Update hazard references, so the active array grows as needed.  Change
+  the default hazard_max to 1000.
+
+* Abort transactions if the cache is so full that they cannot make
+  progress.
+
+* Fix a bug where verify could crash if an empty checkpoint exists.
+
+* Make the maximum number of chunks for merges configurable, rather than
+  deriving a value from the number of hazard references available.
+
+* Switch to an atomic add to allocate transaction IDs.  This fixes a subtle
+  race before where two threads could temporarily have the same ID in the
+  global state table.  If one of the threads timed out and the other thread
+  committed its transaction with that ID, the commit would not become
+  visible immediately.  This could lead to deadlock errors in workloads
+  that are logically conflict-free.
+
+* Have auto-commit transactions retry deadlocks.  This requires that we
+  keep the user's key and value in the cursor.
+
+* Simplify the code handling updated records in variable-length
+  column-store reconciliation.
+
+* Never wait for eviction when holding the schema lock.  This avoids
+  deadlocks between opening a column store file and taking a checkpoint.
+
+* Take care with the loop termination when walking files for eviction.  We
+  were making one extra call into __wt_tree_walk, which would leave a leaf
+  page in the WT_REF_EVICT_WALK state, unable to be evicted.  In some
+  workloads, including LSM loads, we could end up with many files all
+  consisting of a single leaf page, none of which could be evicted.
+
+* Pause updates when the cache is full.
+
+* In files marked as "out of cache", don't wait for eviction when reading a
+  page.
+
+* Fix the record count calculation for minor merges.  This was leading to
+  no Bloom filter being created for minor merges after running for some
+  time, leading to merges taking increasingly long to complete.
+
+* Only sleep in the LSM checkpoint thread if no work is done.
+
+* Add sanity check of cache size to LSM open.
+
+[#338] Create fake checkpoints until an object is modified, so that a
+       checkpoint between the cursor create and the bulk load doesn't make
+       it impossible to do a bulk-load on the cursor.
+
+
 WiredTiger release 1.3.1, 2012-09-25
 ------------------------------------
 

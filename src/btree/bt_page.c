@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -15,7 +15,7 @@ static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 
 /*
  * __wt_page_in --
- *	Acquire a hazard reference to a page; if the page is not in-memory,
+ *	Acquire a hazard pointer to a page; if the page is not in-memory,
  *	read it from the disk and build an in-memory version.
  */
 int
@@ -28,35 +28,18 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int busy, read_lockout, wake;
-
-	/*
-	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full), or after we fail to evict a page.  Otherwise, we
-	 * are just wasting effort and making a busy mutex busier.
-	 */
-	wake = 1;
+	int busy;
 
 	for (;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
-			/* The page isn't in memory, attempt to read it. */
-
-			/* Check if there is space in the cache. */
-			__wt_eviction_check(session, &read_lockout, wake);
-			wake = 0;
-
 			/*
-			 * If the cache is full, give up, but only if we are
-			 * not holding the schema lock.  The schema lock can
-			 * block checkpoints, and thus eviction, so it is not
-			 * safe to wait for eviction if we are holding it.
+			 * The page isn't in memory, attempt to read it.
+			 *
+			 * First make sure there is space in the cache.
 			 */
-			if (read_lockout &&
-			   !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
-				break;
-
+			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
 		case WT_REF_EVICT_FORCE:
@@ -70,9 +53,9 @@ __wt_page_in_func(
 		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 			/*
-			 * The page is in memory: get a hazard reference, update
+			 * The page is in memory: get a hazard pointer, update
 			 * the page's LRU and return.  The expected reason we
-			 * can't get a hazard reference is because the page is
+			 * can't get a hazard pointer is because the page is
 			 * being evicted; yield and try again.
 			 */
 #ifdef HAVE_DIAGNOSTIC
@@ -91,20 +74,20 @@ __wt_page_in_func(
 			 * Ensure the page doesn't have ancient updates on it.
 			 * If it did, reading the page could ignore committed
 			 * updates.  This should be extremely unlikely in real
-			 * applications, force eviction of the page to avoid
+			 * applications, wait for eviction of the page to avoid
 			 * the issue.
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				__wt_evict_page_request(session, page);
-				__wt_hazard_clear(session, page);
-				__wt_evict_server_wake(session);
+				page->read_gen = 0;
+				WT_RET(__wt_hazard_clear(session, page));
+				WT_RET(__wt_evict_server_wake(session));
 				break;
 			}
 
 			/* Check if we need an autocommit transaction. */
 			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
-				__wt_hazard_clear(session, page);
+				WT_TRET(__wt_hazard_clear(session, page));
 				return (ret);
 			}
 
@@ -113,13 +96,8 @@ __wt_page_in_func(
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/* Find a page to evict -- if the page is busy, keep trying. */
-		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
-			__wt_yield();
-		else if (ret == WT_NOTFOUND)
-			wake = 1;
-		else
-			WT_RET(ret);
+		/* We failed to get the page -- yield before retrying. */
+		__wt_yield();
 	}
 }
 
@@ -128,8 +106,9 @@ __wt_page_in_func(
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk, WT_PAGE **pagep)
+__wt_page_inmem(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *parent_ref,
+    WT_PAGE_HEADER *dsk, int disk_not_alloc, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -151,8 +130,13 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	page->dsk = dsk;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->type = dsk->type;
+	if (disk_not_alloc)
+		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);
 
-	inmem_size = 0;
+	inmem_size = sizeof(WT_PAGE);
+	if (!disk_not_alloc)
+		inmem_size += dsk->mem_size;
+
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_fix.recno = dsk->recno;
@@ -175,17 +159,12 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	__wt_cache_page_read(
-	    session, page, sizeof(WT_PAGE) + dsk->size + inmem_size);
+	__wt_cache_page_read(session, page, inmem_size);
 
 	*pagep = page;
 	return (0);
 
-err:	/*
-	 * Our caller (specifically salvage) may have special concerns about the
-	 * underlying disk image, the caller owns that problem.
-	 */
-	__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+err:	__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -231,8 +210,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.intl.t));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += dsk->u.entries * sizeof(*page->u.intl.t);
+	*inmem_sizep += dsk->u.entries * sizeof(*page->u.intl.t);
 
 	/*
 	 * Walk the page, building references: the page contains value items.
@@ -281,8 +259,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.col_var.d));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
+	*inmem_sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
@@ -319,8 +296,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	page->u.col_var.repeats = repeats;
 	page->u.col_var.nrepeats = nrepeats;
 	page->entries = dsk->u.entries;
-	if (inmem_sizep != NULL)
-		*inmem_sizep += bytes_allocated;
+	*inmem_sizep += bytes_allocated;
 	return (0);
 }
 
@@ -358,8 +334,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	nindx = dsk->u.entries / 2;
 	WT_ERR((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += nindx * sizeof(*page->u.intl.t);
+	*inmem_sizep += nindx * sizeof(*page->u.intl.t);
 
 	/*
 	 * Set the number of elements now -- we're about to allocate memory,
@@ -412,7 +387,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 				WT_ERR(__wt_page_modify_init(session, page));
 				page->modify->first_id = WT_TXN_NONE;
 				if (btree->modified)
-					__wt_page_modify_set(page);
+					__wt_page_modify_set(session, page);
 			}
 
 			++ref;
@@ -422,13 +397,13 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 		/*
 		 * If Huffman decoding is required or it's an overflow record,
-		 * use the heavy-weight __wt_cell_unpack_copy() call to build
-		 * the key.  Else, we can do it faster internally as we don't
-		 * have to shuffle memory around as much.
+		 * unpack the cell to build the key, then resolve the prefix.
+		 * Else, we can do it faster internally as we don't have to
+		 * shuffle memory around as much.
 		 */
 		prefix = unpack->prefix;
 		if (huffman != NULL || unpack->ovfl) {
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
@@ -438,10 +413,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			if (prefix != 0) {
 				WT_ERR(__wt_buf_grow(
 				    session, current, prefix + current->size));
-				memmove((uint8_t *)current->data +
-				    prefix, current->data, current->size);
-				memcpy(
-				    (void *)current->data, last->data, prefix);
+				memmove((uint8_t *)current->mem + prefix,
+				    current->data, current->size);
+				memcpy(current->mem, last->data, prefix);
+				current->data = current->mem;
 				current->size += prefix;
 			}
 		} else {
@@ -449,26 +424,32 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			 * Get the cell's data/length and make sure we have
 			 * enough buffer space.
 			 */
-			WT_ERR(__wt_buf_grow(
+			WT_ERR(__wt_buf_init(
 			    session, current, prefix + unpack->size));
 
 			/* Copy the prefix then the data into place. */
 			if (prefix != 0)
-				memcpy((void *)
-				    current->data, last->data, prefix);
-			memcpy((uint8_t *)
-			    current->data + prefix, unpack->data, unpack->size);
+				memcpy(current->mem, last->data, prefix);
+			memcpy((uint8_t *)current->mem + prefix, unpack->data,
+			    unpack->size);
 			current->size = prefix + unpack->size;
 		}
 
 		/*
 		 * Allocate and initialize the instantiated key.
+		 *
+		 * Note: all keys on internal pages are instantiated, we assume
+		 * they're more likely to be useful than keys on leaf pages.
+		 * It's possible that's wrong (imagine a cursor reading a table
+		 * that's never randomly searched, the internal page keys are
+		 * unnecessary).  If this policy changes, it has implications
+		 * for reconciliation, the row-store reconciliation function
+		 * depends on keys always be instantiated.
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
 		    current->data, current->size, &ref->u.key));
-		if (inmem_sizep != NULL)
-			*inmem_sizep += sizeof(WT_IKEY) + current->size;
+		*inmem_sizep += sizeof(WT_IKEY) + current->size;
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new
@@ -505,15 +486,15 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	unpack = &_unpack;
 
 	/*
-	 * Leaf row-store page entries map to a maximum of two-to-one to the
+	 * Leaf row-store page entries map to a maximum of one-to-one to the
 	 * number of physical entries on the page (each physical entry might be
 	 * a key without a subsequent data item).  To avoid over-allocation in
-	 * workloads with large numbers of empty data items, first walk the page
-	 * counting the number of keys, then allocate the indices.
+	 * workloads without empty data items, first walk the page counting the
+	 * number of keys, then allocate the indices.
 	 *
 	 * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
-	 * overflow (WT_CELL_KEY_OVFL) items, data are either a single on-page
-	 * (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
+	 * overflow (WT_CELL_KEY_OVFL) items, data are either non-existent or a
+	 * single on-page (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
 	 */
 	nindx = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -530,9 +511,16 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		}
 	}
 
+	/*
+	 * We use the fact that cells exactly fill a page to detect the case of
+	 * a row-store leaf page where the last cell is a key (that is, there's
+	 * no subsequent value cell).  Assert that to be true, the bug would be
+	 * difficult to find/diagnose in the field.
+	 */
+	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->mem_size));
+
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += nindx * sizeof(*page->u.row.d);
+	*inmem_sizep += nindx * sizeof(*page->u.row.d);
 
 	/* Walk the page again, building indices. */
 	rip = page->u.row.d;

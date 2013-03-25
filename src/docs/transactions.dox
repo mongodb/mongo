@@ -81,7 +81,7 @@ transactional readers, an operation may fail and return ::WT_DEADLOCK.
 
 WiredTiger supports <code>read-uncommitted</code>,
 <code>read-committed</code> and  <code>snapshot</code> isolation levels;
-the default isolation level is is <code>read-committed</code>.
+the default isolation level is <code>read-committed</code>.
 
 - <code>read-uncommitted</code>:
 Transactions can see changes made by other transactions before those
@@ -103,7 +103,7 @@ Snapshot isolation is a strong guarantee, but not equivalent to a
 single-threaded execution of the transactions, known as serializable
 isolation.  Concurrent transactions T1 and T2 running under snapshot
 isolation may both commit and produce a state that neither (T1 followed
-by T2) or (T2 followed by T1) could have produced, if there is overlap
+by T2) nor (T2 followed by T1) could have produced, if there is overlap
 between T1's reads and T2's writes, and between T1's writes and T2's
 reads.
 

@@ -86,10 +86,22 @@ hashed a configurable number of times (default 4), and the corresponding
 bits set.  The Bloom filter is used to avoid reading from a chunk if the key
 cannot be present.
 
-With the defaults, they Bloom filter only requires one byte per key, so it
+With the defaults, the Bloom filter only requires one byte per key, so it
 usually fits in cache.  The Bloom parameters can be configured with
-\c "lsm_bloom_bit_count" and \c "lsm_bloom_hash_count" configuration keys to
-WT_SESSION::create.
+\c "lsm_bloom_bit_count" and \c "lsm_bloom_hash_count" configuration keys
+to WT_SESSION::create.  The Bloom file can be configured with the
+\c "lsm_bloom_config" key.
+
+@section lsm_schema Creating tables using LSM trees
+
+Tables or indices can be stored using LSM trees.  Schema support is provided
+for LSM as an extension to the WT_SESSION::create method:
+
+@code
+session->create(session, "table:T", "type=lsm");
+@endcode
+
+The default type for all schema objects will continue to be btree.
 
 @section lsm_caveats Caveats
 
@@ -97,24 +109,10 @@ WT_SESSION::create.
 
 Reads from an LSM cursor may need to position a cursor in each active chunk.
 The number of chunks depends on the chunk size, and how many chunks have
-been merged.  There must be at least as many hazard references available as
+been merged.  There must be at least as many hazard pointers available as
 there are chunks in the tree for each cursor that is open on the LSM tree.
-The number of hazard references is configured with the \c "hazard_max"
+The number of hazard pointers is configured with the \c "hazard_max"
 configuration key to ::wiredtiger_open.
-
-@subsection lsm_schema Creating tables using LSM trees
-
-It is not yet possible to create tables or indices using LSM trees for
-storage.  This will be addressed in a future release of WiredTiger.
-
-Schema support will be provided for LSM as with an extension to the
-WT_SESSION::create method:
-
-@code
-session->create(session, "table:T", "type=lsm");
-@endcode
-
-The default type for all schema objects will continue to be btree.
 
 @subsection lsm_tombstones Empty values
 
@@ -127,8 +125,8 @@ reason, applications cannot store records in LSM trees with empty values.
 There are currently some significant limitations in transactional access to
 data stored in LSM trees:
 
-- if an update transaction runs for long enough that the chunk it started
-  writing to has been replaced, its data may not be included in the
+- if an update transaction runs long enough so that the chunk it started
+  writing has been replaced, its data may not be included in the
   checkpoint when that chunk is swapped to "on disk" mode, and thus may not
   become visible to readers of the tree immediately when the transaction
   commits;

@@ -1,12 +1,11 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
 
 #include "wt_internal.h"
-#include "bloom.h"
 
 #define	WT_BLOOM_TABLE_CONFIG "key_format=r,value_format=1t,exclusive=true"
 
@@ -46,7 +45,7 @@ __bloom_init(WT_SESSION_IMPL *session,
 err:	if (bloom->uri != NULL)
 		__wt_free(session, bloom->uri);
 	if (bloom->config != NULL)
-		__wt_free(session, bloom->uri);
+		__wt_free(session, bloom->config);
 	if (bloom->bitstring != NULL)
 		__wt_free(session, bloom->bitstring);
 	if (bloom != NULL)
@@ -117,6 +116,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
+	WT_DECL_RET;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
 	uint64_t size;
 
@@ -124,15 +124,26 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 
 	/* Find the largest key, to get the size of the filter. */
 	cfg[1] = bloom->config;
-	WT_RET(__wt_curfile_open(session, bloom->uri, owner, cfg, &c));
-	WT_RET(c->prev(c));
-	WT_RET(c->get_key(c, &size));
+	c = NULL;
+	WT_ERR(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
+
+	/* XXX Layering violation: bump the cache priority for Bloom filters. */
+	S2BT(session)->evict_priority = (1 << 19);
+
+	WT_ERR(c->prev(c));
+	WT_ERR(c->get_key(c, &size));
+	WT_ERR(c->reset(c));
 
 	bloom->c = c;
-	WT_RET(__bloom_setup(bloom, 0, size, factor, k));
+	WT_ERR(__bloom_setup(bloom, 0, size, factor, k));
 
 	*bloomp = bloom;
 	return (0);
+
+err:	if (c != NULL)
+		(void)c->close(c);
+	(void)__wt_bloom_close(bloom);
+	return (ret);
 }
 
 /*
@@ -161,43 +172,70 @@ __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
 int
 __wt_bloom_finalize(WT_BLOOM *bloom)
 {
-	WT_SESSION *wt_session;
 	WT_CURSOR *c;
+	WT_DECL_RET;
+	WT_ITEM values;
+	WT_SESSION *wt_session;
 	uint64_t i;
 
 	wt_session = (WT_SESSION *)bloom->session;
+	WT_CLEAR(values);
 
 	/*
 	 * Create a bit table to store the bloom filter in.
 	 * TODO: should this call __wt_schema_create directly?
 	 */
 	WT_RET(wt_session->create(wt_session, bloom->uri, bloom->config));
-
 	WT_RET(wt_session->open_cursor(
-	    wt_session, bloom->uri, NULL, "bulk", &c));
+	    wt_session, bloom->uri, NULL, "bulk=bitmap", &c));
+
 	/* Add the entries from the array into the table. */
-	for (i = 0; i < bloom->m; i++) {
-		c->set_value(c, __bit_test(bloom->bitstring, i));
-		WT_RET(c->insert(c));
+	for (i = 0; i < bloom->m; i += values.size) {
+		values.data = bloom->bitstring + (i >> 3);
+		/*
+		 * Shave off some bytes for pure paranoia, in case WiredTiger
+		 * reserves some special sizes. Choose a value so that if
+		 * we do multiple inserts, it will be on an byte boundary.
+		 */
+		values.size = (uint32_t)WT_MIN(bloom->m - i, UINT32_MAX - 128);
+		c->set_value(c, &values);
+		WT_ERR(c->insert(c));
 	}
-	WT_RET(c->close(c));
+
+err:	WT_TRET(c->close(c));
 	__wt_free(bloom->session, bloom->bitstring);
 	bloom->bitstring = NULL;
+
+	return (ret);
+}
+
+/*
+ * __wt_bloom_hash --
+ *	Calculate the hash values for a given key.
+ */
+int
+__wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash)
+{
+	WT_UNUSED(bloom);
+
+	bhash->h1 = __wt_hash_fnv64(key->data, key->size);
+	bhash->h2 = __wt_hash_city64(key->data, key->size);
 
 	return (0);
 }
 
 /*
- * __wt_bloom_get --
- *	Tests whether the given key is in the Bloom filter.
- *	Returns zero if found, WT_NOTFOUND if not.
+ * __wt_bloom_hash_get --
+ *	Tests whether the key (as given by its hash signature) is in the Bloom
+ *	filter.  Returns zero if found, WT_NOTFOUND if not.
  */
 int
-__wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
+__wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
+	int result;
 	uint32_t i;
 	uint64_t h1, h2;
 	uint8_t bit;
@@ -214,37 +252,46 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
 	} else
 		c = bloom->c;
 
-	/*
-	 * This comparison code is complex to avoid calculating the second
-	 * hash if possible.
-	 */
-	h1 = __wt_hash_fnv64(key->data, key->size);
+	h1 = bhash->h1;
+	h2 = bhash->h2;
 
-	/*
-	 * Add 1 to the hash because Wired Tiger tables are 1 based, and the
-	 * original bitstring array was 0 based.
-	 */
-	c->set_key(c, (h1 % bloom->m) + 1);
-	WT_RET(c->search(c));
-	WT_RET(c->get_value(c, &bit));
-	if (bit == 0)
-		return (WT_NOTFOUND);
-	h2 = __wt_hash_city64(key->data, key->size);
-	for (i = 0, h1 += h2; i < bloom->k - 1; i++, h1 += h2) {
+	result = 0;
+	for (i = 0; i < bloom->k; i++, h1 += h2) {
+		/*
+		 * Add 1 to the hash because WiredTiger tables are 1 based and
+		 * the original bitstring array was 0 based.
+		 */
 		c->set_key(c, (h1 % bloom->m) + 1);
 		WT_ERR(c->search(c));
 		WT_ERR(c->get_value(c, &bit));
 
-		if (bit == 0)
-			return (WT_NOTFOUND);
+		if (bit == 0) {
+			result = WT_NOTFOUND;
+			break;
+		}
 	}
-	return (0);
+	WT_ERR(c->reset(c));
+	return (result);
 
 err:	/* Don't return WT_NOTFOUND from a failed search. */
 	if (ret == WT_NOTFOUND)
 		ret = WT_ERROR;
 	__wt_err(bloom->session, ret, "Failed lookup in bloom filter.");
 	return (ret);
+}
+
+/*
+ * __wt_bloom_get --
+ *	Tests whether the given key is in the Bloom filter.
+ *	Returns zero if found, WT_NOTFOUND if not.
+ */
+int
+__wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
+{
+	WT_BLOOM_HASH bhash;
+
+	WT_RET(__wt_bloom_hash(bloom, key, &bhash));
+	return (__wt_bloom_hash_get(bloom, &bhash));
 }
 
 /*

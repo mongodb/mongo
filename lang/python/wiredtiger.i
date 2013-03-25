@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -55,6 +55,10 @@ from packing import pack, unpack
 		(*$1)->flags |= WT_CURSTD_RAW;
 		PyObject_SetAttrString($result, "is_column",
 		    PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
+		PyObject_SetAttrString($result, "key_format",
+		    PyString_InternFromString((*$1)->key_format));
+		PyObject_SetAttrString($result, "value_format",
+		    PyString_InternFromString((*$1)->value_format));
 	}
 }
 
@@ -85,6 +89,7 @@ DESTRUCTOR(__wt_session, close)
 
 /* Don't require empty config strings. */
 %typemap(default) const char *config { $1 = NULL; }
+%typemap(default) WT_CURSOR *to_dup { $1 = NULL; }
 
 /* 
  * Error returns other than WT_NOTFOUND generate an exception.
@@ -153,6 +158,58 @@ SELFHELPER(struct __wt_connection, connection)
 SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
 
+/* Error handling.  Default case: a non-zero return is an error. */
+%exception {
+	$action
+	if (result != 0) {
+		/* We could use PyErr_SetObject for more complex reporting. */
+		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
+		SWIG_fail;
+	}
+}
+
+/* Cursor positioning methods can also return WT_NOTFOUND. */
+%define NOTFOUND_OK(m)
+%exception m {
+	$action
+	if (result != 0 && result != WT_NOTFOUND) {
+		/* We could use PyErr_SetObject for more complex reporting. */
+		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
+		SWIG_fail;
+	}
+}
+%enddef
+
+/* Cursor compare can return any of -1, 0, 1 or WT_NOTFOUND. */
+%define COMPARE_OK(m)
+%exception m {
+	$action
+	if ((result < -1 || result > 1) && result != WT_NOTFOUND) {
+		/* We could use PyErr_SetObject for more complex reporting. */
+		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
+		SWIG_fail;
+	}
+}
+%enddef
+
+NOTFOUND_OK(__wt_cursor::next)
+NOTFOUND_OK(__wt_cursor::prev)
+NOTFOUND_OK(__wt_cursor::remove)
+NOTFOUND_OK(__wt_cursor::search)
+NOTFOUND_OK(__wt_cursor::update)
+
+COMPARE_OK(__wt_cursor::compare)
+COMPARE_OK(__wt_cursor::search_near)
+
+/* Lastly, some methods need no (additional) error checking. */
+%exception __wt_connection::search_near;
+%exception __wt_connection::get_home;
+%exception __wt_connection::is_new;
+%exception __wt_cursor::_set_key;
+%exception __wt_cursor::_set_value;
+%exception wiredtiger_strerror;
+%exception wiredtiger_version;
+
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
 %ignore __wt_cursor::get_key;
@@ -167,6 +224,25 @@ SELFHELPER(struct __wt_cursor, cursor)
 /* SWIG magic to turn Python byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
 
+/* Handle binary data returns from get_key/value -- avoid cstring.i: it creates a list of returns. */
+%typemap(in,numinputs=0) (char **datap, int *sizep) (char *data, int size) { $1 = &data; $2 = &size; }
+%typemap(frearg) (char **datap, int *sizep) "";
+%typemap(argout) (char **datap, int *sizep) {
+	if (*$1)
+		$result = SWIG_FromCharPtrAndSize(*$1, *$2);
+}
+
+/* Handle record number returns from get_recno */
+%typemap(in,numinputs=0) (uint64_t *recnop) (uint64_t recno) { $1 = &recno; }
+%typemap(frearg) (uint64_t *recnop) "";
+%typemap(argout) (uint64_t *recnop) { $result = PyLong_FromUnsignedLongLong(*$1); }
+
+%{
+typedef int int_void;
+%}
+typedef int int_void;
+%typemap(out) int_void { $result = VOID_Object; }
+
 %extend __wt_cursor {
 	/* Get / set keys and values */
 	void _set_key(char *data, int size) {
@@ -176,23 +252,21 @@ SELFHELPER(struct __wt_cursor, cursor)
 		$self->set_key($self, &k);
 	}
 
-	void _set_recno(uint64_t recno) {
+	int_void _set_recno(uint64_t recno) {
 		WT_ITEM k;
 		uint8_t recno_buf[20];
 		size_t size;
-		int ret = wiredtiger_struct_pack($self->session,
-		    recno_buf, sizeof (recno_buf), "r", recno);
-		if (ret == 0)
-			ret = wiredtiger_struct_size($self->session,
-			    &size, "q", recno);
-		if (ret != 0) {
-			SWIG_Python_SetErrorMsg(wtError,
-			    wiredtiger_strerror(ret));
-			return;
-		}
+		int ret;
+		if ((ret = wiredtiger_struct_size($self->session,
+		    &size, "r", recno)) != 0 ||
+		    (ret = wiredtiger_struct_pack($self->session,
+		    recno_buf, sizeof (recno_buf), "r", recno)) != 0)
+			return (ret);
+
 		k.data = recno_buf;
 		k.size = (uint32_t)size;
 		$self->set_key($self, &k);
+		return (ret);
 	}
 
 	void _set_value(char *data, int size) {
@@ -202,69 +276,57 @@ SELFHELPER(struct __wt_cursor, cursor)
 		$self->set_value($self, &v);
 	}
 
-	PyObject *_get_key() {
+	/* Don't return values, just throw exceptions on failure. */
+	int_void _get_key(char **datap, int *sizep) {
 		WT_ITEM k;
 		int ret = $self->get_key($self, &k);
-		if (ret != 0) {
-			SWIG_Python_SetErrorMsg(wtError,
-			    wiredtiger_strerror(ret));
-			return (NULL);
+		if (ret == 0) {
+			*datap = (char *)k.data;
+			*sizep = (int)k.size;
 		}
-		return SWIG_FromCharPtrAndSize(k.data, k.size);
+		return (ret);
 	}
 
-	PyObject *_get_recno() {
+	int_void _get_recno(uint64_t *recnop) {
 		WT_ITEM k;
-		uint64_t r;
 		int ret = $self->get_key($self, &k);
 		if (ret == 0)
 			ret = wiredtiger_struct_unpack($self->session,
-			    k.data, k.size, "q", &r);
-		if (ret != 0) {
-			SWIG_Python_SetErrorMsg(wtError,
-			    wiredtiger_strerror(ret));
-			return (NULL);
-		}
-		return PyLong_FromUnsignedLongLong(r);
+			    k.data, k.size, "q", recnop);
+		return (ret);
 	}
 
-	PyObject *_get_value() {
+	int_void _get_value(char **datap, int *sizep) {
 		WT_ITEM v;
 		int ret = $self->get_value($self, &v);
-		if (ret != 0) {
-			SWIG_Python_SetErrorMsg(wtError,
-			    wiredtiger_strerror(ret));
-			return (NULL);
+		if (ret == 0) {
+			*datap = (char *)v.data;
+			*sizep = (int)v.size;
 		}
-		return SWIG_FromCharPtrAndSize(v.data, v.size);
+		return (ret);
 	}
 
 	/* compare and search_near need special handling. */
-	PyObject *compare(WT_CURSOR *other) {
+	int compare(WT_CURSOR *other) {
 		int cmp = 0;
 		int ret = $self->compare($self, other, &cmp);
-		if (ret != 0) {
-			SWIG_Python_SetErrorMsg(wtError,
-			    wiredtiger_strerror(ret));
-			return (NULL);
-		}
-		return (SWIG_From_int(cmp));
+		/*
+		 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
+		 * colliding with other errors.
+		 */
+		return ((ret != 0) ? ret :
+		    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
 	}
 
-	PyObject *search_near() {
+	int search_near() {
 		int cmp = 0;
 		int ret = $self->search_near($self, &cmp);
-		if (ret != 0 && ret != WT_NOTFOUND) {
-			SWIG_Python_SetErrorMsg(wtError,
-			    wiredtiger_strerror(ret));
-			return (NULL);
-		}
 		/*
 		 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
 		 * colliding with WT_NOTFOUND.
 		 */
-		return (SWIG_From_int((ret != 0) ? ret :
-		    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1));
+		return ((ret != 0) ? ret :
+		    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
 	}
 
 %pythoncode %{
@@ -273,7 +335,10 @@ SELFHELPER(struct __wt_cursor, cursor)
 		
 		@copydoc WT_CURSOR::get_key
 		Returns only the first column.'''
-		return self.get_keys()[0]
+		k = self.get_keys()
+		if len(k) == 1:
+			return k[0]
+		return k
 
 	def get_keys(self):
 		'''get_keys(self) -> (object, ...)
@@ -289,7 +354,10 @@ SELFHELPER(struct __wt_cursor, cursor)
 		
 		@copydoc WT_CURSOR::get_value
 		Returns only the first column.'''
-		return self.get_values()[0]
+		v = self.get_values()
+		if len(v) == 1:
+			return v[0]
+		return v
 
 	def get_values(self):
 		'''get_values(self) -> (object, ...)
@@ -301,6 +369,8 @@ SELFHELPER(struct __wt_cursor, cursor)
 		'''set_key(self) -> None
 		
 		@copydoc WT_CURSOR::set_key'''
+		if len(args) == 1 and type(args[0]) == tuple:
+			args = args[0]
 		if self.is_column:
 			self._set_recno(long(args[0]))
 		else:
@@ -312,6 +382,8 @@ SELFHELPER(struct __wt_cursor, cursor)
 		'''set_value(self) -> None
 		
 		@copydoc WT_CURSOR::set_value'''
+		if len(args) == 1 and type(args[0]) == tuple:
+			args = args[0]
 		# Keep the Python string pinned
 		self._value = pack(self.value_format, *args)
 		self._set_value(self._value)
@@ -322,14 +394,21 @@ SELFHELPER(struct __wt_cursor, cursor)
 		if not hasattr(self, '_iterable'):
 			self._iterable = IterableCursor(self)
 		return self._iterable
+
+	def __getitem__(self, key):
+		'''Python convenience for searching'''
+		self.set_key(key)
+		if self.search() != 0:
+			raise KeyError
+		return self.get_value()
 %}
 };
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;
 %immutable __wt_cursor::uri;
-%immutable __wt_cursor::key_format;
-%immutable __wt_cursor::value_format;
+%ignore __wt_cursor::key_format;
+%ignore __wt_cursor::value_format;
 %immutable __wt_session::connection;
 
 %ignore __wt_buf;
@@ -353,47 +432,6 @@ SELFHELPER(struct __wt_cursor, cursor)
 
 %ignore wiredtiger_extension_init;
 
-/*
- * Error handling.  This comes last so it doesn't interfere with the extension
- * code above.
- * 
- * Default case: a non-zero return is an error.
- */
-%exception {
-	$action
-	if (result != 0) {
-		/* We could use PyErr_SetObject for more complex reporting. */
-		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror(result));
-		SWIG_fail;
-	}
-}
-
-/* Cursor positioning methods can also return WT_NOTFOUND. */
-%define NOTFOUND_OK(m)
-%exception m {
-	$action
-	if (result != 0 && result != WT_NOTFOUND) {
-		/* We could use PyErr_SetObject for more complex reporting. */
-		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror(result));
-		SWIG_fail;
-	}
-}
-%enddef
-
-NOTFOUND_OK(__wt_cursor::next)
-NOTFOUND_OK(__wt_cursor::prev)
-NOTFOUND_OK(__wt_cursor::remove)
-NOTFOUND_OK(__wt_cursor::search)
-NOTFOUND_OK(__wt_cursor::update)
-
-/* Lastly, some methods need no (additional) error checking. */
-%exception __wt_connection::compare;
-%exception __wt_connection::search_near;
-%exception __wt_connection::get_home;
-%exception __wt_connection::is_new;
-%exception wiredtiger_strerror;
-%exception wiredtiger_version;
-
 /* Convert 'int *' to output args for wiredtiger_version */
 %apply int *OUTPUT { int * };
 
@@ -407,27 +445,30 @@ NOTFOUND_OK(__wt_cursor::update)
 ## @}
 
 class stat:
-	""" a set of static defines used by statistics cursor """
-	pass
+	'''keys for statistics cursors'''
 
-class filestat:
-	""" a set of static defines used by statistics cursor """
-	pass
+	class conn:
+		'''keys for cursors on connection statistics'''
+		pass
+
+	class dsrc:
+		'''keys for cursors on data source statistics'''
+		pass
 
 import sys
-# All names starting with 'WT_STAT_file_' are renamed to
-# the wiredtiger.filestat class, those starting with 'WT_STAT_' are
-# renamed to wiredtiger.stat .
+# All names starting with 'WT_STAT_DSRC_' are renamed to
+# the wiredtiger.stat.dsrc class, those starting with 'WT_STAT_CONN' are
+# renamed to wiredtiger.stat.conn class.
 def _rename_with_prefix(prefix, toclass):
 	curmodule = sys.modules[__name__]
 	for name in dir(curmodule):
 		if name.startswith(prefix):
-			shortname = name[len(prefix):]
+			shortname = name[len(prefix):].lower()
 			setattr(toclass, shortname, getattr(curmodule, name))
 			delattr(curmodule, name)
 
-_rename_with_prefix('WT_STAT_file_', filestat)
-_rename_with_prefix('WT_STAT_', stat)
+_rename_with_prefix('WT_STAT_CONN_', stat.conn)
+_rename_with_prefix('WT_STAT_DSRC_', stat.dsrc)
 del _rename_with_prefix
 %}
 

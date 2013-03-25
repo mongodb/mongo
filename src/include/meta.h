@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -39,6 +39,8 @@ struct __wt_ckpt {
 	uintmax_t sec;				/* Timestamp */
 
 	uint64_t ckpt_size;			/* Checkpoint size */
+
+	uint64_t write_gen;			/* Write generation */
 
 	void	*bpriv;				/* Block manager private */
 

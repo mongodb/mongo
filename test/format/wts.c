@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -45,44 +65,50 @@ wts_open(void)
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	const char *ext1, *ext2;
-	char config[512], *end, *p;
-
-	/* If the bzip2 compression module has been built, use it. */
-#define	EXTPATH	"../../ext"
-	ext1 = EXTPATH "compressors/bzip2_compress/.libs/bzip2_compress.so";
-	if (access(ext1, R_OK) != 0) {
-		ext1 = "";
-		g.c_bzip = 0;
-	}
-	ext2 = EXTPATH "/collators/reverse/.libs/reverse_collator.so";
+	char config[2048], *end, *p;
 
 	/*
-	 * Open configuration -- put command line configuration options at the
-	 * end so they can override "standard" configuration.
+	 * Open configuration.
+	 *
+	 * Put configuration file configuration options second to last. Put
+	 * command line configuration options at the end. Do this so they
+	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\",\"%s\"],%s",
-	    g.progname, g.c_cache, ext1, ext2,
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
+	    g.progname, g.c_cache,
+	    REVERSE_PATH,
+	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
+	    (access(RAW_PATH, R_OK) == 0 &&
+	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
+	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret =
 	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open");
+	g.wts_conn = conn;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
+	/*
+	 * Create the object.
+	 *
+	 * Make sure at least 2 internal page per thread can fit in cache.
+	 */
 	maxintlpage = 1U << g.c_intl_page_max;
-	/* Make sure at least 2 internal page per thread can fit in cache. */
 	while (2 * g.c_threads * maxintlpage > g.c_cache << 20)
 		maxintlpage >>= 1;
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
 		maxintlitem = 40;
-	maxleafpage = 1U << g.c_leaf_page_max;
+
 	/* Make sure at least one leaf page per thread can fit in cache. */
+	maxleafpage = 1U << g.c_leaf_page_max;
 	while (g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
 		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
@@ -98,10 +124,6 @@ wts_open(void)
 	    (g.type == ROW) ? "u" : "r",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 
-	if (g.c_bzip)
-		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=\"bzip2_compress\"");
-
 	switch (g.type) {
 	case FIX:
 		p += snprintf(p, (size_t)(end - p),
@@ -111,6 +133,9 @@ wts_open(void)
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
+		if (!g.c_prefix)
+			p += snprintf(p, (size_t)(end - p),
+			    ",prefix_compression=false");
 		if (g.c_reverse)
 			p += snprintf(p, (size_t)(end - p),
 			    ",collator=reverse");
@@ -125,13 +150,58 @@ wts_open(void)
 		break;
 	}
 
+	/* Configure checksums (not configurable from the command line). */
+	switch MMRAND(1, 10) {
+	case 1:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
+		break;
+	case 2:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"off\"");
+		break;
+	default:					/* 80% */
+		p += snprintf(
+		    p, (size_t)(end - p), ",checksum=\"uncompressed\"");
+		break;
+	}
+
+	/* Configure compression. */
+	switch (g.compression) {
+	case COMPRESS_NONE:
+		break;
+	case COMPRESS_BZIP:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"bzip2\"");
+		break;
+	case COMPRESS_LZO:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"LZO1B-6\"");
+		break;
+	case COMPRESS_RAW:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"raw\"");
+		break;
+	case COMPRESS_SNAPPY:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"snappy\"");
+		break;
+	}
+
+	/* Configure internal key truncation. */
+	p += snprintf(
+	    p, (size_t)(end - p), ",internal_key_truncate=%s",
+	    g.c_internal_key_truncation ? "true" : "false");
+
+	/* Configure Btree page key gap. */
+	p += snprintf(p, (size_t)(end - p), ",key_gap=%u", g.c_key_gap);
+
+	/* Configure Btree split page percentage. */
+	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
+
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
-
-	g.wts_conn = conn;
 }
 
 void
@@ -211,8 +281,14 @@ wts_verify(const char *tag)
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== verify start ===============");
 	if ((ret = session->verify(session, g.uri, NULL)) != 0)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== verify stop ===============");
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -258,15 +334,8 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-	/*
-	 * XXX
-	 * WiredTiger only supports file object statistics.
-	 */
-	if (strcmp(g.c_data_source, "file") != 0)
-		goto skip;
-
-	/* File statistics. */
-	fprintf(fp, "\n\n====== File statistics:\n");
+	/* Data source statistics. */
+	fprintf(fp, "\n\n====== Data source statistics:\n");
 	if ((stat_name =
 	    malloc(strlen("statistics:") + strlen(g.uri) + 1)) == NULL)
 		syserr("malloc");
@@ -286,7 +355,7 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-skip:	if ((ret = fclose(fp)) != 0)
+	if ((ret = fclose(fp)) != 0)
 		die(ret, "fclose");
 
 	if ((ret = session->close(session, NULL)) != 0)

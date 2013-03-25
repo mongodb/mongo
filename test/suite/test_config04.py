@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -27,6 +27,7 @@
 
 import os
 import wiredtiger, wttest
+from wiredtiger import stat
 
 # test_config04.py
 #    Individually test config options
@@ -82,10 +83,8 @@ class test_config04(wttest.WiredTigerTestCase):
     def common_cache_size_test(self, sizestr, size):
         self.common_test('cache_size=' + sizestr)
         cursor = self.session.open_cursor('statistics:', None, None)
-        cursor.set_key(wiredtiger.stat.cache_bytes_max)
-        self.assertEqual(cursor.search(), 0)
-        got_cache = cursor.get_values()[2]
-        self.assertEqual(got_cache, size)
+        self.assertEqual(cursor[stat.conn.cache_bytes_max][2], size)
+        cursor.close()
 
     def test_bad_config(self):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

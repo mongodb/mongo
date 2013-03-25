@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -22,7 +22,11 @@ __wt_buf_clear(WT_ITEM *buf)
 	buf->mem = NULL;
 	buf->memsize = 0;
 
-	/* Note: don't clear the flags, the buffer remains marked in-use. */
+	/*
+	 * Note: don't clear the flags, the buffer remains marked for aligned
+	 * use as well as "in-use".
+	 */
+	F_CLR(buf, WT_ITEM_MAPPED);
 }
 
 /*
@@ -37,6 +41,10 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 
 	WT_ASSERT(session, size <= UINT32_MAX);
 
+	/* Clear buffers previously used for mapped returns. */
+	if (F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_buf_clear(buf);
+
 	if (size > buf->memsize) {
 		/*
 		 * Grow the buffer's memory: if the data reference is not set
@@ -47,7 +55,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 			offset = 0;
 			set_data = 1;
 		} else if (buf->data >= buf->mem &&
-		    (uint8_t *)buf->data < (uint8_t *)buf->mem + buf->memsize) {
+		    WT_PTRDIFF(buf->data, buf->mem) < buf->memsize) {
 			offset = WT_PTRDIFF(buf->data, buf->mem);
 			set_data = 1;
 		} else {
@@ -75,8 +83,8 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 int
 __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
-	WT_RET(__wt_buf_grow(session, buf, size));
 	buf->data = buf->mem;
+	WT_RET(__wt_buf_grow(session, buf, size));
 	buf->size = 0;
 
 	return (0);
@@ -132,6 +140,8 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 {
 	void *retp;
 
+	WT_ASSERT(session, !F_ISSET(buf, WT_ITEM_MAPPED));
+
 	/*
 	 * Sometimes we steal a buffer for a different purpose, for example,
 	 * we've read in an overflow item, and now it's going to become a key
@@ -145,12 +155,9 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 	 * the page header, so buf->data references a location past buf->mem.
 	 */
 	if (buf->data != buf->mem) {
-		WT_ASSERT(session,
-		    buf->data > buf->mem &&
-		    (uint8_t *)buf->data <
-		    (uint8_t *)buf->mem + buf->memsize &&
-		    (uint8_t *)buf->data + buf->size <=
-		    (uint8_t *)buf->mem + buf->memsize);
+		WT_ASSERT(session, buf->data > buf->mem &&
+		    WT_PTRDIFF(buf->data, buf->mem) + buf->size <=
+		    buf->memsize);
 		memmove(buf->mem, buf->data, buf->size);
 	}
 
@@ -172,7 +179,8 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 void
 __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
-	__wt_free(session, buf->mem);
+	if (!F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_free(session, buf->mem);
 	__wt_buf_clear(buf);
 }
 
@@ -186,6 +194,10 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 {
 	va_list ap;
 	size_t len;
+
+	/* Clear buffers previously used for mapped returns. */
+	if (F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_buf_clear(buf);
 
 	for (;;) {
 		va_start(ap, fmt);
@@ -219,6 +231,10 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 	va_list ap;
 	size_t len, space;
 	char *p;
+
+	/* Clear buffers previously used for mapped returns. */
+	if (F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_buf_clear(buf);
 
 	for (;;) {
 		va_start(ap, fmt);

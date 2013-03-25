@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -155,7 +155,8 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_KEY_RET))
+		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
 
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -169,12 +170,18 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		} else
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
-		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
-			fmt = "u";
-		ret = __wt_struct_unpackv(
-		    session, cursor->key.data, cursor->key.size, fmt, ap);
+		fmt = LF_ISSET(WT_CURSOR_RAW_OK) ? "u" : cursor->key_format;
+
+		/* Fast path some common cases. */
+		if (strcmp(fmt, "S") == 0)
+			*va_arg(ap, const char **) = cursor->key.data;
+		else if (strcmp(fmt, "u") == 0) {
+			key = va_arg(ap, WT_ITEM *);
+			key->data = cursor->key.data;
+			key->size = cursor->key.size;
+		} else
+			ret = __wt_struct_unpackv(session,
+			    cursor->key.data, cursor->key.size, fmt, ap);
 	}
 
 err:	API_END(session);
@@ -196,6 +203,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt, *str;
 
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
+	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -212,17 +220,14 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		sz = sizeof(cursor->recno);
 	} else {
 		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
-			fmt = "u";
-		if (strcmp(fmt, "S") == 0) {
+		if (LF_ISSET(WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
+			item = va_arg(ap, WT_ITEM *);
+			sz = item->size;
+			cursor->key.data = item->data;
+		} else if (strcmp(fmt, "S") == 0) {
 			str = va_arg(ap, const char *);
 			sz = strlen(str) + 1;
 			cursor->key.data = (void *)str;
-		} else if (strcmp(fmt, "u") == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			sz = item->size;
-			cursor->key.data = (void *)item->data;
 		} else {
 			buf = &cursor->key;
 
@@ -244,10 +249,9 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		    "Key size (%" PRIu64 ") out of range", (uint64_t)sz);
 	cursor->saved_err = 0;
 	cursor->key.size = WT_STORE_SIZE(sz);
-	F_SET(cursor, WT_CURSTD_KEY_SET);
+	F_SET(cursor, WT_CURSTD_KEY_APP);
 	if (0) {
 err:		cursor->saved_err = ret;
-		F_CLR(cursor, WT_CURSTD_KEY_SET);
 	}
 
 	API_END(session);
@@ -261,19 +265,30 @@ int
 __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_DECL_RET;
+	WT_ITEM *value;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
+
+	if (!F_ISSET(cursor, WT_CURSTD_VALUE_APP | WT_CURSTD_VALUE_RET))
+		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
-	ret = __wt_struct_unpackv(session,
-	    cursor->value.data, cursor->value.size, fmt, ap);
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
+
+	/* Fast path some common cases. */
+	if (strcmp(fmt, "S") == 0)
+		*va_arg(ap, const char **) = cursor->value.data;
+	else if (strcmp(fmt, "u") == 0) {
+		value = va_arg(ap, WT_ITEM *);
+		value->data = cursor->value.data;
+		value->size = cursor->value.size;
+	} else
+		ret = __wt_struct_unpackv(session,
+		    cursor->value.data, cursor->value.size, fmt, ap);
+
 	va_end(ap);
 
 err:	API_END(session);
@@ -294,41 +309,45 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	size_t sz;
 	va_list ap;
 
-	CURSOR_API_CALL(cursor, session, set_value, NULL);
-
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
-	/* Fast path some common cases: single strings or byte arrays. */
+	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	F_CLR(cursor, WT_CURSTD_VALUE_SET);
+
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
+
+	/* Fast path some common cases: single strings, byte arrays and bits. */
 	if (strcmp(fmt, "S") == 0) {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
 		cursor->value.data = str;
-	} else if (strcmp(fmt, "u") == 0) {
+	} else if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;
-	} else {
+	} else if (strcmp(fmt, "t") == 0 ||
+	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0)) {
+		sz = 1;
 		buf = &cursor->value;
-		ret = __wt_struct_sizev(session, &sz, cursor->value_format, ap);
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
+	} else {
+		WT_ERR(
+		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
 		va_end(ap);
-		WT_ERR(ret);
 		va_start(ap, cursor);
-		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
-		    (ret = __wt_struct_packv(session, buf->mem, sz,
-		    cursor->value_format, ap)) != 0) {
-			cursor->saved_err = ret;
-			F_CLR(cursor, WT_CURSTD_VALUE_SET);
-			goto err;
-		}
-		cursor->value.data = buf->mem;
+		buf = &cursor->value;
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
+		    cursor->value_format, ap));
 	}
-	F_SET(cursor, WT_CURSTD_VALUE_SET);
+	F_SET(cursor, WT_CURSTD_VALUE_APP);
 	cursor->value.size = WT_STORE_SIZE(sz);
-	va_end(ap);
 
-err:	API_END(session);
+	if (0) {
+err:		cursor->saved_err = ret;
+	}
+	va_end(ap);
+	API_END(session);
 }
 
 /*
@@ -365,7 +384,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_free(session, cursor->uri);
 	__wt_free(session, cursor);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -400,18 +419,14 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
  */
 int
 __wt_cursor_dup(WT_SESSION_IMPL *session,
-    WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
+    WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_ITEM key;
-	WT_SESSION *wt_session;
-
-	wt_session = &session->iface;
 
 	/* Open a new cursor with the same URI. */
-	WT_ERR(wt_session->open_cursor(
-	    wt_session, to_dup->uri, NULL, config, &cursor));
+	WT_ERR(__wt_open_cursor(session, to_dup->uri, NULL, cfg, &cursor));
 
 	/*
 	 * Get a copy of the cursor's raw key, and set it in the new cursor,
@@ -427,7 +442,7 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (cursor != NULL)
-			(void)cursor->close(cursor);
+			WT_TRET(cursor->close(cursor));
 		cursor = NULL;
 	}
 

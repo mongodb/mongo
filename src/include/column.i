@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -58,8 +58,8 @@ __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
  *	Search a column-store insert list, creating a skiplist stack as we go.
  */
 static inline WT_INSERT *
-__col_insert_search(
-    WT_INSERT_HEAD *inshead, WT_INSERT ***ins_stack, uint64_t recno)
+__col_insert_search(WT_INSERT_HEAD *inshead,
+    WT_INSERT ***ins_stack, WT_INSERT **next_stack, uint64_t recno)
 {
 	WT_INSERT **insp, *ret_ins;
 	uint64_t ins_recno;
@@ -71,9 +71,12 @@ __col_insert_search(
 
 	/* Fast path appends. */
 	if (recno >= WT_INSERT_RECNO(ret_ins)) {
-		for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
-			ins_stack[i] = (inshead->tail[i] != NULL) ?
+		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
+			ins_stack[i] = (i == 0) ? &ret_ins->next[0] :
+			    (inshead->tail[i] != NULL) ?
 			    &inshead->tail[i]->next[i] : &inshead->head[i];
+			next_stack[i] = NULL;
+		}
 		return (ret_ins);
 	}
 
@@ -82,22 +85,26 @@ __col_insert_search(
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
-		if (*insp == NULL) {
+		if ((ret_ins = *insp) == NULL) {
+			next_stack[i] = NULL;
 			ins_stack[i--] = insp--;
 			continue;
 		}
 
-		ret_ins = *insp;
 		ins_recno = WT_INSERT_RECNO(ret_ins);
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 
 		if (cmp > 0)			/* Keep going at this level */
-			insp = &(*insp)->next[i];
+			insp = &ret_ins->next[i];
 		else if (cmp == 0)		/* Exact match: return */
-			for (; i >= 0; i--)
+			for (; i >= 0; i--) {
+				next_stack[i] = ret_ins->next[i];
 				ins_stack[i] = &ret_ins->next[i];
-		else				/* Drop down a level */
+			}
+		else {				/* Drop down a level */
+			next_stack[i] = ret_ins;
 			ins_stack[i--] = insp--;
+		}
 	}
 	return (ret_ins);
 }

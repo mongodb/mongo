@@ -28,7 +28,7 @@ The \c wt tool supports several commands.
 
 <hr>
 @section util_backup wt backup
-Perform a hot backup of a database or set of database objects.
+Perform a hot backup of a database or set of data sources.
 
 The \c backup command performs a hot backup of the database, copying the
 database files to a \c specified directory, which can be subsequently
@@ -45,7 +45,20 @@ The following are command-specific options for the \c backup command:
 @par <code>-t uri</code>
 By default, the \c backup command does a hot backup of the entire
 database; the \c -t option changes the \c backup command to do a hot
-backup of only the named objects.
+backup of only the named data sources.
+
+<hr>
+@section util_compact wt compact
+Compact a table or file.
+
+The \c compact command attempts to rewrite the specified table or file
+to consume less disk space.
+
+@subsection util_compact_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] compact uri</code>
+
+@subsection util_compact_options Options
+The \c compact command has no command-specific options.
 
 <hr>
 @section util_create wt create
@@ -93,8 +106,9 @@ See @subpage dump_formats for details of the dump file formats.
 The following are command-specific options for the \c dump command:
 
 @par <code>-c</code>
-By default, the \c dump command opens the most recent version of the object;
-the \c -c option changes the \c dump command to open the named checkpoint.
+By default, the \c dump command opens the most recent version of the data
+source; the \c -c option changes the \c dump command to open the named
+checkpoint.
 
 @par <code>-f</code>
 By default, the \c dump command output is written to the standard output;
@@ -108,31 +122,12 @@ Dump all characters in a hexadecimal encoding (the default is to leave
 printable characters unencoded).
 
 <hr>
-@section util_dumpfile wt dumpfile
-Dump a file in a debugging format.
-
-The \c dumpfile command dumps the specified physical file in a non-portable,
-debugging format, exiting success if the file is correct, and failure if the
-file is corrupted.
-
-@subsection util_dumpfile_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dumpfile [-f output] file</code>
-
-@subsection util_dumpfile_options Options
-The following are command-specific options for the \c dumpfile command:
-
-@par <code>-f</code>
-By default, the \c dumpfile command output is written to the standard
-output; the \c -f option re-directs the output to the specified
-file.
-
-<hr>
 @section util_list wt list
 List the tables and files in the database.
 
-By default, the \c list command prints out the tables and files stored
-in the database.  If an object name is specified as an argument, only
-information about that object is printed.
+By default, the \c list command prints out the tables and files stored in
+the database.  If a URI is specified as an argument, only information about
+that data source is printed.
 
 @subsection util_list_synopsis Synopsis
 <code>wt [-Vv] [-C config] [-h directory] list [-cv] [uri]</code>
@@ -141,11 +136,11 @@ information about that object is printed.
 The following are command-specific options for the \c list command:
 
 @par <code>-c</code>
-If the \c -c option is specified, the object's checkpoints are printed
+If the \c -c option is specified, the data source's checkpoints are printed
 in a human-readable format.
 
 @par <code>-v</code>
-If the \c -v option is specified, the object's complete schema table
+If the \c -v option is specified, the data source's complete schema table
 value is printed.
 
 <hr>
@@ -169,9 +164,9 @@ The following are command-specific options for the \c load command:
 
 @par <code>-a</code>
 If the \c -a option is specified, record number keys in the input are
-ignored and the data is appended to the object and assigned new record
-number keys.  The \c -a option is only applicable when loading an object
-where the primary key is a record number.
+ignored and the data is appended to the data source and assigned new record
+number keys.  The \c -a option is only applicable when loading into a
+column store.
 
 @par <code>-f</code>
 By default, the \c load command reads from the standard input; the \c
@@ -179,19 +174,17 @@ By default, the \c load command reads from the standard input; the \c
 
 @par <code>-r</code>
 By default, the \c load command uses the table or file name taken from
-the input; the \c -r option renames the object.
+the input; the \c -r option renames the data source.
 
 @par <code>-o</code>
 By default, input data will not overwrite existing data where the
-key/value pair already exists in the object, and the attempt will fail;
-the \c -o option causes the \c load command to overwrite already
+key/value pair already exists in the data source, and the attempt will
+fail; the \c -o option causes the \c load command to overwrite already
 existing data.
 
 Additionally, \c uri and \c configuration pairs may be specified to the
-\c load command.  Each of these pairs may be used to modify the
-configuration of an object in the table or file.  For each of the pairs,
-the configuration string will be appended to the WT_SESSION::create call
-for the object matching the uri.
+\c load command.  Each of these pairs will be appended to the configuration
+string from the dump header passed to the WT_SESSION::create call.
 
 <hr>
 @section util_loadtext wt loadtext
@@ -245,10 +238,8 @@ Display the log in a printable format.
 Read records from a table or file.
 
 The \c read command prints out the records associated with the specified
-keys from the specified object.
-
-The object must be configured with string or record number keys and
-string values.
+keys from the specified data source.  The data source must be configured
+with string or record number keys and string values.
 
 The \c read command exits non-zero if a specified record is not found.
 
@@ -274,7 +265,7 @@ The \c rename command has no command-specific options.
 @section util_salvage wt salvage
 Recover data from a corrupted file.
 
-The \c salvage command salvages the specified object, discarding any
+The \c salvage command salvages the specified data source, discarding any
 data that cannot be recovered.  Underlying files are re-written in
 place, overwriting the original file contents.
 
@@ -291,10 +282,10 @@ The \c -F option forces the salvage of the file, regardless.
 
 <hr>
 @section util_stat wt stat
-Display database or object statistics.
+Display database or data source statistics.
 
 The \c stat command outputs run-time statistics for the WiredTiger
-engine, or, if specified, for the command-line object.
+engine, or, if specified, for the URI on the command-line.
 
 @subsection util_stat_synopsis Synopsis
 <code>wt [-Vv] [-C config] [-h directory] stat [uri]</code>
@@ -307,8 +298,8 @@ The \c stat command has no command-specific options.
 Upgrade a table or file.
 
 The \c upgrade command upgrades the specified table or file, exiting
-success if the object up-to-date, and failure if the object cannot be
-upgraded.
+success if the data source is up-to-date, and failure if the data source
+cannot be upgraded.
 
 @subsection util_upgrade_synopsis Synopsis
 <code>wt [-Vv] [-C config] [-h directory] upgrade uri</code>
@@ -321,7 +312,8 @@ The \c upgrade command has no command-specific options.
 Check the structural integrity of a table or file.
 
 The \c verify command verifies the specified table or file, exiting
-success if the object is correct, and failure if the object is corrupted.
+success if the data source is correct, and failure if the data source is
+corrupted.
 
 @subsection util_verify_synopsis Synopsis
 <code>wt [-Vv] [-C config] [-h directory] verify uri</code>
@@ -333,15 +325,14 @@ The \c verify command has no command-specific options.
 @section util_write wt write
 Write records to a table or file.
 
-The \c write command stores records into the specified object.
-
-The object must be configured with string or record number keys and
+The \c write command stores records into the specified data source.
+The data source must be configured with string or record number keys and
 string values.
 
 If the \c write command is called with the \c -a option, each
 command-line argument is a single value to be appended to the specified
-column-store object.  If the \c write command is not called with the \c
--a option, the command-line arguments are key/value pairs.
+column-store data source.  If the \c write command is not called with
+the \c -a option, the command-line arguments are key/value pairs.
 
 Attempting to overwrite an already existing record will fail.
 
@@ -356,7 +347,7 @@ wt [-Vv] [-C config] [-h directory] write [-o] uri key value ...
 The following are command-specific options for the \c write command:
 
 @par <code>-a</code>
-Append each value as a new record in the object.
+Append each value as a new record in the data source.
 
 @par <code>-o</code>
 By default, attempting to overwrite an already existing record will

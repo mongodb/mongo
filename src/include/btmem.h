@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -18,27 +18,41 @@ struct __wt_page_header {
 	 */
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
-	uint32_t size;			/* 08-11: page size */
-
-	union {
-		uint32_t entries;	/* 12-15: number of cells on page */
-		uint32_t datalen;	/* 12-15: overflow data length */
-	} u;
-
-	uint8_t type;			/* 16: page type */
+	/*
+	 * We maintain page write-generations in the non-transactional case
+	 * as that's how salvage can determine the most recent page between
+	 * pages overlapping the same key range.
+	 */
+	uint64_t write_gen;		/* 08-15: write generation */
 
 	/*
-	 * End the WT_PAGE_HEADER structure with 3 bytes of padding: it wastes
-	 * space, but it leaves the WT_PAGE_HEADER structure 32-bit aligned and
-	 * having a small amount of space to play with in the future can't hurt.
+	 * The page's in-memory size isn't rounded or aligned, it's the actual
+	 * number of bytes the disk-image consumes when instantiated in memory.
 	 */
-	uint8_t unused[3];		/* 17-19: unused padding */
+	uint32_t mem_size;		/* 16-19: in-memory page size */
+
+	union {
+		uint32_t entries;	/* 20-23: number of cells on page */
+		uint32_t datalen;	/* 20-23: overflow data length */
+	} u;
+
+	uint8_t type;			/* 24: page type */
+
+#define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
+	uint8_t flags;			/* 25: flags */
+
+	/*
+	 * End the structure with 2 bytes of padding: it wastes space, but it
+	 * leaves the structure 32-bit aligned and having a few bytes to play
+	 * with in the future can't hurt.
+	 */
+	uint8_t unused[2];		/* 26-27: unused padding */
 };
 /*
  * WT_PAGE_HEADER_SIZE is the number of bytes we allocate for the structure: if
  * the compiler inserts padding it will break the world.
  */
-#define	WT_PAGE_HEADER_SIZE		20
+#define	WT_PAGE_HEADER_SIZE		28
 
 /*
  * The block-manager specific information immediately follows the WT_PAGE_DISK
@@ -166,6 +180,7 @@ struct __wt_page_modify {
 #define	WT_TRK_JUST_ADDED	0x004	/* Object added this reconciliation */
 #define	WT_TRK_OBJECT		0x008	/* Slot set (not empty) */
 #define	WT_TRK_ONPAGE		0x010	/* Object was referenced from a page */
+#define	WT_TRK_OVFL_VALUE	0x020	/* Cached deleted overflow value */
 		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
@@ -270,7 +285,7 @@ struct __wt_page {
 	 * The read-generation is not declared volatile: read-generation is set
 	 * a lot (on every access), and we don't want to write it that much.
 	 */
-	 uint64_t read_gen;
+	uint64_t read_gen;
 
 	/*
 	 * In-memory pages optionally reference a number of entries originally
@@ -278,10 +293,7 @@ struct __wt_page {
 	 */
 	uint32_t entries;
 
-	/*
-	 * Memory attached to the page (although not exact or complete), used
-	 * to force eviction of a page tying too much memory down.
-	 */
+	/* Memory attached to the page. */
 	uint32_t memory_footprint;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
@@ -295,7 +307,8 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_EVICT_LRU	0x02	/* Page is on the LRU queue */
+#define	WT_PAGE_DISK_NOT_ALLOC	0x02	/* Ignore disk image on page discard */
+#define	WT_PAGE_EVICT_LRU	0x04	/* Page is on the LRU queue */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -316,34 +329,40 @@ struct __wt_page {
  *
  * WT_REF_DISK:
  *	The initial setting before a page is brought into memory, and set as a
- * result of page eviction; the page is on disk, and must be read into memory
- * before use.  WT_REF_DISK has a value of 0 (the default state after allocating
- * cleared memory).
+ *	result of page eviction; the page is on disk, and must be read into
+ *	memory before use.  WT_REF_DISK has a value of 0 (the default state
+ *	after allocating cleared memory).
  *
  * WT_REF_DELETED:
  *	The page is on disk, but has been deleted from the tree; we can delete
- * row-store leaf pages without reading them if they don't reference overflow
- * items.
+ *	row-store leaf pages without reading them if they don't reference
+ *	overflow items.
  *
  * WT_REF_EVICT_FORCE:
- *	Set by eviction when a page is awaiting forced eviction; prevents a page
- * from being evicted multiple times concurrently.
+ *	An application thread has selected this page for eviction. No other
+ *	hazard references should be granted. If eviction fails, the eviction
+ *	server should set the state back to WT_REF_MEM.
  *
  * WT_REF_EVICT_WALK:
- *	The next page to be walked for LRU eviction.  This page is available for
- * reads but not eviction.
+ *	The next page to be walked for LRU eviction.  This page is available
+ *	for reads but not eviction.
  *
  * WT_REF_LOCKED:
- *	Set by eviction; an eviction thread has selected this page or a parent
- * for eviction.  Once hazard references are checked, the page will be evicted.
+ *	Locked for exclusive access.  In eviction, this page or a parent has
+ *	been selected for eviction; once hazard pointers are checked, the page
+ *	will be evicted.  When reading a page that was previously deleted, it
+ *	is locked until the page is in memory with records marked deleted.  The
+ *	thread that set the page to WT_REF_LOCKED has exclusive access, no
+ *	other thread may use the WT_REF until the state is changed.
  *
  * WT_REF_MEM:
  *	Set by a reading thread once the page has been read from disk; the page
- * is in the cache and the page reference is OK.
+ *	is in the cache and the page reference is OK.
  *
  * WT_REF_READING:
- *	Set by a reading thread before reading a page from disk; other readers
- * of the page wait until the read completes.
+ *	Set by a reading thread before reading an ordinary page from disk;
+ *	other readers of the page wait until the read completes.  Sync can
+ *	safely skip over such pages: they are clean by definition.
  *
  * The life cycle of a typical page goes like this: pages are read into memory
  * from disk and their state set to WT_REF_MEM.  When the page is selected for
@@ -354,21 +373,21 @@ struct __wt_page {
  * because the page was busy, page state is reset to WT_REF_MEM.
  *
  * Readers check the state field and if it's WT_REF_MEM, they set a hazard
- * reference to the page, flush memory and re-confirm the page state.  If the
+ * pointer to the page, flush memory and re-confirm the page state.  If the
  * page state is unchanged, the reader has a valid reference and can proceed.
  *
  * When an evicting thread wants to discard a page from the tree, it sets the
- * WT_REF_LOCKED state, flushes memory, then checks hazard references.  If a
- * hazard reference is found, state is reset to WT_REF_MEM, restoring the page
- * to the readers.  If the evicting thread does not find a hazard reference,
+ * WT_REF_LOCKED state, flushes memory, then checks hazard pointers.  If a
+ * hazard pointer is found, state is reset to WT_REF_MEM, restoring the page
+ * to the readers.  If the evicting thread does not find a hazard pointer,
  * the page is evicted.
  */
 enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
-	WT_REF_EVICT_FORCE,		/* Page is awaiting force eviction */
+	WT_REF_EVICT_FORCE,		/* Page is ready for forced eviction */
 	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
-	WT_REF_LOCKED,			/* Page being evicted */
+	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
 	WT_REF_READING			/* Page being read */
 };

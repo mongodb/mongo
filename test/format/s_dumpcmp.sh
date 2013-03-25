@@ -32,13 +32,25 @@ if test $# -ne 0; then
 	exit 1
 fi
 
-revext="$top/ext/collators/reverse/.libs/reverse_collator.so"
-bzext="$top/ext/compressors/bzip2_compress/.libs/bzip2_compress.so"
-if test -e $bzext ; then
-        ext="\"$revext\",\"$bzext\""
-else
-        ext="\"$revext\""
+ext="\"$top/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so\""
+
+bzip2_ext="$top/ext/compressors/bzip2/.libs/libwiredtiger_bzip2.so"
+if test -e $bzip2_ext ; then
+        ext="$ext,\"$bzip2_ext\""
 fi
+lzo_ext=".libs/lzo_compress.so"
+if test -e $lzo_ext ; then
+        ext="$ext,\"$lzo_ext\""
+fi
+raw_ext=".libs/raw_compress.so"
+if test -e $raw_ext ; then
+        ext="$ext,\"$raw_ext\""
+fi
+snappy_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
+if test -e $snappy_ext ; then
+        ext="$ext,\"$snappy_ext\""
+fi
+
 config='extensions=['$ext']'
 
 $top/wt -h RUNDIR -C "$config" dump $wt_name |

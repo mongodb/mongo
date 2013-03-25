@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -218,9 +218,7 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 
     def check(self, uri, value):
         cursor = self.session.open_cursor(uri, None, "checkpoint=checkpoint-1")
-        cursor.set_key(key_populate(cursor, 10))
-        cursor.search()
-        self.assertEquals(cursor.get_value(), value)
+        self.assertEquals(cursor[key_populate(cursor, 10)], value)
         cursor.close()
 
     def test_checkpoint_target(self):
@@ -303,9 +301,7 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
             # Verify the "last" checkpoint sees the correct value.
             cursor = self.session.open_cursor(
                 uri, None, "checkpoint=WiredTigerCheckpoint")
-            cursor.set_key(key_populate(cursor, 10))
-            cursor.search()
-            self.assertEquals(cursor.get_value(), value)
+            self.assertEquals(cursor[key_populate(cursor, 10)], value)
             # Don't close the checkpoint cursor, we want it to remain open until
             # the test completes.
 
@@ -381,8 +377,8 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key");
-        cursor.set_value("value");
+        cursor.set_key("key")
+        cursor.set_value("value")
         cursor.insert()
         self.session.checkpoint()
 
@@ -398,8 +394,8 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key");
-        cursor.set_value("value");
+        cursor.set_key("key")
+        cursor.set_value("value")
         cursor.insert()
         self.session.checkpoint('name=ckpt')
 

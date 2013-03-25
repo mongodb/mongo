@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -158,7 +158,7 @@ class test_base05(wttest.WiredTigerTestCase):
         create_args = 'key_format=S,value_format=S,' + self.config_string()
         self.session_create("table:" + self.table_name1, create_args)
         self.pr('creating cursor')
-        cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
+        cursor = self.session.open_cursor('table:' + self.table_name1)
         numbers = {}
         for i in range(0, self.nentries):
             numbers[i] = i

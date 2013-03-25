@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -100,8 +100,18 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	if (id == txn->id)
 		return (1);
 
-	/* Read-uncommitted transactions see all other changes. */
-	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED)
+	/*
+	 * Read-uncommitted transactions see all other changes.
+	 *
+	 * All metadata reads are at read-uncommitted isolation.  That's
+	 * because once a schema-level operation completes, subsequent
+	 * operations must see the current version of checkpoint metadata, or
+	 * they may try to read blocks that may have been freed from a file.
+	 * Metadata updates use non-transactional techniques (such as the
+	 * schema and metadata locks) to protect access to in-flight updates.
+	 */
+	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    S2BT(session) == session->metafile)
 		return (1);
 
 	/*
@@ -144,6 +154,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
 static inline WT_UPDATE *
 __wt_txn_read_skip(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
 {
+	*skipp = 0;
 	while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 		if (upd->txnid != WT_TXN_ABORTED)
 			*skipp = 1;
@@ -179,7 +190,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
-				WT_BSTAT_INCR(session, update_conflict);
+				WT_DSTAT_INCR(session, txn_update_conflict);
 				return (WT_DEADLOCK);
 			}
 			upd = upd->next;
@@ -264,10 +275,9 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
-	    txn->isolation == TXN_ISO_SNAPSHOT)) {
-		__wt_txn_get_snapshot(session, WT_TXN_NONE);
-		txn_state->snap_min = txn->snap_min;
-	} else if (!F_ISSET(txn, TXN_RUNNING))
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		__wt_txn_get_snapshot(session, WT_TXN_NONE, WT_TXN_NONE);
+	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = txn_global->current;
 }
 
@@ -286,8 +296,50 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 
 	/* Release the snap_min ID we put in the global table. */
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    !F_ISSET(txn, TXN_RUNNING)) {
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
 		__wt_txn_release_snapshot(session);
+	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = WT_TXN_NONE;
-	}
+}
+
+/*
+ * __wt_txn_am_oldest --
+ *	Am I the oldest transaction in the system?
+ */
+static inline int
+__wt_txn_am_oldest(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *s;
+	uint32_t i, session_cnt;
+	wt_txnid_t id, my_id;
+
+	/* Cache the result: if we're the oldest, don't keep checking. */
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_OLDEST))
+		return (1);
+
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
+
+	/*
+	 * Use this slightly convoluted way to get our ID, in case session->txn
+	 * has been hijacked for eviction.
+	 */
+	s = &txn_global->states[session->id];
+	if ((my_id = s->id) == WT_TXN_NONE)
+		return (0);
+
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (i = 0, s = txn_global->states;
+	    i < session_cnt;
+	    i++, s++)
+		if ((id = s->id) != WT_TXN_NONE && TXNID_LT(id, my_id))
+			return (0);
+
+	F_SET(txn, TXN_OLDEST);
+	return (1);
 }

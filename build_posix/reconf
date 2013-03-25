@@ -45,7 +45,7 @@ sh ./makemake
 
 # From here on, work in the top of the tree
 cd ..
-autoreconf --install
+autoreconf --install --warnings=all
 
 # Make sure any missing files are writable
 chmod 755 build_posix/gnu-support/*

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -45,14 +45,15 @@ __lsm_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
  */
 static int
 __lsm_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
-    const char *obj, const char *cfg[], WT_CURSOR **new_cursor)
+    const char *obj, WT_CURSOR *owner, const char *cfg[],
+    WT_CURSOR **new_cursor)
 {
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	WT_UNUSED(dsrc);
 
-	return (__wt_clsm_open(session, obj, cfg, new_cursor));
+	return (__wt_clsm_open(session, obj, owner, cfg, new_cursor));
 }
 
 /*
@@ -141,7 +142,7 @@ __wt_lsm_cleanup(WT_CONNECTION *wt_conn)
 
 	if ((ret = __wt_schema_get_source(session, "lsm:", &dsrc)) == 0) {
 		lsm_dsrc = (WT_LSM_DATA_SOURCE *)dsrc;
-		__wt_rwlock_destroy(session, &lsm_dsrc->rwlock);
+		ret = __wt_rwlock_destroy(session, &lsm_dsrc->rwlock);
 		__wt_free(session, dsrc);
 	}
 	if (ret == WT_NOTFOUND)

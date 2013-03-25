@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -45,7 +45,7 @@ __curbackup_next(WT_CURSOR *cursor)
 	cb->iface.key.size = WT_STORE_SIZE(strlen(cb->list[cb->next]) + 1);
 	++cb->next;
 
-	F_SET(cursor, WT_CURSTD_KEY_SET);
+	F_SET(cursor, WT_CURSTD_KEY_RET);
 
 err:	API_END(session);
 	return (ret);
@@ -59,6 +59,7 @@ static int
 __curbackup_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BACKUP *cb;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
@@ -67,8 +68,8 @@ __curbackup_reset(WT_CURSOR *cursor)
 	cb->next = 0;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-	API_END(session);
-	return (0);
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -100,7 +101,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	    tret = __backup_stop(session));		/* Stop the backup. */
 	WT_TRET(tret);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -112,37 +113,21 @@ int
 __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,			/* get-key */
-		(int (*)		/* get-value */
-		    (WT_CURSOR *, ...))__wt_cursor_notsup,
-		(void (*)		/* set-key */
-		    (WT_CURSOR *, ...))__wt_cursor_notsup,
-		(void (*)		/* set-value */
-		    (WT_CURSOR *, ...))__wt_cursor_notsup,
-		NULL,			/* compare */
-		__curbackup_next,
-		__wt_cursor_notsup,	/* prev */
-		__curbackup_reset,	/* reset */
-		__wt_cursor_notsup,	/* search */
-		(int (*)		/* search-near */
-		    (WT_CURSOR *, int *))__wt_cursor_notsup,
-		__wt_cursor_notsup,	/* insert */
-		__wt_cursor_notsup,	/* update */
-		__wt_cursor_notsup,	/* remove */
-		__curbackup_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    NULL,			/* get-key */
+	    __wt_cursor_notsup,		/* get-value */
+	    __wt_cursor_notsup,		/* set-key */
+	    __wt_cursor_notsup,		/* set-value */
+	    NULL,			/* compare */
+	    __curbackup_next,		/* next */
+	    __wt_cursor_notsup,		/* prev */
+	    __curbackup_reset,		/* reset */
+	    __wt_cursor_notsup,		/* search */
+	    __wt_cursor_notsup,		/* search-near */
+	    __wt_cursor_notsup,		/* insert */
+	    __wt_cursor_notsup,		/* update */
+	    __wt_cursor_notsup,		/* remove */
+	    __curbackup_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_BACKUP *cb;
 	WT_DECL_RET;
@@ -155,6 +140,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 
 	cursor->key_format = "S";	/* Return the file names as the key. */
+	cursor->value_format = "";	/* No value. */
 
 	/*
 	 * Start the backup and fill in the cursor's list.  Acquire the API
@@ -221,10 +207,10 @@ __backup_start(
 	conn->ckpt_backup = 1;
 
 err:	if (bfp != NULL)
-		(void)fclose(bfp);
+		WT_TRET(fclose(bfp) == 0 ? 0 : __wt_errno());
 
 	if (ret != 0)
-		(void)__backup_file_remove(session);
+		WT_TRET(__backup_file_remove(session));
 
 	return (ret);
 }
@@ -470,14 +456,19 @@ __backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
 		WT_ERR_TEST(
 		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
 
-		/* Save the file name. */
-		WT_ERR(__wt_config_getones(session, value, "filename", &cval));
-		if (cval.len > 0) {
-			WT_ERR(__wt_buf_fmt(
-			    session, tmp, "%.*s", (int)cval.len, cval.str));
+		/* Save the source URI, if it is a file. */
+		WT_ERR(__wt_config_getones(session, value, "source", &cval));
+		if (cval.len > strlen("file:") &&
+		    WT_PREFIX_MATCH(cval.str, "file:")) {
+			WT_ERR(__wt_buf_fmt(session, tmp, "%.*s",
+			    (int)(cval.len - strlen("file:")),
+			    cval.str + strlen("file:")));
 			WT_ERR(__backup_list_append(
-			    session, cb, (char *)tmp->data));
-		}
+			    session, cb, (const char *)tmp->data));
+		} else
+			WT_ERR_MSG(session, EINVAL,
+			    "%s: unknown data source '%.*s'",
+			    (const char *)tmp->data, (int)cval.len, cval.str);
 	}
 
 err:	__wt_scr_free(&tmp);
@@ -498,7 +489,7 @@ __backup_file_create(WT_SESSION_IMPL *session, FILE **fpp)
 
 	/* Open the hot backup file. */
 	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
-	WT_ERR_TEST((*fpp = fopen(path, "w")) == NULL, WT_NOTFOUND);
+	WT_ERR_TEST((*fpp = fopen(path, "w")) == NULL, __wt_errno());
 
 err:	__wt_free(session, path);
 	return (ret);

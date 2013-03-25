@@ -1,4 +1,4 @@
-# Doxyfile 1.8.1.2
+# Doxyfile 1.8.2
 
 # This file describes the settings to be used by the documentation system
 # doxygen (www.doxygen.org) for a project
@@ -136,7 +136,9 @@ FULL_PATH_NAMES        = NO
 # only done if one of the specified strings matches the left-hand part of 
 # the path. The tag can be used to show relative paths in the file list. 
 # If left blank the directory from which doxygen is run is used as the 
-# path to strip.
+# path to strip. Note that you specify absolute paths here, but also 
+# relative paths, which will be relative from the directory where doxygen is 
+# started.
 
 STRIP_FROM_PATH        = 
 
@@ -255,14 +257,15 @@ OPTIMIZE_FOR_FORTRAN   = NO
 OPTIMIZE_OUTPUT_VHDL   = NO
 
 # Doxygen selects the parser to use depending on the extension of the files it 
-# parses. With this tag you can assign which parser to use for a given extension. 
-# Doxygen has a built-in mapping, but you can override or extend it using this 
-# tag. The format is ext=language, where ext is a file extension, and language 
-# is one of the parsers supported by doxygen: IDL, Java, Javascript, CSharp, C, 
-# C++, D, PHP, Objective-C, Python, Fortran, VHDL, C, C++. For instance to make 
-# doxygen treat .inc files as Fortran files (default is PHP), and .f files as C 
-# (default is Fortran), use: inc=Fortran f=C. Note that for custom extensions 
-# you also need to set FILE_PATTERNS otherwise the files are not read by doxygen.
+# parses. With this tag you can assign which parser to use for a given 
+# extension. Doxygen has a built-in mapping, but you can override or extend it 
+# using this tag. The format is ext=language, where ext is a file extension, 
+# and language is one of the parsers supported by doxygen: IDL, Java, 
+# Javascript, CSharp, C, C++, D, PHP, Objective-C, Python, Fortran, VHDL, C, 
+# C++. For instance to make doxygen treat .inc files as Fortran files (default 
+# is PHP), and .f files as C (default is Fortran), use: inc=Fortran f=C. Note 
+# that for custom extensions you also need to set FILE_PATTERNS otherwise the 
+# files are not read by doxygen.
 
 EXTENSION_MAPPING      = 
 
@@ -274,6 +277,13 @@ EXTENSION_MAPPING      =
 # Disable only in case of backward compatibilities issues.
 
 MARKDOWN_SUPPORT       = NO
+
+# When enabled doxygen tries to link words that correspond to documented classes, 
+# or namespaces to their corresponding documentation. Such a link can be 
+# prevented in individual cases by by putting a % sign in front of the word or 
+# globally by setting AUTOLINK_SUPPORT to NO.
+
+AUTOLINK_SUPPORT       = YES
 
 # If you use STL classes (i.e. std::string, std::vector, etc.) but do not want 
 # to include (a tag file for) the STL sources as input, then you should 
@@ -295,11 +305,11 @@ CPP_CLI_SUPPORT        = NO
 
 SIP_SUPPORT            = NO
 
-# For Microsoft's IDL there are propget and propput attributes to indicate getter 
-# and setter methods for a property. Setting this option to YES (the default) 
-# will make doxygen replace the get and set methods by a property in the 
-# documentation. This will only work if the methods are indeed getting or 
-# setting a simple type. If this is not the case, or you want to show the 
+# For Microsoft's IDL there are propget and propput attributes to indicate
+# getter and setter methods for a property. Setting this option to YES (the
+# default) will make doxygen replace the get and set methods by a property in
+# the documentation. This will only work if the methods are indeed getting or
+# setting a simple type. If this is not the case, or you want to show the
 # methods anyway, you should set this option to NO.
 
 IDL_PROPERTY_SUPPORT   = YES
@@ -388,7 +398,7 @@ EXTRACT_ALL            = NO
 
 EXTRACT_PRIVATE        = NO
 
-# If the EXTRACT_PACKAGE tag is set to YES all members with package or internal
+# If the EXTRACT_PACKAGE tag is set to YES all members with package or internal 
 # scope will be included in the documentation.
 
 EXTRACT_PACKAGE        = NO
@@ -953,12 +963,22 @@ HTML_FOOTER            = style/footer.html
 
 # The HTML_STYLESHEET tag can be used to specify a user-defined cascading 
 # style sheet that is used by each HTML page. It can be used to 
-# fine-tune the look of the HTML output. If the tag is left blank doxygen 
-# will generate a default style sheet. Note that doxygen will try to copy 
-# the style sheet file to the HTML output directory, so don't put your own 
-# style sheet in the HTML output directory as well, or it will be erased!
+# fine-tune the look of the HTML output. If left blank doxygen will 
+# generate a default style sheet. Note that it is recommended to use 
+# HTML_EXTRA_STYLESHEET instead of this one, as it is more robust and this 
+# tag will in the future become obsolete.
 
-HTML_STYLESHEET        = style/wiredtiger.css
+HTML_STYLESHEET        = 
+
+# The HTML_EXTRA_STYLESHEET tag can be used to specify an additional 
+# user-defined cascading style sheet that is included after the standard 
+# style sheets created by doxygen. Using this option one can overrule 
+# certain style aspects. This is preferred over using HTML_STYLESHEET 
+# since it does not replace the standard style sheet and is therefor more 
+# robust against future updates. Doxygen will copy the style sheet file to 
+# the output directory.
+
+HTML_EXTRA_STYLESHEET  = style/wiredtiger.css
 
 # The HTML_EXTRA_FILES tag can be used to specify one or more extra images or 
 # other source files which should be copied to the HTML output directory. Note 
@@ -1044,9 +1064,9 @@ DOCSET_FEEDNAME        = "Doxygen generated docs"
 
 DOCSET_BUNDLE_ID       = org.doxygen.Project
 
-# When GENERATE_PUBLISHER_ID tag specifies a string that should uniquely identify 
-# the documentation publisher. This should be a reverse domain-name style 
-# string, e.g. com.mycompany.MyDocSet.documentation.
+# When GENERATE_PUBLISHER_ID tag specifies a string that should uniquely 
+# identify the documentation publisher. This should be a reverse domain-name 
+# style string, e.g. com.mycompany.MyDocSet.documentation.
 
 DOCSET_PUBLISHER_ID    = org.doxygen.Publisher
 
@@ -1641,7 +1661,7 @@ PERL_PATH              = /usr/bin/perl
 # this option also works with HAVE_DOT disabled, but it is recommended to 
 # install and use dot, since it yields more powerful graphs.
 
-CLASS_DIAGRAMS         = YES
+CLASS_DIAGRAMS         = NO
 
 # You can define message sequence charts within doxygen comments using the \msc 
 # command. Doxygen will then run the mscgen tool (see 

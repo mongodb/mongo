@@ -1,16 +1,38 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
 #include "config.h"
 
-static const char *config_file_type(int);
+static void	   config_compression(void);
+static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
-static uint32_t	   config_translate(const char *);
+static int	   config_find_is_perm(const char *, size_t);
+static u_int	   config_translate(const char *);
 
 /*
  * config_setup --
@@ -29,8 +51,7 @@ config_setup(void)
 	 * trees are only compatible with row-store) and other items depend on
 	 * them.
 	 */
-	cp = config_find("data_source", strlen("data_source"));
-	if (!(cp->flags & C_PERM)) {
+	if (!config_find_is_perm("data_source", strlen("data_source")))
 		switch (MMRAND(0, 2)) {
 		case 0:
 			config_single("data_source=file", 0);
@@ -44,10 +65,8 @@ config_setup(void)
 			config_single("data_source=table", 0);
 			break;
 		}
-	}
 
-	cp = config_find("file_type", strlen("file_type"));
-	if (!(cp->flags & C_PERM)) {
+	if (!config_find_is_perm("file_type", strlen("file_type"))) {
 		if (strcmp(g.c_data_source, "lsm") == 0)
 			config_single("file_type=row", 0);
 		else
@@ -62,8 +81,8 @@ config_setup(void)
 				config_single("file_type=row", 0);
 				break;
 			}
-		}
-	g.type = (int)config_translate(g.c_file_type);
+	}
+	g.type = config_translate(g.c_file_type);
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still
@@ -83,9 +102,6 @@ config_setup(void)
 	strcpy(g.uri, g.c_data_source);
 	strcat(g.uri, ":");
 	strcat(g.uri, WT_NAME);
-
-	/* Reset the key count. */
-	g.key_cnt = 0;
 
 	/* Default single-threaded half of the time. */
 	cp = config_find("threads", strlen("threads"));
@@ -108,6 +124,8 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
+	config_compression();
+
 	/* Clear operations values if the whole run is read-only. */
 	if (g.c_ops == 0)
 		for (cp = c; cp->name != NULL; ++cp)
@@ -115,11 +133,8 @@ config_setup(void)
 				*cp->v = 0;
 
 	/* Multi-threaded runs cannot be replayed. */
-	if (g.replay && !SINGLETHREADED) {
-		fprintf(stderr,
-		    "%s: -r is incompatible with threaded runs\n", g.progname);
-		exit(EXIT_FAILURE);
-	}
+	if (g.replay && !SINGLETHREADED)
+		die(0, "-r is incompatible with threaded runs");
 
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
@@ -130,6 +145,66 @@ config_setup(void)
 		if (cp->name != NULL &&
 		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
 			g.c_delete_pct = 0;
+	}
+
+	/* Reset the key count. */
+	g.key_cnt = 0;
+}
+
+/*
+ * config_compression --
+ *	Compression configuration.
+ */
+static void
+config_compression(void)
+{
+	CONFIG *cp;
+	const char *cstr;
+
+	/*
+	 * Compression: choose something if compression wasn't specified,
+	 * otherwise confirm the appropriate shared library is available.
+	 * We don't include LZO in the test compression choices, we don't
+	 * yet have an LZO module of our own.
+	 */
+	cp = config_find("compression", strlen("compression"));
+	if (!(cp->flags & C_PERM)) {
+		cstr = "compression=none";
+		switch (MMRAND(0, 9)) {
+		case 0:					/* 10% */
+			break;
+		case 1: case 2: case 3: case 4:		/* 40% */
+			if (access(BZIP_PATH, R_OK) == 0)
+				cstr = "compression=bzip";
+			break;
+		case 5:					/* 10% */
+			if (access(BZIP_PATH, R_OK) == 0)
+				cstr = "compression=raw";
+			break;
+		case 6: case 7: case 8: case 9:		/* 40% */
+			if (access(SNAPPY_PATH, R_OK) == 0)
+				cstr = "compression=snappy";
+			break;
+		}
+		config_single(cstr, 0);
+	}
+	g.compression = config_translate(g.c_compression);
+	if (!(cp->flags & C_PERM))
+		return;
+
+	switch (g.compression) {
+	case COMPRESS_BZIP:
+	case COMPRESS_RAW:
+		if (access(BZIP_PATH, R_OK) != 0)
+			die(0, "bzip library not found or not readable");
+		break;
+	case COMPRESS_LZO:
+		if (access(LZO_PATH, R_OK) != 0)
+			die(0, "LZO library not found or not readable");
+		break;
+	case COMPRESS_SNAPPY:
+		if (access(SNAPPY_PATH, R_OK) != 0)
+			die(0, "snappy library not found or not readable");
 	}
 }
 
@@ -180,10 +255,11 @@ config_print(int error_display)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		if (cp->type_mask != 0 &&
+		if ((cp->type_mask != 0 &&
 		    ((g.type == FIX && !(cp->type_mask & C_FIX)) ||
 		    (g.type == ROW && !(cp->type_mask & C_ROW)) ||
-		    (g.type == VAR && !(cp->type_mask & C_VAR))))
+		    (g.type == VAR && !(cp->type_mask & C_VAR)))) ||
+		    (cp->flags & C_STRING && *(cp->vstr) == NULL))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
 		else if (cp->flags & C_STRING)
@@ -262,21 +338,21 @@ config_single(const char *s, int perm)
 	++ep;
 
 	if (cp->flags & C_STRING) {
-		if (strncmp(s, "data_source", strlen("data_source")) == 0) {
-			if (strncmp("file", ep, strlen("file")) != 0 &&
-			    strncmp("table", ep, strlen("table")) != 0 &&
-			    strncmp("lsm", ep, strlen("lsm")) != 0) {
+		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
+		    strncmp("file", ep, strlen("file")) != 0 &&
+		    strncmp("table", ep, strlen("table")) != 0 &&
+		    strncmp("lsm", ep, strlen("lsm")) != 0) {
 			    fprintf(stderr,
-				"Invalid file type option: %s\n", ep);
+				"Invalid data source option: %s\n", ep);
 			    exit(EXIT_FAILURE);
-			}
-			*cp->vstr = strdup(ep);
 		}
-		else if (strncmp(s, "file_type", strlen("file_type")) == 0)
+		if (strncmp(s, "file_type", strlen("file_type")) == 0)
 			*cp->vstr = strdup(
-			    config_file_type((int)config_translate(ep)));
+			    config_file_type(config_translate(ep)));
+		else
+			*cp->vstr = strdup(ep);
 		if (*cp->vstr == NULL)
-			syserr("strdup");
+			syserr("Config string parsing");
 		return;
 	}
 
@@ -299,25 +375,37 @@ config_single(const char *s, int perm)
  * config_translate --
  *	Return an integer value representing the argument.
  */
-static uint32_t
+static u_int
 config_translate(const char *s)
 {
 	/* If it's already a integer value, we're done. */
 	if (isdigit(s[0]))
-		return (uint32_t)atoi(s);
+		return ((u_int)atoi(s));
 
-	/* Currently, all we translate are the file type names. */
+	/* File type names. */
 	if (strcmp(s, "fix") == 0 ||
 	    strcmp(s, "flcs") == 0 ||		/* Deprecated */
 	    strcmp(s, "fixed-length column-store") == 0)
-		return ((uint32_t)FIX);
+		return (FIX);
 	if (strcmp(s, "var") == 0 ||
 	    strcmp(s, "vlcs") == 0 ||		/* Deprecated */
 	    strcmp(s, "variable-length column-store") == 0)
-		return ((uint32_t)VAR);
+		return (VAR);
 	if (strcmp(s, "row") == 0 ||
 	    strcmp(s, "row-store") == 0)
-		return ((uint32_t)ROW);
+		return (ROW);
+
+	/* Compression type names. */
+	if (strcmp(s, "none") == 0)
+		return (COMPRESS_NONE);
+	if (strcmp(s, "bzip") == 0)
+		return (COMPRESS_BZIP);
+	if (strcmp(s, "lzo") == 0)
+		return (COMPRESS_LZO);
+	if (strcmp(s, "raw") == 0)
+		return (COMPRESS_RAW);
+	if (strcmp(s, "snappy") == 0)
+		return (COMPRESS_SNAPPY);
 
 	fprintf(stderr, "%s: %s: unknown configuration value\n", g.progname, s);
 	exit(EXIT_FAILURE);
@@ -343,11 +431,24 @@ config_find(const char *s, size_t len)
 }
 
 /*
+ * config_find_is_perm
+ *	Return if a specific configuration entry was permanently set.
+ */
+static int
+config_find_is_perm(const char *s, size_t len)
+{
+	CONFIG *cp;
+
+	cp = config_find(s, len);
+	return (cp->flags & C_PERM ? 1 : 0);
+}
+
+/*
  * config_file_type --
  *	Return the file type as a string.
  */
 static const char *
-config_file_type(int type)
+config_file_type(u_int type)
 {
 	switch (type) {
 	case FIX:

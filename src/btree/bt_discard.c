@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -22,7 +22,7 @@ static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
  *	Discard an in-memory page, freeing all memory associated with it.
  */
 void
-__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
+__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 
@@ -44,7 +44,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_HAZARD *hp;
 	if ((hp = __wt_page_hazard_check(session, page)) != NULL)
 		__wt_errx(session,
-		    "discarded page has hazard reference: (%p: %s, line %d)",
+		    "discarded page has hazard pointer: (%p: %s, line %d)",
 		    hp->page, hp->file, hp->line);
 	}
 #endif
@@ -77,7 +77,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 		break;
 	}
 
-	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))	/* Disk image */
+	/* Free any allocated disk image. */
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC))
 		__wt_free(session, page->dsk);
 
 	__wt_overwrite_and_free(session, page);
@@ -101,7 +102,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * If the page split, there may one or more pages linked from
 		 * the page; walk the list, discarding pages.
 		 */
-		__wt_page_out(session, &mod->u.split, 0);
+		__wt_page_out(session, &mod->u.split);
 		break;
 	case WT_PM_REC_REPLACE:
 		/*

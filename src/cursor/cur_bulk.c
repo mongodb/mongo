@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -31,8 +31,8 @@ __curbulk_insert(WT_CURSOR *cursor)
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	WT_ERR(__wt_bulk_insert(cbulk));
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -58,8 +58,8 @@ __curbulk_close(WT_CURSOR *cursor)
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -68,7 +68,7 @@ __curbulk_close(WT_CURSOR *cursor)
  *	Initialize a bulk cursor.
  */
 int
-__wt_curbulk_init(WT_CURSOR_BULK *cbulk)
+__wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap)
 {
 	WT_CURSOR *c = &cbulk->cbt.iface;
 
@@ -81,6 +81,10 @@ __wt_curbulk_init(WT_CURSOR_BULK *cbulk)
 	__wt_cursor_set_notsup(c);
 	c->insert = __curbulk_insert;
 	c->close = __curbulk_close;
+
+	cbulk->bitmap = bitmap;
+	if (bitmap)
+		F_SET(c, WT_CURSTD_RAW);
 
 	return (__wt_bulk_init(cbulk));
 }

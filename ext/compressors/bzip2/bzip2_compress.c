@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -26,6 +26,7 @@
  */
 
 #include <bzlib.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,14 +36,20 @@
 WT_EXTENSION_API *wt_api;
 
 static int
-bzip2_compress(WT_COMPRESSOR *,
-    WT_SESSION *, uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
+bzip2_compress(WT_COMPRESSOR *, WT_SESSION *,
+    uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
 static int
-bzip2_decompress(WT_COMPRESSOR *,
-    WT_SESSION *, uint8_t *, size_t, uint8_t *, size_t, size_t *);
+bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *,
+    uint8_t *, size_t, uint8_t *, size_t, size_t *);
+#ifdef WIREDTIGER_TEST_COMPRESS_RAW
+static int
+bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *,
+    size_t, size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
+    size_t *, uint32_t *);
+#endif
 
 static WT_COMPRESSOR bzip2_compressor = {
-    bzip2_compress, bzip2_decompress, NULL };
+    bzip2_compress, NULL, bzip2_decompress, NULL };
 
 #define	__UNUSED(v)	((void)(v))
 
@@ -72,8 +79,12 @@ wiredtiger_extension_init(
 	wt_api = api;
 	conn = session->connection;
 
-	return (conn->add_compressor(
-	    conn, "bzip2_compress", &bzip2_compressor, NULL));
+#ifdef WIREDTIGER_TEST_COMPRESS_RAW
+	bzip2_compressor.compress_raw = bzip2_compress_raw;
+	return (conn->add_compressor(conn, "raw", &bzip2_compressor, NULL));
+#else
+	return (conn->add_compressor(conn, "bzip2", &bzip2_compressor, NULL));
+#endif
 }
 
 /* Bzip2 WT_COMPRESSOR implementation for WT_CONNECTION::add_compressor. */
@@ -171,6 +182,99 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	return (0);
 }
+
+#ifdef WIREDTIGER_TEST_COMPRESS_RAW
+/*
+ * __bzip2_compress_raw_random --
+ *	Return a 32-bit pseudo-random number.
+ *
+ * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
+ * random number generator.  Computationally fast, with reasonable randomness
+ * properties.
+ */
+static uint32_t
+__bzip2_compress_raw_random(void)
+{
+	static uint32_t m_w = 521288629;
+	static uint32_t m_z = 362436069;
+
+	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+	return (m_z << 16) + (m_w & 65535);
+}
+
+/*
+ * bzip2_compress_raw --
+ *	Test function for the test/format utility.
+ */
+static int
+bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    size_t page_max, size_t extra,
+    uint8_t *src, uint32_t *offsets, uint32_t slots,
+    uint8_t *dst, size_t dst_len, int final,
+    size_t *result_lenp, uint32_t *result_slotsp)
+{
+	uint32_t take, twenty_pct;
+	int compression_failed, ret;
+
+	__UNUSED(page_max);
+	__UNUSED(extra);
+	__UNUSED(final);
+
+	/*
+	 * This function is used by the test/format utility to test the
+	 * WT_COMPRESSOR::compress_raw functionality.
+	 *
+	 * I'm trying to mimic how a real application is likely to behave: if
+	 * it's a small number of slots, we're not going to take them because
+	 * they aren't worth compressing.  In all likelihood, that's going to
+	 * be because the btree is wrapping up a page, but that's OK, that is
+	 * going to happen a lot.   In addition, add a 2% chance of not taking
+	 * anything at all just because we don't want to take it.  Otherwise,
+	 * select between 80 and 100% of the slots and compress them, stepping
+	 * down by 5 slots at a time until something works.
+	 */
+	take = slots;
+	if (take < 10 || __bzip2_compress_raw_random() % 100 < 2)
+		take = 0;
+	else {
+		twenty_pct = (slots / 10) * 2;
+		if (twenty_pct < slots)
+			take -= __bzip2_compress_raw_random() % twenty_pct;
+
+		for (;;) {
+			if ((ret = bzip2_compress(compressor, session,
+			    src, offsets[take],
+			    dst, dst_len,
+			    result_lenp, &compression_failed)) != 0)
+				return (ret);
+			if (!compression_failed)
+				break;
+			if (take < 10) {
+				take = 0;
+				break;
+			}
+			take -= 5;
+		}
+	}
+
+	*result_slotsp = take;
+	if (take == 0)
+		*result_lenp = 0;
+
+#if 0
+	fprintf(stderr,
+	    "bzip2_compress_raw (%s): page_max %" PRIuMAX ", extra %" PRIuMAX
+	    ", slots %" PRIu32 ", take %" PRIu32 ": %" PRIu32 " -> %"
+	    PRIuMAX "\n",
+	    final ? "final" : "not final",
+	    (uintmax_t)page_max, (uintmax_t)extra,
+	    slots, take, offsets[take], (uintmax_t)*result_lenp);
+#endif
+
+	return (0);
+}
+#endif
 
 static int
 bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,

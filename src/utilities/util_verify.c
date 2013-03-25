@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -13,12 +13,23 @@ int
 util_verify(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
-	int ch;
-	char *name;
+	int ch, dump_address, dump_blocks, dump_pages;
+	char *name, config[128];
 
 	name = NULL;
-	while ((ch = util_getopt(argc, argv, "")) != EOF)
+	dump_address = dump_blocks = dump_pages = 0;
+	while ((ch = util_getopt(argc, argv, "d:")) != EOF)
 		switch (ch) {
+		case 'd':
+			if (strcmp(util_optarg, "dump_address") == 0)
+				dump_address = 1;
+			else if (strcmp(util_optarg, "dump_blocks") == 0)
+				dump_blocks = 1;
+			else if (strcmp(util_optarg, "dump_pages") == 0)
+				dump_pages = 1;
+			else
+				return (usage());
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -33,11 +44,22 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 	    "table", UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 		return (1);
 
-	if ((ret = session->verify(session, name, NULL)) != 0) {
+	/* Build the configuration string as necessary. */
+	config[0] = '\0';
+	if (dump_address)
+		(void)strcat(config, "dump_address,");
+	if (dump_blocks)
+		(void)strcat(config, "dump_blocks,");
+	if (dump_pages)
+		(void)strcat(config, "dump_pages,");
+
+	if ((ret = session->verify(session, name, config)) != 0) {
 		fprintf(stderr, "%s: verify(%s): %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
+
+	/* Verbose configures a progress counter, move to the next line. */
 	if (verbose)
 		printf("\n");
 
@@ -56,7 +78,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "verify file\n",
+	    "verify [-d dump_address | dump_blocks | dump_pages] uri\n",
 	    progname, usage_prefix);
 	return (1);
 }

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -25,7 +25,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <errno.h>
 #include <string.h>
 
 #include <wiredtiger.h>
@@ -40,7 +39,8 @@ static int
 nop_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 
-static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress, NULL };
+static WT_COMPRESSOR nop_compressor = {
+    nop_compress, NULL, nop_decompress, NULL };
 
 #define	__UNUSED(v)	((void)(v))
 
@@ -55,8 +55,7 @@ wiredtiger_extension_init(
 	wt_api = api;
 	conn = session->connection;
 
-	return (
-	    conn->add_compressor(conn, "nop_compress", &nop_compressor, NULL));
+	return (conn->add_compressor(conn, "nop", &nop_compressor, NULL));
 }
 
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
@@ -89,12 +88,14 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 {
 	__UNUSED(compressor);
 	__UNUSED(session);
+	__UNUSED(src_len);
 
-	if (dst_len < src_len)
-		return (ENOMEM);
-
-	memcpy(dst, src, src_len);
-	*result_lenp = src_len;
+	/*
+	 * The destination length is the number of uncompressed bytes we're
+	 * expected to return.
+	 */
+	memcpy(dst, src, dst_len);
+	*result_lenp = dst_len;
 	return (0);
 }
 /* End implementation of WT_COMPRESSOR. */

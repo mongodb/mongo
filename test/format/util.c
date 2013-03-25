@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -198,16 +218,11 @@ wts_rand(void)
 	 * internally, and so that messes up the pattern of random numbers
 	 * (and WT might call rand() in the future, who knows?)
 	 */
-	if (g.rand_log == NULL) {
-		if ((g.rand_log =
-		    fopen("RUNDIR/rand", g.replay ? "r" : "w")) == NULL)
-			die(errno, "fopen: RUNDIR/rand");
-		if (!g.replay) {
-			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
-			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-		}
-	}
 	if (g.replay) {
+		if (g.rand_log == NULL &&
+		   (g.rand_log = fopen("RUNDIR/rand", "r")) == NULL)
+			die(errno, "fopen: RUNDIR/rand");
+
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
 			if (feof(g.rand_log)) {
 				fprintf(stderr,
@@ -220,6 +235,17 @@ wts_rand(void)
 
 		r = (uint32_t)strtoul(buf, NULL, 10);
 	} else {
+		if (g.rand_log == NULL) {
+			if ((g.rand_log = fopen("RUNDIR/rand", "w")) == NULL)
+				die(errno, "fopen: RUNDIR/rand");
+			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
+
+			/*
+			 * Seed the random number generator for each new run (we
+			 * know it's a new run when we re-open the log file).
+			 */
+			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+		}
 		r = (uint32_t)rand();
 		fprintf(g.rand_log, "%" PRIu32 "\n", r);
 	}

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -23,6 +23,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t base, indx, limit;
+	int depth;
 
 	__cursor_search_clear(cbt);
 
@@ -32,7 +33,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	ref = NULL;
 
 	/* Search the internal pages of the tree. */
-	for (page = btree->root_page; page->type == WT_PAGE_COL_INT;) {
+	for (depth = 2,
+	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
 		WT_ASSERT(session, ref == NULL ||
 		    ref->u.recno == page->u.intl.recno);
 
@@ -68,10 +70,20 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			ref = page->u.intl.t + (base - 1);
 		}
 
-		/* Move to the child page. */
-		WT_ERR(__wt_page_in(session, page, ref));
+		/*
+		 * Swap the parent page for the child page; return on error,
+		 * the swap function ensures we're holding nothing on failure.
+		 */
+		WT_RET(__wt_page_swap(session, page, page, ref));
 		page = ref->page;
 	}
+
+	/*
+	 * We want to know how deep the tree gets because excessive depth can
+	 * happen because of how WiredTiger splits.
+	 */
+	if (depth > btree->maximum_depth)
+		btree->maximum_depth = depth;
 
 	/*
 	 * Copy the leaf page's write generation value before reading the page.
@@ -117,8 +129,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * For that reason, don't set the cursor's WT_INSERT_HEAD/WT_INSERT pair
 	 * until we know we have a useful entry.
 	 */
-	if ((ins =
-	    __col_insert_search(ins_head, cbt->ins_stack, recno)) != NULL)
+	if ((ins = __col_insert_search(
+	    ins_head, cbt->ins_stack, cbt->next_stack, recno)) != NULL)
 		if (recno == WT_INSERT_RECNO(ins)) {
 			cbt->ins_head = ins_head;
 			cbt->ins = ins;
@@ -135,8 +147,8 @@ past_end:
 	 * past the end of the table.
 	 */
 	cbt->ins_head = WT_COL_APPEND(page);
-	if ((cbt->ins =
-	    __col_insert_search(cbt->ins_head, cbt->ins_stack, recno)) == NULL)
+	if ((cbt->ins = __col_insert_search(
+	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno)) == NULL)
 		cbt->compare = -1;
 	else {
 		cbt->recno = WT_INSERT_RECNO(cbt->ins);
@@ -158,6 +170,6 @@ past_end:
 		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
 
-err:	__wt_stack_release(session, page);
+err:	WT_TRET(__wt_page_release(session, page));
 	return (ret);
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -34,6 +34,11 @@ class test_schema02(wttest.WiredTigerTestCase):
     Test basic operations
     """
     nentries = 1000
+
+    scenarios = [
+        ('normal', { 'idx_config' : '' }),
+        ('lsm', { 'idx_config' : ',type=lsm' }),
+    ]
 
     def expect_failure_colgroup(self, name, configstr, match):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -119,19 +124,28 @@ class test_schema02(wttest.WiredTigerTestCase):
         self.session.create("colgroup:main:c2", "columns=(S3,i4)")
 
         # should be able to create indices on all key combinations
-        self.session.create("index:main:ikey", "columns=(ikey)")
-        self.session.create("index:main:Skey", "columns=(Skey)")
-        self.session.create("index:main:ikeySkey", "columns=(ikey,Skey)")
-        self.session.create("index:main:Skeyikey", "columns=(Skey,ikey)")
+        self.session.create(
+            "index:main:ikey", "columns=(ikey)" + self.idx_config)
+        self.session.create(
+            "index:main:Skey", "columns=(Skey)" + self.idx_config)
+        self.session.create(
+            "index:main:ikeySkey", "columns=(ikey,Skey)" + self.idx_config)
+        self.session.create(
+            "index:main:Skeyikey", "columns=(Skey,ikey)" + self.idx_config)
 
         # should be able to create indices on all value combinations
-        self.session.create("index:main:S1", "columns=(S1)")
-        self.session.create("index:main:i2", "columns=(i2)")
-        self.session.create("index:main:i2S1", "columns=(i2,S1)")
-        self.session.create("index:main:S1i4", "columns=(S1,i4)")
+        self.session.create(
+            "index:main:S1", "columns=(S1)" + self.idx_config)
+        self.session.create(
+            "index:main:i2", "columns=(i2)" + self.idx_config)
+        self.session.create(
+            "index:main:i2S1", "columns=(i2,S1)" + self.idx_config)
+        self.session.create(
+            "index:main:S1i4", "columns=(S1,i4)" + self.idx_config)
 
         # somewhat nonsensical to repeat columns within an index, but allowed
-        self.session.create("index:main:i4S3i4S1", "columns=(i4,S3,i4,S1)")
+        self.session.create(
+            "index:main:i4S3i4S1", "columns=(i4,S3,i4,S1)" + self.idx_config)
 
         # should be able to create colgroups after indices
         self.session.create("colgroup:main:c1", "columns=(S1,i2)")
@@ -139,7 +153,8 @@ class test_schema02(wttest.WiredTigerTestCase):
         self.populate()
 
         # should be able to create indices after populating
-        self.session.create("index:main:i2S1i4", "columns=(i2,S1,i4)")
+        self.session.create(
+            "index:main:i2S1i4", "columns=(i2,S1,i4)" + self.idx_config)
 
         self.check_entries()
 

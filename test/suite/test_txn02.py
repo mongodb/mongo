@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -104,7 +104,7 @@ class test_txn02(wttest.WiredTigerTestCase):
         # Transactions see their own changes.
         # Read-uncommitted transactions see all changes.
         # Snapshot and read-committed transactions should not see changes.
-        self.check(self.session, None, current);
+        self.check(self.session, None, current)
         self.check(self.session2, "isolation=snapshot", committed)
         self.check(self.session2, "isolation=read-committed", committed)
         self.check(self.session2, "isolation=read-uncommitted", current)
@@ -135,7 +135,7 @@ class test_txn02(wttest.WiredTigerTestCase):
                 c.set_key(k)
                 c.set_value(i + 2)
                 c.insert()
-                current[k] = i + 2;
+                current[k] = i + 2
             elif op == 'remove':
                 c.set_key(k)
                 c.remove()

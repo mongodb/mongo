@@ -16,32 +16,28 @@ cursors.
 The following are the builtin cursor types:
 
 <table>
-  @hrow{URI, Type}
+  @hrow{URI, Type, Notes}
    @row{<tt>backup:</tt>,
-hot backup cursor}
+hot backup cursor, See also: @ref hot_backup}
    @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
-column group cursor}
+column group cursor,}
    @row{<tt>config:[\<uri\>]</tt>,
 object configuration cursor (key=config string\,
-value=config value)}
-  @row{<tt>table:\<tablename\></tt>,
-table cursor (key=table key\, value=table value)}
+value=config value),}
   @row{<tt>file:\<filename\></tt>,
-file cursor (key=file key\, value=file value)}
+file cursor (key=file key\, value=file value),}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
-index cursor (key=index key\, value=table value)}
+index cursor (key=index key\, value=table value),}
   @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
-join cursor @notyet{join cursors}}
+join cursor, @notyet{join cursors}}
   @row{<tt>lsm:\<name\></tt>,
-LSM cursor (key=LSM key\, value=LSM value), see @ref lsm}
+LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
-  database or file statistics (key=(int)\,
-  value=(string)description\, (string)value\, (uint64_t)value)}
+database or file statistics (key=(int)\,
+value=(string)description\, (string)value\, (uint64_t)value),}
+  @row{<tt>table:\<tablename\></tt>,
+table cursor (key=table key\, value=table value),}
 </table>
-
-@subsection data_backup Hot backup cursors
-
-See @ref hot_backup for more information.
 
 @subsection data_files Raw Files
 
@@ -69,27 +65,37 @@ which can access the table key columns or a subset of the value columns.
 
 @subsection data_statistics Statistics Data
 
-Cursors can return run-time statistics about the WiredTiger engine as
-well as statistics for the underlying row- and column-store files.  Each
-cursor iteration sets three separate values: a printable description of
-the entry, a printable version of the entry's value, and the entry's
-unsigned 64-bit integral value.
+Statistics cursors can be used to retrieve run-time statistics about a
+WiredTiger database as well as statistics for individual data sources.
+The statistics are at two levels: per-database and per-individual data
+source.  Database-wide statistics are retrieved with the \c "statistics:"
+URI; individual data source statistics are available by specifying
+\c "statistics:<data source URI>".
 
 The statistic key is an integer from the list of keys in @ref statistics_keys
-"Statistics Keys".
+"Statistics Keys".  Statistics cursors return three values from the
+WT_CURSOR::get_value call: a printable description of the statistic, a
+printable version of the entry's value, and the entry's unsigned 64-bit
+integral value, respectively.
 
 The following is an example of printing run-time statistics about the
 WiredTiger engine:
 
 @snippet ex_stat.c statistics database function
 
-The following is an example of printing statistics about an underlying
-file:
+The following is an example of printing statistics about a table:
 
-@snippet ex_stat.c statistics file function
+@snippet ex_stat.c statistics table function
 
 Both examples can use a common display routine that iterates through the
 statistics until the cursor returns the end of the list.
 
 @snippet ex_stat.c statistics display function
+
+Individual statistics values can be retrieved by searching for the
+corresponding key, as shown in the following example:
+
+@snippet ex_stat.c statistics retrieve by key
+
+See @ref tuning_statistics for more examples of how statistics can be used.
 */

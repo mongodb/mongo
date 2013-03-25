@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -8,12 +8,17 @@
 #include "wt_internal.h"
 /*
  * An in-memory page has a list of tracked blocks and overflow items we use for
- * a two different tasks.  First, each tracked object has flag information set:
+ * three different tasks.  First, each tracked object has flag information set:
  *
  * WT_TRK_DISCARD	The object's backing blocks have been discarded.
  * WT_TRK_INUSE		The object is in-use.
+ * WT_TRK_JUST_ADDED	The object was added in this reconciliation (and should
+ *			be cleaned up, if reconciliation fails).
+ * WT_TRK_OBJECT	Tracking slot is empty/not-empty.
  * WT_TRK_ONPAGE	The object is named on the original page, and we might
  *			encounter it every time we reconcile the page.
+ * WT_TRK_OVFL_VALUE	The object is a cached, deleted overflow value and is
+ *			ignored for general reconciliation purposes.
  * The tasks:
  *
  * Task #1:
@@ -29,34 +34,30 @@
  *
  * Task #2:
  *	Free overflow records when we're finished with them, similarly to the
- * blocks in task #1.  But, overflow records have additional complications:
+ * blocks in task #1.  But, overflow records have an additional complication,
+ * we want to re-use overflow records whenever possible.  For example, if an
+ * overflow record is inserted, we allocate space and write it to the backing
+ * file; we don't want to do that again every time the page is reconciled, we
+ * want to re-use the overflow record each time we reconcile the page.  For
+ * this we use the in-use flag.  When reconciliation starts, all of the tracked
+ * overflow records have the "in-use" flag cleared.  As reconciliation proceeds,
+ * every time we create an overflow item, we check our list of tracked objects
+ * for a match.  If we find one we set the in-use flag and re-use the existing
+ * record.  When reconciliation finishes, overflow records not marked in-use are
+ * discarded.   The discard flags affect this, so we know an overflow record is
+ * is discarded and can't be re-used in future reconciliations.
  *
- *	Complication #1: we want to re-use overflow records whenever possible.
- * For example, if an overflow record is inserted, and we allocate space and
- * write it to the backing file, we don't want to do that again every time the
- * page is reconciled, we want to re-use the overflow record each time we
- * reconcile the page.  For this we use the in-use flag.  When reconciliation
- * starts, all of the tracked overflow records have the "track in-use" flag
- * cleared.  As reconciliation proceeds, every time we create an overflow item,
- * we check our list of tracked objects for a match.  If we find one we set the
- * in-use flag and re-use the existing record.  When reconciliation finishes,
- * any overflow records not marked in-use are discarded.   As above, the
- * on-page and discard flags may apply, so we know an overflow record has been
- * discarded (and may not be re-used in future reconciliations).
- *
- *	Complication #2: if we discard an overflow key and free its backing
- * blocks, but then need the key again, we can't get it from disk.  (For
- * example, the key that references an empty leaf page is discarded when the
- * reconciliation completes, but the page might not stay empty and we need
- * the key again for a future reconciliation.)  In this case, the on-page flag
- * is set for the tracked object, and we can get the key from the object itself.
+ * Task #3:
+ *	Cache deleted overflow values.  Sometimes we delete an overflow key or
+ * record, and an older reader in the system still may need a copy.  If it's a
+ * key, we instantiate the key in the cache; if it's a row-store value, we add
+ * it to the end of the slot's WT_UPDATE list.  If it's a column-store value,
+ * we need a place to stash it, and so we stash it in here.
  */
 
-#ifdef HAVE_VERBOSE
 static int __track_dump(WT_SESSION_IMPL *, WT_PAGE *, const char *);
 static int __track_msg(
 	WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_PAGE_TRACK *);
-#endif
 
 /*
  * __rec_track_extend --
@@ -123,7 +124,14 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 */
 	WT_RET(__wt_calloc_def(session, addr_size + data_size, &p));
 
-	track->flags = (uint8_t)flags | WT_TRK_JUST_ADDED | WT_TRK_OBJECT;
+	/*
+	 * Set the just-added flag so we clean up should reconciliation fail,
+	 * except for cached overflow values, which don't get discarded, even
+	 * if reconciliation fails.
+	 */
+	track->flags = (uint8_t)flags | WT_TRK_OBJECT;
+	if (!F_ISSET(track, WT_TRK_OVFL_VALUE))
+		F_SET(track, WT_TRK_JUST_ADDED);
 	track->addr.addr = p;
 	track->addr.size = addr_size;
 	memcpy(track->addr.addr, addr, addr_size);
@@ -134,26 +142,66 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 		memcpy(track->data, data, data_size);
 	}
 
+	/*
+	 * Overflow items are potentially large and on-page items remain in the
+	 * tracking list until the page is evicted.  If we're tracking a lot of
+	 * them, their memory might matter: increment the page and cache memory
+	 * totals.   This is unlikely to matter, but it's inexpensive (unless
+	 * there are lots of them, in with case I guess the memory matters).
+	 *
+	 * If this reconciliation were to fail, we would reasonably perform the
+	 * inverse operation in __wt_rec_track_wrapup_err.  I'm not bothering
+	 * with that because we'd have to crack the structure itself to figure
+	 * out how much to decrement and I don't think it's worth the effort.
+	 * The potential problem is repeatedly failing reconciliation of a page
+	 * with a large number of overflow items, which causes the page's memory
+	 * memory footprint to become incorrectly high, causing us to push the
+	 * page out of cache unnecessarily.  Like I said, not worth the effort.
+	 */
+	if (LF_ISSET(WT_TRK_ONPAGE))
+		__wt_cache_page_inmem_incr(
+		    session, page, addr_size + data_size);
+
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_msg(session, page, "add", track));
 	return (0);
 }
 
 /*
- * __wt_rec_track_onpage_srch --
- *	Search for a permanently tracked object and return a copy of any data
- * associated with it.
+ * __wt_rec_track_ovfl_srch --
+ *	Search for a cached overflow object.
  */
 int
-__wt_rec_track_onpage_srch(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const uint8_t *addr, uint32_t addr_size, int *foundp, WT_ITEM *copy)
+__wt_rec_track_ovfl_srch(
+    WT_PAGE *page, const uint8_t *addr, uint32_t addr_size, WT_ITEM *data)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	/* The default is not-found. */
-	*foundp = 0;
+	mod = page->modify;
+	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
+		if (F_ISSET(track, WT_TRK_OVFL_VALUE) &&
+		    track->addr.size == addr_size &&
+		    memcmp(addr, track->addr.addr, addr_size) == 0) {
+			data->data = track->data;
+			data->size = track->size;
+			return (1);
+		}
+	return (0);
+}
+
+/*
+ * __wt_rec_track_onpage_srch --
+ *	Search for a permanently tracked object.
+ */
+int
+__wt_rec_track_onpage_srch(
+    WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
+{
+	WT_PAGE_MODIFY *mod;
+	WT_PAGE_TRACK *track;
+	uint32_t i;
 
 	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
@@ -175,27 +223,14 @@ __wt_rec_track_onpage_srch(WT_SESSION_IMPL *session, WT_PAGE *page,
 		 * We don't care if the object is currently in-use or not, just
 		 * if it's there.
 		 *
-		 * Ignore empty slots and objects not loaded from a page.
+		 * Ignore cached overflow values and objects not loaded from a
+		 * page, then check for an address match.
 		 */
-		if (!F_ISSET(track, WT_TRK_ONPAGE))
-			continue;
-
-		/*
-		 * Check for an address match, and if we find one, return a
-		 * copy of the object's data.
-		 */
-		if (track->addr.size != addr_size ||
-		    memcmp(addr, track->addr.addr, addr_size) != 0)
-			continue;
-
-		/* Optionally return a copy of the object's data. */
-		if (copy != NULL) {
-			WT_ASSERT(session, track->size != 0);
-			WT_RET(__wt_buf_set(
-			    session, copy, track->data, track->size));
-		}
-		*foundp = 1;
-		return (0);
+		if (F_ISSET(track, WT_TRK_ONPAGE) &&
+		    !F_ISSET(track, WT_TRK_OVFL_VALUE) &&
+		    track->addr.size == addr_size &&
+		    memcmp(addr, track->addr.addr, addr_size) == 0)
+			return (1);
 	}
 	return (0);
 }
@@ -218,14 +253,11 @@ int
 __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
     WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
 {
-	int found;
+	if (__wt_rec_track_onpage_srch(page, addr, addr_size))
+		return (0);
 
-	WT_RET(__wt_rec_track_onpage_srch(
-	    session, page, addr, addr_size, &found, NULL));
-	if (!found)
-		WT_RET(__wt_rec_track(
-		    session, page, addr, addr_size, NULL, 0, WT_TRK_ONPAGE));
-	return (0);
+	return (__wt_rec_track(
+	    session, page, addr, addr_size, NULL, 0, WT_TRK_ONPAGE));
 }
 
 int
@@ -262,12 +294,13 @@ __wt_rec_track_ovfl_reuse(
 			continue;
 
 		/*
-		 * Ignore discarded objects or objects already in-use.  We don't
-		 * care about whether or not the object came from a page, we can
-		 * re-use objects from the page or objects created in a previous
-		 * reconciliation.
+		 * Ignore discarded objects, objects already in-use, or cached
+		 * overflow values.  We don't care about whether or not the
+		 * object came from a page, we can re-use objects from the page
+		 * or objects created in a previous reconciliation.
 		 */
-		if (F_ISSET(track, WT_TRK_DISCARD | WT_TRK_INUSE))
+		if (F_ISSET(track,
+		    WT_TRK_DISCARD | WT_TRK_INUSE | WT_TRK_OVFL_VALUE))
 			continue;
 
 		/*
@@ -309,7 +342,6 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile init"));
-
 	return (0);
 }
 
@@ -320,9 +352,12 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
 	uint32_t i;
+
+	bm = S2BT(session)->bm;
 
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile wrapup"));
@@ -335,6 +370,10 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		/* Ignore empty slots */
 		if (!F_ISSET(track, WT_TRK_OBJECT))
+			continue;
+
+		/* Ignore cached overflow values. */
+		if (F_ISSET(track, WT_TRK_OVFL_VALUE))
 			continue;
 
 		/*
@@ -368,7 +407,7 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (WT_VERBOSE_ISSET(session, reconcile))
 			WT_RET(__track_msg(session, page, "discard", track));
 		WT_RET(
-		    __wt_bm_free(session, track->addr.addr, track->addr.size));
+		    bm->free(bm, session, track->addr.addr, track->addr.size));
 
 		/*
 		 * There are page and overflow blocks we track anew as part of
@@ -395,10 +434,13 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
 	uint32_t i;
+
+	bm = S2BT(session)->bm;
 
 	/*
 	 * After a failed reconciliation of a page, discard entries added in the
@@ -415,7 +457,7 @@ __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * discard them on error.
 			 */
 			if (F_ISSET(track, WT_TRK_INUSE))
-				WT_TRET(__wt_bm_free(session,
+				WT_TRET(bm->free(bm, session,
 				    track->addr.addr, track->addr.size));
 
 			__wt_free(session, track->addr.addr);
@@ -440,7 +482,6 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, track->addr.addr);
 }
 
-#ifdef HAVE_VERBOSE
 /*
  * __track_dump --
  *	Dump the list of tracked objects.
@@ -521,7 +562,7 @@ __wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len)
 	WT_APPEND_FLAG(WT_TRK_INUSE, "inuse");
 	WT_APPEND_FLAG(WT_TRK_JUST_ADDED, "just-added");
 	WT_APPEND_FLAG(WT_TRK_ONPAGE, "onpage");
+	WT_APPEND_FLAG(WT_TRK_OVFL_VALUE, "ovfl-value");
 
 	return (buf);
 }
-#endif

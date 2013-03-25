@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -28,22 +48,17 @@ wts_ops(void)
 	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	time_t now;
 	int ret, running;
 	uint32_t i;
 
 	conn = g.wts_conn;
 
 	/* Open a session. */
-	session = NULL;
-	if (g.logging == LOG_OPS) {
+	if (g.logging != 0) {
 		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session");
-
-		(void)time(&now);
 		(void)session->msg_printf(session,
-		    "===============\nthread ops start: %s===============",
-		    ctime(&now));
+		    "=============== thread ops start ===============");
 	}
 
 	if (SINGLETHREADED) {
@@ -67,7 +82,7 @@ wts_ops(void)
 		for (;;) {
 			total.search =
 			    total.insert = total.remove = total.update = 0;
-			for (i = running = 0; i < g.c_threads; ++i) {
+			for (i = 0, running = 0; i < g.c_threads; ++i) {
 				total.search += tinfo[i].search;
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;
@@ -92,12 +107,9 @@ wts_ops(void)
 		free(tinfo);
 	}
 
-	if (session != NULL) {
-		(void)time(&now);
+	if (g.logging != 0) {
 		(void)session->msg_printf(session,
-		    "===============\nthread ops stop: %s===============",
-		    ctime(&now));
-
+		    "=============== thread ops stop ===============");
 		if ((ret = session->close(session, NULL)) != 0)
 			die(ret, "session.close");
 	}
@@ -111,7 +123,7 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, ckpt_op, session_period, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, compact_op, session_period, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
@@ -128,16 +140,20 @@ ops(void *arg)
 	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
-	/* Each thread does its share of the total operations. */
-	thread_ops = g.c_ops / g.c_threads;
+	/*
+	 * Each thread does its share of the total operations, and make sure
+	 * that it's not 0 (testing runs: threads might be larger than ops).
+	 */
+	thread_ops = g.c_threads + g.c_ops / g.c_threads;
 
 	/* Pick a period for re-opening the session and cursors. */
 	session = NULL;
 	cursor = cursor_insert = NULL;
 	session_period = 100 * MMRAND(1, 50);
 
-	/* Pick an operation where we'll do a checkpoint. */
+	/* Pick an operation where we'll do a checkpoint, compaction. */
 	ckpt_op = MMRAND(1, thread_ops);
+	compact_op = MMRAND(1, thread_ops);
 
 	for (cnt = 0; cnt < thread_ops; ++cnt) {
 		/*
@@ -200,6 +216,9 @@ ops(void *arg)
 			 */
 			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
+		if (cnt == compact_op &&
+		    (ret = session->compact(session, g.uri, NULL)) != 0)
+			die(ret, "session.compact");
 
 		insert = notfound = 0;
 

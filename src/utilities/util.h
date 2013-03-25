@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -42,11 +42,11 @@ extern char *util_optarg;		/* argument associated with option */
 
 int	 util_backup(WT_SESSION *, int, char *[]);
 int	 util_cerr(const char *, const char *, int);
+int	 util_compact(WT_SESSION *, int, char *[]);
 void	 util_copyright(void);
 int	 util_create(WT_SESSION *, int, char *[]);
 int	 util_drop(WT_SESSION *, int, char *[]);
 int	 util_dump(WT_SESSION *, int, char *[]);
-int	 util_dumpfile(WT_SESSION *, int, char *[]);
 int	 util_err(int, const char *, ...);
 int	 util_flush(WT_SESSION *, const char *);
 int	 util_getopt(int, char * const *, const char *);

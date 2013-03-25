@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -33,7 +33,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	WT_ASSERT(session, number != 0 && size != 0);
 
 	if (session != NULL && S2C(session)->stats != NULL)
-		WT_CSTAT_INCR(session, memalloc);
+		WT_CSTAT_INCR(session, memory_allocation);
 
 	if ((p = calloc(number, size)) == NULL)
 		WT_RET_MSG(session, __wt_errno(), "memory allocation");
@@ -70,7 +70,7 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	p = *(void **)retp;
 
 	if (p == NULL && session != NULL && S2C(session)->stats != NULL)
-		WT_CSTAT_INCR(session, memalloc);
+		WT_CSTAT_INCR(session, memory_allocation);
 
 	if ((p = realloc(p, bytes_to_allocate)) == NULL)
 		WT_RET_MSG(session, __wt_errno(), "memory allocation");
@@ -129,7 +129,7 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, p == NULL || bytes_allocated != 0);
 
 		if (p == NULL && session != NULL && S2C(session)->stats != NULL)
-			WT_CSTAT_INCR(session, memalloc);
+			WT_CSTAT_INCR(session, memory_allocation);
 
 		if ((ret = posix_memalign(&newp,
 		    S2C(session)->buffer_alignment,
@@ -212,7 +212,7 @@ __wt_free_int(WT_SESSION_IMPL *session, void *p_arg)
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	if (session != NULL && S2C(session)->stats != NULL)
-		WT_CSTAT_INCR(session, memfree);
+		WT_CSTAT_INCR(session, memory_free);
 
 	/*
 	 * If there's a serialization bug we might race with another thread.

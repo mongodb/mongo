@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -44,7 +44,7 @@ static int
 wt_snappy_pre_size(WT_COMPRESSOR *, WT_SESSION *, uint8_t *, size_t, size_t *);
 
 static WT_COMPRESSOR wt_snappy_compressor = {
-    wt_snappy_compress, wt_snappy_decompress, wt_snappy_pre_size };
+    wt_snappy_compress, NULL, wt_snappy_decompress, wt_snappy_pre_size };
 
 #define	__UNUSED(v)	((void)(v))
 
@@ -59,8 +59,8 @@ wiredtiger_extension_init(
 	wt_api = api;
 	conn = session->connection;
 
-	return (conn->add_compressor(
-	    conn, "snappy_compress", &wt_snappy_compressor, NULL));
+	return (
+	    conn->add_compressor(conn, "snappy", &wt_snappy_compressor, NULL));
 }
 
 /* Snappy WT_COMPRESSOR for WT_CONNECTION::add_compressor. */

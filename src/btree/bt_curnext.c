@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -100,7 +100,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 new_page:	/* Check any insert list for a matching record. */
 		cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
 		cbt->ins = __col_insert_search(
-		    cbt->ins_head, cbt->ins_stack, cbt->recno);
+		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
 		if (cbt->ins != NULL &&
 		    cbt->recno != WT_INSERT_RECNO(cbt->ins))
 			cbt->ins = NULL;
@@ -165,6 +165,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -217,20 +218,23 @@ new_page:	/* Find the matching WT_COL slot. */
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
-			switch (unpack.type) {
-			case WT_CELL_DEL:
+			if (unpack.type == WT_CELL_DEL)
 				continue;
-			case WT_CELL_VALUE:
-				if (S2BT(session)->huffman_value == NULL) {
-					cbt->tmp.data = unpack.data;
-					cbt->tmp.size = unpack.size;
-					break;
-				}
-				/* FALLTHROUGH */
-			default:
-				WT_RET(__wt_cell_unpack_copy(
-				    session, &unpack, &cbt->tmp));
-			}
+
+			/*
+			 * Restart for a variable-length column-store.  We could
+			 * catch restart higher up the call-stack but there's no
+			 * point to it: unlike row-store (where a normal search
+			 * path finds cached overflow values), we have to access
+			 * the page's reconciliation structures, and that's as
+			 * easy here as higher up the stack.
+			 */
+			if ((ret = __wt_cell_unpack_ref(
+			    session, &unpack, &cbt->tmp)) == WT_RESTART)
+				ret = __wt_ovfl_cache_col_restart(
+				    session, cbt->page, &unpack, &cbt->tmp);
+			WT_RET(ret);
+
 			cbt->cip_saved = cip;
 		}
 		val->data = cbt->tmp.data;
@@ -396,13 +400,13 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	WT_BSTAT_INCR(session, cursor_read_next);
+	WT_DSTAT_INCR(session, cursor_next);
 
 	flags = 0;					/* Tree walk flags. */
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 
-	__cursor_func_init(cbt, 0);
+retry:	WT_RET(__cursor_func_init(cbt, 0));
 	__cursor_position_clear(cbt);
 
 	/*
@@ -488,7 +492,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 		}
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
+err:	if (ret == WT_RESTART)
+		goto retry;
+	WT_TRET(__cursor_func_resolve(cbt, ret));
 	return (ret);
 }
 
@@ -505,9 +511,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
-	WT_BSTAT_INCR(session, cursor_read_next);
+	WT_DSTAT_INCR(session, cursor_next);
 
-	__cursor_func_init(cbt, 1);
+retry:	WT_RET(__cursor_func_init(cbt, 1));
 	__cursor_position_clear(cbt);
 
 	/*
@@ -519,7 +525,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	ret = cbt->compare == 0 ?
 	    __wt_kv_return(session, cbt) : WT_NOTFOUND;
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	WT_TRET(__cursor_func_resolve(cbt, ret));
 	return (ret);
 }

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -38,12 +38,12 @@ __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp)
 				continue;
 			break;
 		}
-		((char *)buf->data)[buf->size++] = (char)c;
+		((char *)buf->mem)[buf->size++] = (char)c;
 	}
 	if (c == EOF && ferror(fp))
 		WT_RET_MSG(session, __wt_errno(), "file read");
 
-	((char *)buf->data)[buf->size] = '\0';
+	((char *)buf->mem)[buf->size] = '\0';
 
 	return (0);
 }

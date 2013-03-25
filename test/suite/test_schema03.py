@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -235,7 +235,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     # We need to have a large number of open files available
     # to run this test.  We probably don't need quite this many,
     # but boost it up to this limit anyway.
-    OPEN_FILE_LIMIT = 8192
+    OPEN_FILE_LIMIT = 1000
 
     restart_scenarios = [('table', dict(s_restart=['table'],P=0.3)),
                          ('colgroup0', dict(s_restart=['colgroup0'],P=0.3)),
@@ -249,13 +249,17 @@ class test_schema03(wttest.WiredTigerTestCase):
                          ('all', dict(s_restart=['table','colgroup0','index0','colgroup1','index1','populate0','index2','populate1'],P=1.0))]
 
     ntable_scenarios = wtscenario.quick_scenarios('s_ntable',
-        [1,2,7,43], [1.0,0.4,0.5,0.5])
+        [1,2,5,8], [1.0,0.4,0.5,0.5])
     ncolgroup_scenarios = wtscenario.quick_scenarios('s_colgroup',
-        [[1,0],[0,1],[2,4],[18,5]], [1.0,0.2,0.3,1.0])
+        [[1,0],[0,1],[2,4],[8,5]], [1.0,0.2,0.3,1.0])
     nindex_scenarios = wtscenario.quick_scenarios('s_index',
-        [[1,1,1],[3,2,4],[15,7,3]], [1.0,0.5,1.0])
+        [[1,1,1],[3,2,1],[5,1,3]], [1.0,0.5,1.0])
+    idx_args_scenarios = wtscenario.quick_scenarios('s_index_args',
+        ['', ',type=file', ',type=lsm'], [0.5, 0.3, 0.2])
+    table_args_scenarios = wtscenario.quick_scenarios('s_extra_table_args',
+        ['', ',type=file', ',type=lsm'], [0.5, 0.3, 0.2])
 
-    all_scenarios = wtscenario.multiply_scenarios('_', restart_scenarios, ntable_scenarios, ncolgroup_scenarios, nindex_scenarios)
+    all_scenarios = wtscenario.multiply_scenarios('_', restart_scenarios, ntable_scenarios, ncolgroup_scenarios, nindex_scenarios, idx_args_scenarios, table_args_scenarios)
 
     # Prune the scenarios according to the probabilities given above.
     scenarios = wtscenario.prune_scenarios(all_scenarios, 30)
@@ -281,9 +285,8 @@ class test_schema03(wttest.WiredTigerTestCase):
         super(test_schema03, self).setUp()
 
     def setUpConnectionOpen(self, dir):
-        cs = 100 * 1024 * 1024
-        conn = wiredtiger.wiredtiger_open(dir, 'create,cache_size=' +
-                                          str(cs) + ',hazard_max=300')
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,cache_size=100m,session_max=1000')
         self.pr(`conn`)
         return conn
         
@@ -292,9 +295,6 @@ class test_schema03(wttest.WiredTigerTestCase):
         resource.setrlimit(resource.RLIMIT_NOFILE, self.origFileLimit)
 
     def gen_formats(self, rand, n, iskey):
-        if iskey and n == 1:
-            if rand.rand_range(0, 2) == 0:
-                return 'r'  # record number
         result = ''
         for i in range(0, n):
             if rand.rand_range(0, 2) == 0:
@@ -312,11 +312,12 @@ class test_schema03(wttest.WiredTigerTestCase):
     def join_names(self, sep, prefix, list):
         return sep.join([prefix + str(val) for val in list])
 
-    def create(self, what, tablename, whatname, columnlist):
+    def create(self, what, tablename, whatname, columnlist, extra_args=''):
         createarg = what + ":" + tablename + ":" + whatname
         colarg = self.join_names(',', 'c', columnlist)
-        self.show_python("self.session.create('" + createarg + "', 'columns=(" + colarg + ")')")
-        result = self.session.create(createarg, "columns=(" + colarg + ")")
+        self.show_python("self.session.create('" + createarg + "', 'columns=(" + colarg + ")" + extra_args + "')")
+        result = self.session.create(createarg,
+                "columns=(" + colarg + ")" + extra_args)
         self.assertEqual(result, 0)
 
     def finished_step(self, name):
@@ -404,7 +405,7 @@ class test_schema03(wttest.WiredTigerTestCase):
             #     colgroups named 'g0' --> 'g<N>'
             #     indices named 'i0' --> 'i<N>'
 
-            config = "";
+            config = ""
             config += "key_format=" + tc.keyformats
             config += ",value_format=" + tc.valueformats
             config += ",columns=("
@@ -418,6 +419,7 @@ class test_schema03(wttest.WiredTigerTestCase):
                     config += ","
                 config += "g" + str(j)
             config += ")"
+            config += self.s_extra_table_args
             # indices are not declared here
             self.show_python("self.session.create('table:" + tc.tablename + "', '" + config + "')")
             self.session.create("table:" + tc.tablename, config)
@@ -444,7 +446,7 @@ class test_schema03(wttest.WiredTigerTestCase):
                 self.current_table = tc.tableidx
                 for idx in tc.idxlist:
                     if idx.createset == createset:
-                        self.create('index', tc.tablename, idx.idxname, idx.columns)
+                        self.create('index', tc.tablename, idx.idxname, idx.columns, self.s_index_args)
 
             self.finished_step('index' + str(createset))
 

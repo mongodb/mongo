@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -22,17 +22,17 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 
 	/* Dirty the root page to ensure a write. */
 	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(page);
+	__wt_page_modify_set(session, page);
 
 	return (0);
 }
 
 /*
- * __wt_bt_cache_flush --
- *	Write dirty pages from the cache, optionally discarding the file.
+ * __wt_bt_cache_op --
+ *	Cache operations: compaction, discard, sync/checkpoint.
  */
 int
-__wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
+__wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 {
 	WT_DECL_RET;
 	WT_BTREE *btree;
@@ -40,41 +40,50 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	btree = S2BT(session);
 
 	/*
-	 * Ask the eviction thread to flush any dirty pages, and optionally
-	 * discard the file from the cache.
+	 * Compaction and sync/checkpoint reconcile dirty pages from the cache
+	 * to the backing block manager.  Reconciliation is just another reader
+	 * of the page, so with some care, it can be done in the current thread,
+	 * leaving the eviction thread to keep freeing spaces if the cache is
+	 * full.  Sync and eviction cannot operate on the same page at the same
+	 * time, and there are different modes inside __wt_tree_walk to make
+	 * sure they don't trip over each other.
 	 *
-	 * Reconciliation is just another reader of the page, so it's probably
-	 * possible to do this work in the current thread, rather than poking
-	 * the eviction thread.  The trick is for the sync thread to acquire
-	 * hazard references on each dirty page, which would block the eviction
-	 * thread from attempting to evict the pages.
+	 * The current thread cannot evict pages from the cache, so discard is
+	 * done by calling the eviction server for service.
 	 *
-	 * I'm not doing it for a few reasons: (1) I don't want sync to update
-	 * the page's read-generation number, and eviction already knows how to
-	 * do that, (2) I don't want more than a single sync running at a time,
-	 * and calling eviction makes it work that way without additional work,
-	 * (3) sync and eviction cannot operate on the same page at the same
-	 * time and I'd rather they didn't operate in the same file at the same
-	 * time, and using eviction makes it work that way without additional
-	 * synchronization, (4) eventually we'll have async write I/O, and this
-	 * approach results in one less page writer in the system, (5) the code
-	 * already works that way.   None of these problems can't be fixed, but
-	 * I don't see a reason to change at this time, either.
+	 * XXX
+	 * Set the checkpoint reference for reconciliation -- this is ugly, but
+	 * there's no data structure path from here to reconciliation.
+	 *
+	 * Publish: there must be a barrier to ensure the structure fields are
+	 * set before the eviction thread can see the request.
 	 */
-	btree->ckpt = ckptbase;
-	ret = __wt_sync_file_serial(session, op);
-	btree->ckpt = NULL;
-	WT_RET(ret);
+	WT_PUBLISH(btree->ckpt, ckptbase);
 
 	switch (op) {
-	case WT_SYNC:
+	case WT_SYNC_CHECKPOINT:
+		WT_ERR(__wt_sync_file(session, WT_SYNC_CHECKPOINT));
+		break;
+	case WT_SYNC_COMPACT:
+		WT_ERR(__wt_sync_file(session, WT_SYNC_COMPACT));
 		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:
+		/*
+		 * Schedule and wake the eviction server, then wait for the
+		 * eviction server to wake us.
+		 */
+		WT_ERR(__wt_sync_file_serial(session, op));
+		WT_ERR(__wt_evict_server_wake(session));
+		WT_ERR(__wt_cond_wait(session, session->cond, 0));
+		ret = session->syncop_ret;
+
 		/* If discarding the tree, the root page should be gone. */
-		WT_ASSERT(session, btree->root_page == NULL);
+		WT_ASSERT(session, ret != 0 || btree->root_page == NULL);
 		break;
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	return (0);
+err:	btree->ckpt = NULL;
+	return (ret);
 }

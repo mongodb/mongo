@@ -10,10 +10,10 @@ bin_PROGRAMS = wt
 wt_SOURCES =\
 	src/utilities/util_backup.c \
 	src/utilities/util_cpyright.c \
+	src/utilities/util_compact.c \
 	src/utilities/util_create.c \
 	src/utilities/util_drop.c \
 	src/utilities/util_dump.c \
-	src/utilities/util_dumpfile.c \
 	src/utilities/util_getopt.c \
 	src/utilities/util_list.c \
 	src/utilities/util_load.c \
@@ -31,7 +31,7 @@ wt_SOURCES =\
 	src/utilities/util_write.c
 
 include_HEADERS= wiredtiger.h
-INCLUDES = -I$(srcdir)/src/include
+AM_CPPFLAGS = -I$(srcdir)/src/include
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = wiredtiger.pc
@@ -47,3 +47,6 @@ $(top_srcdir)/src/include/wt_internal.h: auto-includes.chk
 
 auto-includes.chk: $(libwiredtiger_la_SOURCES)
 	@(cd $(srcdir)/dist && sh s_prototypes && sh s_typedef -b) && touch $@
+
+clean-local:
+	rm -rf WT_TEST

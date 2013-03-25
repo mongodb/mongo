@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -38,7 +38,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_WRITE_BARRIER();
 
 	/* Start worker threads. */
-	F_SET(conn, WT_SERVER_RUN);
+	F_SET(conn, WT_CONN_SERVER_RUN);
 
 	/*
 	 * Start the eviction thread.
@@ -49,12 +49,12 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &evict_session));
 	evict_session->name = "eviction-server";
-	WT_ERR(__wt_thread_create(
+	WT_ERR(__wt_thread_create(session,
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 
 	return (0);
 
-err:	(void)__wt_connection_close(conn);
+err:	WT_TRET(__wt_connection_close(conn));
 	return (ret);
 }
 
@@ -87,14 +87,17 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Shut down the server threads. */
-	F_CLR(conn, WT_SERVER_RUN);
+	F_CLR(conn, WT_CONN_SERVER_RUN);
 	if (conn->cache_evict_tid != 0) {
-		__wt_evict_server_wake(session);
-		WT_TRET(__wt_thread_join(conn->cache_evict_tid));
+		WT_TRET(__wt_evict_server_wake(session));
+		WT_TRET(__wt_thread_join(session, conn->cache_evict_tid));
 	}
 
+	/* Disconnect from shared cache - must be before cache destroy. */
+	WT_TRET(__wt_conn_cache_pool_destroy(conn));
+
 	/* Discard the cache. */
-	__wt_cache_destroy(conn);
+	WT_TRET(__wt_cache_destroy(conn));
 
 	/* Discard transaction state. */
 	__wt_txn_global_destroy(conn);
@@ -110,7 +113,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * session in case of any error messages from the remaining operations
 	 * while destroying the connection handle.
 	 *
-	 * Additionally, the session's hazard reference memory isn't discarded
+	 * Additionally, the session's hazard pointer memory isn't discarded
 	 * during normal session close because access to it isn't serialized.
 	 * Discard it now.
 	 */
@@ -122,7 +125,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Destroy the handle. */
-	__wt_connection_destroy(conn);
+	WT_TRET(__wt_connection_destroy(conn));
 
 	return (ret);
 }

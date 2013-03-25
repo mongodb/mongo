@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -63,7 +63,7 @@ def compare_tables(self, session, uris, config=None):
             for next_cursor in cursors:
                 if (next_cursor.next() == wiredtiger.WT_NOTFOUND):
                     done = True
-                    break;
+                    break
                 keys.append(next_cursor.get_value())
             match = all(x == keys[0] for x in keys)
             if not match:
@@ -131,30 +131,33 @@ def simple_populate(self, uri, config, rows):
     self.pr('simple_populate: ' + uri + ' with ' + str(rows) + ' rows')
     self.session.create(uri, 'value_format=S,' + config)
     cursor = self.session.open_cursor(uri, None)
-    for i in range(1, rows):
+    for i in range(1, rows + 1):
         cursor.set_key(key_populate(cursor, i))
         cursor.set_value(value_populate(cursor, i))
         cursor.insert()
     cursor.close()
 
-def simple_populate_check(self, uri):
-    self.pr('simple_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None)
+def simple_populate_check_cursor(self, cursor, rows):
     i = 0
     for key,val in cursor:
         i += 1
         self.assertEqual(key, key_populate(cursor, i))
         if cursor.value_format == '8t' and val == 0:    # deleted
-            continue;
+            continue
         self.assertEqual(val, value_populate(cursor, i))
+    self.assertEqual(i, rows)
+
+def simple_populate_check(self, uri, rows):
+    self.pr('simple_populate_check: ' + uri)
+    cursor = self.session.open_cursor(uri, None)
+    simple_populate_check_cursor(self, cursor, rows)
     cursor.close()
 
 # Return the value stored in a complex object.
 def value_populate_complex(i):
-    return [\
-        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],\
-        i,\
-        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],\
+    return [str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+        i,
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
         str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
 
 # population of a complex object
@@ -183,16 +186,14 @@ def complex_populate(self, uri, config, rows):
     self.session.create(
         indxname + ':indx6', 'columns=(column3,column5,column4)')
     cursor = self.session.open_cursor(uri, None)
-    for i in range(1, rows):
+    for i in range(1, rows + 1):
         cursor.set_key(key_populate(cursor, i))
         v = value_populate_complex(i)
         cursor.set_value(v[0], v[1], v[2], v[3])
         cursor.insert()
     cursor.close()
 
-def complex_populate_check(self, uri):
-    self.pr('complex_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None)
+def complex_populate_check_cursor(self, cursor, rows):
     i = 0
     for key, s1, i2, s3, s4 in cursor:
         i += 1
@@ -202,4 +203,10 @@ def complex_populate_check(self, uri):
         self.assertEqual(i2, v[1])
         self.assertEqual(s3, v[2])
         self.assertEqual(s4, v[3])
+    self.assertEqual(i, rows)
+
+def complex_populate_check(self, uri, rows):
+    self.pr('complex_populate_check: ' + uri)
+    cursor = self.session.open_cursor(uri, None)
+    complex_populate_check_cursor(self, cursor, rows)
     cursor.close()

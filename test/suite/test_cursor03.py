@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -48,7 +48,7 @@ class test_cursor03(TestCursorTracker):
             ('col.val10k', dict(tablekind='col', keysize=None, valsize=[10, 10000], uri='table')),
             ('row.keyval10k', dict(tablekind='row', keysize=[10,10000], valsize=[10, 10000], uri='table')),
         ], [
-            ('count1000', dict(tablecount=1000,cache_size=20*1024*1024)),
+            ('count1000', dict(tablecount=1000,cache_size=25*1024*1024)),
             ('count10000', dict(tablecount=10000, cache_size=64*1024*1024))
             ])
 
@@ -69,7 +69,7 @@ class test_cursor03(TestCursorTracker):
         return self.session.open_cursor(tablearg, None, 'append')
 
     def setUpConnectionOpen(self, dir):
-        wtopen_args = 'create,cache_size=' + str(self.cache_size);
+        wtopen_args = 'create,cache_size=' + str(self.cache_size)
         conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
         self.pr(`conn`)
         return conn

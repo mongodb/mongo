@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -22,6 +22,10 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = S2BT(session);
 
+	/*
+	 * Bulk-load is only permitted on newly created files, not any empty
+	 * file -- see the checkpoint code for a discussion.
+	 */
 	if (!btree->bulk_load_ok)
 		WT_RET_MSG(session, EINVAL,
 		    "bulk-load is only possible for newly created trees");
@@ -101,7 +105,7 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_BSTAT_INCR(session, file_bulk_loaded);
+	WT_DSTAT_INCR(session, cursor_insert_bulk);
 	return (0);
 }
 
@@ -150,7 +154,8 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 	WT_ERR_MSG(session, EINVAL,
 	    "bulk-load presented with out-of-order keys: %.*s compares smaller "
 	    "than previously inserted key %.*s",
-	    (int)a->size, (char *)a->data, (int)b->size, (char *)b->data);
+	    (int)a->size, (const char *)a->data,
+	    (int)b->size, (const char *)b->data);
 
 err:	__wt_scr_free(&a);
 	__wt_scr_free(&b);

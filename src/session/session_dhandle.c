@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -69,7 +69,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 		return (EBUSY);
 	else
-		__wt_readlock(session, dhandle->rwlock);
+		WT_RET(__wt_readlock(session, dhandle->rwlock));
 
 	/*
 	 * At this point, we have the requested lock -- if that is all that was
@@ -86,7 +86,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE) || special_flags == 0) {
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-		__wt_rwunlock(session, dhandle->rwlock);
+		WT_RET(__wt_rwunlock(session, dhandle->rwlock));
 	}
 
 	/* Treat an unopened handle just like a non-existent handle. */
@@ -107,31 +107,43 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	dhandle = session->dhandle;
 
-	/*
-	 * If we had no cache flag set, close and free the btree handle. It was
-	 * never added to the handle cache.
-	 *
-	 * Otherwise, if we had special flags set, close the handle so that
-	 * future access can get a handle without special flags.
-	 */
-	if (F_ISSET(btree, WT_BTREE_NO_CACHE))
-		WT_RET(__wt_conn_dhandle_discard_single(session, dhandle));
-	else {
-		if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
-		    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
-			WT_ASSERT(session,
-			    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-			F_CLR(dhandle, WT_DHANDLE_DISCARD);
-			WT_RET(__wt_conn_btree_sync_and_close(session));
+	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_CLOSE)) {
+		/*
+		 * If configured to discard on last close, attempt to trade our
+		 * read lock for an exclusive lock. If that succeeds, setup for
+		 * discard. It is expected that the exclusive lock will fail
+		 * sometimes since the handle may still be in use: in that case
+		 * we've already unlocked, so we're done.
+		 */
+		WT_ERR(__wt_rwunlock(session, dhandle->rwlock));
+		ret = __wt_try_writelock(session, dhandle->rwlock);
+		if (ret != 0) {
+			if (ret == EBUSY)
+				ret = 0;
+			goto err;
 		}
-
-		if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))
-			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-
-		__wt_rwunlock(session, dhandle->rwlock);
+		F_CLR(dhandle, WT_DHANDLE_DISCARD_CLOSE);
+		F_SET(dhandle, WT_DHANDLE_DISCARD | WT_DHANDLE_EXCLUSIVE);
 	}
-	session->dhandle = NULL;
 
+	/*
+	 * If we had special flags set, close the handle so that future access
+	 * can get a handle without special flags.
+	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
+	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
+		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
+		F_CLR(dhandle, WT_DHANDLE_DISCARD);
+
+		WT_TRET(__wt_conn_btree_sync_and_close(session));
+	}
+
+	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))
+		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
+
+	WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
+
+err:	session->dhandle = NULL;
 	return (ret);
 }
 
@@ -204,61 +216,55 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
+	int candidate;
 
 	dhandle = NULL;
+	candidate = 0;
 
-	/*
-	 * If the no cache flag is set, we never use the handle cache to
-	 * store or retrieve the handle.
-	 */
-	if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
-		TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
-			dhandle = dhandle_cache->dhandle;
-			if (strcmp(uri, dhandle->name) != 0)
-				continue;
-			if (checkpoint == NULL && dhandle->checkpoint == NULL)
-				break;
-			if (checkpoint != NULL && dhandle->checkpoint != NULL &&
-			    strcmp(checkpoint, dhandle->checkpoint) == 0)
-				break;
-		}
-
-		if (dhandle_cache == NULL)
-			session->dhandle = NULL;
-		else {
-			session->dhandle = dhandle;
-
-			/*
-			 * Try to lock the file; if we succeed, our "exclusive"
-			 * state must match.
-			 */
-			ret = __wt_session_lock_btree(session, flags);
-			if (ret != WT_NOTFOUND) {
-				WT_ASSERT(session, ret != 0 ||
-				    LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
-				    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-				return (ret);
-			}
-			ret = 0;
-		}
+	TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
+		dhandle = dhandle_cache->dhandle;
+		if (strcmp(uri, dhandle->name) != 0)
+			continue;
+		if (checkpoint == NULL && dhandle->checkpoint == NULL)
+			break;
+		if (checkpoint != NULL && dhandle->checkpoint != NULL &&
+		    strcmp(checkpoint, dhandle->checkpoint) == 0)
+			break;
 	}
 
-	/*
-	 * If we don't already hold the schema lock, get it now so that we
-	 * can find and/or open the handle.
-	 */
-	WT_WITH_SCHEMA_LOCK_OPT(session,
-	    ret = __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
-	WT_RET(ret);
+	if (dhandle_cache != NULL) {
+		candidate = 1;
+		session->dhandle = dhandle;
 
-	if (dhandle_cache == NULL && !LF_ISSET(WT_BTREE_NO_CACHE))
-		WT_RET(__wt_session_add_btree(session, NULL));
+		/*
+		 * Try to lock the file; if we succeed, our "exclusive"
+		 * state must match.
+		 */
+		ret = __wt_session_lock_btree(session, flags);
+		if (ret == WT_NOTFOUND)
+			dhandle_cache = NULL;
+		else
+			WT_RET(ret);
+	}
 
-	dhandle = session->dhandle;
-	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
-	    F_ISSET(dhandle, WT_DHANDLE_OPEN));
+	if (dhandle_cache == NULL) {
+		/*
+		 * If we don't already hold the schema lock, get it now so that
+		 * we can find and/or open the handle.
+		 */
+		WT_WITH_SCHEMA_LOCK_OPT(session, ret =
+		    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
+		WT_RET(ret);
+
+		if (!candidate)
+			WT_RET(__wt_session_add_btree(session, NULL));
+		WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
+		    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
+	}
+
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
-	    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
+	    F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE));
+	F_SET(session->dhandle, LF_ISSET(WT_DHANDLE_DISCARD_CLOSE));
 
 	return (0);
 }

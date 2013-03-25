@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -42,6 +42,8 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
+
+	/* Verbose configures a progress counter, move to the next line. */
 	if (verbose)
 		printf("\n");
 
@@ -60,7 +62,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "salvage [-F] file\n",
+	    "salvage [-F] uri\n",
 	    progname, usage_prefix);
 	return (1);
 }

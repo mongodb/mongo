@@ -13,6 +13,38 @@ An example of setting a cache size to 500MB:
 
 @snippet ex_config.c configure cache size
 
+@section tuning_memory_allocation Memory allocation
+
+The performance of heavily-threaded WiredTiger applications can be
+dominated by memory allocation because the WiredTiger engine has to free
+and re-allocate memory as part of many queries.  Replacing the system's
+malloc implementation with one that has better threaded performance (for
+example, Google's
+<a href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html">tcmalloc</a>,
+or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
+can dramatically improve throughput.
+
+@section tuning_read_only_objects Read-only objects
+
+Cursors opened on checkpoints (either named, or using the special "last
+checkpoint" name "WiredTigerCheckpoint") are read-only objects.  Unless
+memory mapping is configured off (using the "mmap" configuration string
+to ::wiredtiger_open), read-only objects are mapped into process memory
+instead of being read through the WiredTiger cache.  Using read-only
+objects where possible minimizes the amount of buffer cache memory
+required by WiredTiger applications and the work required for buffer
+cache management, as well as reducing the number of memory copies from
+the operating system buffer cache into application memory.
+
+To open a named checkpoint, use the configuration string "checkpoint"
+to the WT_SESSION::open_cursor method:
+@snippet ex_all.c open a named checkpoint
+
+To open the last checkpoint taken in the object, use the configuration
+string "checkpoint" with the name "WiredTigerCheckpoint" to the
+WT_SESSION::open_cursor method:
+@snippet ex_all.c open the default checkpoint
+
 @section tuning_cache_resident Cache resident objects
 
 Cache resident objects (objects never considered for the purposes of
@@ -108,49 +140,84 @@ An example of configuring page sizes:
 
 @snippet ex_file.c file create
 
-@section tuning_memory_allocation Memory allocation
-
-I/O intensive threaded applications, where the working set does not fit
-into the available cache, can be dominated by memory allocation because
-the WiredTiger engine has to free and re-allocate memory as part of many
-queries.  Replacing the system's malloc implementation with one that has
-better threaded performance (for example, Google's
-<a href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html">tcmalloc</a>,
-or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
-can dramatically improve throughput.
-
 @section tuning_checksums Checksums
 
-WiredTiger configures checksums on file reads and writes, by default.
-In read-only applications, or when file compression provides any
-necessary checksum functionality, or when using backing storage systems
-where blocks require no validation, performance can be increased by
-turning off checksum support when calling the WT_SESSION::create method.
+WiredTiger checksums file reads and writes, by default.  In read-only
+applications, or when file compression provides any necessary checksum
+functionality, or when using backing storage systems where blocks
+require no validation, performance can be increased by turning off
+checksum support when calling the WT_SESSION::create method.
+
+Checksums can be configured to be "off" or "on", as well as "uncompressed".
+The "uncompressed" configuration checksums blocks not otherwise protected
+by compression.   For example, in a system where the compression algorithms
+provide sufficient protection against corruption, and when writing a block
+which is too small to be usefully compressed, setting the checksum
+configuration value to "uncompressed" causes WiredTiger to checksum the
+blocks which are not compressed:
+
+@snippet ex_all.c Configure checksums to uncompressed
+
+@section tuning_direct_io Direct I/O
+
+WiredTiger optionally supports direct I/O, based on the non-standard \c
+O_DIRECT flag to the POSIX 1003.1 open system call.   Configuring direct
+I/O may be useful for applications wanting to minimize the operating
+system cache effects of I/O to and from WiredTiger's buffer cache.
+
+Direct I/O is configured using the "direct_io" configuration string to
+the ::wiredtiger_open function.  An example of configuring direct I/O
+for WiredTiger's data files:
+
+@snippet ex_all.c Configure direct_io for data files
+
+@section tuning_compression Compression
+
+WiredTiger configures key prefix compression for row-store objects, and
+column-store compression for both row-store and column-store objects,
+by default.
+These forms of compression minimize in-memory and on-disk space, but at
+some CPU cost when rows are read and written.   Turning these forms of
+compression off may increase application throughput.
+
+For example, turning off row-store key prefix compression:
+
+@snippet ex_all.c Configure key prefix compression off
+
+For example, turning off row-store or column-store dictionary compression:
+
+@snippet ex_all.c Configure dictionary compression off
+
+WiredTiger does not configure Huffman encoding or block compression by
+default, but these forms of compression can also impact overall
+throughput.  See @ref file_formats_compression for more information.
 
 @section tuning_statistics Performance monitoring with statistics
 
 WiredTiger maintains a variety of statistics that can be read with a
-cursor.  The statistics are at two levels: per-database statistics and
-per-underlying file statistics.  The database statistics are the
-default; the underlying file statistics are available by specifying the
-appropriate uri.
+cursor.  See @ref data_statistics for general information about accessing
+statistics.
 
-The following is an example of printing run-time statistics about the
-WiredTiger engine:
+The statistics gathered by WiredTiger can be combined to derive information
+about the system's behavior.  For example, a cursor can be opened on the
+statistics for a table:
 
-@snippet ex_stat.c statistics database function
+@snippet ex_stat.c statistics calculate open table stats
 
-The following is an example of printing statistics about an underlying
-file:
+Then this code calculates the "fragmentation" of a table, defined
+here as the percentage of the table that is not part of the current
+checkpoint:
 
-@snippet ex_stat.c statistics file function
+@snippet ex_stat.c statistics calculate table fragmentation
 
-Both examples can use a common display routine that iterates through the
-statistics until the cursor returns the end of the list.
+The following example calculates the "write amplification", defined here as
+the ratio of bytes written to the filesystem versus the total bytes
+inserted, updated and removed by the application.
 
-@snippet ex_stat.c statistics display function
+@snippet ex_stat.c statistics calculate write amplification
 
-Note the raw value of the statistic is available from the \c value
-field, as well as a printable string version of the value.
+Both examples use this helper function to retrieve statistics values from a
+cursor:
 
+@snippet ex_stat.c statistics calculation helper function
  */

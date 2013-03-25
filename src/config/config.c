@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -342,12 +342,13 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM *out = key;
 	int utf8_remain = 0;
-	static WT_CONFIG_ITEM default_value = {
+	static const WT_CONFIG_ITEM true_value = {
 		"", 0, 1, ITEM_NUM
 	};
 
 	key->len = 0;
-	*value = default_value;
+	/* Keys with no value default to true. */
+	*value = true_value;
 
 	if (conf->go == NULL)
 		conf->go = gostruct;
@@ -473,6 +474,17 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 }
 
 /*
+ * Arithmetic shift of a negative number is undefined by ISO/IEC 9899, and the
+ * WiredTiger API supports negative numbers.  Check it's not a negative number,
+ * and then cast the shift out of paranoia.
+ */
+#define	WT_SHIFT_INT64(v, s) do {					\
+	if ((v) < 0)							\
+		goto range;						\
+	(v) = (int64_t)(((uint64_t)(v)) << (s));			\
+} while (0)
+
+/*
  * __config_process_value
  *	Deal with special config values like true / false.
  */
@@ -506,23 +518,23 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				break;
 			case 'k':
 			case 'K':
-				value->val <<= 10;
+				WT_SHIFT_INT64(value->val, 10);
 				break;
 			case 'm':
 			case 'M':
-				value->val <<= 20;
+				WT_SHIFT_INT64(value->val, 20);
 				break;
 			case 'g':
 			case 'G':
-				value->val <<= 30;
+				WT_SHIFT_INT64(value->val, 30);
 				break;
 			case 't':
 			case 'T':
-				value->val <<= 40;
+				WT_SHIFT_INT64(value->val, 40);
 				break;
 			case 'p':
 			case 'P':
-				value->val <<= 50;
+				WT_SHIFT_INT64(value->val, 50);
 				break;
 			default:
 				/*
@@ -541,11 +553,13 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		 * that will be caught by __wt_config_check.
 		 */
 		if (value->type == ITEM_NUM && errno == ERANGE)
-			return (
-			    __config_err(conf, "Number out of range", ERANGE));
+			goto range;
 	}
 
 	return (0);
+
+range:
+	return (__config_err(conf, "Number out of range", ERANGE));
 }
 
 /*
@@ -567,17 +581,29 @@ int
 __wt_config_getraw(
     WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM k, v;
+	WT_CONFIG sparser;
+	WT_CONFIG_ITEM k, v, subk;
 	WT_DECL_RET;
 	int found;
 
 	found = 0;
 	while ((ret = __config_next(cparser, &k, &v)) == 0) {
-		if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
-		    key->len == k.len &&
+		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+			continue;
+		if (k.len == key->len &&
 		    strncasecmp(key->str, k.str, k.len) == 0) {
 			*value = v;
 			found = 1;
+		} else if (k.len < key->len && key->str[k.len] == '.' &&
+		    strncasecmp(key->str, k.str, k.len) == 0) {
+			subk.str = key->str + k.len + 1;
+			subk.len = (key->len - k.len) - 1;
+			WT_RET(__wt_config_initn(
+			    cparser->session, &sparser, v.str, v.len));
+			if ((ret =
+			    __wt_config_getraw(&sparser, &subk, value)) == 0)
+				found = 1;
+			WT_RET_NOTFOUND_OK(ret);
 		}
 	}
 
@@ -662,25 +688,26 @@ int
 __wt_config_gets_defno(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
+	static const WT_CONFIG_ITEM false_value = {
+		"", 0, 0, ITEM_NUM
+	};
+
 	/*
-	 * This is a performance hack: it's expensive to parse configuration
-	 * strings, so don't do it unless it's necessary in performance paths
-	 * like cursor creation.  Assume the second configuration string is
-	 * the application's configuration string, and if it's not set (which
-	 * is true most of the time), then assume the default answer is "no",
-	 * and return that.  This makes it much faster to open cursors when
-	 * checking for obscure open configuration strings like "next_random".
+	 * This is a performance hack: it's expensive to repeatedly parse
+	 * configuration strings, so don't do it unless it's necessary in
+	 * performance paths like cursor creation.  Assume the second
+	 * configuration string is the application's configuration string, and
+	 * if it's not set (which is true most of the time), then assume the
+	 * default answer is "false", and return that.  This makes it much
+	 * faster to open cursors when checking for obscure open configuration
+	 * strings like "next_random".
 	 */
-	value->len = 0;
-	value->val = 0;
+	*value = false_value;
 	if (cfg == NULL || cfg[1] == NULL)
 		return (0);
-	else if (cfg[2] == NULL) {
-		int ret = __wt_config_getones(session, cfg[1], key, value);
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		return (ret);
-	}
+	else if (cfg[2] == NULL)
+		WT_RET_NOTFOUND_OK(
+		    __wt_config_getones(session, cfg[1], key, value));
 	return (__wt_config_gets(session, cfg, key, value));
 }
 

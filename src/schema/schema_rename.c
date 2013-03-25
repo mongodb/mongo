@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -66,7 +66,6 @@ __rename_file(
 
 err:	__wt_free(session, newvalue);
 	__wt_free(session, oldvalue);
-
 	return (ret);
 }
 
@@ -75,69 +74,94 @@ err:	__wt_free(session, newvalue);
  *	Rename an index or colgroup reference.
  */
 static int
-__rename_tree(WT_SESSION_IMPL *session, const char *name, const char *newname)
+__rename_tree(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *newuri, const char *name, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
+	WT_DECL_ITEM(nn);
+	WT_DECL_ITEM(ns);
+	WT_DECL_ITEM(nv);
+	WT_DECL_ITEM(os);
 	WT_DECL_RET;
-	WT_ITEM *of, *nf, *nk, *nv;
-	const char *newfile, *p, *t, *value;
+	const char *newname, *olduri, *suffix, *value;
+	int is_colgroup;
 
-	nf = nk = nv = of = NULL;
+	olduri = table->name;
+	newname = newuri;
+	(void)WT_PREFIX_SKIP(newname, "table:");
+
+	/*
+	 * Create the new data source URI and update the schema value.
+	 *
+	 * 'name' has the format (colgroup|index):<tablename>[:<suffix>];
+	 * we need the suffix.
+	 */
+	is_colgroup = WT_PREFIX_MATCH(name, "colgroup:");
+	if (!is_colgroup && !WT_PREFIX_MATCH(name, "index:"))
+		WT_ERR_MSG(session, EINVAL,
+		    "expected a 'colgroup:' or 'index:' source: '%s'", name);
+
+	suffix = strchr(name, ':');
+	WT_ASSERT(session, suffix != NULL);
+	suffix = strchr(suffix + 1, ':');
+
+	WT_ERR(__wt_scr_alloc(session, 0, &nn));
+	WT_ERR(__wt_buf_fmt(session, nn, "%s%s%s",
+	    is_colgroup ? "colgroup:" : "index:",
+	    newname,
+	    (suffix == NULL) ? "" : suffix));
+
+	/* Skip the colon, if any. */
+	if (suffix != NULL)
+		++suffix;
 
 	/* Read the old schema value. */
 	WT_ERR(__wt_metadata_read(session, name, &value));
 
 	/*
-	 * Create the new file name, new schema key, new schema value.
-	 *
-	 * Names are of the form "prefix.oldname:suffix", where suffix is
-	 * optional; we need prefix and suffix.
+	 * Calculate the new data source URI.  Use the existing table structure
+	 * and substitute the new name temporarily.
 	 */
-	if ((p = strchr(name, ':')) == NULL)
+	WT_ERR(__wt_scr_alloc(session, 0, &ns));
+	table->name = newuri;
+	if (is_colgroup)
+		WT_ERR(__wt_schema_colgroup_source(
+		    session, table, suffix, value, ns));
+	else
+		WT_ERR(__wt_schema_index_source(
+		    session, table, suffix, value, ns));
+
+	if ((ret = __wt_config_getones(session, value, "source", &cval)) != 0)
 		WT_ERR_MSG(session, EINVAL,
-		    "invalid index or column-group name: %s", name);
-	t = strchr(p + 1, ':');
+		    "index or column group has no data source: %s", value);
 
-	WT_ERR(__wt_scr_alloc(session, 0, &nf));
-	WT_ERR(__wt_buf_fmt(session, nf, "file:%s%s%s.wt", newname,
-	    t == NULL ? "" : "_",  t == NULL ? "" : t + 1));
-	newfile = (const char *)nf->data + strlen("file:");
+	/* Take a copy of the old data source. */
+	WT_ERR(__wt_scr_alloc(session, 0, &os));
+	WT_ERR(__wt_buf_fmt(session, os, "%.*s", (int)cval.len, cval.str));
 
-	WT_ERR(__wt_scr_alloc(session, 0, &nk));
-	WT_ERR(__wt_buf_fmt(session, nk, "%.*s:%s%s%s",
-	    (int)WT_PTRDIFF(p, name), name, newname,
-	    t == NULL ? "" : ":", t == NULL ? "" : t + 1));
-
-	if ((p = strstr(value, "filename=")) == NULL)
-		WT_ERR_MSG(session, EINVAL,
-		    "index or column-group value has no file name: %s", value);
-	p += strlen("filename=");
-	t = strchr(p, ',');
-
-	/* Take a copy of the old filename. */
-	WT_ERR(__wt_scr_alloc(session, 0, &of));
-	WT_ERR(__wt_buf_fmt(session, of, "file:%.*s",
-	    (int)((t == NULL) ? strlen(p) : WT_PTRDIFF(t, p)), p));
-
-	/* Overwrite it with the new filename. */
+	/* Overwrite it with the new data source. */
 	WT_ERR(__wt_scr_alloc(session, 0, &nv));
 	WT_ERR(__wt_buf_fmt(session, nv, "%.*s%s%s",
-	    (int)WT_PTRDIFF(p, value), value, newfile, t == NULL ? "" : t));
+	    (int)WT_PTRDIFF(cval.str, value), value,
+	    (const char *)ns->data,
+	    cval.str + cval.len));
 
 	/*
 	 * Remove the old metadata entry.
 	 * Insert the new metadata entry.
 	 */
 	WT_ERR(__wt_metadata_remove(session, name));
-	WT_ERR(__wt_metadata_insert(session, nk->data, nv->data));
+	WT_ERR(__wt_metadata_insert(session, nn->data, nv->data));
 
 	/* Rename the file. */
-	WT_ERR(__rename_file(session, of->data, nf->data));
+	WT_ERR(__wt_schema_rename(session, os->data, ns->data, cfg));
 
-err:	__wt_scr_free(&nf);
-	__wt_scr_free(&nk);
+err:	__wt_scr_free(&nn);
+	__wt_scr_free(&ns);
 	__wt_scr_free(&nv);
-	__wt_scr_free(&of);
+	__wt_scr_free(&os);
 	__wt_free(session, value);
+	table->name = olduri;
 	return (ret);
 }
 
@@ -146,40 +170,39 @@ err:	__wt_scr_free(&nf);
  *	WT_SESSION::rename for a table.
  */
 static int
-__rename_table(
-    WT_SESSION_IMPL *session, const char *oldname, const char *newname)
+__rename_table(WT_SESSION_IMPL *session,
+    const char *uri, const char *newuri, const char *cfg[])
 {
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	WT_TABLE *table;
-	int i;
-	const char *value;
+	u_int i;
+	const char *oldname, *value;
 
-	buf = NULL;
+	oldname = uri;
+	(void)WT_PREFIX_SKIP(oldname, "table:");
 
 	WT_RET(__wt_schema_get_table(
 	    session, oldname, strlen(oldname), 0, &table));
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
-		WT_RET(__rename_tree(
-		    session, table->cgroups[i]->name, newname));
+		WT_RET(__rename_tree(session, table, newuri,
+		    table->cgroups[i]->name, cfg));
 
 	/* Rename the indices. */
 	WT_RET(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++)
-		WT_RET(__rename_tree(session,
-		    table->indices[i]->name, newname));
+		WT_RET(__rename_tree(session, table, newuri,
+		    table->indices[i]->name, cfg));
 
 	WT_RET(__wt_schema_remove_table(session, table));
 
 	/* Rename the table. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "table:%s", oldname));
-	WT_ERR(__wt_metadata_read(session, buf->data, &value));
-	WT_ERR(__wt_metadata_remove(session, buf->data));
-	WT_ERR(__wt_buf_fmt(session, buf, "table:%s", newname));
-	WT_ERR(__wt_metadata_insert(session, buf->data, value));
+	WT_ERR(__wt_metadata_read(session, uri, &value));
+	WT_ERR(__wt_metadata_remove(session, uri));
+	WT_ERR(__wt_metadata_insert(session, newuri, value));
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -196,8 +219,6 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	const char *oldname, *newname;
-
-	WT_UNUSED(cfg);
 
 	/* Disallow renames to/from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
@@ -222,10 +243,9 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 			WT_RET_MSG(session, EINVAL,
 			    "rename target type must match URI: %s to %s",
 			    uri, newuri);
-		ret = __rename_table(session, oldname, newname);
-	} else if ((ret = __wt_schema_get_source(session, oldname, &dsrc)) == 0)
-		ret = dsrc->rename(dsrc,
-		    &session->iface, oldname, newname, cfg);
+		ret = __rename_table(session, uri, newuri, cfg);
+	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->rename(dsrc, &session->iface, uri, newuri, cfg);
 
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 

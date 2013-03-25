@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -27,15 +27,15 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	 */
 	if (strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
-		    "comparison method cursors must reference the same object");
+		    "Cursors must reference the same object");
 
 	WT_CURSOR_NEEDKEY(a);
 	WT_CURSOR_NEEDKEY(b);
 
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -53,8 +53,8 @@ __curfile_next(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor, 0);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -73,8 +73,8 @@ __curfile_next_random(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next_random(cbt);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -92,8 +92,8 @@ __curfile_prev(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor, 0);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -111,8 +111,8 @@ __curfile_reset(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, cbt->btree);
 	ret = __wt_btcur_reset(cbt);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -131,8 +131,8 @@ __curfile_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search(cbt);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -151,8 +151,8 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search_near(cbt, exact);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -173,8 +173,8 @@ __curfile_insert(WT_CURSOR *cursor)
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -194,8 +194,8 @@ __curfile_update(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -214,8 +214,8 @@ __curfile_remove(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -266,8 +266,8 @@ __curfile_close(WT_CURSOR *cursor)
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -277,50 +277,35 @@ __curfile_close(WT_CURSOR *cursor)
  */
 int
 __wt_curfile_create(WT_SESSION_IMPL *session,
-    WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
+    WT_CURSOR *owner, const char *cfg[], int bulk, int bitmap,
+    WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__curfile_compare,
-		__curfile_next,
-		__curfile_prev,
-		__curfile_reset,
-		__curfile_search,
-		__curfile_search_near,
-		__curfile_insert,
-		__curfile_update,
-		__curfile_remove,
-		__curfile_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    NULL,			/* get-key */
+	    NULL,			/* get-value */
+	    NULL,			/* set-key */
+	    NULL,			/* set-value */
+	    __curfile_compare,		/* compare */
+	    __curfile_next,		/* next */
+	    __curfile_prev,		/* prev */
+	    __curfile_reset,		/* reset */
+	    __curfile_search,		/* search */
+	    __curfile_search_near,	/* search-near */
+	    __curfile_insert,		/* insert */
+	    __curfile_update,		/* update */
+	    __curfile_remove,		/* remove */
+	    __curfile_close);		/* close */
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	size_t csize;
-	int bulk;
 
 	cbt = NULL;
 
 	btree = S2BT(session);
 	WT_ASSERT(session, btree != NULL);
-
-	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	bulk = (cval.val != 0);
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));
@@ -334,18 +319,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	cbt->btree = btree;
 	if (bulk)
-		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
-
-	/*
-	 * no_cache
-	 * No cache cursors are read-only.
-	 */
-	WT_ERR(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
-	if (cval.val != 0) {
-		cursor->insert = __wt_cursor_notsup;
-		cursor->update = __wt_cursor_notsup;
-		cursor->remove = __wt_cursor_notsup;
-	}
+		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
 
 	/*
 	 * random_retrieval
@@ -379,37 +353,37 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	int bitmap, bulk;
 	uint32_t flags;
 
-	/*
-	 * Bulk and no cache handles are exclusive and may not be used by more
-	 * than a single thread.
-	 * Additionally set the discard flag on no cache handles so they are
-	 * destroyed on close.
-	 */
 	flags = 0;
+
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	if (cval.val != 0)
-		LF_SET(WT_DHANDLE_EXCLUSIVE | WT_BTREE_BULK);
-	WT_RET(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
-	if (cval.val != 0)
-		LF_SET(WT_DHANDLE_EXCLUSIVE | WT_BTREE_NO_CACHE);
+	if (cval.type == ITEM_NUM && (cval.val == 0 || cval.val == 1)) {
+		bitmap = 0;
+		bulk = (cval.val != 0);
+	} else if (WT_STRING_MATCH("bitmap", cval.str, cval.len))
+		bitmap = bulk = 1;
+	else
+		WT_RET_MSG(session, EINVAL,
+		    "Value for 'bulk' must be a boolean or 'bitmap'");
+
+	/* Bulk handles require exclusive access. */
+	if (bulk)
+		LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
 	/* TODO: handle projections. */
 
 	/* Get the handle and lock it while the cursor is using it. */
-	if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
-		WT_RET(__wt_schema_get_btree(
-		    session, uri, strlen(uri), cfg, flags));
-	else if (WT_PREFIX_MATCH(uri, "file:"))
+	if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, flags));
 	else
 		WT_RET(__wt_bad_object_type(session, uri));
 
-	WT_ERR(__wt_curfile_create(session, owner, cfg, cursorp));
+	WT_ERR(__wt_curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */
-	(void)__wt_session_release_btree(session);
+	WT_TRET(__wt_session_release_btree(session));
 	return (ret);
 }

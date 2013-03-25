@@ -6,11 +6,12 @@
 # If the directory exists, it is added to AUTO_SUBDIRS.
 # If a condition is included, the subdir is made conditional via AM_CONDITIONAL
 bench/tcbench
+bench/wtperf
 examples/c
 ext/collators/reverse
-ext/compressors/bzip2_compress BZIP2
-ext/compressors/nop_compress
-ext/compressors/snappy_compress SNAPPY
+ext/compressors/bzip2 BZIP2
+ext/compressors/nop
+ext/compressors/snappy SNAPPY
 lang/python PYTHON
 test/bloom
 test/fops

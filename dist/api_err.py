@@ -82,3 +82,26 @@ tfile.write('''\
 ''')
 tfile.close()
 compare_srcfile(tmp_file, '../src/api/api_strerror.c')
+
+# Update the error documentation block.
+tmp_file = '__tmp'
+tfile = open(tmp_file, 'w')
+skip = 0
+for line in open('../src/docs/error.dox', 'r'):
+	if not skip:
+		tfile.write(line)
+	if line.count('IGNORE_BUILT_BY_API_ERR_END'):
+		tfile.write(line)
+		skip = 0
+	elif line.count('IGNORE_BUILT_BY_API_ERR_BEGIN'):
+		tfile.write('@endif\n\n')
+		skip = 1
+
+		for err in api_data.errors:
+			if 'undoc' in err.flags:
+				continue
+			tfile.write(
+			    '@par <code>' + err.name.upper() + '</code>\n' +
+			    " ".join(err.long_desc.split()) + '\n\n')
+tfile.close()
+compare_srcfile(tmp_file, '../src/docs/error.dox')

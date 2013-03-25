@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -25,123 +25,86 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test001.py
-#   Basic operations
+# test_compress01.py
+#   Basic compression operations
 #
 
-import os
+import os, run
 import wiredtiger, wttest
+from wtscenario import multiply_scenarios, number_scenarios
 
-class test_compress01_base(wttest.WiredTigerTestCase):
-    """
-    Test basic compression
-    """
+# Test basic compression
+class test_compress01(wttest.WiredTigerTestCase):
+
+    types = [
+        ('file', dict(uri='file:test_compress01')),
+        ('table', dict(uri='table:test_compress01')),
+    ]
+    compress = [
+        ('bzip2', dict(compress='bzip2')),
+        ('nop', dict(compress='nop')),
+        ('snappy', dict(compress='snappy')),
+        ('none', dict(compress=None)),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.', types, compress))
+
     nrecords = 10000
+    bigvalue = "abcdefghij" * 1000
 
-    # running tests from the base class uses no compressor,
-    # a reasonable way to test the test case.
-    def __init__(self, testname, compressor_name=None, abbrev='none'):
-        wttest.WiredTigerTestCase.__init__(self, testname)
-        self.compressor_name = compressor_name
-        self.table_name1 = 'test_compress01' + abbrev + '.wt'
-        # bigvalue = '1234567891011121314....'
-        self.bigvalue = ''.join([`num` for num in xrange(1,10000)])  # about 38K chars long
-
-    def create_table(self, tablename):
-        extra_params = ',internal_page_max=16384,leaf_page_max=131072'
-        comp_params = ''
-        if self.compressor_name != None:
-            comp_params = ',block_compressor=' + self.compressor_name
-        params = 'key_format=S,value_format=S' + extra_params + comp_params
-        self.pr('create_table: ' + tablename + ', params: ' + params)
-        self.session.create('file:' + tablename, params)
-
-    def cursor_s(self, tablename, key):
-        cursor = self.session.open_cursor('file:' + tablename, None)
-        cursor.set_key(key)
-        return cursor
-
-    def cursor_ss(self, tablename, key, val):
-        cursor = self.cursor_s(tablename, key)
-        cursor.set_value(val)
-        return cursor
-
-    def record_count(self):
-        return self.nrecords
-
-    def do_insert(self):
-        """
-        Create a table, add keys with big values, get them back
-        """
-        self.create_table(self.table_name1)
-
-        self.pr("inserting `len(self.bigvalue)` byte values")
-        for idx in xrange(1,self.record_count()):
-            val = `idx` + self.bigvalue + `idx`
-            inscursor = self.cursor_ss(self.table_name1, 'key' + `idx`, val)
-            inscursor.insert()
-            inscursor.close()
-
-    def do_verify(self):
-        self.pr('search')
-        for idx in xrange(1,self.record_count()):
-            val = `idx` + self.bigvalue + `idx`
-            getcursor = self.cursor_s(self.table_name1, 'key' + `idx`)
-            ret = getcursor.search()
-            self.assertTrue(ret == 0)
-            self.assertEquals(getcursor.get_value(), val)
-            getcursor.close()
-
-    def extensionArg(self, name):
-        if name != None:
-            testdir = os.path.dirname(__file__)
-            import run
-            extdir = os.path.join(run.wt_builddir, 'ext/compressors')
-            extfile = os.path.join(extdir, name, '.libs', name + '.so')
-            if not os.path.exists(extfile):
-                self.skipTest('Extension "' + extfile + '" not built')
-            return 'extensions=["' + extfile + '"]'
-        else:
-            return ''
-
-    # override WiredTigerTestCase
+    # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
-        return self.setUpConnectionWithExtension(dir, self.compressor_name)
-        
-    def setUpConnectionWithExtension(self, dir, name):
-        conn = wiredtiger.wiredtiger_open(
-            dir, 'create,' + self.extensionArg(name))
+        conn = wiredtiger.wiredtiger_open( dir, 'create,' +
+            ('error_prefix="%s: ",' % self.shortid()) +
+            self.extensionArg(self.compress))
         self.pr(`conn`)
         return conn
 
+    # Return the wiredtiger_open extension argument for a shared library.
+    def extensionArg(self, name):
+        if name == None:
+            return ''
 
-# Put the tests in a class that doesn't inherit from unittest.TestCase so
-# they will only be called by the concrete subclasses with real implementations.
-#
-# It doesn't make sense to call test_compress01_base.test_insert_and_verify --
-# this is how to avoid that.
-class compress01_tests(object):
-    def test_insert_and_verify(self):
-        self.do_insert()
-        # We want a fresh cache so compressed pages are read from disk. 
+        testdir = os.path.dirname(__file__)
+        extdir = os.path.join(run.wt_builddir, 'ext/compressors')
+        extfile = os.path.join(
+            extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
+        if not os.path.exists(extfile):
+            self.skipTest('compression extension "' + extfile + '" not built')
+        return ',extensions=["' + extfile + '"]'
+
+    # Create a table, add keys with both big and small values, then verify them.
+    def test_compress(self):
+
+        # Use relatively small leaf pages to force big values to be overflow
+        # items, but still large enough that we get some compression action.
+        params = 'key_format=S,value_format=S,leaf_page_max=4096'
+        if self.compress != None:
+            params += ',block_compressor=' + self.compress
+
+        self.session.create(self.uri, params)
+        cursor = self.session.open_cursor(self.uri, None)
+        for idx in xrange(1,self.nrecords):
+            cursor.set_key(`idx`)
+            if idx / 12 == 0:
+                cursor.set_value(`idx` + self.bigvalue)
+            else:
+                cursor.set_value(`idx` + "abcdefg")
+            cursor.insert()
+        cursor.close()
+
+        # Force the cache to disk, so we read compressed pages from disk.
         self.reopen_conn()
-        self.do_verify()
 
-
-class test_compress01_1_nop(test_compress01_base, compress01_tests):
-    def __init__(self, testname):
-        test_compress01_base.__init__(self, testname, 'nop_compress', 'nop')
-
-class test_compress01_2_bz(test_compress01_base, compress01_tests):
-    def __init__(self, testname):
-        test_compress01_base.__init__(self, testname, 'bzip2_compress', 'bz')
-
-class test_compress01_3_sn(test_compress01_base, compress01_tests):
-    def __init__(self, testname):
-        test_compress01_base.__init__(self, testname, 'snappy_compress', 'sn')
+        cursor = self.session.open_cursor(self.uri, None)
+        for idx in xrange(1,self.nrecords):
+            cursor.set_key(`idx`)
+            self.assertEqual(cursor.search(), 0)
+            if idx / 12 == 0:
+                self.assertEquals(cursor.get_value(), `idx` + self.bigvalue)
+            else:
+                self.assertEquals(cursor.get_value(), `idx` + "abcdefg")
+        cursor.close()
 
 
 if __name__ == '__main__':
-    wttest.run(test_compress01_1_nop)
-    wttest.run(test_compress01_2_bz)
-    wttest.run(test_compress01_3_sn)
+    wttest.run()

@@ -25,7 +25,7 @@ and the newline character are discarded.
 <li>Any text between double-quote pairs (<b><tt>"</tt></b>) is left
 untouched, including newline and white-space characters.   Backslash
 characters escape double-quote characters: a backslash escaped
-double-quote character can neither start or end a quoted string.
+double-quote character can neither start nor end a quoted string.
 
 <li>Comments are discarded.  If the first non-white-space character
 following an unquoted and unescaped newline character is a hash mark

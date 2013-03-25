@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -8,24 +8,29 @@
 #include "wt_internal.h"
 
 /*
- * __wt_schema_add_table --
+ * __schema_add_table --
  *	Add a table handle to the session's cache.
  */
-int
-__wt_schema_add_table(
-    WT_SESSION_IMPL *session, WT_TABLE *table)
+static int
+__schema_add_table(WT_SESSION_IMPL *session,
+    const char *name, size_t namelen, WT_TABLE **tablep)
 {
+	WT_TABLE *table;
+
+	WT_RET(__wt_schema_open_table(session, name, namelen, &table));
+
 	TAILQ_INSERT_HEAD(&session->tables, table, q);
+	*tablep = table;
 
 	return (0);
 }
 
 /*
- * __wt_schema_get_table --
- *	Get the table handle for the named table.
+ * __schema_find_table --
+ *	Find the table handle for the named table in the session cache.
  */
-int
-__wt_schema_find_table(WT_SESSION_IMPL *session,
+static int
+__schema_find_table(WT_SESSION_IMPL *session,
     const char *name, size_t namelen, WT_TABLE **tablep)
 {
 	WT_TABLE *table;
@@ -54,12 +59,12 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	ret = __wt_schema_find_table(session, name, namelen, &table);
+	table = NULL;
+	ret = __schema_find_table(session, name, namelen, &table);
 
-	if (ret == WT_NOTFOUND) {
-		WT_RET(__wt_schema_open_table(session, name, namelen, &table));
-		ret = __wt_schema_add_table(session, table);
-	}
+	if (ret == WT_NOTFOUND)
+		WT_WITH_SCHEMA_LOCK_OPT(session,
+		    ret = __schema_add_table(session, name, namelen, &table));
 
 	if (ret == 0) {
 		if (!ok_incomplete && !table->cg_complete)
@@ -96,6 +101,7 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
 	__wt_free(session, idx->name);
 	__wt_free(session, idx->source);
 	__wt_free(session, idx->config);
+	__wt_free(session, idx->key_format);
 	__wt_free(session, idx->key_plan);
 	__wt_free(session, idx->value_plan);
 	__wt_free(session, idx->idxkey_format);
@@ -111,7 +117,7 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_COLGROUP *colgroup;
 	WT_INDEX *idx;
-	int i;
+	u_int i;
 
 	__wt_free(session, table->name);
 	__wt_free(session, table->config);

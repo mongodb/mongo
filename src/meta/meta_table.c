@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -81,15 +81,14 @@ __wt_metadata_load_backup(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_getline(session, value, fp));
 		if (value->size == 0)
 			WT_ERR(__wt_illegal_value(session, WT_METADATA_BACKUP));
-		WT_ERR(__wt_metadata_update(
-		    session, (char *)key->data, (char *)value->data));
+		WT_ERR(__wt_metadata_update(session, key->data, value->data));
 	}
 
 	/* Remove the hot backup file, it's only read (successfully) once. */
 	WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));
 
 err:	if (fp != NULL)
-		WT_TRET(fclose(fp));
+		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	if (path != NULL)
 		__wt_free(session, path);
 	__wt_scr_free(&key);
@@ -114,7 +113,7 @@ __wt_metadata_cursor(
 
 	WT_SET_BTREE_IN_SESSION(session, session->metafile);
 	WT_ERR(__wt_session_lock_btree(session, 0));
-	ret = __wt_curfile_create(session, NULL, cfg, cursorp);
+	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
 
 	/* Restore the caller's btree. */
 err:	session->dhandle = saved_dhandle;
@@ -136,15 +135,15 @@ __wt_metadata_insert(
 		WT_RET_MSG(session, EINVAL,
 		    "%s: insert not supported on the turtle file", key);
 
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
-	WT_TRET(cursor->insert(cursor));
-	if (ret == 0 && WT_META_TRACKING(session))
-		ret = __wt_meta_track_insert(session, key);
-	WT_TRET(cursor->close(cursor));
+	WT_ERR(cursor->insert(cursor));
+	if (WT_META_TRACKING(session))
+		WT_ERR(__wt_meta_track_insert(session, key));
 
-err:	return (ret);
+err:	WT_TRET(cursor->close(cursor));
+	return (ret);
 }
 
 /*
@@ -167,9 +166,9 @@ __wt_metadata_update(
 	WT_RET(__wt_metadata_cursor(session, "overwrite", &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
-	WT_TRET(cursor->insert(cursor));
-	WT_TRET(cursor->close(cursor));
+	WT_ERR(cursor->insert(cursor));
 
+err:	WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 
@@ -189,14 +188,12 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
-	WT_TRET(cursor->search(cursor));
-	if (ret == 0) {
-		if (WT_META_TRACKING(session))
-			WT_TRET(__wt_meta_track_update(session, key));
-		WT_TRET(cursor->remove(cursor));
-	}
-	WT_TRET(cursor->close(cursor));
+	WT_ERR(cursor->search(cursor));
+	if (WT_META_TRACKING(session))
+		WT_ERR(__wt_meta_track_update(session, key));
+	WT_ERR(cursor->remove(cursor));
 
+err:	WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 

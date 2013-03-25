@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -39,8 +39,6 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
 		    progname, uri, newname, wiredtiger_strerror(ret));
 		goto err;
 	}
-	if (verbose)
-		printf("\n");
 
 	if (0) {
 err:		ret = 1;

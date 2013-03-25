@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -20,9 +20,10 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
+	WT_INDEX *idx;
 	WT_TABLE *table;
 	const char *tablename;
-	int i;
+	u_int i;
 
 	tablename = uri;
 
@@ -32,13 +33,16 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		    session, uri, cfg, open_flags));
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
-	} else if (WT_PREFIX_MATCH(uri, "colgroup:") ||
-	    WT_PREFIX_MATCH(uri, "index:")) {
-		WT_RET(__wt_schema_get_btree(
-		    session, uri, strlen(uri), cfg, open_flags));
-		ret = func(session, cfg);
-		WT_TRET(__wt_session_release_btree(session));
-	} else if (WT_PREFIX_SKIP(tablename, "lsm:")) {
+	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
+		WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
+		WT_RET(__wt_schema_worker(
+		    session, colgroup->source, func, cfg, open_flags));
+	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
+		idx = NULL;
+		WT_RET(__wt_schema_get_index(session, uri, NULL, &idx));
+		WT_RET(__wt_schema_worker(
+		    session, idx->source, func, cfg, open_flags));
+	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
 		WT_RET(__wt_lsm_tree_worker(
 		    session, uri, func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
@@ -48,11 +52,15 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
-			WT_RET(__wt_session_get_btree_ckpt(session,
-			    colgroup->source, cfg, open_flags));
-			ret = func(session, cfg);
-			WT_TRET(__wt_session_release_btree(session));
-			WT_RET(ret);
+			WT_RET(__wt_schema_worker(
+			    session, colgroup->source, func, cfg, open_flags));
+		}
+
+		WT_RET(__wt_schema_open_indices(session, table));
+		for (i = 0; i < table->nindices; i++) {
+			idx = table->indices[i];
+			WT_RET(__wt_schema_worker(
+			    session, idx->source, func, cfg, open_flags));
 		}
 	} else
 		return (__wt_bad_object_type(session, uri));

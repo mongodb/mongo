@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -17,6 +17,7 @@ int
 __wt_raw_to_hex(
     WT_SESSION_IMPL *session, const uint8_t *from, uint32_t size, WT_ITEM *to)
 {
+	size_t len;
 	uint32_t i;
 	const uint8_t *p;
 	u_char *t;
@@ -25,7 +26,8 @@ __wt_raw_to_hex(
 	 * In the worst case, every character takes up 2 spaces, plus a
 	 * trailing nul byte.
 	 */
-	WT_RET(__wt_buf_init(session, to, size * 2 + 1));
+	len = (size_t)size * 2 + 1;
+	WT_RET(__wt_buf_init(session, to, len));
 
 	for (p = from, t = to->mem, i = size; i > 0; --i, ++p) {
 		*t++ = hex[(*p & 0xf0) >> 4];
@@ -79,7 +81,7 @@ __wt_raw_to_esc_hex(
  *	Convert a pair of hex characters into a byte.
  */
 static inline int
-hex2byte(const char *from, u_char *to)
+hex2byte(const u_char *from, u_char *to)
 {
 	uint8_t byte;
 
@@ -152,7 +154,7 @@ int
 __wt_nhex_to_raw(
     WT_SESSION_IMPL *session, const char *from, size_t size, WT_ITEM *to)
 {
-	const char *p;
+	const u_char *p;
 	u_char *t;
 
 	if (size % 2 != 0)
@@ -160,7 +162,7 @@ __wt_nhex_to_raw(
 
 	WT_RET(__wt_buf_init(session, to, size / 2));
 
-	for (p = from, t = to->mem; size > 0; p += 2, size -= 2, ++t)
+	for (p = (u_char *)from, t = to->mem; size > 0; p += 2, size -= 2, ++t)
 		if (hex2byte(p, t))
 			return (__hex_fmterr(session));
 
@@ -175,12 +177,12 @@ __wt_nhex_to_raw(
 int
 __wt_esc_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 {
-	const char *p;
+	const u_char *p;
 	u_char *t;
 
 	WT_RET(__wt_buf_init(session, to, strlen(from)));
 
-	for (p = from, t = to->mem; *p != '\0'; ++p, ++t) {
+	for (p = (u_char *)from, t = to->mem; *p != '\0'; ++p, ++t) {
 		if ((*t = *p) != '\\')
 			continue;
 		++p;

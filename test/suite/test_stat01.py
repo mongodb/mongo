@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -25,7 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import helper, wiredtiger, wttest
+from wiredtiger import stat
 
 # test_stat01.py
 #    Statistics operations
@@ -35,6 +36,8 @@ class test_stat01(wttest.WiredTigerTestCase):
     """
 
     tablename = 'test_stat01.wt'
+    uri = 'file:' + tablename
+    config = 'key_format=S,allocation_size=512,internal_page_max=16K,leaf_page_max=128K'
     nentries = 25
 
     def statstr_to_int(self, str):
@@ -69,10 +72,23 @@ class test_stat01(wttest.WiredTigerTestCase):
         self.assertTrue(count > mincount)
         self.assertTrue(found, 'in stats, did not see: ' + lookfor)
 
-    def test_statistics(self):
-        extra_params = ',allocation_size=512,internal_page_max=16384,leaf_page_max=131072'
-        self.session.create('table:' + self.tablename, 'key_format=S,value_format=S' + extra_params)
-        cursor = self.session.open_cursor('table:' + self.tablename, None, None)
+    def test_basic_conn_stats(self):
+        self.printVerbose(2, 'overall database stats:')
+        allstat_cursor = self.session.open_cursor('statistics:', None, None)
+        self.check_stats(
+            allstat_cursor, 10, 'blocks written by the block manager')
+
+        # See that we can get a specific stat value by its key,
+        # and verify that its entry is self-consistent
+        values = allstat_cursor[stat.conn.block_write]
+        self.assertEqual(values[0], 'blocks written by the block manager')
+        val = self.statstr_to_int(values[1])
+        self.assertEqual(val, values[2])
+        allstat_cursor.close()
+
+    def test_basic_data_source_stats(self):
+        self.session.create(self.uri, self.config)
+        cursor = self.session.open_cursor(self.uri, None, None)
         value = ""
         for i in range(0, self.nentries):
             key = str(i)
@@ -82,37 +98,37 @@ class test_stat01(wttest.WiredTigerTestCase):
             cursor.insert()
         cursor.close()
 
-        self.printVerbose(2, 'overall database stats:')
-        allstat_cursor = self.session.open_cursor('statistics:', None, None)
-        self.check_stats(allstat_cursor, 10, 'blocks written to a file')
+        self.printVerbose(2, 'data source specific stats:')
+        cursor = self.session.open_cursor(
+            'statistics:' + self.uri, None, None)
+        self.check_stats(cursor, 10, 'overflow pages')
 
         # See that we can get a specific stat value by its key,
         # and verify that its entry is self-consistent
-        allstat_cursor.set_key(wiredtiger.stat.block_write)
-        self.assertEqual(allstat_cursor.search(), 0)
-        values = allstat_cursor.get_values()
-        self.assertEqual(values[0], 'blocks written to a file')
-        val = self.statstr_to_int(values[1])
-        self.assertEqual(val, values[2])
-        allstat_cursor.close()
-
-        self.printVerbose(2, 'file specific stats:')
-        filestat_cursor = self.session.open_cursor('statistics:file:' + self.tablename + ".wt", None, None)
-        self.check_stats(filestat_cursor, 10, 'overflow pages')
-
-        # See that we can get a specific stat value by its key,
-        # and verify that its entry is self-consistent
-        filestat_cursor.set_key(wiredtiger.filestat.overflow)
-        self.assertEqual(filestat_cursor.search(), 0)
-        values = filestat_cursor.get_values()
+        values = cursor[stat.dsrc.btree_overflow]
         self.assertEqual(values[0], 'overflow pages')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
-        filestat_cursor.close()
+        cursor.close()
 
-        self.assertRaises(wiredtiger.WiredTigerError,
-                          lambda: self.session.open_cursor(
-                              'statistics:file:DoesNotExist', None, None))
+    def test_missing_file_stats(self):
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
+            self.session.open_cursor('statistics:file:DoesNotExist'))
+
+    def test_checkpoint_stats(self):
+        nentries = 0
+        last_size = 0
+        for name in ('first', 'second', 'third'):
+            helper.simple_populate(self, self.uri, self.config, nentries)
+            nentries += self.nentries
+            self.session.checkpoint('name=' + name)
+            cursor = self.session.open_cursor(
+                'statistics:' + self.uri, None, 'checkpoint=' + name)
+            size = cursor[stat.dsrc.btree_overflow][1]
+            self.assertTrue(size >= last_size)
+            last_size = size
+            cursor.close()
+            self.session.truncate(self.uri, None, None)
 
 if __name__ == '__main__':
     wttest.run()

@@ -2,39 +2,56 @@
 
 @section config_intro Introduction
 
-Many operations in WiredTiger accept a string to configure options.  These
-strings all have the same format:
+Methods in WiredTiger take a configuration string to provide optional
+arguments and configure non-standard behaviors.  These strings are
+simple comma-separated lists of <code>"<key>=<value>"</code> pairs, and
+all have the same format:
 
 <pre>
   [key['='value]][','[key['='value]]]*
 </pre>
 
-That is, they are simple comma-separated lists of
-<code>"<key>=<value>"</code> pairs.  If the <code>"=<value>"</code> part is
-omitted, the value of 1 is assumed.
+For example, a configuration string is used when opening a connection
+to a database to specify if the database should be created and to set
+the cache size:
 
-To handle more complex configuration, such as specifying a schema, values
-may be nested lists using parentheses.  For example:
+@snippet ex_all.c Open a connection
 
-<pre>
-  schema=(keyfmt=S,valuefmt=S,columns=(name,notes))
-</pre>
+Configuration strings are also used to configure the table schema.  For
+example, to create a table that uses C language strings for keys and
+values:
 
-Empty configuration strings may be represented in C or C++ by passing
-<code>NULL</code>.
+@snippet ex_all.c Create a table
+
+To handle more complex schema configuration, such as specifying multiple
+columns in a table, values are nested using parentheses.  For example:
+
+@snippet ex_all.c Create a table with columns
+
+Values of type of "boolean" can be set to any of \c false, \c true, \c 0
+or \c 1.  If no value is specified for a key, the value \c 1 is implied.
+For example, all of the following forms of the \c overwrite
+configuration string are identical:
+
+@snippet ex_all.c boolean configuration string example
+
+Configuration strings are processed in order from left to right, with
+later settings overriding earlier ones (unless multiple settings for a
+key are supported by the method).
 
 Superfluous commas and whitespace in the configuration string are ignored
 (including at the beginning and end of the string), so it is always safe to
 combine two configuration strings by concatenating them with a comma in
 between.
 
-Keys are processed in order from left to right, with later settings
-overriding earlier ones unless multiple settings for a key are permitted.
+Empty configuration strings may be represented in C or C++ by passing
+<code>NULL</code>.
 
-@section config_json JSON compatibility
+@section config_json JavaScript Object Notation (JSON) compatibility
 
-The parser for configuration strings will accept additional formatting as
-follows:
+WiredTiger configuration strings are compatible with
+<a href="http://www.json.org/">JavaScript Object Notation (JSON)</a>,
+and will accept additional formatting as follows:
 
 - parentheses may be round or square brackets or curly braces:
   <code>'()'</code>, <code>'[]'</code> or <code>'{}'</code>
@@ -60,21 +77,12 @@ For example, in Python, code might look as follows:
   })
 \endcode
 
-@section config_examples Code samples
+Because JSON compatibility allows colons to be used as key/value separators,
+WiredTiger URIs may require quoting.  For example, the following
+WT_SESSION::checkpoint call specifies a set of URIs as checkpoint targets,
+using double-quote characters to keep the parser from treating the colon
+characters as JSON name/value separators:
 
-@todo improve the example
-
-Open a connection to a database, creating it if it does not exist and set a
-cache size of 10MB, then open a session in the database:
-
-@snippet ex_config.c configure cache size
-
-Create a table that uses C language strings for keys and values:
-
-@snippet ex_config.c create a table
-
-Walk a transactional cursor through the table:
-
-@snippet ex_config.c transaction
+@snippet ex_all.c JSON quoting example
 
 */

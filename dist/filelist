@@ -5,7 +5,7 @@ src/api/api_strerror.c
 src/api/api_version.c
 src/block/block_addr.c
 src/block/block_ckpt.c
-src/block/block_cksum.c
+src/block/block_compact.c
 src/block/block_ext.c
 src/block/block_mgr.c
 src/block/block_open.c
@@ -15,8 +15,7 @@ src/block/block_vrfy.c
 src/block/block_write.c
 src/bloom/bloom.c
 src/btree/bt_bulk.c
-src/btree/bt_cache.c
-src/btree/bt_cell.c
+src/btree/bt_compact.c
 src/btree/bt_curnext.c
 src/btree/bt_curprev.c
 src/btree/bt_cursor.c
@@ -25,6 +24,7 @@ src/btree/bt_discard.c
 src/btree/bt_evict.c
 src/btree/bt_handle.c
 src/btree/bt_huffman.c
+src/btree/bt_io.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
@@ -52,6 +52,8 @@ src/config/config_concat.c
 src/config/config_def.c
 src/conn/conn_api.c
 src/conn/conn_dhandle.c
+src/conn/conn_cache.c
+src/conn/conn_cache_pool.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
 src/conn/conn_stat.c
@@ -70,6 +72,7 @@ src/lsm/lsm_cursor.c
 src/lsm/lsm_dsrc.c
 src/lsm/lsm_merge.c
 src/lsm/lsm_meta.c
+src/lsm/lsm_stat.c
 src/lsm/lsm_tree.c
 src/lsm/lsm_worker.c
 src/meta/meta_api.c
@@ -88,6 +91,7 @@ src/os_posix/os_flock.c
 src/os_posix/os_fsync.c
 src/os_posix/os_ftruncate.c
 src/os_posix/os_getline.c
+src/os_posix/os_map.c
 src/os_posix/os_mtx.c
 src/os_posix/os_open.c
 src/os_posix/os_priv.c
@@ -95,6 +99,7 @@ src/os_posix/os_remove.c
 src/os_posix/os_rename.c
 src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
+src/os_posix/os_strtouq.c
 src/os_posix/os_thread.c
 src/os_posix/os_time.c
 src/os_posix/os_yield.c
@@ -107,12 +112,14 @@ src/schema/schema_open.c
 src/schema/schema_plan.c
 src/schema/schema_project.c
 src/schema/schema_rename.c
+src/schema/schema_stat.c
 src/schema/schema_truncate.c
 src/schema/schema_util.c
 src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_dhandle.c
 src/session/session_salvage.c
+src/support/cksum.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -53,10 +53,10 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None, None)
         next = 0
         while True:
-            next += 1
             nextret = cursor.next()
             if nextret != 0:
                 break
+            next += 1
             self.assertEqual(cursor.get_key(), key_populate(cursor, next))
             dupc = self.session.open_cursor(None, cursor, None)
             self.assertEqual(cursor.compare(dupc), 0)

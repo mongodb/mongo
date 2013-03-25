@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -18,6 +18,7 @@ __conn_dhandle_open_lock(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 
 	btree = dhandle->handle;
 
@@ -38,10 +39,10 @@ __conn_dhandle_open_lock(
 
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
-			__wt_readlock(session, dhandle->rwlock);
+			WT_RET(__wt_readlock(session, dhandle->rwlock));
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 				return (0);
-			__wt_rwunlock(session, dhandle->rwlock);
+			WT_RET(__wt_rwunlock(session, dhandle->rwlock));
 		}
 
 		/*
@@ -50,21 +51,21 @@ __conn_dhandle_open_lock(
 		 * with another thread that successfully opens the file, we
 		 * don't want to block waiting to get exclusive access.
 		 */
-		if (__wt_try_writelock(session, dhandle->rwlock) == 0) {
+		if ((ret = __wt_try_writelock(session, dhandle->rwlock)) == 0) {
 			/*
 			 * If it was opened while we waited, drop the write
 			 * lock and get a read lock instead.
 			 */
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
-				__wt_rwunlock(session, dhandle->rwlock);
+				WT_RET(__wt_rwunlock(session, dhandle->rwlock));
 				continue;
 			}
 
 			/* We have an exclusive lock, we're done. */
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 			return (0);
-		} else if (LF_ISSET(WT_DHANDLE_EXCLUSIVE))
+		} else if (ret != EBUSY || LF_ISSET(WT_DHANDLE_EXCLUSIVE))
 			return (EBUSY);
 
 		/* Give other threads a chance to make progress. */
@@ -95,21 +96,21 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Increment the reference count if we already have the btree open. */
-	if (!LF_ISSET(WT_BTREE_NO_CACHE))
-		TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-			if (strcmp(name, dhandle->name) == 0 &&
-			    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
-			    (ckpt != NULL && dhandle->checkpoint != NULL &&
-			    strcmp(ckpt, dhandle->checkpoint) == 0))) {
-				++dhandle->refcnt;
-				session->dhandle = dhandle;
-				return (__conn_dhandle_open_lock(
-				    session, dhandle, flags));
-			}
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
+		if (strcmp(name, dhandle->name) == 0 &&
+		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
+		    (ckpt != NULL && dhandle->checkpoint != NULL &&
+		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
+			++dhandle->refcnt;
+			session->dhandle = dhandle;
+			return (__conn_dhandle_open_lock(
+			    session, dhandle, flags));
+		}
 
 	/*
 	 * Allocate the WT_BTREE structure, its lock, and set the name so we
-	 * can put the handle into the list.
+	 * can add the handle to the list.  Lock the handle before inserting
+	 * it in the list.
 	 */
 	btree = NULL;
 	WT_RET(__wt_calloc_def(session, 1, &dhandle));
@@ -120,26 +121,23 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		session, "btree handle", &dhandle->rwlock)) == 0 &&
 	    (ret = __wt_strdup(session, name, &dhandle->name)) == 0 &&
 	    (ckpt == NULL ||
-	    (ret = __wt_strdup(session, ckpt, &dhandle->checkpoint)) == 0)) {
-		/* Lock the handle before it is inserted in the list. */
-		__wt_writelock(session, dhandle->rwlock);
+	    (ret = __wt_strdup(session, ckpt, &dhandle->checkpoint)) == 0) &&
+	    (ret = __wt_writelock(session, dhandle->rwlock)) == 0) {
 		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 
-		if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
-			/* Add to the connection list. */
-			dhandle->refcnt = 1;
-			TAILQ_INSERT_TAIL(&conn->dhqh, dhandle, q);
-		}
+		/* Add to the connection list. */
+		dhandle->refcnt = 1;
+		TAILQ_INSERT_TAIL(&conn->dhqh, dhandle, q);
 	}
 
 	if (ret == 0)
 		session->dhandle = dhandle;
 	else {
 		if (dhandle->rwlock != NULL)
-			__wt_rwlock_destroy(session, &dhandle->rwlock);
+			WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
 		__wt_free(session, dhandle->name);
 		__wt_free(session, dhandle->checkpoint);
-		__wt_overwrite_and_free(session, btree);
+		__wt_overwrite_and_free(session, dhandle);
 	}
 
 	return (ret);
@@ -190,7 +188,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		ret = __wt_checkpoint(session, NULL);
+		ret = __wt_checkpoint_close(session, NULL);
 
 	WT_TRET(__wt_btree_close(session));
 	F_CLR(dhandle, WT_DHANDLE_OPEN);
@@ -212,7 +210,6 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
-	WT_DECL_ITEM(addr);
 	WT_DECL_RET;
 
 	dhandle = session->dhandle;
@@ -235,16 +232,11 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_RET(__wt_conn_btree_sync_and_close(session));
 
-	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
 	do {
-		WT_ERR(__wt_meta_checkpoint_addr(
-		    session, dhandle->name, dhandle->checkpoint, addr));
-		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
-		    dhandle->checkpoint == NULL ? 0 : 1));
+		WT_ERR(__wt_btree_open(session, cfg));
 		F_SET(dhandle, WT_DHANDLE_OPEN);
 		/*
 		 * Checkpoint handles are read only, so eviction calculations
@@ -256,7 +248,7 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 		/* Drop back to a readlock if that is all that was needed. */
 		if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			__wt_rwunlock(session, dhandle->rwlock);
+			WT_ERR(__wt_rwunlock(session, dhandle->rwlock));
 			WT_ERR(
 			    __conn_dhandle_open_lock(session, dhandle, flags));
 		}
@@ -264,10 +256,9 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
-		(void)__wt_conn_btree_close(session, 1);
+		WT_TRET(__wt_conn_btree_close(session, 1));
 	}
 
-	__wt_scr_free(&addr);
 	return (ret);
 }
 
@@ -279,19 +270,14 @@ int
 __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name, const char *ckpt, const char *cfg[], uint32_t flags)
 {
-	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const char *treeconf;
 
-	conn = S2C(session);
-
-	WT_STAT_INCR(conn->stats, file_open);
+	WT_CSTAT_INCR(session, file_open);
 
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
-	btree = S2BT(session);
 
 	if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
 	    (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
@@ -306,7 +292,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 
 err:	if (ret != 0) {
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-		__wt_rwunlock(session, dhandle->rwlock);
+		WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
 	}
 
 	WT_ASSERT(session, ret != 0 ||
@@ -402,9 +388,6 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	conn = S2C(session);
 	dhandle = session->dhandle;
 
-	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_STAT_DECR(conn->stats, file_open);
-
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/*
@@ -413,7 +396,13 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	 */
 	inuse = --dhandle->refcnt > 0;
 	if (!inuse && !locked) {
-		__wt_writelock(session, dhandle->rwlock);
+		/*
+		 * XXX
+		 * If we fail to get the lock it should be OK (the reference
+		 * count has already been decremented), but it's really not a
+		 * good thing.
+		 */
+		WT_RET(__wt_writelock(session, dhandle->rwlock));
 		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 	}
 
@@ -430,7 +419,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 			WT_TRET(__wt_conn_btree_sync_and_close(session));
 		if (!locked) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			__wt_rwunlock(session, dhandle->rwlock);
+			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
 		}
 	}
 
@@ -527,7 +516,7 @@ __wt_conn_dhandle_discard_single(
 		WT_TRET(__wt_conn_btree_sync_and_close(session));
 		session->dhandle = NULL;
 	}
-	__wt_rwlock_destroy(session, &dhandle->rwlock);
+	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
 	__wt_free(session, dhandle->config);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);

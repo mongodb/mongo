@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -57,6 +57,7 @@ int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
 const char *progname;
+const char *home = NULL;
 
 int
 cursor_ops(WT_SESSION *session)
@@ -93,7 +94,7 @@ cursor_ops(WT_SESSION *session)
 
 	/* Reconfigure the cursor to overwrite the record. */
 	ret = session->open_cursor(
-	    session, NULL, cursor, "overwrite=true", &overwrite_cursor);
+	    session, NULL, cursor, "overwrite", &overwrite_cursor);
 	ret = cursor->close(cursor);
 
 	overwrite_cursor->set_value(overwrite_cursor, value);
@@ -102,31 +103,35 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	/*! [boolean configuration string example] */
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite", &cursor);
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite=true", &cursor);
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite=1", &cursor);
+	/*! [boolean configuration string example] */
+	}
+
+	{
+	/*! [open a named checkpoint] */
+	ret = session->open_cursor(session,
+	    "table:mytable", NULL, "checkpoint=midnight", &cursor);
+	/*! [open a named checkpoint] */
+	}
+
+	{
+	/*! [open the default checkpoint] */
+	ret = session->open_cursor(session,
+	    "table:mytable", NULL, "checkpoint=WiredTigerCheckpoint", &cursor);
+	/*! [open the default checkpoint] */
+	}
+
+	{
 	/*! [Get the cursor's string key] */
 	const char *key;	/* Get the cursor's string key. */
 	ret = cursor->get_key(cursor, &key);
 	/*! [Get the cursor's string key] */
-	}
-
-	{
-	/*! [Get the cursor's record number key] */
-	uint64_t recno;		/* Get the cursor's record number key. */
-	ret = cursor->get_key(cursor, &recno);
-	/*! [Get the cursor's record number key] */
-	}
-
-	{
-	/*! [Get the cursor's string value] */
-	const char *value;	/* Get the cursor's string value. */
-	ret = cursor->get_value(cursor, &value);
-	/*! [Get the cursor's string value] */
-	}
-
-	{
-	/*! [Get the cursor's raw value] */
-	WT_ITEM value;		/* Get the cursor's raw value. */
-	ret = cursor->get_value(cursor, &value);
-	/*! [Get the cursor's raw value] */
 	}
 
 	{
@@ -138,10 +143,41 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	/*! [Get the cursor's record number key] */
+	uint64_t recno;		/* Get the cursor's record number key. */
+	ret = cursor->get_key(cursor, &recno);
+	/*! [Get the cursor's record number key] */
+	}
+
+	{
 	/*! [Set the cursor's record number key] */
 	uint64_t recno = 37;	/* Set the cursor's record number key. */
 	cursor->set_key(cursor, recno);
 	/*! [Set the cursor's record number key] */
+	}
+
+	{
+	/*! [Get the cursor's composite key] */
+			/* Get the cursor's "SiH" format composite key. */
+	const char *first;
+	int32_t second;
+	uint16_t third;
+	cursor->get_key(cursor, &first, &second, &third);
+	/*! [Get the cursor's composite key] */
+	}
+
+	{
+	/*! [Set the cursor's composite key] */
+			/* Set the cursor's "SiH" format composite key. */
+	cursor->set_key(cursor, "first", (int32_t)5, (uint16_t)7);
+	/*! [Set the cursor's composite key] */
+	}
+
+	{
+	/*! [Get the cursor's string value] */
+	const char *value;	/* Get the cursor's string value. */
+	ret = cursor->get_value(cursor, &value);
+	/*! [Get the cursor's string value] */
 	}
 
 	{
@@ -151,6 +187,14 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_value(cursor, value);
 	/*! [Set the cursor's string value] */
 	}
+
+	{
+	/*! [Get the cursor's raw value] */
+	WT_ITEM value;		/* Get the cursor's raw value. */
+	ret = cursor->get_value(cursor, &value);
+	/*! [Get the cursor's raw value] */
+	}
+
 	{
 	/*! [Set the cursor's raw value] */
 	WT_ITEM value;		/* Set the cursor's raw value. */
@@ -229,7 +273,7 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret == 0)
-		recno = cursor->get_key(cursor, &recno);
+		ret = cursor->get_key(cursor, &recno);
 	/*! [Insert a new record and assign a record number] */
 	}
 
@@ -252,7 +296,7 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Display an error] */
-	const char *key = "some key";
+	const char *key = "non-existent key";
 	cursor->set_key(cursor, key);
 	if ((ret = cursor->remove(cursor)) != 0) {
 		fprintf(stderr,
@@ -378,6 +422,15 @@ checkpoint_ops(WT_SESSION *session)
 	    "target=(\"table:mytable\"),name=July01,drop=(May01,June01)");
 	/*! [Checkpoint examples] */
 
+	/*! [JSON quoting example] */
+	/*
+	 * Checkpoint a list of objects.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->
+	    checkpoint(session, "target=(\"table:table1\",\"table:table2\")");
+	/*! [JSON quoting example] */
+
 	return (ret);
 }
 
@@ -395,18 +448,67 @@ session_ops(WT_SESSION *session)
 	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
 
+	/*! [Create a column-store table] */
+	ret = session->create(session,
+	    "table:mytable", "key_format=r,value_format=S");
+	/*! [Create a column-store table] */
+
+	/*! [Create a table with columns] */
+	/*
+	 * Create a table with columns: keys are record numbers, values are
+	 * (string, signed 32-bit integer, unsigned 16-bit integer).
+	 */
+	ret = session->create(session, "table:mytable",
+	    "key_format=r,value_format=SiH"
+	    "columns=(id,department,salary,year-started)");
+	/*! [Create a table with columns] */
+
+	/*
+	 * This example code gets run, and the compression libraries might not
+	 * be loaded, causing the create to fail.  The documentation requires
+	 * the code snippets, use #ifdef's to avoid running it.
+	 */
+#ifdef MIGHT_NOT_RUN
+	/*! [Create a bzip2 compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=bzip2,key_format=S,value_format=S");
+	/*! [Create a bzip2 compressed table] */
+
+	/*! [Create a snappy compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=snappy,key_format=S,value_format=S");
+	/*! [Create a snappy compressed table] */
+#endif
+
+	/*! [Configure checksums to uncompressed] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,checksum=uncompressed");
+	/*! [Configure checksums to uncompressed] */
+
+	/*! [Configure dictionary compression off] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,dictionary=false");
+	/*! [Configure dictionary compression off] */
+
+	/*! [Configure key prefix compression off] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,prefix_compression=false");
+	/*! [Configure key prefix compression off] */
+
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
 	/*! [Create a cache-resident object] */
 
+	/*! [Compact a table] */
+	ret = session->compact(session, "table:mytable", NULL);
+	/*! [Compact a table] */
+
 	/*! [Drop a table] */
 	ret = session->drop(session, "table:mytable", NULL);
 	/*! [Drop a table] */
-
-	/*! [Dump a file] */
-	ret = session->dumpfile(session, "file:myfile", NULL);
-	/*! [Dump a file] */
 
 	/*! [Print to the message stream] */
 	ret = session->msg_printf(
@@ -554,13 +656,15 @@ my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE open_cursor] */
 static int
 my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *obj, const char *cfg[], WT_CURSOR **new_cursor)
+    const char *obj, WT_CURSOR *owner, const char *cfg[],
+    WT_CURSOR **new_cursor)
 {
 	/* Unused parameters */
 	(void)dsrc;
 
 	(void)session;
 	(void)obj;
+	(void)owner;
 	(void)cfg;
 	(void)new_cursor;
 
@@ -729,7 +833,7 @@ add_compressor(WT_CONNECTION *conn)
 
 	/*! [WT_COMPRESSOR register] */
 	static WT_COMPRESSOR my_compressor = {
-	    my_compress, my_decompress, my_pre_size };
+	    my_compress, NULL, my_decompress, my_pre_size };
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [WT_COMPRESSOR register] */
 
@@ -890,12 +994,47 @@ main(void)
 	int ret;
 
 	{
-	/*! [Open a connection] */
 	WT_CONNECTION *conn;
-	const char *home = "WT_TEST";
-	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
+	/*! [Open a connection] */
+	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
 	}
+
+#ifdef MIGHT_NOT_RUN
+	/*
+	 * This example code gets run, and the compression libraries might not
+	 * be installed, causing the open to fail.  The documentation requires
+	 * the code snippets, use #ifdef's to avoid running it.
+	 */
+	{
+	/*! [Configure bzip2 extension] */
+	WT_CONNECTION *conn;
+
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
+	/*! [Configure bzip2 extension] */
+	}
+
+	{
+	/*! [Configure snappy extension] */
+	WT_CONNECTION *conn;
+
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
+	/*! [Configure snappy extension] */
+	}
+
+	/*
+	 * We're not allowed to open multiple connections, don't run more than
+	 * one wiredtiger_open call.
+	 */
+	{
+	/*! [Configure direct_io for data files] */
+	ret = wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn);
+	/*! [Configure direct_io for data files] */
+#endif
 
 	/*! [Get the WiredTiger library version #1] */
 	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));

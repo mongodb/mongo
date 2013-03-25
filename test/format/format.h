@@ -1,12 +1,32 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -25,6 +45,17 @@
 #else
 #include <wiredtiger.h>
 #endif
+
+#define	EXTPATH	"../../ext/"			/* Extensions path */
+#define	BZIP_PATH							\
+	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
+#define	SNAPPY_PATH							\
+	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+#define	REVERSE_PATH							\
+	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
+
+#define	LZO_PATH	".libs/lzo_compress.so"
+#define	RAW_PATH	".libs/raw_compress.so"
 
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
@@ -59,37 +90,50 @@ typedef struct {
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
 
+	char *uri;				/* Object name */
+
 #define	FIX		1			/* File types */
 #define	ROW		2
 #define	VAR		3
-	int   type;				/* File type */
-	char *uri;				/* Object name */
+	u_int   type;				/* File type */
+
+#define	COMPRESS_NONE	1
+#define	COMPRESS_BZIP	2
+#define	COMPRESS_LZO	3
+#define	COMPRESS_RAW	4
+#define	COMPRESS_SNAPPY	5
+	u_int compression;			/* Compression type */
 
 	char *config_open;			/* Command-line configuration */
 
-	uint32_t c_bitcnt;			/* Config values */
-	uint32_t c_bzip;
-	uint32_t c_cache;
-	char    *c_data_source;
-	uint32_t c_delete_pct;
-	uint32_t c_dictionary;
-	char    *c_file_type;
-	uint32_t c_huffman_key;
-	uint32_t c_huffman_value;
-	uint32_t c_insert_pct;
-	uint32_t c_intl_page_max;
-	uint32_t c_key_max;
-	uint32_t c_key_min;
-	uint32_t c_leaf_page_max;
-	uint32_t c_ops;
-	uint32_t c_repeat_data_pct;
-	uint32_t c_reverse;
-	uint32_t c_rows;
-	uint32_t c_runs;
-	uint32_t c_threads;
-	uint32_t c_value_max;
-	uint32_t c_value_min;
-	uint32_t c_write_pct;
+	u_int c_bitcnt;				/* Config values */
+	u_int c_cache;
+	char *c_compression;
+	char *c_config_open;
+	char *c_data_source;
+	u_int c_delete_pct;
+	u_int c_dictionary;
+	char *c_file_type;
+	u_int c_huffman_key;
+	u_int c_huffman_value;
+	u_int c_insert_pct;
+	u_int c_internal_key_truncation;
+	u_int c_intl_page_max;
+	u_int c_key_gap;
+	u_int c_key_max;
+	u_int c_key_min;
+	u_int c_leaf_page_max;
+	u_int c_ops;
+	u_int c_prefix;
+	u_int c_repeat_data_pct;
+	u_int c_reverse;
+	u_int c_rows;
+	u_int c_runs;
+	u_int c_split_pct;
+	u_int c_threads;
+	u_int c_value_max;
+	u_int c_value_min;
+	u_int c_write_pct;
 
 	uint32_t key_cnt;			/* Keys loaded so far */
 	uint32_t rows;				/* Total rows */

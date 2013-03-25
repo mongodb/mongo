@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -36,7 +36,7 @@ __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 {
 	size_t offset, sub_off;
 
-	if (!WT_META_TRACKING(session))
+	if (session->meta_track_next == NULL)
 		session->meta_track_next = session->meta_track;
 
 	offset = WT_PTRDIFF(session->meta_track_next, session->meta_track);
@@ -83,13 +83,17 @@ __wt_meta_track_discard(WT_SESSION_IMPL *session)
 int
 __wt_meta_track_on(WT_SESSION_IMPL *session)
 {
-	return (__meta_track_next(session, NULL));
+	if (session->meta_track_nest++ == 0)
+		WT_RET(__meta_track_next(session, NULL));
+
+	return (0);
 }
 
 static int
 __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 {
 	WT_DATA_HANDLE *saved_dhandle;
+	WT_BM *bm;
 	WT_DECL_RET;
 	int tret;
 
@@ -106,8 +110,10 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
 		saved_dhandle = session->dhandle;
 		WT_SET_BTREE_IN_SESSION(session, trk->btree);
-		if (!unroll)
-			WT_TRET(__wt_bm_checkpoint_resolve(session));
+		if (!unroll) {
+			bm = trk->btree->bm;
+			WT_TRET(bm->checkpoint_resolve(bm, session));
+		}
 		session->dhandle = saved_dhandle;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
@@ -183,10 +189,13 @@ free:	trk->op = WT_ST_EMPTY;
 int
 __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
 
-	if (!WT_META_TRACKING(session))
+	WT_ASSERT(session,
+	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
+	if (--session->meta_track_nest != 0)
 		return (0);
 
 	trk_orig = session->meta_track;
@@ -197,6 +206,14 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 
 	while (--trk >= trk_orig)
 		WT_TRET(__meta_track_apply(session, trk, unroll));
+
+	/* If the operation succeeded, checkpoint the metadata. */
+	if (!unroll && ret == 0 && session->metafile != NULL) {
+		saved_dhandle = session->dhandle;
+		WT_SET_BTREE_IN_SESSION(session, session->metafile);
+		ret = __wt_checkpoint(session, NULL);
+		session->dhandle = saved_dhandle;
+	}
 
 	return (ret);
 }

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -350,25 +350,53 @@ __wt_assert(WT_SESSION_IMPL *session,
 	va_end(ap);
 
 #ifdef HAVE_DIAGNOSTIC
-	__wt_abort(session);
+	__wt_abort(session);			/* Drop core if testing. */
 	/* NOTREACHED */
 #endif
 }
 
 /*
+ * __wt_panic --
+ *	A standard error message when we panic.
+ */
+int
+__wt_panic(WT_SESSION_IMPL *session)
+{
+	F_SET(S2C(session), WT_CONN_PANIC);
+	__wt_errx(session, "%s",
+	    "the WiredTiger library cannot continue; the process must exit "
+	    "and restart");
+
+#if !defined(HAVE_DIAGNOSTIC)
+	/*
+	 * Chaos reigns within.
+	 * Reflect, repent, and reboot.
+	 * Order shall return.
+	 */
+	return (WT_PANIC);
+#endif
+
+	__wt_abort(session);			/* Drop core if testing. */
+	/* NOTREACHED */
+}
+
+/*
  * __wt_illegal_value --
- *	Print a standard error message when we detect an illegal value.
+ *	A standard error message when we detect an illegal value.
  */
 int
 __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 {
-	WT_RET_MSG(session, WT_ERROR,
-	    "%s%s"
-	    "encountered an illegal file format or internal value; restart "
-	    "the system and verify the underlying files, if corruption is "
-	    "detected use the WT_SESSION salvage method or the wt utility's "
-	    "salvage command to repair the file",
-	    name == NULL ? "" : name, name == NULL ? "" : " ");
+	__wt_errx(session, "%s%s%s",
+	    name == NULL ? "" : name, name == NULL ? "" : ": ",
+	    "encountered an illegal file format or internal value");
+
+#if !defined(HAVE_DIAGNOSTIC)
+	return (__wt_panic(session));
+#endif
+
+	__wt_abort(session);			/* Drop core if testing. */
+	/* NOTREACHED */
 }
 
 /*
@@ -384,6 +412,7 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
 	    WT_PREFIX_MATCH(uri, "config:") ||
 	    WT_PREFIX_MATCH(uri, "file:") ||
 	    WT_PREFIX_MATCH(uri, "index:") ||
+	    WT_PREFIX_MATCH(uri, "lsm:") ||
 	    WT_PREFIX_MATCH(uri, "statistics:") ||
 	    WT_PREFIX_MATCH(uri, "table:"))
 		WT_RET_MSG(session, ENOTSUP,

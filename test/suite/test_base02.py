@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -35,14 +35,18 @@ import wiredtiger, wttest
 # Test configuration strings.
 class test_base02(wttest.WiredTigerTestCase):
     name = 'test_base02a'
+    extra_config = ''
 
     scenarios = [
         ('file', dict(uri='file:')),
-        ('table', dict(uri='table:'))
-        ]
+        ('table', dict(uri='table:')),
+        ('lsm', dict(uri='lsm:')),
+        ('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
+    ]
 
     def create_and_drop(self, confstr):
         name = self.uri + self.name
+        confstr += self.extra_config
         self.pr('create_and_drop: ' + name + ": " + confstr)
         self.session.create(name, confstr)
         self.session.drop(name, None)
@@ -82,7 +86,7 @@ class test_base02(wttest.WiredTigerTestCase):
         conf_jsonstr = [
             json.dumps({'columns' : ('key', 'value')}),
             json.dumps({
-                "key_format" : "r",
+                "key_format" : "S",
                 "value_format" : "5sHQ",
                 "columns" : ("id", "country", "year", "population"),
                 "colgroups" : ("cyear", "population"),

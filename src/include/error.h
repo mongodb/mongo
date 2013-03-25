@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -7,6 +7,15 @@
 
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 #define	WT_DEBUG_BYTE	(0xab)
+
+/* In DIAGNOSTIC mode, yield in places where we want to encourage races. */
+#ifdef HAVE_DIAGNOSTIC
+#define	WT_HAVE_DIAGNOSTIC_YIELD do {					\
+	__wt_yield();							\
+} while (0)
+#else
+#define	WT_HAVE_DIAGNOSTIC_YIELD
+#endif
 
 /* Return and branch-to-err-label cases for switch statements. */
 #define	WT_ILLEGAL_VALUE(session)					\
@@ -66,8 +75,25 @@
 /* Set "ret" if not already set. */
 #define	WT_TRET(a) do {							\
 	int __ret;							\
-	if ((__ret = (a)) != 0 && ret == 0)				\
+	if ((__ret = (a)) != 0 &&					\
+	    (ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))\
 		ret = __ret;						\
+} while (0)
+#define	WT_TRET_NOTFOUND_OK(a) do {					\
+	int __ret;							\
+	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND &&		\
+	    (ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))\
+		ret = __ret;						\
+} while (0)
+
+#define	WT_PANIC_ERR(session, v, ...) do {				\
+	__wt_err(session, v, __VA_ARGS__);				\
+	(void)__wt_panic(session);					\
+} while (0)
+#define	WT_PANIC_RETX(session, ...) do {				\
+	__wt_errx(session, __VA_ARGS__);				\
+	/* Return WT_PANIC regardless of earlier return codes. */	\
+	return (__wt_panic(session));					\
 } while (0)
 
 /*

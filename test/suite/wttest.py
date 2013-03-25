@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -262,7 +262,7 @@ class WiredTigerTestCase(unittest.TestCase):
         self.origcwd = os.getcwd()
         removeAll(self.testdir)
         if os.path.exists(self.testdir):
-            raise Exception(self.testdir + ": cannot remove directory");
+            raise Exception(self.testdir + ": cannot remove directory")
         os.makedirs(self.testdir)
         try:
             os.chdir(self.testdir)

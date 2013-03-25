@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -10,11 +10,11 @@
 static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
 
 /*
- * __wt_block_truncate --
+ * __wt_block_manager_truncate --
  *	Truncate a file.
  */
 int
-__wt_block_truncate(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_truncate(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -35,11 +35,11 @@ err:	WT_TRET(__wt_close(session, fh));
 }
 
 /*
- * __wt_block_create --
+ * __wt_block_manager_create --
  *	Create a file.
  */
 int
-__wt_block_create(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -55,58 +55,77 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 
 	/* Undo any create on error. */
 	if (ret != 0)
-		(void)__wt_remove(session, filename);
+		WT_TRET(__wt_remove(session, filename));
+
+	return (ret);
+}
+
+/*
+ * __block_destroy --
+ *	Destroy a block handle.
+ */
+static int
+__block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	if (block->name != NULL)
+		__wt_free(session, block->name);
+
+	if (block->fh != NULL)
+		WT_TRET(__wt_close(session, block->fh));
+
+	__wt_spin_destroy(session, &block->live_lock);
+
+	TAILQ_REMOVE(&conn->blockqh, block, q);
+
+	__wt_overwrite_and_free(session, block);
 
 	return (ret);
 }
 
 /*
  * __wt_block_open --
- *	Open a file.
+ *	Open a block handle.
  */
 int
 __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
-    const char *config, const char *cfg[], int forced_salvage, void *blockp)
+    const char *config, const char *cfg[], int forced_salvage,
+    WT_BLOCK **blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
 	WT_UNUSED(cfg);
-	*(void **)blockp = NULL;
+	WT_VERBOSE_TRET(session, block, "open: %s", filename);
 
-	/*
-	 * Allocate the structure, connect (so error close works), copy the
-	 * name.
-	 */
-	WT_RET(__wt_calloc_def(session, 1, &block));
+	conn = S2C(session);
+	*blockp = NULL;
+
+	__wt_spin_lock(session, &conn->block_lock);
+	TAILQ_FOREACH(block, &conn->blockqh, q)
+		if (strcmp(filename, block->name) == 0) {
+			++block->ref;
+			*blockp = block;
+			__wt_spin_unlock(session, &conn->block_lock);
+			return (0);
+		}
+
+	/* Basic structure allocation, initialization. */
+	WT_ERR(__wt_calloc_def(session, 1, &block));
+	block->ref = 1;
+	TAILQ_INSERT_HEAD(&conn->blockqh, block, q);
+
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
 	/* Get the allocation size. */
 	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
 	block->allocsize = (uint32_t)cval.val;
-
-	/* Check if configured for checksums. */
-	WT_ERR(__wt_config_getones(session, config, "checksum", &cval));
-	block->checksum = cval.val == 0 ? 0 : 1;
-
-	/* Page compressor */
-	WT_ERR(__wt_config_getones(session, config, "block_compressor", &cval));
-	if (cval.len > 0) {
-		WT_CONNECTION_IMPL *conn;
-		WT_NAMED_COMPRESSOR *ncomp;
-
-		conn = S2C(session);
-		TAILQ_FOREACH(ncomp, &conn->compqh, q)
-			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
-				block->compressor = ncomp->compressor;
-				break;
-			}
-		if (block->compressor == NULL)
-			WT_ERR_MSG(session, EINVAL,
-			    "unknown block_compressor '%.*s'",
-			    (int)cval.len, cval.str);
-	}
 
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
@@ -123,35 +142,40 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	if (!forced_salvage)
 		WT_ERR(__desc_read(session, block));
 
-	*(void **)blockp = block;
+	*blockp = block;
+	__wt_spin_unlock(session, &conn->block_lock);
 	return (0);
 
-err:	(void)__wt_block_close(session, block);
+err:	WT_TRET(__block_destroy(session, block));
+	__wt_spin_unlock(session, &conn->block_lock);
 	return (ret);
 }
 
 /*
  * __wt_block_close --
- *	Close a file.
+ *	Close a block handle.
  */
 int
 __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	WT_VERBOSE_RETVAL(session, block, ret, "close");
+	if (block == NULL)				/* Safety check */
+		return (0);
 
-	ret = __wt_block_checkpoint_unload(session, block);
+	conn = S2C(session);
 
-	if (block->name != NULL)
-		__wt_free(session, block->name);
+	WT_VERBOSE_TRET(session,
+	    block, "close: %s", block->name == NULL ? "" : block->name );
 
-	if (block->fh != NULL)
-		WT_TRET(__wt_close(session, block->fh));
+	__wt_spin_lock(session, &conn->block_lock);
 
-	__wt_spin_destroy(session, &block->live_lock);
+			/* Reference count is initialized to 1. */
+	if (block->ref == 0 || --block->ref == 0)
+		WT_TRET(__block_destroy(session, block));
 
-	__wt_free(session, block);
+	__wt_spin_unlock(session, &conn->block_lock);
 
 	return (ret);
 }
@@ -248,8 +272,18 @@ err:	__wt_scr_free(&buf);
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BSTAT_SET(session, file_size, block->fh->file_size);
-	WT_BSTAT_SET(session, file_magic, WT_BLOCK_MAGIC);
-	WT_BSTAT_SET(session, file_major, WT_BLOCK_MAJOR_VERSION);
-	WT_BSTAT_SET(session, file_minor, WT_BLOCK_MINOR_VERSION);
+	/*
+	 * We're looking inside the live system's structure, which normally
+	 * requires locking: the chances of a corrupted read are probably
+	 * non-existent, and it's statistics information regardless, but it
+	 * isn't like this is a common function for an application to call.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
+	WT_DSTAT_SET(session, block_allocsize, block->allocsize);
+	WT_DSTAT_SET(session, block_checkpoint_size, block->live.ckpt_size);
+	WT_DSTAT_SET(session, block_magic, WT_BLOCK_MAGIC);
+	WT_DSTAT_SET(session, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_DSTAT_SET(session, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_DSTAT_SET(session, block_size, block->fh->file_size);
+	__wt_spin_unlock(session, &block->live_lock);
 }

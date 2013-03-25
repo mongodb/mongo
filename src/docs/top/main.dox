@@ -3,19 +3,21 @@
 WiredTiger is an high performance, scalable, production quality, NoSQL,
 @subpage license "Open Source" extensible platform for data management.
 
-To browse or download the WiredTiger source code, visit our
+@section releases Releases
 
-- <a href="https://github.com/wiredtiger/wiredtiger"><b>Project page</b></a>
+<table>
+@row{<b>WiredTiger 1.4.2</b> (current),
+	<a href="releases/wiredtiger-1.4.2.tar.bz2"><b>[Release package]</b></a>,
+	<a href="1.4.2/index.html"><b>[Documentation]</b></a>}
+@row{<b>Development branch</b>,
+	<a href="https://github.com/wiredtiger/wiredtiger"><b>[Source code]</b></a>,
+	<a href="develop/index.html"><b>[Documentation]</b></a>}
+</table>
 
-To ask questions or discuss issues related to using WiredTiger, visit our
+@section contact Contact Us
 
-- <a href="http://groups.google.com/group/wiredtiger-users"><b>User Group</b></a>
+To ask questions or discuss issues related to using WiredTiger,
 
-View the documentation online:
-
-- <a href="1.3.1/index.html"><b>WiredTiger 1.3.1 (current release)</b></a>
-- <a href="1.2.2/index.html"><b>WiredTiger 1.2.2</b></a>
-- <a href="1.1.5/index.html"><b>WiredTiger 1.1.5</b></a>
-
-- <a href="develop/index.html"><b>WiredTiger develop branch (unstable)</b></a>
+- Visit our <a href="http://groups.google.com/group/wiredtiger-users"><b>User Group</b></a>
+- Send email to <a href="mailto:info@wiredtiger.com"><b>info@wiredtiger.com</b></a>
 */

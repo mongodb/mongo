@@ -101,6 +101,7 @@ struct __wt_item {
 #ifndef DOXYGEN
 #define	WT_ITEM_ALIGNED					0x00000001
 #define	WT_ITEM_INUSE					0x00000002
+#define	WT_ITEM_MAPPED					0x00000004
 	/* This appears in the middle of the struct to avoid padding. */
 	/*! Object flags (internal use). */
 	uint32_t flags;
@@ -180,6 +181,8 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Get the cursor's record number key
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... pointers to hold key fields corresponding to
+	 * WT_CURSOR::key_format.
 	 * @errors
 	 */
 	int __F(get_key)(WT_CURSOR *cursor, ...);
@@ -191,6 +194,8 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Get the cursor's raw value
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... pointers to hold value fields corresponding to
+	 * WT_CURSOR::value_format.
 	 * @errors
 	 */
 	int __F(get_value)(WT_CURSOR *cursor, ...);
@@ -202,6 +207,7 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Set the cursor's record number key
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... key fields corresponding to WT_CURSOR::key_format.
 	 *
 	 * If an error occurs during this operation, a flag will be set in the
 	 * cursor, and the next operation to access the key will fail.  This
@@ -216,6 +222,7 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Set the cursor's raw value
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... value fields corresponding to WT_CURSOR::value_format.
 	 *
 	 * If an error occurs during this operation, a flag will be set in the
 	 * cursor, and the next operation to access the value will fail.  This
@@ -314,7 +321,7 @@ struct __wt_cursor {
 	 * must be set; if the record already exists, the key's value will be
 	 * updated, otherwise, the record will be inserted.
 	 *
-	 * In a cursor with record number keys was configured with "append",
+	 * If a cursor with record number keys was configured with "append",
 	 * the value must be set; a new record will be appended and the record
 	 * number set as the cursor key value.
 	 *
@@ -366,7 +373,7 @@ struct __wt_cursor {
 	/*! Close the cursor.
 	 *
 	 * This releases the resources associated with the cursor handle.
-	 * Cursors are closed implicitly by ending the enclosing transaction or
+	 * Cursors are closed implicitly by ending the enclosing connection or
 	 * closing the session in which they were opened.
 	 *
 	 * @snippet ex_all.c Close the cursor
@@ -399,11 +406,15 @@ struct __wt_cursor {
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_DUMP_HEX	0x0002
 #define	WT_CURSTD_DUMP_PRINT	0x0004
-#define	WT_CURSTD_KEY_SET	0x0008
-#define	WT_CURSTD_OPEN		0x0010
-#define	WT_CURSTD_OVERWRITE	0x0020
-#define	WT_CURSTD_RAW		0x0040
-#define	WT_CURSTD_VALUE_SET	0x0080
+#define	WT_CURSTD_KEY_APP	0x0008
+#define	WT_CURSTD_KEY_RET	0x0010
+#define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_APP | WT_CURSTD_KEY_RET)
+#define	WT_CURSTD_OPEN		0x0020
+#define	WT_CURSTD_OVERWRITE	0x0040
+#define	WT_CURSTD_RAW		0x0080
+#define	WT_CURSTD_VALUE_APP	0x0100
+#define	WT_CURSTD_VALUE_RET	0x0200
+#define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_APP | WT_CURSTD_VALUE_RET)
 	uint32_t flags;
 #endif
 };
@@ -501,31 +512,44 @@ struct __wt_session {
 	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
-	 *  @row{<tt>table:\<tablename\></tt>,
-	 *	table cursor,
-	 *	table key\, table value(s)}
+	 *  @row{<tt>config:[\<uri\>]</tt>,
+	 *	object configuration cursor, (key=config string\,
+	 *	value=config value)}
 	 *  @row{<tt>file:\<filename\></tt>,
 	 *	file cursor,
 	 *	file key\, file value(s)}
 	 *  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
 	 *	index cursor,
 	 *	key=index key\, value=table value(s)}
+	 *  @row{<tt>lsm:\<name\></tt>,
+	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
 	 *  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
 	 *	database or file statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
 	 *	string value\, uint64_t value</code>)\,
 	 *	see @ref data_statistics for details}
+	 *  @row{<tt>table:\<tablename\></tt>,
+	 *	table cursor,
+	 *	table key\, table value(s)}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
-	 * @param session the session handle
 	 * @configstart{session.open_cursor, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for cursors with record number keys.,a
 	 * boolean flag; default \c false.}
-	 * @config{bulk, configure the cursor for bulk loads\, a fast load path
-	 * that may only be used for newly created objects. Cursors configured
-	 * for bulk load only support the WT_CURSOR::insert and WT_CURSOR::close
-	 * methods.,a boolean flag; default \c false.}
+	 * @config{bulk, configure the cursor for bulk loads\, a fast\, initial
+	 * load path.  Bulk load may only be used for newly created objects\,
+	 * and in the case of row-store objects\, key/value items must be loaded
+	 * in sorted order.  Cursors configured for bulk load only support the
+	 * WT_CURSOR::insert and WT_CURSOR::close methods.  The value is usually
+	 * a true/false flag\, but the the special value \c "bitmap" is for use
+	 * with fixed-length column stores\, and allows chunks of a memory
+	 * resident bitmap to be loaded directly into a file by passing a \c
+	 * WT_ITEM to WT_CURSOR::set_value where the \c size field indicates the
+	 * number of records in the bitmap (as specified by the file's \c
+	 * value_format). Bulk load bitmap values must end on a byte boundary
+	 * relative to the bit count (except for the last set of values
+	 * loaded).,a string; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved
 	 * name "WiredTigerCheckpoint" opens the most recent internal checkpoint
 	 * taken for the object).  The cursor does not support data
@@ -547,11 +571,12 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u".  See @ref cursor_raw for details.,a
 	 * boolean flag; default \c false.}
-	 * @config{statistics, configure the cursor for statistics.,a boolean
-	 * flag; default \c false.}
 	 * @config{statistics_clear, reset statistics counters when the cursor
 	 * is closed; valid only for statistics cursors.,a boolean flag; default
 	 * \c false.}
+	 * @config{statistics_fast, only gather statistics that don't require
+	 * traversing the tree; valid only for statistics cursors.,a boolean
+	 * flag; default \c false.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source.,a list of strings; default empty.}
 	 * @configend
@@ -586,11 +611,14 @@ struct __wt_session {
 	 * @config{cache_resident, do not ever evict the object's pages; see
 	 * @ref tuning_cache_resident for more information.,a boolean flag;
 	 * default \c false.}
-	 * @config{checksum, configure file block checksums; if false\, the
-	 * block manager is free to not write or check block checksums. This can
-	 * increase performance in applications where compression provides
-	 * checksum functionality or read-only applications where blocks require
-	 * no verification.,a boolean flag; default \c true.}
+	 * @config{checksum, configure file block checksums; permitted values
+	 * are <code>on</code> (checksum all file blocks)\, <code>off</code>
+	 * (checksum no file blocks) and <code>uncompresssed</code> (checksum
+	 * only file blocks which are not compressed for some reason).  The \c
+	 * uncompressed value is for applications which can reasonably rely on
+	 * decompression to fail if a block has been corrupted.,a string\,
+	 * chosen from the following options: \c "on"\, \c "off"\, \c
+	 * "uncompressed"; default \c on.}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
 	 * the table.  If no column groups are specified\, all columns are
@@ -614,8 +642,8 @@ struct __wt_session {
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration.,a boolean flag; default \c false.}
-	 * @config{filename, override the default filename derived from the
-	 * object name.,a string; default empty.}
+	 * @config{format, the file format.,a string\, chosen from the following
+	 * options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
 	 * values are empty (off)\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>".  See @ref huffman for more information.,a string;
@@ -624,8 +652,10 @@ struct __wt_session {
 	 * Permitted values are empty (off)\, \c "english"\, \c "utf8<file>" or
 	 * \c "utf16<file>".  See @ref huffman for more information.,a string;
 	 * default empty.}
-	 * @config{internal_item_max, the maximum key size stored on internal
-	 * nodes\, in bytes.  If zero\, a maximum is calculated to permit at
+	 * @config{internal_item_max, the largest key stored within an internal
+	 * node\, in bytes.  If non-zero\, any key larger than the specified
+	 * size will be stored as an overflow item (which may require additional
+	 * I/O to access).  If zero\, a default size is chosen that permits at
 	 * least 8 keys per internal page.,an integer greater than or equal to
 	 * 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\,
@@ -634,8 +664,10 @@ struct __wt_session {
 	 * @config{internal_page_max, the maximum page size for internal nodes\,
 	 * in bytes; the size must be a multiple of the allocation size and is
 	 * significant for applications wanting to avoid excessive L2 cache
-	 * misses while searching the tree.,an integer between 512B and 512MB;
-	 * default \c 2KB.}
+	 * misses while searching the tree.  The page maximum is the bytes of
+	 * uncompressed data\, that is\, the limit is applied before any block
+	 * compression is done.,an integer between 512B and 512MB; default \c
+	 * 2KB.}
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * key_format is \c 'u' and applications use WT_ITEM structures to
@@ -647,32 +679,58 @@ struct __wt_session {
 	 * leaf page\, constraining the number of keys processed to instantiate
 	 * a random Btree leaf page key.,an integer greater than or equal to 0;
 	 * default \c 10.}
-	 * @config{leaf_item_max, the maximum key or value size stored on leaf
-	 * nodes\, in bytes. If zero\, a size is calculated to permit at least 8
-	 * items (values or row store keys) per leaf page.,an integer greater
-	 * than or equal to 0; default \c 0.}
+	 * @config{leaf_item_max, the largest key or value stored within a leaf
+	 * node\, in bytes. If non-zero\, any key or value larger than the
+	 * specified size will be stored as an overflow item (which may require
+	 * additional I/O to access).  If zero\, a default size is chosen that
+	 * permits at least 4 key and value pairs per leaf page.,an integer
+	 * greater than or equal to 0; default \c 0.}
 	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
 	 * bytes; the size must be a multiple of the allocation size\, and is
 	 * significant for applications wanting to maximize sequential data
-	 * transfer from a storage device.,an integer between 512B and 512MB;
-	 * default \c 1MB.}
+	 * transfer from a storage device.  The page maximum is the bytes of
+	 * uncompressed data\, that is\, the limit is applied before any block
+	 * compression is done.,an integer between 512B and 512MB; default \c
+	 * 1MB.}
+	 * @config{lsm_bloom, create bloom filters on LSM tree chunks as they
+	 * are merged.,a boolean flag; default \c true.}
 	 * @config{lsm_bloom_bit_count, the number of bits used per item for LSM
-	 * bloom filters..,an integer between 2 and 1000; default \c 8.}
+	 * bloom filters.,an integer between 2 and 1000; default \c 8.}
+	 * @config{lsm_bloom_config, config string used when creating Bloom
+	 * filter files\, passed to WT_SESSION::create.,a string; default
+	 * empty.}
 	 * @config{lsm_bloom_hash_count, the number of hash values per item used
-	 * for LSM bloom filters..,an integer between 2 and 100; default \c 4.}
+	 * for LSM bloom filters.,an integer between 2 and 100; default \c 4.}
+	 * @config{lsm_bloom_newest, create a bloom filter on an LSM tree chunk
+	 * before it's first merge. Only supported if bloom filters are
+	 * enabled.,a boolean flag; default \c false.}
+	 * @config{lsm_bloom_oldest, create a bloom filter on the oldest LSM
+	 * tree chunk. Only supported if bloom filters are enabled.,a boolean
+	 * flag; default \c false.}
 	 * @config{lsm_chunk_size, the maximum size of the in-memory chunk of an
 	 * LSM tree.,an integer between 512K and 500MB; default \c 2MB.}
 	 * @config{lsm_merge_max, the maximum number of chunks to include in a
 	 * merge operation.,an integer between 2 and 100; default \c 15.}
+	 * @config{lsm_merge_threads, the number of thread to perform merge
+	 * operations.,an integer between 1 and 10; default \c 1.}
+	 * @config{memory_page_max, the maximum size a page can grow to in
+	 * memory before being reconciled to disk.  The specified size will be
+	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>.  This
+	 * limit is soft - it is possible for pages to be temporarily larger
+	 * than this value.,an integer between 512B and 10TB; default \c 5MB.}
 	 * @config{prefix_compression, configure row-store format key prefix
 	 * compression.,a boolean flag; default \c true.}
+	 * @config{source, override the default data source URI derived from the
+	 * object name.,a string; default empty.}
 	 * @config{split_pct, the Btree page split size as a percentage of the
 	 * maximum Btree page size\, that is\, when a Btree page is split\, it
 	 * will be split into smaller pages\, where each page is the specified
 	 * percentage of the maximum Btree page size.,an integer between 25 and
 	 * 100; default \c 75.}
-	 * @config{type, the file type.,a string\, chosen from the following
-	 * options: \c "btree"; default \c btree.}
+	 * @config{type, set the data source type.  This setting overrides the
+	 * URI prefix for the data source\, if no \c source configuration
+	 * setting is provided.,a string\, chosen from the following options: \c
+	 * "file"\, \c "lsm"; default \c file.}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * value_format is \c 'u' and applications use a WT_ITEM structure to
@@ -683,6 +741,23 @@ struct __wt_session {
 	 * @errors
 	 */
 	int __F(create)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Compact an object.
+	 *
+	 * @snippet ex_all.c Compact a table
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the object to drop, such as \c "table:stock"
+	 * @configstart{session.compact, see dist/api_data.py}
+	 * @config{trigger, Compaction will not be attempted unless the
+	 * specified percentage of the underlying objects is expected to be
+	 * recovered by compaction.,an integer between 10 and 50; default \c
+	 * 30.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(compact)(WT_SESSION *session,
 	    const char *name, const char *config);
 
 	/*! Drop (delete) an object.
@@ -791,7 +866,17 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to verify
-	 * @configempty{session.verify, see dist/api_data.py}
+	 * @configstart{session.verify, see dist/api_data.py}
+	 * @config{dump_address, Display addresses and page types as pages are
+	 * verified\, using the application's message handler\, intended for
+	 * debugging.,a boolean flag; default \c false.}
+	 * @config{dump_blocks, Display the contents of on-disk blocks as they
+	 * are verified\, using the application's message handler\, intended for
+	 * debugging.,a boolean flag; default \c false.}
+	 * @config{dump_pages, Display the contents of in-memory pages as they
+	 * are verified\, using the application's message handler\, intended for
+	 * debugging.,a boolean flag; default \c false.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(verify)(WT_SESSION *session,
@@ -812,7 +897,7 @@ struct __wt_session {
 	 *
 	 * All open cursors are reset.
 	 *
-	 * WT_SESSION::transaction_begin will fail if a transaction is already
+	 * WT_SESSION::begin_transaction will fail if a transaction is already
 	 * in progress in the session.
 	 *
 	 * @snippet ex_all.c transaction commit/rollback
@@ -883,6 +968,9 @@ struct __wt_session {
 	 * drop all checkpoints before and including the named checkpoint.
 	 * Checkpoints cannot be dropped while a hot backup is in progress or if
 	 * open in a cursor.,a list of strings; default empty.}
+	 * @config{force, checkpoints may be skipped if the underlying object
+	 * has not been modified\, this option forces the checkpoint.,a boolean
+	 * flag; default \c false.}
 	 * @config{name, if non-empty\, specify a name for the checkpoint.,a
 	 * string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects.,a list
@@ -896,21 +984,6 @@ struct __wt_session {
 	/*! @name Debugging
 	 * @{
 	 */
-
-	/*! Dump a physical file in debugging mode.
-	 *
-	 * The specified file is displayed in a non-portable debugging mode to
-	 * the application's standard output.
-	 *
-	 * @snippet ex_all.c Dump a file
-	 *
-	 * @param session the session handle
-	 * @param name the URI of the file to dump
-	 * @configempty{session.dumpfile, see dist/api_data.py}
-	 * @errors
-	 */
-	int __F(dumpfile)(WT_SESSION *session,
-	    const char *name, const char *config);
 
 	/*! Send a string to the message handler for debugging.
 	 *
@@ -957,23 +1030,43 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{connection.reconfigure, see dist/api_data.py}
-	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
-	 * integer between 1MB and 10TB; default \c 100MB.}
+	 * @config{cache_size, maximum heap memory to allocate for the cache. A
+	 * database should configure either a cache_size or a shared_cache not
+	 * both.,an integer between 1MB and 10TB; default \c 100MB.}
 	 * @config{error_prefix, prefix string for error messages.,a string;
 	 * default empty.}
+	 * @config{eviction_dirty_target, continue evicting until the cache has
+	 * less dirty pages than this (as a percentage). Dirty pages will only
+	 * be evicted if the cache is full enough to trigger eviction.,an
+	 * integer between 10 and 99; default \c 80.}
 	 * @config{eviction_target, continue evicting until the cache becomes
 	 * less full than this (as a percentage).  Must be less than \c
 	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
 	 * @config{eviction_trigger, trigger eviction when the cache becomes
 	 * this full (as a percentage).,an integer between 10 and 99; default \c
 	 * 95.}
+	 * @config{shared_cache = (, shared cache configuration options. A
+	 * database should configure either a cache_size or a shared_cache not
+	 * both.,a set of related configuration options defined
+	 * below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a
+	 * shared cache is redistributed.,an integer between 1MB and 10TB;
+	 * default \c 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of
+	 * cache this database is guaranteed to have available from the shared
+	 * cache. This setting is per database. Defaults to the chunk size.,a
+	 * string; default \c 0.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a
+	 * cache that is shared between databases.,a string; default
+	 * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to
+	 * allocate for the shared cache. Setting this will update the value if
+	 * one is already set.,an integer between 1MB and 10TB; default \c
+	 * 500MB.}@config{ ),,}
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
-	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
-	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\,
-	 * \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
-	 * "salvage"\, \c "verify"\, \c "write"; default empty.}
+	 * chosen from the following options: \c "block"\, \c "shared_cache"\,
+	 * \c "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c
+	 * "hazard"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
+	 * "reconcile"\, \c "salvage"\, \c "verify"\, \c "write"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1125,10 +1218,11 @@ struct __wt_connection {
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
- * I/O.  By default\, a platform-specific alignment value is used (512 bytes on
- * Linux systems\, zero elsewhere).,an integer between -1 and 1MB; default \c
- * -1.}
- * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
+ * I/O.  The default value of -1 indicates that a platform-specific alignment
+ * value should be used (512 bytes on Linux systems\, zero elsewhere).,an
+ * integer between -1 and 1MB; default \c -1.}
+ * @config{cache_size, maximum heap memory to allocate for the cache. A database
+ * should configure either a cache_size or a shared_cache not both.,an integer
  * between 1MB and 10TB; default \c 100MB.}
  * @config{create, create the database if it does not exist.,a boolean flag;
  * default \c false.}
@@ -1137,25 +1231,46 @@ struct __wt_connection {
  * from the following options: \c "data"\, \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages.,a string; default
  * empty.}
+ * @config{eviction_dirty_target, continue evicting until the cache has less
+ * dirty pages than this (as a percentage). Dirty pages will only be evicted if
+ * the cache is full enough to trigger eviction.,an integer between 10 and 99;
+ * default \c 80.}
  * @config{eviction_target, continue evicting until the cache becomes less full
  * than this (as a percentage).  Must be less than \c eviction_trigger.,an
  * integer between 10 and 99; default \c 80.}
  * @config{eviction_trigger, trigger eviction when the cache becomes this full
  * (as a percentage).,an integer between 10 and 99; default \c 95.}
- * @config{extensions, list of extensions to load.  Optional values are passed
- * as the \c config parameter to WT_CONNECTION::load_extension.  Complex paths
- * may need quoting\, for example\,
- * <code>extensions=("/path/to/ext.so"="entry=my_entry")</code>.,a list of
- * strings; default empty.}
- * @config{hazard_max, maximum number of simultaneous hazard references per
+ * @config{extensions, list of shared library extensions to load (using dlopen).
+ * Optional values are passed as the \c config parameter to
+ * WT_CONNECTION::load_extension.  Complex paths may require quoting\, for
+ * example\, <code>extensions=("/path/ext.so"="entry=my_entry")</code>.,a list
+ * of strings; default empty.}
+ * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle.,an integer greater than or equal to 15; default \c 1000.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}
+ * @config{lsm_merge, merge LSM chunks where possible.,a boolean flag; default
+ * \c true.}
+ * @config{mmap, Use memory mapping to access files when possible.,a boolean
+ * flag; default \c true.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
  * processes). <b>Not yet supported in WiredTiger</b>.,a boolean flag; default
  * \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads).,an integer greater than or equal to 1; default \c 50.}
+ * @config{shared_cache = (, shared cache configuration options. A database
+ * should configure either a cache_size or a shared_cache not both.,a set of
+ * related configuration options defined
+ * below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
+ * cache is redistributed.,an integer between 1MB and 10TB; default \c
+ * 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database
+ * is guaranteed to have available from the shared cache. This setting is per
+ * database. Defaults to the chunk size.,a string; default \c
+ * 0.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared
+ * between databases.,a string; default
+ * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
+ * the shared cache. Setting this will update the value if one is already
+ * set.,an integer between 1MB and 10TB; default \c 500MB.}@config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
  * checkpoints.,a boolean flag; default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
@@ -1166,10 +1281,10 @@ struct __wt_connection {
  * information.,a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
- * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
- * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\, \c
- * "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c "salvage"\, \c
- * "verify"\, \c "write"; default empty.}
+ * values chosen from the following options: \c "block"\, \c "shared_cache"\, \c
+ * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
+ * "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+ * "salvage"\, \c "verify"\, \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file
@@ -1201,8 +1316,11 @@ const char *wiredtiger_strerror(int err);
 struct __wt_event_handler {
 	/*!
 	 * Callback to handle error messages; by default, error messages are
-	 * written to the stderr stream.  If the handler returns non-zero,
-	 * the application's current operation will return an error.
+	 * written to the stderr stream.
+	 *
+	 * Error handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
 	 *
 	 * @param error a WiredTiger, C99 or POSIX error code, which can
 	 * be converted to a string using ::wiredtiger_strerror
@@ -1213,8 +1331,11 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle informational messages; by default, informational
-	 * messages are written to the stdout stream.  If the handler returns
-	 * non-zero, the application's current operation will return an error.
+	 * messages are written to the stdout stream.
+	 *
+	 * Message handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
 	 *
 	 * @param message an informational string
 	 */
@@ -1222,8 +1343,11 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle progress messages; by default, no progress
-	 * messages are written.  If the handler returns non-zero, the
-	 * application's current operation will return an error.
+	 * messages are written.
+	 *
+	 * Progress handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
 	 *
 	 * @param operation a string representation of the operation
 	 * @param progress a counter
@@ -1325,7 +1449,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  */
 /*! Conflict between concurrent operations.
  * This error is generated when an operation cannot be completed due to a
- * conflict with concurrent operations.  The operation should be retried.  If a
+ * conflict with concurrent operations.  The operation may be retried; if a
  * transaction is in progress, it should be rolled back and the operation
  * retried in a new transaction.
  */
@@ -1337,8 +1461,8 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  */
 #define	WT_DUPLICATE_KEY	-31801
 /*! Non-specific WiredTiger error.
- * This error is generated for cases that are not covered by specific error
- * returns.
+ * This error is returned when an error is not covered by a specific error
+ * return.
  */
 #define	WT_ERROR	-31802
 /*! Cursor item not found.
@@ -1347,9 +1471,14 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
  */
 #define	WT_NOTFOUND	-31803
+/*! WiredTiger library panic.
+ * This error indicates an underlying problem that requires the application exit
+ * and restart.
+ */
+#define	WT_PANIC	-31804
 /*! @cond internal */
 /*! Restart the operation (internal). */
-#define	WT_RESTART	-31804
+#define	WT_RESTART	-31805
 /*! @endcond */
 /*
  * Error return section: END
@@ -1412,7 +1541,7 @@ struct __wt_collator {
 struct __wt_compressor {
 	/*! Callback to compress a chunk of data.
 	 *
-	 * WT_COMPRESSOR::compress is given a source buffer and a destination
+	 * WT_COMPRESSOR::compress takes a source buffer and a destination
 	 * buffer, by default of the same size.  If the callback can compress
 	 * the buffer to a smaller size in the destination, it does so, sets
 	 * the \c compression_failed return to 0 and returns 0.  If compression
@@ -1445,15 +1574,120 @@ struct __wt_compressor {
 	    uint8_t *dst, size_t dst_len,
 	    size_t *result_lenp, int *compression_failed);
 
+	/*! Callback to compress a list of byte strings.
+	 *
+	 * WT_COMPRESSOR::compress_raw gives applications fine-grained control
+	 * over disk block size when writing row-store or variable-length
+	 * column-store pages.  Where this level of control is not required by
+	 * the underlying storage device, set the WT_COMPRESSOR::compress_raw
+	 * callback to \c NULL and WiredTiger will internally split each page
+	 * into blocks, each block then compressed by WT_COMPRESSOR::compress.
+	 *
+	 * WT_COMPRESSOR::compress_raw takes a source buffer and an array of
+	 * 0-based offsets of byte strings in that buffer.  The callback then
+	 * encodes none, some or all of the byte strings and copies the encoded
+	 * representation into a destination buffer.  The callback returns the
+	 * number of byte strings encoded and the bytes needed for the encoded
+	 * representation.   The encoded representation has header information
+	 * prepended and is written as a block to the underlying file object.
+	 *
+	 * On entry, \c page_max is the configured maximum size for objects of
+	 * this type.  (This value is provided for convenience, and will be
+	 * either the \c internal_page_max or \c leaf_page_max value specified
+	 * to WT_SESSION::create when the object was created.)
+	 *
+	 * On entry, \c extra is a count of additional bytes that will be added
+	 * to the encoded representation before it is written.  In other words,
+	 * if the target write size is 8KB, the returned encoded representation
+	 * should be less than or equal to (8KB - \c extra).  The method does
+	 * not need to skip bytes in the destination buffer based on \c extra,
+	 * the method should only use \c extra to decide how many bytes to store
+	 * into the destination buffer for its ideal block size.
+	 *
+	 * On entry, \c src points to the source buffer; \c offsets is an array
+	 * of \c slots 0-based offsets into \c src, where each offset is the
+	 * start of a byte string, except for the last offset, which is the
+	 * offset of the first byte past the end of the last byte string.  (In
+	 * other words, <code>offsets[0]</code> will be 0, the offset of the
+	 * first byte of the first byte string in \c src, and
+	 * <code>offsets[slots]</code> is the total length of all of the byte
+	 * strings in the \c src buffer.)
+	 *
+	 * On entry, \c dst points to the destination buffer with a length
+	 * of \c dst_len.  If the WT_COMPRESSOR::pre_size method is specified,
+	 * the destination buffer will be at least the size returned by that
+	 * method; otherwise, the destination buffer will be at least the
+	 * maximum size for the page being written (that is, when writing a
+	 * row-store leaf page, the destination buffer will be at least as
+	 * large as the \c leaf_page_max configuration value).
+	 *
+	 * After successful completion, the callback should return \c 0, and
+	 * set \c result_slotsp to the number of byte strings encoded and
+	 * \c result_lenp to the bytes needed for the encoded representation.
+	 *
+	 * WiredTiger repeatedly calls the callback function until all rows on
+	 * the page have been encoded.  There is no requirement the callback
+	 * encode any or all of the byte strings passed by WiredTiger.  If the
+	 * callback does not encode any of the byte strings, the callback must
+	 * set \c result_slotsp to 0.  In this case, WiredTiger will accumulate
+	 * more rows and repeat the call; if there are no more rows to
+	 * accumulate, WiredTiger writes the remaining rows without further
+	 * calls to the callback.
+	 *
+	 * On entry, \c final is zero if there are more rows to be written as
+	 * part of this page (if there will be additional data provided to the
+	 * callback), and non-zero if there are no more rows to be written as
+	 * part of this page.  If \c final is set and the callback fails to
+	 * encode any rows, WiredTiger writes the remaining rows without further
+	 * calls to the callback.  If \c final is set and the callback encodes
+	 * any number of rows, WiredTiger continues to call the callback until
+	 * all of the rows are encoded or the callback fails to encode any rows.
+	 *
+	 * The WT_COMPRESSOR::compress_raw callback is intended for applications
+	 * wanting to create disk blocks in specific sizes.
+	 * WT_COMPRESSOR::compress_raw is not a replacement for
+	 * WT_COMPRESSOR::compress: objects which WT_COMPRESSOR::compress_raw
+	 * cannot handle (for example, overflow key or value items), or which
+	 * WT_COMPRESSOR::compress_raw chooses not to compress for any reason
+	 * (for example, if WT_COMPRESSOR::compress_raw callback chooses not to
+	 * compress a small number of rows, but the page being written has no
+	 * more rows to accumulate), will be passed to WT_COMPRESSOR::compress.
+	 *
+	 * The WT_COMPRESSOR::compress_raw callback is only called for objects
+	 * where it is applicable, that is, for row-store and variable-length
+	 * column-store objects, where both row-store key prefix compression
+	 * and row-store and variable-length column-store dictionary compression
+	 * are \b not configured.  When WT_COMPRESSOR::compress_raw is not
+	 * applicable, the WT_COMPRESSOR::compress callback is used instead.
+	 *
+	 * @param[in] page_max the configured maximum page size for this object
+	 * @param[in] extra the count of the additional bytes
+	 * @param[in] src the data to compress
+	 * @param[in] offsets the byte offsets of the byte strings in src
+	 * @param[in] slots the number of entries in offsets
+	 * @param[in] dst the destination buffer
+	 * @param[in] dst_len the length of the destination buffer
+	 * @param[in] final non-zero if there are no more rows to accumulate
+	 * @param[out] result_lenp the length of the compressed data
+	 * @param[out] result_slotsp the number of byte offsets taken
+	 * @returns zero for success, non-zero to indicate an error.
+	 */
+	int (*compress_raw)(WT_COMPRESSOR *compressor, WT_SESSION *session,
+	    size_t page_max, size_t extra,
+	    uint8_t *src, uint32_t *offsets, uint32_t slots,
+	    uint8_t *dst, size_t dst_len,
+	    int final,
+	    size_t *result_lenp, uint32_t *result_slotsp);
+
 	/*! Callback to decompress a chunk of data.
 	 *
-	 * WT_COMPRESSOR::decompress is given a source buffer and a destination
+	 * WT_COMPRESSOR::decompress takes a source buffer and a destination
 	 * buffer.  The contents are switched from \c compress: the
 	 * source buffer is the compressed value, and the destination buffer is
 	 * sized to be the original size.  If the callback successfully
 	 * decompresses the source buffer to the destination buffer, it returns
 	 * 0.  If an error occurs, it returns an errno or WiredTiger error code.
-	 * The source buffer that WT_COMPRESSOR::decompress is given may have a
+	 * The source buffer that WT_COMPRESSOR::decompress takes may have a
 	 * size that is rounded up from the size originally produced by
 	 * WT_COMPRESSOR::compress, with the remainder of the buffer set to
 	 * zeroes. Most compressors do not care about this difference if the
@@ -1559,7 +1793,8 @@ struct __wt_data_source {
 	 * @snippet ex_all.c WT_DATA_SOURCE open_cursor
 	 */
 	int (*open_cursor)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *obj, const char *cfg[], WT_CURSOR **new_cursor);
+	    const char *obj, WT_CURSOR *owner, const char *cfg[],
+	    WT_CURSOR **new_cursor);
 
 	/*! Callback to rename an object.
 	 *
@@ -1621,158 +1856,246 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  */
 
 /*!
- * @name Statistics for connection handles
+ * @name Connection statistics
  * @anchor statistics_keys
  * @anchor statistics_conn
- * Statistics in WiredTiger are accessed through cursors with \c "statistics:"
- * URIs.  Individual statistics can be queried through the cursor using the
- * following keys.
+ * Statistics are accessed through cursors with \c "statistics:" URIs.
+ * Individual statistics can be queried through the cursor using the following
+ * keys.  See @ref data_statistics for more information.
  * @{
  */
-/*! ancient transactions */
-#define	WT_STAT_txn_ancient				0
-/*! blocks read from a file */
-#define	WT_STAT_block_read				1
-/*! blocks written to a file */
-#define	WT_STAT_block_write				2
-/*! cache: bytes currently held in the cache */
-#define	WT_STAT_cache_bytes_inuse			3
-/*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_cache_evict_slow			4
-/*! cache: internal pages evicted */
-#define	WT_STAT_cache_evict_internal			5
+/*! mapped bytes read by the block manager */
+#define	WT_STAT_CONN_BLOCK_BYTE_MAP_READ		0
+/*! bytes read by the block manager */
+#define	WT_STAT_CONN_BLOCK_BYTE_READ			1
+/*! bytes written by the block manager */
+#define	WT_STAT_CONN_BLOCK_BYTE_WRITE			2
+/*! mapped blocks read by the block manager */
+#define	WT_STAT_CONN_BLOCK_MAP_READ			3
+/*! blocks read by the block manager */
+#define	WT_STAT_CONN_BLOCK_READ				4
+/*! blocks written by the block manager */
+#define	WT_STAT_CONN_BLOCK_WRITE			5
+/*! cache: tracked dirty bytes in the cache */
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			6
+/*! cache: bytes currently in the cache */
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			7
 /*! cache: maximum bytes configured */
-#define	WT_STAT_cache_bytes_max				6
-/*! cache: modified pages evicted */
-#define	WT_STAT_cache_evict_modified			7
-/*! cache: pages currently held in the cache */
-#define	WT_STAT_cache_pages_inuse			8
-/*! cache: pages selected for eviction not evicted because of a hazard
- * reference */
-#define	WT_STAT_cache_evict_hazard			9
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			8
+/*! cache: bytes read into cache */
+#define	WT_STAT_CONN_CACHE_BYTES_READ			9
+/*! cache: bytes written from cache */
+#define	WT_STAT_CONN_CACHE_BYTES_WRITE			10
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_cache_evict_unmodified			10
-/*! checkpoints */
-#define	WT_STAT_checkpoint				11
-/*! condition wait calls */
-#define	WT_STAT_cond_wait				12
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		11
+/*! cache: modified pages evicted */
+#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		12
+/*! cache: pages selected for eviction unable to be evicted */
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		13
+/*! cache: eviction unable to acquire hazard pointer */
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		14
+/*! cache: internal pages evicted */
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		15
+/*! cache: eviction server unable to reach eviction goal */
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		16
+/*! cache: tracked dirty pages in the cache */
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			17
+/*! cache: pages currently held in the cache */
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			18
+/*! cache: pages read into cache */
+#define	WT_STAT_CONN_CACHE_READ				19
+/*! cache: pages written from cache */
+#define	WT_STAT_CONN_CACHE_WRITE			20
+/*! pthread mutex condition wait calls */
+#define	WT_STAT_CONN_COND_WAIT				21
 /*! files currently open */
-#define	WT_STAT_file_open				13
-/*! rwlock readlock calls */
-#define	WT_STAT_rwlock_rdlock				14
-/*! rwlock writelock calls */
-#define	WT_STAT_rwlock_wrlock				15
-/*! total memory allocations */
-#define	WT_STAT_memalloc				16
-/*! total memory frees */
-#define	WT_STAT_memfree					17
+#define	WT_STAT_CONN_FILE_OPEN				22
+/*! total heap memory allocations */
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			23
+/*! total heap memory frees */
+#define	WT_STAT_CONN_MEMORY_FREE			24
 /*! total read I/Os */
-#define	WT_STAT_total_read_io				18
-/*! total write I/Os */
-#define	WT_STAT_total_write_io				19
-/*! transaction failures due to cache overflow */
-#define	WT_STAT_txn_fail_cache				20
+#define	WT_STAT_CONN_READ_IO				25
+/*! pthread mutex shared lock read-lock calls */
+#define	WT_STAT_CONN_RWLOCK_READ			26
+/*! pthread mutex shared lock write-lock calls */
+#define	WT_STAT_CONN_RWLOCK_WRITE			27
+/*! ancient transactions */
+#define	WT_STAT_CONN_TXN_ANCIENT			28
 /*! transactions */
-#define	WT_STAT_txn_begin				21
+#define	WT_STAT_CONN_TXN_BEGIN				29
+/*! transaction checkpoints */
+#define	WT_STAT_CONN_TXN_CHECKPOINT			30
 /*! transactions committed */
-#define	WT_STAT_txn_commit				22
+#define	WT_STAT_CONN_TXN_COMMIT				31
+/*! transaction failures due to cache overflow */
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			32
 /*! transactions rolled-back */
-#define	WT_STAT_txn_rollback				23
+#define	WT_STAT_CONN_TXN_ROLLBACK			33
+/*! total write I/Os */
+#define	WT_STAT_CONN_WRITE_IO				34
 
 /*!
  * @}
- * @name Statistics for file objects
- * @anchor statistics_file
+ * @name Statistics for data sources
+ * @anchor statistics_dsrc
  * @{
  */
-/*! bulk-loaded entries */
-#define	WT_STAT_file_bulk_loaded			0
-/*! column-store deleted values */
-#define	WT_STAT_file_col_deleted			1
-/*! column-store fixed-size leaf pages */
-#define	WT_STAT_file_col_fix_pages			2
-/*! column-store internal pages */
-#define	WT_STAT_file_col_int_pages			3
-/*! column-store variable-size leaf pages */
-#define	WT_STAT_file_col_var_pages			4
-/*! cursor-inserts */
-#define	WT_STAT_cursor_inserts				5
-/*! cursor-read */
-#define	WT_STAT_cursor_read				6
-/*! cursor-read-near */
-#define	WT_STAT_cursor_read_near			7
-/*! cursor-read-next */
-#define	WT_STAT_cursor_read_next			8
-/*! cursor-read-prev */
-#define	WT_STAT_cursor_read_prev			9
-/*! cursor-removes */
-#define	WT_STAT_cursor_removes				10
-/*! cursor-resets */
-#define	WT_STAT_cursor_resets				11
-/*! cursor-updates */
-#define	WT_STAT_cursor_updates				12
-/*! file: block allocations */
-#define	WT_STAT_alloc					13
-/*! file: block allocations required file extension */
-#define	WT_STAT_extend					14
-/*! file: block frees */
-#define	WT_STAT_free					15
-/*! file: overflow pages read from the file */
-#define	WT_STAT_overflow_read				16
-/*! file: pages read from the file */
-#define	WT_STAT_page_read				17
-/*! file: pages written to the file */
-#define	WT_STAT_page_write				18
-/*! file: size */
-#define	WT_STAT_file_size				19
-/*! fixed-record size */
-#define	WT_STAT_file_fixed_len				20
-/*! magic number */
-#define	WT_STAT_file_magic				21
-/*! major version number */
-#define	WT_STAT_file_major				22
-/*! maximum internal page item size */
-#define	WT_STAT_file_maxintlitem			23
-/*! maximum internal page size */
-#define	WT_STAT_file_maxintlpage			24
-/*! maximum leaf page item size */
-#define	WT_STAT_file_maxleafitem			25
-/*! maximum leaf page size */
-#define	WT_STAT_file_maxleafpage			26
+/*! blocks allocated */
+#define	WT_STAT_DSRC_BLOCK_ALLOC			0
+/*! block manager file allocation unit size */
+#define	WT_STAT_DSRC_BLOCK_ALLOCSIZE			1
+/*! checkpoint size */
+#define	WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE		2
+/*! block allocations requiring file extension */
+#define	WT_STAT_DSRC_BLOCK_EXTENSION			3
+/*! blocks freed */
+#define	WT_STAT_DSRC_BLOCK_FREE				4
+/*! file magic number */
+#define	WT_STAT_DSRC_BLOCK_MAGIC			5
+/*! file major version number */
+#define	WT_STAT_DSRC_BLOCK_MAJOR			6
 /*! minor version number */
-#define	WT_STAT_file_minor				27
+#define	WT_STAT_DSRC_BLOCK_MINOR			7
+/*! block manager size */
+#define	WT_STAT_DSRC_BLOCK_SIZE				8
+/*! bloom filters in the LSM tree */
+#define	WT_STAT_DSRC_BLOOM_COUNT			9
+/*! bloom filter false positives */
+#define	WT_STAT_DSRC_BLOOM_FALSE_POSITIVE		10
+/*! bloom filter hits */
+#define	WT_STAT_DSRC_BLOOM_HIT				11
+/*! bloom filter misses */
+#define	WT_STAT_DSRC_BLOOM_MISS				12
+/*! bloom filter pages evicted from cache */
+#define	WT_STAT_DSRC_BLOOM_PAGE_EVICT			13
+/*! bloom filter pages read into cache */
+#define	WT_STAT_DSRC_BLOOM_PAGE_READ			14
+/*! total size of bloom filters */
+#define	WT_STAT_DSRC_BLOOM_SIZE				15
+/*! column-store variable-size deleted values */
+#define	WT_STAT_DSRC_BTREE_COLUMN_DELETED		16
+/*! column-store fixed-size leaf pages */
+#define	WT_STAT_DSRC_BTREE_COLUMN_FIX			17
+/*! column-store internal pages */
+#define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		18
+/*! column-store variable-size leaf pages */
+#define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		19
+/*! pages rewritten by compaction */
+#define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		20
+/*! total LSM, table or file object key/value pairs */
+#define	WT_STAT_DSRC_BTREE_ENTRIES			21
+/*! fixed-record size */
+#define	WT_STAT_DSRC_BTREE_FIXED_LEN			22
+/*! maximum tree depth */
+#define	WT_STAT_DSRC_BTREE_MAXIMUM_DEPTH		23
+/*! maximum internal page item size */
+#define	WT_STAT_DSRC_BTREE_MAXINTLITEM			24
+/*! maximum internal page size */
+#define	WT_STAT_DSRC_BTREE_MAXINTLPAGE			25
+/*! maximum leaf page item size */
+#define	WT_STAT_DSRC_BTREE_MAXLEAFITEM			26
+/*! maximum leaf page size */
+#define	WT_STAT_DSRC_BTREE_MAXLEAFPAGE			27
 /*! overflow pages */
-#define	WT_STAT_file_overflow				28
-/*! page size allocation unit */
-#define	WT_STAT_file_allocsize				29
-/*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				30
-/*! reconcile: dictionary match */
-#define	WT_STAT_rec_dictionary				31
-/*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				32
-/*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				33
-/*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				34
-/*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				35
-/*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				36
-/*! reconcile: pages written */
-#define	WT_STAT_rec_written				37
-/*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				38
+#define	WT_STAT_DSRC_BTREE_OVERFLOW			28
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			39
+#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			29
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			40
-/*! total entries */
-#define	WT_STAT_file_entries				41
+#define	WT_STAT_DSRC_BTREE_ROW_LEAF			30
+/*! bytes read into cache */
+#define	WT_STAT_DSRC_CACHE_BYTES_READ			31
+/*! bytes written from cache */
+#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			32
+/*! unmodified pages evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		33
+/*! modified pages evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		34
+/*! data source pages selected for eviction unable to be evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		35
+/*! eviction unable to acquire hazard pointer */
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		36
+/*! internal pages evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		37
+/*! overflow values cached in memory */
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		38
+/*! pages read into cache */
+#define	WT_STAT_DSRC_CACHE_READ				39
+/*! overflow pages read into cache */
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		40
+/*! pages written from cache */
+#define	WT_STAT_DSRC_CACHE_WRITE			41
+/*! raw compression call failed (no additional data available) */
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			42
+/*! raw compression call failed (additional data available) */
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	43
+/*! raw compression call succeeded */
+#define	WT_STAT_DSRC_COMPRESS_RAW_OK			44
+/*! compressed pages read */
+#define	WT_STAT_DSRC_COMPRESS_READ			45
+/*! compressed pages written */
+#define	WT_STAT_DSRC_COMPRESS_WRITE			46
+/*! page written failed to compress */
+#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		47
+/*! page written was too small to compress */
+#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		48
+/*! cursor insert calls */
+#define	WT_STAT_DSRC_CURSOR_INSERT			49
+/*! bulk-loaded cursor-insert calls */
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			50
+/*! cursor-insert key and value bytes inserted */
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		51
+/*! cursor next calls */
+#define	WT_STAT_DSRC_CURSOR_NEXT			52
+/*! cursor prev calls */
+#define	WT_STAT_DSRC_CURSOR_PREV			53
+/*! cursor remove calls */
+#define	WT_STAT_DSRC_CURSOR_REMOVE			54
+/*! cursor-remove key bytes removed */
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		55
+/*! cursor reset calls */
+#define	WT_STAT_DSRC_CURSOR_RESET			56
+/*! cursor search calls */
+#define	WT_STAT_DSRC_CURSOR_SEARCH			57
+/*! cursor search near calls */
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			58
+/*! cursor update calls */
+#define	WT_STAT_DSRC_CURSOR_UPDATE			59
+/*! cursor-update value bytes updated */
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		60
+/*! chunks in the LSM tree */
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			61
+/*! highest merge generation in the LSM tree */
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			62
+/*! queries that could have benefited from a Bloom filter that did not
+ * exist */
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		63
+/*! reconciliation dictionary matches */
+#define	WT_STAT_DSRC_REC_DICTIONARY			64
+/*! reconciliation overflow keys written */
+#define	WT_STAT_DSRC_REC_OVFL_KEY			65
+/*! reconciliation overflow values written */
+#define	WT_STAT_DSRC_REC_OVFL_VALUE			66
+/*! reconciliation pages deleted */
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			67
+/*! reconciliation pages merged */
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			68
+/*! page reconciliation calls */
+#define	WT_STAT_DSRC_REC_PAGES				69
+/*! page reconciliation calls for eviction */
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			70
+/*! page reconciliation failed when an update could not be included */
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			71
+/*! reconciliation internal pages split */
+#define	WT_STAT_DSRC_REC_SPLIT_INTL			72
+/*! reconciliation leaf pages split */
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			73
+/*! object compaction */
+#define	WT_STAT_DSRC_SESSION_COMPACT			74
 /*! update conflicts */
-#define	WT_STAT_update_conflict				42
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		75
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			43
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			76
 /*! @} */
 /*
  * Statistics section: END

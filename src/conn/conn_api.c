@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -76,7 +76,7 @@ __conn_load_extension(
 
 	if (0) {
 err:		if (dlh != NULL)
-			(void)__wt_dlclose(session, dlh);
+			WT_TRET(__wt_dlclose(session, dlh));
 	}
 	__wt_free(session, entry_name);
 
@@ -304,9 +304,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	/*
 	 * Close open, external sessions.
-	 * Additionally, the session's hazard reference memory isn't discarded
+	 * Additionally, the session's hazard pointer memory isn't discarded
 	 * during normal session close because access to it isn't serialized.
-	 * Discard it now.  Note the loop for the hazard reference memory, it's
+	 * Discard it now.  Note the loop for the hazard pointer memory, it's
 	 * the entire session array, not only the active session count, as the
 	 * active session count may be less than the maximum session count.
 	 */
@@ -365,8 +365,13 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	 * Don't include the default config: only override values the
 	 * application sets explicitly.
 	 */
+	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
-	WT_ERR(__conn_verbose_config(session, raw_cfg));
+	WT_ERR(__conn_verbose_config(session, cfg));
+	/* Wake up the cache pool server so any changes are noticed. */
+	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
+		WT_ERR(__wt_cond_signal(
+		    session, __wt_process.cache_pool->cache_pool_cond));
 
 err:	API_END(session);
 	return (ret);
@@ -520,13 +525,13 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 	*t = '\0';
 
 #if 0
-	fprintf(stderr, "file config: {%s}\n", (char *)cbuf->data);
+	fprintf(stderr, "file config: {%s}\n", (const char *)cbuf->data);
 	exit(0);
 #endif
 
 	/* Check the configuration string. */
 	WT_ERR(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, cbuf->data));
+	    session, __wt_confchk_wiredtiger_open, cbuf->data, 0));
 
 	/*
 	 * The configuration file falls between the default configuration and
@@ -577,7 +582,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 
 	/* Check the configuration string. */
 	WT_RET(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, env_config));
+	    session, __wt_confchk_wiredtiger_open, env_config, 0));
 
 	/*
 	 * The environment setting comes second-to-last: it overrides the
@@ -706,7 +711,7 @@ __conn_single(WT_SESSION_IMPL *session, const char **cfg)
 	return (0);
 
 err:	if (conn->lock_fh != NULL) {
-		(void)__wt_close(session, conn->lock_fh);
+		WT_TRET(__wt_close(session, conn->lock_fh));
 		conn->lock_fh = NULL;
 	}
 	return (ret);
@@ -719,7 +724,6 @@ err:	if (conn->lock_fh != NULL) {
 static int
 __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-#ifdef HAVE_VERBOSE
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -728,6 +732,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		uint32_t flag;
 	} *ft, verbtypes[] = {
 		{ "block",	WT_VERB_block },
+		{ "shared_cache",WT_VERB_shared_cache },
 		{ "ckpt",	WT_VERB_ckpt },
 		{ "evict",	WT_VERB_evict },
 		{ "evictserver",WT_VERB_evictserver },
@@ -736,7 +741,6 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "lsm",	WT_VERB_lsm },
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
-		{ "readserver",	WT_VERB_readserver },
 		{ "reconcile",	WT_VERB_reconcile },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
@@ -756,8 +760,6 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_RET_NOTFOUND_OK(ret);
 	}
-#endif
-
 	return (0);
 }
 
@@ -829,8 +831,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_connection_init(conn));
 
 	/* Check the configuration strings. */
-	WT_ERR(
-	    __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
+	WT_ERR(__wt_config_check(
+	    session, __wt_confchk_wiredtiger_open, config, 0));
 
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));
@@ -848,15 +850,20 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->hazard_max = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_LSM_MERGE);
 	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
-	if (!cval.val)
-		F_SET(conn, WT_CONN_NOSYNC);
+	if (cval.val)
+		F_SET(conn, WT_CONN_SYNC);
 	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_TRANSACTIONAL);
 
 	/* Configure verbose flags. */
 	WT_ERR(__conn_verbose_config(session, cfg));
+
+	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
@@ -884,6 +891,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
+
+	/* Configure mmap. */
+	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
+	conn->mmap = cval.val == 0 ? 0 : 1;
 
 	/* Load any extensions referenced in the config. */
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
@@ -952,7 +963,7 @@ err:	if (cbuf != NULL)
 	__wt_buf_free(session, &exconfig);
 
 	if (ret != 0 && conn != NULL)
-		__wt_connection_destroy(conn);
+		WT_TRET(__wt_connection_destroy(conn));
 
 	return (ret);
 }

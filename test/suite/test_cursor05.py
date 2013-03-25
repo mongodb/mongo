@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -109,9 +109,7 @@ class test_cursor05(wttest.WiredTigerTestCase):
         # Do something that leaves the cursor in an uninitialized spot
         if expectcount > 0:
             n = expectcount - 1
-            cursor.set_key(n, 'key' + str(n))
-            cursor.search()
-            (s1, i2, s3, i4) = cursor.get_values()
+            s1, i2, s3, i4 = cursor[(n, 'key' + str(n))]
             self.assertEqual(s1, 'val' + str(n))
             self.assertEqual(i2, n)
             self.assertEqual(s3, 'val' + str(n))

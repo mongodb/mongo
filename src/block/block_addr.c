@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -141,7 +141,7 @@ __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
 
 	ci->version = *p++;
 	if (ci->version != WT_BM_CHECKPOINT_VERSION)
-		WT_RET_MSG(session, WT_ERROR, "illegal checkpoint address");
+		WT_RET_MSG(session, WT_ERROR, "unsupported checkpoint version");
 
 	pp = &p;
 	WT_RET(__block_buffer_to_addr(block, pp,
@@ -156,8 +156,6 @@ __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
 	ci->file_size = (off_t)a;
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	ci->ckpt_size = a;
-	WT_RET(__wt_vunpack_uint(pp, 0, &a));
-	ci->write_gen = a;
 
 	return (0);
 }
@@ -173,7 +171,7 @@ __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
 	uint64_t a;
 
 	if (ci->version != WT_BM_CHECKPOINT_VERSION)
-		WT_RET_MSG(session, WT_ERROR, "illegal checkpoint address");
+		WT_RET_MSG(session, WT_ERROR, "unsupported checkpoint version");
 
 	(*pp)[0] = ci->version;
 	(*pp)++;
@@ -189,8 +187,6 @@ __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
 	a = (uint64_t)ci->file_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 	a = (uint64_t)ci->ckpt_size;
-	WT_RET(__wt_vpack_uint(pp, 0, a));
-	a = ci->write_gen;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 
 	return (0);

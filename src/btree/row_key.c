@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -20,7 +20,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_ROW *rip;
-	uint32_t i;
+	uint32_t gap, i;
 
 	btree = S2BT(session);
 
@@ -50,7 +50,9 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET(__wt_scr_alloc(
 	    session, (uint32_t)__bitstr_size(page->entries), &tmp));
 
-	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, btree->key_gap);
+	if ((gap = btree->key_gap) == 0)
+		gap = 1;
+	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, gap);
 
 	/* Instantiate the keys. */
 	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
@@ -266,14 +268,14 @@ __wt_row_key_copy(
 		 */
 		if (direction == FORWARD) {
 			/*
-			 * Get a copy of the current key;
-			 * Ensure the buffer can hold the key plus the prefix;
-			 * Append the key to the prefix (already in the buffer);
-			 * Set the final size of the key.
+			 * Get a reference to the current key's bytes;
+			 * Ensure the buffer can hold the key's bytes plus the
+			 *    prefix (and also setting the final buffer size);
+			 * Append the key to the prefix (already in the buffer).
 			 */
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, tmp));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, tmp));
 			WT_ERR(__wt_buf_initsize(
 			    session, retb, tmp->size + unpack->prefix));
 			memcpy((uint8_t *)
@@ -304,24 +306,24 @@ next:		switch (direction) {
 	if (!is_local)
 		return (0);
 
-	/*
-	 * Allocate and initialize a WT_IKEY structure, we're instantiating
-	 * this key.
-	 */
+	/* If still needed, instantiate the key. */
 	key = WT_ROW_KEY_COPY(rip_arg);
-	WT_ERR(__wt_row_ikey_alloc(session,
-	    WT_PAGE_DISK_OFFSET(page, key), retb->data, retb->size, &ikey));
+	if (!__wt_off_page(page, key)) {
+		WT_ERR(__wt_row_ikey_alloc(session,
+		    WT_PAGE_DISK_OFFSET(page, key),
+		    retb->data, retb->size, &ikey));
 
-	/* Serialize the swap of the key into place. */
-	ret = __wt_row_key_serial(session, page, rip_arg, ikey);
-
-	/*
-	 * Free the WT_IKEY structure if the serialized call didn't use it for
-	 * the key.
-	 */
-	key = WT_ROW_KEY_COPY(rip_arg);
-	if (key != ikey)
-		__wt_free(session, ikey);
+		/*
+		 * Serialize the swap of the key into place.  If we succeed,
+		 * update the page's memory footprint; if we fail, free the
+		 * WT_IKEY structure.
+		 */
+		if (WT_ATOMIC_CAS(WT_ROW_KEY_COPY(rip), key, ikey))
+			__wt_cache_page_inmem_incr(
+			    session, page, sizeof(WT_IKEY) + ikey->size);
+		else
+			__wt_free(session, ikey);
+	}
 
 	__wt_scr_free(&retb);
 
@@ -342,16 +344,17 @@ WT_CELL *
 __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
 	u_int type;
 
 	cell = WT_ROW_KEY_COPY(rip);
 	/*
 	 * Key copied.
 	 *
-	 * Now, cell either references a WT_IKEY structure that has a value-cell
-	 * offset, or references the on-page key WT_CELL, and we can walk past
-	 * that to find the value WT_CELL.  Both can be processed regardless of
-	 * what other threads are doing.
+	 * Cell now either references a WT_IKEY structure with a cell offset,
+	 * or references the on-page key WT_CELL.  Both can be processed
+	 * regardless of what other threads are doing.  If it's the former,
+	 * use it to get the latter.
 	 */
 	if (__wt_off_page(page, cell))
 		cell = WT_PAGE_REF_OFFSET(page, ((WT_IKEY *)cell)->cell_offset);
@@ -359,10 +362,19 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	/*
 	 * Row-store leaf pages may have a single data cell between each key, or
 	 * keys may be adjacent (when the data cell is empty).  Move to the next
-	 * key.  The page reconciliation code guarantees there is always a key
-	 * cell after an empty data cell, so this is safe.
+	 * cell and check its type.
+	 *
+	 * One special case: if the last key on a page is a key without a value,
+	 * don't walk off the end of the page: the size of the underlying disk
+	 * image is exact, which means the end of the last cell on the page plus
+	 * the length of the cell should be the byte immediately after the page
+	 * disk image.
 	 */
-	cell = __wt_cell_next(cell);
+	__wt_cell_unpack(cell, &unpack);
+	cell = (WT_CELL *)((uint8_t *)cell + __wt_cell_total_len(&unpack));
+	if (__wt_off_page(page, cell))
+		return (NULL);
+
 	type = __wt_cell_type(cell);
 	return (type == WT_CELL_KEY || type == WT_CELL_KEY_OVFL ? NULL : cell);
 }
@@ -388,31 +400,4 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
 
 	*(WT_IKEY **)ikeyp = ikey;
 	return (0);
-}
-
-/*
- * __wt_row_key_serial_func --
- *	Server function to instantiate a key during a row-store search.
- */
-void
-__wt_row_key_serial_func(WT_SESSION_IMPL *session)
-{
-	WT_IKEY *ikey;
-	WT_PAGE *page;
-	WT_ROW *rip;
-
-	__wt_row_key_unpack(session, &page, &rip, &ikey);
-
-	/*
-	 * We don't care about the page's write generation -- there's a simpler
-	 * test, if the key we're interested in still needs to be instantiated,
-	 * because it can only be in one of two states.
-	 */
-	if (!__wt_off_page(page, WT_ROW_KEY_COPY(rip))) {
-		WT_ROW_KEY_SET(rip, ikey);
-		__wt_cache_page_inmem_incr(
-		    session, page, sizeof(WT_IKEY) + ikey->size);
-	}
-
-	__wt_session_serialize_wrapup(session, NULL, 0);
 }

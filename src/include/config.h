@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -26,4 +26,5 @@ struct __wt_config_check {
 	const char *name;
 	const char *type;
 	const char *checks;
+	WT_CONFIG_CHECK *subconfigs;
 };
