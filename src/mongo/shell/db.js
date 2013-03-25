@@ -761,7 +761,7 @@ DB.prototype.killOP = DB.prototype.killOp;
 
 DB.tsToSeconds = function(x){
     if ( x.t && x.i )
-        return x.t / 1000;
+        return x.t;
     return x / 4294967296; // low 32 bits are ordinal #s within a second
 }
 
