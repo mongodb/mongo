@@ -45,6 +45,9 @@
 
 namespace mongo {
 
+    typedef std::map<double, NativeFunction> FunctionMap;
+    typedef std::map<double, void*> ArgumentMap;
+
     string trim( string s ) {
         while ( s.size() && isspace( s[0] ) )
             s = s.substr( 1 );
@@ -1174,56 +1177,8 @@ namespace mongo {
         return JS_TRUE;
     }
 
-    JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
-        try {
-            Convertor c(cx);
-            NativeFunction func = reinterpret_cast<NativeFunction>(
-                    static_cast<long long>( c.getNumber( obj , "x" ) ) );
-            void* data = reinterpret_cast<void*>(
-                    static_cast<long long>( c.getNumber( obj , "y" ) ) );
-            verify( func );
-
-            BSONObj a;
-            if ( argc > 0 ) {
-                BSONObjBuilder args;
-                for ( uintN i = 0; i < argc; ++i ) {
-                    c.append( args , args.numStr( i ) , argv[i] );
-                }
-                a = args.obj();
-            }
-
-            BSONObj out;
-            try {
-                out = func( a, data );
-            }
-            catch ( std::exception& e ) {
-                if ( ! JS_IsExceptionPending( cx ) ) {
-                    JS_ReportError( cx, e.what() );
-                }
-                return JS_FALSE;
-            }
-
-            if ( out.isEmpty() ) {
-                *rval = JSVAL_VOID;
-            }
-            else {
-                *rval = c.toval( out.firstElement() );
-            }
-        }
-        catch ( const AssertionException& e ) {
-            if ( ! JS_IsExceptionPending( cx ) ) {
-                JS_ReportError( cx, e.what() );
-            }
-            return JS_FALSE;
-        }
-        catch ( const std::exception& e ) {
-            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
-            fassertFailed( 16281 );
-        }
-        return JS_TRUE;
-    }
-
     JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval );
+    JSBool native_helper(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval);
 
     JSBool native_gc( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
         JS_GC( cx );
@@ -1869,12 +1824,16 @@ namespace mongo {
             smlock;
             string name = field;
             jsval v;
-            v = _convertor->toval( static_cast<double>( reinterpret_cast<long long>(func) ) );
+            double funcId = static_cast<double>(_functionMap.size());
+            _functionMap.insert(make_pair(funcId, func));
+            v = _convertor->toval(funcId);
             _convertor->setProperty( _global, (name + "_").c_str(), v );
 
             stringstream code;
             if (data) {
-                v = _convertor->toval( static_cast<double>( reinterpret_cast<long long>(data) ) );
+                double argsId = static_cast<double>(_argumentMap.size());
+                _argumentMap.insert(make_pair(argsId, data));
+                v = _convertor->toval(argsId);
                 _convertor->setProperty( _global, (name + "_data_").c_str(), v );
                 code << field << "_" << " = { x : " << field << "_ , y: " << field << "_data_ }; ";
             } else {
@@ -1892,6 +1851,10 @@ namespace mongo {
 
         JSContext *SavedContext() const { return _context; }
 
+        // map from internal function id to function pointer
+        FunctionMap _functionMap;
+        // map from internal function argument id to function pointer
+        ArgumentMap _argumentMap;
     private:
 
         void _postCreateHacks() {
@@ -1970,7 +1933,69 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
+        try {
+            Convertor c(cx);
 
+            // get function pointer from JS caller's argument property 'x'
+            massert(16735, "nativeHelper argument requires object with 'x' property",
+                    c.hasProperty(obj, "x"));
+            double functionAddress = c.getNumber(obj, "x");
+            FunctionMap::iterator funcIter = currentScope->_functionMap.find(functionAddress);
+            massert(16734, "JavaScript function not in map",
+                    funcIter != currentScope->_functionMap.end());
+            NativeFunction func = funcIter->second;
+            verify(func);
+
+            // get data pointer from JS caller's argument property 'y'
+            void* data = NULL;
+            if (c.hasProperty(obj, "y")) {
+                double argumentAddress = c.getNumber(obj, "y");
+                ArgumentMap::iterator argIter = currentScope->_argumentMap.find(argumentAddress);
+                massert(16736, "nativeHelper 'y' parameter must be in the argumentMap",
+                        argIter != currentScope->_argumentMap.end());
+                data = argIter->second;
+            }
+
+            BSONObj a;
+            if ( argc > 0 ) {
+                BSONObjBuilder args;
+                for ( uintN i = 0; i < argc; ++i ) {
+                    c.append( args , args.numStr( i ) , argv[i] );
+                }
+                a = args.obj();
+            }
+
+            BSONObj out;
+            try {
+                out = func( a, data );
+            }
+            catch ( std::exception& e ) {
+                if ( ! JS_IsExceptionPending( cx ) ) {
+                    JS_ReportError( cx, e.what() );
+                }
+                return JS_FALSE;
+            }
+
+            if ( out.isEmpty() ) {
+                *rval = JSVAL_VOID;
+            }
+            else {
+                *rval = c.toval( out.firstElement() );
+            }
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16281 );
+        }
+        return JS_TRUE;
+    }
 
     void SMEngine::runTest() {
         SMScope s;
