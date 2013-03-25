@@ -356,7 +356,8 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	flags = 0;
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	if (cval.type == ITEM_NUM && (cval.val == 0 || cval.val == 1)) {
+	if (cval.type == ITEM_BOOL ||
+	    (cval.type == ITEM_NUM && (cval.val == 0 || cval.val == 1))) {
 		bitmap = 0;
 		bulk = (cval.val != 0);
 	} else if (WT_STRING_MATCH("bitmap", cval.str, cval.len))

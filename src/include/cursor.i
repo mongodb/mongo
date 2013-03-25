@@ -78,6 +78,15 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 		if (--session->ncursors == 0)
 			__wt_txn_read_last(session);
 		F_CLR(cbt, WT_CBT_ACTIVE);
+
+		/*
+		 * If this is an autocommit operation that is just getting
+		 * started, check that the cache isn't full.  We may have other
+		 * cursors open, but the one we just closed might help eviction
+		 * make progress.
+		 */
+		if (F_ISSET(&session->txn, TXN_AUTOCOMMIT))
+			WT_RET(__wt_cache_full_check(session));
 	}
 	return (0);
 }

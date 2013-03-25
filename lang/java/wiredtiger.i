@@ -776,6 +776,11 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %ignore __wt_connection::open_session;
 %rename(open_session) __wt_connection::open_session_wrap;
 %ignore __wt_session::open_cursor;
+%javamethodmodifiers __wt_session::open_cursor_wrap "
+  /**
+   * @copydoc WT_SESSION::open_cursor
+   */
+  public ";
 %rename(open_cursor) __wt_session::open_cursor_wrap;
 
 %rename(Cursor) __wt_cursor;

@@ -57,8 +57,9 @@ __wt_config_check(WT_SESSION_IMPL *session,
 		if (strcmp(checks[i].type, "int") == 0)
 			badtype = (v.type != ITEM_NUM);
 		else if (strcmp(checks[i].type, "boolean") == 0)
-			badtype = (v.type != ITEM_NUM ||
-			    (v.val != 0 && v.val != 1));
+			badtype = (v.type != ITEM_BOOL &&
+			    (v.type != ITEM_NUM ||
+			    (v.val != 0 && v.val != 1)));
 		else if (strcmp(checks[i].type, "list") == 0)
 			badtype = (v.len > 0 && v.type != ITEM_STRUCT);
 		else if (strcmp(checks[i].type, "category") == 0) {

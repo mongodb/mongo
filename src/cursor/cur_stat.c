@@ -443,7 +443,8 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
-err:		__wt_free(session, cst);
+err:		__wt_free(session, cst->stats);
+		__wt_free(session, cst);
 	}
 
 	return (ret);

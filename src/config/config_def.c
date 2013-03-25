@@ -426,7 +426,7 @@ __wt_confdfl_wiredtiger_open =
 	"lsm_merge=,mmap=,multiprocess=0,session_max=50,"
 	"shared_cache=(chunk=10MB,name=pool,reserve=0,size=500MB),"
 	"statistics=0,statistics_log=(clear=,path=\"WiredTigerStat.%H\","
-	"timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,transactional=,"
+	"sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,transactional=,"
 	"use_environment_priv=0,verbose=";
 
 WT_CONFIG_CHECK
@@ -440,6 +440,7 @@ WT_CONFIG_CHECK
 __wt_confchk_statistics_log_subconfigs[] = {
 	{ "clear", "boolean", NULL, NULL },
 	{ "path", "string", NULL, NULL },
+	{ "sources", "list", NULL, NULL },
 	{ "timestamp", "string", NULL, NULL },
 	{ "wait", "int", "min=5,max=100000", NULL },
 	{ NULL, NULL, NULL, NULL }

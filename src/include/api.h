@@ -65,7 +65,7 @@
 		else {							\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\
 			if (ret == 0 || ret == WT_DEADLOCK) {		\
-				ret = __wt_cache_full_check(s);		\
+				ret = 0;				\
 				continue;				\
 			}						\
 		}							\

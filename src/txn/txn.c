@@ -39,7 +39,7 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 	txn->snapshot_count = n;
 	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
 	txn->snap_max = id;
-	WT_ASSERT(session, txn->snap_min != WT_TXN_NONE);
+	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
 	txn->oldest_snap_min = TXNID_LT(oldest_snap_min, txn->snap_min) ?
 	    oldest_snap_min : txn->snap_min;
 }
@@ -76,13 +76,15 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
-	/* If nothing has changed since last time, we're done. */
-	if (txn->last_oldest_gen == txn_global->gen)
-		return;
-	txn->last_oldest_gen = txn_global->gen;
-
 	oldest_snap_min =
 	    (txn->id != WT_TXN_NONE) ? txn->id : txn_global->current;
+
+	/* If nothing has changed since last time, we're done. */
+	if (txn->last_oldest_gen == txn_global->gen &&
+	    txn->last_oldest_id == oldest_snap_min)
+		return;
+	txn->last_oldest_gen = txn_global->gen;
+	txn->last_oldest_id = oldest_snap_min;
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states;

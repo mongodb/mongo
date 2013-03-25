@@ -343,7 +343,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	WT_CONFIG_ITEM *out = key;
 	int utf8_remain = 0;
 	static const WT_CONFIG_ITEM true_value = {
-		"", 0, 1, ITEM_NUM
+		"", 0, 1, ITEM_BOOL
 	};
 
 	key->len = 0;
@@ -499,10 +499,10 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 
 	if (value->type == ITEM_ID) {
 		if (strncasecmp(value->str, "true", value->len) == 0) {
-			value->type = ITEM_NUM;
+			value->type = ITEM_BOOL;
 			value->val = 1;
 		} else if (strncasecmp(value->str, "false", value->len) == 0) {
-			value->type = ITEM_NUM;
+			value->type = ITEM_BOOL;
 			value->val = 0;
 		}
 	} else if (value->type == ITEM_NUM) {
