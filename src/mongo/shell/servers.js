@@ -1,3 +1,6 @@
+// Wrap whole file in a function to avoid polluting the global namespace
+(function() {
+
 _parsePath = function() {
     var dbpath = "";
     for( var i = 0; i < arguments.length; ++i )
@@ -731,7 +734,7 @@ startMongos = function(args){
 /**
  * Returns a new argArray with any test-specific arguments added.
  */
-getTestArgs = function(argArray) {
+function getTestArgs(argArray) {
     var programName = argArray[0];
     if (programName.endsWith('mongod') || programName.endsWith('mongos')) {
         if (jsTest.options().enableTestCommands) {
@@ -858,3 +861,5 @@ myPort = function() {
     else
         return 27017;
 }
+
+}());
