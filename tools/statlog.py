@@ -32,7 +32,7 @@ from subprocess import call
 
 # Plot a set of entries for a title.
 def plot(title, entries, num):
-    # Ignore entries with identical values.
+    # Ignore entries where the value never changes.
     skip = 1
     v = entries[0][1]
     for entry in entries:
@@ -90,6 +90,6 @@ for line in fileinput.input(sys.argv[1:]):
 
 # Plot each entry in the dictionary.
 rno = 0
-for entry in d.iteritems():
+for entry in sorted(d.iteritems()):
     rno = rno + 1
     plot(entry[0], entry[1], "%03d" % rno)

@@ -1309,13 +1309,16 @@ struct __wt_connection {
  * which the log records are written\, may contain strftime conversion
  * specifications.  If the value is not an absolute path name\, the file is
  * created relative to the database home.,a string; default \c
- * "WiredTigerStat.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp
- * prepended to each log record\, may contain strftime conversion
- * specifications.,a string; default \c "%b %d
- * %H:%M:%S".}@config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
- * write of the log records; setting this value configures \c statistics and
- * statistics logging.,an integer between 5 and 100000; default \c 0.}@config{
- * ),,}
+ * "WiredTigerStat.%H".}@config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if non-empty\,
+ * include statistics for the list of data source URIs.  No statistics that
+ * require traversing a tree are reported\, as if the \c statistics_fast
+ * configuration string were set.,a list of strings; default
+ * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to
+ * each log record\, may contain strftime conversion specifications.,a string;
+ * default \c "%b %d %H:%M:%S".}@config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to
+ * wait between each write of the log records; setting this value configures \c
+ * statistics and statistics logging.,an integer between 5 and 100000; default
+ * \c 0.}@config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
  * checkpoints.,a boolean flag; default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
