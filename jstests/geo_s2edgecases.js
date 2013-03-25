@@ -5,20 +5,20 @@ roundworldpoint = { "type" : "Point", "coordinates": [ 180, 0 ] }
 
 // Opposite the equator
 roundworld = { "type" : "Polygon",
-             "coordinates" : [ [ [179,1], [181,1], [181,-1], [179,-1], [179,1]]]}
+             "coordinates" : [ [ [179,1], [-179,1], [-179,-1], [179,-1], [179,1]]]}
 t.insert({geo : roundworld})
 
 roundworld2 = { "type" : "Polygon",
-             "coordinates" : [ [ [179,1], [179,-1], [181,-1], [181,1], [179,1]]]}
+             "coordinates" : [ [ [179,1], [179,-1], [-179,-1], [-179,1], [179,1]]]}
 t.insert({geo : roundworld2})
 
 // North pole
 santapoint = { "type" : "Point", "coordinates": [ 180, 90 ] }
 santa = { "type" : "Polygon",
-             "coordinates" : [ [ [179,89], [179,90], [181,90], [181,89], [179,89]]]}
+             "coordinates" : [ [ [179,89], [179,90], [-179,90], [-179,89], [179,89]]]}
 t.insert({geo : santa})
 santa2 = { "type" : "Polygon",
-             "coordinates" : [ [ [179,89], [181,89], [181,90], [179,90], [179,89]]]}
+             "coordinates" : [ [ [179,89], [-179,89], [-179,90], [179,90], [179,89]]]}
 t.insert({geo : santa2})
 
 // South pole

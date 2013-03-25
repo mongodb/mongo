@@ -54,6 +54,10 @@ namespace {
         // Make sure lat is in range
         ASSERT_TRUE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, 90.0]}")));
         ASSERT_TRUE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, -90.0]}")));
+        ASSERT_TRUE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [180, 90.0]}")));
+        ASSERT_TRUE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [-180, -90.0]}")));
+        ASSERT_FALSE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [180.01, 90.0]}")));
+        ASSERT_FALSE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [-180.01, -90.0]}")));
         ASSERT_FALSE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, 90.1]}")));
         ASSERT_FALSE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, -90.1]}")));
     }
@@ -63,6 +67,10 @@ namespace {
             fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4]]}")));
         ASSERT_TRUE(GeoParser::isLineString(
             fromjson("{'type':'LineString', 'coordinates':[[0,-90], [0,90]]}")));
+        ASSERT_TRUE(GeoParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[180,-90], [-180,90]]}")));
+        ASSERT_FALSE(GeoParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[180.1,-90], [-180.1,90]]}")));
         ASSERT_FALSE(GeoParser::isLineString(
             fromjson("{'type':'LineString', 'coordinates':[[0,-91], [0,90]]}")));
         ASSERT_FALSE(GeoParser::isLineString(
@@ -82,6 +90,13 @@ namespace {
     TEST(GeoParser, isValidPolygon) {
         ASSERT_TRUE(GeoParser::isPolygon(
             fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}")));
+        // No out of bounds points
+        ASSERT_FALSE(GeoParser::isPolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,91],[0,5],[0,0]] ]}")));
+        ASSERT_TRUE(GeoParser::isPolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[180,0],[5,5],[0,5],[0,0]] ]}")));
+        ASSERT_FALSE(GeoParser::isPolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[181,0],[5,5],[0,5],[0,0]] ]}")));
         // And one with a hole.
         ASSERT_TRUE(GeoParser::isPolygon(
             fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
