@@ -122,6 +122,7 @@ env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
 
 env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
 
+env.StaticLibrary('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
@@ -143,7 +144,6 @@ commonFiles = [ "pch.cpp",
                 "util/concurrency/spin_lock.cpp",
                 "util/text_startuptest.cpp",
                 "util/stack_introspect.cpp",
-                "util/concurrency/synchronization.cpp",
                 "util/net/sock.cpp",
                 "util/net/ssl_manager.cpp",
                 "util/net/httpclient.cpp",
@@ -209,6 +209,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'mongohasher',
                            'md5',
                            'processinfo',
+                           'synchronization',
                            'stacktrace',
                            'stringutils',
                            'fail_point',

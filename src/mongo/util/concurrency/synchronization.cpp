@@ -15,7 +15,6 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
 #include "synchronization.h"
 
 namespace mongo {
