@@ -133,6 +133,14 @@ struct __wt_page_modify {
 	 */
 	uint32_t disk_gen;
 
+	/*
+	 * Track the highest transaction ID at which the page was written to
+	 * disk.  This can be used to avoid trying to write the page multiple
+	 * times if a snapshot is keeping old versions pinned (e.g., in a
+	 * checkpoint).
+	 */
+	wt_txnid_t disk_txn;
+
 	union {
 		WT_PAGE *split;		/* Resulting split */
 		WT_ADDR	 replace;	/* Resulting replacement */
@@ -224,7 +232,7 @@ struct __wt_page {
 		 */
 		struct {
 			uint64_t    recno;	/* Starting recno */
-			WT_REF *t;		/* Subtree */
+			WT_REF     *t;		/* Subtree */
 		} intl;
 
 		/* Row-store leaf page. */
@@ -237,10 +245,9 @@ struct __wt_page {
 			 * WT_PAGE structure as small as possible for read-only
 			 * pages.  For consistency, we could move the row-store
 			 * modification structures into WT_PAGE_MODIFY too, but
-			 * it doesn't shrink WT_PAGE any further, and avoiding
-			 * ugly naming in WT_PAGE_MODIFY to avoid growing it
-			 * won't be pretty.  So far, avoiding ugly naming has
-			 * overridden consistency.
+			 * that doesn't shrink WT_PAGE any further and it would
+			 * require really ugly naming inside of WT_PAGE_MODIFY
+			 * to avoid growing that structure.
 			 */
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
@@ -274,17 +281,29 @@ struct __wt_page {
 	WT_PAGE_MODIFY *modify;
 
 	/*
-	 * The read generation is incremented each time the page is searched,
-	 * and acts as an LRU value for each page in the tree; it is read by
-	 * the eviction server thread to select pages to be discarded from the
-	 * in-memory tree.
+	 * The page's read generation acts as an LRU value for each page in the
+	 * tree; it is used by the eviction server thread to select pages to be
+	 * discarded from the in-memory tree.
 	 *
-	 * The read generation is a 64-bit value; incremented every time the
-	 * page is searched, a 32-bit value could overflow.
+	 * The read generation is a 64-bit value, if incremented frequently, a
+	 * 32-bit value could overflow.
 	 *
-	 * The read-generation is not declared volatile: read-generation is set
-	 * a lot (on every access), and we don't want to write it that much.
+	 * The read generation is a piece of shared memory potentially accessed
+	 * by many threads.  We don't want to update page read generations for
+	 * in-cache workloads and suffer the cache misses, so we don't simply
+	 * increment the read generation value on every access.  Instead, the
+	 * read generation is initialized to 0, then set to a real value if the
+	 * page is ever considered for eviction.  Once set to a real value, the
+	 * read generation is potentially incremented every time the page is
+	 * accessed.  To try and avoid incrementing the page at a fast rate in
+	 * this case, the read generation is incremented to a future point.
+	 *
+	 * The read generation is not declared volatile or published: the read
+	 * generation is set a lot, and we don't want to write it that much.
 	 */
+#define	WT_READ_GEN_NOTSET	0
+#define	WT_READ_GEN_OLDEST	1
+#define	WT_READ_GEN_STEP	1000
 	uint64_t read_gen;
 
 	/*
@@ -418,6 +437,28 @@ struct __wt_ref {
 #define	WT_REF_FOREACH(page, ref, i)					\
 	for ((i) = (page)->entries,					\
 	    (ref) = (page)->u.intl.t; (i) > 0; ++(ref), --(i))
+
+/*
+ * WT_LINK_PAGE --
+ * Link a child page into a reference in its parent.
+ */
+#define	WT_LINK_PAGE(ppage, pref, cpage) do {				\
+	(pref)->page = (cpage);						\
+	(cpage)->parent = (ppage);					\
+	(cpage)->ref = (pref);						\
+} while (0)
+
+/*
+ * WT_MERGE_STACK_MIN --
+ * When stacks of in-memory pages become this deep, they are considered for
+ * merging.
+ *
+ * WT_MERGE_FULL_PAGE --
+ * When the result of a merge contains more than this number of keys, it is
+ * considered "done" and will not be merged again.
+ */
+#define	WT_MERGE_STACK_MIN	3
+#define	WT_MERGE_FULL_PAGE	100
 
 /*
  * WT_ROW --

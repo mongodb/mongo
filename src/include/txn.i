@@ -276,7 +276,7 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
-		__wt_txn_get_snapshot(session, WT_TXN_NONE, WT_TXN_NONE);
+		__wt_txn_get_snapshot(session, WT_TXN_NONE, WT_TXN_NONE, 0);
 	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = txn_global->current;
 }

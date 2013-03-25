@@ -1,6 +1,6 @@
 /*! @page cache_configuration Cache configuration
 
-@section cache_basic Overview of WiredTiger cache configuration.
+@section cache_basic Cache configuration
 
 The WiredTiger cache implements an approximation of a least recently used
 algorithm. Ideally the cache should be configured to be large enough to
@@ -10,7 +10,7 @@ The WiredTiger cache size can be configured when first opening a database via
 @ref wiredtiger_open or changed after open using the
 WT_CONNECTION::reconfigure method.
 
-@section shared_cache Overview of WiredTiger shared cache configuration.
+@section shared_cache Shared cache configuration
 
 WiredTiger supports sharing a single cache among multiple databases within
 a process.
@@ -50,7 +50,7 @@ WiredTiger shared cache tuning options can be configured when first opening a
 database via @ref wiredtiger_open or changed after open using the
 WT_CONNECTION::reconfigure method.
 
-@section cache_eviction Overview of WiredTiger eviction configuration.
+@section cache_eviction Eviction configuration
 
 WiredTiger provides several configuration options for tuning how aggressively
 pages are evicted from the cache. Different values will result in better

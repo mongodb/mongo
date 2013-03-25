@@ -1,4 +1,5 @@
-# Read the source files and output the statistics #defines and allocation code.
+# Read the source files and output the statistics #defines plus the
+# initialize and clear code.
 
 import re, string, sys, textwrap
 from dist import compare_srcfile
@@ -90,30 +91,21 @@ compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 def print_func(name, list):
 	'''Print the functions for the stat.c file.'''
 	f.write('''
-int
-__wt_stat_alloc_''' + name + '''_stats(WT_SESSION_IMPL *session, WT_''' +
-	    name.upper() + '''_STATS **statsp)
+void
+__wt_stat_init_''' + name + '''_stats(WT_''' + name.upper() + '''_STATS *stats)
 {
-\tWT_''' + name.upper() + '''_STATS *stats;
-
-\tWT_RET(__wt_calloc_def(session, 1, &stats));
-
 ''')
-
 	for l in sorted(list):
 		o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
 		if len(o) + 7  > 80:
 			o = o.replace('= ', '=\n\t    ')
 		f.write(o)
-	f.write('''
-\t*statsp = stats;
-\treturn (0);
-}
+	f.write('''}
 ''')
 
 	f.write('''
 void
-__wt_stat_clear_''' + name + '''_stats(WT_STATS *stats_arg)
+__wt_stat_clear_''' + name + '''_stats(void *stats_arg)
 {
 \tWT_''' + name.upper() + '''_STATS *stats;
 
@@ -126,7 +118,7 @@ __wt_stat_clear_''' + name + '''_stats(WT_STATS *stats_arg)
 			f.write('\tstats->' + l.name + '.v = 0;\n');
 	f.write('}\n')
 
-# Write the stat allocation and clear routines to the stat.c file.
+# Write the stat initialization and clear routines to the stat.c file.
 f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')

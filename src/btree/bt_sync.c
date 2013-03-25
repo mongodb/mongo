@@ -62,10 +62,9 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
-		WT_ERR(__wt_sync_file(session, WT_SYNC_CHECKPOINT));
-		break;
 	case WT_SYNC_COMPACT:
-		WT_ERR(__wt_sync_file(session, WT_SYNC_COMPACT));
+	case WT_SYNC_WRITE_LEAVES:
+		WT_ERR(__wt_sync_file(session, op));
 		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:

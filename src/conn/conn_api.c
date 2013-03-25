@@ -319,6 +319,16 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		if (!F_ISSET(s, WT_SESSION_INTERNAL))
 			__wt_free(session, s->hazard);
 
+	/*
+	 * Shut down server threads other than the eviction server, which is
+	 * needed later to close btree handles.  Some of these threads access
+	 * btree handles, so take care in ordering shutdown to make sure they
+	 * exit before files are closed.
+	 */
+	F_CLR(conn, WT_CONN_SERVER_RUN);
+	WT_TRET(__wt_checkpoint_destroy(conn));
+	WT_TRET(__wt_statlog_destroy(conn));
+
 	/* Clean up open LSM handles. */
 	WT_ERR(__wt_lsm_cleanup(&conn->iface));
 
@@ -338,6 +348,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		__conn_remove_data_source(conn, ndsrc);
 
 	WT_TRET(__wt_connection_close(conn));
+
 	/* We no longer have a session, don't try to update it. */
 	session = NULL;
 
@@ -351,23 +362,37 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	/*
+	 * Special version of cfg that doesn't include the default config: used
+	 * to limit changes to values that the application sets explicitly.
+	 * Note that any function using this value has to be prepared to handle
+	 * not-found as a valid option return.
+	 */
 	const char *raw_cfg[] = { config, NULL };
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
-	WT_UNUSED(cfg);
 
-	/*
-	 * Don't include the default config: only override values the
-	 * application sets explicitly.
-	 */
+	/* Turning on statistics clears any existing values. */
+	if ((ret =
+	    __wt_config_gets(session, raw_cfg, "statistics", &cval)) == 0) {
+		conn->statistics = cval.val == 0 ? 0 : 1;
+		if (conn->statistics)
+			__wt_stat_clear_connection_stats(&conn->stats);
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
-	WT_ERR(__conn_verbose_config(session, cfg));
+
+	WT_ERR(__conn_verbose_config(session, raw_cfg));
+
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		WT_ERR(__wt_cond_signal(
@@ -526,7 +551,6 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 
 #if 0
 	fprintf(stderr, "file config: {%s}\n", (const char *)cbuf->data);
-	exit(0);
 #endif
 
 	/* Check the configuration string. */
@@ -750,7 +774,8 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
-	WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "verbose", &cval));
+	if ((ret = __wt_config_gets(session, cfg, "verbose", &cval)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
@@ -882,6 +907,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		    "buffer_alignment requires posix_memalign");
 #endif
 
+	/*
+	 * Configuration: direct_io, mmap, statistics.
+	 */
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
 	for (ft = directio_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
@@ -891,10 +919,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
-
-	/* Configure mmap. */
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val == 0 ? 0 : 1;
+	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
+	conn->statistics = cval.val == 0 ? 0 : 1;
 
 	/* Load any extensions referenced in the config. */
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
@@ -963,7 +991,11 @@ err:	if (cbuf != NULL)
 	__wt_buf_free(session, &exconfig);
 
 	if (ret != 0 && conn != NULL)
-		WT_TRET(__wt_connection_destroy(conn));
+		WT_TRET(__wt_connection_close(conn));
+
+	/* Let the server threads proceed. */
+	if (ret == 0)
+		conn->connection_initialized = 1;
 
 	return (ret);
 }

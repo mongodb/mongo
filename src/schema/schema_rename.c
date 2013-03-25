@@ -102,6 +102,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 		    "expected a 'colgroup:' or 'index:' source: '%s'", name);
 
 	suffix = strchr(name, ':');
+	/* An existing table should have a well formed name. */
 	WT_ASSERT(session, suffix != NULL);
 	suffix = strchr(suffix + 1, ':');
 
@@ -187,16 +188,17 @@ __rename_table(WT_SESSION_IMPL *session,
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
-		WT_RET(__rename_tree(session, table, newuri,
+		WT_ERR(__rename_tree(session, table, newuri,
 		    table->cgroups[i]->name, cfg));
 
 	/* Rename the indices. */
-	WT_RET(__wt_schema_open_indices(session, table));
+	WT_ERR(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++)
-		WT_RET(__rename_tree(session, table, newuri,
+		WT_ERR(__rename_tree(session, table, newuri,
 		    table->indices[i]->name, cfg));
 
-	WT_RET(__wt_schema_remove_table(session, table));
+	__wt_schema_remove_table(session, table);
+	table = NULL;
 
 	/* Rename the table. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
@@ -205,6 +207,8 @@ __rename_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_metadata_insert(session, newuri, value));
 
 err:	__wt_scr_free(&buf);
+	if (table != NULL)
+		__wt_schema_release_table(session, table);
 	return (ret);
 }
 
@@ -246,6 +250,9 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 		ret = __rename_table(session, uri, newuri, cfg);
 	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
 		ret = dsrc->rename(dsrc, &session->iface, uri, newuri, cfg);
+
+	/* Bump the schema generation so that stale data is ignored. */
+	++S2C(session)->schema_gen;
 
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 

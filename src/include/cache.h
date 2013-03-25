@@ -25,9 +25,8 @@ struct __wt_cache {
 	 * be exact, they can't be garbage, we track what comes in and what goes
 	 * out and calculate the difference as needed.
 	 */
-	uint64_t bytes_read;		/* Bytes/pages read by read server */
-	uint64_t pages_read;
-	uint64_t bytes_inmem;		/* Bytes/pages created in memory */
+	uint64_t bytes_inmem;		/* Bytes/pages in memory */
+	uint64_t pages_inmem;
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
 	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
@@ -54,7 +53,6 @@ struct __wt_cache {
 	 */
 	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
-	size_t   evict_allocated;	/* LRU list bytes allocated */
 	uint32_t evict_entries;		/* LRU list eviction slots */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	u_int    evict_file_next;	/* LRU: next file to search */
@@ -77,6 +75,8 @@ struct __wt_cache {
 	 * Flags.
 	 */
 #define	WT_EVICT_FORCE_PASS	0x01	/* Ignore the eviction trigger */
+#define	WT_EVICT_NO_PROGRESS	0x02	/* Check if pages are being evicted */
+#define	WT_EVICT_STUCK		0x04	/* Eviction server is stuck */
 	uint32_t flags;
 };
 

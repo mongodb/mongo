@@ -35,14 +35,9 @@
  * Align an unsigned value of any type to a specified power-of-2, including the
  * offset result of a pointer subtraction; do the calculation using the largest
  * unsigned integer type available.
- *
- * Optionally cast the result to a uint32_t because that's the size of a piece
- * of data in the WiredTiger engine.
  */
 #define	WT_ALIGN(n, v)							\
 	((((uintmax_t)(n)) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
-#define	WT_ALIGN32(n, v)						\
-	((uint32_t)WT_ALIGN(n, v))
 
 /* Min, max. */
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))
@@ -163,6 +158,13 @@
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
+
+/*
+ * Skip the default configuration string in an list of configurations. The
+ * default config is always the first entry in the array, and the array always
+ * has an explicit NULL terminator, so this is safe.
+ */
+#define	WT_SKIP_DEFAULT_CONFIG(c) &(c)[1]
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

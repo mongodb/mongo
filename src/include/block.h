@@ -159,7 +159,8 @@ struct __wt_bm {
 	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, uint32_t *, int *);
 	int (*salvage_start)(WT_BM *, WT_SESSION_IMPL *);
 	int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, uint32_t);
-	int (*stat)(WT_BM *, WT_SESSION_IMPL *);
+	int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
+	int (*sync)(WT_BM *, WT_SESSION_IMPL *);
 	int (*verify_addr)
 	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
 	int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
@@ -194,7 +195,12 @@ struct __wt_block {
 
 	/* Configuration information, set when the file is opened. */
 	uint32_t allocsize;		/* Allocation size */
-	u_int block_header;		/* Header length */
+	u_int	 block_header;		/* Header length */
+
+	int64_t	 os_cache;		/* System buffer cache flush max */
+	int64_t	 os_cache_max;
+	int64_t	 os_cache_dirty;	/* System buffer cache write max */
+	int64_t	 os_cache_dirty_max;
 
 	/*
 	 * There is only a single checkpoint in a file that can be written.  The
@@ -205,6 +211,13 @@ struct __wt_block {
 	 */
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
+
+	/*
+	 * Array of free WT_EXTLIST structures, if we're doing lots of I/O,
+	 * a cache avoids an allocation/free while holding the spin lock.
+	 */
+	WT_EXT *free_ext;		/* List of free entries */
+	u_int	free_ext_cnt;		/* Limit the number we cache */
 
 				/* Salvage support */
 	off_t	slvg_off;		/* Salvage file offset */

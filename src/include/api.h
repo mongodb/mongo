@@ -74,7 +74,7 @@
 	    (ret) != WT_DUPLICATE_KEY)					\
 		F_SET(&(s)->txn, TXN_ERROR);				\
 	break;								\
-} while (1)
+} while (ret == 0)
 
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some

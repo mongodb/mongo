@@ -13,7 +13,7 @@ static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int);
+static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int);
 static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
@@ -25,6 +25,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
+	int merge;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
@@ -32,18 +33,16 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	WT_ASSERT(session, session->excl_next == 0);
 
 	/*
-	 * Split-merge pages cannot be evicted, they're always merged into their
-	 * parent; split-merge pages are ignored by the eviction thread, we
-	 * never get a split-merge page to evict.  Check out of sheer paranoia.
-	 * Split pages are NOT included in this test, because a split page can
-	 * be separately evicted, at which point it's replaced in its parent by
-	 * a reference to a split-merge page.  That's a normal part of the leaf
-	 * page life-cycle if it grows too large and must be pushed out of the
-	 * cache.
+	 * If we get a split-merge page during normal eviction, try to collapse
+	 * it.  During close, it will be merged into its parent.
 	 */
 	mod = page->modify;
-	if (mod != NULL && F_ISSET(mod, WT_PM_REC_SPLIT_MERGE))
+	merge = __wt_btree_mergeable(page);
+	if (merge && exclusive)
 		return (EBUSY);
+
+	WT_ASSERT(session, merge || mod == NULL ||
+	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE));
 
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
@@ -54,10 +53,14 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * not disallowed anywhere.
 	 *
 	 * Note that page->ref may be NULL in some cases (e.g., for root pages
-	 * or during salvage).  That's OK if WT_REC_SINGLE is set: we won't
-	 * check hazard pointers in that case.
+	 * or during salvage).  That's OK if exclusive is set: we won't check
+	 * hazard pointers in that case.
 	 */
-	WT_ERR(__rec_review(session, page->ref, page, exclusive, 1));
+	WT_ERR(__rec_review(session, page->ref, page, exclusive, merge, 1));
+
+	/* Try to merge internal pages. */
+	if (merge)
+		WT_ERR(__wt_merge_tree(session, page));
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
@@ -66,7 +69,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	mod = page->modify;
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!exclusive &&
+	if (!exclusive && !merge &&
 	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)) {
 		WT_CSTAT_INCR(session, cache_eviction_internal);
 		WT_DSTAT_INCR(session, cache_eviction_internal);
@@ -291,17 +294,15 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  */
 static int
 __rec_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE *page, int exclusive, int top)
+    WT_REF *ref, WT_PAGE *page, int exclusive, int merge, int top)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE *t;
-	WT_TXN *txn;
 	uint32_t i;
 
 	btree = S2BT(session);
-	txn = &session->txn;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -322,8 +323,8 @@ __rec_review(WT_SESSION_IMPL *session,
 			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
-				WT_RET(__rec_review(
-				    session, ref, ref->page, exclusive, 0));
+				WT_RET(__rec_review(session,
+				    ref, ref->page, exclusive, merge, 0));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_EVICT_FORCE:	/* Forced evict */
@@ -374,20 +375,30 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * we find a page which can't be merged into its parent, and failing if
 	 * we never find such a page.
 	 */
-	if (btree->checkpointing && __wt_page_is_modified(page))
+	if (btree->checkpointing && !merge && __wt_page_is_modified(page)) {
+ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
+		WT_DSTAT_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
+	}
 
 	if (btree->checkpointing && top)
 		for (t = page->parent;; t = t->parent) {
 			if (t == NULL || t->ref == NULL)	/* root */
-				return (EBUSY);
+				goto ckpt;
 			if (t->ref->state != WT_REF_MEM)	/* scary */
-				return (EBUSY);
+				goto ckpt;
 			if (t->modify == NULL ||		/* not merged */
 			    !F_ISSET(t->modify, WT_PM_REC_EMPTY |
 			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
 				break;
 		}
+
+	/*
+	 * If we are merging internal pages, we just need exclusive access, we
+	 * don't need to write everything.
+	 */
+	if (merge)
+		return (0);
 
 	/*
 	 * Fail if any page in the top-level page's subtree won't be merged into
@@ -435,20 +446,6 @@ __rec_review(WT_SESSION_IMPL *session,
 			WT_VERBOSE_RET(session, evict,
 			    "eviction failed, reconciled page not clean");
 
-			/*
-			 * A pathological case: if we're the oldest transaction
-			 * in the system and we're stuck trying to find space,
-			 * abort the transaction to give up all hazard
-			 * references before trying again.
-			 */
-			if (F_ISSET(txn, TXN_RUNNING) &&
-			    __wt_txn_am_oldest(session) &&
-			    ++txn->eviction_fails >= 100) {
-				txn->eviction_fails = 0;
-				ret = WT_DEADLOCK;
-				WT_CSTAT_INCR(session, txn_fail_cache);
-			}
-
 			/* 
 			 * We may be able to discard any "update" memory the
 			 * page no longer needs.
@@ -466,7 +463,6 @@ __rec_review(WT_SESSION_IMPL *session,
 		WT_RET(ret);
 
 		WT_ASSERT(session, __wt_page_is_modified(page) == 0);
-		txn->eviction_fails = 0;
 	}
 
 	/*

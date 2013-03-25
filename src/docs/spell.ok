@@ -41,6 +41,7 @@ WiredTigerCheckpoint
 aR
 ack'ed
 alloc
+allocator
 allocsize
 ao
 api
@@ -97,6 +98,7 @@ del
 desc
 destructor
 destructors
+distclean
 dl
 dlp
 dontlock
@@ -116,6 +118,7 @@ env
 eof
 erlang
 errno
+fadvise
 failchk
 fd's
 fieldname
@@ -135,6 +138,7 @@ getopt
 getter
 gid
 github
+gnuplot
 hb
 hotbackup
 href
@@ -201,6 +205,7 @@ mutexes
 mutexing
 mvcc
 mygcc
+mytable
 namespace
 ndary
 ndbm
@@ -223,6 +228,7 @@ objectsin
 ol
 oltp
 oob
+os
 ovfl
 pcoll
 pdf
@@ -238,6 +244,7 @@ printvalue
 priv
 pthread
 pthreads
+py
 qnx
 rdbms
 rdlock
@@ -270,8 +277,10 @@ spinlocks
 sql
 src
 startsync
+statlog
 str
 strerror
+strftime
 struct
 structs
 subdatabases

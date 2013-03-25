@@ -12,6 +12,7 @@ ext/collators/reverse
 ext/compressors/bzip2 BZIP2
 ext/compressors/nop
 ext/compressors/snappy SNAPPY
+lang/java JAVA
 lang/python PYTHON
 test/bloom
 test/fops

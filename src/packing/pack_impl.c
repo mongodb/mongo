@@ -21,8 +21,6 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 	WT_PACK_VALUE pv;
 	int fields;
 
-	WT_CLEAR(pv);		/* -Wuninitialized. */
-
 	WT_RET(__pack_initn(session, &pack, fmt, len));
 
 	for (fields = 0; (ret = __pack_next(&pack, &pv)) == 0; fields++)
@@ -56,8 +54,6 @@ __wt_struct_sizev(
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
 	size_t total;
-
-	WT_CLEAR(pv);		/* -Wuninitialized */
 
 	WT_RET(__pack_init(session, &pack, fmt));
 
@@ -99,8 +95,6 @@ __wt_struct_packv(WT_SESSION_IMPL *session,
 	WT_PACK_VALUE pv;
 	uint8_t *p, *end;
 
-	WT_CLEAR(pv);		/* -Wuninitialized */
-
 	WT_RET(__pack_init(session, &pack, fmt));
 
 	p = buffer;
@@ -111,6 +105,7 @@ __wt_struct_packv(WT_SESSION_IMPL *session,
 		WT_RET(__pack_write(session, &pv, &p, (size_t)(end - p)));
 	}
 
+	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
 
 	if (ret != WT_NOTFOUND)
@@ -154,13 +149,13 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	p = buffer;
 	end = p + size;
-	WT_CLEAR(pv.u.item);			/* GCC 4.6 lint */
 
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
 		WT_UNPACK_PUT(session, pv, ap);
 	}
 
+	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
 
 	if (ret != WT_NOTFOUND)

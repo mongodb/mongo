@@ -133,6 +133,7 @@ typedef struct {
 		int already_compressed;
 	} *bnd;				/* Saved boundaries */
 	uint32_t bnd_next;		/* Next boundary slot */
+	uint32_t bnd_next_max;		/* Maximum boundary slots used */
 	uint32_t bnd_entries;		/* Total boundary slots */
 	size_t   bnd_allocated;		/* Bytes allocated */
 
@@ -177,7 +178,6 @@ typedef struct {
 	 * these fields work.
 	 */
 	int	 cell_zero;		/* Row-store internal page 0th key */
-	WT_REF	*merge_ref;		/* Row-store merge correction key */
 
 	/*
 	 * WT_DICTIONARY --
@@ -278,7 +278,9 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	/* We're shouldn't get called with a clean page, that's an error. */
-	WT_ASSERT_RET(session, __wt_page_is_modified(page));
+	if (!__wt_page_is_modified(page))
+		WT_RET_MSG(session, WT_ERROR,
+		    "Attempt to reconcile a clean page.");
 
 	/*
 	 * We can't do anything with a split-merge page, it must be merged into
@@ -289,9 +291,12 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 
 	WT_VERBOSE_RET(
 	    session, reconcile, "%s", __wt_page_type_string(page->type));
+	WT_CSTAT_INCR(session, rec_pages);
 	WT_DSTAT_INCR(session, rec_pages);
-	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED))
+	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED)) {
+		WT_CSTAT_INCR(session, rec_pages_eviction);
 		WT_DSTAT_INCR(session, rec_pages_eviction);
+	}
 
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
@@ -574,6 +579,7 @@ __rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		WT_PANIC_RETX(
 		    session, "reconciliation illegally skipped an update");
 	case WT_SKIP_UPDATE_QUIT:
+		WT_CSTAT_INCR(session, rec_skipped_update);
 		WT_DSTAT_INCR(session, rec_skipped_update);
 		return (EBUSY);
 	case 0:
@@ -808,10 +814,11 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * If no such transactions exist, we can discard the leaf page to the
 	 * block manager and no cell needs to be written at all.  We do this
 	 * outside of the underlying tracking routines because this action is
-	 * permanent and irrevocable.  (Setting the WT_REF.addr value to NULL
-	 * means we've lost track of the disk address in a permanent way.  If
-	 * we ever read into this chunk of the name space again, the cache read
-	 * function instantiates a new page.)
+	 * permanent and irrevocable.  (Clearing the address means we've lost
+	 * track of the disk address in a permanent way.  This is safe because
+	 * there's no path to reading the leaf page again: if reconciliation
+	 * fails, and we ever read into this part of the name space again, the
+	 * cache read function instantiates a new page.)
 	 *
 	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
 	 * it means this WT_REF is the re-creation of a deleted node (we wrote
@@ -992,16 +999,22 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 static int
 __rec_split_bnd_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
+	uint32_t incr;
+
 	/*
 	 * Make sure there's enough room in which to save another boundary.
 	 *
 	 * The calculation is actually +1, because we save the start point one
-	 * past the current entry -- make it +20 so we don't grow slot-by-slot.
+	 * past the current entry; normal reconciliation generally doesn't use
+	 * a lot of buffers, but we grow aggressively anyway, bulk load eats up
+	 * a lot of these entries because we have an entry for each page that's
+	 * created by the bulk load.
 	 */
 	if (r->bnd_next + 1 >= r->bnd_entries) {
-		WT_RET(__wt_realloc(session, &r->bnd_allocated,
-		    (r->bnd_entries + 20) * sizeof(*r->bnd), &r->bnd));
-		r->bnd_entries += 20;
+		incr = r->bnd_entries + r->bnd_entries / 2 + 20;
+		WT_RET(__wt_realloc(session,
+		    &r->bnd_allocated, incr * sizeof(*r->bnd), &r->bnd));
+		r->bnd_entries = incr;
 	}
 	return (0);
 }
@@ -1055,9 +1068,8 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * split pages, because otherwise we could end up splitting one large
 	 * packed page over and over.   We don't want to pick the minimum size
 	 * either, because that penalizes an application that did a bulk load
-	 * and subsequently inserted a few items into packed pages.  Currently,
-	 * I'm using 75%, but I have no empirical evidence that's a good value.
-	 * We should leave this as a tuning variable, but probably undocumented.
+	 * and subsequently inserted a few items into packed pages.  Currently
+	 * defaulted to 75%, but I have no empirical evidence that's "correct".
 	 *
 	 * The maximum page size may be a multiple of the split page size (for
 	 * example, there's a maximum page size of 128KB, but because the table
@@ -1083,10 +1095,9 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	if (r->raw_compression)
 		r->split_size = 0;
 	else if (page->type == WT_PAGE_COL_FIX)
-		r->split_size = r->page_size;
+		r->split_size = r->page_size_max;
 	else
-		r->split_size = WT_SPLIT_PAGE_SIZE(
-		    r->page_size, btree->allocsize, btree->split_pct);
+		r->split_size = __wt_split_page_size(btree, r->page_size_max);
 
 	/*
 	 * If the maximum page size is the same as the split page size, either
@@ -1181,8 +1192,9 @@ __rec_split_row_promote_cell(
 	 */
 	cell = WT_PAGE_HEADER_BYTE(btree, dsk);
 	__wt_cell_unpack(cell, unpack);
-	WT_ASSERT_RET(session,
-	    unpack->raw != WT_CELL_VALUE_COPY && unpack->prefix == 0);
+	WT_ASSERT(session,
+	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
+
 	WT_RET(__wt_cell_unpack_copy(session, unpack, copy));
 	return (0);
 }
@@ -1203,18 +1215,11 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 	 * length byte string, get a copy.
 	 *
 	 * This function is called from the split code at each split boundary,
-	 * but that means we're not called before the first boundary.  When we
-	 * do the split work at the second boundary, we need to copy the key
-	 * for the first boundary from the page we're building.  Alternatively,
-	 * we could store a copy of the first key we put on a page somewhere,
-	 * perhaps while building the keys for a page, but that's likely to be
-	 * even uglier.
-	 */
-	if (r->bnd_next == 1)
-		WT_RET(__rec_split_row_promote_cell(
-		    session, r->dsk.mem, &r->bnd[0].key));
-
-	/*
+	 * but that means we're not called before the first boundary.  It's OK
+	 * we never do the work for the first boundary because that key cannot
+	 * come from the page, it has to come from the parent.  See the comment
+	 * in the code that creates the row-store split-merge page for details.
+	 *
 	 * For the current slot, take the last key we built, after doing suffix
 	 * compression.  The "last key we built" describes some process: before
 	 * calling the split code, we must place the last key on the page before
@@ -1446,8 +1451,14 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * Set the promotion key for the chunk.  Repeated each time we
 		 * try and split, which might be wasted work, but detecting
 		 * repeated key-building is probably more complicated than it's
-		 * worth.
+		 * worth.  Don't bother doing the work for the first boundary,
+		 * that key cannot come from the page, it has to come from the
+		 * parent.  See the comment in the code that creates the row-
+		 * store split-merge page for details.
 		 */
+		if (r->bnd_next == 0)
+			break;
+
 		WT_RET(__rec_split_row_promote_cell(session, dsk, &bnd->key));
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -1579,8 +1590,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 */
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	WT_ERR(compressor->compress_raw(compressor, wt_session,
-	    r->page_size_max, WT_BLOCK_COMPRESS_SKIP,
-	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
+	    r->page_size_max, btree->split_pct,
+	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
 	    result_len, final, &result_len, &result_slots));
@@ -1787,10 +1798,8 @@ __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * entries to 0, is because there's another entry to write, which then
 	 * sets entries to 1).  If the page was empty, we eventually delete it.
 	 */
-	if (r->entries == 0) {
-		WT_ASSERT_RET(session, r->bnd_next == 0);
+	if (r->entries == 0)
 		return (0);
-	}
 
 	return (r->raw_compression ?
 	    __rec_split_finish_raw(session, r) :
@@ -1827,7 +1836,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
 	 * information remains unchanged between the pages.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->split_size, &tmp));
+	WT_RET(__wt_scr_alloc(session, r->page_size_max, &tmp));
 	dsk = tmp->mem;
 	memcpy(dsk, r->dsk.mem, WT_PAGE_HEADER_SIZE);
 
@@ -1859,8 +1868,9 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * Fix up our caller's information.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
-	WT_ASSERT_ERR(
-	    session, len < r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree));
+	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
+		WT_PANIC_ERR(session, ret = WT_PANIC,
+		    "Reconciliation remnant too large for the split buffer");
 
 	dsk = r->dsk.mem;
 	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
@@ -2969,37 +2979,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Modified child.
 		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
-		 *
-		 * There's one special case we have to handle here: the internal
-		 * page being merged has a potentially incorrect first key and
-		 * we need to replace it with the one we have.  The problem is
-		 * caused by the fact that the page search algorithm coerces the
-		 * 0th key on any internal page to be smaller than any search
-		 * key.  We do that because we don't want to have to update the
-		 * internal pages every time a new "smallest" key is inserted
-		 * into the tree.  But, if a new "smallest" key is inserted into
-		 * our split-created subtree, and we don't update the internal
-		 * page, when we merge that internal page into its parent page,
-		 * the key may be incorrect (or more likely, have been coerced
-		 * to a single byte because it's an internal page's 0th key).
-		 * Imagine the following tree:
-		 *
-		 *	2	5	40	internal page
-		 *		|
-		 * 	    10  | 20		split-created internal page
-		 *	    |
-		 *	    6			inserted smallest key
-		 *
-		 * after a simple merge, we'd have corruption:
-		 *
-		 *	2    10    20	40	merged internal page
-		 *	     |
-		 *	     6			key sorts before parent's key
-		 *
-		 * To fix this problem, we take the higher-level page's key as
-		 * our first key, because that key sorts before any possible
-		 * key inserted into the subtree, and discard whatever 0th key
-		 * is on the split-created internal page.
 		 */
 		if (state == WT_CHILD_MODIFIED)
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
@@ -3040,7 +3019,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					    session, page,
 					    kpack->data, kpack->size));
 
-				r->merge_ref = ref;
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
@@ -3082,7 +3060,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/*
 		 * Build key cell.
-		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
 		if (onpage_ovfl) {
@@ -3202,14 +3179,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			case WT_PM_REC_SPLIT:
 			case WT_PM_REC_SPLIT_MERGE:
-				/*
-				 * If we have a merge key set, we're working our
-				 * way down a merge tree.  If we have not set a
-				 * merge key, we're starting descent of a new
-				 * merge tree, set the merge key.
-				 */
-				if (r->merge_ref == NULL)
-					r->merge_ref = ref;
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
@@ -3240,14 +3209,10 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		__rec_cell_build_addr(r, p, size, vtype, 0);
 
 		/*
-		 * Build the key cell.  If this is the first key in a "to be
-		 * merged" subtree, use the merge correction key saved in the
-		 * top-level parent page when this function was called.
-		 *
+		 * Build the key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		ikey = r->merge_ref == NULL ? ref->u.key : r->merge_ref->u.key;
-		r->merge_ref = NULL;
+		ikey = ref->u.key;
 		WT_RET(__rec_cell_build_key(session, r, WT_IKEY_DATA(ikey),
 		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
 		r->cell_zero = 0;
@@ -3764,8 +3729,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
 	WT_PAGE_MODIFY *mod;
-	uint32_t page_size;
+	WT_REF *ref;
+	uint32_t size;
 	int was_modified;
+	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -3779,17 +3746,34 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 */
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case 0:	/*
-		 * The page has never been reconciled before, track the original
-		 * address blocks (if any).  The "if any" is for empty trees we
-		 * create when a new tree is opened, and for previously deleted
-		 * pages that are instantiated in memory.
+		 * The page has never been reconciled before, free the original
+		 * address blocks (if any).  The "if any" is for empty trees
+		 * created when a new tree is opened, previously deleted pages
+		 * instantiated in memory, or pages reconciled into split-merge
+		 * pages and then replaced by other pages because the tree grew
+		 * too deep.
 		 *
 		 * The exception is root pages are never tracked or free'd, they
 		 * are checkpoints, and must be explicitly dropped.
 		 */
-		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL)
-			WT_RET(__wt_rec_track_onpage_ref(
-			    session, page, page->parent, page->ref));
+		if (WT_PAGE_IS_ROOT(page))
+			break;
+
+		ref = page->ref;
+		if (ref->addr != NULL) {
+			/*
+			 * Free the page and clear the address (so we don't free
+			 * it twice).  Logically, this is the same as adding the
+			 * address to the reconciliation tracking information
+			 * and freeing it when reconciliation ends as part of
+			 * cleaning up the track information, but that is going
+			 * to happen right at the end of this switch statement,
+			 * might as well save the work.
+			 */
+			__wt_get_addr(page->parent, ref, &addr, &size);
+			WT_RET(bm->free(bm, session, addr, size));
+			ref->addr = NULL;
+		}
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
@@ -3807,7 +3791,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
-		mod->u.replace.addr = NULL;
 		mod->u.replace.size = 0;
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
@@ -3928,6 +3911,11 @@ err:			__wt_scr_free(&tkey);
 			WT_RET(ret);
 		}
 
+		if (r->bnd_next > r->bnd_next_max) {
+			r->bnd_next_max = r->bnd_next;
+			WT_DSTAT_SET(session, rec_split_max, r->bnd_next_max);
+		}
+
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
@@ -3967,11 +3955,14 @@ err:			__wt_scr_free(&tkey);
 	 */
 	if (!r->upd_skipped) {
 		was_modified = __wt_page_is_modified(page);
-		WT_ORDERED_READ(page_size, page->memory_footprint);
+		WT_ORDERED_READ(size, page->memory_footprint);
 		mod->disk_gen = r->orig_write_gen;
 		if (was_modified && !__wt_page_is_modified(page))
-			__wt_cache_dirty_decr(session, page_size);
+			__wt_cache_dirty_decr(session, size);
 	}
+
+	/* Record the most recent transaction ID we could have written. */
+	mod->disk_txn = session->txn.snap_min;
 
 	return (0);
 }
@@ -4000,36 +3991,36 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (bnd->addr.addr != NULL) {
 			WT_TRET(bm->free(
 			    bm, session, bnd->addr.addr, bnd->addr.size));
-			bnd->addr.addr = NULL;
+			__wt_free(session, bnd->addr.addr);
 		}
 	return (ret);
 }
 
 /*
- * __rec_split_row --
- *	Split a row-store page, creating a new internal page.
+ * __rec_split_merge_new --
+ *	Create a split-merge page.
  */
 static int
-__rec_split_row(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *orig, WT_PAGE **splitp)
+__rec_split_merge_new(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_PAGE *orig, WT_PAGE **pagep, uint8_t type)
 {
-	WT_ADDR *addr;
-	WT_BOUNDARY *bnd;
-	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_REF *ref;
-	uint32_t i;
 
-	/* Allocate a row-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)r->bnd_next, &page->u.intl.t));
-
-	/* Fill it in. */
+	/*
+	 * Allocate a new internal page and fill it in.
+	 *
+	 * Our caller cleans up, make sure we return a valid page reference,
+	 * even on error.
+	 */
+	WT_RET(__wt_page_alloc(session, type, r->bnd_next, pagep));
+	page = *pagep;
 	page->parent = orig->parent;
 	page->ref = orig->ref;
-	page->read_gen = __wt_cache_read_gen(session);
+	if (type == WT_PAGE_COL_INT)
+		page->u.intl.recno = r->bnd[0].recno;
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = r->bnd_next;
-	page->type = WT_PAGE_ROW_INT;
+	page->flags_atomic = WT_PAGE_DISK_NOT_ALLOC;
 
 	/*
 	 * We don't re-write parent pages when child pages split, which means
@@ -4050,27 +4041,100 @@ __rec_split_row(
 	 * its memory discarded, but the newly created split page cannot be
 	 * evicted, it can only be merged into its parent.
 	 */
-	WT_ERR(__wt_page_modify_init(session, page));
+	WT_RET(__wt_page_modify_init(session, page));
 	F_SET(page->modify, WT_PM_REC_SPLIT_MERGE);
 
-	/* Enter each split page into the new, internal page. */
+	return (0);
+}
+
+/*
+ * __rec_split_row --
+ *	Split a row-store page, creating a new internal page.
+ */
+static int
+__rec_split_row(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *orig, WT_PAGE **splitp)
+{
+	WT_ADDR *addr;
+	WT_BOUNDARY *bnd;
+	WT_DECL_RET;
+	WT_IKEY *ikey;
+	WT_PAGE *page;
+	WT_REF *ref;
+	size_t size;
+	uint32_t i;
+
+	/* Allocate a split-merge page. */
+	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_ROW_INT));
+
+	/*
+	 * The "parent" key for each split chunk is the first key on the chunk,
+	 * except for the 0th chunk, which cannot come from the page itself as
+	 * it might not be small enough.    If the existing key for the page is
+	 * smaller than the first key on the chunk we can lose after the merge.
+	 * Imagine the following tree, where an internal page has keys 2, 5 and
+	 * 40.  The page with key 5 splits into two chunks, and 10 is the first
+	 * key in the first chunk.
+	 *
+	 *	2	5	40	internal page
+	 *		|
+	 * 	    10  | 20		split-created internal page
+	 *
+	 * If we subsequently insert a key 6, it works because the page search
+	 * algorithm coerces the 0th key of an internal page to be smaller than
+	 * any search key.  (We do that because we don't want to have to update
+	 * internal pages every time a new "smallest" key is inserted into the
+	 * tree.)   Anyway, that results in the following tree:
+	 *
+	 *	2	5	40	internal page
+	 *		|
+	 * 	    10  | 20		split-created internal page
+	 *	    |
+	 *	    6			inserted smallest key
+	 *
+	 * after a simple merge where we replace page 5 with pages 10 and 20,
+	 * we'd have corruption:
+	 *
+	 *	2    10    20	40	merged internal page
+	 *	     |
+	 *	     6			key sorts before parent's key
+	 *
+	 * To fix this problem, we take the original parent page's key as the
+	 * first chunk's key because that key sorts before any possible key
+	 * inserted into the subtree.
+	 */
+	if (WT_PAGE_IS_ROOT(orig))
+		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, "", 1));
+	else {
+		ikey = orig->ref->u.key;
+		WT_ERR(__wt_buf_set(
+		    session, &r->bnd[0].key, WT_IKEY_DATA(ikey), ikey->size));
+	}
+
+	/* Enter each split child page into the new internal page. */
+	size = 0;
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		*addr = bnd->addr;
 		bnd->addr.addr = NULL;
+		size += bnd->addr.size;
 
 		ref->page = NULL;
-		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		WT_ERR(__wt_row_ikey(session, 0,
 		    bnd->key.data, bnd->key.size, &ref->u.key));
+		size += sizeof(WT_IKEY) + bnd->key.size;
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}
+	__wt_cache_page_inmem_incr(
+	    session, page, r->bnd_next * sizeof(WT_ADDR) + size);
 
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page);
+err:	if (page != NULL)
+		__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -4089,25 +4153,10 @@ __rec_split_col(
 	WT_REF *ref;
 	uint32_t i;
 
-	/* Allocate a column-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)r->bnd_next, &page->u.intl.t));
+	/* Allocate a split-merge page. */
+	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_COL_INT));
 
-	/* Fill it in. */
-	page->parent = orig->parent;
-	page->ref = orig->ref;
-	page->read_gen = __wt_cache_read_gen(session);
-	page->u.intl.recno = r->bnd[0].recno;
-	page->entries = r->bnd_next;
-	page->type = WT_PAGE_COL_INT;
-
-	/*
-	 * See the comment above in __rec_split_row().
-	 */
-	WT_ERR(__wt_page_modify_init(session, page));
-	F_SET(page->modify, WT_PM_REC_SPLIT_MERGE);
-
-	/* Enter each split page into the new, internal page. */
+	/* Enter each split child page into the new internal page. */
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
@@ -4119,11 +4168,14 @@ __rec_split_col(
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}
+	__wt_cache_page_inmem_incr(
+	    session, page, r->bnd_next * sizeof(WT_ADDR));
 
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page);
+err:	if (page != NULL)
+		__wt_page_out(session, &page);
 	return (ret);
 }
 

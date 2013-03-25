@@ -38,7 +38,7 @@ __session_close_cache(WT_SESSION_IMPL *session)
 	while ((dhandle_cache = TAILQ_FIRST(&session->dhandles)) != NULL)
 		WT_TRET(__wt_session_discard_btree(session, dhandle_cache));
 
-	WT_TRET(__wt_schema_close_tables(session));
+	__wt_schema_close_tables(session);
 
 	return (ret);
 }
@@ -594,6 +594,13 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
 	WT_ERR(__session_reset_cursors(session));
+
+	/*
+	 * Now there are no cursors open and no transaction active in this
+	 * thread.  Check if the cache is full: if we have to block for
+	 * eviction, this is the best time to do it.
+	 */
+	WT_ERR(__wt_cache_full_check(session));
 
 	ret = __wt_txn_begin(session, cfg);
 

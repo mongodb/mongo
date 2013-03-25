@@ -39,7 +39,7 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 	txn->snapshot_count = n;
 	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
 	txn->snap_max = id;
-	WT_ASSERT(session, txn->snap_min != WT_TXN_NONE);
+	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
 	txn->oldest_snap_min = TXNID_LT(oldest_snap_min, txn->snap_min) ?
 	    oldest_snap_min : txn->snap_min;
 }
@@ -51,13 +51,9 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
-	WT_TXN *txn;
 	WT_TXN_STATE *txn_state;
 
-	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
-
-	txn->snapshot_count = 0;
 	txn_state->snap_min = WT_TXN_NONE;
 }
 
@@ -79,8 +75,16 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
+
 	oldest_snap_min =
 	    (txn->id != WT_TXN_NONE) ? txn->id : txn_global->current;
+
+	/* If nothing has changed since last time, we're done. */
+	if (txn->last_oldest_gen == txn_global->gen &&
+	    txn->last_oldest_id == oldest_snap_min)
+		return;
+	txn->last_oldest_gen = txn_global->gen;
+	txn->last_oldest_id = oldest_snap_min;
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states;
@@ -100,7 +104,7 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
  */
 void
 __wt_txn_get_snapshot(
-    WT_SESSION_IMPL *session, wt_txnid_t my_id, wt_txnid_t max_id)
+    WT_SESSION_IMPL *session, wt_txnid_t my_id, wt_txnid_t max_id, int force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -114,9 +118,18 @@ __wt_txn_get_snapshot(
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
 
+	/* If nothing has changed since last time, we're done. */
+	if (!force && txn->last_id == txn_global->current &&
+	    txn->last_gen == txn_global->gen) {
+		txn_state->snap_min = txn->snap_min;
+		return;
+	}
+
 	do {
 		/* Take a copy of the current session ID. */
-		current_id = oldest_snap_min = txn_global->current;
+		txn->last_gen = txn->last_oldest_gen = txn_global->gen;
+		txn->last_id = oldest_snap_min = current_id =
+		    txn_global->current;
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -153,39 +166,19 @@ __wt_txn_get_snapshot(
 /*
  * __wt_txn_get_evict_snapshot --
  *	Set up a snapshot in the current transaction for eviction.
- *	No changes that are invisible to any active transaction can be evicted.
+ *	Only changes that visible to all active transactions can be evicted.
  */
 void
 __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_TXN_GLOBAL *txn_global;
-	WT_TXN_STATE *s;
-	wt_txnid_t current_id, id, oldest_snap_min;
-	uint32_t i, session_cnt;
+	WT_TXN *txn;
 
-	conn = S2C(session);
-	txn_global = &conn->txn_global;
+	txn = &session->txn;
 
-	do {
-		/* Take a copy of the current session ID. */
-		current_id = oldest_snap_min = txn_global->current;
+	__wt_txn_get_oldest(session);
+	__txn_sort_snapshot(
+	    session, 0, txn->oldest_snap_min, txn->oldest_snap_min);
 
-		/* Walk the array of concurrent transactions. */
-		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++)
-			if ((id = s->snap_min) != WT_TXN_NONE &&
-			    TXNID_LT(id, oldest_snap_min))
-				oldest_snap_min = id;
-
-		/*
-		 * Ensure the snapshot reads are scheduled before re-checking
-		 * the global current ID.
-		 */
-		WT_READ_BARRIER();
-	} while (current_id != txn_global->current);
-
-	__txn_sort_snapshot(session, 0, oldest_snap_min, oldest_snap_min);
 	/*
 	 * Note that we carefully don't update the global table with this
 	 * snap_min value: there is already a running transaction in this
@@ -237,7 +230,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * If two threads race to allocate an ID, only the latest ID
 		 * will proceed.  The winning thread can be sure its snapshot
 		 * contains all of the earlier active IDs.  Threads that race
-		 * race and get an earlier ID may not appear in the snapshot,
+		 * and get an earlier ID may not appear in the snapshot,
 		 * but they will loop and allocate a new ID before proceeding
 		 * to make any updates.
 		 *
@@ -249,7 +242,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 			txn->id = WT_ATOMIC_ADD(txn_global->current, 1);
 		} while (txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
 		WT_PUBLISH(txn_state->id, txn->id);
-		oldest_snap_min = txn->id;
 
 		/*
 		 * If we are starting a snapshot isolation transaction, get
@@ -260,6 +252,9 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * visible.
 		 */
 		if (txn->isolation == TXN_ISO_SNAPSHOT) {
+			txn->last_gen = txn->last_oldest_gen = txn_global->gen;
+			oldest_snap_min = txn->id;
+
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
 			for (i = n = 0, s = txn_global->states;
@@ -297,11 +292,13 @@ void
 __wt_txn_release(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
 	txn->mod_count = txn->modref_count = 0;
-	txn_state = &S2C(session)->txn_global.states[session->id];
+	txn_global = &S2C(session)->txn_global;
+	txn_state = &txn_global->states[session->id];
 
 	/* Clear the transaction's ID from the global table. */
 	WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
@@ -319,6 +316,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
 	F_CLR(txn, TXN_ERROR | TXN_OLDEST | TXN_RUNNING);
+
+	/* Update the global generation number. */
+	++txn_global->gen;
 }
 
 /*
@@ -347,7 +347,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * commit.
 	 */
 	if (session->ncursors > 0)
-		__wt_txn_get_snapshot(session, txn->id, WT_TXN_NONE);
+		__wt_txn_get_snapshot(session, txn->id, WT_TXN_NONE, 1);
 	__wt_txn_release(session);
 	return (0);
 }
@@ -463,5 +463,6 @@ __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn)
 	session = conn->default_session;
 	txn_global = &conn->txn_global;
 
-	__wt_free(session, txn_global->states);
+	if (txn_global != NULL)
+		__wt_free(session, txn_global->states);
 }

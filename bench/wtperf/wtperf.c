@@ -41,6 +41,15 @@
 
 #define	ATOMIC_ADD(v, val)						\
 	__sync_add_and_fetch(&(v), val)
+#ifndef F_CLR
+#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
+#endif
+#ifndef F_ISSET
+#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
+#endif
+#ifndef F_SET
+#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
+#endif
 
 typedef struct {
 	const char *home;
@@ -68,6 +77,8 @@ typedef struct {
 #define	WT_PERF_POP	0x01
 #define	WT_PERF_READ	0x02
 	uint32_t phase;
+#define WT_INSERT_RMW	0x01
+	uint32_t flags;
 	struct timeval phase_start_time;
 } CONFIG;
 
@@ -99,9 +110,10 @@ void worker(CONFIG *, uint32_t);
 	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
 
 /* Worker thread types. */
-#define WORKER_READ	0x01
-#define WORKER_INSERT	0x02
-#define WORKER_UPDATE	0x03
+#define WORKER_READ		0x01
+#define WORKER_INSERT		0x02
+#define WORKER_INSERT_RMW	0x03
+#define WORKER_UPDATE		0x04
 
 /* Default values - these are tiny, we want the basic run to be fast. */
 CONFIG default_cfg = {
@@ -127,6 +139,7 @@ CONFIG default_cfg = {
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
+	0,		/* flags */
 	{0, 0}		/* phase_start_time */
 };
 /* Small config values - these are small. */
@@ -154,6 +167,7 @@ CONFIG small_cfg = {
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
+	0,		/* flags */
 	{0, 0}		/* phase_start_time */
 };
 /* Default values - these are small, we want the basic run to be fast. */
@@ -181,6 +195,7 @@ CONFIG med_cfg = {
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
+	0,		/* flags */
 	{0, 0}		/* phase_start_time */
 };
 /* Default values - these are small, we want the basic run to be fast. */
@@ -208,6 +223,7 @@ CONFIG large_cfg = {
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
+	0,		/* flags */
 	{0, 0}		/* phase_start_time */
 };
 
@@ -240,7 +256,11 @@ read_thread(void *arg)
 void *
 insert_thread(void *arg)
 {
-	worker((CONFIG *)arg, WORKER_INSERT);
+	CONFIG *config;
+
+	config = (CONFIG *)arg;
+	worker(config, F_ISSET(config, WT_INSERT_RMW) ?
+	    WORKER_INSERT_RMW : WORKER_INSERT);
 	return (NULL);
 }
 
@@ -314,6 +334,12 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			if (op_ret == 0)
 				++g_nread_ops;
 			break;
+		case WORKER_INSERT_RMW:
+			op_name="insert_rmw";
+			op_ret = cursor->search(cursor);
+			if (op_ret != WT_NOTFOUND)
+				break;
+			/* Fall through */
 		case WORKER_INSERT:
 			op_name = "insert";
 			cursor->set_value(cursor, data_buf);
@@ -758,7 +784,7 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	const char *user_cconfig, *user_tconfig;
-	const char *opts = "C:I:P:R:U:T:c:d:eh:i:k:l:r:s:t:u:v:SML";
+	const char *opts = "C:I:P:R:U:T:c:d:eh:i:jk:l:r:s:t:u:v:SML";
 	char *cc_buf, *tc_buf;
 	int ch, checkpoint_created, ret, stat_created;
 	pthread_t checkpoint, stat;
@@ -809,6 +835,9 @@ int main(int argc, char **argv)
 			break;
 		case 'i':
 			cfg.icount = (uint32_t)atoi(optarg);
+			break;
+		case 'j':
+			F_SET(&cfg, WT_INSERT_RMW);
 			break;
 		case 'k':
 			cfg.key_sz = (uint32_t)atoi(optarg);
@@ -1122,6 +1151,8 @@ void print_config(CONFIG *cfg)
 	printf("\t Workload period: %d\n", cfg->run_time);
 	printf("\t Number read threads: %d\n", cfg->read_threads);
 	printf("\t Number insert threads: %d\n", cfg->insert_threads);
+	if (F_ISSET(cfg, WT_INSERT_RMW))
+		printf("\t Insert operations are RMW.\n");
 	printf("\t Number update threads: %d\n", cfg->update_threads);
 	printf("\t Verbosity: %d\n", cfg->verbose);
 }
@@ -1144,6 +1175,7 @@ void usage(void)
 	printf("\t-e use existing database (skip population phase)\n");
 	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST \n");
 	printf("\t-i <int> number of records to insert\n");
+	printf("\t-j Execute a read prior to each insert in populate\n");
 	printf("\t-k <int> key item size\n");
 	printf("\t-l <int> log statistics every <int> report intervals."
 	    "Default disabled.\n");

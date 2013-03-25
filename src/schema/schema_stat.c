@@ -74,15 +74,16 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 	WT_UNUSED(flags);
 	name = uri + strlen("table:");
 
-	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
 	/* Clear the statistics we are about to recalculate. */
 	if (cst->stats != NULL) {
 		__wt_stat_clear_dsrc_stats(cst->stats);
 		stats = (WT_DSRC_STATS *)cst->stats;
 	} else {
-		WT_ERR(__wt_stat_alloc_dsrc_stats(session, &stats));
+		WT_ERR(__wt_calloc_def(session, 1, &stats));
+		__wt_stat_init_dsrc_stats(stats);
 		cst->stats_first = cst->stats = (WT_STATS *)stats;
 		cst->stats_count = sizeof(*stats) / sizeof(WT_STATS);
 	}
@@ -127,6 +128,7 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 	}
 
 err:	__wt_scr_free(&buf);
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 

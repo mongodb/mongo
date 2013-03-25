@@ -237,17 +237,8 @@ __wt_rec_track_onpage_srch(
 
 /*
  * __wt_rec_track_onpage_addr --
- *	Search for a permanently tracked object (based on an addr/size pair),
- * and add it if it isn't already tracked.
- *
- * __wt_rec_track_onpage_ref --
- *	Search for a permanently tracked object (based on a page and ref),
- * and add it if it isn't already tracked.
- *
- * These functions are short-hand for "search the on-page records, and if the
- * address is not already listed as an object, add it".  Note there is no
- * possibility of object re-use, the object is discarded when reconciliation
- * completes.
+ *	Search the on-page records for a permanently tracked object (based on
+ * an addr/size pair), and add it if it isn't already tracked.
  */
 int
 __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
@@ -256,19 +247,12 @@ __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
 	if (__wt_rec_track_onpage_srch(page, addr, addr_size))
 		return (0);
 
+	/*
+	 * Note there is no possibility of object re-use, the object is
+	 * discarded when reconciliation completes.
+	 */
 	return (__wt_rec_track(
 	    session, page, addr, addr_size, NULL, 0, WT_TRK_ONPAGE));
-}
-
-int
-__wt_rec_track_onpage_ref(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE *refpage, WT_REF *ref)
-{
-	uint32_t size;
-	const uint8_t *addr;
-
-	__wt_get_addr(refpage, ref, &addr, &size);
-	return (__wt_rec_track_onpage_addr(session, page, addr, size));
 }
 
 /*

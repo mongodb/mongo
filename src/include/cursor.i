@@ -75,18 +75,18 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		WT_ASSERT(session, session->ncursors > 0);
-		if (--session->ncursors == 0) {
+		if (--session->ncursors == 0)
 			__wt_txn_read_last(session);
-
-			/*
-			 * We no longer have any active cursors, check if our
-			 * operation overflowed the cache.  We don't care if we
-			 * fail to evict pages: our operation is done
-			 * regardless.
-			 */
-			(void)__wt_cache_full_check(session);
-		}
 		F_CLR(cbt, WT_CBT_ACTIVE);
+
+		/*
+		 * If this is an autocommit operation that is just getting
+		 * started, check that the cache isn't full.  We may have other
+		 * cursors open, but the one we just closed might help eviction
+		 * make progress.
+		 */
+		if (F_ISSET(&session->txn, TXN_AUTOCOMMIT))
+			WT_RET(__wt_cache_full_check(session));
 	}
 	return (0);
 }

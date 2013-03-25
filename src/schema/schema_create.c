@@ -14,11 +14,10 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
 	int is_metadata;
-	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[4] = API_CONF_DEFAULTS(file, meta, config);
-	const char *filename, *treeconf;
+	const char *fileconf, *filename;
 
-	treeconf = NULL;
+	fileconf = NULL;
 
 	is_metadata = strcmp(uri, WT_METADATA_URI) == 0;
 
@@ -28,14 +27,14 @@ __create_file(WT_SESSION_IMPL *session,
 
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
-	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
+	    __wt_metadata_read(session, uri, &fileconf)) != WT_NOTFOUND) {
 		if (exclusive)
 			WT_TRET(EEXIST);
 		goto err;
 	}
 
 	/* Create the file. */
-	WT_ERR(__wt_btree_create(session, filename));
+	WT_ERR(__wt_block_manager_create(session, filename));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
@@ -50,8 +49,8 @@ __create_file(WT_SESSION_IMPL *session,
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 		filecfg[2] = val->data;
 		filecfg[3] = NULL;
-		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
-		if ((ret = __wt_metadata_insert(session, uri, treeconf)) != 0) {
+		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
+		if ((ret = __wt_metadata_insert(session, uri, fileconf)) != 0) {
 			if (ret == WT_DUPLICATE_KEY)
 				ret = EEXIST;
 			goto err;
@@ -59,20 +58,23 @@ __create_file(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Open the file to check that it was setup correctly.
+	 * Open the file to check that it was setup correctly.   We don't need
+	 * to pass the configuration, we just wrote the collapsed configuration
+	 * into the metadata file, and it's going to be read/used by underlying
+	 * functions.
 	 *
 	 * Keep the handle exclusive until it is released at the end of the
 	 * call, otherwise we could race with a drop.
 	 */
 	WT_ERR(__wt_conn_btree_get(
-	    session, uri, NULL, cfg, WT_DHANDLE_EXCLUSIVE));
+	    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_handle_lock(session, 1));
 	else
 		WT_ERR(__wt_session_release_btree(session));
 
 err:	__wt_scr_free(&val);
-	__wt_free(session, treeconf);
+	__wt_free(session, fileconf);
 	return (ret);
 }
 
@@ -143,7 +145,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	/* Make sure the column group is referenced from the table. */
 	if (cgname != NULL && (ret =
 	    __wt_config_subgets(session, &table->cgconf, cgname, &cval)) != 0)
-		WT_RET_MSG(session, EINVAL,
+		WT_ERR_MSG(session, EINVAL,
 		    "Column group '%s' not found in table '%.*s'",
 		    cgname, (int)tlen, tablename);
 
@@ -203,6 +205,8 @@ err:	__wt_free(session, cgconf);
 	__wt_buf_free(session, &confbuf);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
+
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 
@@ -355,6 +359,8 @@ err:	__wt_free(session, idxconf);
 	__wt_buf_free(session, &extra_cols);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
+
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 
@@ -381,8 +387,10 @@ __create_table(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	if ((ret = __wt_schema_get_table(session,
-	    tablename, strlen(tablename), 0, &table)) == 0)
+	    tablename, strlen(tablename), 0, &table)) == 0) {
+		__wt_schema_release_table(session, table);
 		return (exclusive ? EEXIST : 0);
+	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	WT_RET(__wt_config_gets(session, cfg, "colgroups", &cval));
@@ -416,9 +424,13 @@ __create_table(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		if (table != NULL)
-			WT_TRET(__wt_schema_remove_table(session, table));
+err:		if (table != NULL) {
+			__wt_schema_remove_table(session, table);
+			table = NULL;
+		}
 	}
+	if (table != NULL)
+		__wt_schema_release_table(session, table);
 	__wt_free(session, cgname);
 	__wt_free(session, tableconf);
 	return (ret);

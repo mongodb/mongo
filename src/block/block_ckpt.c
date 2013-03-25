@@ -209,17 +209,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 		    data_cksum, 0));
 
 	/* Process the checkpoint list, deleting and updating as required. */
-	WT_RET(__ckpt_process(session, block, ckptbase));
-
-	/*
-	 * Checkpoints have to hit disk (it would be reasonable to configure for
-	 * lazy checkpoints, but we don't support them yet).  Regardless, we're
-	 * not holding any locks, other writers can proceed while we wait.
-	 */
-	if (F_ISSET(S2C(session), WT_CONN_SYNC))
-		WT_RET(__wt_fsync(session, block->fh));
-
-	return (0);
+	return (__ckpt_process(session, block, ckptbase));
 }
 
 /*
@@ -275,7 +265,7 @@ __ckpt_extlist_fblocks(
 	 * file that contains a previous checkpoint's extents.
 	 */
 	return (__wt_block_insert_ext(
-	    session, &block->live.ckpt_avail, el->offset, el->size));
+	    session, block, &block->live.ckpt_avail, el->offset, el->size));
 }
 
 /*
@@ -419,7 +409,7 @@ __ckpt_process(
 		 * must be paired in the checkpoint.
 		 */
 		if (a->root_offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_insert_ext(session,
+			WT_ERR(__wt_block_insert_ext(session, block,
 			    &a->discard, a->root_offset, a->root_size));
 
 		/*
@@ -436,10 +426,10 @@ __ckpt_process(
 		 */
 		if (a->alloc.entries != 0)
 			WT_ERR(__wt_block_extlist_merge(
-			    session, &a->alloc, &b->alloc));
+			    session, block, &a->alloc, &b->alloc));
 		if (a->discard.entries != 0)
 			WT_ERR(__wt_block_extlist_merge(
-			    session, &a->discard, &b->discard));
+			    session, block, &a->discard, &b->discard));
 
 		/*
 		 * If the "to" checkpoint is also being deleted, we're done with
@@ -576,12 +566,12 @@ __ckpt_update(
 	alloc = &block->live.alloc;
 	WT_RET(__wt_block_extlist_write(session, block, &ci->alloc, NULL));
 	if (ci->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_off_remove_overlap(
-		    session, alloc, ci->alloc.offset, ci->alloc.size));
+		WT_RET(__wt_block_off_remove_overlap(session,
+		    block, alloc, ci->alloc.offset, ci->alloc.size));
 	WT_RET(__wt_block_extlist_write(session, block, &ci->discard, NULL));
 	if (ci->discard.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_off_remove_overlap(
-		    session, alloc, ci->discard.offset, ci->discard.size));
+		WT_RET(__wt_block_off_remove_overlap(session,
+		    block, alloc, ci->discard.offset, ci->discard.size));
 
 	/*
 	 * We only write an avail list for the live system, other checkpoint's
@@ -599,8 +589,8 @@ __ckpt_update(
 		WT_RET(__wt_block_extlist_write(
 		    session, block, &ci->avail, &ci->ckpt_avail));
 		if (ci->avail.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_RET(__wt_block_off_remove_overlap(
-			    session, alloc, ci->avail.offset, ci->avail.size));
+			WT_RET(__wt_block_off_remove_overlap(session,
+			    block, alloc, ci->avail.offset, ci->avail.size));
 	}
 
 	/*
@@ -679,7 +669,8 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * available list.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __wt_block_extlist_merge(session, &ci->ckpt_avail, &ci->avail);
+	ret = __wt_block_extlist_merge(
+	    session, block, &ci->ckpt_avail, &ci->avail);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	/* Discard the list. */

@@ -309,7 +309,7 @@ next:		switch (direction) {
 	/* If still needed, instantiate the key. */
 	key = WT_ROW_KEY_COPY(rip_arg);
 	if (!__wt_off_page(page, key)) {
-		WT_ERR(__wt_row_ikey_alloc(session,
+		WT_ERR(__wt_row_ikey(session,
 		    WT_PAGE_DISK_OFFSET(page, key),
 		    retb->data, retb->size, &ikey));
 
@@ -380,11 +380,27 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 }
 
 /*
- * __wt_row_ikey_alloc --
+ * __wt_row_ikey_incr --
+ *	Instantiate a key in a WT_IKEY structure and increment the page's
+ * memory footprint.
+ */
+int
+__wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page,
+    uint32_t cell_offset, const void *key, uint32_t size, void *ikeyp)
+{
+	WT_RET(__wt_row_ikey(session, cell_offset, key, size, ikeyp));
+
+	__wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + size);
+
+	return (0);
+}
+
+/*
+ * __wt_row_ikey --
  *	Instantiate a key in a WT_IKEY structure.
  */
 int
-__wt_row_ikey_alloc(WT_SESSION_IMPL *session,
+__wt_row_ikey(WT_SESSION_IMPL *session,
     uint32_t cell_offset, const void *key, uint32_t size, void *ikeyp)
 {
 	WT_IKEY *ikey;

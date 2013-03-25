@@ -12,13 +12,6 @@
  * gory details.  The short version is that we have less cases to deal with
  * because the compiler promotes shorter types to int or unsigned int.
  */
-
-typedef struct {
-	WT_SESSION_IMPL *session;
-	const char *cur, *end, *orig;
-	unsigned long repeats;
-} WT_PACK;
-
 typedef struct {
 	union {
 		int64_t i;
@@ -30,6 +23,13 @@ typedef struct {
 	int8_t havesize;
 	char type;
 } WT_PACK_VALUE;
+
+typedef struct {
+	WT_SESSION_IMPL *session;
+	const char *cur, *end, *orig;
+	unsigned long repeats;
+	WT_PACK_VALUE lastv;
+} WT_PACK;
 
 static inline int
 __pack_initn(
@@ -59,6 +59,7 @@ __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 	char *endsize;
 
 	if (pack->repeats > 0) {
+		*pv = pack->lastv;
 		--pack->repeats;
 		return (0);
 	}
@@ -66,13 +67,17 @@ __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 next:	if (pack->cur == pack->end)
 		return (WT_NOTFOUND);
 
-	pv->size = WT_STORE_SIZE(strtoul(pack->cur, &endsize, 10));
-	pv->havesize = (endsize > pack->cur);
-	if (!pv->havesize)
+	if (isdigit(*pack->cur)) {
+		pv->havesize = 1;
+		pv->size = WT_STORE_SIZE(strtoul(pack->cur, &endsize, 10));
+		pack->cur = endsize;
+	} else {
+		pv->havesize = 0;
 		pv->size = 1;
-	pack->cur = endsize;
-	pack->repeats = 0;
+	}
+
 	pv->type = *pack->cur++;
+	pack->repeats = 0;
 
 	switch (pv->type) {
 	case 'S':
@@ -107,6 +112,7 @@ next:	if (pack->cur == pack->end)
 		if (pv->size == 0)
 			goto next;
 		pack->repeats = pv->size - 1;
+		pack->lastv = *pv;
 		return (0);
 	default:
 		WT_RET_MSG(pack->session, EINVAL,
@@ -156,9 +162,8 @@ next:	if (pack->cur == pack->end)
 	case 'R':							\
 		pv.u.u = va_arg(ap, uint64_t);				\
 		break;							\
-	default:							\
-		WT_ASSERT(session, pv.type != pv.type);			\
-		break;							\
+	/* User format strings have already been validated. */          \
+	WT_ILLEGAL_VALUE(session);                                      \
 	}								\
 } while (0)
 
@@ -436,8 +441,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'R':							\
 		*va_arg(ap, uint64_t *) = pv.u.u;			\
 		break;							\
-	default:							\
-		WT_ASSERT(session, pv.type != pv.type);			\
-		break;							\
+	/* User format strings have already been validated. */          \
+	WT_ILLEGAL_VALUE(session);                                      \
 	}								\
 } while (0)

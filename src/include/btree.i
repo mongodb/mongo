@@ -20,21 +20,33 @@ __wt_page_is_modified(WT_PAGE *page)
  * __wt_eviction_page_force --
  *      Add a page for forced eviction if it matches the criteria.
  */
-static inline int
+static inline void
 __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
 	btree = S2BT(session);
 
-	if (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
-	    __wt_page_is_modified(page) &&
-	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
-	    page->memory_footprint > btree->maxmempage)
-		return (__wt_evict_forced_page(session, page));
+	/*
+	 * Ignore internal pages (check read-only information first to the
+	 * extent possible, this is shared data).
+	 */
+	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
+		return;
 
-	return (0);
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+	    __wt_page_is_modified(page) &&
+	    page->memory_footprint > btree->maxmempage)
+		__wt_evict_forced_page(session, page);
 }
+
+/*
+ * Estimate the per-allocation overhead.  All implementations of malloc / free
+ * have some kind of header and pad for alignment.  We can't know for sure what
+ * that adds up to, but this is an estimate based on some measurements of heap
+ * size versus bytes in use.
+ */
+#define	WT_ALLOC_OVERHEAD      32
 
 /*
  * __wt_cache_page_inmem_incr --
@@ -44,6 +56,8 @@ static inline void
 __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
+
+	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
@@ -60,6 +74,8 @@ static inline void
 __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
+
+	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
@@ -96,31 +112,6 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, size_t size)
 }
 
 /*
- * __wt_cache_page_read --
- *	Read pages into the cache.
- */
-static inline void
-__wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
-{
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-	WT_ASSERT(session, size != 0);
-	(void)WT_ATOMIC_ADD(cache->pages_read, 1);
-	(void)WT_ATOMIC_ADD(cache->bytes_read, size);
-	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
-
-	/*
-	 * It's unusual, but possible, that the page is already dirty.
-	 * For example, when reading an in-memory page with references to
-	 * deleted leaf pages, the internal page may be marked dirty.  If so,
-	 * update the total bytes dirty here.
-	 */
-	if (__wt_page_is_modified(page))
-		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
-}
-
-/*
  * __wt_cache_page_evict --
  *	Evict pages from the cache.
  */
@@ -130,7 +121,9 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
+
 	WT_ASSERT(session, page->memory_footprint != 0);
+
 	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
 	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
 
@@ -140,7 +133,22 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline uint64_t
 __wt_cache_read_gen(WT_SESSION_IMPL *session)
 {
-	return (++S2C(session)->cache->read_gen);
+	return (S2C(session)->cache->read_gen);
+}
+
+static inline uint64_t
+__wt_cache_read_gen_set(WT_SESSION_IMPL *session)
+{
+	/*
+	 * We return read-generations from the future (where "the future" is
+	 * measured by increments of the global read generation).  The reason
+	 * is because when acquiring a new hazard reference on a page, we can
+	 * check its read generation, and if the read generation isn't less
+	 * than the current global generation, we don't bother updating the
+	 * page.  In other words, the goal is to avoid some number of updates
+	 * immediately after each update we have to make.
+	 */
+	return (++S2C(session)->cache->read_gen + WT_READ_GEN_STEP);
 }
 
 /*
@@ -158,7 +166,7 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	pages_in = cache->pages_read;
+	pages_in = cache->pages_inmem;
 	pages_out = cache->pages_evict;
 	return (pages_in > pages_out ? pages_in - pages_out : 0);
 }
@@ -178,7 +186,7 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	bytes_in = cache->bytes_read + cache->bytes_inmem;
+	bytes_in = cache->bytes_inmem;
 	bytes_out = cache->bytes_evict;
 	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
 }
@@ -219,9 +227,13 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
-	 * a page, if we don't do the update, discard the memory.
+	 * a page.  If our modify structure is used, update the page's memory
+	 * footprint, else discard the modify structure, another thread did the
+	 * work.
 	 */
-	if (!WT_ATOMIC_CAS(page->modify, NULL, modify))
+	if (WT_ATOMIC_CAS(page->modify, NULL, modify))
+		__wt_cache_page_inmem_incr(session, page, sizeof(*modify));
+	else
 		__wt_free(session, modify);
 	return (0);
 }
@@ -237,7 +249,15 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
 		(void)WT_ATOMIC_ADD(
 		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+
+		/*
+		 * The page can never end up with changes older than the oldest
+		 * running transaction.
+		 */
+		if (F_ISSET(&session->txn, TXN_RUNNING))
+			page->modify->disk_txn = session->txn.snap_min - 1;
 	}
+
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -475,7 +495,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * No lock is required because the session array is fixed size, but it
-	 * it may contain inactive entries.  We must review any active session
+	 * may contain inactive entries.  We must review any active session
 	 * that might contain a hazard pointer, so insert a barrier before
 	 * reading the active session count.  That way, no matter what sessions
 	 * come or go, we'll check the slots for all of the sessions that could
@@ -506,6 +526,36 @@ __wt_skip_choose_depth(void)
 	    __wt_random() < WT_SKIP_PROBABILITY; d++)
 		;
 	return (d);
+}
+
+/*
+ * __wt_btree_size_overflow --
+ *      Check if the size of an in-memory tree with a single leaf page is
+ *      over a specified maximum.  If called on anything other than a simple
+ *      tree with a single leaf page, returns true so the calling code will
+ *      switch to a new tree.
+ */
+static inline int
+__wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
+{
+	WT_BTREE *btree;
+	WT_PAGE *child, *root;
+
+	btree = S2BT(session);
+	root = btree->root_page;
+
+	if (btree == NULL || root == NULL ||
+	    (child = root->u.intl.t->page) == NULL)
+		return (0);
+
+	/* Make sure this is a simple tree, or LSM should switch. */
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    root->entries != 1 ||
+	    root->u.intl.t->state != WT_REF_MEM ||
+	    child->type != WT_PAGE_ROW_LEAF)
+		return (1);
+
+	return (child->memory_footprint > maxsize);
 }
 
 /*
@@ -545,3 +595,18 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
 	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
 	    (k1), (k2), &(cmp)))
+
+/*
+ * __wt_btree_mergeable --
+ *      Determines whether the given page is a candidate for merging.
+ */
+static inline int
+__wt_btree_mergeable(WT_PAGE *page)
+{
+	if (WT_PAGE_IS_ROOT(page) ||
+	    page->modify == NULL ||
+	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
+		return (0);
+
+	return (!WT_PAGE_IS_ROOT(page->parent));
+}

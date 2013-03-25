@@ -19,15 +19,15 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_ITEM buf;
 	WT_LSM_CHUNK *chunk;
-	const char *config;
+	const char *lsmconfig;
 	size_t chunk_sz, alloc;
 	u_int nchunks;
 
 	WT_CLEAR(buf);
 	chunk_sz = sizeof(WT_LSM_CHUNK);
 
-	WT_RET(__wt_metadata_read(session, lsm_tree->name, &config));
-	WT_ERR(__wt_config_init(session, &cparser, config));
+	WT_RET(__wt_metadata_read(session, lsm_tree->name, &lsmconfig));
+	WT_ERR(__wt_config_init(session, &cparser, lsmconfig));
 	while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
 		if (WT_STRING_MATCH("bloom_config", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->bloom_config);
@@ -146,7 +146,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	__wt_free(session, config);
+err:	__wt_free(session, lsmconfig);
 	return (ret);
 }
 

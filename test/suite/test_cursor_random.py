@@ -72,7 +72,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         cursor.close
 
     # Check that next_random works in the presence of a larger set of values.
-    def test_cursor_random_single_record(self):
+    def test_cursor_random_multiple_records(self):
         uri = self.type + 'random'
         if self.type == 'file:':
             simple_populate(

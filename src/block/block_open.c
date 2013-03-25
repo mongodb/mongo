@@ -71,6 +71,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_DECL_RET;
 
 	conn = S2C(session);
+	TAILQ_REMOVE(&conn->blockqh, block, q);
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);
@@ -80,7 +81,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	__wt_spin_destroy(session, &block->live_lock);
 
-	TAILQ_REMOVE(&conn->blockqh, block, q);
+	__wt_block_ext_cleanup(session, block);
 
 	__wt_overwrite_and_free(session, block);
 
@@ -93,8 +94,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 int
 __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
-    const char *config, const char *cfg[], int forced_salvage,
-    WT_BLOCK **blockp)
+    const char *cfg[], int forced_salvage, WT_BLOCK **blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
@@ -124,8 +124,37 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
 	/* Get the allocation size. */
-	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "allocation_size", &cval));
 	block->allocsize = (uint32_t)cval.val;
+
+	/* Configuration: optional OS buffer cache maximum size. */
+	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
+	block->os_cache_max = cval.val;
+#ifdef HAVE_POSIX_FADVISE
+	if (conn->direct_io && block->os_cache_max)
+		WT_ERR_MSG(session, EINVAL,
+		    "os_cache_max not supported in combination with direct_io");
+#else
+	if (block->os_cache_max)
+		WT_ERR_MSG(session, EINVAL,
+		    "os_cache_max not supported if posix_fadvise not "
+		    "available");
+#endif
+
+	/* Configuration: optional immediate write scheduling flag. */
+	WT_ERR(__wt_config_gets(session, cfg, "os_cache_dirty_max", &cval));
+	block->os_cache_dirty_max = cval.val;
+#ifdef HAVE_SYNC_FILE_RANGE
+	if (conn->direct_io && block->os_cache_dirty_max)
+		WT_ERR_MSG(session, EINVAL,
+		    "os_cache_dirty_max not supported in combination with "
+		    "direct_io");
+#else
+	if (block->os_cache_dirty_max)
+		WT_ERR_MSG(session, EINVAL,
+		    "os_cache_dirty_max not supported if sync_file_range not "
+		    "available");
+#endif
 
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
@@ -258,8 +287,11 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
 	    desc->minorv > WT_BLOCK_MINOR_VERSION))
 		WT_ERR_MSG(session, WT_ERROR,
-		    "%s is an unsupported version of a WiredTiger file",
-		    block->name);
+		    "unsupported WiredTiger file version: this build only "
+		    "supports major/minor versions up to %d/%d, and the file "
+		    "is version %d/%d",
+		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
+		    desc->majorv, desc->minorv);
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -270,7 +302,7 @@ err:	__wt_scr_free(&buf);
  *	Block statistics
  */
 void
-__wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 {
 	/*
 	 * We're looking inside the live system's structure, which normally
@@ -279,11 +311,11 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * isn't like this is a common function for an application to call.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	WT_DSTAT_SET(session, block_allocsize, block->allocsize);
-	WT_DSTAT_SET(session, block_checkpoint_size, block->live.ckpt_size);
-	WT_DSTAT_SET(session, block_magic, WT_BLOCK_MAGIC);
-	WT_DSTAT_SET(session, block_major, WT_BLOCK_MAJOR_VERSION);
-	WT_DSTAT_SET(session, block_minor, WT_BLOCK_MINOR_VERSION);
-	WT_DSTAT_SET(session, block_size, block->fh->file_size);
+	WT_STAT_SET(stats, block_allocsize, block->allocsize);
+	WT_STAT_SET(stats, block_checkpoint_size, block->live.ckpt_size);
+	WT_STAT_SET(stats, block_magic, WT_BLOCK_MAGIC);
+	WT_STAT_SET(stats, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_STAT_SET(stats, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_STAT_SET(stats, block_size, block->fh->file_size);
 	__wt_spin_unlock(session, &block->live_lock);
 }

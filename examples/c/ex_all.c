@@ -447,11 +447,13 @@ session_ops(WT_SESSION *session)
 	ret = session->create(session,
 	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a column-store table] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S");
 	/*! [Create a column-store table] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a table with columns] */
 	/*
@@ -459,9 +461,10 @@ session_ops(WT_SESSION *session)
 	 * (string, signed 32-bit integer, unsigned 16-bit integer).
 	 */
 	ret = session->create(session, "table:mytable",
-	    "key_format=r,value_format=SiH"
+	    "key_format=r,value_format=SiH,"
 	    "columns=(id,department,salary,year-started)");
 	/*! [Create a table with columns] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*
 	 * This example code gets run, and the compression libraries might not
@@ -474,41 +477,63 @@ session_ops(WT_SESSION *session)
 	    "table:mytable",
 	    "block_compressor=bzip2,key_format=S,value_format=S");
 	/*! [Create a bzip2 compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a snappy compressed table] */
 	ret = session->create(session,
 	    "table:mytable",
 	    "block_compressor=snappy,key_format=S,value_format=S");
 	/*! [Create a snappy compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 #endif
 
 	/*! [Configure checksums to uncompressed] */
 	ret = session->create(session, "table:mytable",
 	    "key_format=S,value_format=S,checksum=uncompressed");
 	/*! [Configure checksums to uncompressed] */
+	ret = session->drop(session, "table:mytable", NULL);
 
-	/*! [Configure dictionary compression off] */
+	/*! [Configure dictionary compression on] */
 	ret = session->create(session, "table:mytable",
-	    "key_format=S,value_format=S,dictionary=false");
-	/*! [Configure dictionary compression off] */
+	    "key_format=S,value_format=S,dictionary=1000");
+	/*! [Configure dictionary compression on] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Configure key prefix compression off] */
 	ret = session->create(session, "table:mytable",
 	    "key_format=S,value_format=S,prefix_compression=false");
 	/*! [Configure key prefix compression off] */
+	ret = session->drop(session, "table:mytable", NULL);
+
+#ifdef MIGHT_NOT_RUN
+						/* Requires sync_file_range */
+	/*! [os_cache_dirty_max configuration] */
+	ret = session->create(
+	    session, "table:mytable", "os_cache_dirty_max=500MB");
+	/*! [os_cache_dirty_max configuration] */
+	ret = session->drop(session, "table:mytable", NULL);
+
+						/* Requires posix_fadvise */
+	/*! [os_cache_max configuration] */
+	ret = session->create(session, "table:mytable", "os_cache_max=1GB");
+	/*! [os_cache_max configuration] */
+	ret = session->drop(session, "table:mytable", NULL);
+#endif
 
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
 	/*! [Create a cache-resident object] */
+	ret = session->drop(session, "table:mytable", NULL);
+
+	{
+	/* Create a table for the session operations. */
+	ret = session->create(
+	    session, "table:mytable", "key_format=S,value_format=S");
 
 	/*! [Compact a table] */
 	ret = session->compact(session, "table:mytable", NULL);
 	/*! [Compact a table] */
-
-	/*! [Drop a table] */
-	ret = session->drop(session, "table:mytable", NULL);
-	/*! [Drop a table] */
 
 	/*! [Print to the message stream] */
 	ret = session->msg_printf(
@@ -552,6 +577,11 @@ session_ops(WT_SESSION *session)
 	/*! [Verify a table] */
 	ret = session->verify(session, "table:mytable", NULL);
 	/*! [Verify a table] */
+
+	/*! [Drop a table] */
+	ret = session->drop(session, "table:mytable", NULL);
+	/*! [Drop a table] */
+	}
 
 	/*! [Close a session] */
 	ret = session->close(session, NULL);
@@ -826,6 +856,31 @@ my_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 /*! [WT_COMPRESSOR presize] */
 
+static int
+my_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    size_t page_max, u_int split_pct, size_t extra,
+    uint8_t *src, uint32_t *offsets, uint32_t slots,
+    uint8_t *dst, size_t dst_len, int final,
+    size_t *result_lenp, uint32_t *result_slotsp)
+{
+	/* Unused parameters */
+	(void)compressor;
+	(void)session;
+	(void)page_max;
+	(void)split_pct;
+	(void)extra;
+	(void)src;
+	(void)offsets;
+	(void)slots;
+	(void)dst;
+	(void)dst_len;
+	(void)final;
+	(void)result_lenp;
+	(void)result_slotsp;
+
+	return (0);
+}
+
 int
 add_compressor(WT_CONNECTION *conn)
 {
@@ -833,7 +888,11 @@ add_compressor(WT_CONNECTION *conn)
 
 	/*! [WT_COMPRESSOR register] */
 	static WT_COMPRESSOR my_compressor = {
-	    my_compress, NULL, my_decompress, my_pre_size };
+	    my_compress,
+	    my_compress_raw,		/* NULL, if no raw compression */
+	    my_decompress,
+	    my_pre_size			/* NULL, if pre-sizing not needed */
+	};
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [WT_COMPRESSOR register] */
 
@@ -875,9 +934,11 @@ connection_ops(WT_CONNECTION *conn)
 {
 	int ret;
 
+#ifdef MIGHT_NOT_RUN
 	/*! [Load an extension] */
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
 	/*! [Load an extension] */
+#endif
 
 	add_collator(conn);
 	add_data_source(conn);
@@ -991,14 +1052,18 @@ hot_backup(WT_SESSION *session)
 int
 main(void)
 {
+	WT_CONNECTION *conn;
 	int ret;
 
-	{
-	WT_CONNECTION *conn;
 	/*! [Open a connection] */
 	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
-	}
+
+	if (ret == 0)
+		connection_ops(conn);
+	/*
+	 * The connection has been closed.
+	 */
 
 #ifdef MIGHT_NOT_RUN
 	/*
@@ -1006,34 +1071,70 @@ main(void)
 	 * be installed, causing the open to fail.  The documentation requires
 	 * the code snippets, use #ifdef's to avoid running it.
 	 */
-	{
 	/*! [Configure bzip2 extension] */
-	WT_CONNECTION *conn;
-
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
 	/*! [Configure bzip2 extension] */
-	}
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
 
-	{
 	/*! [Configure snappy extension] */
-	WT_CONNECTION *conn;
-
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
 	/*! [Configure snappy extension] */
-	}
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
 
 	/*
-	 * We're not allowed to open multiple connections, don't run more than
-	 * one wiredtiger_open call.
+	 * This example code gets run, and direct I/O might not be available,
+	 * causing the open to fail.  The documentation requires code snippets,
+	 * use #ifdef's to avoid running it.
 	 */
-	{
+	/* Might Not Run: direct I/O may not be available. */
 	/*! [Configure direct_io for data files] */
 	ret = wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn);
 	/*! [Configure direct_io for data files] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+#endif
+
+	/*! [Statistics configuration] */
+	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
+	/*! [Statistics configuration] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Statistics logging] */
+	ret = wiredtiger_open(
+	    home, NULL, "create,statistics_log=(wait=30)", &conn);
+	/*! [Statistics logging] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Statistics logging with objects] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "statistics_log=(sources=(\"table:table1\",\"table:table2\"))",
+	    &conn);
+	/*! [Statistics logging with objects] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+#ifdef MIGHT_NOT_RUN
+	/*
+	 * This example code gets run, and a non-existent log file path might
+	 * cause the open to fail.  The documentation requires code snippets,
+	 * use #ifdef's to avoid running it.
+	 */
+	/*! [Statistics logging with path] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "statistics_log=(wait=120,path=\"/log/log.%m.%d.%y\")", &conn);
+	/*! [Statistics logging with path] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
 #endif
 
 	/*! [Get the WiredTiger library version #1] */

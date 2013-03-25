@@ -86,13 +86,13 @@ const char *
 __wt_confdfl_connection_reconfigure =
 	"cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
 	"eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	"name=,reserve=0,size=500MB),verbose=";
+	"name=pool,reserve=0,size=500MB),statistics=0,verbose=";
 
 WT_CONFIG_CHECK
 __wt_confchk_shared_cache_subconfigs[] = {
 	{ "chunk", "int", "min=1MB,max=10TB", NULL },
 	{ "name", "string", NULL, NULL },
-	{ "reserve", "string", NULL, NULL },
+	{ "reserve", "int", NULL, NULL },
 	{ "size", "int", "min=1MB,max=10TB", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -106,6 +106,7 @@ __wt_confchk_connection_reconfigure[] = {
 	{ "eviction_trigger", "int", "min=10,max=99", NULL},
 	{ "shared_cache", "category", NULL,
 	     __wt_confchk_shared_cache_subconfigs},
+	{ "statistics", "boolean", NULL, NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
@@ -129,11 +130,9 @@ __wt_confdfl_file_meta =
 	"checksum=on,collator=,columns=,dictionary=0,format=btree,"
 	"huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,key_gap=10"
-	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
-	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
-	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,prefix_compression=,"
-	"split_pct=75,value_format=u,version=(major=0,minor=0)";
+	",leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB,"
+	"os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,split_pct=75"
+	",value_format=u,version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -157,16 +156,9 @@ __wt_confchk_file_meta[] = {
 	{ "key_gap", "int", "min=0", NULL},
 	{ "leaf_item_max", "int", "min=0", NULL},
 	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL},
-	{ "lsm_bloom", "boolean", NULL, NULL},
-	{ "lsm_bloom_bit_count", "int", "min=2,max=1000", NULL},
-	{ "lsm_bloom_config", "string", NULL, NULL},
-	{ "lsm_bloom_hash_count", "int", "min=2,max=100", NULL},
-	{ "lsm_bloom_newest", "boolean", NULL, NULL},
-	{ "lsm_bloom_oldest", "boolean", NULL, NULL},
-	{ "lsm_chunk_size", "int", "min=512K,max=500MB", NULL},
-	{ "lsm_merge_max", "int", "min=2,max=100", NULL},
-	{ "lsm_merge_threads", "int", "min=1,max=10", NULL},
 	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
+	{ "os_cache_dirty_max", "int", "min=0", NULL},
+	{ "os_cache_max", "int", "min=0", NULL},
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
 	{ "value_format", "format", NULL, NULL},
@@ -255,8 +247,9 @@ __wt_confdfl_session_create =
 	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
 	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
 	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,prefix_compression=,source=,"
-	"split_pct=75,type=file,value_format=u";
+	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_dirty_max=0,"
+	"os_cache_max=0,prefix_compression=,source=,split_pct=75,type=file,"
+	"value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
@@ -291,6 +284,8 @@ __wt_confchk_session_create[] = {
 	{ "lsm_merge_max", "int", "min=2,max=100", NULL},
 	{ "lsm_merge_threads", "int", "min=1,max=10", NULL},
 	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
+	{ "os_cache_dirty_max", "int", "min=0", NULL},
+	{ "os_cache_max", "int", "min=0", NULL},
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "source", "string", NULL, NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
@@ -423,17 +418,39 @@ __wt_confchk_table_meta[] = {
 
 const char *
 __wt_confdfl_wiredtiger_open =
-	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
-	"error_prefix=,eviction_dirty_target=80,eviction_target=80,"
-	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
-	",mmap=,multiprocess=0,session_max=50,shared_cache=(chunk=10MB,name=,"
-	"reserve=0,size=500MB),sync=,transactional=,use_environment_priv=0,"
-	"verbose=";
+	"buffer_alignment=-1,cache_size=100MB,"
+	"checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),create=0,"
+	"direct_io=,error_prefix=,eviction_dirty_target=80,eviction_target=80"
+	",eviction_trigger=95,extensions=,hazard_max=1000,logging=0,"
+	"lsm_merge=,mmap=,multiprocess=0,session_max=50,"
+	"shared_cache=(chunk=10MB,name=pool,reserve=0,size=500MB),"
+	"statistics=0,statistics_log=(clear=,path=\"WiredTigerStat.%H\","
+	"sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,transactional=,"
+	"use_environment_priv=0,verbose=";
+
+WT_CONFIG_CHECK
+__wt_confchk_checkpoint_subconfigs[] = {
+	{ "name", "string", NULL, NULL },
+	{ "wait", "int", "min=1,max=100000", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
+WT_CONFIG_CHECK
+__wt_confchk_statistics_log_subconfigs[] = {
+	{ "clear", "boolean", NULL, NULL },
+	{ "path", "string", NULL, NULL },
+	{ "sources", "list", NULL, NULL },
+	{ "timestamp", "string", NULL, NULL },
+	{ "wait", "int", "min=5,max=100000", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
 
 WT_CONFIG_CHECK
 __wt_confchk_wiredtiger_open[] = {
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL},
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
+	{ "checkpoint", "category", NULL,
+	     __wt_confchk_checkpoint_subconfigs},
 	{ "create", "boolean", NULL, NULL},
 	{ "direct_io", "list", "choices=[\"data\",\"log\"]", NULL},
 	{ "error_prefix", "string", NULL, NULL},
@@ -449,6 +466,9 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "session_max", "int", "min=1", NULL},
 	{ "shared_cache", "category", NULL,
 	     __wt_confchk_shared_cache_subconfigs},
+	{ "statistics", "boolean", NULL, NULL},
+	{ "statistics_log", "category", NULL,
+	     __wt_confchk_statistics_log_subconfigs},
 	{ "sync", "boolean", NULL, NULL},
 	{ "transactional", "boolean", NULL, NULL},
 	{ "use_environment_priv", "boolean", NULL, NULL},

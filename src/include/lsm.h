@@ -65,10 +65,9 @@ struct __wt_lsm_tree {
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
-	WT_DSRC_STATS *stats;		/* LSM statistics */
+	WT_DSRC_STATS stats;		/* LSM statistics */
 
 	uint64_t dsk_gen;
-	uint32_t *memsizep;
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;

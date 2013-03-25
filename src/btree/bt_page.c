@@ -7,11 +7,13 @@
 
 #include "wt_internal.h"
 
-static int  __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static void __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static void __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
-static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_row_leaf_entries(
+	WT_SESSION_IMPL *, WT_PAGE_HEADER *, uint32_t *);
 
 /*
  * __wt_page_in --
@@ -68,7 +70,8 @@ __wt_page_in_func(
 				break;
 
 			page = ref->page;
-			WT_ASSERT(session, !WT_PAGE_IS_ROOT(page));
+			WT_ASSERT(session,
+			    page != NULL && !WT_PAGE_IS_ROOT(page));
 
 			/*
 			 * Ensure the page doesn't have ancient updates on it.
@@ -79,7 +82,7 @@ __wt_page_in_func(
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				page->read_gen = 0;
+				page->read_gen = WT_READ_GEN_OLDEST;
 				WT_RET(__wt_hazard_clear(session, page));
 				WT_RET(__wt_evict_server_wake(session));
 				break;
@@ -91,7 +94,15 @@ __wt_page_in_func(
 				return (ret);
 			}
 
-			page->read_gen = __wt_cache_read_gen(session);
+			/*
+			 * If this page has ever been considered for eviction,
+			 * and its generation is aging, update it.
+			 */
+			if (page->read_gen != WT_READ_GEN_NOTSET &&
+			    page->read_gen < __wt_cache_read_gen(session))
+				page->read_gen =
+				    __wt_cache_read_gen_set(session);
+
 			return (0);
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -99,6 +110,74 @@ __wt_page_in_func(
 		/* We failed to get the page -- yield before retrying. */
 		__wt_yield();
 	}
+}
+
+/*
+ * __wt_page_alloc --
+ *	Create or read a page into the cache.
+ */
+int
+__wt_page_alloc(WT_SESSION_IMPL *session,
+    uint8_t type, uint32_t alloc_entries, WT_PAGE **pagep)
+{
+	WT_CACHE *cache;
+	WT_PAGE *page;
+	size_t size;
+	void *p;
+
+	*pagep = NULL;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * Allocate a page, and for most page types, the additional information
+	 * it needs to describe the disk image.
+	 */
+	size = sizeof(WT_PAGE);
+	switch (type) {
+	case WT_PAGE_COL_FIX:
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		size += alloc_entries * sizeof(WT_REF);
+		break;
+	case WT_PAGE_COL_VAR:
+		size += alloc_entries * sizeof(WT_COL);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		size += alloc_entries * sizeof(WT_ROW);
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	WT_RET(__wt_calloc(session, 1, size, &page));
+	p = (uint8_t *)page + sizeof(WT_PAGE);
+
+	switch (type) {
+	case WT_PAGE_COL_FIX:
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		page->u.intl.t = p;
+		break;
+	case WT_PAGE_COL_VAR:
+		page->u.col_var.d = p;
+		break;
+	case WT_PAGE_ROW_LEAF:
+		page->u.row.d = p;
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	/* Increment the cache statistics. */
+	__wt_cache_page_inmem_incr(session, page, size);
+	(void)WT_ATOMIC_ADD(cache->pages_inmem, 1);
+
+	/* The one page field we set is the type. */
+	page->type = type;
+
+	*pagep = page;
+	return (0);
 }
 
 /*
@@ -112,54 +191,100 @@ __wt_page_inmem(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	size_t inmem_size;
+	uint32_t alloc_entries;
+	size_t size;
 
-	WT_ASSERT_RET(session, dsk->u.entries > 0);
-
+	alloc_entries = 0;
 	*pagep = NULL;
 
 	/*
-	 * Allocate and initialize the WT_PAGE.
-	 * Set the LRU so the page is not immediately selected for eviction.
-	 * Set the read generation (which can't match a search where the write
-	 * generation wasn't set, that is, remained 0).
+	 * Figure out how many underlying objects the page references so
+	 * we can allocate them along with the page.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	page->parent = parent;
-	page->ref = parent_ref;
+	switch (dsk->type) {
+	case WT_PAGE_COL_FIX:
+		break;
+	case WT_PAGE_COL_INT:
+		/*
+		 * Column-store internal page entries map one-to-one to the
+		 * number of physical entries on the page (each physical entry
+		 * is an offset object).
+		 */
+		alloc_entries = dsk->u.entries;
+		break;
+	case WT_PAGE_COL_VAR:
+		/*
+		 * Column-store leaf page entries map one-to-one to the number
+		 * of physical entries on the page (each physical entry is a
+		 * data item).
+		 */
+		alloc_entries = dsk->u.entries;
+		break;
+	case WT_PAGE_ROW_INT:
+		/*
+		 * Row-store internal page entries map one-to-two to the number
+		 * of physical entries on the page (each in-memory entry is a
+		 * key item and location cookie).
+		 */
+		alloc_entries = dsk->u.entries / 2;
+		break;
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Row-store leaf page entries map in an indeterminate way to
+		 * the physical entries on the page, we have to walk the page
+		 * to figure it out.
+		 */
+		WT_RET(__inmem_row_leaf_entries(session, dsk, &alloc_entries));
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	/* Allocate and initialize a new WT_PAGE. */
+	WT_RET(__wt_page_alloc(session, dsk->type, alloc_entries, &page));
 	page->dsk = dsk;
-	page->read_gen = __wt_cache_read_gen(session);
-	page->type = dsk->type;
+	page->read_gen = WT_READ_GEN_NOTSET;
 	if (disk_not_alloc)
 		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);
 
-	inmem_size = sizeof(WT_PAGE);
-	if (!disk_not_alloc)
-		inmem_size += dsk->mem_size;
+	/*
+	 * Track the memory allocated to build this page so we can update the
+	 * cache statistics in a single call.
+	 */
+	size = disk_not_alloc ? 0 : dsk->mem_size;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
+		page->entries = dsk->u.entries;
 		page->u.col_fix.recno = dsk->recno;
-		WT_ERR(__inmem_col_fix(session, page));
+		__inmem_col_fix(session, page);
 		break;
 	case WT_PAGE_COL_INT:
+		page->entries = dsk->u.entries;
 		page->u.intl.recno = dsk->recno;
-		WT_ERR(__inmem_col_int(session, page, &inmem_size));
+		__inmem_col_int(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
+		page->entries = dsk->u.entries;
 		page->u.col_var.recno = dsk->recno;
-		WT_ERR(__inmem_col_var(session, page, &inmem_size));
+		WT_ERR(__inmem_col_var(session, page, &size));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__inmem_row_int(session, page, &inmem_size));
+		page->entries = dsk->u.entries / 2;
+		WT_ERR(__inmem_row_int(session, page, &size));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__inmem_row_leaf(session, page, &inmem_size));
+		page->entries = alloc_entries;
+		WT_ERR(__inmem_row_leaf(session, page));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	__wt_cache_page_read(session, page, inmem_size);
+	/* Update the page's in-memory size and the cache statistics. */
+	__wt_cache_page_inmem_incr(session, page, size);
+
+	/* Link the new page into the parent. */
+	if (parent_ref != NULL)
+		WT_LINK_PAGE(parent, parent_ref, page);
 
 	*pagep = page;
 	return (0);
@@ -172,7 +297,7 @@ err:	__wt_page_out(session, &page);
  * __inmem_col_fix --
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
-static int
+static void
 __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -182,16 +307,14 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	dsk = page->dsk;
 
 	page->u.col_fix.bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
-	page->entries = dsk->u.entries;
-	return (0);
 }
 
 /*
  * __inmem_col_int --
  *	Build in-memory index for column-store internal pages.
  */
-static int
-__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+static void
+__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -205,14 +328,6 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	unpack = &_unpack;
 
 	/*
-	 * Column-store page entries map one-to-one to the number of physical
-	 * entries on the page (each physical entry is a offset object).
-	 */
-	WT_RET(__wt_calloc_def(
-	    session, (size_t)dsk->u.entries, &page->u.intl.t));
-	*inmem_sizep += dsk->u.entries * sizeof(*page->u.intl.t);
-
-	/*
 	 * Walk the page, building references: the page contains value items.
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
@@ -223,9 +338,6 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		ref->u.recno = unpack->v;
 		++ref;
 	}
-
-	page->entries = dsk->u.entries;
-	return (0);
 }
 
 /*
@@ -234,7 +346,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
  *	column-store trees.
  */
 static int
-__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -254,20 +366,12 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	recno = page->u.col_var.recno;
 
 	/*
-	 * Column-store page entries map one-to-one to the number of physical
-	 * entries on the page (each physical entry is a data item).
-	 */
-	WT_RET(__wt_calloc_def(
-	    session, (size_t)dsk->u.entries, &page->u.col_var.d));
-	*inmem_sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
-
-	/*
 	 * Walk the page, building references: the page contains unsorted value
 	 * items.  The value items are on-page (WT_CELL_VALUE), overflow items
 	 * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
 	 */
-	cip = page->u.col_var.d;
 	indx = 0;
+	cip = page->u.col_var.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
@@ -292,11 +396,10 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		indx++;
 		recno += rle;
 	}
+	*sizep += bytes_allocated;
 
 	page->u.col_var.repeats = repeats;
 	page->u.col_var.nrepeats = nrepeats;
-	page->entries = dsk->u.entries;
-	*inmem_sizep += bytes_allocated;
 	return (0);
 }
 
@@ -305,7 +408,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
  *	Build in-memory index for row-store internal pages.
  */
 static int
-__inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -316,7 +419,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	WT_REF *ref;
-	uint32_t i, nindx, prefix;
+	uint32_t i, prefix;
 	void *huffman;
 
 	btree = S2BT(session);
@@ -326,22 +429,6 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
 	WT_ERR(__wt_scr_alloc(session, 0, &last));
-
-	/*
-	 * Internal row-store page entries map one-to-two to the number of
-	 * physical entries on the page (each in-memory entry is a key item
-	 * and location cookie).
-	 */
-	nindx = dsk->u.entries / 2;
-	WT_ERR((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
-	*inmem_sizep += nindx * sizeof(*page->u.intl.t);
-
-	/*
-	 * Set the number of elements now -- we're about to allocate memory,
-	 * and if we fail in the middle of the page, we want to discard that
-	 * memory properly.
-	 */
-	page->entries = nindx;
 
 	/*
 	 * Walk the page, instantiating keys: the page contains sorted key and
@@ -446,10 +533,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		 * for reconciliation, the row-store reconciliation function
 		 * depends on keys always be instantiated.
 		 */
-		WT_ERR(__wt_row_ikey_alloc(session,
+		WT_ERR(__wt_row_ikey(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
 		    current->data, current->size, &ref->u.key));
-		*inmem_sizep += sizeof(WT_IKEY) + current->size;
+		*sizep += sizeof(WT_IKEY) + current->size;
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new
@@ -468,21 +555,19 @@ err:	__wt_scr_free(&current);
 }
 
 /*
- * __inmem_row_leaf --
- *	Build in-memory index for row-store leaf pages.
+ * __inmem_row_leaf_entries --
+ *	Return the number of entries for row-store leaf pages.
  */
 static int
-__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_row_leaf_entries(
+    WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, uint32_t *nindxp)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_HEADER *dsk;
-	WT_ROW *rip;
 	uint32_t i, nindx;
 
 	btree = S2BT(session);
-	dsk = page->dsk;
 	unpack = &_unpack;
 
 	/*
@@ -519,10 +604,29 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->mem_size));
 
-	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
-	*inmem_sizep += nindx * sizeof(*page->u.row.d);
+	*nindxp = nindx;
+	return (0);
+}
 
-	/* Walk the page again, building indices. */
+/*
+ * __inmem_row_leaf --
+ *	Build in-memory index for row-store leaf pages.
+ */
+static int
+__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
+	WT_PAGE_HEADER *dsk;
+	WT_ROW *rip;
+	uint32_t i;
+
+	btree = S2BT(session);
+	dsk = page->dsk;
+	unpack = &_unpack;
+
+	/* Walk the page, building indices. */
 	rip = page->u.row.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
@@ -539,14 +643,12 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		}
 	}
 
-	page->entries = nindx;
-
 	/*
 	 * If the keys are Huffman encoded, instantiate some set of them.  It
 	 * doesn't matter if we are randomly searching the page or scanning a
 	 * cursor through it, there isn't a fast-path to getting keys off the
 	 * page.
 	 */
-	return (btree->huffman_key == NULL ?
-	    0 : __wt_row_leaf_keys(session, page));
+	return (
+	    btree->huffman_key == NULL ? 0 : __wt_row_leaf_keys(session, page));
 }

@@ -67,6 +67,16 @@ __bm_checkpoint(WT_BM *bm,
 }
 
 /*
+ * __bm_sync --
+ *	Flush a file to disk.
+ */
+static int
+__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+	return (__wt_fsync(session, bm->block->fh));
+}
+
+/*
  * __bm_checkpoint_load --
  *	Load a checkpoint point.
  */
@@ -86,17 +96,12 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 
 	if (checkpoint) {
 		/*
-		 * Read-only objects are mapped into memory instead of being
-		 * read into cache buffers.  Ignore errors, with no mapping
-		 * we'll read into the cache.
-		 *
-		 * Turn off mapping when verifying the file, because we can't
-		 * perform checksum validation of mapped segments, and verify
-		 * has to checksum pages.
+		 * Read-only objects are optionally mapped into memory instead
+		 * of being read into cache buffers.
 		 */
-		if (conn->mmap && !bm->block->verify)
-			(void)__wt_mmap(
-			    session, bm->block->fh, &bm->map, &bm->maplen);
+		if (conn->mmap)
+			WT_RET(__wt_block_map(
+			    session, bm->block, &bm->map, &bm->maplen));
 
 		/*
 		 * If this handle is for a checkpoint, that is, read-only, there
@@ -132,7 +137,7 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 	/* Unmap any mapped segment. */
 	if (bm->map != NULL)
 		WT_TRET(
-		    __wt_munmap(session, bm->block->fh, bm->map, bm->maplen));
+		    __wt_block_unmap(session, bm->block, bm->map, bm->maplen));
 
 	/* Unload the checkpoint. */
 	WT_TRET(__wt_block_checkpoint_unload(session, bm->block, !bm->is_live));
@@ -197,9 +202,9 @@ __bm_free(WT_BM *bm,
  *	Block-manager statistics.
  */
 static int
-__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 {
-	__wt_block_stat(session, bm->block);
+	__wt_block_stat(session, bm->block, stats);
 	return (0);
 }
 
@@ -333,6 +338,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->salvage_valid = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, uint8_t *, uint32_t))__bm_readonly;
 		bm->stat = __bm_stat;
+		bm->sync = (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->verify_addr = __bm_verify_addr;
 		bm->verify_end = __bm_verify_end;
 		bm->verify_start = __bm_verify_start;
@@ -358,6 +364,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->salvage_start = __bm_salvage_start;
 		bm->salvage_valid = __bm_salvage_valid;
 		bm->stat = __bm_stat;
+		bm->sync = __bm_sync;
 		bm->verify_addr = __bm_verify_addr;
 		bm->verify_end = __bm_verify_end;
 		bm->verify_start = __bm_verify_start;
@@ -371,8 +378,8 @@ __bm_method_set(WT_BM *bm, int readonly)
  *	Open a file.
  */
 int
-__wt_block_manager_open(WT_SESSION_IMPL *session, const char *filename,
-    const char *config, const char *cfg[], int forced_salvage, WT_BM **bmp)
+__wt_block_manager_open(WT_SESSION_IMPL *session,
+    const char *filename, const char *cfg[], int forced_salvage, WT_BM **bmp)
 {
 	WT_BM *bm;
 	WT_DECL_RET;
@@ -383,7 +390,7 @@ __wt_block_manager_open(WT_SESSION_IMPL *session, const char *filename,
 	__bm_method_set(bm, 0);
 
 	WT_ERR(__wt_block_open(
-	    session, filename, config, cfg, forced_salvage, &bm->block));
+	    session, filename, cfg, forced_salvage, &bm->block));
 
 	*bmp = bm;
 	return (0);

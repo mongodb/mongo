@@ -25,7 +25,7 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 
 	/* Delete the root address and truncate the file. */
 	WT_RET(__wt_meta_checkpoint_clear(session, name));
-	WT_RET(__wt_btree_truncate(session, filename));
+	WT_RET(__wt_block_manager_truncate(session, filename));
 
 	return (0);
 }
@@ -43,8 +43,8 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	const char *hname;
 	u_int i;
 
-	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
+	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
 	/* Truncate the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -78,6 +78,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	}
 
 err:	__wt_scr_free(&namebuf);
+	__wt_schema_release_table(session, table);
 	return (ret);
 }
 

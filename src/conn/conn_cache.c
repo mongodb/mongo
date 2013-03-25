@@ -32,7 +32,7 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL) &&
 	    (ret = __wt_config_gets(session, cfg,
-	    "shared_cache.reserved", &cval)) == 0)
+	    "shared_cache.reserve", &cval)) == 0 && cval.val != 0)
 		cache->cp_reserved = (uint64_t)cval.val;
 	else if ((ret = __wt_config_gets(session, cfg,
 	    "shared_cache.chunk", &cval)) == 0)
@@ -98,10 +98,10 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	__wt_spin_init(session, &cache->evict_walk_lock);
 
 	/*
-	 * We pull some values from the cache statistics (rather than have two
-	 * copies).  Set them.
+	 * We get/set some values in the cache statistics (rather than have
+	 * two copies), configure them.
 	 */
-	__wt_cache_stats_update(conn, 0);
+	__wt_cache_stats_update(session);
 	return (0);
 
 err:	WT_RET(__wt_cache_destroy(conn));
@@ -113,22 +113,25 @@ err:	WT_RET(__wt_cache_destroy(conn));
  *	Update the cache statistics for return to the application.
  */
 void
-__wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags)
+__wt_cache_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_STATS *stats;
 
-	WT_UNUSED(flags);
+	conn = S2C(session);
 	cache = conn->cache;
+	stats = &conn->stats;
 
-	WT_STAT_SET(conn->stats, cache_bytes_max, conn->cache_size);
-	WT_STAT_SET(
-	    conn->stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
-	WT_STAT_SET(
-	    conn->stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
-	WT_STAT_SET(
-	    conn->stats, cache_bytes_dirty, __wt_cache_bytes_dirty(cache));
-	WT_STAT_SET(
-	    conn->stats, cache_pages_dirty, __wt_cache_pages_dirty(cache));
+	/*
+	 * Some statistics are always set, regardless of the configuration of
+	 * run-time statistics in the system.
+	 */
+	WT_STAT_SET(stats, cache_bytes_max, conn->cache_size);
+	WT_STAT_SET(stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
+	WT_STAT_SET(stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(stats, cache_bytes_dirty, __wt_cache_bytes_dirty(cache));
+	WT_STAT_SET(stats, cache_pages_dirty, __wt_cache_pages_dirty(cache));
 }
 
 /*

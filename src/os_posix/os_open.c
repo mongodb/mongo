@@ -59,12 +59,13 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FH *fh;
 	mode_t mode;
-	int f, fd, matched;
+	int direct_io, f, fd, matched;
 	const char *path;
 
 	conn = S2C(session);
 	fh = NULL;
 	fd = -1;
+	direct_io = 0;
 
 	WT_VERBOSE_RET(session, fileops, "%s: open", name);
 
@@ -113,13 +114,18 @@ __wt_open(WT_SESSION_IMPL *session,
 		mode = 0;
 
 #ifdef O_DIRECT
-	if (is_tree && FLD_ISSET(conn->direct_io, WT_DIRECTIO_DATA))
+	if (is_tree && FLD_ISSET(conn->direct_io, WT_DIRECTIO_DATA)) {
 		f |= O_DIRECT;
+		direct_io = 1;
+	}
 #endif
 
 	WT_SYSCALL_RETRY(((fd = open(path, f, mode)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s", name);
+		WT_ERR_MSG(session, ret,
+		    direct_io ?
+		    "%s: open failed with direct I/O configured, some "
+		    "filesystem types do not support direct I/O" : "%s", name);
 
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
 	/*
@@ -146,6 +152,11 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->fd = fd;
 	fh->refcnt = 1;
+
+#ifdef O_DIRECT
+	if (f & O_DIRECT)
+		fh->direct_io = 1;
+#endif
 
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(session, fh, &fh->file_size));

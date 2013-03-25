@@ -376,7 +376,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * checksum and still be broken, but paranoia is healthy in
 		 * salvage.  Regardless, verify does return failure because
 		 * it detects failures we'd expect to see in a corrupted file,
-		 * like overflow references past the the end of the file or
+		 * like overflow references past the end of the file or
 		 * overflow references to non-existent pages, might as well
 		 * discard these pages now.
 		 */
@@ -1087,17 +1087,13 @@ __slvg_col_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
-	/* Allocate a column-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
-
-	/* Fill it in. */
+	/* Allocate a column-store root (internal) page and fill it in. */
+	WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT, leaf_cnt, &page));
 	page->parent = NULL;				/* Root page */
 	page->ref = NULL;
-	page->read_gen = 0;
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
-	page->type = WT_PAGE_COL_INT;
 	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
@@ -1665,16 +1661,12 @@ __slvg_row_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
-	/* Allocate a row-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
-
-	/* Fill it in. */
-	page->parent = NULL;				/* Root page */
+	/* Allocate a row-store root (internal) page and fill it in. */
+	WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, &page));
+	page->parent = NULL;
 	page->ref = NULL;
-	page->read_gen = 0;
+	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = leaf_cnt;
-	page->type = WT_PAGE_ROW_INT;
 	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
@@ -1706,9 +1698,8 @@ __slvg_row_build_internal(
 			WT_ERR(__slvg_row_build_leaf(
 			    session, trk, page, ref, ss));
 		} else
-			WT_ERR(__wt_row_ikey_alloc(session, 0,
-			    trk->row_start.data,
-			    trk->row_start.size,
+			WT_ERR(__wt_row_ikey_incr(session, page, 0,
+			    trk->row_start.data, trk->row_start.size,
 			    &ref->u.key));
 		++ref;
 	}
@@ -1814,13 +1805,10 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 			++skip_stop;
 		}
 
-	/*
-	 * I believe it's no longer possible for a salvaged page to be entirely
-	 * empty, that is, if we selected the page for salvage, there is at
-	 * least one cell on the page we want.  This is a change from previous
-	 * behavior, so I'm asserting it.
-	 */
-	WT_ASSERT_ERR(session, skip_start + skip_stop < page->entries);
+	/* We should have selected some entries, but not the entire page. */
+	WT_ASSERT(session,
+	    skip_start + skip_stop > 0 &&
+	    skip_start + skip_stop < page->entries);
 
 	/*
 	 * Take a copy of this page's first key to define the start of
@@ -1829,8 +1817,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 */
 	rip = page->u.row.d + skip_start;
 	WT_ERR(__wt_row_key(session, page, rip, key, 0));
-	WT_ERR(
-	    __wt_row_ikey_alloc(session, 0, key->data, key->size, &ref->u.key));
+	WT_ERR(__wt_row_ikey_incr(
+	    session, parent, 0, key->data, key->size, &ref->u.key));
 
 	/*
 	 * Discard backing overflow pages for any items being discarded that

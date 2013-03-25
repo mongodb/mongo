@@ -30,30 +30,59 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t
 	fi
+
 	if egrep '%l[diouxXn]|%[diouxXn]l' $f > $t; then
 		echo "$f: incorrect or dangerous printf format: %l[diouxXn]"
 		cat $t
 	fi
+
 	if grep "(unsigned)" $f > $t; then
 		echo "$f: (unsigned) cast is wrong"
 		cat $t
 	fi
+
 	egrep 'u_quad' $f | sed '/@u_quad_decl@/d' > $t
 	test -s $t && {
 		echo "$f: old-style type declaration: u_XXX_t or u_quad"
 		cat $t
 	}
 
-	# Direct calls to strtouq, not __wt_strtouq
-	if ! expr "$f" : '.*/os_strtouq.c' > /dev/null; then
-		egrep strtouq $f | egrep -v __wt_strtouq | \
-		egrep -v '^[[:space:]].*\*' > $t
-		test -s $t && {
-			echo "$f: explicit call to strtouq"
-			cat $t
-		}
+	# Common typos (Wikipedia's list).
+	egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' $f > $t
+	test -s $t && {
+		echo "$f: paired typo"
+		cat $t
+	}
+
+	# Direct calls to functions we're not supposed to use in the library.
+	# We don't check for all of them, just a few of the common ones.
+	if ! expr "$f" : 'examples/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/.*' > /dev/null &&
+	   ! expr "$f" : 'test/.*' > /dev/null &&
+	   ! expr "$f" : '.*/utilities/.*' > /dev/null; then
+		if ! expr "$f" : '.*/os_alloc.c' > /dev/null &&
+		     egrep '[[:space:]]free[(]|[[:space:]]strdup[(]|[[:space:]]strndup[(]|[[:space:]]malloc[(]|[[:space:]]calloc[(]|[[:space:]]realloc[(]' $f > $t; then
+			test -s $t && {
+				echo "$f: call to illegal function"
+				cat $t
+			}
+		fi
+		if ! expr "$f" : '.*/os_strtouq.c' > /dev/null &&
+		     egrep '[[:space:]]strtouq[(]' $f > $t; then
+			test -s $t && {
+				echo "$f: call to illegal function"
+				cat $t
+			}
+		fi
+		if egrep '[[:space:]]exit[(]' $f > $t; then
+			test -s $t && {
+				echo "$f: call to illegal function"
+				cat $t
+			}
+		fi
 	fi
 
+	# Declaration of an integer return variable.
 	if ! expr "$f" : 'examples/.*' > /dev/null &&
 	   ! expr "$f" : 'test/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/.*' > /dev/null; then
@@ -71,13 +100,9 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		egrep 'return|WT_RET' | \
 		sed -e "s,^,$f:," -e 's/$/ [return skips API_END call]/'
 
-	# Bad code we can't easily fix
-	grep -Hn 'bzero|exit[ ]*\(1\)|^[	 ]+[|&=+-]' $f
-
 	tr -cd '[:alnum:][:space:][:punct:]' < $f |
 	unexpand |
 	sed -e 's/){/) {/' \
-	    -e 's/\([	 ]\)exit (/\1exit(/g' \
 	    -e 's/\([	 ]\)for(/\1for (/' \
 	    -e 's/\([	 ]\)if(/\1if (/' \
 	    -e 's/\([	 ]\)index(/\1strchr(/' \

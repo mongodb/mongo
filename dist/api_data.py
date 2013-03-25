@@ -60,12 +60,17 @@ column_meta = [
 
 source_meta = [
 	Config('source', '', r'''
-		override the default data source URI derived from the object
-		name'''),
+		set a custom data source URI for a column group, index or simple
+		table.  By default, the data source URI is derived from the \c
+		type and the column group or index name.  Applications can
+		create tables from existing data sources by supplying a \c
+		source configuration'''),
 	Config('type', 'file', r'''
-		set the data source type.  This setting overrides the URI
-		prefix for the data source, if no \c source configuration
-		setting is provided''',
+		set the type of data source used to store a column group, index
+		or simple table.  By default, a \c "file:" URI is derived from
+		the object name.  The \c type configuration can be used to
+		switch to a different storage format, such as LSM.  Ignored if
+		an explicit URI is supplied with a \c source configuration''',
 		choices=['file', 'lsm']),
 ]
 
@@ -122,7 +127,7 @@ lsm_config = [
 ]
 
 # Per-file configuration
-file_config = format_meta + lsm_config + [
+file_config = format_meta + [
 	Config('allocation_size', '512B', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
@@ -214,6 +219,17 @@ file_config = format_meta + lsm_config + [
 		soft - it is possible for pages to be temporarily larger than
 		this value''',
 		min='512B', max='10TB'),
+	Config('os_cache_max', '0', r'''
+		maximum system buffer cache usage, in bytes.  If non-zero, evict
+		object blocks from the system buffer cache after that many bytes
+		from this object are read or written into the buffer cache''',
+		min=0),
+	Config('os_cache_dirty_max', '0', r'''
+		maximum dirty system buffer cache usage, in bytes.  If non-zero,
+		schedule writes for dirty blocks belonging to this object in the
+		system buffer cache after that many bytes from this object are
+		written into the buffer cache''',
+		min=0),
 	Config('prefix_compression', 'true', r'''
 		configure row-store format key prefix compression''',
 		type='boolean'),
@@ -262,8 +278,8 @@ connection_runtime_config = [
 		Config('reserve', '0', r'''
 			amount of cache this database is guaranteed to have available
 			from the shared cache. This setting is per database. Defaults
-			to the chunk size'''),
-		Config('name', '', r'''
+			to the chunk size''', type='int'),
+		Config('name', 'pool', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''
 			maximum memory to allocate for the shared cache. Setting this
@@ -289,6 +305,9 @@ connection_runtime_config = [
 		trigger eviction when the cache becomes this full (as a
 		percentage)''',
 		min=10, max=99),
+	Config('statistics', 'false', r'''
+		Maintain database statistics that may impact performance''',
+		type='boolean'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -337,7 +356,7 @@ methods = {
 		min='10', max='50'),
 ]),
 
-'session.create' : Method(table_only_meta + file_config + source_meta + [
+'session.create' : Method(table_only_meta + file_config + lsm_config + source_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
 		object exists, check that its settings match the specified
@@ -359,18 +378,19 @@ methods = {
 		number key; valid only for cursors with record number keys''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
-		configure the cursor for bulk loads, a fast, initial load
-		path.  Bulk load may only be used for newly created objects,
-		and in the case of row-store objects, key/value items must
-		be loaded in sorted order.  Cursors configured for bulk load
-		only support the WT_CURSOR::insert and WT_CURSOR::close
-		methods.  The value is usually a true/false flag, but the the
-		special value \c "bitmap" is for use with fixed-length column
-		stores, and allows chunks of a memory resident bitmap to be
-		loaded directly into a file by passing a \c WT_ITEM to
-		WT_CURSOR::set_value where the \c size field indicates the
-		number of records in the bitmap (as specified by the file's
-		\c value_format). Bulk load bitmap values must end on a byte
+		configure the cursor for bulk-loading, a fast, initial load
+		path (see @ref bulk_load for more information).  Bulk-load
+		may only be used for newly created objects and cursors
+		configured for bulk-load only support the WT_CURSOR::insert
+		and WT_CURSOR::close methods.  When bulk-loading row-store
+		objects, keys must be loaded in sorted order.  The value is
+		usually a true/false flag; when bulk-loading fixed-length
+		column store objects, the special value \c bitmap allows
+		chunks of a memory resident bitmap to be loaded directly into
+		a file by passing a \c WT_ITEM to WT_CURSOR::set_value where
+		the \c size field indicates the number of records in the
+		bitmap (as specified by the object's \c value_format
+		configuration). Bulk-loaded bitmap values must end on a byte
 		boundary relative to the bit count (except for the last set
 		of values loaded)'''),
 	Config('checkpoint', '', r'''
@@ -499,10 +519,21 @@ methods = {
 
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
-		in-memory alignment (in bytes) for buffers used for I/O.  The default
-		value of -1 indicates that a platform-specific alignment value should
-		be used (512 bytes on Linux systems, zero elsewhere)''',
+		in-memory alignment (in bytes) for buffers used for I/O.  The
+		default value of -1 indicates that a platform-specific
+		alignment value should be used (512 bytes on Linux systems,
+		zero elsewhere)''',
 		min='-1', max='1MB'),
+	Config('checkpoint', '', r'''
+		periodically checkpoint the database''',
+		type='category', subconfig=[
+		Config('name', '"WiredTigerCheckpoint"', r'''
+		the checkpoint name'''),
+		Config('wait', '0', r'''
+		seconds to wait between each checkpoint; setting this value
+		configures periodic checkpoints''',
+		min='1', max='100000'),
+		]),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),
@@ -539,6 +570,33 @@ methods = {
 		maximum expected number of sessions (including server
 		threads)''',
 		min='1'),
+	Config('statistics_log', '', r'''
+		log database connection statistics into a file when the
+		\c statistics configuration value is set to true.  See
+		@ref statistics_log for more information''',
+		type='category', subconfig=[
+		Config('clear', 'true', r'''
+		reset statistics counters after each set of log records are
+		written''', type='boolean'),
+		Config('path', '"WiredTigerStat.%H"', r'''
+		the pathname to a file into which the log records are written,
+		may contain strftime conversion specifications.  If the value
+		is not an absolute path name, the file is created relative to
+		the database home'''),
+		Config('sources', '', r'''
+		if non-empty, include statistics for the list of data source
+		URIs.  No statistics that require traversing a tree are
+		reported, as if the \c statistics_fast configuration string
+		were set''',
+		type='list'),
+		Config('timestamp', '"%b %d %H:%M:%S"', r'''
+		a timestamp prepended to each log record, may contain strftime
+		conversion specifications'''),
+		Config('wait', '0', r'''
+		seconds to wait between each write of the log records; setting
+		this value configures \c statistics and statistics logging''',
+		min='5', max='100000'),
+		]),
 	Config('sync', 'true', r'''
 		flush files to stable storage when closing or writing
 		checkpoints''',

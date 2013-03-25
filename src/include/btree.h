@@ -9,12 +9,9 @@
 #define	WT_BTREE_MINOR_VERSION	0
 
 /*
- * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
- * (The maximum of 512MB is enforced by the software, it could be set as high
- * as 4GB.)
+ * The maximum btree leaf and internal page size is 512MB. (The maximum of
+ * 512MB is enforced by the software, it could be set as high as 4GB.)
  */
-#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
-#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 
 /*
@@ -40,13 +37,6 @@
 #define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
 
 /*
- * Split page size calculation -- we don't want to repeatedly split every time
- * a new entry is added, so we split to a smaller-than-maximum page size.
- */
-#define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN32(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
-
-/*
  * XXX
  * The server threads use their own WT_SESSION_IMPL handles because they may
  * want to block (for example, the eviction server calls reconciliation, and
@@ -70,12 +60,12 @@ struct __wt_data_handle {
 
 	const char *name;		/* Object name as a URI */
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
-	const char *config;		/* Configuration string */
+	const char **cfg;		/* Configuration information */
 
 	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */
 	void *handle;			/* Generic handle */
 
-	WT_DSRC_STATS *stats;		/* Data source statistics */
+	WT_DSRC_STATS stats;		/* Data-source statistics */
 
 	/* Flags values over 0xff are reserved for WT_BTREE_* */
 #define	WT_DHANDLE_DISCARD	        0x01	/* Discard on release */

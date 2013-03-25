@@ -49,6 +49,7 @@ struct __wt_txn_state {
 
 struct __wt_txn_global {
 	volatile wt_txnid_t current;	/* Current transaction ID. */
+	volatile uint32_t gen;		/* Completed transaction generation */
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
 
@@ -79,6 +80,10 @@ struct __wt_txn {
 	 */
 	wt_txnid_t oldest_snap_min;
 
+	/* Saved global state, to avoid repeating scans. */
+	wt_txnid_t last_id, last_oldest_id;
+	uint32_t last_gen, last_oldest_gen;
+
 	/*
 	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
 	 * modified by this transaction.
@@ -90,12 +95,6 @@ struct __wt_txn {
 	WT_REF	      **modref;
 	size_t		modref_alloc;
 	u_int		modref_count;
-
-	/*
-	 * Count of unsuccessful eviction attempts, used to abort if the cache
-	 * is full and no progress can be made.
-	 */
-	u_int		eviction_fails;
 
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02

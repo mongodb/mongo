@@ -57,21 +57,21 @@ The following are some of the common builtin cursor types:
   @hrow{URI, Type, Notes}
    @row{<tt>backup:</tt>,
 hot backup cursor, See also: @ref hot_backup}
-   @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
+   @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
 column group cursor,}
    @row{<tt>config:[\<uri\>]</tt>,
 object configuration cursor, (key=config string\,
 value=config value)}
-  @row{<tt>file:\<filename\></tt>,
+  @row{<tt>file:\<file name\></tt>,
 file cursor (key=file key\, value=file value),}
-  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+  @row{<tt>index:\<table name\>:\<index name\></tt>,
 index cursor (key=index key\, value=table value),}
   @row{<tt>lsm:\<name\></tt>,
 LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
-  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
+  @row{<tt>statistics:[\<data source URI\>]</tt>,
 database or file statistics (key=(int)\,
 value=(string)description\, (string)value\, (uint64_t)value),}
-  @row{<tt>table:\<tablename\></tt>,
+  @row{<tt>table:\<table name\></tt>,
 table cursor (key=table key\, value=table value),}
 </table>
 

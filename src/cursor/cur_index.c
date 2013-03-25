@@ -292,6 +292,9 @@ __curindex_close(WT_CURSOR *cursor)
 
 	if (cindex->child != NULL)
 		WT_TRET(cindex->child->close(cindex->child));
+
+	if (cindex->table != NULL)
+		__wt_schema_release_table(session, cindex->table);
 	/* The URI is owned by the index. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
@@ -408,7 +411,10 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	 * using only the primary's recno as the index key.  Disallow that for
 	 * now.
 	 */
-	WT_ASSERT(session, !WT_CURSOR_RECNO(cursor));
+	if (WT_CURSOR_RECNO(cursor))
+		WT_ERR_MSG(session, WT_ERROR,
+		    "Column store indexes based on a record number primary "
+		    "key are not supported.");
 
 	/* Handle projections. */
 	if (columns != NULL) {

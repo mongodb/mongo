@@ -37,8 +37,6 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (lsm_tree->rwlock != NULL)
 		WT_TRET(__wt_rwlock_destroy(session, &lsm_tree->rwlock));
 
-	__wt_free(session, lsm_tree->stats);
-
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		if ((chunk = lsm_tree->chunk[i]) == NULL)
 			continue;
@@ -296,6 +294,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
+	const char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
 	if ((ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree)) == 0) {
@@ -304,9 +303,15 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	/* If the tree has metadata, it already exists. */
-	if (__wt_metadata_read(session, uri, &config) == 0) {
-		__wt_free(session, config);
+	/*
+	 * If the tree has metadata, it already exists.
+	 *
+	 * !!!
+	 * Use a local variable: we don't care what the existing configuration
+	 * is, but we don't want to overwrite the real config.
+	 */
+	if (__wt_metadata_read(session, uri, &tmpconfig) == 0) {
+		__wt_free(session, tmpconfig);
 		return (exclusive ? EEXIST : 0);
 	}
 	WT_RET_NOTFOUND_OK(ret);
@@ -447,7 +452,7 @@ __lsm_tree_open(
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
-	WT_ERR(__wt_stat_alloc_dsrc_stats(session, &lsm_tree->stats));
+	__wt_stat_init_dsrc_stats(&lsm_tree->stats);
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
@@ -528,11 +533,7 @@ __wt_lsm_tree_switch(
 	uint32_t new_id;
 
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
-
-	WT_VERBOSE_RET(session, lsm,
-	    "Tree switch to: %d because %d > %d", new_id,
-	    (lsm_tree->memsizep == NULL ? 0 : (int)*lsm_tree->memsizep),
-	    (int)lsm_tree->chunk_size);
+	WT_VERBOSE_RET(session, lsm, "Tree switch to: %d", new_id);
 
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
 	    lsm_tree->chunk_alloc)
@@ -549,8 +550,6 @@ __wt_lsm_tree_switch(
 
 	++lsm_tree->dsk_gen;
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
-
-	lsm_tree->memsizep = NULL;
 
 err:	/* TODO: mark lsm_tree bad on error(?) */
 	return (ret);

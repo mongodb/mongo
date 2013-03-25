@@ -38,9 +38,15 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		WT_ASSERT(session, ref == NULL ||
 		    ref->u.recno == page->u.intl.recno);
 
+		/* Fast path appends. */
+		base = page->entries;
+		ref = &page->u.intl.t[base - 1];
+		if (recno >= ref->u.recno)
+			goto descend;
+
 		/* Binary search of internal pages. */
-		for (base = 0,
-		    limit = page->entries; limit != 0; limit >>= 1) {
+		for (base = 0, ref = NULL,
+		    limit = page->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			ref = page->u.intl.t + indx;
 
@@ -51,7 +57,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			base = indx + 1;
 			--limit;
 		}
-		WT_ASSERT(session, ref != NULL);
+
+descend:	WT_ASSERT(session, ref != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.

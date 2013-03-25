@@ -45,7 +45,7 @@ To rebuild from scratch, discard any previous configuration by cleaning
 out the build area:
 
 @code
-make realclean
+make distclean
 @endcode
 
 To see additional configuration options, run:
