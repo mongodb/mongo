@@ -78,7 +78,6 @@ wts_open(void)
 	    "create,cache_size=%" PRIu32 "MB,"
 	    "error_prefix=\"%s\","
 	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s,"
-	    "statistics=true,statistics_log=(sources=(\"%s\"),wait=5),"
 	    "sync=false,",
 	    g.c_cache,
 	    g.progname,
@@ -89,8 +88,7 @@ wts_open(void)
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
-	    g.config_open == NULL ? "" : g.config_open,
-	    g.uri);
+	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret =
 	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
