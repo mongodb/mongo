@@ -1113,12 +1113,20 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
-	/*! [Statistics logging with objects] */
+	/*! [Statistics logging with a table] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "statistics_log=(sources=(\"table:table1\",\"table:table2\"))",
 	    &conn);
-	/*! [Statistics logging with objects] */
+	/*! [Statistics logging with a table] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Statistics logging with all tables] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,statistics_log=(sources=(\"table:\"))",
+	    &conn);
+	/*! [Statistics logging with all tables] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
