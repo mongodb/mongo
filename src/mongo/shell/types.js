@@ -620,7 +620,11 @@ tojsonObject = function(x, indent, nolint){
     var num = 1;
     for (var k in keys){
         var val = x[k];
-        if (val == DB.prototype || val == DBCollection.prototype)
+
+        // skip internal DB types to avoid issues with interceptors
+        if (typeof DB != 'undefined' && val == DB.prototype)
+            continue;
+        if (typeof DBCollection != 'undefined' && val == DBCollection.prototype)
             continue;
 
         s += indent + "\"" + k + "\" : " + tojson(val, indent, nolint);
