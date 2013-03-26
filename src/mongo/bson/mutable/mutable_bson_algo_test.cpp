@@ -18,6 +18,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/platform/basic.h"
 #include "mongo/unittest/unittest.h"
 
@@ -202,6 +203,59 @@ namespace {
         Element threeChildren = findFirstChildNamed(doc().root(), "threeChildren");
         ASSERT_TRUE(threeChildren.ok());
         ASSERT_EQUALS(countChildren(threeChildren), 3u);
+    }
+
+    TEST_F(ManyChildrenTest, getNthSibling) {
+        const Element leftChild = doc().root().leftChild();
+        ASSERT_TRUE(leftChild.ok());
+        const Element rightChild = doc().root().rightChild();
+        ASSERT_TRUE(rightChild.ok());
+
+        // Check that moving zero is a no-op
+        Element zeroAway = getNthSibling(leftChild, 0);
+        ASSERT_TRUE(zeroAway.ok());
+        ASSERT_EQUALS(leftChild, zeroAway);
+        zeroAway = getNthSibling(rightChild, 0);
+        ASSERT_TRUE(zeroAway.ok());
+        ASSERT_EQUALS(rightChild, zeroAway);
+
+        // Check that moving left of leftmost gets a not-ok element.
+        Element badLeft = getNthSibling(leftChild, -1);
+        ASSERT_FALSE(badLeft.ok());
+
+        // Check that moving right of rightmost gets a non-ok element.
+        Element badRight = getNthSibling(rightChild, 1);
+        ASSERT_FALSE(badRight.ok());
+
+        // Check that the moving one right from leftmost gets us the expected element.
+        Element target = leftChild.rightSibling();
+        ASSERT_TRUE(target.ok());
+        Element query = getNthSibling(leftChild, 1);
+        ASSERT_TRUE(target.ok());
+        ASSERT_EQUALS(target, query);
+
+        // And the same from the other side
+        target = rightChild.leftSibling();
+        ASSERT_TRUE(target.ok());
+        query = getNthSibling(rightChild, -1);
+        ASSERT_TRUE(target.ok());
+        ASSERT_EQUALS(target, query);
+
+        // Ensure that walking more chidren than we have gets us past the end
+        const int children = countChildren(doc().root());
+        query = getNthSibling(leftChild, children);
+        ASSERT_FALSE(query.ok());
+        query = getNthSibling(rightChild, -children);
+        ASSERT_FALSE(query.ok());
+
+        // Ensure that walking all the children in either direction gets
+        // us to the other right/left child.
+        query = getNthSibling(leftChild, children - 1);
+        ASSERT_TRUE(query.ok());
+        ASSERT_EQUALS(rightChild, query);
+        query = getNthSibling(rightChild, -(children - 1));
+        ASSERT_TRUE(query.ok());
+        ASSERT_EQUALS(leftChild, query);
     }
 
 } // namespace

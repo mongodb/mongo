@@ -20,37 +20,12 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/timer.h"
 
 #include "mongo/client/dbclientinterface.h"
-
-namespace mongo {
-namespace mutablebson {
-
-    // TODO: Move to a utility or testing utility header.
-    std::ostream& operator<<(std::ostream& stream, const ConstElement& elt) {
-        stream << "Element("<< static_cast<const void*>(&elt.getDocument()) << ", ";
-        if (elt.ok())
-            stream << elt.getIdx();
-        else
-            stream << "kInvalidIndex";
-        stream << ")";
-
-        if (elt.ok()) {
-            stream << " of type '" << typeName(elt.getType()) << "'";
-            if (elt.hasValue())
-                stream << " with accessible value '" << elt.getValue() << "'";
-            else
-                stream << " with no accessible value";
-        }
-
-        return stream;
-    }
-
-} // namespace mutablebson
-} // namespace mongo
 
 namespace {
 

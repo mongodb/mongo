@@ -131,8 +131,8 @@ namespace mutablebson {
     template<typename ElementType>
     ElementType getNthSibling(ElementType element, int n) {
         return (n < 0) ?
-            advanceToNthLeftSibling(element, n) :
-            advanceToNthRightSibling(element, n);
+            getNthLeftSibling(element, -n) :
+            getNthRightSibling(element, n);
     }
 
     /** Get the child that is 'n' Elements to the right of 'element's left child. */
