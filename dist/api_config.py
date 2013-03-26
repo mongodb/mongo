@@ -13,6 +13,7 @@ tmp_file = '__tmp'
 f='../src/include/wiredtiger.in'
 tfile = open(tmp_file, 'w')
 
+whitespace_re = re.compile(r'\s+')
 cbegin_re = re.compile(r'(\s*\*\s*)@config(?:empty|start)\{(.*?),.*\}')
 
 def gettype(c):
@@ -55,7 +56,7 @@ def typedesc(c):
 
 def parseconfig(c, name_indent=''):
     ctype = gettype(c)
-    desc = textwrap.dedent(c.desc) + '.'
+    desc = whitespace_re.sub(' ', c.desc.strip()) + '.'
     desc = desc.replace(',', '\\,')
     default = '\\c ' + str(c.default) if c.default or ctype == 'int' \
             else 'empty'
@@ -68,11 +69,11 @@ def parseconfig(c, name_indent=''):
         name += ' = ('
     tdesc += '.'
     tdesc = tdesc.replace(',', '\\,')
-    output = '@config{' + ','.join((name, desc, tdesc)) + '}'
+    output = '@config{' + ', '.join((name, desc, tdesc)) + '}\n'
     if ctype == 'category':
         for subc in c.subconfig:
             output += parseconfig(subc, name_indent + ('&nbsp;' * 4))
-        output += '@config{ ),,}'
+        output += '@config{ ),,}\n'
     return output
 
 def getconfcheck(c):
@@ -120,7 +121,9 @@ for line in open(f, 'r'):
             ', see dist/api_data.py}\n')
 
     w = textwrap.TextWrapper(width=80-len(prefix.expandtabs()),
-            break_on_hyphens=False)
+            break_on_hyphens=False,
+			replace_whitespace=False,
+			fix_sentence_endings=True)
     lastname = None
     for c in sorted(api_data.methods[config_name].config):
         name = c.name
@@ -137,7 +140,7 @@ for line in open(f, 'r'):
             continue
         output = parseconfig(c)
         for l in w.wrap(output):
-            tfile.write(prefix + l + '\n')
+            tfile.write(prefix + l.replace('\n', '\n' + prefix) + '\n')
 
     tfile.write(prefix + '@configend\n')
 
@@ -166,15 +169,11 @@ def checkstr(c):
     cmin = str(checks.get('min', ''))
     cmax = str(checks.get('max', ''))
     choices = checks.get('choices', [])
-    subconfig = checks.get('subconfig', [])
     result = []
     if cmin:
         result.append('min=' + cmin)
     if cmax:
         result.append('max=' + cmax)
-    if subconfig:
-        result.append('subconfig=' + '[' +
-            ','.join('\\"' + parseconfig(c) + '\\"' for c in subconfig) + ']')
     if choices:
         result.append('choices=' + '[' +
             ','.join('\\"' + s + '\\"' for s in choices) + ']')

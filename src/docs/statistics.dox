@@ -27,11 +27,18 @@ The timestamp format may be changed with the \c statistics_log.timestamp
 configuration string.  The \c timestamp value may contain ISO C90 standard
 strftime conversion specifications.
 
-By default, only the system's connection statistics are logged, but
-statistics may be optionally reported for underlying objects by adding
-a list of URIs to the \c statistics_log configuration string:
+By default, only the database statistics are logged.
 
-@snippet ex_all.c Statistics logging with objects
+Statistics for specific underlying data sources may be included by adding
+a list of data source URIs to the \c statistics_log configuration string:
+
+@snippet ex_all.c Statistics logging with a table
+
+Statistics for all underlying data sources of a particular type may be
+included by adding a partial data source URI to the \c statistics_log
+configuration string:
+
+@snippet ex_all.c Statistics logging with all tables
 
 When database statistics are logged, the database home will be the first
 space-separated entry for each record in the log file.  For example:
@@ -45,8 +52,9 @@ Mar 08 11:38:23 1 /database/home total heap memory re-allocations
 Mar 08 11:38:23 472 /database/home total read I/Os
 @endcode
 
-When object statistics are logged, the object URI will be the first
-space-separated entry for each record in the log file.  For example:
+When data source statistics are logged, the data source's URI will be
+the first space-separated entry for each record in the log file.  For
+example:
 
 @code
 Mar 20 10:42:36 21 table:mytable compressed pages written
@@ -55,6 +63,11 @@ Mar 20 10:42:36 5 table:mytable page written was too small to compress
 Mar 20 10:42:36 586 table:mytable cursor insert calls
 Mar 20 10:42:36 0 table:mytable bulk-loaded cursor-insert calls
 @endcode
+
+No statistics are logged for any data source for which a handle is not
+currently open in the database, nor will any statistics requiring the
+traversal of a tree (as if the \c statistics_fast configuration string
+were set).
 
 The location of the log files may be changed with the \c statistics_log.path
 configuration string.  The \c path value value may contain ISO C90 standard

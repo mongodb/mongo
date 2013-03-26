@@ -588,9 +588,12 @@ methods = {
 		the database home'''),
 		Config('sources', '', r'''
 		if non-empty, include statistics for the list of data source
-		URIs.  No statistics that require traversing a tree are
-		reported, as if the \c statistics_fast configuration string
-		were set''',
+		URIs, if they are open at the time of the statistics logging.
+		The list may include URIs matching a single data source
+		("table:mytable"), or a URI matching all data sources of a
+		particular type ("table:").  No statistics that require the 
+		traversal of a tree are reported, as if the \c statistics_fast
+		configuration string were set''',
 		type='list'),
 		Config('timestamp', '"%b %d %H:%M:%S"', r'''
 		a timestamp prepended to each log record, may contain strftime

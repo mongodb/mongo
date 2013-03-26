@@ -18,7 +18,7 @@ $WIREDTIGER_VERSION_STRING
 
 This is version $WIREDTIGER_VERSION_MAJOR.$WIREDTIGER_VERSION_MINOR.$WIREDTIGER_VERSION_PATCH of WiredTiger.
 
-WiredTiger documentation can be found at:
+WiredTiger release packages and documentation can be found at:
 
 	http://source.wiredtiger.com/
 

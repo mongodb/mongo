@@ -29,7 +29,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
 }
 
 /*
- * __wt_statlog_config --
+ * __statlog__config --
  *	Parse and setup the statistics server options.
  */
 static int
@@ -66,31 +66,12 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		;
 	WT_RET_NOTFOUND_OK(ret);
 	if (cnt != 0) {
-		WT_RET(
-		    __wt_calloc_def(session, cnt * 2 + 1, &conn->stat_sources));
+		WT_RET(__wt_calloc_def(session, cnt + 1, &conn->stat_sources));
 		WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 		for (cnt = 0;
-		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0;) {
-			/*
-			 * We close and re-open each statistics cursor each time
-			 * we dump statistics (the object may or may not exist
-			 * underneath at any point, and I don't want this code
-			 * to break if/when the lifetime of an underlying object
-			 * changes).  Create pairs of strings: the first is the
-			 * object uri, written into the output, the second is
-			 * the enhanced uri used to open the statistics cursor.
-			 */
+		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
 			WT_RET(__wt_strndup(session,
 			    k.str, k.len, &conn->stat_sources[cnt]));
-			++cnt;
-
-			WT_RET(__wt_calloc_def(session,
-			    strlen("statistics:") + k.len + 1,
-			    &conn->stat_sources[cnt]));
-			strcpy(conn->stat_sources[cnt], "statistics:");
-			strncat(conn->stat_sources[cnt], k.str, k.len);
-			++cnt;
-		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
 
@@ -99,28 +80,48 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.timestamp", &cval));
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->stat_stamp));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->stat_format));
 
 	return (0);
 }
 
 /*
- * __stat_server_dump --
- *	Dump a single set of statistics.
+ * __statlog_dump --
+ *	Dump out the connection statistics.
  */
 static int
-__stat_server_dump(WT_SESSION_IMPL *session,
-    const char *name, const char *cursor_uri, const char *stamp, FILE *fp)
+__statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	uint64_t value;
-	const char *config, *desc, *pdesc;
+	const char *config, *desc, *pdesc, *uri;
 
+	conn = S2C(session);
+
+	/* Build the statistics cursor URI. */
+	if (conn_stats)
+		uri = "statistics:";
+	else {
+		WT_RET(__wt_scr_alloc(
+		    session, strlen("statistics:") + strlen(name) + 5, &tmp));
+		(void)strcpy(tmp->mem, "statistics:");
+		(void)strcat(tmp->mem, name);
+		uri = tmp->mem;
+	}
+
+	/*
+	 * Open the statistics cursor; immediately free any temporary buffer,
+	 * it makes error handling easier.
+	 */
 	wt_session = (WT_SESSION *)session;
 	config = S2C(session)->stat_clear ?
 	    "statistics_clear,statistics_fast" : "statistics_fast";
+	ret = wt_session->open_cursor(wt_session, uri, NULL, config, &cursor);
+	__wt_scr_free(&tmp);
 
 	/*
 	 * If we don't find an underlying object, silently ignore it, the object
@@ -128,17 +129,15 @@ __stat_server_dump(WT_SESSION_IMPL *session,
 	 * of WT_NOTFOUND for missing files, check both, as well as for EBUSY if
 	 * the handle is exclusively locked at the moment.
 	 */
-	ret = wt_session->open_cursor(
-	    wt_session, cursor_uri, NULL, config, &cursor);
 	if (ret == EBUSY || ret == ENOENT || ret == WT_NOTFOUND)
 		return (0);
 	WT_RET(ret);
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pdesc, &value)) == 0)
-		WT_ERR_TEST((fprintf(fp,
+		WT_ERR_TEST((fprintf(conn->stat_fp,
 		    "%s %" PRIu64 " %s %s\n",
-		    stamp, value, name, desc) < 0), __wt_errno());
+		    conn->stat_stamp, value, name, desc) < 0), __wt_errno());
 	WT_ERR_NOTFOUND_OK(ret);
 
 err:	WT_TRET(cursor->close(cursor));
@@ -147,20 +146,40 @@ err:	WT_TRET(cursor->close(cursor));
 }
 
 /*
- * __stat_server --
+ * __statlog_apply --
+ *	Review a single open handle and dump statistics on demand.
+ */
+static int
+__statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_BTREE *btree;
+	char **p;
+
+	WT_UNUSED(cfg);
+
+	btree = session->btree;
+
+	/* Check for a match on the set of sources. */
+	for (p = S2C(session)->stat_sources; *p != NULL; ++p)
+		if (WT_PREFIX_MATCH(btree->name, *p))
+			return (__statlog_dump(session, btree->name, 0));
+	return (0);
+}
+
+/*
+ * __statlog_server --
  *	The statistics server thread.
  */
 static void *
-__stat_server(void *arg)
+__statlog_server(void *arg)
 {
 	struct timespec ts;
 	struct tm *tm, _tm;
 	FILE *fp;
 	WT_CONNECTION_IMPL *conn;
-	WT_ITEM path, tmp;
 	WT_DECL_RET;
+	WT_ITEM path, tmp;
 	WT_SESSION_IMPL *session;
-	char **p;
 
 	session = arg;
 	conn = S2C(session);
@@ -222,19 +241,25 @@ __stat_server(void *arg)
 		}
 
 		/* Create the entry prefix for this time of day. */
-		if (strftime(tmp.mem, tmp.memsize, conn->stat_stamp, tm) == 0)
+		if (strftime(tmp.mem, tmp.memsize, conn->stat_format, tm) == 0)
 			WT_ERR_MSG(
 			    session, ENOMEM, "strftime timestamp conversion");
 
-		/* Dump the connection statistics. */
-		WT_ERR(__stat_server_dump(
-		    session, conn->home, "statistics:", tmp.mem, fp));
+		/* Reference temporary values from the connection structure. */
+		conn->stat_fp = fp;
+		conn->stat_stamp = tmp.mem;
 
-		/* Dump the object list statistics. */
-		if ((p = conn->stat_sources) != NULL)
-			for (; *p != NULL; p += 2)
-				WT_ERR(__stat_server_dump(
-				    session, p[0], p[1], tmp.mem, fp));
+		/* Dump the connection statistics. */
+		WT_ERR(__statlog_dump(session, conn->home, 1));
+
+		/*
+		 * Lock the schema and walk the list of open handles, dumping
+		 * any that match the list of object sources.
+		 */
+		if (conn->stat_sources != NULL)
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_conn_btree_apply(
+			    session, __statlog_apply, NULL));
 
 		/* Flush. */
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
@@ -255,7 +280,7 @@ err:		__wt_err(session, ret, "statistics log server error");
 }
 
 /*
- * __wt_statlog_create -
+ * __wt_statlog_create --
  *	Start the statistics server thread.
  */
 int
@@ -291,14 +316,14 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * to figure out the scheduling.
 	 */
 	WT_RET(__wt_thread_create(
-	    session, &conn->stat_tid, __stat_server, conn->stat_session));
+	    session, &conn->stat_tid, __statlog_server, conn->stat_session));
 	conn->stat_tid_set = 1;
 
 	return (0);
 }
 
 /*
- * __wt_statlog_destroy -
+ * __wt_statlog_destroy --
  *	Destroy the statistics server thread.
  */
 int
@@ -324,7 +349,7 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_free(session, conn->stat_sources);
 	}
 	__wt_free(session, conn->stat_path);
-	__wt_free(session, conn->stat_stamp);
+	__wt_free(session, conn->stat_format);
 
 	/* Close the server thread's session, free its hazard array. */
 	if (conn->stat_session != NULL) {

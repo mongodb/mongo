@@ -1,3 +1,53 @@
+WiredTiger release 1.5.1, 2013-03-25
+------------------------------------
+
+This is a bugfix and performance tuning release. The main changes are:
+
+* Fix several bugs in LSM:
+ - the logic for setting the "no eviction" flag on LSM chunks was reversed,
+   causing unnecessary eviction once the cache became full;
+ - calling session.checkpoint while writing to an LSM tree could confuse
+   the logic around switching to new chunks; and
+ - fix a possible NULL pointer indirection when switching chunks.
+
+* Make WT_ASSERT a no-op when not in DIAGNOSTIC mode.
+
+* Panic if we find a block on the wrong list, that's not something we can
+  recover from.
+
+* If a page is reconciled (causing it's on-disk blocks to be freed and
+  potentially recycled), and then a subsequent collapse of a stack of
+  split-merge pages replaces that page with a page that has not yet been
+  reconciled, we can potentially free the same blocks twice.  The fix is to
+  clear the page's WT_REF.addr field at the time we free the blocks, so
+  future reconciliations will ignore the original disk blocks.
+
+* Fix a bug in the dump utility that allowed index URIs.
+
+* Tweak merge to build better trees with random insert workloads.
+
+* Don't use a stale value for the oldest reader transaction ID.
+
+* Track the size of the WT_REF array in internal pages (including
+  WT_ADDRs).  Also add an estimate of per-allocation overhead.
+
+* Fix a bug where URIs containing absolute paths were not being parsed
+  correctly.
+
+* Add a RMW insert mode to wtbench.
+
+[#427] Improve cleanup after a failed wiredtiger_open call.
+
+[#484] Don't allow true/false values in config strings where integers are
+       expected.
+
+[#486] Move the cache full check for autocommit transactions out of the
+       rollback path (since we don't reset cursors there), to after we
+       close a cursor.
+
+[#488] Fix an assertion failure if we try to do eviction without ever having done an update.
+
+
 WiredTiger release 1.5.0, 2013-03-14
 ------------------------------------
 

@@ -147,10 +147,13 @@ struct __wt_connection_impl {
 	pthread_t	 stat_tid;	/* Statistics log thread */
 	int		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
+
 	int		 stat_clear;	/* Statistics log clear */
+	const char	*stat_format;	/* Statistics log timestamp format */
+	FILE		*stat_fp;	/* Statistics log file handle */
 	const char	*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
-	const char	*stat_stamp;	/* Statistics log timestamp format */
+	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */
 
 	WT_FH	   *log_fh;		/* Logging file handle */
