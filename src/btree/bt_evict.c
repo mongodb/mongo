@@ -934,7 +934,7 @@ retry:	file_count = 0;
 		if (ret != 0 || i == cache->evict_entries)
 			break;
 	}
-	cache->evict_file_next = (btree == NULL) ? 0 : file_count;
+	cache->evict_file_next = (dhandle == NULL) ? 0 : file_count;
 
 	/* Walk the files a few times if we don't find enough pages. */
 	if (ret == 0 && i < cache->evict_entries && retries++ < 10)

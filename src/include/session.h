@@ -39,7 +39,7 @@ typedef	enum {
 
 /* Get the btree for a session */
 #define	S2BT(session) ((session)->dhandle == NULL ?                     \
-        NULL : (WT_BTREE *)(session)->dhandle->handle)
+	NULL : (WT_BTREE *)(session)->dhandle->handle)
 
 /*
  * WT_SESSION_IMPL --
