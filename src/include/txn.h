@@ -81,8 +81,8 @@ struct __wt_txn {
 	wt_txnid_t oldest_snap_min;
 
 	/* Saved global state, to avoid repeating scans. */
-	wt_txnid_t last_id, last_oldest_id;
-	uint32_t last_gen, last_oldest_gen;
+	wt_txnid_t last_id;
+	uint32_t last_gen;
 
 	/*
 	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or

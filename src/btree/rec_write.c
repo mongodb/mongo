@@ -835,6 +835,10 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 		__wt_get_addr(page, ref, &addr, &size);
 		WT_RET(bm->free(bm, session, addr, size));
 
+		if (__wt_off_page(page, ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+			__wt_free(session, ref->addr);
+		}
 		ref->addr = NULL;
 	}
 
@@ -3772,6 +3776,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 */
 			__wt_get_addr(page->parent, ref, &addr, &size);
 			WT_RET(bm->free(bm, session, addr, size));
+			if (__wt_off_page(page->parent, ref->addr)) {
+				__wt_free(
+				    session, ((WT_ADDR *)ref->addr)->addr);
+				__wt_free(session, ref->addr);
+			}
 			ref->addr = NULL;
 		}
 		break;
