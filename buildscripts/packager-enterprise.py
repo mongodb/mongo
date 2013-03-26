@@ -570,7 +570,7 @@ Homepage: http://www.mongodb.org
 Package: @@PACKAGE_BASENAME@@
 Conflicts: @@PACKAGE_CONFLICTS@@
 Architecture: any
-Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsnmp15, libgsasl7
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsnmp15, libgsasl7, libssl1.0.0
 Description: An object/document-oriented database
  MongoDB is a high-performance, open source, schema-free 
  document-oriented  data store that's easy to deploy, manage
@@ -592,7 +592,8 @@ Description: An object/document-oriented database
     s=re.sub("@@PACKAGE_BASENAME@@", "mongodb%s" % spec.suffix(), s)
     conflict_suffixes=["", "-stable", "-unstable", "-nightly", "-10gen", "-10gen-unstable", "-10gen-enterprise"]
     conflict_suffixes = [suff for suff in conflict_suffixes if suff != spec.suffix()]
-    s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongodb"+suffix for suffix in conflict_suffixes]), s)
+    s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongodb"+suffix for suffix in conflict_suffixes] + [ "mongodb18"+suffix for suffix in conflict_suffixes] + ["mongodb20"+suffix for suffix in conflict_suffixes]), s)
+
     f=open(path, 'w')
     try:
         f.write(s)
@@ -940,6 +941,9 @@ fi
 %{_mandir}/man1/mongostat.1*
 # FIXME: uncomment when mongosniff is back in the package
 #%{_mandir}/man1/mongosniff.1*
+#@@VERSION>=2.4.0@@%{_mandir}/man1/mongotop.1*
+#@@VERSION>=2.4.0@@%{_mandir}/man1/mongoperf.1*
+#@@VERSION>=2.4.0@@%{_mandir}/man1/mongooplog.1*
 
 %files server
 %defattr(-,root,root,-)
@@ -972,7 +976,7 @@ fi
     s=re.sub("@@BINARYDIR@@", BINARYDIR, s)
     conflict_suffixes=["", "-10gen", "-10gen-unstable", "-10gen-enterprise"]
     conflict_suffixes = [suff for suff in conflict_suffixes if suff != spec.suffix()]
-    s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongo"+_ for _ in conflict_suffixes]), s)
+    s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongo"+suffix for suffix in conflict_suffixes] + [ "mongo18"+suffix for suffix in conflict_suffixes] + ["mongo20"+suffix for suffix in conflict_suffixes]), s)
     if suffix.endswith("-10gen"):
         s=re.sub("@@PACKAGE_PROVIDES@@", "mongo-stable", s)
         s=re.sub("@@PACKAGE_OBSOLETES@@", "mongo-stable", s)
