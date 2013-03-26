@@ -65,6 +65,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp -v rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
 mkdir -p $RPM_BUILD_ROOT/var/log/mongo
+mkdir -p $RPM_BUILD_ROOT/var/run/mongo
 touch $RPM_BUILD_ROOT/var/log/mongo/mongod.log
 
 %clean
@@ -140,9 +141,13 @@ fi
 #/etc/rc.d/init.d/mongos
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongo
+%attr(0755,mongod,mongod) %dir /var/run/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
 %changelog
+* Tue Mar 26 2013 Spencer Rinehart <spencer.rinehart@dominionenterprises.com>
+- Fix pidfile location.
+
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
 
