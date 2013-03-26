@@ -31,6 +31,7 @@ JAVA_SRC = \
 
 JAVA_JUNIT = \
 		$(JAVATEST)/CursorTest.java \
+		$(JAVATEST)/CursorTest02.java \
 		$(JAVATEST)/PackTest.java \
 		$(JAVATEST)/WiredTigerSuite.java
 
