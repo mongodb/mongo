@@ -1,7 +1,7 @@
 Name: mongo-10gen
 Conflicts: mongo, mongo-10gen-unstable
 Obsoletes: mongo-stable
-Version: 2.4.0
+Version: 2.4.1
 Release: mongodb_1%{?dist}
 Summary: mongo client shell and tools
 License: AGPL 3.0
@@ -147,6 +147,7 @@ fi
 %changelog
 * Tue Mar 26 2013 Spencer Rinehart <spencer.rinehart@dominionenterprises.com>
 - Fix pidfile location.
+- Bump to 2.4.1.
 
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
