@@ -79,13 +79,6 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
 	oldest_snap_min =
 	    (txn->id != WT_TXN_NONE) ? txn->id : txn_global->current;
 
-	/* If nothing has changed since last time, we're done. */
-	if (txn->last_oldest_gen == txn_global->gen &&
-	    txn->last_oldest_id == oldest_snap_min)
-		return;
-	txn->last_oldest_gen = txn_global->gen;
-	txn->last_oldest_id = oldest_snap_min;
-
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states;
 	    i < session_cnt;
@@ -127,7 +120,7 @@ __wt_txn_get_snapshot(
 
 	do {
 		/* Take a copy of the current session ID. */
-		txn->last_gen = txn->last_oldest_gen = txn_global->gen;
+		txn->last_gen = txn_global->gen;
 		txn->last_id = oldest_snap_min = current_id =
 		    txn_global->current;
 
@@ -252,7 +245,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * visible.
 		 */
 		if (txn->isolation == TXN_ISO_SNAPSHOT) {
-			txn->last_gen = txn->last_oldest_gen = txn_global->gen;
+			txn->last_gen = txn_global->gen;
 			oldest_snap_min = txn->id;
 
 			/* Copy the array of concurrent transactions. */
