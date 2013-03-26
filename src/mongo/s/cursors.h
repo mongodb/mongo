@@ -105,6 +105,7 @@ namespace mongo {
         void remove( long long id );
 
         void storeRef(const std::string& server, long long id, const std::string& ns);
+        void removeRef( long long id );
 
         /** @return the server for id or "" */
         string getRef( long long id ) const ;

@@ -211,8 +211,14 @@ namespace mongo {
                 Message response;
                 bool ok = conn->callRead( r.m() , response);
                 uassert( 10204 , "dbgrid: getmore: error calling db", ok);
-                r.reply( response , "" /*conn->getServerAddress() */ );
 
+                bool hasMore = (response.singleData()->getCursor() != 0);
+
+                if ( !hasMore ) {
+                    cursorCache.removeRef( id );
+                }
+
+                r.reply( response , "" /*conn->getServerAddress() */ );
                 conn.done();
                 return;
             }
