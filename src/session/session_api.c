@@ -223,6 +223,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
+	WT_DSTAT_INCR(session, cursor_create);
 
 	if ((to_dup == NULL && uri == NULL) || (to_dup != NULL && uri != NULL))
 		WT_ERR_MSG(session, EINVAL,

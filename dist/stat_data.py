@@ -105,6 +105,7 @@ dsrc_stats = [
 	##########################################
 	# Operations
 	##########################################
+	Stat('cursor_create', 'cursor creation'),
 	Stat('cursor_insert', 'cursor insert calls'),
 	Stat('cursor_insert_bulk', 'bulk-loaded cursor-insert calls'),
 	Stat('cursor_insert_bytes',
