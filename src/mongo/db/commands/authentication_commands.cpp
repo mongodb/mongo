@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -102,6 +103,7 @@ namespace mongo {
             if (dbname != StringData("local", StringData::LiteralTag()) ||
                 user != internalSecurity.user) {
                 errmsg = _nonceAuthenticateCommandsDisabledMessage;
+                result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
                 return false;
             }
         }
@@ -115,6 +117,7 @@ namespace mongo {
                   << endl;
             errmsg = "auth fails";
             sleepmillis(10);
+            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
             return false;
         }
 
@@ -142,6 +145,7 @@ namespace mongo {
                 log() << "auth: bad nonce received or getnonce not called. could be a driver bug or a security attack. db:" << dbname << endl;
                 errmsg = "auth fails";
                 sleepmillis(30);
+                result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
                 return false;
             }
         }
@@ -153,6 +157,7 @@ namespace mongo {
         if (!status.isOK()) {
             log() << status.reason() << std::endl;
             errmsg = "auth fails";
+            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
             return false;
         }
         pwd = userObj["pwd"].String();
@@ -173,6 +178,7 @@ namespace mongo {
         if ( key != computed ) {
             log() << "auth: key mismatch " << user << ", ns:" << dbname << endl;
             errmsg = "auth fails";
+            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
             return false;
         }
 
