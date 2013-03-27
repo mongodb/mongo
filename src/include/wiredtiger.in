@@ -2269,65 +2269,67 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		52
 /*! page written was too small to compress */
 #define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		53
+/*! cursor creation */
+#define	WT_STAT_DSRC_CURSOR_CREATE			54
 /*! cursor insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			54
+#define	WT_STAT_DSRC_CURSOR_INSERT			55
 /*! bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			55
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			56
 /*! cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		56
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		57
 /*! cursor next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			57
+#define	WT_STAT_DSRC_CURSOR_NEXT			58
 /*! cursor prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			58
+#define	WT_STAT_DSRC_CURSOR_PREV			59
 /*! cursor remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			59
+#define	WT_STAT_DSRC_CURSOR_REMOVE			60
 /*! cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		60
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		61
 /*! cursor reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			61
+#define	WT_STAT_DSRC_CURSOR_RESET			62
 /*! cursor search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			62
+#define	WT_STAT_DSRC_CURSOR_SEARCH			63
 /*! cursor search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			63
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			64
 /*! cursor update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			64
+#define	WT_STAT_DSRC_CURSOR_UPDATE			65
 /*! cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		65
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		66
 /*! chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			66
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			67
 /*! highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			67
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			68
 /*! queries that could have benefited from a Bloom filter that did not
  * exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		68
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		69
 /*! reconciliation dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			69
+#define	WT_STAT_DSRC_REC_DICTIONARY			70
 /*! reconciliation overflow keys written */
-#define	WT_STAT_DSRC_REC_OVFL_KEY			70
+#define	WT_STAT_DSRC_REC_OVFL_KEY			71
 /*! reconciliation overflow values written */
-#define	WT_STAT_DSRC_REC_OVFL_VALUE			71
+#define	WT_STAT_DSRC_REC_OVFL_VALUE			72
 /*! reconciliation pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			72
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			73
 /*! reconciliation pages merged */
-#define	WT_STAT_DSRC_REC_PAGE_MERGE			73
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			74
 /*! page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				74
+#define	WT_STAT_DSRC_REC_PAGES				75
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			75
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			76
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			76
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			77
 /*! reconciliation internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTL			77
+#define	WT_STAT_DSRC_REC_SPLIT_INTL			78
 /*! reconciliation leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			78
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			79
 /*! reconciliation maximum number of splits created by for a page */
-#define	WT_STAT_DSRC_REC_SPLIT_MAX			79
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			80
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			80
+#define	WT_STAT_DSRC_SESSION_COMPACT			81
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		81
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		82
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			82
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			83
 /*! @} */
 /*
  * Statistics section: END

@@ -131,6 +131,7 @@ struct __wt_dsrc_stats {
 	WT_STATS compress_write;
 	WT_STATS compress_write_fail;
 	WT_STATS compress_write_too_small;
+	WT_STATS cursor_create;
 	WT_STATS cursor_insert;
 	WT_STATS cursor_insert_bulk;
 	WT_STATS cursor_insert_bytes;
