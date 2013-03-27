@@ -1581,14 +1581,14 @@ namespace mongo {
             string name = field;
             long long funcId = static_cast<long long>(_functionMap.size());
             _functionMap.insert(make_pair(funcId, func));
-            jsval v = _convertor->toval(funcId);
+            jsval v = _convertor->toval((static_cast<double>(funcId)));
             _convertor->setProperty(_global, (name + "_").c_str(), v);
-
             stringstream code;
+
             if (data) {
                 long long argsId = static_cast<long long>(_argumentMap.size());
                 _argumentMap.insert(make_pair(argsId, data));
-                v = _convertor->toval(argsId);
+                v = _convertor->toval(static_cast<double>(argsId));
                 _convertor->setProperty(_global, (name + "_data_").c_str(), v);
                 code << field << "_" << " = { x : " << field << "_ , y: " << field << "_data_ }; ";
             } else {
