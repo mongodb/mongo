@@ -568,7 +568,7 @@ namespace mongo {
                     _authMongoCR(userSource, user, password, errmsg, digestPassword));
         }
         else if (saslClientAuthenticate != NULL) {
-            uassertStatusOK(saslClientAuthenticate(this, params, NULL));
+            uassertStatusOK(saslClientAuthenticate(this, params));
         }
         else {
             uasserted(ErrorCodes::BadValue,

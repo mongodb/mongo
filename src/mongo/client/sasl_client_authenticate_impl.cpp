@@ -13,6 +13,14 @@
  *    limitations under the License.
  */
 
+/**
+ * This module implements the client side of SASL authentication in MongoDB, in terms of the Cyrus
+ * SASL library.  See <sasl/sasl.h> and http://cyrusimap.web.cmu.edu/ for relevant documentation.
+ *
+ * The primary entry point at runtime is saslClientAuthenticateImpl().
+ */
+
+#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/init.h"
@@ -20,14 +28,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/client/sasl_client_session.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/gsasl_session.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
-
-#include <gsasl.h>  // Must be included after "mongo/platform/cstdint.h" because of SERVER-8086.
 
 namespace mongo {
 namespace {
@@ -36,97 +42,6 @@ namespace {
     const int defaultSaslClientLogLevel = 4;
 
     const char* const saslClientLogFieldName = "clientLogLevel";
-
-    Gsasl* _gsaslLibraryContext = NULL;
-
-    MONGO_INITIALIZER(SaslClientContext)(InitializerContext* context) {
-        fassert(16710, _gsaslLibraryContext == NULL);
-
-        if (!gsasl_check_version(GSASL_VERSION))
-            return Status(ErrorCodes::UnknownError, "Incompatible gsasl library.");
-
-        int rc = gsasl_init(&_gsaslLibraryContext);
-        if (GSASL_OK != rc)
-            return Status(ErrorCodes::UnknownError, gsasl_strerror(rc));
-        return Status::OK();
-    }
-
-    /**
-     * Configure "*session" as a client gsasl session for authenticating on the connection
-     * "*client", with the given "saslParameters".  "gsasl" and "sessionHook" are passed through
-     * to GsaslSession::initializeClientSession, where they are documented.
-     */
-    Status configureSession(Gsasl* gsasl,
-                            DBClientWithCommands* client,
-                            const BSONObj& saslParameters,
-                            void* sessionHook,
-                            GsaslSession* session) {
-
-        std::string mechanism;
-        Status status = bsonExtractStringField(saslParameters,
-                                               saslCommandMechanismFieldName,
-                                               &mechanism);
-        if (!status.isOK())
-            return status;
-
-        status = session->initializeClientSession(gsasl, mechanism, sessionHook);
-        if (!status.isOK())
-            return status;
-
-        std::string service;
-        status = bsonExtractStringFieldWithDefault(saslParameters,
-                                                   saslCommandServiceNameFieldName,
-                                                   saslDefaultServiceName,
-                                                   &service);
-        if (!status.isOK())
-            return status;
-        session->setProperty(GSASL_SERVICE, service);
-
-        std::string hostname;
-        status = bsonExtractStringFieldWithDefault(saslParameters,
-                                                   saslCommandServiceHostnameFieldName,
-                                                   HostAndPort(client->getServerAddress()).host(),
-                                                   &hostname);
-        if (!status.isOK())
-            return status;
-        session->setProperty(GSASL_HOSTNAME, hostname);
-
-        BSONElement principalElement = saslParameters[saslCommandPrincipalFieldName];
-        if (principalElement.type() == String) {
-            session->setProperty(GSASL_AUTHID, principalElement.str());
-        }
-        else if (!principalElement.eoo()) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "Expected string for " << principalElement);
-        }
-
-        BSONElement passwordElement = saslParameters[saslCommandPasswordFieldName];
-        if (passwordElement.type() == String) {
-            bool digest;
-            status = bsonExtractBooleanFieldWithDefault(saslParameters,
-                                                        saslCommandDigestPasswordFieldName,
-                                                        true,
-                                                        &digest);
-            if (!status.isOK())
-                return status;
-
-            std::string passwordHash;
-            if (digest) {
-                passwordHash = client->createPasswordDigest(principalElement.str(),
-                                                            passwordElement.str());
-            }
-            else {
-                passwordHash = passwordElement.str();
-            }
-            session->setProperty(GSASL_PASSWORD, passwordHash);
-        }
-        else if (!passwordElement.eoo()) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "Expected string for " << passwordElement);
-        }
-
-        return Status::OK();
-    }
 
     int getSaslClientLogLevel(const BSONObj& saslParameters) {
         int saslLogLevel = defaultSaslClientLogLevel;
@@ -138,33 +53,135 @@ namespace {
         return saslLogLevel;
     }
 
-    Status saslClientAuthenticateImpl(DBClientWithCommands* client,
-                                      const BSONObj& saslParameters,
-                                      void* sessionHook) {
+    /**
+     * Gets the password data from "saslParameters" and stores it to "outPassword".
+     *
+     * If "saslParameters" indicates that the password needs to be "digested" via
+     * DBClientWithCommands::createPasswordDigest(), this method takes care of that.
+     * On success, the value of "*outPassword" is always the correct value to set
+     * as the password on the SaslClientSession.
+     *
+     * Returns Status::OK() on success, and ErrorCodes::NoSuchKey if the password data is not
+     * present in "saslParameters".  Other ErrorCodes returned indicate other errors.
+     */
+    Status extractPassword(DBClientWithCommands* client,
+                           const BSONObj& saslParameters,
+                           std::string* outPassword) {
 
-        GsaslSession session;
+        std::string rawPassword;
+        Status status = bsonExtractStringField(saslParameters,
+                                               saslCommandPasswordFieldName,
+                                               &rawPassword);
+        if (!status.isOK())
+            return status;
+
+        bool digest;
+        status = bsonExtractBooleanFieldWithDefault(saslParameters,
+                                                    saslCommandDigestPasswordFieldName,
+                                                    true,
+                                                    &digest);
+        if (!status.isOK())
+            return status;
+
+        if (digest) {
+            std::string user;
+            status = bsonExtractStringField(saslParameters,
+                                            saslCommandPrincipalFieldName,
+                                            &user);
+            if (!status.isOK())
+                return status;
+
+            *outPassword = client->createPasswordDigest(user, rawPassword);
+        }
+        else {
+            *outPassword = rawPassword;
+        }
+        return Status::OK();
+    }
+
+    /**
+     * Configures "session" to perform the client side of a SASL conversation over connection
+     * "client".
+     *
+     * "saslParameters" is a BSON document providing the necessary configuration information.
+     *
+     * Returns Status::OK() on success.
+     */
+    Status configureSession(SaslClientSession* session,
+                            DBClientWithCommands* client,
+                            const BSONObj& saslParameters) {
+
+        std::string value;
+        Status status = bsonExtractStringField(saslParameters,
+                                               saslCommandMechanismFieldName,
+                                               &value);
+        if (!status.isOK())
+            return status;
+        session->setParameter(SaslClientSession::parameterMechanism, value);
+
+        status = bsonExtractStringFieldWithDefault(saslParameters,
+                                                   saslCommandServiceNameFieldName,
+                                                   saslDefaultServiceName,
+                                                   &value);
+        if (!status.isOK())
+            return status;
+        session->setParameter(SaslClientSession::parameterServiceName, value);
+
+        status = bsonExtractStringFieldWithDefault(saslParameters,
+                                                   saslCommandServiceHostnameFieldName,
+                                                   HostAndPort(client->getServerAddress()).host(),
+                                                   &value);
+        if (!status.isOK())
+            return status;
+        session->setParameter(SaslClientSession::parameterServiceHostname, value);
+
+        status = bsonExtractStringField(saslParameters,
+                                        saslCommandPrincipalFieldName,
+                                        &value);
+        if (!status.isOK())
+            return status;
+        session->setParameter(SaslClientSession::parameterUser, value);
+
+        status = extractPassword(client, saslParameters, &value);
+        if (status.isOK()) {
+            session->setParameter(SaslClientSession::parameterPassword, value);
+        }
+        else if (status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+
+        return session->initialize();
+    }
+
+    /**
+     * Driver for the client side of a sasl authentication session, conducted synchronously over
+     * "client".
+     */
+    Status saslClientAuthenticateImpl(DBClientWithCommands* client, const BSONObj& saslParameters) {
 
         int saslLogLevel = getSaslClientLogLevel(saslParameters);
 
-        Status status = configureSession(_gsaslLibraryContext,
-                                         client,
-                                         saslParameters,
-                                         sessionHook,
-                                         &session);
+        SaslClientSession session;
+        Status status = configureSession(&session, client, saslParameters);
         if (!status.isOK())
             return status;
 
         std::string targetDatabase;
-        status = bsonExtractStringFieldWithDefault(saslParameters,
-                                                   saslCommandPrincipalSourceFieldName,
-                                                   saslDefaultDBName,
-                                                   &targetDatabase);
+        try {
+            status = bsonExtractStringFieldWithDefault(saslParameters,
+                                                       saslCommandPrincipalSourceFieldName,
+                                                       saslDefaultDBName,
+                                                       &targetDatabase);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
         if (!status.isOK())
             return status;
 
         BSONObj saslFirstCommandPrefix = BSON(
                 saslStartCommandName << 1 <<
-                saslCommandMechanismFieldName << session.getMechanism());
+                saslCommandMechanismFieldName <<
+                session.getParameter(SaslClientSession::parameterMechanism));
 
         BSONObj saslFollowupCommandPrefix = BSON(saslContinueCommandName << 1);
         BSONObj saslCommandPrefix = saslFirstCommandPrefix;

@@ -841,9 +841,9 @@ def doConfigure(myenv):
         if not conf.CheckLib( v8_lib_choices ):
             Exit(1)
 
-    env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
-    if env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
-        "gsasl", "gsasl.h", "C", "gsasl_check_version(GSASL_VERSION);", autoadd=False):
+    conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
+    if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
+        "sasl2", "sasl/sasl.h", "C", "sasl_version_info(0, 0, 0, 0, 0, 0);", autoadd=False):
 
         Exit(1)
 
