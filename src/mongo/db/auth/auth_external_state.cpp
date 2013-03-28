@@ -30,9 +30,12 @@ namespace mongo {
                                                    const PrincipalName& principalName,
                                                    BSONObj* result) {
 
-        if (dbname == StringData("$external", StringData::LiteralTag())) {
+        if (dbname == StringData("$external", StringData::LiteralTag()) ||
+            dbname == AuthorizationManager::SERVER_RESOURCE_NAME ||
+            dbname == AuthorizationManager::CLUSTER_RESOURCE_NAME) {
             return Status(ErrorCodes::UserNotFound,
-                          "No privilege documents stored in the $external user source.");
+                          mongoutils::str::stream() << "No privilege documents stored in the " <<
+                          dbname << " user source.");
         }
 
         if (!NamespaceString::validDBName(dbname)) {
