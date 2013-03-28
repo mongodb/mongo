@@ -1,3 +1,17 @@
+WiredTiger release 1.5.2, 2013-03-28
+------------------------------------
+
+This is a bugfix release. The main changes are:
+
+[#493] Fix get_key/value in the Java API for complex cursors.
+
+* Fix a leak in eviction detected by valgrind.
+
+* Stop trying to cache the oldest reader: we only use it for eviction and only update it when required.
+
+* Track cursor creation in the statistics (creating a cursor per operation isn't a good idea).
+
+
 WiredTiger release 1.5.1, 2013-03-25
 ------------------------------------
 
