@@ -292,7 +292,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		lprintf(cfg, ret = ENOMEM, 0, "Populate key buffer");
 		goto err;
 	}
-	if (worker_type == WORKER_INSERT) {
+	if (worker_type == WORKER_INSERT || worker_type == WORKER_UPDATE) {
 		data_buf = calloc(cfg->data_sz, 1);
 		if (data_buf == NULL) {
 			lprintf(cfg, ret = ENOMEM, 0, "Populate data buffer");
@@ -352,10 +352,12 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			op_ret = cursor->search(cursor);
 			if (op_ret == 0) {
 				cursor->get_value(cursor, &value);
-				if (value[0] == 'a')
-					value[0] = 'b';
+				memcpy(data_buf, value, cfg->data_sz);
+				if (data_buf[0] == 'a')
+					data_buf[0] = 'b';
 				else
-					value[0] = 'a';
+					data_buf[0] = 'a';
+				cursor->set_value(cursor, data_buf);
 				op_ret = cursor->update(cursor);
 			}
 			if (op_ret == 0)
