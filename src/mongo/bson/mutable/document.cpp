@@ -585,6 +585,11 @@ namespace mutablebson {
             const Element::RepIdx id = _elements.size();
             verify(id <= kMaxRepIdx);
             _elements.push_back(rep);
+            if (debug) {
+                // Force all reps to new addresses to help catch invalid rep usage.
+                std::vector<ElementRep> new_elements(_elements);
+                _elements.swap(new_elements);
+            }
             return id;
         }
 
@@ -624,6 +629,11 @@ namespace mutablebson {
             const size_t objIdx = _objects.size();
             verify(objIdx <= kMaxObjIdx);
             _objects.push_back(newObj);
+            if (debug) {
+                // Force reallocation to catch use after invalidation.
+                std::vector<BSONObj> new_objects(_objects);
+                _objects.swap(new_objects);
+            }
             return objIdx;
         }
 
@@ -797,6 +807,11 @@ namespace mutablebson {
                 &fieldName.rawData()[0],
                 &fieldName.rawData()[fieldName.size()]);
             _fieldNames.push_back('\0');
+            if (debug) {
+                // Force names to new addresses to catch invalidation errors.
+                std::vector<char> new_fieldNames(_fieldNames);
+                _fieldNames.swap(new_fieldNames);
+            }
             return id;
         }
 
@@ -874,53 +889,60 @@ namespace mutablebson {
         verify(_doc == e._doc);
 
         Document::Impl& impl = getDocument().getImpl();
-        ElementRep& newRep = impl.getElementRep(e._repIdx);
+        ElementRep* newRep = &impl.getElementRep(e._repIdx);
 
         // check that new element roots a clean subtree.
-        if (!canAttach(e._repIdx, newRep))
-            return getAttachmentError(newRep);
+        if (!canAttach(e._repIdx, *newRep))
+            return getAttachmentError(*newRep);
 
-        ElementRep& thisRep = impl.getElementRep(_repIdx);
+        ElementRep* thisRep = &impl.getElementRep(_repIdx);
 
-        dassert(thisRep.parent != kOpaqueRepIdx);
-        if (thisRep.parent == kInvalidRepIdx)
+        dassert(thisRep->parent != kOpaqueRepIdx);
+        if (thisRep->parent == kInvalidRepIdx)
             return Status(
                 ErrorCodes::IllegalOperation,
                 "Attempt to add a sibling to an element without a parent");
 
-        ElementRep& parentRep = impl.getElementRep(thisRep.parent);
-        if (impl.isLeaf(parentRep))
+        ElementRep* parentRep = &impl.getElementRep(thisRep->parent);
+        if (impl.isLeaf(*parentRep))
             return Status(
                 ErrorCodes::IllegalOperation,
                 "Attempt to add a sibling element under a non-object element");
 
-        // If our current right sibling is opaque it needs to be resolved.
-        Element::RepIdx rightSiblingIdx = impl.resolveRightSibling(_repIdx);
-        dassert(rightSiblingIdx != kOpaqueRepIdx);
+        // If our current right sibling is opaque it needs to be resolved. This will invalidate
+        // our reps so we need to reacquire them.
+        Element::RepIdx rightSiblingIdx = thisRep->sibling.right;
+        if (rightSiblingIdx == kOpaqueRepIdx) {
+            rightSiblingIdx = impl.resolveRightSibling(_repIdx);
+            dassert(rightSiblingIdx != kOpaqueRepIdx);
+            newRep = &impl.getElementRep(e._repIdx);
+            thisRep = &impl.getElementRep(_repIdx);
+            parentRep = &impl.getElementRep(thisRep->parent);
+        }
 
         // The new element shares our parent.
-        newRep.parent = thisRep.parent;
+        newRep->parent = thisRep->parent;
 
         // We are the new element's left sibling.
-        newRep.sibling.left = _repIdx;
+        newRep->sibling.left = _repIdx;
 
         // The new element right sibling is our right sibling.
-        newRep.sibling.right = rightSiblingIdx;
+        newRep->sibling.right = rightSiblingIdx;
 
         // The new element becomes our right sibling.
-        thisRep.sibling.right = e._repIdx;
+        thisRep->sibling.right = e._repIdx;
 
         // If the new element has a right sibling after the adjustments above, then that right
         // sibling must be updated to have the new element as its left sibling.
-        if (newRep.sibling.right != kInvalidRepIdx)
+        if (newRep->sibling.right != kInvalidRepIdx)
             impl.getElementRep(rightSiblingIdx).sibling.left = e._repIdx;
 
         // If we were our parent's right child, then we no longer are. Make the new right
         // sibling the right child.
-        if (parentRep.child.right == _repIdx)
-            parentRep.child.right = e._repIdx;
+        if (parentRep->child.right == _repIdx)
+            parentRep->child.right = e._repIdx;
 
-        impl.deserialize(thisRep.parent);
+        impl.deserialize(thisRep->parent);
 
         return Status::OK();
     }
@@ -928,14 +950,16 @@ namespace mutablebson {
     Status Element::remove() {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
+        // We need to realize any opaque right sibling, because we are going to need to set its
+        // left sibling. Do this before acquiring thisRep since otherwise we would potentially
+        // invalidate it.
+        impl.resolveRightSibling(_repIdx);
+
         ElementRep& thisRep = impl.getElementRep(_repIdx);
 
         if (thisRep.parent == kInvalidRepIdx)
             return Status(ErrorCodes::IllegalOperation, "trying to remove a parentless element");
-
-        // We need to realize any opaque right sibling, because we are going to need to set its
-        // left sibling.
-        impl.resolveRightSibling(_repIdx);
 
         // If our right sibling is not the end of the object, then set its left sibling to be
         // our left sibling.
@@ -973,40 +997,46 @@ namespace mutablebson {
     Status Element::rename(const StringData& newName) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        ElementRep& thisRep = impl.getElementRep(_repIdx);
+
+        // Operations below may invalidate thisRep, so we may need to reacquire it.
+        ElementRep* thisRep = &impl.getElementRep(_repIdx);
 
         // For non-leaf serialized elements, we can realize any opaque relatives and then
         // convert ourselves to deserialized.
-        if (thisRep.objIdx != kInvalidObjIdx && !impl.isLeaf(thisRep)) {
+        if (thisRep->objIdx != kInvalidObjIdx && !impl.isLeaf(*thisRep)) {
 
-            const bool array = (impl.getType(thisRep) == mongo::Array);
+            const bool array = (impl.getType(*thisRep) == mongo::Array);
 
             // Realize any opaque right sibling or left child now, since otherwise we will lose
             // the ability to do so.
             impl.resolveLeftChild(_repIdx);
             impl.resolveRightSibling(_repIdx);
 
+            // The resolve calls above may have invalidated thisRep, we need to reacquire it.
+            thisRep = &impl.getElementRep(_repIdx);
+
             // Set this up as a non-supported deserialized element. We will set the fieldName
             // in the else clause in the block below.
-            thisRep.serialized = false;
-            thisRep.array = array;
+            impl.deserialize(_repIdx);
+
+            thisRep->array = array;
 
             // TODO: If we ever want to be able to add to the left or right of an opaque object
             // without expanding, this may need to change.
-            thisRep.objIdx = kInvalidObjIdx;
+            thisRep->objIdx = kInvalidObjIdx;
         }
 
-        if (thisRep.serialized) {
+        if (thisRep->serialized) {
             // For leaf elements we just create a new Element with the current value and
             // replace.
-            dassert(impl.hasValue(thisRep));
+            dassert(impl.hasValue(*thisRep));
             Element replacement = getDocument().makeElementWithNewFieldName(
-                newName, impl.getSerializedElement(thisRep));
-            replacement.hasValue();
+                newName, impl.getSerializedElement(*thisRep));
+            // NOTE: This call will also invalidate thisRep.
             setValue(&replacement);
         } else {
             // The easy case: just update what our field name offset refers to.
-            impl.insertFieldName(thisRep, newName);
+            impl.insertFieldName(*thisRep, newName);
         }
 
         return Status::OK();
@@ -1520,9 +1550,9 @@ namespace mutablebson {
         Document::Impl& impl = getDocument().getImpl();
 
         // Establish our right sibling in case it is opaque. Otherwise, we would lose the
-        // ability to do so after the modifications below.
-        //
-        // TODO: This can probably go in the 'rootish' guarded block below.
+        // ability to do so after the modifications below. It is important that this occur
+        // before we acquire thisRep and valueRep since otherwise we would potentially
+        // invalidate them.
         impl.resolveRightSibling(_repIdx);
 
         ElementRep& thisRep = impl.getElementRep(_repIdx);

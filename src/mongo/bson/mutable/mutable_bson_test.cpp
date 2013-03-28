@@ -845,5 +845,81 @@ namespace {
         ASSERT_EQUALS(false, e3Child.getValueBool());
     }
 
+    TEST(Document, RenameDeserialization) {
+        // Regression test for a bug where certain rename operations failed to deserialize up
+        // the tree correctly, resulting in a lost rename
+        static const char inJson[] =
+            "{"
+            "  'a' : { 'b' : { 'c' : { 'd' : 4 } } }"
+            "}";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+
+        mmb::Document doc(inObj);
+        mmb::Element a = doc.root().leftChild();
+        ASSERT_TRUE(a.ok());
+        mmb::Element b = a.leftChild();
+        ASSERT_TRUE(b.ok());
+        mmb::Element c = b.leftChild();
+        ASSERT_TRUE(c.ok());
+        c.rename("C");
+        mongo::BSONObj outObj = doc.getObject();
+        static const char outJson[] =
+            "{"
+            "  'a' : { 'b' : { 'C' : { 'd' : 4 } } }"
+            "}";
+        ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    }
+
+    TEST(Document, RemoveElementWithOpaqueRightSibling) {
+        // Regression test for a bug where removing an element with an opaque right sibling
+        // would access an invalidated rep. Note that this test may or may not fail depending
+        // on the details of memory allocation: failures would be clearly visible with
+        // valgrind, however.
+        static const char inJson[] =
+            "{"
+            "  'a' : 1, 'b' : 2, 'c' : 3"
+            "}";
+
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        mmb::Element a = doc.root().leftChild();
+        ASSERT_TRUE(a.ok());
+        a.remove();
+
+        static const char outJson[] =
+            "{"
+            "  'b' : 2, 'c' : 3"
+            "}";
+        mongo::BSONObj outObj = doc.getObject();
+        ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    }
+
+    TEST(Document, AddRightSiblingToElementWithOpaqueRightSibling) {
+        // Regression test for a bug where adding a right sibling to a node with an opaque
+        // right sibling would potentially access an invalidated rep. Like the 'remove' test
+        // above, this may or may not crash, but would be visible under a memory checking tool.
+        static const char inJson[] =
+            "{"
+            "  'a' : 1, 'b' : 2, 'c' : 3"
+            "}";
+
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        mmb::Element a = doc.root().leftChild();
+        ASSERT_TRUE(a.ok());
+        mmb::Element newElt = doc.makeElementString("X", "X");
+        ASSERT_OK(a.addSiblingRight(newElt));
+
+        static const char outJson[] =
+            "{"
+            "  'a' : 1, 'X' : 'X', 'b' : 2, 'c' : 3"
+            "}";
+        mongo::BSONObj outObj = doc.getObject();
+        ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    }
+
+
 } // namespace
 
