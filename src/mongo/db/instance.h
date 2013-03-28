@@ -90,6 +90,11 @@ namespace mongo {
         virtual bool isFailed() const {
             return false;
         }
+
+        virtual bool isStillConnected() {
+            return true;
+        }
+
         virtual string toString() {
             return "DBDirectClient";
         }

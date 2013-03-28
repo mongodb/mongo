@@ -92,6 +92,7 @@ namespace mongo {
 
         virtual string getServerAddress() const { return _address; }
         virtual bool isFailed() const { return false; }
+        virtual bool isStillConnected();
         virtual string toString() { return _toString(); }
 
         virtual BSONObj getLastErrorDetailed(const std::string& db,

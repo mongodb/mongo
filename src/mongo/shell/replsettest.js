@@ -327,7 +327,7 @@ ReplSetTest.prototype.callIsMaster = function() {
   return master || false;
 }
 
-ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
+ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs, timeout ) {
     var hostCount = host.length;
     if( hostCount ){
         for( var i = 0; i < hostCount; i++ ) {
@@ -335,6 +335,8 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
         }
         return;
     }
+    
+    timeout = timeout || 60 * 1000;
     
     if( hostOk == undefined ) hostOk = { ok : true }
     if( host.host ) host = host.host
@@ -374,8 +376,7 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
             }
         }
         return false;
-    }, "timed out waiting for replica set client to recognize hosts",
-       3 * 20 * 1000 /* ReplicaSetMonitorWatcher updates every 20s */ )
+    }, "timed out waiting for replica set client to recognize hosts", timeout )
     
 }
 

@@ -115,6 +115,10 @@ namespace mongo {
         }
 #endif
 
+        bool isStillConnected() {
+            return psock->isStillConnected();
+        }
+
         uint64_t getSockCreationMicroSec() const {
             return psock->getSockCreationMicroSec();
         }
