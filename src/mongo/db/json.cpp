@@ -465,6 +465,9 @@ namespace mongo {
     }
 
     Status JParse::dbRefObject(const StringData& fieldName, BSONObjBuilder& builder) {
+
+        BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
+
         if (!accept(COLON)) {
             return parseError("Expecting ':'");
         }
@@ -474,6 +477,8 @@ namespace mongo {
         if (ret != Status::OK()) {
             return ret;
         }
+        subBuilder.append("$ref", ns);
+
         if (!accept(COMMA)) {
             return parseError("Expecting ','");
         }
@@ -484,42 +489,12 @@ namespace mongo {
         if (!accept(COLON)) {
             return parseError("Expecting ':'");
         }
-        if (accept("ObjectId")) {
-            BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
-            subBuilder.append("$ref", ns);
-            objectId("$id", subBuilder);
-            subBuilder.done();
+        Status valueRet = value("$id", subBuilder);
+        if (valueRet != Status::OK()) {
+            return valueRet;
         }
-        else if (accept(LBRACE)) {
-            BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
-            subBuilder.append("$ref", ns);
-            if (!acceptField("$oid")) {
-                return parseError("Expected field name: \"$oid\"");
-            }
-            objectIdObject("$id", subBuilder);
-            subBuilder.done();
-            if (!accept(RBRACE)) {
-                return parseError("Expecting '}'");
-            }
-        }
-        else {
-            std::string id;
-            id.reserve(ID_RESERVE_SIZE);
-            Status ret = quotedString(&id);
-            if (ret != Status::OK()) {
-                return ret;
-            }
-            if (id.size() != 24) {
-                return parseError("Expecting 24 hex digits: " + id);
-            }
-            if (!isHexString(id)) {
-                return parseError("Expecting hex digits: " + id);
-            }
-            BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
-            subBuilder.append("$ref", ns);
-            subBuilder.append("$id", OID(id));
-            subBuilder.done();
-        }
+
+        subBuilder.done();
         return Status::OK();
     }
 
@@ -661,6 +636,8 @@ namespace mongo {
     }
 
     Status JParse::dbRef(const StringData& fieldName, BSONObjBuilder& builder) {
+        BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
+
         if (!accept(LPAREN)) {
             return parseError("Expecting '('");
         }
@@ -670,27 +647,21 @@ namespace mongo {
         if (refRet != Status::OK()) {
             return refRet;
         }
+        subBuilder.append("$ref", ns);
+
         if (!accept(COMMA)) {
             return parseError("Expecting ','");
         }
-        std::string id;
-        id.reserve(ID_RESERVE_SIZE);
-        Status idRet = quotedString(&id);
-        if (idRet != Status::OK()) {
-            return idRet;
+
+        Status valueRet = value("$id", subBuilder);
+        if (valueRet != Status::OK()) {
+            return valueRet;
         }
-        if (id.size() != 24) {
-            return parseError("Expecting 24 hex digits: " + id);
-        }
-        if (!isHexString(id)) {
-            return parseError("Expecting hex digits: " + id);
-        }
+
         if (!accept(RPAREN)) {
             return parseError("Expecting ')'");
         }
-        BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
-        subBuilder.append("$ref", ns);
-        subBuilder.append("$id", OID(id));
+
         subBuilder.done();
         return Status::OK();
     }

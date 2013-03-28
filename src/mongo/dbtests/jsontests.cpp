@@ -860,11 +860,9 @@ namespace JsonTests {
         class DBRefConstructor : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                OID o;
-                memset( &o, 0, 12 );
                 BSONObjBuilder subBuilder(b.subobjStart("a"));
                 subBuilder.append("$ref", "ns");
-                subBuilder.append("$id", o);
+                subBuilder.append("$id", "000000000000000000000000");
                 subBuilder.done();
                 return b.obj();
             }
@@ -877,11 +875,9 @@ namespace JsonTests {
         class DBRefConstructorCapitals : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                OID o;
-                memset( &o, 0, 12 );
                 BSONObjBuilder subBuilder(b.subobjStart("a"));
                 subBuilder.append("$ref", "ns");
-                subBuilder.append("$id", o);
+                subBuilder.append("$id", "000000000000000000000000");
                 subBuilder.done();
                 return b.obj();
             }
@@ -890,14 +886,40 @@ namespace JsonTests {
             }
         };
 
-        class DBRefObjectIDString : public Base {
+        class DBRefConstructorNumber : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                OID o;
-                memset( &o, 0, 12 );
                 BSONObjBuilder subBuilder(b.subobjStart("a"));
                 subBuilder.append("$ref", "ns");
-                subBuilder.append("$id", o);
+                subBuilder.append("$id", 1);
+                subBuilder.done();
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : Dbref( \"ns\", 1 ) }";
+            }
+        };
+
+        class DBRefNumberId : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                subBuilder.append("$id", 1);
+                subBuilder.done();
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : { \"$ref\" : \"ns\", \"$id\" : 1 } }";
+            }
+        };
+
+        class DBRefStringId : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                subBuilder.append("$id", "000000000000000000000000");
                 subBuilder.done();
                 return b.obj();
             }
@@ -1605,7 +1627,8 @@ namespace JsonTests {
             add< FromJsonTests::Utf8TooShort >();
             add< FromJsonTests::DBRefConstructor >();
             add< FromJsonTests::DBRefConstructorCapitals >();
-            add< FromJsonTests::DBRefObjectIDString >();
+            add< FromJsonTests::DBRefNumberId >();
+            add< FromJsonTests::DBRefStringId >();
             add< FromJsonTests::DBRefObjectIDObject >();
             add< FromJsonTests::DBRefObjectIDConstructor >();
             add< FromJsonTests::Oid >();
