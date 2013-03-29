@@ -84,7 +84,6 @@ namespace mongo {
             v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
             V8Scope* scope = (V8Scope*)(scp->Value());
             val = scope->mongoToV8Element(elmt, false);
-            info.This()->ForceSet(name, val, v8::DontEnum);
 
             if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
               // if accessing a subobject, it may get modified and base obj would not know
@@ -204,7 +203,6 @@ namespace mongo {
             if (elmt.eoo())
                 return handle_scope.Close(v8::Handle<v8::Value>());
             val = scope->mongoToV8Element(elmt, false);
-            info.This()->ForceSet(name, val, v8::DontEnum);
 
             if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
                 // if accessing a subobject, it may get modified and base obj would not know
