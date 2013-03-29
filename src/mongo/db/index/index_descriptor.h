@@ -17,6 +17,8 @@
 #pragma once
 
 #include <string>
+
+#include "mongo/db/index.h"  // For IndexDetails.
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

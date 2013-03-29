@@ -14,193 +14,19 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/btreecursor.h"
 
-#include "mongo/db/btree.h"
-#include "mongo/db/curop-inl.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/index/catalog_hack.h"
 
 namespace mongo {
 
-    template< class V >
-    class BtreeCursorImpl : public BtreeCursor { 
-    public:
-        typedef typename BucketBasics<V>::KeyNode KeyNode;
-        typedef typename V::Key Key;
-        typedef typename V::_KeyNode _KeyNode;
-
-        BtreeCursorImpl( NamespaceDetails* a , int b, const IndexDetails& c )
-            : BtreeCursor(a,b,c){
-        }
-
-        void init(const BSONObj &d, const BSONObj &e, bool f, int g) {
-            BtreeCursor::init(d,e,f,g);
-        }
-        
-        void init( const shared_ptr< FieldRangeVector >& bounds, int singleIntervalLimit, int direction ) {
-            BtreeCursor::init(bounds,singleIntervalLimit,direction );
-            pair< DiskLoc, int > noBestParent;
-            indexDetails.head.btree<V>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, direction, noBestParent );
-            skipAndCheck();
-            dassert( _dups.size() == 0 );
-        }
-
-
-        virtual DiskLoc currLoc() { 
-            if( bucket.isNull() ) return DiskLoc();
-            return currKeyNode().recordLoc;
-        }
-
-        virtual BSONObj keyAt(int ofs) const { 
-            verify( !bucket.isNull() );
-            const BtreeBucket<V> *b = bucket.btree<V>();
-            int n = b->getN();
-            if( n == b->INVALID_N_SENTINEL ) {
-                throw UserException(15850, "keyAt bucket deleted");
-            }
-            dassert( n >= 0 && n < 10000 );
-            return ofs >= n ? BSONObj() : b->keyNode(ofs).key.toBson();
-        }
-
-        virtual BSONObj currKey() const { 
-            verify( !bucket.isNull() );
-            return bucket.btree<V>()->keyNode(keyOfs).key.toBson();
-        }
-
-        virtual bool curKeyHasChild() { 
-            return !currKeyNode().prevChildBucket.isNull();
-        }
-
-        bool skipUnusedKeys() {
-            int u = 0;
-            while ( 1 ) {
-                if ( !ok() )
-                    break;
-                const _KeyNode& kn = keyNode(keyOfs);
-                if ( kn.isUsed() )
-                    break;
-                bucket = _advance(bucket, keyOfs, _direction, "skipUnusedKeys");
-                u++;
-                //don't include unused keys in nscanned
-                //++_nscanned;
-            }
-            if ( u > 10 )
-                OCCASIONALLY log() << "btree unused skipped:" << u << endl;
-            return u;
-        }
-
-        /* Since the last noteLocation(), our key may have moved around, and that old cached
-           information may thus be stale and wrong (although often it is right).  We check
-           that here; if we have moved, we have to search back for where we were at.
-
-           i.e., after operations on the index, the BtreeCursor's cached location info may
-           be invalid.  This function ensures validity, so you should call it before using
-           the cursor if other writers have used the database since the last noteLocation
-           call.
-        */
-        void checkLocation() {
-            if ( eof() )
-                return;
-
-            _multikey = d->isMultikey(idxNo);
-
-            if ( keyOfs >= 0 ) {
-                verify( !keyAtKeyOfs.isEmpty() );
-
-                try {
-                    // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
-                    // which is possible as keys may have been deleted.
-                    int x = 0;
-                    while( 1 ) {
-                        //  if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
-                        //       b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                        if ( keyAt(keyOfs).binaryEqual(keyAtKeyOfs) ) {
-                            const _KeyNode& kn = keyNode(keyOfs);
-                            if( kn.recordLoc == locAtKeyOfs ) {
-                                if ( !kn.isUsed() ) {
-                                    // we were deleted but still exist as an unused
-                                    // marker key. advance.
-                                    skipUnusedKeys();
-                                }
-                                return;
-                            }
-                        }
-
-                        // we check one key earlier too, in case a key was just deleted.  this is
-                        // important so that multi updates are reasonably fast.
-                        if( keyOfs == 0 || x++ )
-                            break;
-                        keyOfs--;
-                    }
-                }
-                catch(UserException& e) { 
-                    if( e.getCode() != 15850 )
-                        throw;
-                    // hack: fall through if bucket was just deleted. should only happen under deleteObjects()
-                    DEV log() << "debug info: bucket was deleted" << endl;
-                }
-            }
-
-            /* normally we don't get to here.  when we do, old position is no longer
-                valid and we must refind where we left off (which is expensive)
-            */
-
-            /* TODO: Switch to keep indexdetails and do idx.head! */
-            bucket = _locate(keyAtKeyOfs, locAtKeyOfs);
-            RARELY log() << "key seems to have moved in the index, refinding. " << bucket.toString() << endl;
-            if ( ! bucket.isNull() )
-                skipUnusedKeys();
-
-        }
-    
-    protected:
-        virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) {
-            thisLoc.btree<V>()->advanceTo(thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction);
-        }
-        virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) {
-            return thisLoc.btree<V>()->advance(thisLoc, keyOfs, direction, caller);
-        }
-        virtual void _audit() {
-            out() << "BtreeCursor(). dumping head bucket" << endl;
-            indexDetails.head.btree<V>()->dump();
-        }
-        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) {
-            bool found;
-            return indexDetails.head.btree<V>()->
-                     locate(indexDetails, indexDetails.head, key, _ordering, keyOfs, found, loc, _direction);
-        }
-
-        const _KeyNode& keyNode(int keyOfs) const { 
-            return bucket.btree<V>()->k(keyOfs);
-        }
-
-    private:
-        const KeyNode currKeyNode() const {
-            verify( !bucket.isNull() );
-            const BtreeBucket<V> *b = bucket.btree<V>();
-            return b->keyNode(keyOfs);
-        }
-    };
-
-    template class BtreeCursorImpl<V0>;
-    template class BtreeCursorImpl<V1>;
-
     BtreeCursor* BtreeCursor::make( NamespaceDetails * nsd , int idxNo , const IndexDetails& indexDetails ) {
-        int v = indexDetails.version();
-        
-        if( v == 1 ) 
-            return new BtreeCursorImpl<V1>( nsd , idxNo , indexDetails );
-        
-        if( v == 0 ) 
-            return new BtreeCursorImpl<V0>( nsd , idxNo , indexDetails );
-
-        dassert( IndexDetails::isASupportedIndexVersionNumber(v) );
-        uasserted(14800, str::stream() << "unsupported index version " << v);
-        return 0; // not reachable
+        return new BtreeCursor( nsd , idxNo , indexDetails );
     }
     
     BtreeCursor* BtreeCursor::make( NamespaceDetails* namespaceDetails,
@@ -231,7 +57,6 @@ namespace mongo {
         d( nsd ),
         idxNo( theIndexNo ),
         indexDetails( id ),
-        _ordering( Ordering::make( BSONObj() ) ),
         _boundsMustMatch( true ),
         _nscanned() {
     }
@@ -239,7 +64,6 @@ namespace mongo {
     void BtreeCursor::_finishConstructorInit() {
         _multikey = d->isMultikey( idxNo );
         _order = indexDetails.keyPattern();
-        _ordering = Ordering::make( _order );
     }
     
     void BtreeCursor::init( const BSONObj& sk, const BSONObj& ek, bool endKeyInclusive, int direction ) {
@@ -249,7 +73,20 @@ namespace mongo {
         _endKeyInclusive =  endKeyInclusive;
         _direction = direction;
         _independentFieldRanges = false;
-        audit();
+        dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
+
+        _indexDescriptor.reset(CatalogHack::getDescriptor(d->idx(idxNo)));
+        _indexAM.reset(CatalogHack::getBtreeIndex(_indexDescriptor.get()));
+
+        IndexCursor *cursor;
+        _indexAM->newCursor(&cursor);
+        _indexCursor.reset(cursor);
+
+        CursorOptions opts;
+        opts.direction = _direction == 1 ? CursorOptions::INCREASING : CursorOptions::DECREASING;
+        cursor->setOptions(opts);
+
+        _hitEnd = false;
     }
 
     void BtreeCursor::init(  const shared_ptr< FieldRangeVector > &bounds, int singleIntervalLimit, int direction ) {
@@ -260,60 +97,96 @@ namespace mongo {
         _endKeyInclusive = true;
         _boundsIterator.reset( new FieldRangeVectorIterator( *_bounds , singleIntervalLimit ) );
         _independentFieldRanges = true;
-        audit();
+        dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
         startKey = _bounds->startKey();
         _boundsIterator->advance( startKey ); // handles initialization
         _boundsIterator->prepDive();
-        bucket = indexDetails.head;
-        keyOfs = 0;
+
+        _indexDescriptor.reset(CatalogHack::getDescriptor(d->idx(idxNo)));
+        _indexAM.reset(CatalogHack::getBtreeIndex(_indexDescriptor.get()));
+
+        IndexCursor *cursor;
+        _indexAM->newCursor(&cursor);
+        _indexCursor.reset(cursor);
+
+        CursorOptions opts;
+        opts.direction = _direction == 1 ? CursorOptions::INCREASING : CursorOptions::DECREASING;
+        _indexCursor->setOptions(opts);
+
+        _indexCursor->seek(_boundsIterator->cmp(), _boundsIterator->inc());
+        _hitEnd = false;
+        skipAndCheck();
+        dassert( _dups.size() == 0 );
     }
 
     /** Properly destroy forward declared class members. */
     BtreeCursor::~BtreeCursor() {}
-    
-    void BtreeCursor::audit() {
-        dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
+
+    DiskLoc BtreeCursor::currLoc() { 
+        if (!ok()) {
+            return DiskLoc();
+        } else {
+            return _indexCursor->getValue();
+        }
     }
 
+    const DiskLoc BtreeCursor::getBucket() const {
+        return _indexCursor->getBucket();
+    }
+
+    int BtreeCursor::getKeyOfs() const {
+        return _indexCursor->getKeyOfs();
+    }
+
+    void BtreeCursor::aboutToDeleteBucket(const DiskLoc& b) {
+        _indexCursor->aboutToDeleteBucket(b);
+    }
+
+    BSONObj BtreeCursor::currKey() const { 
+        return _indexCursor->getKey();
+    }
+
+    /* Since the last noteLocation(), our key may have moved around, and that old cached
+       information may thus be stale and wrong (although often it is right).  We check
+       that here; if we have moved, we have to search back for where we were at.
+
+       i.e., after operations on the index, the BtreeCursor's cached location info may
+       be invalid.  This function ensures validity, so you should call it before using
+       the cursor if other writers have used the database since the last noteLocation
+       call.
+     */
+    void BtreeCursor::checkLocation() {
+        if (eof()) return;
+        _indexCursor->restorePosition();
+        _multikey = d->isMultikey(idxNo);
+    }
+    
     void BtreeCursor::initWithoutIndependentFieldRanges() {
-        if ( indexDetails.getSpec().getType() ) {
-            startKey = indexDetails.getSpec().getType()->fixKey( startKey );
-            endKey = indexDetails.getSpec().getType()->fixKey( endKey );
-        }
-        bucket = _locate(startKey, _direction > 0 ? minDiskLoc : maxDiskLoc);
-        if ( ok() ) {
-            _nscanned = 1;
-        }
-        skipUnusedKeys();
+        _indexCursor->seek(startKey);
+        if (ok()) { _nscanned = 1; }
         checkEnd();
     }
 
     void BtreeCursor::skipAndCheck() {
         long long startNscanned = _nscanned;
-        skipUnusedKeys();
-        while( 1 ) {
-            if ( !skipOutOfRangeKeysAndCheckEnd() ) {
-                break;
-            }
-            do {
-                // If nscanned is increased by more than 20 before a matching key is found, abort
-                // skipping through the btree to find a matching key.  This iteration cutoff
-                // prevents unbounded internal iteration within BtreeCursor::init() and
-                // BtreeCursor::advance() (the callers of skipAndCheck()).  See SERVER-3448.
-                if ( _nscanned > startNscanned + 20 ) {
-                    skipUnusedKeys();
-                    // If iteration is aborted before a key matching _bounds is identified, the
-                    // cursor may be left pointing at a key that is not within bounds
-                    // (_bounds->matchesKey( currKey() ) may be false).  Set _boundsMustMatch to
-                    // false accordingly.
-                    _boundsMustMatch = false;
-                    return;
-                }
-            } while( skipOutOfRangeKeysAndCheckEnd() );
-            if ( !skipUnusedKeys() ) {
-                break;
-            }
+        if ( !skipOutOfRangeKeysAndCheckEnd() ) {
+            return;
         }
+        do {
+            // If nscanned is increased by more than 20 before a matching key is found, abort
+            // skipping through the btree to find a matching key.  This iteration cutoff
+            // prevents unbounded internal iteration within BtreeCursor::init() and
+            // BtreeCursor::advance() (the callers of skipAndCheck()).  See SERVER-3448.
+            if ( _nscanned > startNscanned + 20 ) {
+                //skipUnusedKeys();
+                // If iteration is aborted before a key matching _bounds is identified, the
+                // cursor may be left pointing at a key that is not within bounds
+                // (_bounds->matchesKey( currKey() ) may be false).  Set _boundsMustMatch to
+                // false accordingly.
+                _boundsMustMatch = false;
+                return;
+            }
+        } while( skipOutOfRangeKeysAndCheckEnd() );
     }
 
     bool BtreeCursor::skipOutOfRangeKeysAndCheckEnd() {
@@ -322,7 +195,7 @@ namespace mongo {
         }
         int ret = _boundsIterator->advance( currKey() );
         if ( ret == -2 ) {
-            bucket = DiskLoc();
+            _hitEnd = true;
             return false;
         }
         else if ( ret == -1 ) {
@@ -343,18 +216,57 @@ namespace mongo {
 
     // Check if the current key is beyond endKey.
     void BtreeCursor::checkEnd() {
-        if ( bucket.isNull() )
-            return;
+        if (!ok()) { return; }
+
         if ( !endKey.isEmpty() ) {
             int cmp = sgn( endKey.woCompare( currKey(), _order ) );
-            if ( ( cmp != 0 && cmp != _direction ) ||
-                    ( cmp == 0 && !_endKeyInclusive ) )
-                bucket = DiskLoc();
+            if ( ( cmp != 0 && cmp != _direction ) || ( cmp == 0 && !_endKeyInclusive ) ) {
+                _hitEnd = true;
+            }
         }
     }
 
+    bool BtreeCursor::ok() {
+        return !_indexCursor->isEOF() && !_hitEnd;
+    }
+
     void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive) {
-        _advanceTo( bucket, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, _ordering, _direction );
+        verify(keyEnd.size() == keyEndInclusive.size());
+
+        if (keyBeginLen != 0) {
+            // We package up the combination of keyBegin and keyEnd into one vector of elements.
+            vector<BSONElement> elts;
+            BSONObjIterator it(keyBegin);
+            for (int i = 0; i < keyBeginLen; ++i) {
+                elts.push_back(it.next(true));
+            }
+
+            verify((size_t)keyBeginLen <= keyEnd.size());
+
+            size_t size = (afterKey) ? keyBeginLen : keyEnd.size();
+
+            vector<const BSONElement*> key;
+            vector<bool> inclusive;
+
+            key.resize(size);
+            inclusive.resize(size);
+
+            for (int i = 0; i < keyBeginLen; ++i) {
+                key[i] = &elts[i];
+                inclusive[i] = true;
+            }
+
+            inclusive[keyBeginLen - 1] = !afterKey;
+
+            for (size_t i = keyBeginLen; i < size; ++i) {
+                key[i] = keyEnd[i];
+                inclusive[i] = keyEndInclusive[i];
+            }
+
+            _indexCursor->skip(key, inclusive);
+        } else {
+            _indexCursor->skip(keyEnd, keyEndInclusive);
+        }
     }
 
     bool BtreeCursor::advance() {
@@ -362,13 +274,13 @@ namespace mongo {
         _boundsMustMatch = true;
 
         killCurrentOp.checkForInterrupt();
-        if ( bucket.isNull() )
+        if (!ok()) {
             return false;
+        }
         
-        bucket = _advance(bucket, keyOfs, _direction, "BtreeCursor::advance");
+        _indexCursor->next();
         
         if ( !_independentFieldRanges ) {
-            skipUnusedKeys();
             checkEnd();
             if ( ok() ) {
                 ++_nscanned;
@@ -377,15 +289,12 @@ namespace mongo {
         else {
             skipAndCheck();
         }
+
         return ok();
     }
 
     void BtreeCursor::noteLocation() {
-        if ( !eof() ) {
-            BSONObj o = currKey().getOwned();
-            keyAtKeyOfs = o;
-            locAtKeyOfs = currLoc();
-        }
+        if (!eof()) { _indexCursor->savePosition(); }
     }
 
     string BtreeCursor::toString() {
@@ -414,6 +323,7 @@ namespace mongo {
         return Cursor::currentMatches( details );
     }
 
+    /* -------------------------- tests below -------------------------------------- */
     /* ----------------------------------------------------------------------------- */
 
     struct BtreeCursorUnitTest {

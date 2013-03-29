@@ -130,14 +130,20 @@ namespace mongo {
 
     protected:
         // These friends are the classes that actually fill out an UpdateStatus.
-        // TODO(hk): when we check in BtreeBasedAccessMethod, make friends.
-        // template <class Key> friend class BtreeBasedAccessMethod;
+        template <class Key> friend class BtreeBasedAccessMethod;
+
+        class PrivateUpdateData;
 
         bool _isValid;
         bool _isMultiKey;
 
         // This is meant to be filled out only by the friends above.
-        void *_indexSpecificUpdateData;
+        scoped_ptr<PrivateUpdateData> _indexSpecificUpdateData;
+    };
+
+    class UpdateTicket::PrivateUpdateData {
+    public:
+        virtual ~PrivateUpdateData() { }
     };
 
     /**

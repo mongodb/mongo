@@ -42,6 +42,15 @@ namespace mongo {
     public:
         virtual ~IndexCursor() { }
 
+        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
+        virtual DiskLoc getBucket() const { return DiskLoc(); }
+
+        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
+        virtual int getKeyOfs() const { return 0; }
+
+        // XXX SHORT TERM HACKS THAT MUST DIE: btree deletion
+        virtual void aboutToDeleteBucket(const DiskLoc& bucket) { }
+
         /**
          * Set options on the cursor (direction).  See CursorOptions below.
          */
