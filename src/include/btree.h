@@ -55,7 +55,7 @@
  */
 struct __wt_data_handle {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
-	uint32_t   refcnt;		/* Sessions using this tree */
+	uint32_t   refcnt;		/* Sessions using this handle */
 	TAILQ_ENTRY(__wt_data_handle) q;/* Linked list of handles */
 
 	const char *name;		/* Object name as a URI */
