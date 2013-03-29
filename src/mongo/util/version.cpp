@@ -227,27 +227,24 @@ namespace mongo {
 
             std::ifstream f("/proc/self/numa_maps", std::ifstream::in);
             if (f.is_open()) {
-                char line[100]; //we only need the first line
-                f.getline(line, sizeof(line));
+                std::string line; //we only need the first line
+                std::getline(f, line);
                 if (f.fail()) {
                     warning() << "failed to read from /proc/self/numa_maps: "
                               << errnoWithDescription() << startupWarningsLog;
                     warned = true;
                 }
                 else {
-                    // just in case...
-                    line[98] = ' ';
-                    line[99] = '\0';
-                    
                     // skip over pointer
-                    const char* space = strchr(line, ' ');
-                    
-                    if ( ! space ) {
+                    std::string::size_type where = line.find(' ');
+                    if ( (where == std::string::npos) || (++where == line.size()) ) {
                         log() << startupWarningsLog;
-                        log() << "** WARNING: cannot parse numa_maps" << startupWarningsLog;
+                        log() << "** WARNING: cannot parse numa_maps line: '" << line << "'" << startupWarningsLog;
                         warned = true;
                     }
-                    else if ( ! startsWith(space+1, "interleave") ) {
+                    // if the text following the space doesn't begin with 'interleave', then
+                    // issue the warning.
+                    else if ( line.find("interleave", where) != where ) {
                         log() << startupWarningsLog;
                         log() << "** WARNING: You are running on a NUMA machine." << startupWarningsLog;
                         log() << "**          We suggest launching mongod like this to avoid performance problems:" << startupWarningsLog;
