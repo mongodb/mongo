@@ -458,7 +458,6 @@ private:
         int objSize;
         BSONObj obj;
         obj = fromjson (buf.get(), &objSize);
-        uassert(15934, "JSON object size didn't match file size", objSize == fileSize);
         return obj;
     }
 
