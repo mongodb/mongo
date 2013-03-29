@@ -296,6 +296,15 @@ namespace mongo {
         return v8::Boolean::New(false);
     }
 
+    /**
+     * GC Prologue and Epilogue constants (used to display description constants)
+     */
+    struct GCPrologueState { static const char* name; };
+    const char* GCPrologueState::name = "prologue";
+    struct GCEpilogueState { static const char* name; };
+    const char* GCEpilogueState::name = "epilogue";
+
+    template <typename _GCState>
     void gcCallback(v8::GCType type, v8::GCCallbackFlags flags) {
         const int verbosity = 1;    // log level for stat collection
         if (logLevel < verbosity)
@@ -304,12 +313,13 @@ namespace mongo {
 
         v8::HeapStatistics stats;
         v8::V8::GetHeapStatistics(&stats);
-        LOG(verbosity) << "V8 GC heap stats - "
-                << " total: " << stats.total_heap_size()
-                << " exec: " << stats.total_heap_size_executable()
-                << " used: " << stats.used_heap_size()<< " limit: "
-                << stats.heap_size_limit()
-                << endl;
+        log() << "V8 GC " << _GCState::name
+              << " heap stats - "
+              << " total: " << stats.total_heap_size()
+              << " exec: " << stats.total_heap_size_executable()
+              << " used: " << stats.used_heap_size()<< " limit: "
+              << stats.heap_size_limit()
+              << endl;
     }
 
     V8ScriptEngine::V8ScriptEngine() :
@@ -466,7 +476,8 @@ namespace mongo {
         v8::Context::Scope context_scope(_context);
 
         // display heap statistics on MarkAndSweep GC run
-        v8::V8::AddGCPrologueCallback(gcCallback, v8::kGCTypeMarkSweepCompact);
+        v8::V8::AddGCPrologueCallback(gcCallback<GCPrologueState>, v8::kGCTypeMarkSweepCompact);
+        v8::V8::AddGCEpilogueCallback(gcCallback<GCEpilogueState>, v8::kGCTypeMarkSweepCompact);
 
         // if the isolate runs out of heap space, raise a flag on the StackGuard instead of
         // calling abort()
