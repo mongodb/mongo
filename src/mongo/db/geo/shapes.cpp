@@ -459,4 +459,5 @@ namespace mongo {
 
         return sqrt((a * a) + (b * b));
     }
+
 }  // namespace mongo

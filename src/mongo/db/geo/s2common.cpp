@@ -1,4 +1,3 @@
-// XXX THIS FILE IS DEPRECATED.  PLEASE DON'T MODIFY.
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
@@ -17,12 +16,163 @@
 
 #include "mongo/db/geo/s2common.h"
 
+#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geoquery.h"
+#include "third_party/s2/s2.h"
+#include "third_party/s2/s2cell.h"
+#include "third_party/s2/s2regioncoverer.h"
+
 namespace mongo {
 
     static string myitoa(int d) {
         stringstream ss;
         ss << d;
         return ss.str();
+    }
+
+    static void keysFromRegion(S2RegionCoverer *coverer, const S2Region &region,
+                               vector<string> *out) {
+        vector<S2CellId> covering;
+        coverer->GetCovering(region, &covering);
+        for (size_t i = 0; i < covering.size(); ++i) {
+            out->push_back(covering[i].toString());
+        }
+    }
+
+    bool S2SearchUtil::getKeysForObject(const BSONObj& obj, const S2IndexingParams& params,
+                                        vector<string>* out) {
+        S2RegionCoverer coverer;
+        params.configureCoverer(&coverer);
+
+        GeometryContainer geoContainer;
+        if (!geoContainer.parseFrom(obj)) { return false; }
+        if (!geoContainer.hasS2Region()) { return false; }
+
+        keysFromRegion(&coverer, geoContainer.getRegion(), out);
+
+        return true;
+    }
+
+    double dist(const S2Point& a, const S2Point& b) {
+        S1Angle angle(a, b);
+        return angle.radians();
+    }
+
+    double dist(const S2Point& a, const MultiPointWithCRS& b) {
+        double minDist = numeric_limits<double>::max();
+        for (size_t i = 0; i < b.points.size(); ++i) {
+            minDist = min(minDist, dist(a, b.points[i]));
+        }
+        return minDist;
+    }
+
+    double dist(const S2Point& a, const S2Polyline& b) {
+        int tmp;
+        S1Angle angle(a, b.Project(a, &tmp));
+        return angle.radians();
+    }
+
+    double dist(const S2Point& a, const MultiLineWithCRS& b) {
+        double minDist = numeric_limits<double>::max();
+        for (size_t i = 0; i < b.lines.vector().size(); ++i) {
+            minDist = min(minDist, dist(a, *b.lines.vector()[i]));
+        }
+        return minDist;
+    }
+
+    double dist(const S2Point& a, const S2Polygon& b) {
+        S1Angle angle(a, b.Project(a));
+        return angle.radians();
+    }
+
+    double dist(const S2Point& a, const MultiPolygonWithCRS& b) {
+        double minDist = numeric_limits<double>::max();
+        for (size_t i = 0; i < b.polygons.vector().size(); ++i) {
+            minDist = min(minDist, dist(a, *b.polygons.vector()[i]));
+        }
+        return minDist;
+    }
+
+    bool S2SearchUtil::distanceBetween(const S2Point& us, const BSONObj& them,
+                                       const S2IndexingParams &params, double *out) {
+        if (GeoParser::isGeometryCollection(them)) {
+            GeometryCollection c;
+            GeoParser::parseGeometryCollection(them, &c);
+            double minDist = numeric_limits<double>::max();
+
+            for (size_t i = 0; i < c.points.size(); ++i) {
+                minDist = min(minDist, dist(us, c.points[i].point));
+            }
+
+            const vector<LineWithCRS*>& lines = c.lines.vector();
+            for (size_t i = 0; i < lines.size(); ++i) {
+                minDist = min(minDist, dist(us, lines[i]->line));
+            }
+
+            const vector<PolygonWithCRS*>& polys = c.polygons.vector();
+            for (size_t i = 0; i < polys.size(); ++i) {
+                minDist = min(minDist, dist(us, polys[i]->polygon));
+            }
+
+            const vector<MultiPointWithCRS*>& multipoints = c.multiPoints.vector();
+            for (size_t i = 0; i < multipoints.size(); ++i) {
+                MultiPointWithCRS* mp = multipoints[i];
+                for (size_t j = 0; j < mp->points.size(); ++j) {
+                    minDist = min(minDist, dist(us, mp->points[i]));
+                }
+            }
+
+            const vector<MultiLineWithCRS*>& multilines = c.multiLines.vector();
+            for (size_t i = 0; i < multilines.size(); ++i) {
+                const vector<S2Polyline*>& lines = multilines[i]->lines.vector();
+                for (size_t j = 0; j < lines.size(); ++j) {
+                    minDist = min(minDist, dist(us, *lines[j]));
+                }
+            }
+
+            const vector<MultiPolygonWithCRS*>& multipolys = c.multiPolygons.vector();
+            for (size_t i = 0; i < multipolys.size(); ++i) {
+                const vector<S2Polygon*>& polys = multipolys[i]->polygons.vector();
+                for (size_t j = 0; j < polys.size(); ++j) {
+                    minDist = min(minDist, dist(us, *polys[j]));
+                }
+            }
+
+            *out = params.radius * minDist;
+            return true;
+        } if (GeoParser::isMultiPoint(them)) {
+            MultiPointWithCRS multiPoint;
+            GeoParser::parseMultiPoint(them, &multiPoint);
+            *out = dist(us, multiPoint) * params.radius;
+            return true;
+        } else if (GeoParser::isMultiLine(them)) {
+            MultiLineWithCRS multiLine;
+            GeoParser::parseMultiLine(them, &multiLine);
+            *out = dist(us, multiLine) * params.radius;
+            return true;
+        } else if (GeoParser::isMultiPolygon(them)) {
+            MultiPolygonWithCRS multiPolygon;
+            GeoParser::parseMultiPolygon(them, &multiPolygon);
+            *out = dist(us, multiPolygon) * params.radius;
+            return true;
+        } else if (GeoParser::isPolygon(them)) {
+            PolygonWithCRS poly;
+            GeoParser::parsePolygon(them, &poly);
+            *out = dist(us, poly.polygon) * params.radius;
+            return true;
+        } else if (GeoParser::isLine(them)) {
+            LineWithCRS line;
+            GeoParser::parseLine(them, &line);
+            *out = dist(us, line.line) * params.radius;
+            return true;
+        } else if (GeoParser::isPoint(them)) {
+            PointWithCRS point;
+            GeoParser::parsePoint(them, &point);
+            *out = dist(us, point.point) * params.radius;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     void S2SearchUtil::setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer,

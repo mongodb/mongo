@@ -20,9 +20,9 @@
 
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/geo/geoquery.h"
+#include "mongo/db/geo/s2common.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/platform/unordered_set.h"

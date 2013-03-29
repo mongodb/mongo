@@ -14,66 +14,74 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/geo/geoparser.h"
-#include "mongo/util/mongoutils/str.h"
-#include "third_party/s2/s2.h"
-#include "third_party/s2/s2cap.h"
-#include "third_party/s2/s2regioncoverer.h"
-#include "third_party/s2/s2cell.h"
-#include "third_party/s2/s2polyline.h"
-#include "third_party/s2/s2polygon.h"
-#include "third_party/s2/s2regioncoverer.h"
-
 #pragma once
 
+#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/shapes.h"
+#include "mongo/util/mongoutils/str.h"
+#include "third_party/s2/s2regionunion.h"
+
 namespace mongo {
+
     class GeometryContainer {
     public:
         bool parseFrom(const BSONObj &obj);
 
-        // Does we intersect the provided data?  Sadly there is no common good
-        // way to check this, so we do different things for all pairs of
-        // geometry_of(query,data).
+        /**
+         * To check intersection, we iterate over the otherContainer's geometries, checking each
+         * geometry to see if we intersect it.  If we intersect one geometry, we intersect the
+         * entire other container.
+         */
         bool intersects(const GeometryContainer& otherContainer) const;
-        bool intersects(const S2Cell& otherPoint) const;
-        bool intersects(const S2Polyline& otherLine) const;
-        bool intersects(const S2Polygon& otherPolygon) const;
-        // And, within.
+
+        /**
+         * To check containment, we iterate over the otherContainer's geometries.  If we don't
+         * contain any sub-geometry of the otherContainer, the otherContainer is not contained
+         * within us.  If each sub-geometry of the otherContainer is contained within us, we contain
+         * the entire otherContainer.
+         */
         bool contains(const GeometryContainer& otherContainer) const;
 
-        bool supportsContains() const {
-            return NULL != _polygon.get()
-                   || NULL != _cap.get()
-                   || NULL != _oldPolygon.get()
-                   || NULL != _oldCircle.get();
-        }
+        /**
+         * Only polygons (and aggregate types thereof) support contains.
+         */
+        bool supportsContains() const;
 
-        bool hasS2Region() const {
-            return NULL != _cell
-                   || NULL != _line
-                   || NULL != _polygon
-                   || NULL != _cap;
-        }
+        bool hasS2Region() const;
 
         // Used by s2cursor only to generate a covering of the query object.
         // One region is not NULL and this returns it.
         const S2Region& getRegion() const;
     private:
+        // Does 'this' intersect with the provided type?
+        bool intersects(const S2Cell& otherPoint) const;
+        bool intersects(const S2Polyline& otherLine) const;
+        bool intersects(const S2Polygon& otherPolygon) const;
+        // These three just iterate over the geometries and call the 3 methods above.
+        bool intersects(const MultiPointWithCRS& otherMultiPoint) const;
+        bool intersects(const MultiLineWithCRS& otherMultiLine) const;
+        bool intersects(const MultiPolygonWithCRS& otherMultiPolygon) const;
+
+        // Used when 'this' has a polygon somewhere, either in _polygon or _multiPolygon or
+        // _geometryCollection.
+        bool contains(const S2Cell& otherCell, const S2Point& otherPoint) const;
+        bool contains(const S2Polyline& otherLine) const;
+        bool contains(const S2Polygon& otherPolygon) const;
+
         // Only one of these shared_ptrs should be non-NULL.  S2Region is a
         // superclass but it only supports testing against S2Cells.  We need
         // the most specific class we can get.
-        shared_ptr<S2Cell> _cell;
-        // If we have _cell we have _point.  We need _cell in some cases, _point in others.
-        shared_ptr<S2Point> _point;
+        shared_ptr<PointWithCRS> _point;
+        shared_ptr<LineWithCRS> _line;
+        shared_ptr<PolygonWithCRS> _polygon;
+        shared_ptr<CapWithCRS> _cap;
+        shared_ptr<MultiPointWithCRS> _multiPoint;
+        shared_ptr<MultiLineWithCRS> _multiLine;
+        shared_ptr<MultiPolygonWithCRS> _multiPolygon;
+        shared_ptr<GeometryCollection> _geometryCollection;
+        shared_ptr<BoxWithCRS> _box;
 
-        shared_ptr<S2Polyline> _line;
-        shared_ptr<S2Polygon> _polygon;
-        shared_ptr<S2Cap> _cap;
-        // Legacy shapes.
-        shared_ptr<Polygon> _oldPolygon;
-        shared_ptr<Box> _oldBox;
-        shared_ptr<Circle> _oldCircle;
-        shared_ptr<Point> _oldPoint;
+        shared_ptr<S2RegionUnion> _region;
     };
 
     class NearQuery {
@@ -84,7 +92,7 @@ namespace mongo {
         bool parseFrom(const BSONObj &obj, double radius);
         bool parseFromGeoNear(const BSONObj &obj, double radius);
         string field;
-        S2Point centroid;
+        PointWithCRS centroid;
         // Distance IN METERS that we're willing to search.
         double maxDistance;
         // Did we convert to this distance from radians?  (If so, we output distances in radians.)

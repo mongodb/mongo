@@ -20,27 +20,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/s2common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/s2_index_cursor.h"
 #include "mongo/db/jsobj.h"
-#include "third_party/s2/s2.h"
-#include "third_party/s2/s2cell.h"
-#include "third_party/s2/s2polygon.h"
-#include "third_party/s2/s2polyline.h"
-#include "third_party/s2/s2regioncoverer.h"
-
-namespace {
-
-    static void keysFromRegion(S2RegionCoverer *coverer, const S2Region &region,
-                               vector<string> *out) {
-        vector<S2CellId> covering;
-        coverer->GetCovering(region, &covering);
-        for (size_t i = 0; i < covering.size(); ++i) {
-            out->push_back(covering[i].toString());
-        }
-    }
-
-}  // namespace
 
 namespace mongo {
 
@@ -154,34 +137,16 @@ namespace mongo {
 
     // Get the index keys for elements that are GeoJSON.
     void S2AccessMethod::getGeoKeys(const BSONElementSet& elements, BSONObjSet* out) const {
-        S2RegionCoverer coverer;
-        _params.configureCoverer(&coverer);
-
-        // See here for GeoJSON format: geojson.org/geojson-spec.html
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
             uassert(16754, "Can't parse geometry from element: " + i->toString(),
                     i->isABSONObj());
             const BSONObj &obj = i->Obj();
 
             vector<string> cells;
-            S2Polyline line;
-            S2Cell point;
-            // We only support GeoJSON polygons.  Why?:
-            // 1. we don't automagically do WGS84/flat -> WGS84, and
-            // 2. the old polygon format must die.
-            if (GeoParser::isGeoJSONPolygon(obj)) {
-                S2Polygon polygon;
-                GeoParser::parseGeoJSONPolygon(obj, &polygon);
-                keysFromRegion(&coverer, polygon, &cells);
-            } else if (GeoParser::parseLineString(obj, &line)) {
-                keysFromRegion(&coverer, line, &cells);
-            } else if (GeoParser::parsePoint(obj, &point)) {
-                S2CellId parent(point.id().parent(_params.finestIndexedLevel));
-                cells.push_back(parent.toString());
-            } else {
-                uasserted(16755, "Can't extract geo keys from object, malformed geometry?:"
-                        + obj.toString());
-            }
+            bool succeeded = S2SearchUtil::getKeysForObject(obj, _params, &cells);
+            uassert(16755, "Can't extract geo keys from object, malformed geometry?:"
+                           + obj.toString(), succeeded);
+
             uassert(16756, "Unable to generate keys for (likely malformed) geometry: "
                     + obj.toString(),
                     cells.size() > 0);

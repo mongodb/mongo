@@ -16,10 +16,20 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include <string>
+#include <vector>
+
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
+#include "third_party/s2/s2.h"
+#include "third_party/s2/s2cap.h"
+#include "third_party/s2/s2cell.h"
+#include "third_party/s2/s2latlng.h"
+#include "third_party/s2/s2polygon.h"
+#include "third_party/s2/s2polyline.h"
 
 namespace mongo {
+
     struct Point;
     double distance(const Point& p1, const Point &p2);
     bool distanceWithin(const Point &p1, const Point &p2, double radius);
@@ -103,4 +113,73 @@ namespace mongo {
         bool _boundsCalculated;
         vector<Point> _points;
     };
+
+    // Clearly this isn't right but currently it's sufficient.
+    enum CRS {
+        FLAT,
+        SPHERE
+    };
+
+    struct PointWithCRS {
+        S2Point point;
+        S2Cell cell;
+        Point oldPoint;
+        CRS crs;
+    };
+
+    struct LineWithCRS {
+        S2Polyline line;
+        CRS crs;
+    };
+
+    struct CapWithCRS {
+        S2Cap cap;
+        Circle circle;
+        CRS crs;
+    };
+
+    struct BoxWithCRS {
+        Box box;
+        CRS crs;
+    };
+
+    struct PolygonWithCRS {
+        S2Polygon polygon;
+        Polygon oldPolygon;
+        CRS crs;
+    };
+
+    struct MultiPointWithCRS {
+        vector<S2Point> points;
+        vector<S2Cell> cells;
+        CRS crs;
+    };
+
+    struct MultiLineWithCRS {
+        OwnedPointerVector<S2Polyline> lines;
+        CRS crs;
+    };
+
+    struct MultiPolygonWithCRS {
+        OwnedPointerVector<S2Polygon> polygons;
+        CRS crs;
+    };
+
+    struct GeometryCollection {
+        vector<PointWithCRS> points;
+
+        // The amount of indirection here is painful but we can't operator= scoped_ptr or
+        // OwnedPointerVector.
+        OwnedPointerVector<LineWithCRS> lines;
+        OwnedPointerVector<PolygonWithCRS> polygons;
+        OwnedPointerVector<MultiPointWithCRS> multiPoints;
+        OwnedPointerVector<MultiLineWithCRS> multiLines;
+        OwnedPointerVector<MultiPolygonWithCRS> multiPolygons;
+
+        bool supportsContains() {
+            // Only polygons (and multiPolygons) support containment.
+            return (polygons.vector().size() > 0 || multiPolygons.vector().size() > 0);
+        }
+    };
+
 }  // namespace mongo

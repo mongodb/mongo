@@ -23,7 +23,8 @@ class S2RegionUnion : public S2Region {
   S2RegionUnion();
 
   // Create a region representing the union of the given regions.
-  // Takes ownership of all regions and clears the given vector.
+  // DOES NOT take ownership of all regions.
+  // clears the given vector.
   S2RegionUnion(vector<S2Region*>* regions);
 
   virtual ~S2RegionUnion();

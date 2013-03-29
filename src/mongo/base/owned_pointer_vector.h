@@ -35,7 +35,7 @@ namespace mongo {
         ~OwnedPointerVector();
 
         /** Access the vector. */
-        const std::vector<T*>& vector() { return _vector; }
+        const std::vector<T*>& vector() const { return _vector; }
         std::vector<T*>& mutableVector() { return _vector; }
 
         void clear();
