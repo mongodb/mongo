@@ -47,6 +47,9 @@ namespace spidermonkey {
 
     using std::string;
 
+    typedef std::map<uint32_t, NativeFunction> FunctionMap;
+    typedef std::map<uint32_t, void*> ArgumentMap;
+
     string trim( string s );
 
     class BSONFieldIterator;
@@ -294,6 +297,11 @@ namespace spidermonkey {
         virtual void gc();
 
         JSContext *SavedContext() const { return _context; }
+
+        // map from internal function id to function pointer
+        FunctionMap _functionMap;
+        // map from internal function argument id to function pointer
+        ArgumentMap _argumentMap;
 
     private:
         void _postCreateHacks();
