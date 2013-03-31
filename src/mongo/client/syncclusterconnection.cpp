@@ -181,7 +181,7 @@ namespace mongo {
             if ( lockType > 0 ) { // write $cmd
                 string errmsg;
                 if ( ! prepare( errmsg ) )
-                    throw UserException( 13104 , (string)"SyncClusterConnection::findOne prepare failed: " + errmsg );
+                    throw UserException( PrepareConfigsFailedCode , (string)"SyncClusterConnection::findOne prepare failed: " + errmsg );
 
                 vector<BSONObj> all;
                 for ( size_t i=0; i<_conns.size(); i++ ) {
