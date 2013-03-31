@@ -488,12 +488,57 @@ namespace mongo {
         return true;
     }
 
+
+    bool DistributedLock::isLockHeld( double timeout, string* errMsg ) {
+        ScopedDbConnection conn(_conn.toString(), timeout );
+
+        BSONObj lockObj;
+        try {
+            lockObj = conn->findOne( LocksType::ConfigNS,
+                                     BSON( LocksType::name(_name) ) ).getOwned();
+        }
+        catch ( DBException& e ) {
+            *errMsg = str::stream() << "error checking whether lock " << _name << " is held "
+                                    << causedBy( e );
+            return false;
+        }
+        conn.done();
+
+        if ( lockObj.isEmpty() ) {
+            *errMsg = str::stream() << "could not assert if lock " << _name << " "
+                                    << "was held because there was correspondant document in the "
+                                    << "locks collection";
+            return false;
+        }
+
+        if ( lockObj[LocksType::state()].numberInt() < 2 ) {
+            *errMsg = str::stream() << "lock " << _name << " is not held because its current "
+                                    << "state is " << lockObj[LocksType::state()].numberInt();
+            return false;
+        }
+
+        if ( lockObj[LocksType::process()].String() != _processId ) {
+            *errMsg = str::stream() << "lock " << _name << " is currently being held by "
+                                    << " another process " << lockObj[LocksType::process()].String();
+            return false;
+        }
+
+        if ( distLockPinger.willUnlockOID( lockObj[LocksType::lockID()].OID() ) ) {
+            *errMsg = str::stream() << "lock " << _name << " is not held and is currently being "
+                                    << "scheduled for lazy unlock by "
+                                    << lockObj[LocksType::lockID()].OID();
+            return false;
+        }
+
+        return true;
+    }
+
     // Semantics of this method are basically that if the lock cannot be acquired, returns false, can be retried.
     // If the lock should not be tried again (some unexpected error) a LockException is thrown.
     // If we are only trying to re-enter a currently held lock, reenter should be true.
     // Note:  reenter doesn't actually make this lock re-entrant in the normal sense, since it can still only
     // be unlocked once, instead it is used to verify that the lock is already held.
-    bool DistributedLock::lock_try( const string& why , bool reenter, BSONObj * other ) {
+    bool DistributedLock::lock_try( const string& why , bool reenter, BSONObj * other, double timeout ) {
 
         // TODO:  Start pinging only when we actually get the lock?
         // If we don't have a thread pinger, make sure we shouldn't have one
@@ -515,7 +560,7 @@ namespace mongo {
         if ( other == NULL )
             other = &dummyOther;
 
-        ScopedDbConnection conn(_conn.toString());
+        ScopedDbConnection conn(_conn.toString(), timeout );
 
         BSONObjBuilder queryBuilder;
         queryBuilder.append( LocksType::name() , _name );
