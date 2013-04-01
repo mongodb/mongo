@@ -82,6 +82,18 @@ env.StaticLibrary('metadata', ['collection_manager.cpp',
                            '$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson'])
 
+env.StaticLibrary('range_deleter',
+                  [ 'range_deleter.cpp',
+                    'range_deleter_mock_env.cpp',
+                    'range_deleter_stats.cpp'
+                  ],
+                  LIBDEPS = [
+                      'base',
+                      '$BUILD_DIR/mongo/base/base',
+                      '$BUILD_DIR/mongo/bson',
+                      '$BUILD_DIR/mongo/synchronization'
+                  ])
+
 env.CppUnitTest('chunk_diff_test',
                 'chunk_diff_test.cpp',
                 LIBDEPS=['metadata'],
@@ -98,3 +110,12 @@ env.CppUnitTest('metadata_loader_test',
                 LIBDEPS=['metadata',
                          '$BUILD_DIR/mongo/mocklib'],
                 NO_CRUTCH=True);
+
+env.CppUnitTest('range_deleter_test',
+                [ 'range_deleter_test.cpp' ],
+                LIBDEPS = [ 'range_deleter' ]);
+
+env.CppUnitTest('range_deleter_stat_test',
+                [ 'range_deleter_stat_test.cpp' ],
+                LIBDEPS = [ 'range_deleter' ]);
+
