@@ -130,7 +130,7 @@ namespace mongo {
         string key = toSTLString(name);
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.erase(key);
-        holder->_extra.push_back(key);
+        holder->_extra.insert(key);
         holder->_modified = true;
 
         // set into JS object
@@ -159,7 +159,7 @@ namespace mongo {
             arr->Set(i, name);
         }
 
-        for (list<string>::iterator it = holder->_extra.begin();
+        for (set<string>::iterator it = holder->_extra.begin();
              it != holder->_extra.end(); it++) {
             string sname = *it;
             if (added.count(sname))
@@ -174,7 +174,7 @@ namespace mongo {
         string key = toSTLString(name);
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.insert(key);
-        holder->_extra.remove(key);
+        holder->_extra.erase(key);
         holder->_modified = true;
 
         // also delete in JS obj
@@ -226,7 +226,7 @@ namespace mongo {
         string key = str::stream() << index;
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.insert(key);
-        holder->_extra.remove(key);
+        holder->_extra.erase(key);
         holder->_modified = true;
 
         // also delete in JS obj
@@ -265,7 +265,7 @@ namespace mongo {
         string key = str::stream() << index;
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.erase(key);
-        holder->_extra.push_back(key);
+        holder->_extra.insert(key);
         holder->_modified = true;
 
         // set into JS object
