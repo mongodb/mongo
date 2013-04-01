@@ -219,7 +219,11 @@ namespace mongo {
         }
         if (NULL != _polygon) {
             if (NULL != otherContainer._cell) {
-                // Intersecting a point is containing a point.  Hooray!
+                // This is much faster for actual containment checking.
+                if (_polygon->Contains(*otherContainer._point)) {
+                    return true;
+                }
+                // This is slower but contains edges/vertices.
                 return _polygon->MayIntersect(*otherContainer._cell);
             } else if (NULL != otherContainer._line) {
                 // Kind of a mess.  We get a function for clipping the line to the
@@ -312,6 +316,8 @@ namespace mongo {
             GeoParser::parsePoint(obj, _cell.get());
             _oldPoint.reset(new Point());
             GeoParser::parsePoint(obj, _oldPoint.get());
+            _point.reset(new S2Point());
+            GeoParser::parsePoint(obj, _point.get());
         } else if (GeoParser::isLineString(obj)) {
             _line.reset(new S2Polyline());
             GeoParser::parseLineString(obj, _line.get());
