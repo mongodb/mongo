@@ -19,6 +19,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/s/cluster_client_internal.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -238,16 +239,45 @@ namespace mongo {
             return e.toStatus("could not create indexes in new collection");
         }
 
-        // Copy data over
+        //
+        // Copy data over in batches. A batch size here is way smaller than the maximum size of
+        // a bsonobj. We want to copy efficiently but we don't need to maximize the object size
+        // here.
+        //
+
+        Timer t;
+        int64_t docCount = 0;
+        const int32_t maxBatchSize = BSONObjMaxUserSize / 2;
         try {
             ScopedDbConnection& conn = *connPtr;
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(fromNS, BSONObj())));
 
+            vector<BSONObj> insertBatch;
+            int32_t insertSize = 0;
             while (cursor->more()) {
 
                 BSONObj next = cursor->nextSafe();
+                ++docCount;
 
-                conn->insert(toNS, next);
+                if (insertSize + next.objsize() > maxBatchSize ) {
+                    conn->insert(toNS, insertBatch);
+                    _checkGLE(conn);
+                    insertBatch.clear();
+                    insertSize = 0;
+                }
+
+                insertBatch.push_back(next);
+                insertSize += next.objsize();
+
+                if (t.seconds() > 10) {
+                    t.reset();
+                    log() << "Copied " << docCount << " documents so far from "
+                          << fromNS << " to " << toNS;
+                }
+            }
+
+            if (!insertBatch.empty()) {
+                conn->insert(toNS, insertBatch);
                 _checkGLE(conn);
             }
         }
