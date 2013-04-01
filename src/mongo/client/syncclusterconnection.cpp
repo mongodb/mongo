@@ -336,7 +336,31 @@ namespace mongo {
             return;
         }
 
-        uassert( 10023 , "SyncClusterConnection bulk insert not implemented" , 0);
+        for (vector<BSONObj>::const_iterator it = v.begin(); it != v.end(); ++it ) {
+            BSONObj obj = *it;
+            if ( obj["_id"].type() == EOO ) {
+                string assertMsg = "SyncClusterConnection::insert (batched) obj misses an _id: ";
+                uasserted( 16743, assertMsg + obj.jsonString() );
+            }
+        }
+
+        // fsync all connections before starting the batch.
+        string errmsg;
+        if ( ! prepare( errmsg ) ) {
+            string assertMsg = "SyncClusterConnection::insert (batched) prepare failed: ";
+            throw UserException( 16744, assertMsg + errmsg );
+        }
+
+        // We still want one getlasterror per document, even if they're batched.
+        for ( size_t i=0; i<_conns.size(); i++ ) {
+            for ( vector<BSONObj>::const_iterator it = v.begin(); it != v.end(); ++it ) {
+                _conns[i]->insert( ns, *it, flags );
+                _conns[i]->getLastErrorDetailed();
+            }
+        }
+
+        // We issue a final getlasterror, but this time with an fsync.
+        _checkLast();
     }
 
     void SyncClusterConnection::remove( const string &ns , Query query, int flags ) {
