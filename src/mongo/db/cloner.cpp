@@ -767,7 +767,7 @@ namespace mongo {
             // source DB.
             ActionSet actions;
             actions.addAction(ActionType::copyDBTarget);
-            out->push_back(Privilege(dbname, actions));
+            out->push_back(Privilege(dbname, actions)); // NOTE: dbname is always admin
         }
         virtual void help( stringstream &help ) const {
             help << "copy a database from another host to this host\n";

@@ -522,12 +522,18 @@ namespace mongo {
         class CopyDBCmd : public PublicGridCommand {
         public:
             CopyDBCmd() : PublicGridCommand( "copydb" ) {}
+            virtual bool adminOnly() const {
+                return true;
+            }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                // Should never get here because this command shouldn't get registered when auth is
-                // enabled
-                verify(0);
+                // Note: privileges required are currently only granted to old-style users for
+                // backwards compatibility, since we can't properly handle auth checking for the
+                // read from the source DB.
+                ActionSet actions;
+                actions.addAction(ActionType::copyDBTarget);
+                out->push_back(Privilege(dbname, actions)); // NOTE: dbname is always admin
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string todb = cmdObj.getStringField("todb");
@@ -562,12 +568,9 @@ namespace mongo {
             }
         };
         MONGO_INITIALIZER(RegisterCopyDBCommand)(InitializerContext* context) {
-            if (!AuthorizationManager::isAuthEnabled()) {
-                // Leaked intentionally: a Command registers itself when constructed.
-                new CopyDBCmd();
-            } else {
-                new NotWithAuthCmd("copydb");
-            }
+            // Leaked intentionally: a Command registers itself when constructed.
+            // NOTE: this initializer block cannot be removed due to SERVER-9167
+            new CopyDBCmd();
             return Status::OK();
         }
 
