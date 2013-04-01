@@ -24,7 +24,7 @@ connection_stats = [
 	# System statistics
 	##########################################
 	Stat('cond_wait', 'pthread mutex condition wait calls'),
-	Stat('file_open', 'files currently open'),
+	Stat('file_open', 'files currently open', perm=1),
 	Stat('memory_allocation', 'total heap memory allocations'),
 	Stat('memory_free', 'total heap memory frees'),
 	Stat('memory_grow', 'total heap memory re-allocations'),
