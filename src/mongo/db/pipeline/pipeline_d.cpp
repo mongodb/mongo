@@ -69,7 +69,7 @@ namespace mongo {
           object so that we can preserve it for the Cursor we're going to
           create below.
          */
-        shared_ptr<BSONObj> pQueryObj(new BSONObj(queryBuilder.obj()));
+        BSONObj queryObj = queryBuilder.obj();
 
         /* Look for an initial simple project; we'll avoid constructing Values
          * for fields that won't make it through the projection.
@@ -112,7 +112,7 @@ namespace mongo {
         }
 
         /* Create the sort object; see comments on the query object above */
-        shared_ptr<BSONObj> pSortObj(new BSONObj(sortBuilder.obj()));
+        BSONObj sortObj = sortBuilder.obj();
 
         /* get the full "namespace" name */
         string fullName(dbName + "." + pPipeline->getCollectionName());
@@ -120,9 +120,9 @@ namespace mongo {
         /* for debugging purposes, show what the query and sort are */
         DEV {
             (log() << "\n---- query BSON\n" <<
-             pQueryObj->jsonString(Strict, 1) << "\n----\n").flush();
+             queryObj.jsonString(Strict, 1) << "\n----\n").flush();
             (log() << "\n---- sort BSON\n" <<
-             pSortObj->jsonString(Strict, 1) << "\n----\n").flush();
+             sortObj.jsonString(Strict, 1) << "\n----\n").flush();
             (log() << "\n---- fullName\n" <<
              fullName << "\n----\n").flush();
         }
@@ -157,14 +157,14 @@ namespace mongo {
         shared_ptr<Cursor> pCursor;
         bool initSort = false;
         if (pSort) {
-            const BSONObj queryAndSort = BSON("$query" << *pQueryObj << "$orderby" << *pSortObj);
+            const BSONObj queryAndSort = BSON("$query" << queryObj << "$orderby" << sortObj);
             shared_ptr<ParsedQuery> pq (new ParsedQuery(
-                        fullName.c_str(), 0, 0, QueryOption_NoCursorTimeout, queryAndSort, projection));
+                fullName.c_str(), 0, 0, QueryOption_NoCursorTimeout, queryAndSort, projection));
 
             /* try to create the cursor with the query and the sort */
             shared_ptr<Cursor> pSortedCursor(
-                pCursor = getOptimizedCursor(
-                    fullName.c_str(), *pQueryObj, *pSortObj,
+                getOptimizedCursor(
+                    fullName.c_str(), queryObj, sortObj,
                     QueryPlanSelectionPolicy::any(), pq));
 
             if (pSortedCursor.get()) {
@@ -183,12 +183,12 @@ namespace mongo {
 
         if (!pCursor.get()) {
             shared_ptr<ParsedQuery> pq (new ParsedQuery(
-                        fullName.c_str(), 0, 0, QueryOption_NoCursorTimeout, *pQueryObj, projection));
+                fullName.c_str(), 0, 0, QueryOption_NoCursorTimeout, queryObj, projection));
 
             /* try to create the cursor without the sort */
             shared_ptr<Cursor> pUnsortedCursor(
-                pCursor = getOptimizedCursor(
-                    fullName.c_str(), *pQueryObj, BSONObj(),
+                getOptimizedCursor(
+                    fullName.c_str(), queryObj, BSONObj(),
                     QueryPlanSelectionPolicy::any(), pq));
 
             pCursor = pUnsortedCursor;
@@ -211,9 +211,9 @@ namespace mongo {
           referenced (by reference) by the cursor, which doesn't make its
           own copies of them.
         */
-        pSource->setQuery(pQueryObj);
+        pSource->setQuery(queryObj);
         if (initSort)
-            pSource->setSort(pSortObj);
+            pSource->setSort(sortObj);
 
         if (haveProjection) {
             pSource->setProjection(projection, dependencies);

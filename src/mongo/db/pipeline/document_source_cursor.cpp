@@ -188,11 +188,10 @@ namespace mongo {
         {
             BSONObj bsonObj;
             
-            pBuilder->append("query", *pQuery);
+            pBuilder->append("query", _query);
 
-            if (pSort.get())
-            {
-                pBuilder->append("sort", *pSort);
+            if (!_sort.isEmpty()) {
+                pBuilder->append("sort", _sort);
             }
 
             BSONObj projectionSpec;
@@ -203,9 +202,9 @@ namespace mongo {
 
             // construct query for explain
             BSONObjBuilder queryBuilder;
-            queryBuilder.append("$query", *pQuery);
-            if (pSort.get())
-                queryBuilder.append("$orderby", *pSort);
+            queryBuilder.append("$query", _query);
+            if (!_sort.isEmpty())
+                queryBuilder.append("$orderby", _sort);
             queryBuilder.append("$explain", 1);
             Query query(queryBuilder.obj());
 
@@ -239,14 +238,6 @@ namespace mongo {
 
     void DocumentSourceCursor::setNamespace(const string &n) {
         ns = n;
-    }
-
-    void DocumentSourceCursor::setQuery(const shared_ptr<BSONObj> &pBsonObj) {
-        pQuery = pBsonObj;
-    }
-
-    void DocumentSourceCursor::setSort(const shared_ptr<BSONObj> &pBsonObj) {
-        pSort = pBsonObj;
     }
 
     void DocumentSourceCursor::setProjection(const BSONObj& projection, const ParsedDeps& deps) {
