@@ -283,7 +283,7 @@ err:	API_END(session);
 }
 
 /*
- * __wt_curdump_init --
+ * __wt_curdump_create --
  *	initialize a dump cursor.
  */
 int
