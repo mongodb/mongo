@@ -494,7 +494,9 @@ namespace mongo {
 
 
     bool DistributedLock::isLockHeld( double timeout, string* errMsg ) {
-        ScopedDbConnection conn(_conn.toString(), timeout );
+        scoped_ptr<ScopedDbConnection> connPtr(
+                        ScopedDbConnection::getInternalScopedDbConnection( _conn.toString(), timeout ) );
+        ScopedDbConnection& conn = *connPtr;
 
         BSONObj lockObj;
         try {
@@ -564,7 +566,9 @@ namespace mongo {
         if ( other == NULL )
             other = &dummyOther;
 
-        ScopedDbConnection conn(_conn.toString(), timeout );
+        scoped_ptr<ScopedDbConnection> connPtr(
+                ScopedDbConnection::getInternalScopedDbConnection( _conn.toString(), timeout ) );
+        ScopedDbConnection& conn = *connPtr;
 
         BSONObjBuilder queryBuilder;
         queryBuilder.append( LocksType::name() , _name );
