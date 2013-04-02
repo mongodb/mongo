@@ -39,7 +39,7 @@ using namespace std;
 
 namespace mongo {
 
-#if defined(_WIN32) && defined(MONGO_USE_SRW_ON_WINDOWS)
+#if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
     SimpleRWLock::SimpleRWLock(const StringData& p) : name(p.toString()) {
         InitializeSRWLock(&_lock);
     }

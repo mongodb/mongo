@@ -637,7 +637,7 @@ namespace ThreadedTests {
                     RWLock::Upgradable u(m);
                     LOG(Z) << x << ' ' << ch << " got" << endl;
                     if( ch == 'U' ) {
-#ifdef MONGO_USE_SRW_ON_WINDOWS
+#if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
                         // SRW locks are neither fair nor FIFO, as per docs
                         if( t.millis() > 2000 ) {
 #else

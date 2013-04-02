@@ -4,8 +4,13 @@
 // (C) Copyright 2007 Anthony Williams
 // (C) Copyright 2007 David Deakins
 
+#ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x400
+#endif
+
+#ifndef WINVER
 #define WINVER 0x400
+#endif
 
 #include <boost/thread/thread.hpp>
 #include <algorithm>

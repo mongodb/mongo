@@ -87,7 +87,12 @@ namespace mongo {
     template <typename T>
     class AtomicIntrinsics<T, typename boost::enable_if_c<sizeof(T) == sizeof(LONGLONG)>::type> {
     public:
-        static const bool kHaveInterlocked64 = (_WIN32_WINNT >= _WIN32_WINNT_VISTA);
+
+#if defined(NTDDI_VERSION) && defined(NTDDI_VISTA) && (NTDDI_VERSION >= NTDDI_VISTA)
+        static const bool kHaveInterlocked64 = true;
+#else
+        static const bool kHaveInterlocked64 = false;
+#endif
 
         static T compareAndSwap(volatile T* dest, T expected, T newValue) {
             return InterlockedImpl<kHaveInterlocked64>::compareAndSwap(dest, expected, newValue);

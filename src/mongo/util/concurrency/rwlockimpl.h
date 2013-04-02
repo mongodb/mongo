@@ -24,7 +24,7 @@
 namespace mongo { 
     typedef RWLockBase1 RWLockBase;
 }
-#elif defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
+#elif defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
 
 // windows slimreaderwriter version.  newer windows versions only
 

@@ -197,7 +197,9 @@ add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
-add_option( "win2008plus", "use newer operating system API features" , 0 , False )
+add_option( "win2008plus",
+            "use newer operating system API features (deprecated, use win-version-min instead)" ,
+            0 , False )
 
 # dev options
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
@@ -591,8 +593,21 @@ elif "win32" == os.sys.platform:
 
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
 
-    if has_option( "win2008plus" ):
-        env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
+    win_version_min_choices = {
+        'xpsp3'  : ('0501', '0300'),
+        'vista'  : ('0600', '0000'),
+        'ws08r2' : ('0601', '0000'),
+        'win7'   : ('0601', '0000'),
+        'win8'   : ('0602', '0000'),
+    }
+
+    add_option("win-version-min", "minimum Windows version to support", 1, False,
+               type = 'choice', default = None,
+               choices = win_version_min_choices.keys())
+
+    if has_option('win-version-min') and has_option('win2008plus'):
+        print("Can't specify both 'win-version-min' and 'win2008plus'")
+        Exit(1)
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
         if os.path.exists(os.path.join(pathdir, 'cl.exe')):
@@ -630,9 +645,7 @@ elif "win32" == os.sys.platform:
     # 'conversion' conversion from 'type1' to 'type2', possible loss of data
     #  An integer type is converted to a smaller integer type.
     env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244"] )
-    
-    # PSAPI_VERSION relates to process api dll Psapi.dll.
-    env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","PSAPI_VERSION=1" ] )
+    env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS"] )
 
     # this would be for pre-compiled headers, could play with it later  
     #env.Append( CCFLAGS=['/Yu"pch.h"'] )
@@ -670,31 +683,11 @@ elif "win32" == os.sys.platform:
     # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
     env.Append( LINKFLAGS=" /LARGEADDRESSAWARE " )
 
-    if force64:
-        env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib/x64" ] )
-    else:
-        env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib" ] )
-
-    if release:
-        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  " )
-    else:
-        env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT  " )
-
-    winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib DbgHelp.lib"
-
-    if force64:
-
-        winLibString += ""
-
-    else:
-        winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
-        winLibString += " odbc32.lib odbccp32.lib uuid.lib "
+    env.Append(LIBS=['ws2_32.lib', 'kernel32.lib', 'advapi32.lib', 'Psapi.lib', 'DbgHelp.lib'])
 
     # v8 calls timeGetTime()
     if usev8:
-        winLibString += " winmm.lib "
-
-    env.Append( LIBS=Split(winLibString) )
+        env.Append(LIBS=['winmm.lib'])
 
     env.Append( EXTRACPPPATH=["#/../winpcap/Include"] )
     env.Append( EXTRALIBPATH=["#/../winpcap/Lib"] )
@@ -897,6 +890,51 @@ def doConfigure(myenv):
         Exit(1)
 
     myenv = conf.Finish()
+
+    # Figure out what our minimum windows version is. If the user has specified, then use
+    # that. Otherwise, if they have explicitly selected between 32 bit or 64 bit, choose XP or
+    # Vista respectively. Finally, if they haven't done either of these, try invoking the
+    # compiler to figure out whether we are doing a 32 or 64 bit build and select as
+    # appropriate.
+    if windows:
+        win_version_min = None
+        default_32_bit_min = 'xpsp3'
+        default_64_bit_min = 'vista'
+        if has_option('win-version-min'):
+            win_version_min = get_option('win-version-min')
+        elif has_option('win2008plus'):
+            win_version_min = 'win7'
+        else:
+            if force32:
+                win_version_min = default_32_bit_min
+            elif force64:
+                win_version_min = default_64_bit_min
+            else:
+                def CheckFor64Bit(context):
+                    win64_test_body = textwrap.dedent(
+                        """
+                        #if !defined(_WIN64)
+                        #error
+                        #endif
+                        """
+                    )
+                    context.Message('Checking if toolchain is in 64-bit mode... ')
+                    result = context.TryCompile(win64_test_body, ".c")
+                    context.Result(result)
+                    return result
+
+                conf = Configure(myenv, clean=False, help=False, custom_tests = {
+                    'CheckFor64Bit' : CheckFor64Bit
+                })
+                if conf.CheckFor64Bit():
+                    win_version_min = default_64_bit_min
+                else:
+                    win_version_min = default_32_bit_min
+                conf.Finish();
+
+        win_version_min = win_version_min_choices[win_version_min]
+        env.Append( CPPDEFINES=[("_WIN32_WINNT", "0x" + win_version_min[0])] )
+        env.Append( CPPDEFINES=[("NTDDI_VERSION", "0x" + win_version_min[0] + win_version_min[1])] )
 
     # Enable PCH if we are on using gcc or clang and the 'Gch' tool is enabled. Otherwise,
     # remove any pre-compiled header since the compiler may try to use it if it exists.
