@@ -25,7 +25,7 @@
 namespace mongo {
 
     class UpdateTicket;
-    class InsertDeleteOptions;
+    struct InsertDeleteOptions;
 
     /**
      * An IndexAccessMethod is the interface through which all the mutation, lookup, and

@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    class CursorOptions;
+    struct CursorOptions;
 
     /**
      * An IndexCursor is the interface through which one traverses the entries of a given
