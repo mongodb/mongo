@@ -465,12 +465,6 @@ namespace mongo {
         _isolate = v8::Isolate::New();
         v8::Isolate::Scope iscope(_isolate);
 
-        // resource constraints must be set on isolate, before any call or lock
-        v8::ResourceConstraints rc;
-        rc.set_max_young_space_size(4 * 1024 * 1024);
-        rc.set_max_old_space_size(64 * 1024 * 1024);
-        v8::SetResourceConstraints(&rc);
-
         // lock the isolate and enter the context
         v8::Locker l(_isolate);
         v8::HandleScope handleScope;
