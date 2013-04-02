@@ -29,7 +29,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	recno = cbt->iface.recno;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	ref = NULL;
 
 	/* Search the internal pages of the tree. */

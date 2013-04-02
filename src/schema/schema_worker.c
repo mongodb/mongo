@@ -49,7 +49,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_RET(__wt_schema_get_table(session,
 		    tablename, strlen(tablename), 0, &table));
-		WT_ASSERT(session, session->btree == NULL);
+		WT_ASSERT(session, session->dhandle == NULL);
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];

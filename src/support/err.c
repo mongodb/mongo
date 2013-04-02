@@ -118,6 +118,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	size_t len, remain, wlen;
 	const char *err, *prefix1, *prefix2;
@@ -136,7 +137,8 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	p = s;
 	end = s + sizeof(s);
 
-	prefix1 = (session->btree != NULL) ? session->btree->name : NULL;
+	dhandle = session->dhandle;
+	prefix1 = (dhandle != NULL) ? dhandle->name : NULL;
 	prefix2 = session->name;
 
 	remain = WT_PTRDIFF(end, p);

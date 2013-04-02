@@ -303,7 +303,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_PAGE_HEADER *dsk;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	dsk = page->dsk;
 
 	page->u.col_fix.bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
@@ -323,7 +323,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_REF *ref;
 	uint32_t i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
 
@@ -358,7 +358,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	size_t bytes_allocated;
 	uint32_t i, indx, max_repeats, nrepeats;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
 	repeats = NULL;
@@ -422,7 +422,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	uint32_t i, prefix;
 	void *huffman;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 	dsk = page->dsk;
 	huffman = btree->huffman_key;
@@ -567,7 +567,7 @@ __inmem_row_leaf_entries(
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t i, nindx;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 
 	/*
@@ -622,7 +622,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ROW *rip;
 	uint32_t i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
 

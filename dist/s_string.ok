@@ -56,6 +56,7 @@ Config
 CustomersPhone
 DATAITEMs
 DESC
+DHANDLE
 DSRC
 DUPLICATEV
 Decrement
@@ -344,6 +345,7 @@ dereference
 desc
 dest
 dev
+dhandle
 dlclose
 dlh
 dll

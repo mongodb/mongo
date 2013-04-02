@@ -53,15 +53,15 @@ struct __wt_stats {
 } while (0)
 #define	WT_DSTAT_INCR(session, fld) do {				\
 	if (S2C(session)->statistics)					\
-		WT_STAT_INCR(&(session)->btree->stats, fld);		\
+		WT_STAT_INCR(&session->dhandle->stats, fld);		\
 } while (0)
 #define	WT_DSTAT_INCRV(session, fld, v) do {				\
 	if (S2C(session)->statistics)					\
-		WT_STAT_INCRV(&(session)->btree->stats, fld, v);	\
+		WT_STAT_INCRV(&session->dhandle->stats, fld, v);	\
 } while (0)
 #define	WT_DSTAT_SET(session, fld, v) do {				\
 	if (S2C(session)->statistics)					\
-		WT_STAT_SET(&(session)->btree->stats, fld, v);		\
+		WT_STAT_SET(&session->dhandle->stats, fld, v);		\
 } while (0)
 
 /* Flags used by statistics initialization. */

@@ -92,8 +92,8 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
 static int
 __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 {
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_BM *bm;
-	WT_BTREE *saved_btree;
 	WT_DECL_RET;
 	int tret;
 
@@ -108,21 +108,21 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_EMPTY:	/* Unused slot */
 		break;
 	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
-		saved_btree = session->btree;
-		session->btree = trk->btree;
+		saved_dhandle = session->dhandle;
+		WT_SET_BTREE_IN_SESSION(session, trk->btree);
 		if (!unroll) {
 			bm = trk->btree->bm;
 			WT_TRET(bm->checkpoint_resolve(bm, session));
 		}
-		session->btree = saved_btree;
+		session->dhandle = saved_dhandle;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
-		saved_btree = session->btree;
-		session->btree = trk->btree;
+		saved_dhandle = session->dhandle;
+		WT_SET_BTREE_IN_SESSION(session, trk->btree);
 		if (unroll && trk->created)
-			F_SET(session->btree, WT_BTREE_DISCARD);
+			F_SET(session->dhandle, WT_DHANDLE_DISCARD);
 		WT_TRET(__wt_session_release_btree(session));
-		session->btree = saved_btree;
+		session->dhandle = saved_dhandle;
 		break;
 	case WT_ST_FILEOP:	/* File operation */
 		/*
@@ -189,7 +189,7 @@ free:	trk->op = WT_ST_EMPTY;
 int
 __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
-	WT_BTREE *saved_btree;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
 
@@ -209,10 +209,10 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 
 	/* If the operation succeeded, checkpoint the metadata. */
 	if (!unroll && ret == 0 && session->metafile != NULL) {
-		saved_btree = session->btree;
-		session->btree = session->metafile;
+		saved_dhandle = session->dhandle;
+		WT_SET_BTREE_IN_SESSION(session, session->metafile);
 		ret = __wt_checkpoint(session, NULL);
-		session->btree = saved_btree;
+		session->dhandle = saved_dhandle;
 	}
 
 	return (ret);
@@ -266,12 +266,12 @@ __wt_meta_track_checkpoint(WT_SESSION_IMPL *session)
 {
 	WT_META_TRACK *trk;
 
-	WT_ASSERT(session, session->btree != NULL);
+	WT_ASSERT(session, session->dhandle != NULL);
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_CHECKPOINT;
-	trk->btree = session->btree;
+	trk->btree = S2BT(session);
 	return (0);
 }
 /*
@@ -346,12 +346,12 @@ __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created)
 {
 	WT_META_TRACK *trk;
 
-	WT_ASSERT(session, session->btree != NULL);
+	WT_ASSERT(session, session->dhandle != NULL);
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_LOCK;
-	trk->btree = session->btree;
+	trk->btree = S2BT(session);
 	trk->created = created;
 	return (0);
 }

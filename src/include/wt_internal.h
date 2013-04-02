@@ -69,8 +69,6 @@ struct __wt_bm;
     typedef struct __wt_bm WT_BM;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
-struct __wt_btree_session;
-    typedef struct __wt_btree_session WT_BTREE_SESSION;
 struct __wt_cache;
     typedef struct __wt_cache WT_CACHE;
 struct __wt_cache_pool;
@@ -117,6 +115,10 @@ struct __wt_cursor_stat;
     typedef struct __wt_cursor_stat WT_CURSOR_STAT;
 struct __wt_cursor_table;
     typedef struct __wt_cursor_table WT_CURSOR_TABLE;
+struct __wt_data_handle;
+    typedef struct __wt_data_handle WT_DATA_HANDLE;
+struct __wt_data_handle_cache;
+    typedef struct __wt_data_handle_cache WT_DATA_HANDLE_CACHE;
 struct __wt_dlh;
     typedef struct __wt_dlh WT_DLH;
 struct __wt_dsrc_stats;
@@ -204,7 +206,8 @@ struct __wt_update;
 #include "posix.h"
 
 #include "txn.h"			/* typedef for wt_txnid_t */
-#include "stat.h"			/* WT_DSRC_STATS for data sources */
+#include "stat.h"			/* required by dhandle.h */
+#include "dhandle.h"			/* required by btree.h */
 
 #include "api.h"
 #include "block.h"

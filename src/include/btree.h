@@ -37,38 +37,11 @@
 #define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
 
 /*
- * XXX
- * The server threads use their own WT_SESSION_IMPL handles because they may
- * want to block (for example, the eviction server calls reconciliation, and
- * some of the reconciliation diagnostic code reads pages), and the user's
- * session handle is already blocking on a server thread.  The problem is the
- * server thread needs to reference the correct btree handle, and that's
- * hanging off the application's thread of control.  For now, I'm just making
- * it obvious where that's getting done.
- */
-#define	WT_SET_BTREE_IN_SESSION(s, b)	((s)->btree = (b))
-#define	WT_CLEAR_BTREE_IN_SESSION(s)	((s)->btree = NULL)
-
-/*
  * WT_BTREE --
  *	A btree handle.
  */
 struct __wt_btree {
-	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
-	uint32_t   refcnt;		/* Sessions using this tree. */
-	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
-
-	const char *name;		/* Object name as a URI */
-	const char *checkpoint;		/* Checkpoint name (or NULL) */
-	const char **cfg;		/* Configuration information */
-
-	WT_DSRC_STATS stats;		/* Data-source statistics */
-	int maximum_depth;		/* Maximum tree depth */
-
-	/*
-	 * XXX Everything above here should move into the session-level
-	 * handle structure.
-	 */
+	WT_DATA_HANDLE *dhandle;
 
 	WT_CKPT	  *ckpt;		/* Checkpoint information */
 
@@ -103,6 +76,7 @@ struct __wt_btree {
 
 	u_int dictionary;		/* Reconcile: dictionary slots */
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */
+	int   maximum_depth;		/* Reconcile: maximum tree depth */
 	int   prefix_compression;	/* Reconcile: key prefix compression */
 	u_int split_pct;		/* Reconcile: split page percent */
 	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
@@ -125,17 +99,13 @@ struct __wt_btree {
 
 	volatile int checkpointing;	/* Checkpoint in progress */
 
-#define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
-#define	WT_BTREE_DISCARD	0x0002	/* Discard on release */
-#define	WT_BTREE_DISCARD_CLOSE	0x0004	/* Discard on last close */
-#define	WT_BTREE_EXCLUSIVE	0x0008	/* Need exclusive access to handle */
-#define	WT_BTREE_LOCK_ONLY	0x0010	/* Handle is only needed for locking */
-#define	WT_BTREE_NO_EVICTION	0x0020	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x0040	/* Disable hazard pointers */
-#define	WT_BTREE_OPEN		0x0080	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x0100	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x0200	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0400	/* Handle is for verify */
+	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
+#define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
+#define	WT_BTREE_NO_EVICTION	0x00200	/* Disable eviction */
+#define	WT_BTREE_NO_HAZARD	0x00400	/* Disable hazard references */
+#define	WT_BTREE_SALVAGE	0x00800	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x01000	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x02000	/* Handle is for verify */
 	uint32_t flags;
 };
 

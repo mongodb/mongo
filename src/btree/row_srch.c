@@ -20,7 +20,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	WT_ITEM insert_key;
 	int cmp, i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* If there's no insert chain to search, we're done. */
 	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL) {
@@ -121,7 +121,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	srch_key = &cbt->iface.key;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	rip = NULL;
 
 	/* Search the internal pages of the tree. */
@@ -317,7 +317,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	__cursor_search_clear(cbt);
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Walk the internal pages of the tree. */
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {

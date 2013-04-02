@@ -419,7 +419,7 @@ __rec_write_init(
 	WT_RECONCILE *r;
 	uint32_t i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Allocate a reconciliation structure if we don't already have one. */
 	if ((r = *(WT_RECONCILE **)retp) == NULL) {
@@ -784,7 +784,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	uint32_t size;
 	const uint8_t *addr;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	/*
 	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
@@ -1036,7 +1036,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 	size_t corrected_page_size;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 
 	/*
@@ -1187,7 +1187,7 @@ __rec_split_row_promote_cell(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 
 	/*
@@ -1284,7 +1284,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * reconciliation loop, and I don't want to repeat the code that many
 	 * times.
 	 */
-	btree = session->btree;
+	btree = S2BT(session);
 	dsk = r->dsk.mem;
 
 	/* Hitting a page boundary resets the dictionary, in all cases. */
@@ -1435,7 +1435,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	uint8_t *dsk_start;
 
 	wt_session = (WT_SESSION *)session;
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 	compressor = btree->compressor;
 	unpack = &_unpack;
@@ -1830,7 +1830,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * split chunks we've created and write those pages out, then update
 	 * the caller's information.
 	 */
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * The data isn't laid out on a page boundary or nul padded; copy it to
@@ -1930,7 +1930,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	uint64_t recno;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
-	btree = session->btree;
+	btree = S2BT(session);
 	page = cbulk->leaf;
 
 	WT_RET(__rec_write_init(session, page, 0, &cbulk->reconcile));
@@ -1966,7 +1966,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -2016,7 +2016,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
@@ -2074,7 +2074,7 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK  *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	if (cbulk->entry == cbulk->nrecs) {
 		if (cbulk->entry != 0) {
@@ -2110,7 +2110,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
 
 	if (cbulk->bitmap) {
@@ -2157,7 +2157,7 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	val = &r->v;
 	WT_RET(__rec_cell_build_val(
@@ -2190,7 +2190,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_RET(__rec_split_init(
 	    session, r, page, page->u.intl.recno, btree->maxintlpage));
@@ -2319,7 +2319,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	uint64_t recno;
 	uint32_t entry, nrecs;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
@@ -2405,7 +2405,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 	uint64_t page_start, page_take;
 	uint32_t entry, nrecs;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * !!!
@@ -2472,7 +2472,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_BTREE *btree;
 	WT_KV *val;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	val = &r->v;
 
 	/*
@@ -2563,7 +2563,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	int deleted, last_deleted, orig_deleted, update_no_copy;
 	const void *data;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	last = r->last;
 	unpack = &_unpack;
 
@@ -2906,7 +2906,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	int onpage_ovfl, ovfl_key, state;
 	const void *p;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	key = &r->k;
 	kpack = &_kpack;
@@ -3280,7 +3280,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	int dictionary, onpage_ovfl, ovfl_key;
 	const void *p;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 
 	key = &r->k;
@@ -3606,7 +3606,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 	WT_UPDATE *upd;
 	int ovfl_key;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	key = &r->k;
 	val = &r->v;
 
@@ -3738,7 +3738,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	int was_modified;
 	const uint8_t *addr;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 	mod = page->modify;
 
@@ -3988,7 +3988,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_DECL_RET;
 	uint32_t i;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	/*
 	 * On error, discard pages we've written, they're unreferenced by the
@@ -4203,7 +4203,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	uint8_t pfx;
 	const uint8_t *a, *b;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	key = &r->k;
 	*is_ovflp = 0;
 
@@ -4321,7 +4321,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_KV *val;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	val = &r->v;
 
 	/*
@@ -4372,7 +4372,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	int found;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 	page = r->page;
 

@@ -6,14 +6,14 @@
  */
 
 /*
- * WT_BTREE_SESSION --
- *	Per-session cache of btree handles to avoid synchronization when
- * opening cursors.
+ * WT_DATA_HANDLE_CACHE --
+ *	Per-session cache of handles to avoid synchronization when opening
+ *	cursors.
  */
-struct __wt_btree_session {
-	WT_BTREE *btree;
+struct __wt_data_handle_cache {
+	WT_DATA_HANDLE *dhandle;
 
-	TAILQ_ENTRY(__wt_btree_session) q;
+	TAILQ_ENTRY(__wt_data_handle_cache) q;
 };
 
 /*
@@ -37,6 +37,10 @@ typedef	enum {
 /* Get the connection implementation for a session */
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
+/* Get the btree for a session */
+#define	S2BT(session) ((session)->dhandle == NULL ?                     \
+	NULL : (WT_BTREE *)(session)->dhandle->handle)
+
 /*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
@@ -52,8 +56,8 @@ struct __wt_session_impl {
 
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
-	WT_BTREE *btree;		/* Current file */
-	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
+	WT_DATA_HANDLE *dhandle;	/* Current data handle */
+	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */

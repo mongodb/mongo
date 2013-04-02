@@ -21,7 +21,7 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 		return (EINVAL);
 
 	/* Close any btree handles in the file. */
-	WT_RET(__wt_conn_btree_close_all(session, name));
+	WT_RET(__wt_conn_dhandle_close_all(session, name));
 
 	/* Delete the root address and truncate the file. */
 	WT_RET(__wt_meta_checkpoint_clear(session, name));
@@ -37,10 +37,10 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 static int
 __truncate_table(WT_SESSION_IMPL *session, const char *name)
 {
-	WT_BTREE *btree;
 	WT_DECL_ITEM(namebuf);
 	WT_DECL_RET;
 	WT_TABLE *table;
+	const char *hname;
 	u_int i;
 
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
@@ -53,10 +53,11 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		 * __wt_conn_btree_close_all.
 		 */
 		WT_ERR(__wt_session_get_btree(session,
-		    table->cgroups[i]->source, NULL, NULL, WT_BTREE_EXCLUSIVE));
-		btree = session->btree;
-		WT_ERR(__wt_buf_set(
-		    session, namebuf, btree->name, strlen(btree->name) + 1));
+		    table->cgroups[i]->source, NULL, NULL,
+		    WT_DHANDLE_EXCLUSIVE));
+		hname = session->dhandle->name;
+		WT_ERR(
+		    __wt_buf_set(session, namebuf, hname, strlen(hname) + 1));
 		WT_ERR(__truncate_file(session, namebuf->data));
 	}
 
@@ -68,10 +69,11 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		 * __wt_conn_btree_close_all.
 		 */
 		WT_ERR(__wt_session_get_btree(session,
-		    table->indices[i]->source, NULL, NULL, WT_BTREE_EXCLUSIVE));
-		btree = session->btree;
+		    table->indices[i]->source, NULL, NULL,
+		    WT_DHANDLE_EXCLUSIVE));
+		hname = session->dhandle->name;
 		WT_ERR(__wt_buf_set(
-		    session, namebuf, btree->name, strlen(btree->name) + 1));
+		    session, namebuf, hname, strlen(hname) + 1));
 		WT_ERR(__truncate_file(session, namebuf->data));
 	}
 

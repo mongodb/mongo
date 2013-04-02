@@ -67,7 +67,7 @@ __create_file(WT_SESSION_IMPL *session,
 	 * call, otherwise we could race with a drop.
 	 */
 	WT_ERR(__wt_conn_btree_get(
-	    session, uri, NULL, NULL, WT_BTREE_EXCLUSIVE));
+	    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_handle_lock(session, 1));
 	else
@@ -467,7 +467,7 @@ __wt_schema_create(
 		ret = dsrc->create(dsrc, &session->iface,
 		    name, exclusive, config);
 
-	session->btree = NULL;
+	session->dhandle = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	return (ret);

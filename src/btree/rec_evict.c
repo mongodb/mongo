@@ -126,7 +126,7 @@ err:		/*
 static void
 __rec_root_update(WT_SESSION_IMPL *session)
 {
-	session->btree->root_page = NULL;
+	S2BT(session)->root_page = NULL;
 }
 
 /*
@@ -271,7 +271,7 @@ static void
 __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	/* We should never evict the file's current eviction point. */
-	WT_ASSERT(session, session->btree->evict_page != page);
+	WT_ASSERT(session, S2BT(session)->evict_page != page);
 
 	/* Make sure a page is not in the eviction request list. */
 	if (!exclusive)
@@ -302,7 +302,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	WT_PAGE *t;
 	uint32_t i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree

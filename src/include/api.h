@@ -9,27 +9,27 @@
 #define	API_CONF_DEFAULTS(h, n, cfg)					\
 	{ __wt_confdfl_##h##_##n, (cfg), NULL }
 
-#define	API_SESSION_INIT(s, h, n, cur, bt)				\
-	WT_BTREE *__oldbtree = (s)->btree;				\
+#define	API_SESSION_INIT(s, h, n, cur, dh)				\
+	WT_DATA_HANDLE *__olddh = (s)->dhandle;				\
 	const char *__oldname = (s)->name;				\
 	(s)->cursor = (cur);						\
-	(s)->btree = (bt);						\
+	(s)->dhandle = (dh);						\
 	(s)->name = #h "." #n;
 
-#define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
-	API_SESSION_INIT(s, h, n, cur, bt);				\
+#define	API_CALL_NOCONF(s, h, n, cur, dh) do {				\
+	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0)
 
-#define	API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {			\
+#define	API_CALL(s, h, n, cur, dh, cfg, cfgvar) do {			\
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
-	API_SESSION_INIT(s, h, n, cur, bt);				\
+	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
 	WT_ERR(((cfg) != NULL) ?					\
 	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg), 0) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL) {						\
-		(s)->btree = __oldbtree;				\
+		(s)->dhandle = __olddh;					\
 		(s)->name = __oldname;					\
 	}								\
 } while (0)
@@ -101,11 +101,13 @@
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur, bt)
+	API_CALL_NOCONF(s, cursor, n, cur,				\
+	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
 #define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	TXN_API_CALL_NOCONF(s, cursor, n, cur, bt)
+	TXN_API_CALL_NOCONF(s, cursor, n, cur,				\
+	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\
 	TXN_API_END(s, ret)

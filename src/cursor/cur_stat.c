@@ -285,10 +285,8 @@ __curstat_close(WT_CURSOR *cursor)
 
 	__wt_buf_free(session, &cst->pv);
 
-	if (session->btree != NULL) {
+	if (cst->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
-		cst->btree = session->btree = NULL;
-	}
 
 	__wt_free(session, cst->stats);
 	WT_TRET(__wt_cursor_close(cursor));
@@ -326,13 +324,13 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 
 	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
-	btree = session->btree;
+	btree = S2BT(session);
 	WT_RET(__wt_btree_stat_init(session, flags));
 
 	cst->btree = btree;
 	cst->notpositioned = 1;
-	cst->stats_first = (WT_STATS *)&btree->stats;
-	cst->stats_count = sizeof(btree->stats) / sizeof(WT_STATS);
+	cst->stats_first = (WT_STATS *)&btree->dhandle->stats;
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
 	    __wt_stat_clear_dsrc_stats : NULL;
 	return (0);

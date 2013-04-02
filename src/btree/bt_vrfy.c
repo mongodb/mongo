@@ -54,7 +54,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	uint32_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 	ckptbase = NULL;
 
@@ -69,7 +69,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__verify_config(session, cfg, vs));
 
 	/* Get a list of the checkpoints for this file. */
-	WT_ERR(__wt_meta_ckptlist_get(session, btree->name, &ckptbase));
+	WT_ERR(
+	    __wt_meta_ckptlist_get(session, btree->dhandle->name, &ckptbase));
 
 	/* Inform the underlying block manager we're verifying. */
 	WT_ERR(bm->verify_start(bm, session, ckptbase));
@@ -77,11 +78,11 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		WT_VERBOSE_ERR(session, verify,
-		    "%s: checkpoint %s", btree->name, ckpt->name);
+		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name);
 #ifdef HAVE_DIAGNOSTIC
 		if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
-			WT_ERR(__wt_msg(session,
-			    "%s: checkpoint %s", btree->name, ckpt->name));
+			WT_ERR(__wt_msg(session, "%s: checkpoint %s",
+			    btree->dhandle->name, ckpt->name));
 #endif
 
 		/* Fake checkpoints require no work. */
@@ -210,7 +211,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	uint32_t entry, i;
 	int found, lno;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
 	WT_VERBOSE_RET(session, verify, "%s %s",
@@ -431,7 +432,7 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	WT_ITEM item;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr->size != 0);
@@ -471,7 +472,7 @@ __verify_row_leaf_key_order(
 	WT_BTREE *btree;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * If a tree is empty (just created), it won't have keys; if there
@@ -533,7 +534,7 @@ __verify_overflow_cell(
 	WT_PAGE_HEADER *dsk;
 	uint32_t cell_num, i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 	*found = 0;
 
@@ -580,7 +581,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	WT_BM *bm;
 	WT_PAGE_HEADER *dsk;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	/* Read and verify the overflow item. */
 	WT_RET(__wt_bt_read(session, vs->tmp1, addr, addr_size));
