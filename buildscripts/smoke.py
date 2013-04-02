@@ -376,7 +376,6 @@ def skipTest(path):
             return True
 
         authTestsToSkip = [("jstests", "drop2.js"), # SERVER-8589,
-                           ("sharding", "read_pref_rs_client.js"), # SERVER-6495
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "sync6.js"),
                            ("sharding", "parallel.js"),
