@@ -505,15 +505,6 @@ isBuildingLatest = False
 if has_option( "prefix" ):
     installDir = GetOption( "prefix" )
 
-def findVersion( root , choices ):
-    if not isinstance(root, list):
-        root = [root]
-    for r in root:
-        for c in choices:
-            if ( os.path.exists( r + c ) ):
-                return r + c
-    raise RuntimeError("can't find a version of [" + repr(root) + "] choices: " + repr(choices))
-
 def filterExists(paths):
     return filter(os.path.exists, paths)
 
@@ -610,22 +601,18 @@ elif "win32" == os.sys.platform:
         print("Can't specify both 'win-version-min' and 'win2008plus'")
         Exit(1)
 
+    # If tools configuration fails to set up 'cl' in the path, fall back to importing the whole
+    # shell environment and hope for the best. This will work, for instance, if you have loaded
+    # an SDK shell.
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
         if os.path.exists(os.path.join(pathdir, 'cl.exe')):
-            print( "found visual studio at " + pathdir )
             break
     else:
-        #use current environment
+        print("NOTE: Tool configuration did not find 'cl' compiler, falling back to os environment")
         env['ENV'] = dict(os.environ)
 
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
-
-    winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
-                              [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
-    print( "Windows SDK Root '" + winSDKHome + "'" )
-
-    env.Append( EXTRACPPPATH=[ winSDKHome + "/Include" ] )
 
     # /EHsc exception handling style for visual studio
     # /W3 warning level
