@@ -206,7 +206,8 @@ struct __wt_update;
 #include "posix.h"
 
 #include "txn.h"			/* typedef for wt_txnid_t */
-#include "stat.h"			/* WT_DSRC_STATS for data sources */
+#include "stat.h"			/* required by dhandle.h */
+#include "dhandle.h"			/* required by btree.h */
 
 #include "api.h"
 #include "block.h"
