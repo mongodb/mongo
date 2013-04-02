@@ -1563,7 +1563,7 @@ namespace mongo_test {
 
         ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
         // Trigger calls to Node::getConnWithRefresh
-        monitor->check(true);
+        monitor->check();
     }
 
     // Stress test case for a node that is previously a primary being removed from the set.
@@ -1589,7 +1589,7 @@ namespace mongo_test {
             MockReplicaSet::ReplConfigMap newConfig = origConfig;
 
             replSet.setConfig(origConfig);
-            replMonitor->check(true); // Make sure the monitor sees the change
+            replMonitor->check(); // Make sure the monitor sees the change
 
             string hostToRemove;
             {
@@ -1603,12 +1603,12 @@ namespace mongo_test {
             }
 
             replSet.setPrimary(hostToRemove);
-            replMonitor->check(true); // Make sure the monitor sees the new primary
+            replMonitor->check(); // Make sure the monitor sees the new primary
 
             newConfig.erase(hostToRemove);
             replSet.setConfig(newConfig);
             replSet.setPrimary(newConfig.begin()->first);
-            replMonitor->check(true); // Force refresh -> should not crash
+            replMonitor->check(); // Force refresh -> should not crash
         }
 
         ReplicaSetMonitor::remove(replSet.getSetName(), true);
