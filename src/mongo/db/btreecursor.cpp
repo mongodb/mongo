@@ -75,7 +75,7 @@ namespace mongo {
         _independentFieldRanges = false;
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
 
-        _indexDescriptor.reset(CatalogHack::getDescriptor(d->idx(idxNo)));
+        _indexDescriptor.reset(CatalogHack::getDescriptor(d, idxNo));
         _indexAM.reset(CatalogHack::getBtreeIndex(_indexDescriptor.get()));
 
         IndexCursor *cursor;
@@ -102,7 +102,7 @@ namespace mongo {
         _boundsIterator->advance( startKey ); // handles initialization
         _boundsIterator->prepDive();
 
-        _indexDescriptor.reset(CatalogHack::getDescriptor(d->idx(idxNo)));
+        _indexDescriptor.reset(CatalogHack::getDescriptor(d, idxNo));
         _indexAM.reset(CatalogHack::getBtreeIndex(_indexDescriptor.get()));
 
         IndexCursor *cursor;

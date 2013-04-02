@@ -16,45 +16,54 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/db/btree.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/hasher.h"  // For HashSeed.
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/btree_access_method_internal.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class BtreeInterface;
-    class IndexCursor;
-    class IndexDescriptor;
-
     /**
-     * The IndexAccessMethod for a Btree index.
-     * Any index created with {field: 1} or {field: -1} uses this.
+     * This is the access method for "hashed" indices.
      */
-    class BtreeAccessMethod : public BtreeBasedAccessMethod {
+    class HashAccessMethod : public BtreeBasedAccessMethod {
     public:
-        // Every Btree-based index needs these.  We put them in the BtreeBasedAccessMethod
-        // superclass and subclasses (like this) can use them.
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_interface;
         using BtreeBasedAccessMethod::_ordering;
 
-        BtreeAccessMethod(IndexDescriptor* descriptor);
-        virtual ~BtreeAccessMethod() { }
+        HashAccessMethod(IndexDescriptor* descriptor);
 
         virtual Status newCursor(IndexCursor** out);
 
-        // TODO(hk): Keep bucket deletion internal to this class.
+        // This is a NO-OP.
+        virtual Status setOptions(const CursorOptions& options) {
+            return Status::OK();
+        }
+
+        /**
+         * Hashing function used by both this class and the cursors we create.
+         */
+        static long long int makeSingleKey(const BSONElement& e, HashSeed seed, int v);
 
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        // Our keys differ for V0 and V1.
-        scoped_ptr<BtreeKeyGenerator> _keyGenerator;
+        // Only one of our fields is hashed.  This is the field name for it.
+        string _hashedField;
+
+        // _seed defaults to zero.
+        HashSeed _seed;
+
+        // _hashVersion defaults to zero.
+        int _hashVersion;
+
+        // What key do we insert when the field is missing?
+        // TODO: fix migration code to do the right thing.
+        // TODO: see http://codereview.10gen.com/9497028/patch/3001/4007
+        BSONObj _missingKey;
     };
 
 }  // namespace mongo

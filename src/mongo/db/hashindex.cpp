@@ -1,3 +1,5 @@
+// XXX THIS FILE IS DEPRECATED.  PLEASE DON'T MODIFY.
+
 // mongo/db/hashindex.cpp
 
 /**

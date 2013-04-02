@@ -40,6 +40,18 @@ namespace mongo {
         }
     }
 
+    string KeyPattern::findPluginName(const BSONObj& keyPattern) {
+        BSONObjIterator i(keyPattern);
+
+        while (i.more()) {
+            BSONElement e = i.next();
+            if (String != e.type()) { continue; }
+            return e.String();
+        }
+
+        return "";
+    }
+
     BSONObj KeyPattern::extractSingleKey(const BSONObj& doc ) const {
         if ( _pattern.isEmpty() )
             return BSONObj();

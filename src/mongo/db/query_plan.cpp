@@ -18,6 +18,10 @@
 
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/cmdline.h"
+#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/emulated_cursor.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/intervalbtreecursor.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/parsed_query.h"
@@ -247,6 +251,17 @@ doneCheckOrder:
                 // SERVER-5390
                 numWanted = _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
             }
+
+            // TODO(hk): Migrate!
+            bool testIndexMigrations = true;
+
+            if (testIndexMigrations && CatalogHack::isIndexMigrated(_type->keyPattern())) {
+                IndexDescriptor* descriptor = CatalogHack::getDescriptor(_d, _idxNo);
+                IndexAccessMethod* iam = CatalogHack::getSpecialIndex(descriptor);
+                return shared_ptr<Cursor>(new EmulatedCursor(descriptor, iam, _originalQuery,
+                                                             _order, numWanted));
+            }
+
             return _type->newCursor( _originalQuery, _order, numWanted );
         }
 

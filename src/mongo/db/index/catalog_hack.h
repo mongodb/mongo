@@ -14,17 +14,37 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/keypattern.h"
 #include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/keypattern.h"
 
 namespace mongo {
 
+    /**
+     * Fake some catalog behavior until the catalog is finalized.
+     */
     class CatalogHack {
     public:
-        static IndexDescriptor* getDescriptor(IndexDetails &id) {
-            return new IndexDescriptor(&id, id.info.obj());
+        static IndexDescriptor* getDescriptor(NamespaceDetails* nsd, int idxNo) {
+            IndexDetails& id = nsd->idx(idxNo);
+            return new IndexDescriptor(nsd, idxNo, &id, id.info.obj());
+        }
+
+        static bool isIndexMigrated(const BSONObj& keyPattern) {
+            string type = KeyPattern::findPluginName(keyPattern);
+            return "hashed" == type;
+        }
+
+        static IndexAccessMethod* getSpecialIndex(IndexDescriptor* desc) {
+            string type = KeyPattern::findPluginName(desc->keyPattern());
+            if ("hashed" == type) {
+                return new HashAccessMethod(desc);
+            } else {
+                verify(0);
+                return NULL;
+            }
         }
 
         // The IndexDetails passed in might refer to a Btree-backed index that is not a proper Btree
@@ -32,14 +52,7 @@ namespace mongo {
         // for the backed index; it wants to talk Btree directly.  So BtreeCursor always asks for a
         // Btree index.
         static IndexAccessMethod* getBtreeIndex(IndexDescriptor* desc) {
-            if (0 == desc->version()) {
-                return new BtreeAccessMethod<V0>(desc);
-            } else if (1 == desc->version()) {
-                return new BtreeAccessMethod<V1>(desc);
-            } else {
-                verify(0);
-                return NULL;
-            }
+            return new BtreeAccessMethod(desc);
         }
     };
 

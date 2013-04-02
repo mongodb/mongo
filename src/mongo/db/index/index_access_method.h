@@ -130,7 +130,7 @@ namespace mongo {
 
     protected:
         // These friends are the classes that actually fill out an UpdateStatus.
-        template <class Key> friend class BtreeBasedAccessMethod;
+        friend class BtreeBasedAccessMethod;
 
         class PrivateUpdateData;
 

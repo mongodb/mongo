@@ -1,0 +1,169 @@
+/**
+*    Copyright (C) 2013 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "mongo/db/btree.h"
+#include "mongo/db/index/btree_interface.h"
+
+namespace mongo {
+
+    template <class Version>
+    class BtreeInterfaceImpl : public BtreeInterface {
+    public:
+        // typedef typename BucketBasics<Version>::VersionNode VersionNode;
+
+        virtual ~BtreeInterfaceImpl() { }
+
+        virtual int bt_insert(const DiskLoc thisLoc,
+                              const DiskLoc recordLoc,
+                              const BSONObj& key,
+                              const Ordering &order,
+                              bool dupsAllowed,
+                              IndexDetails& idx,
+                              bool toplevel) const {
+            // FYI: toplevel has a default value of true in btree.h
+            return thisLoc.btree<Version>()->bt_insert(
+                thisLoc,
+                recordLoc,
+                key,
+                order,
+                dupsAllowed,
+                idx,
+                toplevel);
+        }
+
+        virtual bool unindex(const DiskLoc thisLoc,
+                             IndexDetails& id,
+                             const BSONObj& key,
+                             const DiskLoc recordLoc) const {
+            return thisLoc.btree<Version>()->unindex(thisLoc, id, key, recordLoc);
+        }
+
+        virtual DiskLoc locate(const IndexDetails& idx,
+                               const DiskLoc& thisLoc,
+                               const BSONObj& key,
+                               const Ordering& order,
+                               int& pos,
+                               bool& found,
+                               const DiskLoc& recordLoc,
+                               int direction) const {
+            // FYI: direction has a default of 1
+            return thisLoc.btree<Version>()->locate(
+                idx,
+                thisLoc,
+                key,
+                order,
+                pos,
+                found,
+                recordLoc,
+                direction);
+        }
+
+        virtual bool wouldCreateDup(const IndexDetails& idx,
+                                    const DiskLoc& thisLoc,
+                                    const BSONObj& key,
+                                    const Ordering& order,
+                                    const DiskLoc& self) const {
+            typename Version::KeyOwned ownedVersion(key);
+            return thisLoc.btree<Version>()->wouldCreateDup(
+                idx,
+                thisLoc,
+                ownedVersion,
+                order,
+                self);
+        }
+
+        virtual void customLocate(DiskLoc& locInOut,
+                                  int& keyOfs,
+                                  const BSONObj& keyBegin,
+                                  int keyBeginLen, bool afterVersion,
+                                  const vector<const BSONElement*>& keyEnd,
+                                  const vector<bool>& keyEndInclusive,
+                                  const Ordering& order,
+                                  int direction,
+                                  pair<DiskLoc, int>& bestParent) {
+            locInOut.btree<Version>()->customLocate(
+                locInOut,
+                keyOfs,
+                keyBegin,
+                keyBeginLen,
+                afterVersion,
+                keyEnd,
+                keyEndInclusive,
+                order,
+                direction,
+                bestParent);
+        }
+
+        virtual void advanceTo(DiskLoc &thisLoc,
+                               int &keyOfs,
+                               const BSONObj &keyBegin,
+                               int keyBeginLen,
+                               bool afterVersion,
+                               const vector<const BSONElement*>& keyEnd,
+                               const vector<bool>& keyEndInclusive,
+                               const Ordering& order, int direction) const {
+            thisLoc.btree<Version>()->advanceTo(
+                thisLoc,
+                keyOfs,
+                keyBegin,
+                keyBeginLen,
+                afterVersion,
+                keyEnd,
+                keyEndInclusive,
+                order,
+                direction);
+        }
+
+
+        virtual bool keyIsUsed(DiskLoc bucket, int keyOffset) const {
+            return bucket.btree<Version>()->k(keyOffset).isUsed();
+        }
+
+        virtual BSONObj keyAt(DiskLoc bucket, int keyOffset) const {
+            verify(!bucket.isNull());
+            const BtreeBucket<Version> *b = bucket.btree<Version>();
+            int n = b->getN();
+            if (n == b->INVALID_N_SENTINEL) {
+                throw UserException(deletedBucketCode, "keyAt bucket deleted");
+            }
+            dassert( n >= 0 && n < 10000 );
+            return keyOffset >= n ? BSONObj() : b->keyNode(keyOffset).key.toBson();
+        }
+
+        virtual DiskLoc recordAt(DiskLoc bucket, int keyOffset) const {
+            const BtreeBucket<Version> *b = bucket.btree<Version>();
+            return b->keyNode(keyOffset).recordLoc;
+        }
+
+        virtual string dupKeyError(DiskLoc bucket, const IndexDetails &idx,
+                                   const BSONObj& keyObj) const {
+            typename Version::KeyOwned key(keyObj);
+            return bucket.btree<Version>()->dupKeyError(idx, key);
+        }
+
+        virtual DiskLoc advance(const DiskLoc& thisLoc,
+                                int& keyOfs,
+                                int direction,
+                                const char* caller) const {
+            return thisLoc.btree<Version>()->advance(thisLoc, keyOfs, direction, caller);
+        }
+    };
+
+    BtreeInterfaceImpl<V0> interface_v0;
+    BtreeInterfaceImpl<V1> interface_v1;
+    BtreeInterface* BtreeInterface::interfaces[] = { &interface_v0, &interface_v1 };
+
+}  // namespace mongo
