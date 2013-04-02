@@ -24,7 +24,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_UPDATE *upd;
 	uint8_t v;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	page = cbt->page;
 	cursor = &cbt->iface;

@@ -17,7 +17,7 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	page = btree->root_page;
 
 	/* Dirty the root page to ensure a write. */
@@ -37,7 +37,7 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	WT_DECL_RET;
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * Compaction and sync/checkpoint reconcile dirty pages from the cache

@@ -74,6 +74,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->compress_write_fail.desc = "page written failed to compress";
 	stats->compress_write_too_small.desc =
 	    "page written was too small to compress";
+	stats->cursor_create.desc = "cursor creation";
 	stats->cursor_insert.desc = "cursor insert calls";
 	stats->cursor_insert_bulk.desc = "bulk-loaded cursor-insert calls";
 	stats->cursor_insert_bytes.desc =
@@ -171,6 +172,7 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->compress_write.v = 0;
 	stats->compress_write_fail.v = 0;
 	stats->compress_write_too_small.v = 0;
+	stats->cursor_create.v = 0;
 	stats->cursor_insert.v = 0;
 	stats->cursor_insert_bulk.v = 0;
 	stats->cursor_insert_bytes.v = 0;
@@ -299,7 +301,6 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
 	stats->cond_wait.v = 0;
-	stats->file_open.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
 	stats->memory_grow.v = 0;

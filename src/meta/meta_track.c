@@ -115,7 +115,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
 		if (unroll && trk->created)
-			F_SET(trk->btree, WT_BTREE_DISCARD);
+			F_SET(trk->btree->dhandle, WT_DHANDLE_DISCARD);
 		WT_WITH_BTREE(session, trk->btree,
 		    WT_TRET(__wt_session_release_btree(session)));
 		break;
@@ -261,12 +261,12 @@ __wt_meta_track_checkpoint(WT_SESSION_IMPL *session)
 {
 	WT_META_TRACK *trk;
 
-	WT_ASSERT(session, session->btree != NULL);
+	WT_ASSERT(session, session->dhandle != NULL);
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_CHECKPOINT;
-	trk->btree = session->btree;
+	trk->btree = S2BT(session);
 	return (0);
 }
 /*
@@ -341,12 +341,12 @@ __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created)
 {
 	WT_META_TRACK *trk;
 
-	WT_ASSERT(session, session->btree != NULL);
+	WT_ASSERT(session, session->dhandle != NULL);
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_LOCK;
-	trk->btree = session->btree;
+	trk->btree = S2BT(session);
 	trk->created = created;
 	return (0);
 }

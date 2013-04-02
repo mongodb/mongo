@@ -24,9 +24,9 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_DSRC_STATS *stats;
 	WT_PAGE *page;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
-	stats = &btree->stats;
+	stats = &btree->dhandle->stats;
 
 	WT_RET(bm->stat(bm, session, stats));
 

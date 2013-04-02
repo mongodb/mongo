@@ -27,16 +27,16 @@ __drop_file(
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
-	if (session->btree == NULL &&
+	if (session->dhandle == NULL &&
 	    (ret = __wt_session_get_btree(session, uri, NULL, cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
+	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
 		return (ret);
 	}
 
 	/* Close all btree handles associated with this file. */
-	WT_RET(__wt_conn_btree_close_all(session, uri));
+	WT_RET(__wt_conn_dhandle_close_all(session, uri));
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_TRET(__wt_metadata_remove(session, uri));

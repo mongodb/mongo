@@ -17,7 +17,7 @@ __ovfl_read(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * Read the overflow item from the block manager, then reference the
@@ -42,7 +42,7 @@ __wt_ovfl_read(WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	WT_DSTAT_INCR(session, cache_read_overflow);
 
 	/*
@@ -262,7 +262,7 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_DECL_RET;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * This function solves a problem in reconciliation. The scenario is:

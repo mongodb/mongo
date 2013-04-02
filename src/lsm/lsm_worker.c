@@ -80,14 +80,14 @@ __wt_lsm_merge_worker(void *vargs)
 		progress = 0;
 
 		/* Clear any state from previous worker thread iterations. */
-		session->btree = NULL;
+		session->dhandle = NULL;
 
 		/* Report stalls to merge in seconds. */
 		if (__wt_lsm_merge(session, lsm_tree, id, stalls / 1000) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
-		session->btree = NULL;
+		WT_CLEAR_BTREE_IN_SESSION(session);
 
 		/*
 		 * Only have one thread freeing old chunks, and only if there
@@ -247,7 +247,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, NULL, WT_BTREE_DISCARD_CLOSE));
+			    __wt_checkpoint, NULL, WT_DHANDLE_DISCARD_CLOSE));
 
 			if (ret != 0) {
 				__wt_err(session, ret,

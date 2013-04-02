@@ -258,7 +258,7 @@ __curfile_close(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cbt->btree);
 	WT_TRET(__wt_btcur_close(cbt));
-	if (session->btree != NULL)
+	if (cbt->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
@@ -301,7 +301,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	cbt = NULL;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	WT_ASSERT(session, btree != NULL);
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
@@ -310,11 +310,11 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor = &cbt->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->uri = btree->name;
+	cursor->uri = btree->dhandle->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
 
-	cbt->btree = session->btree;
+	cbt->btree = btree;
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
 
@@ -368,7 +368,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 
 	/* Bulk handles require exclusive access. */
 	if (bulk)
-		LF_SET(WT_BTREE_BULK | WT_BTREE_EXCLUSIVE);
+		LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
 	/* TODO: handle projections. */
 

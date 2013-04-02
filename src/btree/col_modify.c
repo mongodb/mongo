@@ -241,7 +241,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	__wt_col_append_unpack(args,
 	    &page, &write_gen, &insheadp, &ins_stack, &next_stack,

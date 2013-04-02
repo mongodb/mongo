@@ -20,7 +20,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_PAGE *page;
 	int trigger, skip;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	WT_DSTAT_INCR(session, session_compact);
 
@@ -82,7 +82,7 @@ __wt_compact_page_skip(
 	uint32_t addr_size;
 	const uint8_t *addr;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	/*
 	 * There's one compaction test we do before we read the page, to see
@@ -122,7 +122,7 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t addr_size;
 	const uint8_t *addr;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 	mod = page->modify;
 
 	/*

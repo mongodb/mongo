@@ -461,8 +461,8 @@ __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* If no page stack specified, clear the standard eviction stack. */
 	if (page == NULL) {
-		page = session->btree->evict_page;
-		session->btree->evict_page = NULL;
+		page = S2BT(session)->evict_page;
+		S2BT(session)->evict_page = NULL;
 	}
 
 	/* Clear the current eviction point. */
@@ -589,7 +589,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	__evict_list_clr_range(session, 0);
 
 	/* Wait for LRU eviction activity to drain. */
-	while (request_session->btree->lru_count > 0) {
+	while (S2BT(request_session)->lru_count > 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
 		__wt_yield();
 		__wt_spin_lock(session, &cache->evict_lock);
@@ -671,7 +671,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * pointing to freed memory.
 			 */
 			if (WT_PAGE_IS_ROOT(page))
-				session->btree->root_page = NULL;
+				S2BT(session)->root_page = NULL;
 			__wt_page_out(session, &page);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -701,7 +701,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_TXN *txn;
 	uint32_t flags;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	page = NULL;
 	txn = &session->txn;
@@ -880,6 +880,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	u_int file_count, i, retries;
 
@@ -897,9 +898,13 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	 */
 	i = WT_EVICT_WALK_BASE;
 retry:	file_count = 0;
-	TAILQ_FOREACH(btree, &conn->btqh, q) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			continue;
 		if (file_count++ < cache->evict_file_next)
 			continue;
+		btree = dhandle->handle;
 
 		/*
 		 * Skip files that aren't open or don't have a root page.
@@ -910,8 +915,7 @@ retry:	file_count = 0;
 		 * to a bulk-loaded object, and empty trees aren't worth trying
 		 * to evict, anyway.
 		 */
-		if (!F_ISSET(btree, WT_BTREE_OPEN) ||
-		    btree->root_page == NULL ||
+		if (btree->root_page == NULL ||
 		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 		    btree->bulk_load_ok)
 			continue;
@@ -927,7 +931,7 @@ retry:	file_count = 0;
 		if (ret != 0 || i == cache->evict_entries)
 			break;
 	}
-	cache->evict_file_next = (btree == NULL) ? 0 : file_count;
+	cache->evict_file_next = (dhandle == NULL) ? 0 : file_count;
 
 	/* Walk the files a few times if we don't find enough pages. */
 	if (ret == 0 && i < cache->evict_entries && retries++ < 10)
@@ -948,7 +952,7 @@ __evict_init_candidate(
 	if (evict->page != NULL)
 		__evict_list_clr(session, evict);
 	evict->page = page;
-	evict->btree = session->btree;
+	evict->btree = S2BT(session);
 
 	/* Mark the page on the list */
 	F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
@@ -969,7 +973,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	wt_txnid_t oldest_txn;
 	int modified, restarts, levels;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	start = cache->evict + *slotp;
 	end = start + WT_EVICT_WALK_PER_FILE;
@@ -1248,6 +1252,7 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 #ifdef HAVE_DIAGNOSTIC
 	WT_BTREE *btree;
 	WT_CACHE *cache;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
@@ -1264,7 +1269,11 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 
 	bytes_baseline = __wt_cache_bytes_dirty(cache);
 
-	TAILQ_FOREACH(btree, &conn->btqh, q) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			continue;
+		btree = (WT_BTREE *)dhandle;
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, btree);
 		while ((ret = __wt_tree_walk(

@@ -14,11 +14,11 @@
 int
 __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_BTREE *btree;
 	WT_CKPT *ckptbase;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	btree = session->btree;
+	dhandle = session->dhandle;
 
 	/*
 	 * XXX
@@ -48,9 +48,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * checkpoints with the single new one.
 	 */
 	if (ckptbase[0].raw.data == NULL)
-		WT_ERR(__wt_meta_checkpoint_clear(session, btree->name));
+		WT_ERR(__wt_meta_checkpoint_clear(session, dhandle->name));
 	else
-		WT_ERR(__wt_meta_ckptlist_set(session, btree->name, ckptbase));
+		WT_ERR(
+		    __wt_meta_ckptlist_set(session, dhandle->name, ckptbase));
 
 err:	__wt_meta_ckptlist_free(session, ckptbase);
 	return (ret);

@@ -152,17 +152,17 @@ err:	WT_TRET(cursor->close(cursor));
 static int
 __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_BTREE *btree;
+	WT_DATA_HANDLE *dhandle;
 	char **p;
 
 	WT_UNUSED(cfg);
 
-	btree = session->btree;
+	dhandle = session->dhandle;
 
 	/* Check for a match on the set of sources. */
 	for (p = S2C(session)->stat_sources; *p != NULL; ++p)
-		if (WT_PREFIX_MATCH(btree->name, *p))
-			return (__statlog_dump(session, btree->name, 0));
+		if (WT_PREFIX_MATCH(dhandle->name, *p))
+			return (__statlog_dump(session, dhandle->name, 0));
 	return (0);
 }
 

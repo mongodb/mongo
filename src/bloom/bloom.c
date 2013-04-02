@@ -129,7 +129,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 
 	/* XXX Layering violation: bump the cache priority for Bloom filters. */
-	session->btree->evict_priority = (1 << 19);
+	S2BT(session)->evict_priority = (1 << 19);
 
 	WT_ERR(c->prev(c));
 	WT_ERR(c->get_key(c, &size));

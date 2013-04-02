@@ -463,8 +463,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	 * error code, the verification code takes care of complaining (and, in
 	 * the case of salvage, it won't complain at all, it's OK to fail).
 	 */
-#undef	CHK
-#define	CHK(p, len) do {						\
+#define	WT_CELL_LEN_CHK(p, len) do {					\
 	if (end != NULL && (((uint8_t *)p) + (len)) > end)		\
 		return (WT_ERROR);					\
 } while (0)
@@ -478,7 +477,7 @@ restart:
 	 *
 	 * NOTE: WT_CELL_VALUE_SHORT MUST BE CHECKED BEFORE WT_CELL_KEY_SHORT.
 	 */
-	CHK(cell, 0);
+	WT_CELL_LEN_CHK(cell, 0);
 	if (cell->__chunk[0] & WT_CELL_VALUE_SHORT) {
 		unpack->type = WT_CELL_VALUE;
 		unpack->raw = WT_CELL_VALUE_SHORT;
@@ -507,7 +506,7 @@ restart:
 		/*
 		 * Check the prefix byte that follows the cell descriptor byte.
 		 */
-		CHK(cell, 1);
+		WT_CELL_LEN_CHK(cell, 1);
 		unpack->prefix = cell->__chunk[1];
 
 		unpack->data = cell->__chunk + 2;
@@ -536,7 +535,7 @@ restart:
 		 * Check the prefix byte that follows the cell descriptor byte.
 		 */
 		++p;					/* skip prefix */
-		CHK(p, 0);
+		WT_CELL_LEN_CHK(p, 0);
 		unpack->prefix = cell->__chunk[1];
 	}
 
@@ -599,7 +598,7 @@ restart:
 	 * diagnostic as well, we may be copying the cell from the page and
 	 * we need the right length).
 	 */
-done:	CHK(cell, unpack->__len);
+done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 	if (copied) {
 		unpack->raw = WT_CELL_VALUE_COPY;
 		unpack->__len = saved_len;
@@ -629,7 +628,7 @@ __wt_cell_unpack_ref(
 	WT_BTREE *btree;
 	void *huffman;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Reference the cell's data, optionally decode it. */
 	switch (unpack->type) {

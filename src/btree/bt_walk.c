@@ -168,7 +168,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	int cache, compact, discard, eviction, prev, set_read_gen;
 	int skip, skip_intl, skip_leaf;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Fast-discard currently only works on row-store trees. */
 	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;

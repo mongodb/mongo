@@ -85,7 +85,7 @@ int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_BTREE *btree;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -134,10 +134,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_sync));
 
 	/* Checkpoint the metadata file. */
-	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (strcmp(btree->name, WT_METADATA_URI) == 0)
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+		if (WT_IS_METADATA(dhandle) ||
+		    !WT_PREFIX_MATCH(dhandle->name, "file:"))
 			break;
-	if (btree == NULL)
+	}
+	if (dhandle == NULL)
 		WT_ERR_MSG(session, EINVAL,
 		    "checkpoint unable to find open meta-data handle");
 
@@ -151,7 +153,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
-	WT_WITH_BTREE(session, btree,
+	WT_WITH_DHANDLE(session, dhandle,
 	    ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
@@ -307,6 +309,7 @@ __checkpoint_worker(
 	WT_CONFIG dropconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
@@ -315,9 +318,10 @@ __checkpoint_worker(
 	char *name_alloc;
 
 	conn = S2C(session);
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 	ckpt = ckptbase = NULL;
+	dhandle = session->dhandle;
 	name_alloc = NULL;
 	txn = &session->txn;
 	saved_isolation = txn->isolation;
@@ -328,7 +332,7 @@ __checkpoint_worker(
 	 * in checkpoints.   Closing one discards its blocks, otherwise there's
 	 * no work to do.
 	 */
-	if (btree->checkpoint != NULL)
+	if (dhandle->checkpoint != NULL)
 		return (is_checkpoint ? 0 :
 		    __wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
@@ -349,7 +353,7 @@ __checkpoint_worker(
 	 * the cache without bothering to write any dirty pages.
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
-	    session, btree->name, &ckptbase)) == WT_NOTFOUND)
+	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND)
 		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 	WT_ERR(ret);
@@ -626,7 +630,7 @@ __checkpoint_worker(
 fake:
 	/* Update the object's metadata. */
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
-	ret = __wt_meta_ckptlist_set(session, btree->name, ckptbase);
+	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
 	WT_ERR(ret);
 
 	/*
@@ -669,7 +673,7 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_UNUSED(cfg);
 
-	if (session->btree->modified)
+	if (S2BT(session)->modified)
 		WT_RET(__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_WRITE_LEAVES));
 
@@ -686,10 +690,10 @@ __checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BTREE *btree;
 
 	WT_UNUSED(cfg);
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Only sync ordinary handles: checkpoint handles are read-only. */
-	if (btree->checkpoint == NULL && btree->bm != NULL)
+	if (btree->dhandle->checkpoint == NULL && btree->bm != NULL)
 		return (btree->bm->sync(btree->bm, session));
 	return (0);
 }
