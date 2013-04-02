@@ -58,7 +58,11 @@ namespace mongo {
             while ( i != end ) {
                 boost::filesystem::path p = *i;
                 BSONObjBuilder b;
+            #if BOOST_VERSION >= 104400
                 b << "name" << p.generic_string();
+            #else
+                b << "name" << p.string();
+            #endif
                 b.appendBool( "isDirectory", is_directory( p ) );
                 if ( ! boost::filesystem::is_directory( p ) ) {
                     try {
