@@ -190,7 +190,11 @@ namespace mongo {
                 for ( boost::filesystem::directory_iterator i( jdir );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
+                #if BOOST_VERSION >= 104400
                     string fileName = boost::filesystem::path(*i).leaf().string();
+                #else
+                    string fileName = boost::filesystem::path(*i).leaf();
+                #endif
                     if( anyFiles || str::startsWith(fileName, "j._") )
                         return true;
                 }
@@ -208,7 +212,11 @@ namespace mongo {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
+                #if BOOST_VERSION >= 104400
                     string fileName = boost::filesystem::path(*i).leaf().string();
+                #else
+                    string fileName = boost::filesystem::path(*i).leaf();
+                #endif
                     if( str::startsWith(fileName, "j._") ) {
                         try {
                             removeOldJournalFile(*i);

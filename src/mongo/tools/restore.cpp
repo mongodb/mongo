@@ -230,7 +230,11 @@ public:
         LOG(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
+    #if BOOST_VERSION >= 104400
         if (root.leaf().string()[0] == '.' && root.leaf().string() != ".")
+    #else
+        if (root.leaf()[0] == '.' && root.leaf() != ".")
+    #endif
             return;
 
         if ( is_directory( root ) ) {
@@ -305,14 +309,24 @@ public:
             ns += _db;
         }
         else {
+        #if BOOST_VERSION >= 104400
             ns = root.parent_path().filename().string();
+        #else
+            ns = root.parent_path().filename();
+        #endif
             if (ns.empty())
                 ns = "test";
         }
 
         verify( ns.size() );
 
-        string oldCollName = root.leaf().string(); // Name of the collection that was dumped from
+        // Name of the collection that was dumped from
+    #if BOOST_VERSION >= 104400
+        string oldCollName = root.leaf().string();
+    #else
+        string oldCollName = root.leaf();
+    #endif
+
         oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
         if (use_coll) {
             ns += "." + _coll;
@@ -351,7 +365,11 @@ public:
             if (!boost::filesystem::exists(metadataFile.string())) {
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
                 // System collections shouldn't have metadata so don't warn if that file is missing.
+            #if BOOST_VERSION >= 104400
                 if (!startsWith(metadataFile.leaf().string(), "system.")) {
+            #else
+                if (!startsWith(metadataFile.leaf(), "system.")) {
+            #endif
                     log() << metadataFile.string() << " not found. Skipping." << endl;
                 }
             } else {

@@ -1919,7 +1919,11 @@ namespace mongo {
             virtual bool apply( const Path &p ) {
                 if ( !boost::filesystem::exists( p ) )
                     return false;
+            #if BOOST_VERSION >= 104400
                 boostRenameWrapper( p, newPath_ / ( p.leaf().string() + ".bak" ) );
+            #else
+                boostRenameWrapper( p, newPath_ / ( p.leaf() + ".bak" ) );
+            #endif
                 return true;
             }
             virtual const char * op() const {
