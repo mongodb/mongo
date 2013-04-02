@@ -251,6 +251,9 @@
     <Filter Include="JavaScript source files\Included in shell only">
       <UniqueIdentifier>{fccb174d-464d-4ec9-b0fc-630a294c75c0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\index">
+      <UniqueIdentifier>{08d06617-bffe-4a15-8da3-34d63ad01c37}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -2285,6 +2288,30 @@
     </ClInclude>
     <ClInclude Include="..\db\parsed_query.h">
       <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\btree_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\btree_access_method_internal.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\btree_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\btree_key_generator.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\catalog_hack.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\index_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\index_descriptor.h">
+      <Filter>db\index</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -4323,6 +4350,12 @@
     </ClCompile>
     <ClCompile Include="..\db\parsed_query.cpp">
       <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\btree_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\btree_key_generator.cpp">
+      <Filter>db\index</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

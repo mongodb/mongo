@@ -1856,6 +1856,12 @@
     <ClCompile Include="parsed_query.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
+    <ClCompile Include="index\btree_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\btree_key_generator.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -3918,6 +3924,30 @@
     <ClInclude Include="parsed_query.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
+    <ClInclude Include="index\btree_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\btree_access_method_internal.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\btree_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\btree_key_generator.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\catalog_hack.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\index_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\index_descriptor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -4359,6 +4389,9 @@
     </Filter>
     <Filter Include="JavaScript source files\Included in shell only">
       <UniqueIdentifier>{023400bc-92fc-4d80-849e-ee5c8c6ca478}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\index">
+      <UniqueIdentifier>{222760f0-8bef-42ff-933e-cb765e706d9f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -715,6 +715,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\hashindex.h" />
     <ClInclude Include="..\db\index.h" />
     <ClInclude Include="..\db\indexkey.h" />
+    <ClInclude Include="..\db\index\btree_access_method.h" />
+    <ClInclude Include="..\db\index\btree_access_method_internal.h" />
+    <ClInclude Include="..\db\index\btree_index_cursor.h" />
+    <ClInclude Include="..\db\index\btree_key_generator.h" />
+    <ClInclude Include="..\db\index\catalog_hack.h" />
+    <ClInclude Include="..\db\index\index_access_method.h" />
+    <ClInclude Include="..\db\index\index_cursor.h" />
+    <ClInclude Include="..\db\index\index_descriptor.h" />
     <ClInclude Include="..\db\index_insertion_continuation.h" />
     <ClInclude Include="..\db\index_rebuilder.h" />
     <ClInclude Include="..\db\index_set.h" />
@@ -2870,6 +2878,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\geo\shapes.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\hashindex.cpp" />
+    <ClCompile Include="..\db\index\btree_access_method.cpp" />
+    <ClCompile Include="..\db\index\btree_key_generator.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
     <ClCompile Include="..\db\index_set.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
