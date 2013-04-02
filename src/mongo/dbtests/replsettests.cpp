@@ -20,12 +20,16 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/db.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/time_support.h"
+
 
 namespace mongo {
     void createOplog();
@@ -171,6 +175,555 @@ namespace ReplSetTests {
     };
 
     DBDirectClient Base::client_;
+
+    class IndexBuildThread : public BackgroundJob {
+    public:
+        IndexBuildThread(const BSONObj index) :
+            _done(false), _index(index.getOwned()), _client(NULL), _curop(NULL) {
+        }
+
+        std::string name() const {
+            return "index build helper";
+        }
+
+        void run() {
+            std::string ns = nsToDatabase(_index.getStringField("ns"))+".system.indexes";
+
+            Client::initThread("in progress idx build");
+            Client::WriteContext ctx(ns);
+            _client = currentClient.get();
+
+            // This spins to mimic the db building an index.  Yield the read lock so that other
+            // dbs can be opened (which requires the write lock)
+            while (!_curop || !_curop->killPendingStrict()) {
+                dbtemprelease temp;
+                sleepmillis(0);
+            }
+
+            killCurrentOp.notifyAllWaiters();
+            cc().shutdown();
+            _done = true;
+        }
+
+        // Make sure the test doesn't end while this "index build" is still spinning
+        void finish() {
+            while (!_curop) {
+                sleepmillis(0);
+            }
+
+            _curop->kill();
+
+            while (!_done) {
+                sleepmillis(0);
+            }
+        }
+
+        bool finished() {
+            return _done;
+        }
+
+        CurOp* curop() {
+            if (_curop != NULL) {
+                return _curop;
+            }
+
+            while (_client == NULL) {
+                sleepmillis(0);
+            }
+
+            // On the first time through, make sure the curop is set up correctly
+            _client->curop()->reset(HostAndPort::me(), dbInsert);
+            _client->curop()->enter(_client->getContext());
+            _client->curop()->setQuery(_index);
+
+            _curop = _client->curop();
+            return _curop;
+        }
+
+    private:
+        bool _done;
+        BSONObj _index;
+        Client* _client;
+        CurOp* _curop;
+    };
+
+    class TestDropDB : public Base {
+    public:
+        void run() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            Command *dropDB = Command::findCommand("dropDatabase");
+            BSONObj cmdObj = BSON("dropDatabase" << 1);
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<  "key" <<
+                                    BSON("foo" << 1));
+            BSONObj indexOp2 = BSON("ns" << (dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+            // Different database - foo
+            BSONObj indexOp3 = BSON("ns" << "foo.something.else" << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+            // Different database - unittestsx
+            BSONObj indexOp4 = BSON("ns" << (dbname+"x.something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+            // Different database - xunittests
+            BSONObj indexOp5 = BSON("ns" << ("x"+dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+            IndexBuildThread t3(indexOp3);
+            IndexBuildThread t4(indexOp4);
+            IndexBuildThread t5(indexOp5);
+
+            t1.go();
+            t2.go();
+            t3.go();
+            t4.go();
+            t5.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+            ASSERT(!t3.curop()->killPending());
+            ASSERT(!t4.curop()->killPending());
+            ASSERT(!t5.curop()->killPending());
+
+            dropDB->stopIndexBuilds(dbname, cmdObj);
+
+            sleepsecs(1);
+
+            ASSERT(t1.finished());
+            ASSERT(t2.finished());
+            ASSERT(!t3.finished());
+            ASSERT(!t4.finished());
+            ASSERT(!t5.finished());
+
+            t3.finish();
+            t4.finish();
+            t5.finish();
+        }
+    };
+
+    class TestDrop : public Base {
+    public:
+        void run() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            Command *drop = Command::findCommand("drop");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<
+                                    "key" << BSON("foo" << 1));
+            BSONObj indexOp2 = BSON("ns" << ns() << "name" << "bar_1" <<
+                                    "key" << BSON("bar" << 1) << "background" << true);
+            // Different collection
+            BSONObj indexOp3 = BSON("ns" << (dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+            IndexBuildThread t3(indexOp3);
+
+            t1.go();
+            t2.go();
+            t3.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+            ASSERT(!t3.curop()->killPending());
+
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmdObj = BSON("drop" << coll);
+            drop->stopIndexBuilds(dbname, cmdObj);
+
+            sleepsecs(1);
+
+            ASSERT(t1.finished());
+            ASSERT(t2.finished());
+            ASSERT(!t3.finished());
+
+            t3.finish();
+        }
+    };
+
+    class TestDropIndexes : public Base {
+
+        void testDropIndexes1() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            Command *c = Command::findCommand("dropIndexes");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "x_1" <<  "key" << BSON("x" << 1));
+            BSONObj indexOp2 = BSON("ns" << ns() << "name" << "y_1" <<  "key" << BSON("y" << 1));
+            BSONObj indexOp3 = BSON("ns" << ns() << "name" << "z_1" <<  "key" << BSON("z" << 1));
+
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmd1 = BSON("dropIndexes" << coll << "index" << "*");
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+            IndexBuildThread t3(indexOp3);
+
+            t1.go();
+            t2.go();
+            t3.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+            ASSERT(!t3.curop()->killPending());
+
+            c->stopIndexBuilds(dbname, cmd1);
+
+            sleepsecs(1);
+
+            ASSERT(t1.finished());
+            ASSERT(t2.finished());
+            ASSERT(t3.finished());
+        }
+
+        void testDropIndexes2() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            Command *c = Command::findCommand("dropIndexes");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "x_1" <<  "key" << BSON("x" << 1));
+            BSONObj indexOp2 = BSON("ns" << ns() << "name" << "y_1" <<  "key" << BSON("y" << 1));
+            BSONObj indexOp3 = BSON("ns" << ns() << "name" << "z_1" <<  "key" << BSON("z" << 1));
+
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmd2 = BSON("dropIndexes" << coll << "index" << "y_1");
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+            IndexBuildThread t3(indexOp3);
+
+            t1.go();
+            t2.go();
+            t3.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+            ASSERT(!t3.curop()->killPending());
+
+            c->stopIndexBuilds(dbname, cmd2);
+
+            sleepsecs(1);
+
+            ASSERT(!t1.finished());
+            ASSERT(t2.finished());
+            ASSERT(!t3.finished());
+
+            t1.finish();
+            t3.finish();
+        }
+
+        void testDropIndexes3() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmd3 = BSON("dropIndexes" << coll << "index" << BSON("z" << 1));
+            Command *c = Command::findCommand("dropIndexes");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "x_1" <<  "key" << BSON("x" << 1));
+            BSONObj indexOp2 = BSON("ns" << ns() << "name" << "y_1" <<  "key" << BSON("y" << 1));
+            BSONObj indexOp3 = BSON("ns" << ns() << "name" << "z_1" <<  "key" << BSON("z" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+            IndexBuildThread t3(indexOp3);
+
+            t1.go();
+            t2.go();
+            t3.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+            ASSERT(!t3.curop()->killPending());
+
+            c->stopIndexBuilds(dbname, cmd3);
+
+            sleepsecs(1);
+
+            ASSERT(!t1.finished());
+            ASSERT(!t2.finished());
+            ASSERT(t3.finished());
+
+            t1.finish();
+            t2.finish();
+        }
+
+    public:
+        void run() {
+            testDropIndexes1();
+            testDropIndexes2();
+            testDropIndexes3();
+        }
+    };
+
+    class TestRename : public Base {
+    public:
+        void run() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmdObj = BSON("renameCollection" << ns() << "to" << dbname+".bar");
+            Command *c = Command::findCommand("renameCollection");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "x_1" <<  "key" << BSON("x" << 1));
+            BSONObj indexOp2 = BSON("ns" << ns() << "name" << "y_1" <<  "key" << BSON("y" << 1));
+            BSONObj indexOp3 = BSON("ns" << (dbname+".bar") << "name" << "z_1" <<  "key" << 
+                                    BSON("z" << 1));
+            BSONObj indexOp4 = BSON("ns" << ("x."+coll) << "name" << "z_1" <<  "key" << 
+                                    BSON("z" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+            IndexBuildThread t3(indexOp3);
+            IndexBuildThread t4(indexOp4);
+
+            t1.go();
+            t2.go();
+            t3.go();
+            t4.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+            ASSERT(!t3.curop()->killPending());
+            ASSERT(!t4.curop()->killPending());
+
+            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+
+            ASSERT(t1.finished());
+            ASSERT(t2.finished());
+            ASSERT(!t3.finished());
+            ASSERT(!t4.finished());
+
+            t3.finish();
+            t4.finish();
+
+            // Build indexes
+            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+
+            DBDirectClient cli;
+            time_t max = time(0)+10;
+            // assert.soon
+            while (time(0) < max) {
+                std::string ns = dbname+".system.indexes";
+                if (cli.count(ns) == 3) {
+                    return;
+                }
+            };
+
+            ASSERT(false);
+        }
+    };
+
+    class TestReIndex : public Base {
+    public:
+        void run() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmdObj = BSON("reIndex" << coll);
+            Command *c = Command::findCommand("reIndex");
+
+            DBDirectClient cli;
+            int originalIndexCount = cli.count(dbname+".system.indexes");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<
+                                    "key" << BSON("foo" << 1));
+            BSONObj indexOp2 = BSON("ns" << (dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+
+            t1.go();
+            t2.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+
+            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+            ASSERT_EQUALS(1U, indexes.size());
+            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+
+            ASSERT(!t2.finished());
+            t2.finish();
+
+            time_t max = time(0)+10;
+            // assert.soon(t1.finished())
+            while (time(0) < max) {
+                std::string ns = dbname+".system.indexes";
+                if (static_cast<int>(cli.count(ns)) == originalIndexCount+2) {
+                    return;
+                }
+            };
+
+            ASSERT(false);
+        }
+    };
+
+    class TestTruncateCapped : public Base {
+    public:
+        void run() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmdObj = BSON("emptycapped" << coll);
+            Command *c = Command::findCommand("emptycapped");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<
+                                    "key" << BSON("foo" << 1));
+            BSONObj indexOp2 = BSON("ns" << (dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+
+            t1.go();
+            t2.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+
+            c->stopIndexBuilds(dbname, cmdObj);
+
+            sleepsecs(1);
+
+            ASSERT(t1.finished());
+            ASSERT(!t2.finished());
+
+            t2.finish();
+        }
+    };
+
+    class TestCompact : public Base {
+    public:
+        void run() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            std::string coll(strchr(ns(), '.')+1);
+            BSONObj cmdObj = BSON("compact" << coll);
+            Command *c = Command::findCommand("compact");
+            DBDirectClient cli;
+            int originalIndexCount = cli.count(dbname+".system.indexes");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<
+                                    "key" << BSON("foo" << 1));
+            BSONObj indexOp2 = BSON("ns" << (dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+
+            t1.go();
+            t2.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+
+            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+
+            ASSERT(!t2.finished());
+            t2.finish();
+
+            time_t max = time(0)+10;
+            // assert.soon(t1.finished())
+            while (time(0) < max) {
+                std::string ns = dbname+".system.indexes";
+                if (static_cast<int>(cli.count(ns)) == originalIndexCount+2) {
+                    return;
+                }
+            };
+
+            ASSERT(false);
+        }
+    };
+
+    class TestRepair : public Base {
+    public:
+        void run() {
+            drop();
+
+            std::string dbname = nsToDatabase(ns());
+            Command *c = Command::findCommand("repairDatabase");
+            BSONObj cmdObj = BSON("repairDatabase" << 1);
+            DBDirectClient cli;
+            int originalIndexCount = cli.count(dbname+".system.indexes");
+
+            BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<  "key" <<
+                                    BSON("foo" << 1));
+            BSONObj indexOp2 = BSON("ns" << (dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+            // Different database - foo
+            BSONObj indexOp3 = BSON("ns" << "foo.something.else" << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+            // Different database - unittestsx
+            BSONObj indexOp4 = BSON("ns" << (dbname+"x.something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+            // Different database - xunittests
+            BSONObj indexOp5 = BSON("ns" << ("x"+dbname+".something.else") << "name" << "baz_1" <<
+                                    "key" << BSON("baz" << 1));
+
+            IndexBuildThread t1(indexOp1);
+            IndexBuildThread t2(indexOp2);
+            IndexBuildThread t3(indexOp3);
+            IndexBuildThread t4(indexOp4);
+            IndexBuildThread t5(indexOp5);
+
+            t1.go();
+            t2.go();
+            t3.go();
+            t4.go();
+            t5.go();
+
+            ASSERT(!t1.curop()->killPending());
+            ASSERT(!t2.curop()->killPending());
+            ASSERT(!t3.curop()->killPending());
+            ASSERT(!t4.curop()->killPending());
+            ASSERT(!t5.curop()->killPending());
+
+            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+
+            sleepsecs(1);
+
+            ASSERT(t1.finished());
+            ASSERT(t2.finished());
+            ASSERT(!t3.finished());
+            ASSERT(!t4.finished());
+            ASSERT(!t5.finished());
+
+            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+
+            ASSERT(!t3.finished());
+            ASSERT(!t4.finished());
+            ASSERT(!t5.finished());
+
+            t3.finish();
+            t4.finish();
+            t5.finish();
+
+            time_t max = time(0)+10;
+            // assert.soon(t1.finished() && t2.finished())
+            while (time(0) < max) {
+                std::string ns = dbname+".system.indexes";
+                if (static_cast<int>(cli.count(ns)) == originalIndexCount+4) {
+                    return;
+                }
+            };
+
+            ASSERT(false);
+        }
+    };
 
     class MockInitialSync : public replset::InitialSync {
         int step;
@@ -545,6 +1098,13 @@ namespace ReplSetTests {
             add< CappedUpdate >();
             add< CappedInsert >();
             add< TestRSSync >();
+            add< TestDropDB >();
+            add< TestDrop >();
+            add< TestDropIndexes >();
+            add< TestTruncateCapped >();
+            add< TestReIndex >();
+            add< TestRepair >();
+            add< TestCompact >();
         }
     } myall;
 }

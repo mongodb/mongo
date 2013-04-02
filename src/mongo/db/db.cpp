@@ -672,6 +672,9 @@ namespace mongo {
             Client::WriteContext c("admin", dbpath);
         }
 
+        // Starts a background thread that rebuilds all incomplete indices. 
+        indexRebuilder.go(); 
+
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
@@ -778,8 +781,7 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
-        // SERVER-8536
-        //   ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
+    ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
     ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")

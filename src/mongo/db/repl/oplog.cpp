@@ -26,6 +26,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/namespacestring.h"
@@ -95,6 +96,8 @@ namespace mongo {
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
+
+                replset::BackgroundSync::notify();
             }
         }
 
@@ -439,10 +442,18 @@ namespace mongo {
         if ( *opType == 'i' ) {
             opCounters->gotInsert();
 
-            if (NamespaceString(ns).coll == "system.indexes") {
-                // updates aren't allowed for indexes -- so we will do a regular insert. if index already
-                // exists, that is ok.
-                theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
+            const char *p = strchr(ns, '.');
+            if ( p && strcmp(p, ".system.indexes") == 0 ) {
+                if (o["background"].trueValue()) {
+                    IndexBuilder* builder = new IndexBuilder(ns, o);
+                    // This spawns a new thread and returns immediately.
+                    builder->go();
+                }
+                else {
+                    IndexBuilder builder(ns, o);
+                    // Finish the foreground build before returning
+                    builder.build();
+                }
             }
             else {
                 // do upserts for inserts as we might get replayed more than once
