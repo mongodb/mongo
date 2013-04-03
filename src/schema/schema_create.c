@@ -440,6 +440,7 @@ static int
 __create_data_source(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config, WT_DATA_SOURCE *dsrc)
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	const char *cfg[3], *fileconf;
 
@@ -452,6 +453,15 @@ __create_data_source(WT_SESSION_IMPL *session,
 			WT_TRET(EEXIST);
 		return (ret);
 	}
+
+	/*
+	 * User-specified collators aren't supported for data-source objects.
+	 */
+	if (__wt_config_getones(
+	    session, config, "collator", &cval) != WT_NOTFOUND)
+		WT_RET_MSG(session, EINVAL,
+		    "WT_DATA_SOURCE objects do not support WT_COLLATOR "
+		    "ordering");
 
 	/*
 	 * Set a default key/value format, and insert the configuration into
