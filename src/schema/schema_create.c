@@ -449,6 +449,7 @@ __create_data_source(WT_SESSION_IMPL *session,
 	/* Check if the data-source already exists. */
 	if ((ret =
 	    __wt_metadata_read(session, uri, &fileconf)) != WT_NOTFOUND) {
+		__wt_free(session, fileconf);
 		if (exclusive)
 			WT_TRET(EEXIST);
 		return (ret);
