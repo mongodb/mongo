@@ -401,6 +401,13 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
+	/* 
+	 * !!!
+	 * There's no way yet to reconfigure cursor flags at runtime; if, in
+	 * the future there is a way to do that, similar support needs to be
+	 * added for data-source cursors, or, this call needs to return an
+	 * error in the case of a data-source cursor.
+	 */
 	if ((ret =
 	    __wt_config_gets_defno(session, cfg, "overwrite", &cval)) == 0) {
 		if (cval.val)
