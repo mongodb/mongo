@@ -28,13 +28,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
-#include <assert.h>
-#include <ctype.h>
 #include <errno.h>
-#include <inttypes.h>
-#include <limits.h>
 #include <pthread.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -325,12 +320,14 @@ static int
 kvs_cursor_insert(WT_CURSOR *wt_cursor)
 {
 	CURSOR_SOURCE *cursor;
+	DB *db;
 	DBC *dbc;
 	DBT *key, *value;
 	db_recno_t recno;
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
 	dbc = cursor->dbc;
+	db = cursor->db;
 	key = &cursor->key;
 	value = &cursor->value;
 
@@ -345,7 +342,11 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	value->data = (char *)wt_cursor->value.data;
 	value->size = wt_cursor->value.size;
 
-	ERR(dbc->put(dbc, key, value, DB_KEYFIRST));
+	if (cursor->append) {
+		ERR(db->put(db, NULL, key, value, DB_APPEND));
+		wt_cursor->recno = *(db_recno_t *)key->data;
+	} else
+		ERR(dbc->put(dbc, key, value, DB_KEYFIRST));
 
 	return (0);
 }
