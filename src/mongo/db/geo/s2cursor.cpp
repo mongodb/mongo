@@ -98,6 +98,12 @@ namespace mongo {
     BSONObj S2Cursor::currKey() const { return _btreeCursor->currKey(); }
     DiskLoc S2Cursor::refLoc() { return DiskLoc(); }
     long long S2Cursor::nscanned() { return _nscanned; }
+    bool S2Cursor::getsetdup(DiskLoc loc) { return _btreeCursor->getsetdup(loc); }
+    void S2Cursor::aboutToDeleteBucket(const DiskLoc& b) {
+        if (NULL != _btreeCursor) {
+            _btreeCursor->aboutToDeleteBucket(b);
+        }
+    }
 
     // This is the actual search.
     bool S2Cursor::advance() {

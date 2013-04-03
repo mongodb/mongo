@@ -40,7 +40,8 @@ namespace mongo {
         virtual bool isMultiKey() const { return true; }
         virtual bool autoDedup() const { return false; }
         virtual bool modifiedKeys() const { return true; }
-        virtual bool getsetdup(DiskLoc loc) { return false; }
+        virtual bool getsetdup(DiskLoc loc);
+        virtual void aboutToDeleteBucket(const DiskLoc& b);
         virtual string toString() { return "S2Cursor"; }
         BSONObj indexKeyPattern() { return _keyPattern; }
         virtual bool ok();
