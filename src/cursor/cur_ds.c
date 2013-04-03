@@ -240,10 +240,22 @@ static int
 __curds_close(WT_CURSOR *cursor)
 {
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	ret = cursor->data_source->close(cursor->data_source);
+
+	/*
+	 * The key/value formats are in allocated memory, which isn't standard
+	 * behavior.
+	 */
+	__wt_free(session, cursor->key_format);
+	__wt_free(session, cursor->value_format);
+
 	WT_TRET(__wt_cursor_close(cursor));
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -329,8 +341,8 @@ err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
 			WT_TRET(cursor->close(cursor));
 		else
 			__wt_free(session, cursor);
-		__wt_free(session, metaconf);
 	}
 
+	__wt_free(session, metaconf);
 	return (ret);
 }
