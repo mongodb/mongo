@@ -207,10 +207,6 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
-		if (LF_ISSET(WT_CURSTD_APPEND))
-			WT_ERR_MSG(session, EINVAL,
-			    "Record numbers should not be set on cursors "
-			    "configured for append");
 		if (LF_ISSET(WT_CURSTD_RAW)) {
 			item = va_arg(ap, WT_ITEM *);
 			WT_ERR(__wt_struct_unpack(session,
