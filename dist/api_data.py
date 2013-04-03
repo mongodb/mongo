@@ -598,7 +598,7 @@ methods = {
 		Config('wait', '0', r'''
 		seconds to wait between each write of the log records; setting
 		this value configures \c statistics and statistics logging''',
-		min='5', max='100000'),
+		min='1', max='100000'),
 		]),
 	Config('sync', 'true', r'''
 		flush files to stable storage when closing or writing
