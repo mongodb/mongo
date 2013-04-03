@@ -459,6 +459,7 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 	uint32_t curr_entry, force_entries;
 
 	cache = S2C(session)->cache;
+
 	/*
 	 * Short circuit if there are no forced entries. If the count drops to
 	 * zero between this test and acquiring the lock - we'll do a small
@@ -468,6 +469,11 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 		return (0);
 
 	__wt_spin_lock(session, &cache->evict_lock);
+
+	if (cache->force_entries == 0) {
+		__wt_spin_unlock(session, &cache->evict_lock);
+		return (0);
+	}
 
 	/*
 	 * Try to evict any pages marked as forced. Gather the set of
@@ -490,11 +496,7 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 		if (!WT_ATOMIC_CAS(candidate->page->ref->state,
 		    WT_REF_EVICT_FORCE, WT_REF_LOCKED))
 			continue;
-		force_candidates[force_entries].btree =
-		    candidate->btree;
-		force_candidates[force_entries].page =
-		    candidate->page;
-		force_entries++;
+		force_candidates[force_entries++] = *candidate;
 		__evict_list_clr(session, candidate);
 	}
 	WT_ASSERT(session,
