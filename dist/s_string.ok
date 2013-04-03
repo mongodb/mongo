@@ -59,6 +59,8 @@ DESC
 DHANDLE
 DSRC
 DUPLICATEV
+DbCursor
+DbEnv
 Decrement
 EB
 EBUSY

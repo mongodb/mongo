@@ -846,7 +846,6 @@ err:	unlock();
 	return (ret);
 }
 
-
 void die(int, const char *, ...);
 
 void
