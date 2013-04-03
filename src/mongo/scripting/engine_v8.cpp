@@ -1585,8 +1585,14 @@ namespace mongo {
             return;
         }
         if (value->IsArray()) {
-            BSONObj sub = v8ToMongo(value->ToObject(), depth);
-            b.appendArray(sname, sub);
+            // Note: can't use BSONArrayBuilder because need to call recursively
+            BSONObjBuilder arrBuilder(b.subarrayStart(sname));
+            v8::Handle<v8::Array> array = value.As<v8::Array>();
+            const int len = array->Length();
+            for (int i=0; i < len; i++) {
+                const string name = BSONObjBuilder::numStr(i);
+                v8ToMongoElement(arrBuilder, name, array->Get(i), depth+1, originalParent);
+            }
             return;
         }
         if (value->IsDate()) {
