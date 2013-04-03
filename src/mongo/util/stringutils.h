@@ -33,7 +33,7 @@ namespace mongo {
 
     void joinStringDelim( const std::vector<std::string>& strs , std::string* res , char delim );
 
-    inline std::string tolowerString( const std::string& input ) {
+    inline std::string tolowerString( StringData input ) {
         std::string::size_type sz = input.size();
 
         boost::scoped_array<char> line(new char[sz+1]);
