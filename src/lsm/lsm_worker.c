@@ -83,7 +83,7 @@ __wt_lsm_merge_worker(void *vargs)
 		session->dhandle = NULL;
 
 		/* Report stalls to merge in seconds. */
-		if (__wt_lsm_merge(session, lsm_tree, id, stalls / 1000) == 0)
+		if (__wt_lsm_merge(session, lsm_tree, id, stalls / 100) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
