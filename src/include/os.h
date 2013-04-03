@@ -29,6 +29,10 @@
 	}								\
 } while (0)
 
+#define	WT_TIMEDIFF(end, begin)						\
+	(1000000000 * (uint64_t)((end).tv_sec - (begin).tv_sec) +	\
+	    (uint64_t)(end).tv_nsec - (uint64_t)(begin).tv_nsec)
+
 struct __wt_fh {
 	u_int	refcnt;				/* Reference count */
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */

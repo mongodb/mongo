@@ -808,7 +808,9 @@ __clsm_put(
 	 * The count is in a shared structure, but it's only approximate, so
 	 * don't worry about protecting access.
 	 */
-	++clsm->primary_chunk->count;
+	if (++clsm->primary_chunk->count % 100 == 0 &&
+	    lsm_tree->throttle_sleep > 0)
+		__wt_sleep(0, lsm_tree->throttle_sleep);
 
 	/*
 	 * Set the position for future scans.  If we were already positioned in

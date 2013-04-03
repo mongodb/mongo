@@ -214,6 +214,8 @@ __wt_lsm_tree_setup_chunk(
 
 	WT_CLEAR(buf);
 
+	WT_RET(__wt_epoch(session, &chunk->create_ts));
+
 	WT_RET(__wt_lsm_tree_chunk_name(session, lsm_tree, chunk->id, &buf));
 	chunk->uri = __wt_buf_steal(session, &buf, NULL);
 
@@ -535,11 +537,10 @@ __wt_lsm_tree_switch(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
-	uint32_t new_id;
+	WT_LSM_CHUNK *chunk, **cp;
+	uint32_t in_memory, new_id;
 
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
-	WT_VERBOSE_RET(session, lsm, "Tree switch to: %d", new_id);
 
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
 	    lsm_tree->chunk_alloc)
@@ -548,6 +549,36 @@ __wt_lsm_tree_switch(
 		    WT_MAX(10 * sizeof(*lsm_tree->chunk),
 		    2 * lsm_tree->chunk_alloc),
 		    &lsm_tree->chunk));
+
+	/*
+	 * In the steady state, we expect that the checkpoint worker thread
+	 * will keep up with inserts.  If not, we throttle the insert rate to
+	 * avoid filling the cache with in-memory chunks.  Threads sleep every
+	 * 100 operations, so take that into account in the calculation.
+	 */
+	for (in_memory = 1, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
+	    in_memory < lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
+	    ++in_memory, --cp)
+		;
+	if (in_memory <= 2)
+		lsm_tree->throttle_sleep = 0;
+	else if (in_memory == lsm_tree->nchunks ||
+	    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {
+		/*
+		 * No checkpoint has completed this run.  Keep slowing down
+		 * inserts until one does.
+		 */
+		lsm_tree->throttle_sleep =
+		    WT_MAX(20, 2 * lsm_tree->throttle_sleep);
+	} else {
+		chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
+		lsm_tree->throttle_sleep = (long)((in_memory - 2) *
+		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
+		    (20 * in_memory * chunk->count));
+	}
+
+	WT_VERBOSE_ERR(session, lsm, "Tree switch to: %d, throttle %d",
+	    new_id, (int)lsm_tree->throttle_sleep);
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;
