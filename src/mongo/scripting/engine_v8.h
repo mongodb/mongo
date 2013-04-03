@@ -214,8 +214,6 @@ namespace mongo {
         /**
          * Convert BSON types to v8 Javascript types
          */
-        v8::Local<v8::Object> mongoToV8(const mongo::BSONObj& m, bool array = 0,
-                                        bool readOnly = false);
         v8::Persistent<v8::Object> mongoToLZV8(const mongo::BSONObj& m, bool readOnly = false);
         v8::Handle<v8::Value> mongoToV8Element(const BSONElement& f, bool readOnly = false);
 

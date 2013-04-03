@@ -1258,181 +1258,6 @@ namespace mongo {
         return handle_scope.Close(idCons->NewInstance(1, argv));
     }
 
-    v8::Local<v8::Object> V8Scope::mongoToV8(const BSONObj& m, bool array, bool readOnly) {
-        v8::HandleScope handle_scope;
-        v8::Handle<v8::Value> argv[3];      // arguments for v8 instance constructors
-        v8::Local<v8::ObjectTemplate> readOnlyObjects;
-        v8::Local<v8::Object> o;
-
-        // handle DBRef. needs to come first. isn't it? (metagoto)
-        static string ref = "$ref";
-        if (ref == m.firstElement().fieldName()) {
-            const BSONElement& id = m["$id"];
-            if (!id.eoo()) { // there's no check on $id exitence in sm implementation. risky ?
-                v8::Function* dbRef = getNamedCons("DBRef");
-                o = dbRef->NewInstance();
-            }
-        }
-
-        if (!o.IsEmpty()) {
-            readOnly = false;
-        }
-        else if (array) {
-            // NOTE Looks like it's impossible to add interceptors to v8 arrays.
-            // so array itself will never be read only, but its values can be
-            o = v8::Array::New();
-        }
-        else if (!readOnly) {
-            o = v8::Object::New();
-        }
-        else {
-            // NOTE Our readOnly implemention relies on undocumented ObjectTemplate
-            // functionality that may be fragile, but it still seems like the best option
-            // for now -- fwiw, the v8 docs are pretty sparse.  I've determined experimentally
-            // that when property handlers are set for an object template, they will attach
-            // to objects previously created by that template.  To get this to work, though,
-            // it is necessary to initialize the template's property handlers before
-            // creating objects from the template (as I have in the following few lines
-            // of code).
-            // NOTE In my first attempt, I configured the permanent property handlers before
-            // constructiong the object and replaced the Set() calls below with ForceSet().
-            // However, it turns out that ForceSet() only bypasses handlers for named
-            // properties and not for indexed properties.
-            readOnlyObjects = v8::ObjectTemplate::New();
-            // NOTE This internal field will store type info for special db types.  For
-            // regular objects the field is unnecessary - for simplicity I'm creating just
-            // one readOnlyObjects template for objects where the field is & isn't necessary,
-            // assuming that the overhead of an internal field is slight.
-            readOnlyObjects->SetInternalFieldCount(1);
-            readOnlyObjects->SetNamedPropertyHandler(0);
-            readOnlyObjects->SetIndexedPropertyHandler(0);
-            o = readOnlyObjects->NewInstance();
-        }
-
-        mongo::BSONObj sub;
-
-        for (BSONObjIterator i(m); i.more();) {
-            const BSONElement& f = i.next();
-
-            v8::Local<v8::Value> v;
-            v8::Handle<v8::String> name = v8StringData(f.fieldName());
-
-            switch (f.type()) {
-            case mongo::Code:
-                o->ForceSet(name, newFunction(StringData(f.valuestr(), f.valuestrsize() - 1)));
-                break;
-            case CodeWScope:
-                if (!f.codeWScopeObject().isEmpty())
-                    log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
-                o->ForceSet(name, newFunction(StringData(f.codeWScopeCode(), f.codeWScopeCodeLen() - 1)));
-                break;
-            case mongo::Symbol:
-            case mongo::String:
-                o->ForceSet(name, v8::String::New(f.valuestr(), f.valuestrsize() - 1));
-                break;
-            case mongo::jstOID: {
-                v8::Function * idCons = getObjectIdCons();
-                const string& oidString = f.__oid().str();
-                argv[0] = v8::String::New(oidString.c_str(), oidString.length());
-                o->ForceSet(name, idCons->NewInstance(1, argv));
-                break;
-            }
-            case mongo::NumberDouble:
-            case mongo::NumberInt:
-                o->ForceSet(name, v8::Number::New(f.number()));
-                break;
-            case mongo::Array:
-                sub = f.embeddedObject();
-                o->ForceSet(name, mongoToV8(sub, true, readOnly));
-                break;
-            case mongo::Object:
-                sub = f.embeddedObject();
-                o->ForceSet(name, mongoToLZV8(sub, readOnly));
-                break;
-            case mongo::Date:
-                o->ForceSet(name, v8::Date::New((double) ((long long)f.date().millis)));
-                break;
-            case mongo::Bool:
-                o->ForceSet(name, v8::Boolean::New(f.boolean()));
-                break;
-            case mongo::jstNULL:
-            case mongo::Undefined: // duplicate sm behavior
-                o->ForceSet(name, v8::Null());
-                break;
-            case mongo::RegEx: {
-                v8::Function * regex = getNamedCons("RegExp");
-                argv[0] = v8::String::New(f.regex());
-                argv[1] = v8::String::New(f.regexFlags());
-                o->ForceSet(name, regex->NewInstance(2, argv));
-                break;
-            }
-            case mongo::BinData: {
-                int len;
-                const char *data = f.binData(len);
-                stringstream ss;
-                base64::encode(ss, data, len);
-                argv[0] = v8::Number::New(f.binDataType());
-                argv[1] = v8::String::New(ss.str().c_str());
-                o->ForceSet(name, getNamedCons("BinData")->NewInstance(2, argv));
-                break;
-            }
-            case mongo::Timestamp: {
-                argv[0] = v8::Number::New(f.timestampTime() / 1000);
-                argv[1] = v8::Number::New(f.timestampInc());
-                o->ForceSet(name, getNamedCons("Timestamp")->NewInstance(2,argv));
-                break;
-            }
-            case mongo::NumberLong: {
-                unsigned long long val = f.numberLong();
-                v8::Function* numberLong = getNamedCons("NumberLong");
-                double floatApprox = (double)(long long)val;
-                // values above 2^53 are not accurately represented in JS
-                if ((long long)val == (long long)floatApprox && val < 9007199254740992ULL) {
-                    argv[0] = v8::Number::New(floatApprox);
-                    o->ForceSet(name, numberLong->NewInstance(1, argv));
-                }
-                else {
-                    argv[0] = v8::Number::New(floatApprox);
-                    argv[1] = v8::Integer::New(val >> 32);
-                    argv[2] = v8::Integer::New((unsigned long)(val & 0x00000000ffffffff));
-                    o->ForceSet(name, numberLong->NewInstance(3, argv));
-                }
-                break;
-            }
-            case mongo::MinKey: {
-                o->ForceSet(name, newMinKeyInstance());
-                break;
-            }
-            case mongo::MaxKey: {
-                o->ForceSet(name, newMaxKeyInstance());
-                break;
-            }
-            case mongo::DBRef: {
-                v8::Function* dbPointer = getNamedCons("DBPointer");
-                argv[0] = v8StringData(f.dbrefNS());
-                argv[1] = newId(f.dbrefOID());
-                o->ForceSet(name, dbPointer->NewInstance(2, argv));
-                break;
-            }
-            default:
-                cout << "can't handle type: ";
-                cout  << f.type() << " ";
-                cout  << f.toString();
-                cout  << endl;
-                break;
-            }
-        }
-
-        if (!array && readOnly) {
-            readOnlyObjects->SetNamedPropertyHandler(0, NamedReadOnlySet,
-                                                     0, NamedReadOnlyDelete);
-            readOnlyObjects->SetIndexedPropertyHandler(0, IndexedReadOnlySet,
-                                                       0, IndexedReadOnlyDelete);
-        }
-
-        return handle_scope.Close(o);
-    }
-
     /**
      * converts a BSONObj to a Lazy V8 object
      */
@@ -1534,14 +1359,22 @@ namespace mongo {
         case mongo::NumberDouble:
         case mongo::NumberInt:
             return v8::Number::New(elem.number());
-        case mongo::Array:
+        case mongo::Array: {
             // NB: This comment may no longer be accurate.
             // for arrays it's better to use non lazy object because:
             // - the lazy array is not a true v8 array and requires some v8 src change
             //   for all methods to work
             // - it made several tests about 1.5x slower
             // - most times when an array is accessed, all its values will be used
-            return mongoToV8(elem.embeddedObject(), true, readOnly);
+
+            // It is faster to allow the v8::Array to grow than call nFields() on the array
+            v8::Handle<v8::Array> array = v8::Array::New();
+            int i = 0;
+            BSONForEach(subElem, elem.embeddedObject()) {
+                array->Set(i++, mongoToV8Element(subElem, readOnly));
+            }
+            return array;
+        }
         case mongo::Object:
             return mongoToLZV8(elem.embeddedObject(), readOnly);
         case mongo::Date:
