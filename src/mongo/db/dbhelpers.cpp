@@ -232,10 +232,7 @@ namespace mongo {
         return kpBuilder.obj();
     }
 
-    long long Helpers::removeRange( const string& ns ,
-                                    const BSONObj& min ,
-                                    const BSONObj& max ,
-                                    const BSONObj& keyPattern ,
+    long long Helpers::removeRange( const IndexChunk& chunk ,
                                     bool maxInclusive ,
                                     bool secondaryThrottle ,
                                     RemoveCallback * callback,
@@ -243,6 +240,9 @@ namespace mongo {
                                     bool onlyRemoveOrphanedDocs ) {
 
         Timer rangeRemoveTimer;
+        const string& ns = chunk.ns;
+        const BSONObj& min = chunk.min;
+        const BSONObj& max = chunk.max;
 
         LOG(1) << "begin removal of " << min << " to " << max << " in " << ns
                << (secondaryThrottle ? " (waiting for secondaries)" : "" ) << endl;
@@ -266,17 +266,20 @@ namespace mongo {
                     if ( ! nsd )
                         break;
                     
-                    int ii = nsd->findIndexByKeyPattern( keyPattern );
+                    const KeyPattern& keyPattern = chunk.keyPattern;
+
+                    int ii = nsd->findIndexByKeyPattern( keyPattern.toBSON() );
                     verify( ii >= 0 );
                     
                     IndexDetails& i = nsd->idx( ii );
 
                     // Extend min to get (min, MinKey, MinKey, ....)
-                    KeyPattern kp( keyPattern );
-                    BSONObj newMin = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
+                    BSONObj newMin =
+                            Helpers::toKeyFormat( keyPattern.extendRangeBound( min, false ) );
                     // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
                     // If not included, extend max to get (max, MinKey, MinKey, ....)
-                    BSONObj newMax = Helpers::toKeyFormat( kp.extendRangeBound(max, maxInclusive) );
+                    BSONObj newMax =
+                            Helpers::toKeyFormat( keyPattern.extendRangeBound(max, maxInclusive) );
                     
                     c.reset( BtreeCursor::make( nsd, i, newMin, newMax, maxInclusive, 1 ) );
                 }
@@ -356,6 +359,99 @@ namespace mongo {
 
         return numDeleted;
     }
+
+    const long long IndexChunk::kMaxDocsPerChunk( 250000 );
+
+    // Used by migration clone step
+    // TODO: Cannot hook up quite yet due to _trackerLocks in shared migration code.
+    Status Helpers::getLocsInRange( const IndexChunk& chunk,
+                                    long long maxChunkSizeBytes,
+                                    set<DiskLoc>* locs,
+                                    long long* numDocs,
+                                    long long* estChunkSizeBytes )
+    {
+        const string ns = chunk.ns;
+        *estChunkSizeBytes = 0;
+        *numDocs = 0;
+
+        Client::ReadContext ctx( ns );
+
+        NamespaceDetails* details = nsdetails( ns );
+        if ( !details ) return Status( ErrorCodes::NamespaceNotFound, ns );
+
+        // Require single key
+        const IndexDetails *idx = details->findIndexByPrefix( chunk.keyPattern.toBSON(), true );
+
+        if ( idx == NULL ) {
+            return Status( ErrorCodes::IndexNotFound, chunk.keyPattern.toString() );
+        }
+
+        // Assume both min and max non-empty, append MinKey's to make them fit chosen index
+        KeyPattern idxKeyPattern( idx->keyPattern() );
+        BSONObj min = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( chunk.min, false ) );
+        BSONObj max = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( chunk.max, false ) );
+
+        // TODO: May not always be btreecursor?
+        BtreeCursor* btreeCursor = BtreeCursor::make( details, *idx, min, max, false, 1 );
+        auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout,
+                                                     shared_ptr<Cursor>( btreeCursor ),
+                                                     ns ) );
+
+        // use the average object size to estimate how many objects a full chunk would carry
+        // do that while traversing the chunk's range using the sharding index, below
+        // there's a fair amount of slack before we determine a chunk is too large because object
+        // sizes will vary
+        long long avgDocsWhenFull;
+        long long avgDocSizeBytes;
+        const long long totalDocsInNS = details->stats.nrecords;
+        if ( totalDocsInNS > 0 ) {
+            // TODO: Figure out what's up here
+            avgDocSizeBytes = details->stats.datasize / totalDocsInNS;
+            avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
+            avgDocsWhenFull = std::min( IndexChunk::kMaxDocsPerChunk + 1,
+                                        130 * avgDocsWhenFull / 100 /* slack */);
+        }
+        else {
+            avgDocSizeBytes = 0;
+            avgDocsWhenFull = IndexChunk::kMaxDocsPerChunk + 1;
+        }
+
+        // do a full traversal of the chunk and don't stop even if we think it is a large chunk
+        // we want the number of records to better report, in that case
+        bool isLargeChunk = false;
+        long long docCount = 0;
+
+        while ( cc->ok() ) {
+            DiskLoc loc = cc->currLoc();
+            if ( !isLargeChunk ) {
+                locs->insert( loc );
+            }
+            cc->advance();
+
+            // we can afford to yield here because any change to the base data that we might miss
+            // is already being queued and will be migrated in the 'transferMods' stage
+            if ( !cc->yieldSometimes( ClientCursor::DontNeed ) ) {
+                cc.release();
+                break;
+            }
+
+            if ( ++docCount > avgDocsWhenFull ) {
+                isLargeChunk = true;
+            }
+        }
+
+        *numDocs = docCount;
+        *estChunkSizeBytes = docCount * avgDocSizeBytes;
+
+        if ( isLargeChunk ) {
+            stringstream ss;
+            ss << estChunkSizeBytes;
+            return Status( ErrorCodes::InvalidLength, ss.str() );
+        }
+
+        return Status::OK();
+    }
+
 
     void Helpers::emptyCollection(const char *ns) {
         Client::Context context(ns);

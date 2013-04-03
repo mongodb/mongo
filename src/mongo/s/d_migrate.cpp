@@ -217,11 +217,9 @@ namespace mongo {
                     return;
                 }
 
+                IndexChunk chunk( ns, min, max, indexKeyPattern );
                 long long numDeleted =
-                        Helpers::removeRange( ns,
-                                              min,
-                                              max,
-                                              indexKeyPattern,
+                        Helpers::removeRange( chunk,
                                               false, /*maxInclusive*/
                                               secondaryThrottle,
                                               cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -1644,10 +1642,8 @@ namespace mongo {
 
                 // 2. delete any data already in range
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                long long num = Helpers::removeRange( ns,
-                                                      min,
-                                                      max,
-                                                      indexKeyPattern,
+                IndexChunk chunk( ns, min, max, indexKeyPattern );
+                long long num = Helpers::removeRange( chunk,
                                                       false, /*maxInclusive*/
                                                       secondaryThrottle, /* secondaryThrottle */
                                                       cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -1873,10 +1869,8 @@ namespace mongo {
                     BSONObj idIndexPattern = Helpers::inferKeyPattern( id );
 
                     // TODO: create a better interface to remove objects directly
-                    Helpers::removeRange( ns ,
-                                          id ,
-                                          id,
-                                          idIndexPattern ,
+                    IndexChunk chunk( ns, id, id, idIndexPattern );
+                    Helpers::removeRange( chunk ,
                                           true , /*maxInclusive*/
                                           false , /* secondaryThrottle */
                                           cmdLine.moveParanoia ? &rs : 0 , /*callback*/
