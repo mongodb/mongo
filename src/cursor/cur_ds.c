@@ -8,6 +8,66 @@
 #include "wt_internal.h"
 
 /*
+ * __curds_key_get -
+ *	Get the key from the data-source.
+ */
+static inline void
+__curds_key_get(WT_CURSOR *cursor)
+{
+	cursor->recno = cursor->data_source->recno;
+	cursor->key.data = cursor->data_source->key.data;
+	cursor->key.size = cursor->data_source->key.size;
+	F_CLR(cursor, WT_CURSTD_KEY_APP);
+	F_SET(cursor, WT_CURSTD_KEY_RET);
+}
+	
+/*
+ * __curds_value_get -
+ *	Get the value from the data-source.
+ */
+static inline void
+__curds_value_get(WT_CURSOR *cursor)
+{
+	cursor->value.data = cursor->data_source->value.data;
+	cursor->value.size = cursor->data_source->value.size;
+	F_CLR(cursor, WT_CURSTD_VALUE_APP);
+	F_SET(cursor, WT_CURSTD_VALUE_RET);
+}
+
+/*
+ * __curds_key_set -
+ *	Set the key for the data-source.
+ */
+static inline int
+__curds_key_set(WT_CURSOR *cursor)
+{
+	WT_DECL_RET;
+
+	WT_CURSOR_NEEDKEY(cursor);
+	cursor->data_source->recno = cursor->recno;
+	cursor->data_source->key.data = cursor->key.data;
+	cursor->data_source->key.size = cursor->key.size;
+
+err:	return (ret);
+}
+
+/*
+ * __curds_value_set -
+ *	Set the value for the data-source.
+ */
+static inline int
+__curds_value_set(WT_CURSOR *cursor)
+{
+	WT_DECL_RET;
+
+	WT_CURSOR_NEEDVALUE(cursor);
+	cursor->data_source->value.data = cursor->value.data;
+	cursor->data_source->value.size = cursor->value.size;
+
+err:	return (ret);
+}
+
+/*
  * __curds_next --
  *	WT_CURSOR.next method for the data-source cursor type.
  */
@@ -18,16 +78,10 @@ __curds_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
+
 	WT_ERR(cursor->data_source->next(cursor->data_source));
-
-	cursor->recno = cursor->data_source->recno;
-	cursor->key.data = cursor->data_source->key.data;
-	cursor->key.size = cursor->data_source->key.size;
-	cursor->value.data = cursor->data_source->value.data;
-	cursor->value.size = cursor->data_source->value.size;
-
-	F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	__curds_key_get(cursor);
+	__curds_value_get(cursor);
 
 err:	API_END(session);
 	return (ret);
@@ -44,16 +98,10 @@ __curds_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, prev, NULL);
+
 	WT_ERR(cursor->data_source->prev(cursor->data_source));
-
-	cursor->recno = cursor->data_source->recno;
-	cursor->key.data = cursor->data_source->key.data;
-	cursor->key.size = cursor->data_source->key.size;
-	cursor->value.data = cursor->data_source->value.data;
-	cursor->value.size = cursor->data_source->value.size;
-
-	F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	__curds_key_get(cursor);
+	__curds_value_get(cursor);
 
 err:	API_END(session);
 	return (ret);
@@ -70,6 +118,7 @@ __curds_reset(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, reset, NULL);
+
 	WT_ERR(cursor->data_source->reset(cursor->data_source));
 
 err:	API_END(session);
@@ -87,21 +136,11 @@ __curds_search(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, search, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
 
-	cursor->data_source->recno = cursor->recno;
-	cursor->data_source->key.data = cursor->key.data;
-	cursor->data_source->key.size = cursor->key.size;
-
+	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(cursor->data_source->search(cursor->data_source));
-
-	cursor->key.data = cursor->data_source->key.data;
-	cursor->key.size = cursor->data_source->key.size;
-	cursor->value.data = cursor->data_source->value.data;
-	cursor->value.size = cursor->data_source->value.size;
-
-	F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	__curds_key_get(cursor);
+	__curds_value_get(cursor);
 
 err:	API_END(session);
 	return (ret);
@@ -118,21 +157,11 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
 
-	cursor->data_source->recno = cursor->recno;
-	cursor->data_source->key.data = cursor->key.data;
-	cursor->data_source->key.size = cursor->key.size;
-
+	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(cursor->data_source->search_near(cursor->data_source, exact));
-
-	cursor->key.data = cursor->data_source->key.data;
-	cursor->key.size = cursor->data_source->key.size;
-	cursor->value.data = cursor->data_source->value.data;
-	cursor->value.size = cursor->data_source->value.size;
-
-	F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	__curds_key_get(cursor);
+	__curds_value_get(cursor);
 
 err:	API_END(session);
 	return (ret);
@@ -149,16 +178,16 @@ __curds_insert(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
-	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
-		WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
 
-	cursor->data_source->recno = cursor->recno;
-	cursor->data_source->key.data = cursor->key.data;
-	cursor->data_source->key.size = cursor->key.size;
-	cursor->data_source->value.data = cursor->value.data;
-	cursor->data_source->value.size = cursor->value.size;
+	/* If not appending, we require a key. */
+	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
+		WT_ERR(__curds_key_set(cursor));
+	WT_ERR(__curds_value_set(cursor));
 	WT_ERR(cursor->data_source->insert(cursor->data_source));
+
+	/* If appending, we return a key. */
+	if (F_ISSET(cursor, WT_CURSTD_APPEND))
+		__curds_key_get(cursor);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -175,14 +204,9 @@ __curds_update(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
 
-	cursor->data_source->recno = cursor->recno;
-	cursor->data_source->key.data = cursor->key.data;
-	cursor->data_source->key.size = cursor->key.size;
-	cursor->data_source->value.data = cursor->value.data;
-	cursor->data_source->value.size = cursor->value.size;
+	WT_ERR(__curds_key_set(cursor));
+	WT_ERR(__curds_value_set(cursor));
 	WT_ERR(cursor->data_source->update(cursor->data_source));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
@@ -200,11 +224,8 @@ __curds_remove(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
 
-	cursor->data_source->recno = cursor->recno;
-	cursor->data_source->key.data = cursor->key.data;
-	cursor->data_source->key.size = cursor->key.size;
+	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(cursor->data_source->remove(cursor->data_source));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
