@@ -39,7 +39,7 @@ namespace mongo {
             bool inNegation = false;
             bool inPhrase = false;
 
-            unsigned quoteOffset;
+            unsigned quoteOffset = 0;
 
             Tokenizer i( _language, query );
             while ( i.more() ) {
