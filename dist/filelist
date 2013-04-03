@@ -63,6 +63,7 @@ src/conn/conn_stat.c
 src/cursor/cur_backup.c
 src/cursor/cur_bulk.c
 src/cursor/cur_config.c
+src/cursor/cur_ds.c
 src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_index.c

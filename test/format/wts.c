@@ -95,6 +95,10 @@ wts_open(void)
 		die(ret, "wiredtiger_open");
 	g.wts_conn = conn;
 
+	/* Open any underlying key/value store data-source. */
+	if (DATASOURCE("kvs"))
+		kvs_init(conn, RUNDIR_KVS);
+
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
@@ -215,6 +219,8 @@ wts_close()
 
 	conn = g.wts_conn;
 
+	if (DATASOURCE("kvs"))
+		kvs_close(conn);
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
 }
@@ -225,7 +231,12 @@ wts_dump(const char *tag, int dump_bdb)
 	int offset, ret;
 	char cmd[256];
 
+	/* Data-sources don't support dump comparisons. */
+	if (DATASOURCE("kvs"))
+		return;
+
 	track("dump files and compare", 0ULL, NULL);
+
 	offset = snprintf(cmd, sizeof(cmd), "sh s_dumpcmp");
 	if (dump_bdb)
 		offset += snprintf(cmd + offset,
@@ -248,8 +259,11 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	conn = g.wts_conn;
+	/* Data-sources don't support salvage. */
+	if (DATASOURCE("kvs"))
+		return;
 
+	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
 
 	/*
@@ -278,8 +292,11 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
-	conn = g.wts_conn;
+	/* Data-sources don't support verification. */
+	if (DATASOURCE("kvs"))
+		return;
 
+	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -312,9 +329,13 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	track("stat", 0ULL, NULL);
+	/* Data-sources don't support statistics. */
+	if (DATASOURCE("kvs"))
+		return;
 
 	conn = g.wts_conn;
+	track("stat", 0ULL, NULL);
+
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 

@@ -403,6 +403,9 @@ struct __wt_cursor {
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
+	/* Data source cursors have underlying application-owned cursors. */
+	WT_CURSOR *data_source;
+
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_DUMP_HEX	0x0002
 #define	WT_CURSTD_DUMP_PRINT	0x0004
@@ -1979,36 +1982,35 @@ struct __wt_data_source {
 	 * @snippet ex_all.c WT_DATA_SOURCE create
 	 */
 	int (*create)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, int exclusive, const char *config);
+	    const char *uri, int exclusive, const char *config);
 
 	/*! Callback to drop an object.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE drop
 	 */
 	int (*drop)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *cfg[]);
+	    const char *uri, const char *cfg[]);
 
 	/*! Callback to initialize a cursor.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE open_cursor
 	 */
 	int (*open_cursor)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *uri, WT_CURSOR *owner, const char *cfg[],
-	    WT_CURSOR **new_cursor);
+	    const char *uri, const char *cfg[], WT_CURSOR **new_cursor);
 
 	/*! Callback to rename an object.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE rename
 	 */
 	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *cfg[]);
+	    const char *uri, const char *newname, const char *cfg[]);
 
 	/*! Callback to truncate an object.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE truncate
 	 */
 	int (*truncate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *cfg[]);
+	    const char *uri, const char *cfg[]);
 };
 
 /*!

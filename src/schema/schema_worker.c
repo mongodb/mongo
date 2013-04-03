@@ -19,6 +19,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
    const char *cfg[], uint32_t open_flags)
 {
 	WT_COLGROUP *colgroup;
+	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_TABLE *table;
@@ -30,24 +31,24 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_RET(__wt_session_get_btree_ckpt(
+		WT_ERR(__wt_session_get_btree_ckpt(
 		    session, uri, cfg, open_flags));
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
-		WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
-		WT_RET(__wt_schema_worker(
+		WT_ERR(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
+		WT_ERR(__wt_schema_worker(
 		    session, colgroup->source, func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
 		idx = NULL;
-		WT_RET(__wt_schema_get_index(session, uri, NULL, &idx));
-		WT_RET(__wt_schema_worker(
+		WT_ERR(__wt_schema_get_index(session, uri, NULL, &idx));
+		WT_ERR(__wt_schema_worker(
 		    session, idx->source, func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
-		WT_RET(__wt_lsm_tree_worker(
+		WT_ERR(__wt_lsm_tree_worker(
 		    session, uri, func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
-		WT_RET(__wt_schema_get_table(session,
+		WT_ERR(__wt_schema_get_table(session,
 		    tablename, strlen(tablename), 0, &table));
 		WT_ASSERT(session, session->btree == NULL);
 
@@ -63,8 +64,11 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_schema_worker(
 			    session, idx->source, func, cfg, open_flags));
 		}
-	} else
-		return (__wt_bad_object_type(session, uri));
+	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		WT_ERR_MSG(
+		    session, ENOTSUP, "unsupported object type: %s", uri);
+	else
+		WT_ERR(__wt_bad_object_type(session, uri));
 
 err:	if (table != NULL)
 		__wt_schema_release_table(session, table);

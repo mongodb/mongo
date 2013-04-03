@@ -216,7 +216,9 @@ ops(void *arg)
 			 */
 			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
+		/* Data-sources don't support compaction. */
 		if (cnt == compact_op &&
+		    !DATASOURCE("kvs") &&
 		    (ret = session->compact(session, g.uri, NULL)) != 0)
 			die(ret, "session.compact");
 

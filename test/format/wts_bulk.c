@@ -35,7 +35,7 @@ wts_load(void)
 	WT_ITEM key, value;
 	WT_SESSION *session;
 	uint8_t *keybuf, *valbuf;
-	int ret;
+	int is_bulk, ret;
 
 	conn = g.wts_conn;
 
@@ -50,8 +50,9 @@ wts_load(void)
 	 * Avoid bulk load with a custom collator, because the order of
 	 * insertion will not match the collation order.
 	 */
-	if ((ret = session->open_cursor(session, g.uri, NULL,
-	    (g.type == ROW && g.c_reverse) ? NULL : "bulk", &cursor)) != 0)
+	is_bulk = g.type == ROW && !DATASOURCE("kvs") && !g.c_reverse;
+	if ((ret = session->open_cursor(
+	    session, g.uri, NULL, is_bulk ? "bulk" : NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Set up the default key buffer. */
@@ -77,14 +78,18 @@ wts_load(void)
 
 		switch (g.type) {
 		case FIX:
+			if (!is_bulk)
+				cursor->set_key(cursor, g.key_cnt);
+			cursor->set_value(cursor, *(uint8_t *)value.data);
 			if (g.logging == LOG_OPS)
 				(void)session->msg_printf(session,
 				    "%-10s %" PRIu32 " {0x%02" PRIx8 "}",
 				    "bulk V",
 				    g.key_cnt, ((uint8_t *)value.data)[0]);
-			cursor->set_value(cursor, *(uint8_t *)value.data);
 			break;
 		case VAR:
+			if (!is_bulk)
+				cursor->set_key(cursor, g.key_cnt);
 			cursor->set_value(cursor, &value);
 			if (g.logging == LOG_OPS)
 				(void)session->msg_printf(session,

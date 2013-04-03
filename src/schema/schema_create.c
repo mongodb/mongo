@@ -436,9 +436,48 @@ err:		if (table != NULL) {
 	return (ret);
 }
 
+static int
+__create_data_source(WT_SESSION_IMPL *session,
+    const char *uri, int exclusive, const char *config, WT_DATA_SOURCE *dsrc)
+{
+	WT_DECL_RET;
+	const char *filecfg[3], *fileconf;
+
+	fileconf = NULL;
+
+	/* Check if the data-source already exists. */
+	if ((ret =
+	    __wt_metadata_read(session, uri, &fileconf)) != WT_NOTFOUND) {
+		if (exclusive)
+			WT_TRET(EEXIST);
+		return (ret);
+	}
+
+	/*
+	 * Set a default key/value format, and insert the configuration into
+	 * the metadata.
+	 */
+	filecfg[0] = "key_format=u,value_format=u";
+	filecfg[1] = config;
+	filecfg[2] = NULL;
+	WT_RET(__wt_config_collapse(session, filecfg, &fileconf));
+	if ((ret = __wt_metadata_insert(session, uri, fileconf)) == 0)
+		WT_ERR(dsrc->create(
+		    dsrc, &session->iface, uri, exclusive, fileconf));
+	else if (ret == WT_DUPLICATE_KEY)
+		ret = EEXIST;
+
+	if (0) {
+err:		WT_TRET(__wt_metadata_remove(session, uri));
+	}
+
+	__wt_free(session, fileconf);
+	return (ret);
+}
+
 int
 __wt_schema_create(
-    WT_SESSION_IMPL *session, const char *name, const char *config)
+    WT_SESSION_IMPL *session, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_DATA_SOURCE *dsrc;
@@ -455,17 +494,18 @@ __wt_schema_create(
 	 */
 	WT_RET(__wt_meta_track_on(session));
 
-	if (WT_PREFIX_MATCH(name, "colgroup:"))
-		ret = __create_colgroup(session, name, exclusive, config);
-	else if (WT_PREFIX_MATCH(name, "file:"))
-		ret = __create_file(session, name, exclusive, config);
-	else if (WT_PREFIX_MATCH(name, "index:"))
-		ret = __create_index(session, name, exclusive, config);
-	else if (WT_PREFIX_MATCH(name, "table:"))
-		ret = __create_table(session, name, exclusive, config);
-	else if ((ret = __wt_schema_get_source(session, name, &dsrc)) == 0)
-		ret = dsrc->create(dsrc, &session->iface,
-		    name, exclusive, config);
+	if (WT_PREFIX_MATCH(uri, "colgroup:"))
+		ret = __create_colgroup(session, uri, exclusive, config);
+	else if (WT_PREFIX_MATCH(uri, "file:"))
+		ret = __create_file(session, uri, exclusive, config);
+	else if (WT_PREFIX_MATCH(uri, "index:"))
+		ret = __create_index(session, uri, exclusive, config);
+	else if (WT_PREFIX_MATCH(uri, "table:"))
+		ret = __create_table(session, uri, exclusive, config);
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		if (ret == 0)
+			ret = __create_data_source(
+			    session, uri, exclusive, config, dsrc);
 
 	session->btree = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));

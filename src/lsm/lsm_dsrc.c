@@ -45,15 +45,14 @@ __lsm_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
  */
 static int
 __lsm_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
-    const char *obj, WT_CURSOR *owner, const char *cfg[],
-    WT_CURSOR **new_cursor)
+    const char *obj, const char *cfg[], WT_CURSOR **new_cursor)
 {
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	WT_UNUSED(dsrc);
 
-	return (__wt_clsm_open(session, obj, owner, cfg, new_cursor));
+	return (__wt_clsm_open(session, obj, cfg, new_cursor));
 }
 
 /*

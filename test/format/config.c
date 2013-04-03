@@ -67,7 +67,7 @@ config_setup(void)
 		}
 
 	if (!config_find_is_perm("file_type", strlen("file_type"))) {
-		if (strcmp(g.c_data_source, "lsm") == 0)
+		if (DATASOURCE("lsm"))
 			config_single("file_type=row", 0);
 		else
 			switch (MMRAND(0, 2)) {
@@ -88,7 +88,7 @@ config_setup(void)
 	 * If data_source and file_type were both "permanent", we may still
 	 * have a mismatch.
 	 */
-	if (g.type != ROW && strcmp(g.c_data_source, "lsm") == 0) {
+	if (g.type != ROW && DATASOURCE("lsm")) {
 		fprintf(stderr,
 	    "%s: lsm data_source is only compatible with row file_type\n",
 		    g.progname);
@@ -123,6 +123,10 @@ config_setup(void)
 		else
 			*cp->v = CONF_RAND(cp);
 	}
+
+	/* KVS doesn't support user-specified collations. */
+	if (DATASOURCE("kvs"))
+		g.c_reverse = 0;
 
 	config_compression();
 
@@ -340,8 +344,9 @@ config_single(const char *s, int perm)
 	if (cp->flags & C_STRING) {
 		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
 		    strncmp("file", ep, strlen("file")) != 0 &&
-		    strncmp("table", ep, strlen("table")) != 0 &&
-		    strncmp("lsm", ep, strlen("lsm")) != 0) {
+		    strncmp("kvs", ep, strlen("kvs")) != 0 &&
+		    strncmp("lsm", ep, strlen("lsm")) != 0 &&
+		    strncmp("table", ep, strlen("table")) != 0) {
 			    fprintf(stderr,
 				"Invalid data source option: %s\n", ep);
 			    exit(EXIT_FAILURE);

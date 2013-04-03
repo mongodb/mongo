@@ -48,6 +48,7 @@
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
 	0,				/* int saved_err */		\
+	NULL,				/* data_source */		\
 	0				/* uint32_t flags */		\
 }
 

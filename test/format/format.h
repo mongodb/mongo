@@ -42,9 +42,8 @@
 
 #ifdef BDB
 #include "build_unix/db.h"
-#else
-#include <wiredtiger.h>
 #endif
+#include <wiredtiger.h>
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
 #define	BZIP_PATH							\
@@ -65,8 +64,10 @@
 
 #define	WT_NAME	"wt"				/* Object name */
 
-#define	RUNDIR	"RUNDIR"			/* Run home */
+#define	RUNDIR		"RUNDIR"		/* Run home */
+#define	RUNDIR_KVS	"RUNDIR/KVS"		/* Run home for data-source */
 
+#define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 #define	SINGLETHREADED	(g.c_threads == 1)
 
 typedef struct {
@@ -174,6 +175,8 @@ void	 die(int, const char *, ...);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 kvs_close(WT_CONNECTION *);
+void	 kvs_init(WT_CONNECTION *, const char *);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);

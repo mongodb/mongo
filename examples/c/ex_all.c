@@ -655,14 +655,14 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 /*! [WT_DATA_SOURCE create] */
 static int
 my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, int exclusive, const char *config)
+    const char *uri, int exclusive, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
-	(void)name;
+	(void)uri;
 	(void)exclusive;
-	(void)config;
+	(void)cfg;
 
 	return (0);
 }
@@ -671,12 +671,12 @@ my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE drop] */
 static int
 my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *cfg[])
+    const char *uri, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
-	(void)name;
+	(void)uri;
 	(void)cfg;
 
 	return (0);
@@ -686,15 +686,13 @@ my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE open_cursor] */
 static int
 my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *obj, WT_CURSOR *owner, const char *cfg[],
-    WT_CURSOR **new_cursor)
+    const char *uri, const char *cfg[], WT_CURSOR **new_cursor)
 {
 	/* Unused parameters */
 	(void)dsrc;
 
 	(void)session;
-	(void)obj;
-	(void)owner;
+	(void)uri;
 	(void)cfg;
 	(void)new_cursor;
 
@@ -705,12 +703,12 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE rename] */
 static int
 my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *oldname, const char *newname, const char *cfg[])
+    const char *uri, const char *newname, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
-	(void)oldname;
+	(void)uri;
 	(void)newname;
 	(void)cfg;
 
@@ -721,12 +719,12 @@ my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE truncate] */
 static int
 my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *cfg[])
+    const char *uri, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
-	(void)name;
+	(void)uri;
 	(void)cfg;
 
 	return (0);

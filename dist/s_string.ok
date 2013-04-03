@@ -67,6 +67,7 @@ EMail
 ENOENT
 ENOMEM
 ENOTSUP
+ENV
 EOF
 ETIME
 ETIMEDOUT
@@ -104,6 +105,7 @@ JSON
 Jyrki
 KEYFIRST
 KV
+KVS
 Kanowski's
 Kounavis
 LF
@@ -158,6 +160,7 @@ Pre
 Qsort
 RCS
 READONLY
+RECNO
 REF's
 REQ
 RET
@@ -471,6 +474,7 @@ keycmp
 keyname
 keyv
 kv
+kvs
 ld
 len
 lenp

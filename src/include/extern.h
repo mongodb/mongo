@@ -612,6 +612,11 @@ extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_curds_create(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_DATA_SOURCE *dsrc,
+    WT_CURSOR **cursorp);
 extern int __wt_curdump_create(WT_CURSOR *child,
     WT_CURSOR *owner,
     WT_CURSOR **cursorp);
@@ -691,7 +696,6 @@ extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
     u_int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
-    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
@@ -956,7 +960,7 @@ extern int __wt_schema_index_source(WT_SESSION_IMPL *session,
     const char *config,
     WT_ITEM *buf);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
-    const char *name,
+    const char *uri,
     const char *config);
 extern int __wt_schema_drop(WT_SESSION_IMPL *session,
     const char *uri,
