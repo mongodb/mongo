@@ -101,7 +101,7 @@ void	 die(int, const char *, ...);
 #endif
 
 static inline int
-recno_convert(uint64_t recno, (uint32_t *)&recnop)
+recno_convert(uint64_t recno, uint32_t *recnop)
 {
 	if (recno > UINT32_MAX)
 		return (EINVAL);
@@ -609,8 +609,8 @@ kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		ret = 0;
 	} else
 		ret = EBUSY;
-
 	unlock();
+
 	return (ret);
 }
 
@@ -637,6 +637,36 @@ kvs_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		ret = 0;
 	} else
 		ret = EBUSY;
+	unlock();
+
+	return (ret);
+}
+
+static int
+kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, const char *cfg[])
+{
+	DB *db;
+	int ret;
+	const char *name;
+
+	(void)dsrc;				/* Unused parameters. */
+	(void)session;
+	(void)cfg;
+
+	if ((name = uri2name(uri)) == NULL)	/* Get the object name. */
+		return (EINVAL);
+
+	lock();
+	if (open_cursors == 0) {
+		ERR(db_create(&db, dbenv, 0));
+		ERR(db->verify(db, name, NULL, NULL, 0));
+		/* db handle is dead */
+
+		ret = 0;
+	} else
+		ret = EBUSY;
+	unlock();
 
 	return (ret);
 }
@@ -659,10 +689,13 @@ kvs_init(WT_CONNECTION *conn, const char *dir)
 
 	memset(&ds, 0, sizeof(ds));
 	ds.dsrc.create = kvs_create;
+	ds.dsrc.compact = NULL;			/* No compaction */
 	ds.dsrc.drop = kvs_drop;
 	ds.dsrc.open_cursor = kvs_open_cursor;
 	ds.dsrc.rename = kvs_rename;
+	ds.dsrc.salvage = NULL;			/* No salvage */
 	ds.dsrc.truncate = kvs_truncate;
+	ds.dsrc.verify = kvs_verify;
 	if ((ret =
 	    conn->add_data_source(conn, "kvs:", &ds.dsrc, NULL)) != 0)
 		die(ret, "WT_CONNECTION.add_data_source");

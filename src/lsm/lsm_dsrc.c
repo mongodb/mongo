@@ -104,10 +104,13 @@ __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config)
 	WT_SESSION_IMPL *session;
 	static WT_DATA_SOURCE iface = {
 		__lsm_create,
+		NULL,				/* No compaction support */
 		__lsm_drop,
 		__lsm_open_cursor,
 		__lsm_rename,
-		__lsm_truncate
+		NULL,				/* No salvage support */
+		__lsm_truncate,
+		NULL,				/* No verify support */
 	};
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;

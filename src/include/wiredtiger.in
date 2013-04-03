@@ -1984,6 +1984,13 @@ struct __wt_data_source {
 	int (*create)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	    const char *uri, int exclusive, const char *cfg[]);
 
+	/*! Callback to compact an object.
+	 *
+	 * @snippet ex_all.c WT_DATA_SOURCE compact
+	 */
+	int (*compact)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, const char *cfg[]);
+
 	/*! Callback to drop an object.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE drop
@@ -2005,11 +2012,25 @@ struct __wt_data_source {
 	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	    const char *uri, const char *newname, const char *cfg[]);
 
+	/*! Callback to salvage an object.
+	 *
+	 * @snippet ex_all.c WT_DATA_SOURCE salvage
+	 */
+	int (*salvage)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, const char *cfg[]);
+
 	/*! Callback to truncate an object.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE truncate
 	 */
 	int (*truncate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, const char *cfg[]);
+
+	/*! Callback to verify an object.
+	 *
+	 * @snippet ex_all.c WT_DATA_SOURCE verify
+	 */
+	int (*verify)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	    const char *uri, const char *cfg[]);
 };
 

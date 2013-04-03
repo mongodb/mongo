@@ -22,6 +22,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	WT_INDEX *idx;
+	WT_SESSION *wt_session;
 	WT_TABLE *table;
 	const char *tablename;
 	u_int i;
@@ -64,10 +65,18 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_schema_worker(
 			    session, idx->source, func, cfg, open_flags));
 		}
-	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		WT_ERR_MSG(
-		    session, ENOTSUP, "unsupported object type: %s", uri);
-	else
+	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0) {
+		wt_session = (WT_SESSION *)session;
+		if (func == __wt_compact && dsrc->compact != NULL)
+			WT_ERR(dsrc->compact(dsrc, wt_session, uri, cfg));
+		else if (func == __wt_salvage && dsrc->salvage != NULL)
+			WT_ERR(dsrc->salvage(dsrc, wt_session, uri, cfg));
+		else if (func == __wt_verify && dsrc->verify != NULL)
+			WT_ERR(dsrc->verify(dsrc, wt_session, uri, cfg));
+		else
+			WT_ERR_MSG(session,
+			    ENOTSUP, "unsupported object type: %s", uri);
+	} else
 		WT_ERR(__wt_bad_object_type(session, uri));
 
 err:	if (table != NULL)

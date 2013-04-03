@@ -739,10 +739,13 @@ add_data_source(WT_CONNECTION *conn)
 	/*! [WT_DATA_SOURCE register] */
 	static WT_DATA_SOURCE my_dsrc = {
 		my_create,
+		NULL,			/* No compaction support */
 		my_drop,
 		my_open_cursor,
 		my_rename,
-		my_truncate
+		NULL,			/* No salvage support */
+		my_truncate,
+		NULL			/* No verify support */
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
 	/*! [WT_DATA_SOURCE register] */

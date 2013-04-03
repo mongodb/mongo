@@ -292,10 +292,6 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
-	/* Data-sources don't support verification. */
-	if (DATASOURCE("kvs"))
-		return;
-
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
