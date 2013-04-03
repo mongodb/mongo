@@ -51,14 +51,27 @@ struct __cursor_source {
 	DBC	*dbc;
 	DBT	 key, value;
 
-	int	 append;			/* DB_APPEND flag */
-	int	 recno;				/* DB_RECNO type */
+	int	 append;			/* config "append" */
+	int	 overwrite;			/* config "overwrite" */
+	int	 recno;				/* config "key_format=r" */
 };
 
 static DATA_SOURCE ds;
 static DB_ENV *dbenv;
 static pthread_rwlock_t rwlock;
 static int open_cursors = 0;			/* Cursor count */
+
+static inline int
+map_notfound(int ret)
+{
+	return (ret == DB_NOTFOUND || ret == DB_KEYEMPTY ? WT_NOTFOUND : ret);
+}
+
+static inline int
+map_duplicatekey(int ret)
+{
+	return (ret == DB_KEYEXIST ? WT_DUPLICATE_KEY : ret);
+}
 
 static const char *
 kvs_error_map(int v)
@@ -68,23 +81,31 @@ kvs_error_map(int v)
 	    db_strerror(v) : wiredtiger_strerror(v));
 }
 
+#ifdef HAVE_DIAGNOSTIC
 void	 die(int, const char *, ...);
 #define	ERR(f) do {							\
 	int __ret = (f);						\
 	if (__ret != 0)							\
 		die(0, "%s: %s\n", #f, kvs_error_map(__ret));		\
 } while (0)
+#else
+#define	ERR(f) do {							\
+	int __ret = (f);						\
+	if (__ret != 0)							\
+		return (__ret);						\
+} while (0)
+#endif
 
 static void
 lock(void)
 {
-	ERR(pthread_rwlock_trywrlock(&rwlock));
+	(void)pthread_rwlock_trywrlock(&rwlock);
 }
 
 static void
 unlock(void)
 {
-	ERR(pthread_rwlock_unlock(&rwlock));
+	(void)pthread_rwlock_unlock(&rwlock);
 }
 
 static const char *
@@ -136,19 +157,14 @@ cfg_parse_str(const char *cfg[], const char *match, char **valuep)
 	return (0);
 }
 
-static inline int
-map_notfound(int ret)
-{
-	return (ret == DB_NOTFOUND || ret == DB_KEYEMPTY ? WT_NOTFOUND : ret);
-}
-
-static void
+static int
 bdb_dump(WT_CURSOR *wt_cursor, const char *tag)
 {
 	CURSOR_SOURCE *cursor;
 	DB *db;
 	DBC *dbc;
 	DBT *key, *value;
+	int ret;
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
 	db = cursor->db;
@@ -158,7 +174,7 @@ bdb_dump(WT_CURSOR *wt_cursor, const char *tag)
 	ERR(db->cursor(db, NULL, &dbc, 0));  
 
 	printf("==> %s\n", tag);
-	while (dbc->get(dbc, key, value, DB_NEXT) == 0)
+	while ((ret = dbc->get(dbc, key, value, DB_NEXT)) == 0)
 		if (cursor->recno)
 			printf("\t%llu/%.*s\n",
 			    (unsigned long long)*(db_recno_t *)key->data,
@@ -167,6 +183,9 @@ bdb_dump(WT_CURSOR *wt_cursor, const char *tag)
 			printf("\t%.*s/%.*s\n",
 			    (int)key->size, (char *)key->data,
 			    (int)value->size, (char *)value->data);
+	if (ret == DB_NOTFOUND)
+		ret = 0;
+	return (ret);
 }
 
 static int
@@ -324,6 +343,7 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	DBC *dbc;
 	DBT *key, *value;
 	db_recno_t recno;
+	int ret;
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
 	dbc = cursor->dbc;
@@ -347,13 +367,25 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 		 * Berkeley DB cursors have no operation to append/create a
 		 * new record and set the cursor; use the DB handle instead
 		 * then set the cursor explicitly.
+		 *
+		 * When appending, we're allocating and returning a new
+		 * record number.
 		 */
 		ERR(db->put(db, NULL, key, value, DB_APPEND));
 		wt_cursor->recno = *(db_recno_t *)key->data;
 
 		ERR(dbc->get(dbc, key, value, DB_SET));
-	} else
+	} else if (cursor->overwrite)
 		ERR(dbc->put(dbc, key, value, DB_KEYFIRST));
+	else {
+		/*
+		 * Berkeley DB cursors don't have a no-overwrite flag; use
+		 * the DB handle instead then set the cursor explicitly.
+		 */
+		if ((ret = db->put(db, NULL, key, value, DB_NOOVERWRITE)) != 0)
+			return (map_duplicatekey(ret));
+		ERR(dbc->get(dbc, key, value, DB_SET));
+	}
 
 	return (0);
 }
@@ -508,6 +540,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 						/* Parse configuration. */
 	cursor = calloc(1, sizeof(CURSOR_SOURCE));
 	ERR(cfg_parse_bool(cfg, "append", &cursor->append));
+	ERR(cfg_parse_bool(cfg, "overwrite", &cursor->overwrite));
 	ERR(cfg_parse_str(cfg, "key_format", &key_format));
 	cursor->recno = strcmp(key_format, "r") == 0;
 	free(key_format);

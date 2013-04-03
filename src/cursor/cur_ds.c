@@ -273,7 +273,7 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor, *dsc;
 	WT_DECL_RET;
-	const char *dcfg[3], *metaconf;
+	const char *dscfg[3], **dscfgp, *metaconf;
 
 	metaconf = NULL;
 
@@ -303,11 +303,15 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	 * function doesn't know about (inside of WiredTiger, this is all done
 	 * by the cursor initialization #define).
 	 */
-	dcfg[0] = metaconf;
-	dcfg[1] = F_ISSET(cursor, WT_CURSTD_APPEND) ? "append=1" : NULL;
-	dcfg[2] = NULL;
+	dscfgp = dscfg;
+	*dscfgp++ = metaconf;
+	if (F_ISSET(cursor, WT_CURSTD_APPEND))
+		*dscfgp++ = "append=1";
+	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+		*dscfgp++ = "overwrite=1";
+	*dscfgp = NULL;
 
-	WT_ERR(dsrc->open_cursor(dsrc, &session->iface, uri, dcfg, &dsc));
+	WT_ERR(dsrc->open_cursor(dsrc, &session->iface, uri, dscfg, &dsc));
 	memset(&dsc->q, 0, sizeof(dsc->q));
 	dsc->recno = 0;
 	memset(dsc->raw_recno_buf, 0, sizeof(dsc->raw_recno_buf));
