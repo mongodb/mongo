@@ -89,7 +89,7 @@ recno_convert(WT_CURSOR *wt_cursor, uint32_t *recnop)
 	session = cursor->session;
 
 	if (wt_cursor->recno > UINT32_MAX) {
-		session->msg_printf(session,
+		(void)session->msg_printf(session,
 		    "record number %" PRIuMAX ": %s",
 		    (uintmax_t)wt_cursor->recno, strerror(ERANGE));
 		return (ERANGE);
@@ -105,7 +105,7 @@ uri2name(WT_SESSION *session, const char *uri, const char **namep)
 	const char *name;
 
 	if ((name = strchr(uri, ':')) == NULL || *++name == '\0') {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "unsupported object: %s", uri);
 		return (EINVAL);
 	}
@@ -139,7 +139,7 @@ cfg_parse_str(
 			/* Copy the configuration string's value */
 			p += strlen(match) + 1;
 			if ((*valuep = strdup(p)) == NULL) {
-				session->msg_printf(
+				(void)session->msg_printf(
 				    session, "%s", strerror(errno));
 				return (errno);
 			}
@@ -153,6 +153,7 @@ cfg_parse_str(
 	return (0);
 }
 
+#ifdef HAVE_DIAGNOSTIC
 static int
 bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
 {
@@ -168,7 +169,8 @@ bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
 	value = &cursor->value;
 
 	if ((ret = db->cursor(db, NULL, &dbc, 0)) != 0) {
-		session->msg_printf(session, "Db.cursor: %s", db_strerror(ret));
+		(void)session->msg_printf(
+		    session, "Db.cursor: %s", db_strerror(ret));
 		return (WT_ERROR);
 	}
 
@@ -184,13 +186,14 @@ bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
 			    (int)value->size, (char *)value->data);
 
 	if (ret != DB_NOTFOUND) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "DbCursor.get: %s", db_strerror(ret));
 		return (WT_ERROR);
 	}
 
 	return (0);
 }
+#endif
 
 static int
 kvs_cursor_next(WT_CURSOR *wt_cursor)
@@ -221,7 +224,8 @@ kvs_cursor_next(WT_CURSOR *wt_cursor)
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	session->msg_printf(session, "DbCursor.get: %s", db_strerror(ret));
+	(void)session->msg_printf(
+	    session, "DbCursor.get: %s", db_strerror(ret));
 	return (WT_ERROR);
 }
 
@@ -254,7 +258,8 @@ kvs_cursor_prev(WT_CURSOR *wt_cursor)
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	session->msg_printf(session, "DbCursor.get: %s", db_strerror(ret));
+	(void)session->msg_printf(
+	    session, "DbCursor.get: %s", db_strerror(ret));
 	return (WT_ERROR);
 }
 
@@ -273,14 +278,14 @@ kvs_cursor_reset(WT_CURSOR *wt_cursor)
 	if ((dbc = cursor->dbc) != NULL) {
 		cursor->dbc = NULL;
 		if ((ret = dbc->close(dbc)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "DbCursor.close: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
 
 		if ((ret =
 		    cursor->db->cursor(cursor->db, NULL, &dbc, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "Db.cursor: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
@@ -329,7 +334,8 @@ kvs_cursor_search(WT_CURSOR *wt_cursor)
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	session->msg_printf(session, "DbCursor.get: %s", db_strerror(ret));
+	(void)session->msg_printf(
+	    session, "DbCursor.get: %s", db_strerror(ret));
 	return (WT_ERROR);
 }
 
@@ -375,7 +381,8 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	session->msg_printf(session, "DbCursor.get: %s", db_strerror(ret));
+	(void)session->msg_printf(
+	    session, "DbCursor.get: %s", db_strerror(ret));
 	return (WT_ERROR);
 }
 
@@ -419,20 +426,20 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 		 * number.
 		 */
 		if ((ret = db->put(db, NULL, key, value, DB_APPEND)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "Db.put: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
 		wt_cursor->recno = *(db_recno_t *)key->data;
 
 		if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "DbCursor.get: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
 	} else if (cursor->overwrite) {
 		if ((ret = dbc->put(dbc, key, value, DB_KEYFIRST)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "DbCursor.put: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
@@ -446,13 +453,13 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 			if (ret == DB_KEYEXIST)
 				return (WT_DUPLICATE_KEY);
 
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "Db.put: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
 
 		if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "DbCursor.get: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
@@ -490,7 +497,7 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 	value->size = wt_cursor->value.size;
 
 	if ((ret = dbc->put(dbc, key, value, DB_KEYFIRST)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "DbCursor.put: %s", db_strerror(ret));
 		return (WT_ERROR);
 	}
@@ -527,12 +534,12 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 	if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0) {
 		if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 			return (WT_NOTFOUND);
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "DbCursor.get: %s", db_strerror(ret));
 		return (WT_ERROR);
 	}
 	if ((ret = dbc->del(dbc, 0)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "DbCursor.del: %s", db_strerror(ret));
 		return (WT_ERROR);
 	}
@@ -556,7 +563,7 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 	dbc = cursor->dbc;
 	cursor->dbc = NULL;
 	if (dbc != NULL && (tret = dbc->close(dbc)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "DbCursor.close: %s", db_strerror(tret));
 		ret = WT_ERROR;
 	}
@@ -564,7 +571,8 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 	db = cursor->db;
 	cursor->db = NULL;
 	if (db != NULL && (tret = db->close(db, 0)) != 0) {
-		session->msg_printf(session, "Db.close: %s", db_strerror(tret));
+		(void)session->msg_printf(
+		    session, "Db.close: %s", db_strerror(tret));
 		ret = WT_ERROR;
 	}
 	free(wt_cursor);
@@ -601,17 +609,18 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	ret = 0;			/* Create the Berkeley DB table */
 	if ((tret = db_create(&db, dbenv, 0)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "db_create: %s", db_strerror(tret));
 		return (WT_ERROR);
 	}
 	if ((tret = db->open(db, NULL, name, NULL, type, flags, 0)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "Db.open: %s", uri, db_strerror(tret));
 		ret = WT_ERROR;
 	}
 	if ((tret = db->close(db, 0)) != 0) {
-		session->msg_printf(session, "Db.close", db_strerror(tret));
+		(void)session->msg_printf
+		    (session, "Db.close", db_strerror(tret));
 		ret = WT_ERROR;
 	}
 	return (ret);
@@ -635,13 +644,13 @@ kvs_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	lock();
 	if (open_cursors == 0) {
 		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "db_create: %s", db_strerror(ret));
 			ret = WT_ERROR;
 			goto err;
 		}
 		if ((ret = db->remove(db, name, NULL, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "Db.remove: %s", db_strerror(ret));
 			ret = WT_ERROR;
 			goto err;
@@ -685,20 +694,20 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	lock();
 				/* Open the Berkeley DB cursor */
 	if ((ret = db_create(&cursor->db, dbenv, 0)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "db_create: %s", db_strerror(ret));
 		goto err;
 	}
 	db = cursor->db;
 	if ((ret = db->open(db, NULL, name,
 	    NULL, cursor->recno ? DB_RECNO : DB_BTREE, DB_CREATE, 0)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "Db.open: %s", db_strerror(ret));
 		ret = WT_ERROR;
 		goto err;
 	}
 	if ((ret = db->cursor(db, NULL, &cursor->dbc, 0)) != 0) {
-		session->msg_printf(
+		(void)session->msg_printf(
 		    session, "Db.cursor: %s", db_strerror(ret));
 		ret = WT_ERROR;
 		goto err;
@@ -745,13 +754,13 @@ kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	lock();
 	if (open_cursors == 0) {
 		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "db_create: %s", db_strerror(ret));
 			ret = WT_ERROR;
 			goto err;
 		}
 		if ((ret = db->rename(db, name, NULL, newname, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "Db.rename: %s", db_strerror(ret));
 			ret = WT_ERROR;
 			goto err;
@@ -784,17 +793,17 @@ kvs_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	lock();
 	if (open_cursors == 0) {
 		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "db_create: %s", db_strerror(ret));
 			ret = WT_ERROR;
 			goto err;
 		}
 		if ((ret = db->open(db,
 		    NULL, name, NULL, DB_UNKNOWN, DB_TRUNCATE, 0)) != 0)
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "Db.open: %s", db_strerror(ret));
 		if ((tret = db->close(db, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "Db.close: %s", db_strerror(ret));
 			ret = WT_ERROR;
 			if (ret == 0)
@@ -816,6 +825,7 @@ kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	const char *name;
 
 	(void)dsrc;				/* Unused parameters */
+	(void)cfg;
 
 						/* Get the object name */
 	if ((ret = uri2name(session, uri, &name)) != 0)
@@ -824,7 +834,7 @@ kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	lock();
 	if (open_cursors == 0) {
 		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			session->msg_printf(
+			(void)session->msg_printf(
 			    session, "db_create: %s", db_strerror(ret));
 			ret = WT_ERROR;
 			goto err;
@@ -832,7 +842,7 @@ kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		if ((ret = db->verify(db, name, NULL, NULL, 0)) != 0) {
 			(void)db->close(db, 0);
 
-			session->msg_printf(session,
+			(void)session->msg_printf(session,
 			    "Db.verify: %s: %s", uri, db_strerror(ret));
 			ret = WT_ERROR;
 			goto err;
