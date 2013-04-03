@@ -54,16 +54,36 @@ start()
 
 stop()
 {
-  echo -n $"Stopping mongod: "
-  killproc -p "$PIDFILE" -d 300 /usr/bin/mongod
-  RETVAL=$?
+  echo $"Stopping mongod: "
+  mongo_killproc
+  RETVAL=$((! $?))
+  if [ $RETVAL -eq 0 ] ; then
+    success "$mongod shutdown"
+    rm -f /var/lock/subsys/mongod $PIDFILE
+  else
+    failure "$mongod shutdown"
+  fi
   echo
-  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
+  return $RETVAL
 }
 
 restart () {
 	stop
 	start
+}
+
+mongo_killproc()
+{
+  pid=`pidofproc -p "$PIDFILE" $mongod`
+
+  killproc -p "$PIDFILE" $mongod -TERM >/dev/null 2>&1
+  x=0
+  while [ $x -le 30 ] && checkpid $pid ; do
+    sleep 10
+    x=$(( $x + 1))
+  done
+  killproc -p "$PIDFILE" $mongod -KILL >/dev/null 2>&1
+  checkpid $pid
 }
 
 ulimit -n 12000
