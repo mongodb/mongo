@@ -38,6 +38,10 @@
 #include <build_unix/db.h>
 #include <wiredtiger.h>
 
+#ifndef	UINT32_MAX                      	/* Maximum 32-bit unsigned. */
+#define	UINT32_MAX	4294967295U
+#endif
+
 typedef struct __data_source DATA_SOURCE;	/* XXX: May not need? */
 struct __data_source {
 	WT_DATA_SOURCE dsrc;			/* Must come first */
@@ -95,6 +99,16 @@ void	 die(int, const char *, ...);
 		return (__ret);						\
 } while (0)
 #endif
+
+static inline int
+recno_convert(uint64_t recno, (uint32_t *)&recnop)
+{
+	if (recno > UINT32_MAX)
+		return (EINVAL);
+
+	*recnop = (uint32_t)recno;
+	return (0);
+}
 
 static void
 lock(void)
@@ -274,7 +288,7 @@ kvs_cursor_search(WT_CURSOR *wt_cursor)
 	value = &cursor->value;
 
 	if (cursor->recno) {
-		recno = (uint32_t)wt_cursor->recno;
+		ERR(recno_convert(wt_cursor->recno, &recno));
 		key->data = &recno;
 		key->size = sizeof(db_recno_t);
 	} else {
@@ -313,7 +327,7 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 	value = &cursor->value;
 
 	if (cursor->recno) {
-		recno = (uint32_t)wt_cursor->recno;
+		ERR(recno_convert(wt_cursor->recno, &recno));
 		key->data = &recno;
 		key->size = sizeof(db_recno_t);
 	} else {
@@ -352,7 +366,7 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	value = &cursor->value;
 
 	if (cursor->recno) {
-		recno = (uint32_t)wt_cursor->recno;
+		ERR(recno_convert(wt_cursor->recno, &recno));
 		key->data = &recno;
 		key->size = sizeof(db_recno_t);
 	} else {
@@ -368,8 +382,8 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 		 * new record and set the cursor; use the DB handle instead
 		 * then set the cursor explicitly.
 		 *
-		 * When appending, we're allocating and returning a new
-		 * record number.
+		 * When appending, we're allocating and returning a new record
+		 * number.
 		 */
 		ERR(db->put(db, NULL, key, value, DB_APPEND));
 		wt_cursor->recno = *(db_recno_t *)key->data;
@@ -404,7 +418,7 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 	value = &cursor->value;
 
 	if (cursor->recno) {
-		recno = (uint32_t)wt_cursor->recno;
+		ERR(recno_convert(wt_cursor->recno, &recno));
 		key->data = &recno;
 		key->size = sizeof(db_recno_t);
 	} else {
@@ -434,7 +448,7 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 	value = &cursor->value;
 
 	if (cursor->recno) {
-		recno = (uint32_t)wt_cursor->recno;
+		ERR(recno_convert(wt_cursor->recno, &recno));
 		key->data = &recno;
 		key->size = sizeof(db_recno_t);
 	} else {
