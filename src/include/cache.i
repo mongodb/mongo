@@ -50,7 +50,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	int lockout, wake;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * Only wake the eviction server the first time through here (if the

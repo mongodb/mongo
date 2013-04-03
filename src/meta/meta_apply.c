@@ -16,13 +16,13 @@ int
 __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
-	WT_BTREE *saved_btree;
 	WT_CURSOR *cursor;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	const char *uri;
 	int cmp, tret;
 
-	saved_btree = session->btree;
+	saved_dhandle = session->dhandle;
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, "file:");
 	if ((tret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
@@ -47,6 +47,6 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 	if (tret != WT_NOTFOUND)
 		WT_TRET(tret);
 err:	WT_TRET(cursor->close(cursor));
-	session->btree = saved_btree;
+	session->dhandle = saved_dhandle;
 	return (ret);
 }

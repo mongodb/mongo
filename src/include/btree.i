@@ -25,7 +25,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * Ignore internal pages (check read-only information first to the
@@ -279,7 +279,7 @@ __wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * A memory barrier is required for setting the tree's modified value,
@@ -364,7 +364,7 @@ __wt_row_key(WT_SESSION_IMPL *session,
 	WT_IKEY *ikey;
 	WT_CELL_UNPACK unpack;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 retry:	ikey = WT_ROW_KEY_COPY(rip);
 
@@ -541,7 +541,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	root = btree->root_page;
 
 	if (btree == NULL || root == NULL ||

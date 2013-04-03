@@ -301,7 +301,6 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
 	stats->cond_wait.v = 0;
-	stats->file_open.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
 	stats->memory_grow.v = 0;

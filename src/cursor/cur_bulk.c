@@ -53,10 +53,8 @@ __curbulk_close(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, close, btree);
 	WT_TRET(__wt_bulk_end(cbulk));
-	if (btree != NULL) {
-		WT_ASSERT(session, session->btree == btree);
+	if (btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
-	}
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));

@@ -162,7 +162,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 
 	kb = &cbt->iface.key;

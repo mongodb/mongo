@@ -138,13 +138,14 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM key_conf, value_conf;
 	WT_DECL_RET;
+	const char **cfg;
 	u_int entries, numbytes;
 
-	btree = session->btree;
+	btree = S2BT(session);
+	cfg = btree->dhandle->cfg;
 
-	WT_RET(__wt_config_gets(session, btree->cfg, "huffman_key", &key_conf));
-	WT_RET(__wt_config_gets(
-	    session, btree->cfg, "huffman_value", &value_conf));
+	WT_RET(__wt_config_gets(session, cfg, "huffman_key", &key_conf));
+	WT_RET(__wt_config_gets(session, cfg, "huffman_value", &value_conf));
 	if (key_conf.len == 0 && value_conf.len == 0)
 		return (0);
 
@@ -315,7 +316,7 @@ __wt_btree_huffman_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	if (btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */

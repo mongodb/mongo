@@ -22,7 +22,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 	size_t result_len;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 
 	/*
@@ -86,7 +86,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			WT_ERR(
 			    F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR) ?
 			    WT_ERROR :
-			    __wt_illegal_value(session, btree->name));
+			    __wt_illegal_value(session, btree->dhandle->name));
 	} else
 		if (btree->compressor == NULL)
 			buf->size = dsk->mem_size;
@@ -139,7 +139,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	int data_cksum, compression_failed;
 	uint8_t *src, *dst;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 
 	/* Checkpoint calls are different than standard calls. */

@@ -32,11 +32,11 @@ __session_reset_cursors(WT_SESSION_IMPL *session)
 static int
 __session_close_cache(WT_SESSION_IMPL *session)
 {
-	WT_BTREE_SESSION *btree_session;
+	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 
-	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_discard_btree(session, btree_session));
+	while ((dhandle_cache = TAILQ_FIRST(&session->dhandles)) != NULL)
+		WT_TRET(__wt_session_discard_btree(session, dhandle_cache));
 
 	__wt_schema_close_tables(session);
 
@@ -222,7 +222,6 @@ __session_open_cursor(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
-	WT_DSTAT_INCR(session, cursor_create);
 
 	if ((to_dup == NULL && uri == NULL) || (to_dup != NULL && uri != NULL))
 		WT_ERR_MSG(session, EINVAL,
@@ -429,7 +428,7 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, salvage, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, uri,
-		__wt_salvage, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_SALVAGE));
+		__wt_salvage, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -548,7 +547,7 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, upgrade, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, uri,
-		__wt_upgrade, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_UPGRADE));
+		__wt_upgrade, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -568,7 +567,7 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, verify, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, uri,
-		__wt_verify, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
+		__wt_verify, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -794,7 +793,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	    event_handler == NULL ? session->event_handler : event_handler);
 
 	TAILQ_INIT(&session_ret->cursors);
-	TAILQ_INIT(&session_ret->btrees);
+	TAILQ_INIT(&session_ret->dhandles);
 
 	/* Initialize transaction support. */
 	WT_ERR(__wt_txn_init(session_ret));

@@ -19,7 +19,7 @@ __cache_read_row_deleted(
 	WT_UPDATE **upd_array, *upd;
 	uint32_t i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * Give the page a modify structure and set the transaction ID for the

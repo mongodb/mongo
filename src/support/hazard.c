@@ -26,7 +26,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	WT_HAZARD *hp;
 	int restarts = 0;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	*busyp = 0;
 
 	/* If a file can never be evicted, hazard pointers aren't required. */
@@ -134,7 +134,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_HAZARD *hp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* If a file can never be evicted, hazard pointers aren't required. */
 	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))

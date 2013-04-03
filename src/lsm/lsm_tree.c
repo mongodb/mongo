@@ -757,7 +757,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	u_int i;
 
 	WT_RET(__wt_lsm_tree_get(session, uri,
-	    FLD_ISSET(open_flags, WT_BTREE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
+	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (func == __wt_checkpoint &&
