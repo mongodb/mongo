@@ -632,6 +632,7 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = cfg_parse_str(session, cfg, "key_format", &key_format)) != 0)
 		return (ret);
 	type = strcmp(key_format, "r") == 0 ? DB_RECNO : DB_BTREE;
+	free(key_format);
 
 	flags = DB_CREATE | (exclusive ? DB_EXCL : 0);
 
@@ -909,6 +910,8 @@ kvs_close(WT_CONNECTION *conn)
 	int ret;
 
 	(void)conn;				/* Unused parameters */
+
+	 (void)pthread_rwlock_destroy(&ds.rwlock);
 
 	if (dbenv != NULL && (ret = dbenv->close(dbenv, 0)) != 0)
 		die(0, "DB_ENV.close: %s", db_strerror(ret));
