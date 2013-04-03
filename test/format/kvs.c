@@ -141,6 +141,12 @@ cfg_parse_str(const char *cfg[], const char *match, char **valuep)
 	return (0);
 }
 
+static inline int
+map_notfound(int ret)
+{
+	return (ret == DB_NOTFOUND || ret == DB_KEYEMPTY ? WT_NOTFOUND : ret);
+}
+
 static void
 bdb_dump(WT_CURSOR *wt_cursor, const char *tag)
 {
@@ -191,7 +197,7 @@ kvs_cursor_next(WT_CURSOR *wt_cursor)
 		wt_cursor->value.data = value->data;
 		wt_cursor->value.size = value->size;
 	}
-	return (ret == DB_NOTFOUND ? WT_NOTFOUND : ret);
+	return (map_notfound(ret));
 }
 
 static int
@@ -217,7 +223,7 @@ kvs_cursor_prev(WT_CURSOR *wt_cursor)
 		wt_cursor->value.data = value->data;
 		wt_cursor->value.size = value->size;
 	}
-	return (ret == DB_NOTFOUND ? WT_NOTFOUND : ret);
+	return (map_notfound(ret));
 }
 
 static int
@@ -263,7 +269,7 @@ kvs_cursor_search(WT_CURSOR *wt_cursor)
 	}
 
 	if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0)
-		return (ret == DB_NOTFOUND ? WT_NOTFOUND : ret);
+		return (map_notfound(ret));
 
 	if (cursor->recno)
 		wt_cursor->recno = *(db_recno_t *)key->data;
@@ -302,7 +308,7 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 	}
 
 	if ((ret = dbc->get(dbc, key, value, DB_SET_RANGE)) != 0)
-		return (ret == DB_NOTFOUND ? WT_NOTFOUND : ret);
+		return (map_notfound(ret));
 
 	if (cursor->recno)
 		wt_cursor->recno = *(db_recno_t *)key->data;
@@ -396,9 +402,8 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 		key->size = wt_cursor->key.size;
 	}
 
-	if ((ret = dbc->get(dbc, key, value, DB_SET)) == DB_NOTFOUND)
-		return (WT_NOTFOUND);
-	ERR(ret);
+	if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0)
+		return (map_notfound(ret));
 	ERR(dbc->del(dbc, 0));
 
 	return (0);
