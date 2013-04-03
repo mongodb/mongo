@@ -453,13 +453,6 @@ err:		if (cursor != NULL)
 /*
  * __wt_cursor_init --
  *	Default cursor initialization.
- *
- *	Most cursors are "public", and added to the list in the session
- *	to be closed when the cursor is closed.  However, some cursors are
- *	opened for internal use, or are opened inside another cursor (such
- *	as column groups or indices within a table cursor), and adding those
- *	cursors to the list introduces ordering dependencies into
- *	WT_SESSION->close that we prefer to avoid.
  */
 int
 __wt_cursor_init(WT_CURSOR *cursor,
@@ -512,9 +505,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));
-
-	WT_CLEAR(cursor->key);
-	WT_CLEAR(cursor->value);
 
 	/* Set runtime-configurable settings. */
 	WT_RET(__cursor_runtime_config(cursor, cfg));
