@@ -1142,6 +1142,17 @@ namespace JSTests {
             }
         };
 
+        class Timestamp : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendTimestamp( "a", (unsigned long long) 20000, 5 );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : Timestamp( 20, 5 ) }";
+            }
+        };
+
     } // namespace RoundTripTests
 
     class BinDataType {
@@ -1415,6 +1426,7 @@ namespace JSTests {
             add< RoundTripTests::InformalDBRefTest >();
             add< RoundTripTests::InformalDBRefOIDTest >();
             add< RoundTripTests::InformalDBRefExtraFieldTest >();
+            add< RoundTripTests::Timestamp >();
             add< NoReturnSpecified >();
         }
     } myall;

@@ -1377,12 +1377,9 @@ namespace mongo {
                 break;
             }
             case mongo::Timestamp: {
-                v8::Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() :
-                                                       internalFieldObjects->NewInstance();
-                sub->ForceSet(v8::String::New("t"), v8::Number::New(f.timestampTime() / 1000));
-                sub->ForceSet(v8::String::New("i"), v8::Number::New(f.timestampInc()));
-                sub->SetInternalField(0, v8::Uint32::New(f.type()));
-                o->ForceSet(name, sub);
+                argv[0] = v8::Number::New(f.timestampTime() / 1000);
+                argv[1] = v8::Number::New(f.timestampInc());
+                o->ForceSet(name, getNamedCons("Timestamp")->NewInstance(2,argv));
                 break;
             }
             case mongo::NumberLong: {
@@ -1569,11 +1566,9 @@ namespace mongo {
             return getNamedCons("BinData")->NewInstance(2, argv);
         }
         case mongo::Timestamp:
-            instance = internalFieldObjects->NewInstance();
-            instance->ForceSet(v8::String::New("t"), v8::Number::New(elem.timestampTime() / 1000 ));
-            instance->ForceSet(v8::String::New("i"), v8::Number::New(elem.timestampInc()));
-            instance->SetInternalField(0, v8::Uint32::New(elem.type()));
-            return instance;
+            argv[0] = v8::Number::New(elem.timestampTime() / 1000);
+            argv[1] = v8::Number::New(elem.timestampInc());
+            return getNamedCons("Timestamp")->NewInstance(2,argv);
         case mongo::NumberLong:
             nativeUnsignedLong = elem.numberLong();
             // values above 2^53 are not accurately represented in JS
