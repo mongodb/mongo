@@ -20,7 +20,7 @@ __curds_key_get(WT_CURSOR *cursor)
 	F_CLR(cursor, WT_CURSTD_KEY_APP);
 	F_SET(cursor, WT_CURSTD_KEY_RET);
 }
-	
+
 /*
  * __curds_value_get -
  *	Get the value from the data-source.
