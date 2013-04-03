@@ -42,16 +42,33 @@
 #define	UINT32_MAX	4294967295U
 #endif
 
+static DB_ENV *dbenv;				/* Enclosing environment */
+
 typedef struct __data_source DATA_SOURCE;	/* XXX: May not need? */
 struct __data_source {
 	WT_DATA_SOURCE dsrc;			/* Must come first */
+
+	/*
+	 * XXX
+	 * This only works for a single object: if there were more than one
+	 * object in test/format, cursor open would use the passed-in uri to
+	 * find a { lock, cursor-count } pair to reference from each cursor
+	 * object, and each session.XXX method call would have to use the
+	 * appropriate { lock, cursor-count } pair based on their passed-in
+	 * uri.
+	 */
+	pthread_rwlock_t rwlock;		/* Object's lock */
+	int open_cursors;			/* Object's cursor count */
 };
+static DATA_SOURCE ds;
 
 typedef struct __cursor_source CURSOR_SOURCE;
 struct __cursor_source {
 	WT_CURSOR cursor;			/* Must come first */
 
 	WT_SESSION *session;			/* Enclosing session */
+
+	WT_DATA_SOURCE *dsrc;			/* Enclosing data source */
 
 	DB	*db;				/* Berkeley DB handles */
 	DBC	*dbc;
@@ -62,24 +79,33 @@ struct __cursor_source {
 	int	 recno;				/* config "key_format=r" */
 };
 
-static DATA_SOURCE ds;
-static DB_ENV *dbenv;
-static pthread_rwlock_t rwlock;
-static int open_cursors = 0;			/* Cursor count */
-
-static inline void
+static void
 lock(void)
 {
-	(void)pthread_rwlock_trywrlock(&rwlock);
+	(void)pthread_rwlock_trywrlock(&ds.rwlock);
 }
 
-static inline void
+static void
 unlock(void)
 {
-	(void)pthread_rwlock_unlock(&rwlock);
+	(void)pthread_rwlock_unlock(&ds.rwlock);
 }
 
-static inline int
+static int
+single_thread(WT_DATA_SOURCE *dsrc)
+{
+	DATA_SOURCE *data;
+
+	data = (DATA_SOURCE *)dsrc;
+	lock();
+	if (data->open_cursors != 0) {
+		unlock();
+		return (EBUSY);
+	}
+	return (0);
+}
+
+static int
 recno_convert(WT_CURSOR *wt_cursor, uint32_t *recnop)
 {
 	CURSOR_SOURCE *cursor;
@@ -551,6 +577,7 @@ static int
 kvs_cursor_close(WT_CURSOR *wt_cursor)
 {
 	CURSOR_SOURCE *cursor;
+	DATA_SOURCE *data;
 	DB *db;
 	DBC *dbc;
 	WT_SESSION *session;
@@ -558,6 +585,7 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
 	session = cursor->session;
+	data = (DATA_SOURCE *)cursor->dsrc;
 	ret = 0;
 
 	dbc = cursor->dbc;
@@ -578,7 +606,7 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 	free(wt_cursor);
 
 	lock();
-	--open_cursors;
+	--data->open_cursors;
 	unlock();
 
 	return (ret);
@@ -592,8 +620,8 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	DBTYPE type;
 	uint32_t flags;
 	int ret, tret;
-	const char *name;
 	char *key_format;
+	const char *name;
 
 	(void)dsrc;				/* Unused parameters */
 
@@ -631,37 +659,31 @@ kvs_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, const char *cfg[])
 {
 	DB *db;
-	int ret;
+	int ret, tret;
 	const char *name;
 
-	(void)dsrc;				/* Unused parameters */
-	(void)cfg;
+	(void)cfg;				/* Unused parameters */
 
 						/* Get the object name */
 	if ((ret = uri2name(session, uri, &name)) != 0)
 		return (ret);
 
-	lock();
-	if (open_cursors == 0) {
-		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			(void)session->msg_printf(
-			    session, "db_create: %s", db_strerror(ret));
-			ret = WT_ERROR;
-			goto err;
-		}
-		if ((ret = db->remove(db, name, NULL, 0)) != 0) {
-			(void)session->msg_printf(
-			    session, "Db.remove: %s", db_strerror(ret));
-			ret = WT_ERROR;
-			goto err;
-		}
-		/* db handle is dead */
+	if ((ret = single_thread(dsrc)) != 0)
+		return (ret);
 
-		ret = 0;
-	} else
-		ret = EBUSY;
+	ret = 0;
+	if ((tret = db_create(&db, dbenv, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "db_create: %s", db_strerror(tret));
+		ret = WT_ERROR;
+	} else if ((tret = db->remove(db, name, NULL, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "Db.remove: %s", db_strerror(tret));
+		ret = WT_ERROR;
+	}
+	/* db handle is dead */
 
-err:	unlock();
+	unlock();
 	return (ret);
 }
 
@@ -670,19 +692,22 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, const char *cfg[], WT_CURSOR **new_cursor)
 {
 	CURSOR_SOURCE *cursor;
+	DATA_SOURCE *data;
 	DB *db;
-	int ret;
+	int ret, tret;
 	char *key_format;
 	const char *name;
 
-	(void)dsrc;				/* Unused parameters */
-	(void)cfg;
+	(void)cfg;				/* Unused parameters */
+
+	data = (DATA_SOURCE *)dsrc;
 						/* Get the object name */
 	if ((ret = uri2name(session, uri, &name)) != 0)
 		return (ret);
 						/* Allocate the cursor */
 	cursor = calloc(1, sizeof(CURSOR_SOURCE));
 	cursor->session = session;
+	cursor->dsrc = dsrc;
 						/* Parse configuration */
 	cfg_parse_bool(cfg, "append", &cursor->append);
 	cfg_parse_bool(cfg, "overwrite", &cursor->overwrite);
@@ -693,22 +718,23 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	lock();
 				/* Open the Berkeley DB cursor */
-	if ((ret = db_create(&cursor->db, dbenv, 0)) != 0) {
+	if ((tret = db_create(&cursor->db, dbenv, 0)) != 0) {
 		(void)session->msg_printf(
-		    session, "db_create: %s", db_strerror(ret));
-		goto err;
-	}
-	db = cursor->db;
-	if ((ret = db->open(db, NULL, name,
-	    NULL, cursor->recno ? DB_RECNO : DB_BTREE, DB_CREATE, 0)) != 0) {
-		(void)session->msg_printf(
-		    session, "Db.open: %s", db_strerror(ret));
+		    session, "db_create: %s", db_strerror(tret));
 		ret = WT_ERROR;
 		goto err;
 	}
-	if ((ret = db->cursor(db, NULL, &cursor->dbc, 0)) != 0) {
+	db = cursor->db;
+	if ((tret = db->open(db, NULL, name,
+	    NULL, cursor->recno ? DB_RECNO : DB_BTREE, DB_CREATE, 0)) != 0) {
 		(void)session->msg_printf(
-		    session, "Db.cursor: %s", db_strerror(ret));
+		    session, "Db.open: %s", db_strerror(tret));
+		ret = WT_ERROR;
+		goto err;
+	}
+	if ((tret = db->cursor(db, NULL, &cursor->dbc, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "Db.cursor: %s", db_strerror(tret));
 		ret = WT_ERROR;
 		goto err;
 	}
@@ -726,7 +752,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	*new_cursor = (WT_CURSOR *)cursor;
 
-	++open_cursors;
+	++data->open_cursors;
 
 	if (0) {
 err:		free(cursor);
@@ -741,37 +767,31 @@ kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, const char *newname, const char *cfg[])
 {
 	DB *db;
-	int ret;
+	int ret, tret;
 	const char *name;
 
-	(void)dsrc;				/* Unused parameters */
-	(void)cfg;
+	(void)cfg;				/* Unused parameters */
 
 						/* Get the object name */
 	if ((ret = uri2name(session, uri, &name)) != 0)
 		return (ret);
 
-	lock();
-	if (open_cursors == 0) {
-		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			(void)session->msg_printf(
-			    session, "db_create: %s", db_strerror(ret));
-			ret = WT_ERROR;
-			goto err;
-		}
-		if ((ret = db->rename(db, name, NULL, newname, 0)) != 0) {
-			(void)session->msg_printf(
-			    session, "Db.rename: %s", db_strerror(ret));
-			ret = WT_ERROR;
-			goto err;
-		}
-		/* db handle is dead */
+	if ((ret = single_thread(dsrc)) != 0)
+		return (ret);
 
-		ret = 0;
-	} else
-		ret = EBUSY;
+	ret = 0;
+	if ((tret = db_create(&db, dbenv, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "db_create: %s", db_strerror(tret));
+		ret = WT_ERROR;
+	} else if ((tret = db->rename(db, name, NULL, newname, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "Db.rename: %s", db_strerror(tret));
+		ret = WT_ERROR;
+	}
+	/* db handle is dead */
 
-err:	unlock();
+	unlock();
 	return (ret);
 }
 
@@ -783,34 +803,33 @@ kvs_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	int ret, tret;
 	const char *name;
 
-	(void)dsrc;				/* Unused parameters */
-	(void)cfg;
+	(void)cfg;				/* Unused parameters */
 
 						/* Get the object name */
 	if ((ret = uri2name(session, uri, &name)) != 0)
 		return (ret);
 
-	lock();
-	if (open_cursors == 0) {
-		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			(void)session->msg_printf(
-			    session, "db_create: %s", db_strerror(ret));
-			ret = WT_ERROR;
-			goto err;
-		}
-		if ((ret = db->open(db,
-		    NULL, name, NULL, DB_UNKNOWN, DB_TRUNCATE, 0)) != 0)
-			(void)session->msg_printf(
-			    session, "Db.open: %s", db_strerror(ret));
-		if ((tret = db->close(db, 0)) != 0) {
-			(void)session->msg_printf(
-			    session, "Db.close: %s", db_strerror(ret));
-			ret = WT_ERROR;
-			if (ret == 0)
-				ret = tret;
-		}
-	} else
-		ret = EBUSY;
+	if ((ret = single_thread(dsrc)) != 0)
+		return (ret);
+
+	ret = 0;
+	if ((tret = db_create(&db, dbenv, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "db_create: %s", db_strerror(tret));
+		ret = WT_ERROR;
+		goto err;
+	}
+	if ((tret = db->open(db,
+	    NULL, name, NULL, DB_UNKNOWN, DB_TRUNCATE, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "Db.open: %s", db_strerror(tret));
+		ret = WT_ERROR;
+	}
+	if ((tret = db->close(db, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "Db.close: %s", db_strerror(tret));
+		ret = WT_ERROR;
+	}
 
 err:	unlock();
 	return (ret);
@@ -821,38 +840,33 @@ kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, const char *cfg[])
 {
 	DB *db;
-	int ret;
+	int ret, tret;
 	const char *name;
 
-	(void)dsrc;				/* Unused parameters */
-	(void)cfg;
+	(void)cfg;				/* Unused parameters */
 
 						/* Get the object name */
 	if ((ret = uri2name(session, uri, &name)) != 0)
 		return (ret);
 
-	lock();
-	if (open_cursors == 0) {
-		if ((ret = db_create(&db, dbenv, 0)) != 0) {
-			(void)session->msg_printf(
-			    session, "db_create: %s", db_strerror(ret));
-			ret = WT_ERROR;
-			goto err;
-		}
-		if ((ret = db->verify(db, name, NULL, NULL, 0)) != 0) {
-			(void)db->close(db, 0);
+	if ((ret = single_thread(dsrc)) != 0)
+		return (ret);
 
-			(void)session->msg_printf(session,
-			    "Db.verify: %s: %s", uri, db_strerror(ret));
-			ret = WT_ERROR;
-			goto err;
-		}
+	ret = 0;
+	if ((tret = db_create(&db, dbenv, 0)) != 0) {
+		(void)session->msg_printf(
+		    session, "db_create: %s", db_strerror(tret));
+		ret = WT_ERROR;
+	} else if ((tret = db->verify(db, name, NULL, NULL, 0)) != 0) {
+		(void)db->close(db, 0);
 
-		ret = 0;
-	} else
-		ret = EBUSY;
+		(void)session->msg_printf(session,
+		    "Db.verify: %s: %s", uri, db_strerror(tret));
+		ret = WT_ERROR;
+	}
+	/* db handle is dead */
 
-err:	unlock();
+	unlock();
 	return (ret);
 }
 
@@ -863,7 +877,9 @@ kvs_init(WT_CONNECTION *conn, const char *dir)
 {
 	int ret;
 
-	if (pthread_rwlock_init(&rwlock, NULL) != 0)
+	memset(&ds, 0, sizeof(ds));
+
+	if (pthread_rwlock_init(&ds.rwlock, NULL) != 0)
 		die(errno, "pthread_rwlock_init");
 
 	if ((ret = db_env_create(&dbenv, 0)) != 0)
@@ -874,7 +890,6 @@ kvs_init(WT_CONNECTION *conn, const char *dir)
 	    DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_PRIVATE, 0)) != 0)
 		die(0, "DbEnv.open: %s", db_strerror(ret));
 
-	memset(&ds, 0, sizeof(ds));
 	ds.dsrc.create = kvs_create;
 	ds.dsrc.compact = NULL;			/* No compaction */
 	ds.dsrc.drop = kvs_drop;
@@ -895,6 +910,6 @@ kvs_close(WT_CONNECTION *conn)
 
 	(void)conn;				/* Unused parameters */
 
-	if ((ret = dbenv->close(dbenv, 0)) != 0)
+	if (dbenv != NULL && (ret = dbenv->close(dbenv, 0)) != 0)
 		die(0, "DB_ENV.close: %s", db_strerror(ret));
 }
