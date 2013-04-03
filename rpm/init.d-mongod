@@ -72,7 +72,7 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  killproc -p "$PIDFILEPATH" -d 300 /usr/bin/mongod
+  mongo_killproc $mongod
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
@@ -83,6 +83,37 @@ restart () {
 	start
 }
 
+# Send TERM signal to process and wait up to 300 seconds for process to go away.
+# If process is still alive after 300 seconds, send KILL signal.
+# Built-in killproc() (found in /etc/init.d/functions) is on certain versions of Linux
+# where it sleeps for the full $delay seconds if process does not respond fast enough to
+# the initial TERM signal.
+mongo_killproc()
+{
+  local procname=$1
+  local -i delay=300
+  local -i duration=10
+  local pid=`pidofproc -p "$PIDFILEPATH" $procname`
+
+  kill -TERM $pid >/dev/null 2>&1
+  usleep 100000
+  local -i x=0
+  while [ $x -le $delay ] && checkpid $pid; do
+    sleep $duration
+    x=$(( $x + $duration))
+  done
+
+  kill -KILL $pid >/dev/null 2>&1
+  usleep 100000
+
+  rm -f "$PIDFILEPATH"
+
+  checkpid $pid
+  local RC=$?
+  [ "$RC" -eq 0 ] && failure "${procname} shutdown" || success "${procname} shutdown"
+  RC=$((! $RC))
+  return $RC
+}
 
 RETVAL=0
 
