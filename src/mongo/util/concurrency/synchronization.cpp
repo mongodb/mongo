@@ -17,6 +17,8 @@
 
 #include "synchronization.h"
 
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 namespace mongo {
 
     Notification::Notification() : _mutex ( "Notification" ){ 
@@ -29,6 +31,15 @@ namespace mongo {
         while ( lookFor != cur )
             _condition.wait( lock.boost() );
         lookFor++;
+    }
+
+    bool Notification::timedWaitToBeNotified( int millis ) {
+        scoped_lock lock( _mutex );
+        if ( lookFor != cur )
+            _condition.timed_wait( lock.boost(), boost::posix_time::milliseconds( millis ) );
+        if ( lookFor != cur ) return false;
+        lookFor++;
+        return true;
     }
 
     void Notification::notifyOne() {
