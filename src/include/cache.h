@@ -56,6 +56,7 @@ struct __wt_cache {
 	uint32_t evict_entries;		/* LRU list eviction slots */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	u_int    evict_file_next;	/* LRU: next file to search */
+	uint32_t force_entries;		/* Forced eviction page count */
 
 	/*
 	 * Sync/flush request information.
@@ -74,9 +75,8 @@ struct __wt_cache {
 	/*
 	 * Flags.
 	 */
-#define	WT_EVICT_FORCE_PASS	0x01	/* Ignore the eviction trigger */
-#define	WT_EVICT_NO_PROGRESS	0x02	/* Check if pages are being evicted */
-#define	WT_EVICT_STUCK		0x04	/* Eviction server is stuck */
+#define	WT_EVICT_NO_PROGRESS	0x01	/* Check if pages are being evicted */
+#define	WT_EVICT_STUCK		0x02	/* Eviction server is stuck */
 	uint32_t flags;
 };
 

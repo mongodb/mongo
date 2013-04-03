@@ -49,7 +49,7 @@ struct __wt_stats {
 /* Data-source statistics. */
 #define	WT_DSTAT_DECR(session, fld) do {				\
 	if (S2C(session)->statistics)					\
-		WT_STAT_DECR(&(session)->btree->stats, fld);		\
+		WT_STAT_DECR(&(session)->dhandle->stats, fld);		\
 } while (0)
 #define	WT_DSTAT_INCR(session, fld) do {				\
 	if (S2C(session)->statistics)					\

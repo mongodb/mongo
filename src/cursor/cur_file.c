@@ -333,6 +333,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
+	WT_DSTAT_INCR(session, cursor_create);
+
 	if (0) {
 err:		__wt_free(session, cbt);
 	}
