@@ -83,8 +83,9 @@ AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS([\
-	clock_gettime fcntl gettimeofday pthread_timedjoin_np posix_fadvise\
-	posix_memalign strtouq sync_file_range])
+	clock_gettime fcntl gettimeofday pthread_timedjoin_np\
+	posix_fadvise posix_madvise posix_memalign\
+	strtouq sync_file_range])
 AC_SYS_LARGEFILE
 
 AC_MSG_CHECKING([if the adaptive mutex type is available])
