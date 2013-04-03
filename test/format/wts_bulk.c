@@ -47,10 +47,11 @@ wts_load(void)
 		    "=============== bulk load start ===============");
 
 	/*
-	 * Avoid bulk load with a custom collator, because the order of
-	 * insertion will not match the collation order.
+	 * Avoid bulk load with KVS (there's no bulk load support for a
+	 * data-source); avoid bulk load with a custom collator, because
+	 * the order of insertion will not match the collation order.
 	 */
-	is_bulk = g.type == ROW && !DATASOURCE("kvs") && !g.c_reverse;
+	is_bulk = !DATASOURCE("kvs") && !g.c_reverse;
 	if ((ret = session->open_cursor(
 	    session, g.uri, NULL, is_bulk ? "bulk" : NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
