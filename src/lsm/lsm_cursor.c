@@ -774,7 +774,7 @@ static inline int
 __clsm_put(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
 {
-	WT_BTREE *saved_btree;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
@@ -823,7 +823,7 @@ __clsm_put(
 	 * switch code needs to use btree API methods, and it wants to
 	 * operate on the btree for the primary chunk. Set that up now.
 	 */
-	saved_btree = session->btree;
+	saved_dhandle = session->dhandle;
 	WT_SET_BTREE_IN_SESSION(session, ((WT_CURSOR_BTREE *)primary)->btree);
 	if (__wt_btree_size_overflow(session, lsm_tree->chunk_size)) {
 		/*
@@ -850,7 +850,7 @@ __clsm_put(
 
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
-err:	WT_SET_BTREE_IN_SESSION(session, saved_btree);
+err:	session->dhandle = saved_dhandle;
 
 	return (ret);
 }

@@ -628,7 +628,7 @@ __wt_cell_unpack_ref(
 	WT_BTREE *btree;
 	void *huffman;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Reference the cell's data, optionally decode it. */
 	switch (unpack->type) {

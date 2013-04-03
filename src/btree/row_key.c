@@ -22,7 +22,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ROW *rip;
 	uint32_t gap, i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	if (page->entries == 0) {			/* Just checking... */
 		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);

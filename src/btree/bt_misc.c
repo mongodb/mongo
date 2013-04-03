@@ -106,7 +106,7 @@ __wt_addr_string(
 {
 	WT_BM *bm;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";

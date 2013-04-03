@@ -53,7 +53,7 @@ src/config/config_collapse.c
 src/config/config_concat.c
 src/config/config_def.c
 src/conn/conn_api.c
-src/conn/conn_btree.c
+src/conn/conn_dhandle.c
 src/conn/conn_cache.c
 src/conn/conn_cache_pool.c
 src/conn/conn_ckpt.c
@@ -121,7 +121,7 @@ src/schema/schema_truncate.c
 src/schema/schema_util.c
 src/schema/schema_worker.c
 src/session/session_api.c
-src/session/session_btree.c
+src/session/session_dhandle.c
 src/session/session_salvage.c
 src/support/cksum.c
 src/support/err.c

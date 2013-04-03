@@ -192,7 +192,7 @@ __wt_debug_addr(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
 	WT_ERR(bm->read(bm, session, buf, addr, addr_size));
@@ -223,7 +223,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
 	WT_ERR(__wt_block_read_off(
-	    session, session->btree->bm->block, buf, offset, size, cksum));
+	    session, S2BT(session)->bm->block, buf, offset, size, cksum));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
 err:	__wt_scr_free(&buf);
@@ -291,7 +291,7 @@ __debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 	uint32_t i;
 	uint8_t v;
 
-	btree = ds->session->btree;
+	btree = S2BT(ds->session);
 
 	WT_FIX_FOREACH(btree, dsk, v, i) {
 		__dmsg(ds, "\t{");
@@ -312,7 +312,7 @@ __debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t i;
 
-	btree = ds->session->btree;
+	btree = S2BT(ds->session);
 	unpack = &_unpack;
 
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -382,7 +382,7 @@ __debug_tree(
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
 	if (page == NULL)
-		page = session->btree->root_page;
+		page = S2BT(session)->root_page;
 
 	ret = __debug_page(ds, page, flags);
 
@@ -563,7 +563,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	uint8_t v;
 
 	session = ds->session;
-	btree = session->btree;
+	btree = S2BT(session);
 	dsk = page->dsk;
 	recno = page->u.col_fix.recno;
 

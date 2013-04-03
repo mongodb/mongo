@@ -332,8 +332,8 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	/* Clean up open LSM handles. */
 	WT_ERR(__wt_lsm_cleanup(&conn->iface));
 
-	/* Close open btree handles. */
-	WT_TRET(__wt_conn_btree_discard(conn));
+	/* Close open data handles. */
+	WT_TRET(__wt_conn_dhandle_discard(conn));
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)

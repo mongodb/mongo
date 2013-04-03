@@ -214,7 +214,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	btree = session->btree;
+	btree = S2BT(session);
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */

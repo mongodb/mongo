@@ -41,7 +41,7 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_session_get_btree(session, WT_METADATA_URI, NULL, NULL, 0));
 
-	session->metafile = session->btree;
+	session->metafile = S2BT(session);
 	WT_ASSERT(session, session->metafile != NULL);
 
 	/* The metafile doesn't need to stay locked -- release it. */
@@ -104,19 +104,19 @@ int
 __wt_metadata_cursor(
     WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp)
 {
-	WT_BTREE *saved_btree;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
-	saved_btree = session->btree;
+	saved_dhandle = session->dhandle;
 	WT_ERR(__wt_metadata_open(session));
 
-	session->btree = session->metafile;
+	WT_SET_BTREE_IN_SESSION(session, session->metafile);
 	WT_ERR(__wt_session_lock_btree(session, 0));
 	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
 
 	/* Restore the caller's btree. */
-err:	session->btree = saved_btree;
+err:	session->dhandle = saved_dhandle;
 	return (ret);
 }
 

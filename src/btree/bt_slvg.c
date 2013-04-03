@@ -146,7 +146,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 
 	WT_UNUSED(cfg);
 
-	btree = session->btree;
+	btree = S2BT(session);
 	bm = btree->bm;
 
 	WT_CLEAR(stuff);
@@ -319,7 +319,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
@@ -470,7 +470,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 	uint64_t stop_recno;
 	uint32_t i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 	page = NULL;
 	trk = NULL;
@@ -609,7 +609,7 @@ __slvg_trk_leaf_ovfl(
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t i, ovfl_cnt;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 
 	/*
@@ -1059,7 +1059,7 @@ __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* The tree is dirty. */
 	btree->modified = 1;
@@ -1246,7 +1246,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 	uint64_t recno, start, stop;
 	uint32_t i;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
 	recno = page->u.col_var.recno;
@@ -1288,7 +1288,7 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	uint32_t i, j;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -1356,7 +1356,7 @@ __slvg_row_range_overlap(
 	 * COLUMN-STORE CODE: THEY ARE IDENTICAL OTHER THAN THE PAGES THAT ARE
 	 * BEING HANDLED.
 	 */
-	btree = session->btree;
+	btree = S2BT(session);
 
 	a_trk = ss->pages[a_slot];
 	b_trk = ss->pages[b_slot];
@@ -1564,7 +1564,7 @@ __slvg_row_trk_update_start(
 	uint32_t i;
 	int cmp, found;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	page = NULL;
 	found = 0;
 
@@ -1729,7 +1729,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	uint32_t i, skip_start, skip_stop;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	page = NULL;
 
 	cookie = &_cookie;
@@ -1899,7 +1899,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 	WT_IKEY *ikey;
 	WT_ROW *rip;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
 	for (rip = page->u.row.d + start; start < stop; ++start) {
@@ -2249,7 +2249,7 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 	WT_TRACK *trk;
 	uint32_t i;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 	trk = *trkp;
 	*trkp = NULL;
 

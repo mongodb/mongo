@@ -341,7 +341,7 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile wrapup"));
@@ -424,7 +424,7 @@ __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	bm = session->btree->bm;
+	bm = S2BT(session)->bm;
 
 	/*
 	 * After a failed reconciliation of a page, discard entries added in the
