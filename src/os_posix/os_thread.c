@@ -32,7 +32,7 @@ __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid)
 {
 	WT_DECL_RET;
 
-#ifdef HAVE_PTHREAD_TIMEDJOIN_NP
+#if 0 && defined(HAVE_PTHREAD_TIMEDJOIN_NP)
 	struct timespec abstime;
 
 	WT_RET(__wt_epoch(session, &abstime));
