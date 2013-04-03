@@ -448,11 +448,9 @@ __evict_worker(WT_SESSION_IMPL *session)
 static int
 __evict_forced_pages(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *force_btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *candidate, *force_candidates;
-	WT_PAGE *force_page;
 	uint32_t curr_entry, force_entries;
 
 	cache = S2C(session)->cache;
@@ -474,8 +472,6 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 	 * necessary, but this isn't a common code path, so that optimization
 	 * isn't worth it at the moment.
 	 */
-	force_btree = NULL;
-	force_page = NULL;
 	if ((ret = __wt_calloc_def(session,
 	    cache->force_entries, &force_candidates)) != 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
@@ -504,11 +500,11 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 	WT_ERR(ret);
 
 	/* Evict force pages now that we've released the lock. */
-	for (curr_entry = 0; curr_entry < force_entries; curr_entry++) {
-		WT_SET_BTREE_IN_SESSION(session,
-		    force_candidates[curr_entry].btree);
-		(void)__evict_page(session,
-		    force_candidates[curr_entry].page);
+	for (candidate = force_candidates, curr_entry = 0;
+	    curr_entry < force_entries;
+	    candidate++, curr_entry++) {
+		WT_SET_BTREE_IN_SESSION(session, candidate->btree);
+		(void)__evict_page(session, candidate->page);
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 
