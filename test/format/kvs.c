@@ -343,8 +343,15 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	value->size = wt_cursor->value.size;
 
 	if (cursor->append) {
+		/*
+		 * Berkeley DB cursors have no operation to append/create a
+		 * new record and set the cursor; use the DB handle instead
+		 * then set the cursor explicitly.
+		 */
 		ERR(db->put(db, NULL, key, value, DB_APPEND));
 		wt_cursor->recno = *(db_recno_t *)key->data;
+
+		ERR(dbc->get(dbc, key, value, DB_SET));
 	} else
 		ERR(dbc->put(dbc, key, value, DB_KEYFIRST));
 
