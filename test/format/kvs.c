@@ -434,11 +434,11 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 
 static int
 kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, int exclusive, const char *config)
+    const char *uri, int exclusive, const char *cfg[])
 {
 	DB *db;
 	DBTYPE type;
-	const char *cfg[2], *name;
+	const char *name;
 	char *key_format;
 	uint32_t flags;
 
@@ -448,8 +448,6 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((name = uri2name(uri)) == NULL)	/* Get the object name. */
 		return (EINVAL);
 
-	cfg[0] = config;
-	cfg[1] = NULL;
 	ERR(cfg_parse_str(cfg, "key_format", &key_format));
 	type = strcmp(key_format, "r") == 0 ? DB_RECNO : DB_BTREE;
 

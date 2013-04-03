@@ -441,7 +441,7 @@ __create_data_source(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config, WT_DATA_SOURCE *dsrc)
 {
 	WT_DECL_RET;
-	const char *filecfg[3], *fileconf;
+	const char *cfg[3], *fileconf;
 
 	fileconf = NULL;
 
@@ -457,14 +457,16 @@ __create_data_source(WT_SESSION_IMPL *session,
 	 * Set a default key/value format, and insert the configuration into
 	 * the metadata.
 	 */
-	filecfg[0] = "key_format=u,value_format=u";
-	filecfg[1] = config;
-	filecfg[2] = NULL;
-	WT_RET(__wt_config_collapse(session, filecfg, &fileconf));
-	if ((ret = __wt_metadata_insert(session, uri, fileconf)) == 0)
+	cfg[0] = "key_format=u,value_format=u";
+	cfg[1] = config;
+	cfg[2] = NULL;
+	WT_RET(__wt_config_collapse(session, cfg, &fileconf));
+	if ((ret = __wt_metadata_insert(session, uri, fileconf)) == 0) {
+		cfg[0] = fileconf;
+		cfg[1] = NULL;
 		WT_ERR(dsrc->create(
-		    dsrc, &session->iface, uri, exclusive, fileconf));
-	else if (ret == WT_DUPLICATE_KEY)
+		    dsrc, &session->iface, uri, exclusive, cfg));
+	} else if (ret == WT_DUPLICATE_KEY)
 		ret = EEXIST;
 
 	if (0) {
