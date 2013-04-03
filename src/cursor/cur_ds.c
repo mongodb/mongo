@@ -185,7 +185,7 @@ __curds_insert(WT_CURSOR *cursor)
 	WT_ERR(__curds_value_set(cursor));
 	WT_ERR(cursor->data_source->insert(cursor->data_source));
 
-	/* If appending, we return a key. */
+	/* If appending, we allocated a key. */
 	if (F_ISSET(cursor, WT_CURSTD_APPEND))
 		__curds_key_get(cursor);
 
