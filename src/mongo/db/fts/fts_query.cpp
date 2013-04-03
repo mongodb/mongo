@@ -39,7 +39,7 @@ namespace mongo {
             bool inNegation = false;
             bool inPhrase = false;
 
-            str::stream phrase;
+            unsigned quoteOffset;
 
             Tokenizer i( _language, query );
             while ( i.more() ) {
@@ -47,12 +47,6 @@ namespace mongo {
 
                 if ( t.type == Token::TEXT ) {
                     string s = t.data.toString();
-
-                    if ( inPhrase ) {
-                        if ( phrase.ss.len() > 0 )
-                            phrase << ' ';
-                        phrase << s;
-                    }
 
                     if ( inPhrase && inNegation ) {
                         // don't add term
@@ -73,6 +67,10 @@ namespace mongo {
                     else if ( c == '"' ) {
                         if ( inPhrase ) {
                             // end of a phrase
+                            unsigned phraseStart = quoteOffset + 1;
+                            unsigned phraseLength = t.offset - phraseStart;
+                            StringData phrase = StringData( query ).substr( phraseStart,
+                                                                            phraseLength );
                             if ( inNegation )
                                 _negatedPhrases.push_back( tolowerString( phrase ) );
                             else
@@ -83,7 +81,7 @@ namespace mongo {
                         else {
                             // start of a phrase
                             inPhrase = true;
-                            phrase.ss.reset();
+                            quoteOffset = t.offset;
                         }
                     }
                 }
