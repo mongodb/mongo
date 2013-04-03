@@ -1,6 +1,6 @@
 
 s = new ShardingTest( "migrateBig" , 2 , 0 , 1 , { chunksize : 1 } );
-s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
+s.config.settings.update( { _id: "balancer" }, { $set : { stopped : true, _waitForDelete : true } } , true );
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
 
