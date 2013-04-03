@@ -118,7 +118,8 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
 	WT_DECL_RET;
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
+	const char *cfg[] = API_CONF_DEFAULTS(
+	    session, open_cursor, "checkpoint=WiredTigerCheckpoint");
 	uint64_t size;
 
 	WT_RET(__bloom_init(session, uri, NULL, &bloom));

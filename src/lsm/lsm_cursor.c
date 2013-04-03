@@ -823,6 +823,7 @@ __clsm_put(
 	 * switch code needs to use btree API methods, and it wants to
 	 * operate on the btree for the primary chunk. Set that up now.
 	 */
+#if 0
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
 		    full = __wt_btree_size_overflow(
@@ -833,6 +834,20 @@ __clsm_put(
 			WT_RET(__wt_cond_signal(session, lsm_tree->ckpt_cond));
 		}
 	}
+#else
+	WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+	    full = __wt_btree_size_overflow(
+	    session, lsm_tree->chunk_size));
+
+	if (full) {
+		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
+		if (clsm->dsk_gen == lsm_tree->dsk_gen)
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_lsm_tree_switch(session, lsm_tree));
+		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+		WT_RET(ret);
+	}
+#endif
 	return (0);
 }
 

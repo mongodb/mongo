@@ -227,6 +227,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
 
+			WT_VERBOSE_ERR(session, lsm,
+			     "LSM worker flushing %u", i);
+
 			/*
 			 * Flush the file before checkpointing: this is the
 			 * expensive part in terms of I/O: do it without
@@ -244,6 +247,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 				__wt_btree_evictable(session, 1);
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
+
+			WT_VERBOSE_ERR(session, lsm,
+			     "LSM worker checkpointing %u", i);
 
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
