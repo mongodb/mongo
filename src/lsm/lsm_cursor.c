@@ -117,8 +117,6 @@ __clsm_open_cursors(
 	WT_SESSION_IMPL *session;
 	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
 	    "checkpoint=WiredTigerCheckpoint,raw");
-	const char *merge_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,raw");
 	u_int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -185,8 +183,7 @@ __clsm_open_cursors(
 		chunk = lsm_tree->chunk[i + start_chunk];
 		ret = __wt_open_cursor(session,
 		    chunk->uri, &clsm->iface,
-		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL :
-		    (F_ISSET(clsm, WT_CLSM_MERGE) ? merge_cfg : ckpt_cfg), cp);
+		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL : ckpt_cfg, cp);
 
 		/*
 		 * XXX kludge: we may have an empty chunk where no checkpoint
@@ -197,6 +194,16 @@ __clsm_open_cursors(
 			ret = __wt_open_cursor(session,
 			    chunk->uri, &clsm->iface, NULL, cp);
 		WT_ERR(ret);
+
+#ifdef HAVE_POSIX_MADVISE
+		{
+		WT_BM *bm = ((WT_CURSOR_BTREE *)*cp)->btree->bm;
+
+		if (F_ISSET(clsm, WT_CLSM_MERGE) && bm->map != NULL)
+			WT_ERR(posix_madvise(
+			    bm->map, bm->maplen, POSIX_MADV_SEQUENTIAL));
+		}
+#endif
 
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
 		    !F_ISSET(clsm, WT_CLSM_MERGE))
