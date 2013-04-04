@@ -616,7 +616,7 @@ err:	if (locked)
  */
 int
 __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
-    const char *oldname, const char *newname, const char *cfg[])
+    const char *olduri, const char *newuri, const char *cfg[])
 {
 	WT_DECL_RET;
 	WT_ITEM buf;
@@ -631,7 +631,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	locked = 0;
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, oldname, 1, &lsm_tree));
+	WT_RET(__wt_lsm_tree_get(session, olduri, 1, &lsm_tree));
 
 	/* Shut down the LSM worker. */
 	WT_ERR(__lsm_tree_close(session, lsm_tree));
@@ -641,7 +641,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	locked = 1;
 
 	/* Set the new name. */
-	WT_ERR(__lsm_tree_set_name(session, lsm_tree, newname));
+	WT_ERR(__lsm_tree_set_name(session, lsm_tree, newuri));
 
 	/* Rename the chunks. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {
@@ -673,7 +673,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	if (ret == 0)
 		ret = __wt_lsm_meta_write(session, lsm_tree);
 	if (ret == 0)
-		ret = __wt_metadata_remove(session, oldname);
+		ret = __wt_metadata_remove(session, olduri);
 
 err:	if (locked)
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));

@@ -801,13 +801,13 @@ struct __wt_session {
 	 * @snippet ex_all.c Rename a table
 	 *
 	 * @param session the session handle
-	 * @param oldname the current URI of the object, such as \c "table:old"
-	 * @param newname the new name of the object, such as \c "table:new"
+	 * @param uri the current URI of the object, such as \c "table:old"
+	 * @param newuri the new URI of the object, such as \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(rename)(WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *config);
+	    const char *uri, const char *newuri, const char *config);
 
 	/*! Salvage a file or table
 	 *
@@ -2010,7 +2010,7 @@ struct __wt_data_source {
 	 * @snippet ex_all.c WT_DATA_SOURCE rename
 	 */
 	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *uri, const char *newname, const char *cfg[]);
+	    const char *uri, const char *newuri, const char *cfg[]);
 
 	/*! Callback to salvage an object.
 	 *

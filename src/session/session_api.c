@@ -290,7 +290,7 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  */
 static int
 __session_rename(WT_SESSION *wt_session,
-    const char *uri, const char *newname, const char *config)
+    const char *uri, const char *newuri, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -299,7 +299,7 @@ __session_rename(WT_SESSION *wt_session,
 	SESSION_API_CALL(session, rename, config, cfg);
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_rename(session, uri, newname, cfg));
+	    ret = __wt_schema_rename(session, uri, newuri, cfg));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

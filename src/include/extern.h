@@ -741,8 +741,8 @@ extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session,
     const char *name,
     const char *cfg[]);
 extern int __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
-    const char *oldname,
-    const char *newname,
+    const char *olduri,
+    const char *newuri,
     const char *cfg[]);
 extern int __wt_lsm_tree_truncate( WT_SESSION_IMPL *session,
     const char *name,
