@@ -278,7 +278,11 @@ namespace mongo {
 
         logStartup();
         startReplication();
-        if ( !noHttpInterface )
+        if ( noHttpInterface ) {
+            if (cmdLine.rest)
+                log() << "note: 'rest' option is overridden by 'nohttpinterface', REST interface will not be enabled" << endl;
+        }
+        else
             boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
 
 #if(TESTEXHAUST)
