@@ -857,6 +857,7 @@ extern int __wt_mmap(WT_SESSION_IMPL *session,
     WT_FH *fh,
     void *mapp,
     size_t *lenp);
+extern int __wt_mmap_read(WT_SESSION_IMPL *session, void *p, size_t size);
 extern int __wt_munmap(WT_SESSION_IMPL *session,
     WT_FH *fh,
     void *map,

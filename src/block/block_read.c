@@ -49,6 +49,8 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		buf->size = size;
 		F_SET(buf, WT_ITEM_MAPPED);
 
+		WT_RET(__wt_mmap_read(session, buf->mem, buf->size));
+
 		WT_CSTAT_INCR(session, block_map_read);
 		WT_CSTAT_INCRV(session, block_byte_map_read, size);
 		return (0);

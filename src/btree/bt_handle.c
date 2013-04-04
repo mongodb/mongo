@@ -519,9 +519,9 @@ __btree_warm_cache(WT_SESSION_IMPL *session)
 
 #ifdef HAVE_POSIX_MADVISE
 	if (page->parent->dsk < btree->root_page->dsk)
-		(void)posix_madvise(page->parent->dsk,
-		    WT_PTRDIFF(btree->root_page->dsk, page->parent->dsk),
-		    POSIX_MADV_WILLNEED);
+		WT_RET(__wt_mmap_read(
+		    session, page->parent->dsk,
+		    WT_PTRDIFF(btree->root_page->dsk, page->parent->dsk)));
 #endif
 
 	return (__wt_page_release(session, page));

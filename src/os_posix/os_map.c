@@ -37,6 +37,26 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 }
 
 /*
+ * __wt_mmap_read --
+ *	Cause a section of a memory map to be faulted in.
+ */
+int
+__wt_mmap_read(WT_SESSION_IMPL *session, void *p, size_t size)
+{
+#ifdef HAVE_POSIX_MADVISE
+	/* Linux requires the address be aligned to 4096 bytes */
+	WT_DECL_RET;
+	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)4095);
+	size += WT_PTRDIFF(p, blk);
+
+	if ((ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
+		WT_RET_MSG(session, ret, "posix_madvise");
+#endif
+
+	return (0);
+}
+
+/*
  * __wt_munmap --
  *	Remove a memory mapping.
  */

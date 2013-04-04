@@ -497,6 +497,7 @@ lsm
 lsn
 lu
 lzo
+madvise
 majorp
 malloc
 maxintlitem
