@@ -633,7 +633,7 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	DBTYPE type;
 	uint32_t flags;
 	int ret, tret;
-	char *key_format;
+	char *p;
 	const char *name;
 
 	(void)dsrc;				/* Unused parameters */
@@ -642,10 +642,21 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = uri2name(session, uri, &name)) != 0)
 		return (ret);
 
-	if ((ret = cfg_parse_str(session, cfg, "key_format", &key_format)) != 0)
+	if ((ret = cfg_parse_str(session, cfg, "key_format", &p)) != 0)
 		return (ret);
-	type = strcmp(key_format, "r") == 0 ? DB_RECNO : DB_BTREE;
-	free(key_format);
+	type = strcmp(p, "r") == 0 ? DB_RECNO : DB_BTREE;
+	free(p);
+
+	if ((ret = cfg_parse_str(session, cfg, "value_format", &p)) != 0)
+		return (ret);
+	if (isdigit(p[0]) && p[1] == 't' && p[2] == '\0') {
+		(void)session->msg_printf(session,
+		    "kvs_create: unsupported value format %s", p);
+		ret = EINVAL;
+	}
+	free(p);
+	if (ret != 0)
+		return (ret);
 
 	flags = DB_CREATE | (exclusive ? DB_EXCL : 0);
 
