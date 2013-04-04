@@ -44,7 +44,7 @@ namespace mongo {
             Value subTotal = shardOut[subTotalName];
             verify(!subTotal.missing());
             doubleTotal += subTotal.getDouble();
-            squareTotal += subTotal.getDouble();
+            squareTotal += squareTotal;
             Value subCount = shardOut[countName];
             verify(!subCount.missing());
             count += subCount.getLong();
@@ -66,10 +66,10 @@ namespace mongo {
             if (count) {
 					 double castCount = static_cast<double>(count);
                 avg = doubleTotal / castCount;
-					 stdev = (castCount*squareTotal - pow(doubleTotal,2.0))/castCount*(castCount-1.0);
+					 stdev = sqrt(squareTotal / castCount - avg * avg);
 				}
 
-            return Value::createDouble(squareTotal);
+            return Value::createDouble(stdev);
         }
 
         MutableDocument out;

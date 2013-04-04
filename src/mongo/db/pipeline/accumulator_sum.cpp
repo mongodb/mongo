@@ -37,12 +37,12 @@ namespace mongo {
             long long v = rhs.coerceToLong();
             longTotal += v;
             doubleTotal += v;
-				squareTotal += pow(v,2.0);
+				squareTotal += v * v; 
         }
         else if (totalType == NumberDouble) {
             double v = rhs.coerceToDouble();
             doubleTotal += v;
-				squareTotal += pow(v,2.0);
+				squareTotal += v * v;
         }
         else {
             // non numerics should have returned above so we should never get here
