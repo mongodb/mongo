@@ -222,7 +222,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 {
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	const char *oldname, *newname;
+	const char *p, *t;
 
 	/* Disallow renames to/from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
@@ -234,21 +234,20 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_meta_track_on(session));
 
-	oldname = uri;
-	newname = newuri;
-	if (WT_PREFIX_SKIP(oldname, "file:")) {
-		if (!WT_PREFIX_SKIP(newname, "file:"))
-			WT_RET_MSG(session, EINVAL,
-			    "rename target type must match URI: %s to %s",
-			    uri, newuri);
+	/* The target type must match the source type. */
+	for (p = uri, t = newuri; *p == *t && *p != ':'; ++p, ++t)
+		;
+	if (*p != ':' || *t != ':')
+		WT_RET_MSG(session, EINVAL,
+		    "rename target type must match URI: %s to %s", uri, newuri);
+
+	if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __rename_file(session, uri, newuri);
-	} else if (WT_PREFIX_SKIP(oldname, "table:")) {
-		if (!WT_PREFIX_SKIP(newname, "table:"))
-			WT_RET_MSG(session, EINVAL,
-			    "rename target type must match URI: %s to %s",
-			    uri, newuri);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_lsm_tree_rename(session, uri, newuri, cfg);
+	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __rename_table(session, uri, newuri, cfg);
-	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
 		ret = dsrc->rename(dsrc, &session->iface, uri, newuri, cfg);
 
 	/* Bump the schema generation so that stale data is ignored. */

@@ -197,6 +197,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_clsm_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
@@ -470,7 +472,7 @@ __session_truncate(WT_SESSION *wt_session,
 		goto done;
 	}
 
-	/* Truncate is only supported for file and table objects. */
+	/* Cursor truncate is only supported for file and table objects. */
 	cursor = start == NULL ? stop : start;
 	if (!WT_PREFIX_MATCH(cursor->uri, "file:") &&
 	    !WT_PREFIX_MATCH(cursor->uri, "table:"))

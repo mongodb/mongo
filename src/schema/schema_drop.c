@@ -175,6 +175,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		ret = __drop_file(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __drop_index(session, uri, cfg);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_lsm_tree_drop(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __drop_table(session, uri, force, cfg);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)

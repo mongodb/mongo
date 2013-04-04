@@ -330,7 +330,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_TRET(__wt_statlog_destroy(conn));
 
 	/* Clean up open LSM handles. */
-	WT_ERR(__wt_lsm_cleanup(&conn->iface));
+	WT_ERR(__wt_lsm_tree_close_all(session));
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(conn));
@@ -971,12 +971,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* If there's a hot-backup file, load it. */
 	WT_ERR(__wt_metadata_load_backup(session));
-
-	/*
-	 * XXX LSM initialization.
-	 * This is structured so that it could be moved to an extension.
-	 */
-	WT_ERR(__wt_lsm_init(&conn->iface, NULL));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

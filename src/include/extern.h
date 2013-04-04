@@ -698,8 +698,6 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
-extern int __wt_lsm_cleanup(WT_CONNECTION *wt_conn);
 extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     u_int start_chunk,
