@@ -169,6 +169,7 @@ namespace mongo {
         mutable BSONType totalType;
         mutable long long longTotal;
         mutable double doubleTotal;
+        mutable double squareTotal;
         // count is only used by AccumulatorAvg, but lives here to avoid counting non-numeric values
         mutable long long count;
     };
@@ -246,6 +247,33 @@ namespace mongo {
         static const char countName[];
 
         AccumulatorAvg(const intrusive_ptr<ExpressionContext> &pCtx);
+
+        intrusive_ptr<ExpressionContext> pCtx;
+    };
+
+   class AccumulatorStdev :
+        public AccumulatorSum {
+        typedef AccumulatorSum Super;
+    public:
+        // virtuals from Accumulator
+        virtual Value evaluate(const Document& pDocument) const;
+        virtual Value getValue() const;
+        virtual const char *getOpName() const;
+
+        /*
+          Create an accumulator for standard deviation.
+          @param pCtx the expression context
+          @returns the created accumulator
+         */
+        static intrusive_ptr<Accumulator> create(
+            const intrusive_ptr<ExpressionContext> &pCtx);
+
+    private:
+        static const char subTotalName[];
+        static const char subSquareTotalName[];
+        static const char countName[];
+
+        AccumulatorStdev(const intrusive_ptr<ExpressionContext> &pCtx);
 
         intrusive_ptr<ExpressionContext> pCtx;
     };

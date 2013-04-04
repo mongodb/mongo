@@ -193,6 +193,9 @@
     <ClCompile Include="pipeline\accumulator_single_value.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="pipeline\accumulator_stdev.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="pipeline\accumulator_sum.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>

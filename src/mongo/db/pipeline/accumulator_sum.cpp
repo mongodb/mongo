@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "math.h"
 #include "pch.h"
 #include "accumulator.h"
 
@@ -36,10 +37,12 @@ namespace mongo {
             long long v = rhs.coerceToLong();
             longTotal += v;
             doubleTotal += v;
+				squareTotal += pow(v,2.0);
         }
         else if (totalType == NumberDouble) {
             double v = rhs.coerceToDouble();
             doubleTotal += v;
+				squareTotal += pow(v,2.0);
         }
         else {
             // non numerics should have returned above so we should never get here
