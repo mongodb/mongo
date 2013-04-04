@@ -139,6 +139,7 @@ uri2name(WT_SESSION *session, const char *uri, const char **namep)
 	return (0);
 }
 
+/*! [Data-source: boolean configuration] */
 static void
 cfg_parse_bool(const char *cfg[], const char *match, int *valuep)
 {
@@ -151,7 +152,9 @@ cfg_parse_bool(const char *cfg[], const char *match, int *valuep)
 			return;
 		}
 }
+/*! [Data-source: boolean configuration] */
 
+/*! [Data-source: string configuration] */
 static int
 cfg_parse_str(
     WT_SESSION *session, const char *cfg[], const char *match, char **valuep)
@@ -162,7 +165,10 @@ cfg_parse_str(
 	*valuep = NULL;
 	for (; (p = *cfg) != NULL; ++cfg)
 		if ((p = strstr(p, match)) != NULL && p[strlen(match)] == '=') {
-			/* Copy the configuration string's value */
+			/*
+			 * Copy the configuration string's value and return it
+			 * in allocated memory: our caller must free it.
+			 */
 			p += strlen(match) + 1;
 			if ((*valuep = strdup(p)) == NULL) {
 				(void)session->msg_printf(
@@ -170,7 +176,7 @@ cfg_parse_str(
 				return (errno);
 			}
 
-			/* nul-terminate the string's value */
+			/* nul-terminate the string's value. */
 			for (t = *valuep; *t != '\0' && *t != ','; ++t)
 				;
 			*t = '\0';
@@ -178,6 +184,7 @@ cfg_parse_str(
 		}
 	return (0);
 }
+/*! [Data-source: string configuration] */
 
 #ifdef HAVE_DIAGNOSTIC
 static int
@@ -194,11 +201,17 @@ bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
 	key = &cursor->key;
 	value = &cursor->value;
 
+/*! [Data-source: error message] */
+	/*
+	 * If the Berkeley DB function fails, log the error and then return an
+	 * error in WiredTiger's name space.
+	 */
 	if ((ret = db->cursor(db, NULL, &dbc, 0)) != 0) {
 		(void)session->msg_printf(
 		    session, "Db.cursor: %s", db_strerror(ret));
 		return (WT_ERROR);
 	}
+/*! [Data-source: error message] */
 
 	printf("==> %s\n", tag);
 	while ((ret = dbc->get(dbc, key, value, DB_NEXT)) == 0)
@@ -710,12 +723,14 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	cursor->session = session;
 	cursor->dsrc = dsrc;
 						/* Parse configuration */
+/*! [Data-source: open_cursor configuration] */
 	cfg_parse_bool(cfg, "append", &cursor->append);
 	cfg_parse_bool(cfg, "overwrite", &cursor->overwrite);
 	if ((ret = cfg_parse_str(session, cfg, "key_format", &key_format)) != 0)
 		goto err;
 	cursor->recno = strcmp(key_format, "r") == 0;
 	free(key_format);
+/*! [Data-source: open_cursor configuration] */
 
 	lock();
 				/* Open the Berkeley DB cursor */

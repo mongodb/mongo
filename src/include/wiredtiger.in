@@ -1162,7 +1162,8 @@ struct __wt_connection {
 	int __F(load_extension)(WT_CONNECTION *connection,
 	    const char *path, const char *config);
 
-	/*! Add a custom data source. @notyet{custom data sources}
+	/*! Add a custom data source.  See @ref custom_data_sources for more
+	 * information.
 	 *
 	 * The application must first implement the WT_DATA_SOURCE interface
 	 * and then register the implementation with WiredTiger:
@@ -1965,7 +1966,7 @@ struct __wt_compressor {
  * Applications can extend WiredTiger by providing new implementations of the
  * WT_DATA_SOURCE class.  Each data source supports a different URI scheme for
  * data sources to WT_SESSION::create, WT_SESSION::open_cursor and related
- * methods.
+ * methods.  See @ref custom_data_sources for more information.
  *
  * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_DATA_SOURCE
  * interface from multiple threads concurrently.  It is the responsibility of

@@ -74,8 +74,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		else if (func == __wt_verify && dsrc->verify != NULL)
 			WT_ERR(dsrc->verify(dsrc, wt_session, uri, cfg));
 		else
-			WT_ERR_MSG(session,
-			    ENOTSUP, "unsupported object type: %s", uri);
+			WT_ERR(__wt_object_unsupported(session, uri));
 	} else
 		WT_ERR(__wt_bad_object_type(session, uri));
 

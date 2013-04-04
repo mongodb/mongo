@@ -104,7 +104,9 @@ __wt_schema_truncate(
 	else if (WT_PREFIX_SKIP(tablename, "table:"))
 		ret = __truncate_table(session, tablename);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->truncate(dsrc, &session->iface, uri, cfg);
+		ret = dsrc->truncate == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    dsrc->truncate(dsrc, &session->iface, uri, cfg);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

@@ -1137,6 +1137,7 @@ extern void __wt_assert(WT_SESSION_IMPL *session,
     6)));
 extern int __wt_panic(WT_SESSION_IMPL *session);
 extern int __wt_illegal_value(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_absolute_path(const char *path);
 extern int __wt_filename(WT_SESSION_IMPL *session,

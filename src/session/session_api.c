@@ -206,7 +206,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = __wt_curds_create(session, uri, cfg, dsrc, cursorp);
+		ret = dsrc->open_cursor == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    __wt_curds_create(session, uri, cfg, dsrc, cursorp);
 
 	return (ret);
 }

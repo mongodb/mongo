@@ -400,6 +400,17 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
+ * __wt_object_unsupported --
+ *	Print a standard error message for an object that doesn't support a
+ * particular operation.
+ */
+int
+__wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri)
+{
+	WT_RET_MSG(session, ENOTSUP, "unsupported object operation: %s", uri);
+}
+
+/*
  * __wt_bad_object_type --
  *	Print a standard error message when given an unknown or unsupported
  * object type.

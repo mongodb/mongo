@@ -518,9 +518,9 @@ __wt_schema_create(
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __create_table(session, uri, exclusive, config);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		if (ret == 0)
-			ret = __create_data_source(
-			    session, uri, exclusive, config, dsrc);
+		ret = dsrc->create == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    __create_data_source(session, uri, exclusive, config, dsrc);
 
 	session->dhandle = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
