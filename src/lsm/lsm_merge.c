@@ -136,11 +136,8 @@ __wt_lsm_merge(
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
 			break;
 
-		/*
-		 * Only merge across more than 2 generations if there are no
-		 * new chunks being created.
-		 */
-		if (stalls < 50 && chunk->generation >=
+		/* Don't merge across more than 2 generations. */
+		if (chunk->generation >=
 		    lsm_tree->chunk[end_chunk]->generation + 2)
 			break;
 
@@ -152,13 +149,13 @@ __wt_lsm_merge(
 			break;
 
 		/*
-		 * Never do big merges in the first thread if there are
-		 * multiple threads.  If there is a single thread, wait for 10
-		 * seconds looking for small merges before trying a big one.
+		 * Never merges across generations in the first thread if there
+		 * are multiple threads.  If there is a single thread, wait for
+		 * 30 seconds looking for small merges before trying a big one.
 		 */
-		if (id == 0 && nchunks > 0 &&
-		    chunk->count > lsm_tree->chunk[end_chunk]->count * 2 &&
-		    (lsm_tree->merge_threads > 1 || stalls < 10))
+		if (id == 0 && nchunks > 0 && chunk->generation !=
+		    lsm_tree->chunk[end_chunk]->generation &&
+		    (lsm_tree->merge_threads > 1 || stalls < 30))
 			break;
 
 		F_SET(chunk, WT_LSM_CHUNK_MERGING);
