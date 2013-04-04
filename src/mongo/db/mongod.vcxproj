@@ -2626,6 +2626,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="pipeline\accumulator_min_max.cpp" />
     <ClCompile Include="pipeline\accumulator_push.cpp" />
     <ClCompile Include="pipeline\accumulator_single_value.cpp" />
+    <ClCompile Include="pipeline\accumulator_stdev.cpp" />
     <ClCompile Include="pipeline\accumulator_sum.cpp" />
     <ClCompile Include="pipeline\builder.cpp" />
     <ClCompile Include="pipeline\document.cpp" />
