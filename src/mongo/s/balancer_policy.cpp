@@ -77,8 +77,18 @@ namespace mongo {
         unsigned minChunks = numeric_limits<unsigned>::max();
 
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
-            if ( i->second.isSizeMaxed() || i->second.isDraining() || i->second.hasOpsQueued() ) {
-                LOG(1) << i->first << " is unavailable" << endl;
+            if ( i->second.isSizeMaxed() ) {
+                LOG(1) << i->first << " has already reached the maximum total chunk size." << endl;
+                continue;
+            }
+
+            if ( i->second.isDraining() ) {
+                LOG(1) << i->first << " is currently draining." << endl;
+                continue;
+            }
+
+            if ( i->second.hasOpsQueued() ) {
+                LOG(1) << i->first << " has writebacks queued." << endl;
                 continue;
             }
 
