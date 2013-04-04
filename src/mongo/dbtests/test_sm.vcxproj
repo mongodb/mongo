@@ -3250,6 +3250,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="config_upgrade_tests.cpp" />
     <ClCompile Include="counttests.cpp" />
     <ClCompile Include="cursortests.cpp" />
+    <ClCompile Include="dbhelper_tests.cpp" />
     <ClCompile Include="dbtests.cpp" />
     <ClCompile Include="directclienttests.cpp" />
     <ClCompile Include="documentsourcetests.cpp" />
@@ -3287,7 +3288,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="queryoptimizertests2.cpp" />
     <ClCompile Include="querytests.cpp" />
     <ClCompile Include="queryutiltests.cpp" />
-    <ClCompile Include="removetests.cpp" />
     <ClCompile Include="replica_set_monitor_test.cpp" />
     <ClCompile Include="replsettests.cpp" />
     <ClCompile Include="repltests.cpp" />

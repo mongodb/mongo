@@ -2065,9 +2065,6 @@
     <ClCompile Include="queryutiltests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
-    <ClCompile Include="removetests.cpp">
-      <Filter>dbtests</Filter>
-    </ClCompile>
     <ClCompile Include="replsettests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
@@ -3528,6 +3525,9 @@
     </ClCompile>
     <ClCompile Include="..\db\index\btree_key_generator.cpp">
       <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="dbhelper_tests.cpp">
+      <Filter>dbtests</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
