@@ -86,10 +86,10 @@ class test_rename(wttest.WiredTigerTestCase):
 
     def test_rename_bad_uri(self):
         uri1 = self.uri + self.name1
-	if self.uri == "file:":
-		uri2 = "table:" + self.name2
-	else:
-		uri2 = "file:" + self.name2
+        if self.uri == "file:":
+                uri2 = "table:" + self.name2
+        else:
+                uri2 = "file:" + self.name2
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.rename(uri1, uri2, None),
             '/type must match URI/')
