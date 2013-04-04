@@ -47,13 +47,6 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		cat $t
 	}
 
-	# Common typos (Wikipedia's list).
-	egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' $f > $t
-	test -s $t && {
-		echo "$f: paired typo"
-		cat $t
-	}
-
 	# Direct calls to functions we're not supposed to use in the library.
 	# We don't check for all of them, just a few of the common ones.
 	if ! expr "$f" : 'examples/.*' > /dev/null &&
@@ -142,3 +135,13 @@ test -s $t && {
 	echo 'trailing semi-colon characters appear in test suite scripts:'
 	cat $t
 }
+
+# Check for common typos (Wikipedia's list).
+find examples ext src test \
+    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
+xargs egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' > $t
+	test -s $t && {
+		echo "paired typo"
+		echo "============================"
+		cat $t
+	}
