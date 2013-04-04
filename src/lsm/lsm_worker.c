@@ -307,7 +307,8 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM buf, key;
 	WT_SESSION *wt_session;
-	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor, "raw");
+	const char *cur_cfg[] = API_CONF_DEFAULTS(
+	    session, open_cursor, "checkpoint=WiredTigerCheckpoint,raw");
 	uint64_t insert_count;
 	int exist;
 
