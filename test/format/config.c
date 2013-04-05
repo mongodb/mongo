@@ -66,29 +66,37 @@ config_setup(void)
 			break;
 		}
 
-	if (!config_find_is_perm("file_type", strlen("file_type"))) {
-		if (DATASOURCE("lsm"))
-			config_single("file_type=row", 0);
-		else
-			switch (MMRAND(0, 2)) {
-			case 0:
+	if (!config_find_is_perm("file_type", strlen("file_type")))
+		switch (MMRAND(0, 2)) {
+		case 0:
+			if (!DATASOURCE("lsm") && !DATASOURCE("kvs")) {
 				config_single("file_type=fix", 0);
 				break;
-			case 1:
+			}
+			/* FALLTHROUGH */
+		case 1:
+			if (!DATASOURCE("lsm")) {
 				config_single("file_type=var", 0);
 				break;
-			case 2:
-				config_single("file_type=row", 0);
-				break;
 			}
-	}
+			/* FALLTHROUGH */
+		case 2:
+			config_single("file_type=row", 0);
+			break;
+		}
 	g.type = config_translate(g.c_file_type);
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still
 	 * have a mismatch.
 	 */
-	if (g.type != ROW && DATASOURCE("lsm")) {
+	if (DATASOURCE("kvs") && g.type == FIX) {
+		fprintf(stderr,
+	    "%s: kvs data_source not compatible with fix file_type\n",
+		    g.progname);
+		exit(EXIT_FAILURE);
+	}
+	if (DATASOURCE("lsm") && g.type != ROW) {
 		fprintf(stderr,
 	    "%s: lsm data_source is only compatible with row file_type\n",
 		    g.progname);
