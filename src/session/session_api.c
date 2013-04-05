@@ -741,7 +741,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
     WT_EVENT_HANDLER *event_handler, const char *config,
     WT_SESSION_IMPL **sessionp)
 {
-	static WT_SESSION stds = {
+	static const WT_SESSION stds = {
 		NULL,
 		__session_close,
 		__session_reconfigure,
