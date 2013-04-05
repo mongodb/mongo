@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static void __evict_cache_dump(WT_SESSION_IMPL *);
 static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int __evict_forced_pages(WT_SESSION_IMPL *);
@@ -14,7 +15,6 @@ static void __evict_init_candidate(
     WT_SESSION_IMPL *, WT_EVICT_ENTRY *, WT_PAGE *);
 static int  __evict_lru(WT_SESSION_IMPL *, int);
 static int  __evict_lru_cmp(const void *, const void *);
-static int  __evict_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *, int);
 static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, int);
 static int  __evict_worker(WT_SESSION_IMPL *);
@@ -365,6 +365,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
+	static int dumping = 0;
 	int clean, loop;
 
 	conn = S2C(session);
@@ -372,7 +373,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
-
 		/*
 		 * Block out concurrent eviction while we are handling requests.
 		 */
@@ -412,6 +412,14 @@ __evict_worker(WT_SESSION_IMPL *session)
 		clean = 0;
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 			clean = 1;
+
+#ifdef HAVE_DIAGNOSTIC
+		/* Periodically dump information about the cache. */
+		if (loop == 0 && ++dumping == 10) {
+			__evict_cache_dump(session);
+			dumping = 0;
+		}
+#endif
 
 		/*
 		 * Track whether pages are being evicted.  This will be cleared
@@ -504,7 +512,7 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 	    curr_entry < force_entries;
 	    candidate++, curr_entry++)
 		WT_WITH_BTREE(session, candidate->btree,
-		    (void)__evict_page(session, candidate->page));
+		    (void)__wt_evict_page(session, candidate->page));
 
 err:	__wt_free(session, force_candidates);
 	return (ret);
@@ -542,15 +550,19 @@ __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __evict_page --
+ * __wt_evict_page --
  *	Evict a given page.
  */
-static int
-__evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+int
+__wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
 	WT_TXN saved_txn, *txn;
 	int was_running;
+
+	/* Fast path for clean pages. */
+	if (!__wt_page_is_modified(page))
+		return (__wt_rec_evict(session, page, 0));
 
 	/*
 	 * We have to take care when evicting pages not to write a change that:
@@ -1309,7 +1321,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_ASSERT(session, page->ref->state == WT_REF_LOCKED);
 
 	WT_WITH_BTREE(session, btree,
-	    ret = __evict_page(session, page));
+	    ret = __wt_evict_page(session, page));
 
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 
@@ -1330,6 +1342,7 @@ static void
 __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 {
 #if 0 && defined(HAVE_DIAGNOSTIC)
+	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -1351,7 +1364,13 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
-		/* Reference the correct WT_BTREE handle. */
+
+		btree = dhandle->handle;
+		if (btree->root_page == NULL ||
+		    btree->bulk_load_ok)
+			continue;
+
+		/* Reference the correct data handle. */
 		session->dhandle = dhandle;
 		while ((ret = __wt_tree_walk(
 		    session, &page, WT_TREE_CACHE)) == 0 &&
@@ -1375,3 +1394,62 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 	WT_UNUSED(conn);
 #endif
 }
+
+/*
+ * __evict_cache_dump --
+ *	Dump debugging information about the size of the files in the cache.
+ */
+static void
+__evict_cache_dump(WT_SESSION_IMPL *session)
+{
+#if 0 && defined(HAVE_DIAGNOSTIC)
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+	WT_PAGE *page;
+	uint64_t file_bytes, file_dirty, file_pages, total_bytes;
+
+	conn = S2C(session);
+	total_bytes = 0;
+
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			continue;
+
+		btree = dhandle->handle;
+		if (btree->root_page == NULL ||
+		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+		    btree->bulk_load_ok)
+			continue;
+
+		file_bytes = file_dirty = file_pages = 0;
+		page = NULL;
+		session->dhandle = dhandle;
+		while ((ret =
+		    __wt_tree_walk(session, &page, WT_TREE_CACHE)) == 0 &&
+		    page != NULL) {
+			++file_pages;
+			file_bytes += page->memory_footprint;
+			if (__wt_page_is_modified(page))
+				file_dirty += page->memory_footprint;
+		}
+		session->dhandle = NULL;
+
+		printf("cache dump: %s [%s]: %"
+		    PRIu64 " pages, %" PRIu64 "MB, %" PRIu64 "MB dirty\n",
+		    dhandle->name, dhandle->checkpoint,
+		    file_pages, file_bytes >> 20, file_dirty >> 20);
+
+		total_bytes += file_bytes;
+	}
+	printf("cache dump: total found = %" PRIu64 "MB"
+	    " vs tracked inuse %" PRIu64 "MB\n",
+	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
+	fflush(stdout);
+#else
+	WT_UNUSED(session);
+#endif
+}
+

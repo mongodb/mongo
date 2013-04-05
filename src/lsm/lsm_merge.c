@@ -232,6 +232,9 @@ __wt_lsm_merge(
 		    lsm_tree->bloom_hash_count, &bloom));
 	}
 
+	/* Discard pages we read as soon as we're done with them. */
+	F_SET(session, WT_SESSION_NO_CACHE);
+
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &dest));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
@@ -257,6 +260,7 @@ __wt_lsm_merge(
 	WT_TRET(src->close(src));
 	WT_TRET(dest->close(dest));
 	src = dest = NULL;
+
 	if (create_bloom) {
 		WT_TRET(__wt_bloom_finalize(bloom));
 
@@ -272,6 +276,7 @@ __wt_lsm_merge(
 		WT_TRET(__wt_bloom_close(bloom));
 		bloom = NULL;
 	}
+	F_CLR(session, WT_SESSION_NO_CACHE);
 	WT_ERR(ret);
 
 	/*
@@ -339,6 +344,7 @@ err:	if (src != NULL)
 		else
 			WT_VERBOSE_TRET(session, lsm,
 			    "Merge failed with %s", wiredtiger_strerror(ret));
+		F_CLR(session, WT_SESSION_NO_CACHE);
 	}
 	return (ret);
 }

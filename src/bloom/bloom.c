@@ -106,6 +106,31 @@ __wt_bloom_create(
 }
 
 /*
+ * __bloom_open_cursor --
+ *	Open a cursor to read from a Bloom filter.
+ */
+static int
+__bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
+{
+	WT_CURSOR *c;
+	WT_SESSION_IMPL *session;
+	const char *cfg[] = API_CONF_DEFAULTS(
+	    session, open_cursor, "checkpoint=WiredTigerCheckpoint");
+
+	if ((c = bloom->c) != NULL)
+		return (0);
+
+	session = bloom->session;
+	WT_RET(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
+
+	/* XXX Layering violation: bump the cache priority for Bloom filters. */
+	((WT_CURSOR_BTREE *)c)->btree->evict_priority = (1 << 19);
+
+	bloom->c = c;
+	return (0);
+}
+
+/*
  * __wt_bloom_open --
  *	Open a Bloom filter object for use by a single session. The filter must
  *	have been created and finalized.
@@ -118,33 +143,22 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
 	WT_DECL_RET;
-	const char *cfg[] = API_CONF_DEFAULTS(
-	    session, open_cursor, "checkpoint=WiredTigerCheckpoint");
 	uint64_t size;
 
 	WT_RET(__bloom_init(session, uri, NULL, &bloom));
-
-	/* Find the largest key, to get the size of the filter. */
-	cfg[1] = bloom->config;
-	c = NULL;
-	WT_ERR(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
-
-	/* XXX Layering violation: bump the cache priority for Bloom filters. */
-	S2BT(session)->evict_priority = (1 << 19);
+	WT_ERR(__bloom_open_cursor(bloom, owner));
+	c = bloom->c;
 
 	WT_ERR(c->prev(c));
 	WT_ERR(c->get_key(c, &size));
 	WT_ERR(c->reset(c));
 
-	bloom->c = c;
 	WT_ERR(__bloom_setup(bloom, 0, size, factor, k));
 
 	*bloomp = bloom;
 	return (0);
 
-err:	if (c != NULL)
-		(void)c->close(c);
-	(void)__wt_bloom_close(bloom);
+err:	(void)__wt_bloom_close(bloom);
 	return (ret);
 }
 
@@ -236,7 +250,6 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
-	WT_SESSION *wt_session;
 	int result;
 	uint32_t i;
 	uint64_t h1, h2;
@@ -245,15 +258,9 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 	/* Get operations are only supported by finalized bloom filters. */
 	WT_ASSERT(bloom->session, bloom->bitstring == NULL);
 
-	wt_session = (WT_SESSION *)bloom->session;
-
 	/* Create a cursor on the first time through. */
-	if (bloom->c == NULL) {
-		WT_RET(wt_session->open_cursor(
-		    wt_session, bloom->uri, NULL, NULL, &c));
-		bloom->c = c;
-	} else
-		c = bloom->c;
+	WT_ERR(__bloom_open_cursor(bloom, NULL));
+	c = bloom->c;
 
 	h1 = bhash->h1;
 	h2 = bhash->h2;
