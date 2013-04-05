@@ -83,7 +83,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					    lsm_tree, chunk->id, &buf));
 					chunk->uri =
 					    __wt_buf_steal(session, &buf, NULL);
-					F_SET(chunk, WT_LSM_CHUNK_ONDISK |
+					F_SET(chunk, WT_LSM_CHUNK_EVICTED |
+					    WT_LSM_CHUNK_ONDISK |
 					    WT_LSM_CHUNK_STABLE);
 				} else if (WT_STRING_MATCH(
 				    "bloom", lk.str, lk.len)) {

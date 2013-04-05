@@ -48,9 +48,6 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 * time, and there are different modes inside __wt_tree_walk to make
 	 * sure they don't trip over each other.
 	 *
-	 * The current thread cannot evict pages from the cache, so discard is
-	 * done by calling the eviction server for service.
-	 *
 	 * XXX
 	 * Set the checkpoint reference for reconciliation -- this is ugly, but
 	 * there's no data structure path from here to reconciliation.
@@ -68,6 +65,9 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:
+		WT_ERR(__wt_evict_file(session, op));
+		break;
+#if 0
 		/*
 		 * Schedule and wake the eviction server, then wait for the
 		 * eviction server to wake us.
@@ -80,6 +80,7 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 		/* If discarding the tree, the root page should be gone. */
 		WT_ASSERT(session, ret != 0 || btree->root_page == NULL);
 		break;
+#endif
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 

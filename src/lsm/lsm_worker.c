@@ -7,8 +7,8 @@
 
 #include "wt_internal.h"
 
-static int __lsm_bloom_create(
-    WT_SESSION_IMPL *, WT_LSM_TREE *, WT_LSM_CHUNK *);
+static int __lsm_bloom_create(WT_SESSION_IMPL *, WT_LSM_TREE *, WT_LSM_CHUNK *);
+static int __lsm_discard_handle(WT_SESSION_IMPL *, const char *, const char *);
 static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
 
 /*
@@ -140,12 +140,14 @@ __wt_lsm_bloom_worker(void *arg)
 				goto err;
 
 			chunk = cookie.chunk_array[i];
-			/* Stop if a thread is still active in the chunk. */
-			if (chunk->ncursor != 0 ||
-			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-				break;
 
-			if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
+			/*
+			 * Skip if a thread is still active in the chunk or it
+			 * isn't suitable.
+			 */
+			if (chunk->ncursor != 0 ||
+			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
+			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
 			    F_ISSET(chunk, WT_LSM_CHUNK_MERGING) ||
 			    chunk->generation > 0 ||
 			    chunk->count == 0)
@@ -224,8 +226,25 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (chunk->ncursor != 0)
 				break;
 
-			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+			/*
+			 * If the chunk is already checkpointed, make sure it
+			 * is also evicted.  Either way, there is no point
+			 * trying to checkpoint it again.
+			 */
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+				if (F_ISSET(chunk, WT_LSM_CHUNK_EVICTED))
+					continue;
+
+				if ((ret = __lsm_discard_handle(
+				    session, chunk->uri, NULL)) == 0)
+					F_SET(chunk, WT_LSM_CHUNK_EVICTED);
+				else if (ret == EBUSY)
+					ret = 0;
+				else
+					WT_ERR_MSG(session, ret,
+					    "discard handle");
 				continue;
+			}
 
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker flushing %u", i);
@@ -253,11 +272,10 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, NULL, WT_DHANDLE_DISCARD_CLOSE));
+			    __wt_checkpoint, NULL, 0));
 
 			if (ret != 0) {
-				__wt_err(session, ret,
-				    "LSM checkpoint failed");
+				__wt_err(session, ret, "LSM checkpoint");
 				break;
 			}
 
@@ -270,7 +288,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			if (ret != 0) {
 				__wt_err(session, ret,
-				    "LSM checkpoint metadata write failed");
+				    "LSM checkpoint metadata write");
 				break;
 			}
 
@@ -294,9 +312,9 @@ err:	__wt_free(session, cookie.chunk_array);
 }
 
 /*
- * Create a bloom filter for a chunk of the LSM tree that has not yet been
- * merged. Uses a cursor on the yet to be checkpointed in-memory chunk, so
- * the cache should not be excessively churned.
+ * __lsm_bloom_create --
+ *	Create a bloom filter for a chunk of the LSM tree that has been
+ *	checkpointed but not yet been merged.
  */
 static int
 __lsm_bloom_create(WT_SESSION_IMPL *session,
@@ -331,8 +349,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	wt_session = &session->iface;
 	WT_RET(__wt_exist(session, chunk->bloom_uri + strlen("file:"), &exist));
 	if (exist)
-		WT_RET(wt_session->drop(
-		    wt_session, chunk->bloom_uri, "force,remove_files=false"));
+		WT_RET(wt_session->drop(wt_session, chunk->bloom_uri, "force"));
 
 	bloom = NULL;
 
@@ -366,22 +383,72 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (ret != 0)
-		WT_ERR_MSG(session, ret,
-		    "LSM bloom worker metadata write failed");
+		WT_ERR_MSG(session, ret, "LSM bloom worker metadata write");
 
 err:	if (bloom != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
 }
 
+/*
+ * __lsm_discard_handle --
+ *	Try to discard a handle from cache.
+ */
+static int
+__lsm_discard_handle(
+    WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
+{
+	/*
+	 * We need to grab the schema lock to drop the file, so first try to
+	 * make sure there is minimal work to freeing space in the cache.
+	 * This will fail with EBUSY if the file is still in use.
+	 */
+	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
+	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+	WT_RET(__wt_session_release_btree(session));
+
+	return (0);
+}
+
+/*
+ * __lsm_drop_file --
+ *	Helper function to drop part of an LSM tree.
+ */
+static int
+__lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
+{
+	WT_DECL_RET;
+	const char *drop_cfg[] =
+	    API_CONF_DEFAULTS(session, drop, "remove_files=false");
+
+	/*
+	 * We need to grab the schema lock to drop the file, so first try to
+	 * make sure there is minimal work to freeing space in the cache.
+	 * This will fail with EBUSY if the file is still in use.
+	 */
+	WT_RET(__lsm_discard_handle(session, uri, NULL));
+	WT_RET(__lsm_discard_handle(session, uri, "WiredTigerCheckpoint"));
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_schema_drop(session, uri, drop_cfg));
+
+	if (ret == 0)
+		ret = __wt_remove(session, uri + strlen("file:"));
+
+	return (ret);
+}
+
+/*
+ * __lsm_free_chunks --
+ *	Try to drop chunks from the tree that are no longer required.
+ */
 static int
 __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORKER_COOKIE cookie;
-	const char *drop_cfg[] =
-	    API_CONF_DEFAULTS(session, drop, "remove_files=false");
 	u_int i;
 	int progress;
 
@@ -392,13 +459,12 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if ((chunk = cookie.chunk_array[i]) == NULL)
 			continue;
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
-			WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_drop(
-			    session, chunk->bloom_uri, drop_cfg));
 			/*
 			 * An EBUSY return is acceptable - a cursor may still
 			 * be positioned on this old chunk.
 			 */
-			if (ret == EBUSY) {
+			if ((ret = __lsm_drop_file(
+			    session, chunk->bloom_uri)) == EBUSY) {
 				WT_VERBOSE_ERR(session, lsm,
 				    "LSM worker bloom drop busy: %s.",
 				    chunk->bloom_uri);
@@ -406,28 +472,21 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			} else
 				WT_ERR(ret);
 
-			WT_ERR(__wt_remove(
-			    session, chunk->bloom_uri + strlen("file:")));
 			F_CLR(chunk, WT_LSM_CHUNK_BLOOM);
 		}
 		if (chunk->uri != NULL) {
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_schema_drop(session, chunk->uri, drop_cfg));
-
 			/*
 			 * An EBUSY return is acceptable - a cursor may still
 			 * be positioned on this old chunk.
 			 */
-			if (ret == EBUSY) {
+			if ((ret = __lsm_drop_file(
+			    session, chunk->uri)) == EBUSY) {
 				WT_VERBOSE_ERR(session, lsm,
 				    "LSM worker drop busy: %s.",
 				    chunk->uri);
 				continue;
 			} else
 				WT_ERR(ret);
-
-			WT_ERR(__wt_remove(
-			    session, chunk->uri + strlen("file:")));
 		}
 
 		progress = 1;

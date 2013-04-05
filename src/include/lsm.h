@@ -46,9 +46,10 @@ struct __wt_lsm_chunk {
 
 	uint32_t ncursor;		/* Cursors with the chunk as primary */
 #define	WT_LSM_CHUNK_BLOOM	0x01
-#define	WT_LSM_CHUNK_MERGING	0x02
-#define	WT_LSM_CHUNK_ONDISK	0x04
-#define	WT_LSM_CHUNK_STABLE	0x08
+#define	WT_LSM_CHUNK_EVICTED	0x02
+#define	WT_LSM_CHUNK_MERGING	0x04
+#define	WT_LSM_CHUNK_ONDISK	0x08
+#define	WT_LSM_CHUNK_STABLE	0x10
 	uint32_t flags;
 };
 

@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 
 static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
-static int  __evict_file(WT_SESSION_IMPL *, int);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int __evict_forced_pages(WT_SESSION_IMPL *);
 static void __evict_init_candidate(
@@ -603,6 +602,9 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	int syncop;
 	const char *msg;
 
+	/* No longer used. */
+	WT_ASSERT(session, 0);
+
 	conn = S2C(session);
 	cache = conn->cache;
 
@@ -649,37 +651,44 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	    session, evictserver, "eviction server request: %s", msg);
 
 	/*
-	 * The eviction candidate list might reference pages we are
-	 * about to discard; clear it.
-	 */
-	__evict_list_clr_range(session, 0);
-
-	/* Wait for LRU eviction activity to drain. */
-	while (S2BT(request_session)->lru_count > 0) {
-		__wt_spin_unlock(session, &cache->evict_lock);
-		__wt_yield();
-		__wt_spin_lock(session, &cache->evict_lock);
-	}
-
-	/*
 	 * Handle the request and publish the result: there must be a barrier
 	 * to ensure the return value is set before the requesting thread
 	 * wakes.
 	 */
 	WT_PUBLISH(request_session->syncop_ret,
-	    __evict_file(request_session, syncop));
+	    __wt_evict_file(request_session, syncop));
 	return (__wt_cond_signal(request_session, request_session->cond));
 }
 
 /*
- * __evict_file --
+ * __wt_evict_file --
  *	Flush pages for a specific file as part of a close or compact operation.
  */
-static int
-__evict_file(WT_SESSION_IMPL *session, int syncop)
+int
+__wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 {
+	WT_BTREE *btree;
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+
+	/* We need exclusive access to the file -- disable ordinary eviction. */
+	__wt_spin_lock(session, &cache->evict_lock);
+	F_SET(btree, WT_BTREE_NO_EVICTION);
+
+	/*
+	 * The eviction candidate list might reference pages we are
+	 * about to discard; clear it.
+	 */
+	__evict_list_clr_range(session, 0);
+	__wt_spin_unlock(session, &cache->evict_lock);
+
+	/* Wait for LRU eviction activity to drain. */
+	while (S2BT(session)->lru_count > 0)
+		__wt_yield();
 
 	/* Clear any existing LRU eviction walk, we're discarding the tree. */
 	__wt_evict_clear_tree_walk(session, NULL);
@@ -749,6 +758,7 @@ err:		/* On error, clear any left-over tree walk. */
 		if (next_page != NULL)
 			__wt_evict_clear_tree_walk(session, next_page);
 	}
+	F_CLR(btree, WT_BTREE_NO_EVICTION);
 	return (ret);
 }
 
@@ -1319,8 +1329,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 static void
 __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 {
-#ifdef HAVE_DIAGNOSTIC
-	WT_BTREE *btree;
+#if 0 && defined(HAVE_DIAGNOSTIC)
 	WT_CACHE *cache;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -1331,7 +1340,6 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 	cache = conn->cache;
 	session = conn->default_session;
 	page = NULL;
-	btree = NULL;
 	bytes = 0;
 
 	if (!WT_VERBOSE_ISSET(session, evictserver))
@@ -1343,16 +1351,15 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
-		btree = (WT_BTREE *)dhandle;
 		/* Reference the correct WT_BTREE handle. */
-		WT_SET_BTREE_IN_SESSION(session, btree);
+		session->dhandle = dhandle;
 		while ((ret = __wt_tree_walk(
 		    session, &page, WT_TREE_CACHE)) == 0 &&
 		    page != NULL) {
 			if (__wt_page_is_modified(page))
 				bytes += page->memory_footprint;
 		}
-		WT_CLEAR_BTREE_IN_SESSION(session);
+		session->dhandle = NULL;
 	}
 
 	if (WT_VERBOSE_ISSET(session, evictserver) &&
