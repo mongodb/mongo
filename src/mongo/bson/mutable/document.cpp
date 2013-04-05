@@ -1075,6 +1075,15 @@ namespace mutablebson {
         return Element(_doc, current);
     }
 
+    bool Element::hasChildren() const {
+        verify(ok());
+        // Capturing Document::Impl by non-const ref exploits the constness loophole
+        // created by our Impl so that we can let leftChild be lazily evaluated, even for a
+        // const Element.
+        Document::Impl& impl = _doc->getImpl();
+        return impl.resolveLeftChild(_repIdx) != kInvalidRepIdx;
+    }
+
     Element Element::leftSibling() const {
         verify(ok());
 

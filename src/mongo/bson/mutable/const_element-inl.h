@@ -29,6 +29,10 @@ namespace mutablebson {
         return _basis.rightChild();
     }
 
+    inline bool ConstElement::hasChildren() const {
+        return _basis.hasChildren();
+    }
+
     inline ConstElement ConstElement::leftSibling() const {
         return _basis.leftSibling();
     }

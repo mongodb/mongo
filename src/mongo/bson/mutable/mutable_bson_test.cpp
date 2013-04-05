@@ -990,5 +990,43 @@ namespace {
         ASSERT_EQUALS(end, missing);
     }
 
+    TEST(Element, EmptyDocHasNoChildren) {
+        mmb::Document doc;
+        ASSERT_FALSE(doc.root().hasChildren());
+    }
+
+    TEST(Element, PopulatedDocHasChildren) {
+        mmb::Document doc;
+        ASSERT_OK(doc.root().appendInt("a", 1));
+        ASSERT_TRUE(doc.root().hasChildren());
+        mmb::Element lc = doc.root().leftChild();
+        ASSERT_FALSE(lc.hasChildren());
+    }
+
+    TEST(Element, LazyEmptyDocHasNoChildren) {
+        static const char inJson[] = "{}";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+        ASSERT_FALSE(doc.root().hasChildren());
+    }
+
+    TEST(Element, LazySingletonDocHasChildren) {
+        static const char inJson[] = "{ a : 1 }";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+        ASSERT_TRUE(doc.root().hasChildren());
+        ASSERT_FALSE(doc.root().leftChild().hasChildren());
+    }
+
+    TEST(Element, LazyConstDoubletonDocHasChildren) {
+        static const char inJson[] = "{ a : 1, b : 2 }";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        const mmb::Document doc(inObj);
+        ASSERT_TRUE(doc.root().hasChildren());
+        ASSERT_FALSE(doc.root().leftChild().hasChildren());
+        ASSERT_FALSE(doc.root().rightChild().hasChildren());
+        ASSERT_FALSE(doc.root().leftChild() == doc.root().rightChild());
+    }
+
 } // namespace
 

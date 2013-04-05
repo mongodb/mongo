@@ -42,6 +42,7 @@ namespace mutablebson {
 
         inline ConstElement leftChild() const;
         inline ConstElement rightChild() const;
+        inline bool hasChildren() const;
         inline ConstElement leftSibling() const;
         inline ConstElement rightSibling() const;
         inline ConstElement parent() const;

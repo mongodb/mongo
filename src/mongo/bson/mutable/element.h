@@ -157,6 +157,11 @@ namespace mutablebson {
          */
         Element rightChild() const;
 
+        /** Returns true if this element has children. Always returns false if this Element is
+         *  not an Object or Array.
+         */
+        bool hasChildren() const;
+
         /** Returns either this Element's left sibling, or a non-ok Element if no left sibling
          *  exists.
          */
