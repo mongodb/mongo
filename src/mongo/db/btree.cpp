@@ -745,7 +745,7 @@ namespace mongo {
                               const Ordering &order, int& pos, bool assertIfDup) const {
         Loc recordLoc;
         recordLoc = rl;
-        globalIndexCounters.btree( (char*)this );
+        globalIndexCounters->btree( reinterpret_cast<const char*>(this) );
 
         // binary search for this key
         bool dupsChecked = false;

@@ -18,6 +18,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/btree_stats.h"
 
 namespace mongo {
@@ -64,6 +65,14 @@ namespace mongo {
         _resets++;
     }
 
-    IndexCounters globalIndexCounters;
+    IndexCounters* globalIndexCounters = NULL;
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(BtreeIndexCountersBlockSupported,
+                                         ("SystemInfo"))(InitializerContext* cx) {
+        if (globalIndexCounters == NULL) {
+            globalIndexCounters = new IndexCounters();
+        }
+        return Status::OK();
+    }
 
 }
