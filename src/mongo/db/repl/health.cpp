@@ -24,6 +24,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
@@ -178,21 +179,19 @@ namespace mongo {
         const bo fields;
 
         /** todo fix we might want an so timeout here */
-        DBClientConnection conn(false, 0, /*timeout*/ 20);
-        {
-            string errmsg;
-            if( !conn.connect(m->fullName(), errmsg) ) {
-                ss << "couldn't connect to " << m->fullName() << ' ' << errmsg;
-                return;
-            }
+        OplogReader reader(false);
+
+        if (reader.connect(m->fullName()) == false) {
+            ss << "couldn't connect to " << m->fullName();
+            return;
         }
 
-        auto_ptr<DBClientCursor> c = conn.query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
-        if( c.get() == 0 ) {
+        reader.query(rsoplog, Query().sort("$natural",1), 20, 0, &fields);
+        if ( !reader.haveCursor() ) {
             ss << "couldn't query " << rsoplog;
             return;
         }
-        static const char *h[] = {"ts","optime", "h","op","ns","rest",0};
+        static const char *h[] = {"ts","optime","h","op","ns","rest",0};
 
         ss << "<style type=\"text/css\" media=\"screen\">"
            "table { font-size:75% }\n"
@@ -206,8 +205,8 @@ namespace mongo {
         OpTime otFirst;
         OpTime otLast;
         OpTime otEnd;
-        while( c->more() ) {
-            bo o = c->next();
+        while( reader.more() ) {
+            bo o = reader.next();
             otLast = o["ts"]._opTime();
             if( otFirst.isNull() )
                 otFirst = otLast;
@@ -218,13 +217,13 @@ namespace mongo {
             ss << rsoplog << " is empty\n";
         }
         else {
-            auto_ptr<DBClientCursor> c = conn.query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
-            if( c.get() == 0 ) {
+            reader.query(rsoplog, Query().sort("$natural",-1), 20, 0, &fields);
+            if( !reader.haveCursor() ) {
                 ss << "couldn't query [2] " << rsoplog;
                 return;
             }
             string x;
-            bo o = c->next();
+            bo o = reader.next();
             otEnd = o["ts"]._opTime();
             while( 1 ) {
                 stringstream z;
@@ -232,9 +231,9 @@ namespace mongo {
                     break;
                 say(z, o);
                 x = z.str() + x;
-                if( !c->more() )
+                if( !reader.more() )
                     break;
-                o = c->next();
+                o = reader.next();
             }
             if( !x.empty() ) {
                 ss << "<tr><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>\n" << x;

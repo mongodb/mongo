@@ -86,6 +86,12 @@ namespace mongo {
         }
         */
 
+        void query(const char *ns,
+                   Query query,
+                   int nToReturn,
+                   int nToSkip,
+                   const BSONObj* fields=0);
+
         void tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields=0);
 
         void tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields=0);

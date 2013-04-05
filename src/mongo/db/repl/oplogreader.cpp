@@ -199,6 +199,16 @@ namespace mongo {
         return conn()->runCommand("admin", cmd.obj(), res);
     }
 
+    void OplogReader::query(const char *ns,
+                            Query query,
+                            int nToReturn,
+                            int nToSkip,
+                            const BSONObj* fields) {
+        cursor.reset(
+            _conn->query(ns, query, nToReturn, nToSkip, fields, QueryOption_SlaveOk).release()
+        );
+    }
+
     void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
         verify( !haveCursor() );
         LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
