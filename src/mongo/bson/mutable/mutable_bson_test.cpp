@@ -920,6 +920,61 @@ namespace {
         ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
     }
 
+    TEST(Document, ArrayIndexedAccessFromJson) {
+        static const char inJson[] =
+            "{"
+            " a : 1, b : [{ c : 1 }]"
+            "}";
+
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        mmb::Element a = doc.root().leftChild();
+        ASSERT_TRUE(a.ok());
+        ASSERT_EQUALS("a", a.getFieldName());
+        ASSERT_EQUALS(mongo::NumberInt, a.getType());
+
+        mmb::Element b = a.rightSibling();
+        ASSERT_TRUE(b.ok());
+        ASSERT_EQUALS("b", b.getFieldName());
+        ASSERT_EQUALS(mongo::Array, b.getType());
+
+        mmb::Element b0 = b[0];
+        ASSERT_TRUE(b0.ok());
+        ASSERT_EQUALS("0", b0.getFieldName());
+        ASSERT_EQUALS(mongo::Object, b0.getType());
+    }
+
+    TEST(Document, ArrayIndexedAccessFromManuallyBuilt) {
+        mmb::Document doc;
+        mmb::Element root = doc.root();
+        ASSERT_TRUE(root.ok());
+        {
+            ASSERT_OK(root.appendInt("a", 1));
+            mmb::Element b = doc.makeElementArray("b");
+            ASSERT_TRUE(b.ok());
+            ASSERT_OK(root.pushBack(b));
+            mmb::Element b0 = doc.makeElementObject("ignored");
+            ASSERT_TRUE(b0.ok());
+            ASSERT_OK(b.pushBack(b0));
+            ASSERT_OK(b0.appendInt("c", 1));
+        }
+
+        mmb::Element a = doc.root().leftChild();
+        ASSERT_TRUE(a.ok());
+        ASSERT_EQUALS("a", a.getFieldName());
+        ASSERT_EQUALS(mongo::NumberInt, a.getType());
+
+        mmb::Element b = a.rightSibling();
+        ASSERT_TRUE(b.ok());
+        ASSERT_EQUALS("b", b.getFieldName());
+        ASSERT_EQUALS(mongo::Array, b.getType());
+
+        mmb::Element b0 = b[0];
+        ASSERT_TRUE(b0.ok());
+        ASSERT_EQUALS("ignored", b0.getFieldName());
+        ASSERT_EQUALS(mongo::Object, b0.getType());
+    }
 
 } // namespace
 
