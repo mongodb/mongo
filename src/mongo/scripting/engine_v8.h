@@ -446,7 +446,7 @@ namespace mongo {
         V8Scope* _scope;
         BSONObj _obj;
         bool _modified;
-        set<string> _extra;
+        bool _readOnly;
         set<string> _removed;
     };
 

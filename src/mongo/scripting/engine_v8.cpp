@@ -17,6 +17,7 @@
 
 #include "mongo/scripting/engine_v8.h"
 
+#include "mongo/platform/unordered_set.h"
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
 #include "mongo/util/base64.h"
@@ -52,10 +53,15 @@ namespace mongo {
       return (BSONHolder*)ptr;
     }
 
+    static v8::Handle<v8::Object> unwrapObject(const v8::Handle<v8::Object>& obj) {
+      return obj->GetInternalField(1).As<v8::Object>();
+    }
+
     v8::Persistent<v8::Object> V8Scope::wrapBSONObject(v8::Local<v8::Object> obj,
                                                        BSONHolder* data) {
         data->_scope = this;
-        obj->SetInternalField(0, v8::External::New(data));
+        obj->SetInternalField(0, v8::External::New(data)); // Holder
+        obj->SetInternalField(1, v8::Object::New()); // Object
         v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
         bsonHolderTracker.track(p, data);
         return p;
@@ -66,9 +72,10 @@ namespace mongo {
         v8::HandleScope handle_scope;
         v8::Handle<v8::Value> val;
         try {
-            if (info.This()->HasRealNamedProperty(name)) {
-                // value already cached
-                return handle_scope.Close(info.This()->GetRealNamedProperty(name));
+            v8::Handle<v8::Object> realObject = unwrapObject(info.Holder());
+            if (realObject->HasOwnProperty(name)) {
+                // value already cached or added
+                return handle_scope.Close(realObject->Get(name));
             }
 
             string key = toSTLString(name);
@@ -83,8 +90,12 @@ namespace mongo {
 
             v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
             V8Scope* scope = (V8Scope*)(scp->Value());
-            val = scope->mongoToV8Element(elmt, false);
-            info.This()->ForceSet(name, val, v8::DontEnum);
+            val = scope->mongoToV8Element(elmt, holder->_readOnly);
+
+            if (obj.objsize() > 128 || val->IsObject()) {
+                // Only cache if expected to help (large BSON) or is required due to js semantics
+                realObject->Set(name, val);
+            }
 
             if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
               // if accessing a subobject, it may get modified and base obj would not know
@@ -103,6 +114,9 @@ namespace mongo {
 
     static v8::Handle<v8::Value> namedGetRO(v8::Local<v8::String> name,
                                             const v8::AccessorInfo &info) {
+        return namedGet(name, info);
+        // Rest of function is unused but left in to ease backporting of SERVER-9267
+
         v8::HandleScope handle_scope;
         v8::Handle<v8::Value> val;
         string key = toSTLString(name);
@@ -130,25 +144,25 @@ namespace mongo {
         string key = toSTLString(name);
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.erase(key);
-        holder->_extra.insert(key);
         holder->_modified = true;
 
-        // set into JS object
-        return v8::Handle<v8::Value>();
+        v8::Handle<v8::Object> realObject = unwrapObject(info.Holder());
+        realObject->Set(name, value_obj);
+        return value_obj;
     }
 
     static v8::Handle<v8::Array> namedEnumerator(const v8::AccessorInfo &info) {
         v8::HandleScope handle_scope;
         BSONHolder* holder = unwrapHolder(info.Holder());
         BSONObj obj = holder->_obj;
-        v8::Handle<v8::Array> arr = v8::Handle<v8::Array>(v8::Array::New(obj.nFields()));
-        int i = 0;
+        v8::Handle<v8::Array> out = v8::Array::New();
+        int outIndex = 0;
         v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
         V8Scope* scope = (V8Scope*)(scp->Value());
 
-        set<string> added;
+        unordered_set<string> added;
         // note here that if keys are parseable number, v8 will access them using index
-        for (BSONObjIterator it(obj); it.more(); ++i) {
+        for (BSONObjIterator it(obj); it.more();) {
             const BSONElement& f = it.next();
             string sname = f.fieldName();
             if (holder->_removed.count(sname))
@@ -156,17 +170,21 @@ namespace mongo {
 
             v8::Handle<v8::String> name = scope->v8StringData(sname);
             added.insert(sname);
-            arr->Set(i, name);
+            out->Set(outIndex++, name);
         }
 
-        for (set<string>::iterator it = holder->_extra.begin();
-             it != holder->_extra.end(); it++) {
-            string sname = *it;
+
+        v8::Handle<v8::Object> realObject = unwrapObject(info.Holder());
+        v8::Handle<v8::Array> fields = realObject->GetOwnPropertyNames();
+        const int len = fields->Length();
+        for (int field=0; field < len; field++) {
+            v8::Handle<v8::String> name = fields->Get(field).As<v8::String>();
+            string sname = toSTLString(name);
             if (added.count(sname))
                 continue;
-            arr->Set(i++, scope->v8StringData(sname));
+            out->Set(outIndex++, name);
         }
-        return handle_scope.Close(arr);
+        return handle_scope.Close(out);
     }
 
     v8::Handle<v8::Boolean> namedDelete(v8::Local<v8::String> name, const v8::AccessorInfo& info) {
@@ -174,26 +192,25 @@ namespace mongo {
         string key = toSTLString(name);
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.insert(key);
-        holder->_extra.erase(key);
         holder->_modified = true;
 
-        // also delete in JS obj
-        return handle_scope.Close(v8::Handle<v8::Boolean>());
+        v8::Handle<v8::Object> realObject = unwrapObject(info.Holder());
+        realObject->Delete(name);
+        return v8::True();
     }
 
     static v8::Handle<v8::Value> indexedGet(uint32_t index, const v8::AccessorInfo &info) {
         v8::HandleScope handle_scope;
         v8::Handle<v8::Value> val;
         try {
+            v8::Handle<v8::Object> realObject = unwrapObject(info.Holder());
+            if (realObject->Has(index)) {
+                // value already cached or added
+                return handle_scope.Close(realObject->Get(index));
+            }
             string key = str::stream() << index;
             v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
             V8Scope* scope = (V8Scope*)(scp->Value());
-            v8::Handle<v8::String> name = scope->v8StringData(key);
-
-            if (info.This()->HasRealIndexedProperty(index)) {
-                // value already cached
-                return handle_scope.Close(info.This()->GetRealNamedProperty(name));
-            }
 
             BSONHolder* holder = unwrapHolder(info.Holder());
             if (holder->_removed.count(key))
@@ -203,8 +220,8 @@ namespace mongo {
             BSONElement elmt = obj.getField(key);
             if (elmt.eoo())
                 return handle_scope.Close(v8::Handle<v8::Value>());
-            val = scope->mongoToV8Element(elmt, false);
-            info.This()->ForceSet(name, val, v8::DontEnum);
+            val = scope->mongoToV8Element(elmt, holder->_readOnly);
+            realObject->Set(index, val);
 
             if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
                 // if accessing a subobject, it may get modified and base obj would not know
@@ -226,14 +243,18 @@ namespace mongo {
         string key = str::stream() << index;
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.insert(key);
-        holder->_extra.erase(key);
         holder->_modified = true;
 
         // also delete in JS obj
-        return v8::Handle<v8::Boolean>();
+        v8::Handle<v8::Object> realObject = unwrapObject(info.Holder());
+        realObject->Delete(index);
+        return v8::True();
     }
 
     static v8::Handle<v8::Value> indexedGetRO(uint32_t index, const v8::AccessorInfo &info) {
+        return indexedGet(index, info);
+        // Rest of function is unused but left in-place to ease backporting of SERVER-9267
+
         v8::HandleScope handle_scope;
         v8::Handle<v8::Value> val;
         try {
@@ -265,11 +286,11 @@ namespace mongo {
         string key = str::stream() << index;
         BSONHolder* holder = unwrapHolder(info.Holder());
         holder->_removed.erase(key);
-        holder->_extra.insert(key);
         holder->_modified = true;
 
-        // set into JS object
-        return v8::Handle<v8::Value>();
+        v8::Handle<v8::Object> realObject = unwrapObject(info.Holder());
+        realObject->Set(index, value_obj);
+        return value_obj;
     }
 
     v8::Handle<v8::Value> NamedReadOnlySet(v8::Local<v8::String> property,
@@ -484,7 +505,7 @@ namespace mongo {
 
         // initialize lazy object template
         lzObjectTemplate = v8::Persistent<v8::ObjectTemplate>::New(v8::ObjectTemplate::New());
-        lzObjectTemplate->SetInternalFieldCount(1);
+        lzObjectTemplate->SetInternalFieldCount(2);
         lzObjectTemplate->SetNamedPropertyHandler(namedGet, namedSet, 0, namedDelete,
                                                   namedEnumerator, v8::External::New(this));
         lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, indexedSet, 0, indexedDelete,
@@ -495,7 +516,7 @@ namespace mongo {
                                                                          v8::DontEnum);
 
         roObjectTemplate = v8::Persistent<v8::ObjectTemplate>::New(v8::ObjectTemplate::New());
-        roObjectTemplate->SetInternalFieldCount(1);
+        roObjectTemplate->SetInternalFieldCount(2);
         roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0,
                                                   NamedReadOnlyDelete, namedEnumerator,
                                                   v8::External::New(this));
@@ -1264,6 +1285,7 @@ namespace mongo {
     v8::Persistent<v8::Object> V8Scope::mongoToLZV8(const BSONObj& m, bool readOnly) {
         v8::Local<v8::Object> o;
         BSONHolder* own = new BSONHolder(m);
+        own->_readOnly = readOnly;
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();
