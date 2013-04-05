@@ -19,7 +19,7 @@
  */
 int
 __wt_config_check(WT_SESSION_IMPL *session,
-    WT_CONFIG_CHECK checks[], const char *config, size_t config_len)
+    const WT_CONFIG_CHECK checks[], const char *config, size_t config_len)
 {
 	WT_CONFIG parser, cparser, sparser;
 	WT_CONFIG_ITEM k, v, ck, cv, dummy;

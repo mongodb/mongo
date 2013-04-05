@@ -111,7 +111,7 @@ typedef enum {
  *		['A' ... 'Z'] = &&l_bare, ['a' ... 'z'] = &&l_bare,
  *	};
  */
-static int8_t gostruct[256] = {
+static const int8_t gostruct[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_LOOP, A_LOOP, A_BAD, A_BAD, A_LOOP, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -159,7 +159,7 @@ static int8_t gostruct[256] = {
  *		[127 ... 255] = &&l_bad
  *	};
  */
-static int8_t gobare[256] = {
+static const int8_t gobare[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_UNBARE, A_UNBARE, A_BAD, A_BAD, A_UNBARE, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -206,7 +206,7 @@ static int8_t gobare[256] = {
  *		[248 ... 255] = &&l_bad
  *	};
  */
-static int8_t gostring[256] = {
+static const int8_t gostring[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -250,7 +250,7 @@ static int8_t gostring[256] = {
  *		[192 ... 255] = &&l_bad
  *	};
  */
-static int8_t goutf8_continue[256] = {
+static const int8_t goutf8_continue[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -301,7 +301,7 @@ static int8_t goutf8_continue[256] = {
  *		['r'] = &&l_unesc, ['t'] = &&l_unesc, ['u'] = &&l_unesc
  *	};
  */
-static int8_t goesc[256] = {
+static const int8_t goesc[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,

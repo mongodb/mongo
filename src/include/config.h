@@ -12,7 +12,7 @@ struct __wt_config {
 	const char *cur;
 
 	int depth, top;
-	int8_t *go;
+	const int8_t *go;
 };
 
 struct __wt_config_item {
@@ -26,5 +26,5 @@ struct __wt_config_check {
 	const char *name;
 	const char *type;
 	const char *checks;
-	WT_CONFIG_CHECK *subconfigs;
+	const WT_CONFIG_CHECK *subconfigs;
 };

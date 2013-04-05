@@ -200,7 +200,7 @@ def add_subconfig(c):
         return
     created_subconfigs.add(c.name)
     tfile.write('''
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_%(name)s_subconfigs[] = {
 \t%(check)s
 \t{ NULL, NULL, NULL, NULL }
@@ -224,7 +224,7 @@ for name in sorted(api_data.methods.keys()):
     ctype = api_data.methods[name].config
     name = name.replace('.', '_')
     tfile.write('''
-const char *
+const char * const
 __wt_confdfl_%(name)s =
 %(config)s;
 ''' % {
@@ -238,14 +238,14 @@ __wt_confdfl_%(name)s =
 # string as a terminator for iteration
     if not ctype:
         tfile.write('''
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_%(name)s[] = {
 \t{ NULL, NULL, NULL, NULL }
 };
 ''' % { 'name' : name })
     else:
         tfile.write('''
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_%(name)s[] = {
 \t%(check)s
 \t{ NULL, NULL, NULL, NULL }

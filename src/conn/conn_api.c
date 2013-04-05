@@ -751,7 +751,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	static struct {
+	static const struct {
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
@@ -797,7 +797,7 @@ int
 wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
-	static WT_CONNECTION stdc = {
+	static const WT_CONNECTION stdc = {
 		__conn_close,
 		__conn_reconfigure,
 		__conn_get_home,
@@ -809,7 +809,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_add_compressor,
 		__conn_add_extractor
 	};
-	static struct {
+	static const struct {
 		const char *name;
 		uint32_t flag;
 	} *ft, directio_types[] = {

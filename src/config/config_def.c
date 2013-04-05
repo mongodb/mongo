@@ -2,11 +2,11 @@
 
 #include "wt_internal.h"
 
-const char *
+const char * const
 __wt_confdfl_colgroup_meta =
 	"columns=,source=,type=file";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_colgroup_meta[] = {
 	{ "columns", "list", NULL, NULL},
 	{ "source", "string", NULL, NULL},
@@ -14,67 +14,67 @@ __wt_confchk_colgroup_meta[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_add_collator =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_add_collator[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_add_compressor =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_add_compressor[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_add_data_source =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_add_data_source[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_add_extractor =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_add_extractor[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_close =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_close[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_load_extension =
 	"entry=wiredtiger_extension_init,prefix=";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_load_extension[] = {
 	{ "entry", "string", NULL, NULL},
 	{ "prefix", "string", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_open_session =
 	"isolation=read-committed";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_open_session[] = {
 	{ "isolation", "string",
 	    "choices=[\"read-uncommitted\",\"read-committed\",\"snapshot\"]",
@@ -82,13 +82,13 @@ __wt_confchk_connection_open_session[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_connection_reconfigure =
 	"cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
 	"eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
 	"name=pool,reserve=0,size=500MB),statistics=0,verbose=";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_shared_cache_subconfigs[] = {
 	{ "chunk", "int", "min=1MB,max=10TB", NULL },
 	{ "name", "string", NULL, NULL },
@@ -97,7 +97,7 @@ __wt_confchk_shared_cache_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_connection_reconfigure[] = {
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
 	{ "error_prefix", "string", NULL, NULL},
@@ -115,16 +115,16 @@ __wt_confchk_connection_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_cursor_close =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_cursor_close[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_file_meta =
 	"allocation_size=512B,block_compressor=,cache_resident=0,checkpoint=,"
 	"checksum=on,collator=,columns=,dictionary=0,format=btree,"
@@ -134,7 +134,7 @@ __wt_confdfl_file_meta =
 	"os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,split_pct=75"
 	",value_format=u,version=(major=0,minor=0)";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
 	{ "allocation_size", "int", "min=512B,max=128MB", NULL},
 	{ "block_compressor", "string", NULL, NULL},
@@ -166,11 +166,11 @@ __wt_confchk_file_meta[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_index_meta =
 	"columns=,key_format=u,source=,type=file,value_format=u";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_index_meta[] = {
 	{ "columns", "list", NULL, NULL},
 	{ "key_format", "format", NULL, NULL},
@@ -180,11 +180,11 @@ __wt_confchk_index_meta[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_begin_transaction =
 	"isolation=,name=,priority=0,sync=full";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_begin_transaction[] = {
 	{ "isolation", "string",
 	    "choices=[\"read-uncommitted\",\"read-committed\",\"snapshot\"]",
@@ -197,11 +197,11 @@ __wt_confchk_session_begin_transaction[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_checkpoint =
 	"drop=,force=0,name=,target=";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_checkpoint[] = {
 	{ "drop", "list", NULL, NULL},
 	{ "force", "boolean", NULL, NULL},
@@ -210,35 +210,35 @@ __wt_confchk_session_checkpoint[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_close =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_close[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_commit_transaction =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_commit_transaction[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_compact =
 	"trigger=30";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_compact[] = {
 	{ "trigger", "int", "min=10,max=50", NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_create =
 	"allocation_size=512B,block_compressor=,cache_resident=0,checksum=on,"
 	"colgroups=,collator=,columns=,dictionary=0,exclusive=0,format=btree,"
@@ -251,7 +251,7 @@ __wt_confdfl_session_create =
 	"os_cache_max=0,prefix_compression=,source=,split_pct=75,type=file,"
 	"value_format=u";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
 	{ "allocation_size", "int", "min=512B,max=128MB", NULL},
 	{ "block_compressor", "string", NULL, NULL},
@@ -294,31 +294,31 @@ __wt_confchk_session_create[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_drop =
 	"force=0";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_drop[] = {
 	{ "force", "boolean", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_log_printf =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_log_printf[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_open_cursor =
 	"append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=0,raw=0,"
 	"statistics_clear=0,statistics_fast=0,target=";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
 	{ "append", "boolean", NULL, NULL},
 	{ "bulk", "string", NULL, NULL},
@@ -333,11 +333,11 @@ __wt_confchk_session_open_cursor[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_reconfigure =
 	"isolation=read-committed";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_reconfigure[] = {
 	{ "isolation", "string",
 	    "choices=[\"read-uncommitted\",\"read-committed\",\"snapshot\"]",
@@ -345,57 +345,57 @@ __wt_confchk_session_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_rename =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_rename[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_rollback_transaction =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_rollback_transaction[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_salvage =
 	"force=0";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_salvage[] = {
 	{ "force", "boolean", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_truncate =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_truncate[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_upgrade =
 	"";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_upgrade[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_session_verify =
 	"dump_address=0,dump_blocks=0,dump_pages=0";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_session_verify[] = {
 	{ "dump_address", "boolean", NULL, NULL},
 	{ "dump_blocks", "boolean", NULL, NULL},
@@ -403,11 +403,11 @@ __wt_confchk_session_verify[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_table_meta =
 	"colgroups=,columns=,key_format=u,value_format=u";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_table_meta[] = {
 	{ "colgroups", "list", NULL, NULL},
 	{ "columns", "list", NULL, NULL},
@@ -416,7 +416,7 @@ __wt_confchk_table_meta[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-const char *
+const char * const
 __wt_confdfl_wiredtiger_open =
 	"buffer_alignment=-1,cache_size=100MB,"
 	"checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),create=0,"
@@ -428,14 +428,14 @@ __wt_confdfl_wiredtiger_open =
 	"sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,transactional=,"
 	"use_environment_priv=0,verbose=";
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_checkpoint_subconfigs[] = {
 	{ "name", "string", NULL, NULL },
 	{ "wait", "int", "min=1,max=100000", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_statistics_log_subconfigs[] = {
 	{ "clear", "boolean", NULL, NULL },
 	{ "path", "string", NULL, NULL },
@@ -445,7 +445,7 @@ __wt_confchk_statistics_log_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-WT_CONFIG_CHECK
+const WT_CONFIG_CHECK
 __wt_confchk_wiredtiger_open[] = {
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL},
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
