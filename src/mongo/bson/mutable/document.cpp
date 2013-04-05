@@ -1922,6 +1922,10 @@ namespace mutablebson {
         }
     }
 
+    ConstElement Document::end() const {
+        return ConstElement(Element(const_cast<Document*>(this), kInvalidRepIdx));
+    }
+
     inline Document::Impl& Document::getImpl() {
         // Don't use scoped_ptr<Impl>::operator* since it may generate assertions that the
         // pointer is non-null, but we already know that to be always and forever true, and

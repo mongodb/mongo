@@ -976,5 +976,19 @@ namespace {
         ASSERT_EQUALS(mongo::Object, b0.getType());
     }
 
+    TEST(Document, EndElement) {
+        mmb::Document doc;
+        mmb::ConstElement end = doc.end();
+        ASSERT_FALSE(end.ok());
+        mmb::ConstElement missing = doc.root().leftChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().leftSibling();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightSibling();
+        ASSERT_EQUALS(end, missing);
+    }
+
 } // namespace
 
