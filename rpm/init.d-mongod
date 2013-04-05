@@ -24,7 +24,7 @@ SYSCONFIG="/etc/sysconfig/mongod"
 # for now.  This can go away when this script stops supporting 1.8.
 DBPATH=`awk -F= '/^dbpath=/{print $2}' "$CONFIGFILE"`
 PIDFILE=`awk -F= '/^dbpath\s=\s/{print $2}' "$CONFIGFILE"`
-mongod=${MONGOD-/usr/bin/mongod}
+MONGOD=${MONGOD-/usr/bin/mongod}
 
 MONGO_USER=mongod
 MONGO_GROUP=mongod
@@ -46,7 +46,7 @@ fi
 start()
 {
   echo -n $"Starting mongod: "
-  daemon --user "$MONGO_USER" $NUMACTL $mongod $OPTIONS
+  daemon --user "$MONGO_USER" $NUMACTL $MONGOD $OPTIONS
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod
@@ -55,10 +55,28 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  killproc -p "$PIDFILE" -d 300 /usr/bin/mongod
-  RETVAL=$?
+  pid=`pidofproc -p "$PIDFILE" $MONGOD`
+
+  killproc -p "$PIDFILE" $MONGOD -TERM >/dev/null 2>&1
+  x=0
+  while [ $x -le 30 ] && checkpid $pid ; do
+    sleep 10
+    x=$(( $x + 1))
+  done
+  if checkpid $pid ; then
+    killproc -p "$PIDFILE" $MONGOD -KILL >/dev/null 2>&1
+  fi
+  checkpid $pid
+  RETVAL=$((! $?))
   echo
-  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
+  if [ $RETVAL -eq 0 ] ; then
+    success "$MONGOD shutdown"
+    rm -f /var/lock/subsys/mongod $PIDFILE
+  else
+    failure "$MONGOD shutdown"
+  fi
+  echo
+  return $RETVAL
 }
 
 restart () {
@@ -83,7 +101,7 @@ case "$1" in
     [ -f /var/lock/subsys/mongod ] && restart || :
     ;;
   status)
-    status $mongod
+    status $MONGOD
     RETVAL=$?
     ;;
   *)
