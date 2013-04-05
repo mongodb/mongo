@@ -23,7 +23,7 @@
 	update,								\
 	remove,								\
 	close)								\
-	static WT_CURSOR n = {						\
+	static const WT_CURSOR n = {					\
 	NULL,				/* session */			\
 	NULL,				/* uri */			\
 	NULL,				/* key_format */		\
