@@ -8,7 +8,7 @@ data source might support the type "dsrc:").
 
 The WiredTiger distribution includes an example of a complete custom
 data source implementation (based on Oracle's Berkeley DB database
-engine), in the file test/format/kvs.c.  This example implementation is
+engine), in the file test/format/kvs_bdb.c.  This example implementation is
 public domain software, please feel free to use this code as a prototype
 implementation of other custom data sources.
 
@@ -17,21 +17,39 @@ with WiredTiger using the WT_CONNECTION::add_data_source method:
 
 @snippet ex_all.c WT_DATA_SOURCE register
 
-There are some rules to follow in a data source implementation:
-<ol>
+@section custom_data_source_methods WT_DATA_SOURCE:: methods
 
-<li>
 Any of the WT_DATA_SOURCE methods may be initialized to NULL.  Calling
 uninitialized WT_DATA_SOURCE methods through a WiredTiger API will
-result in an "operation not supported" error.
+result in an "operation not supported" error.   For example, an
+underlying data source that does not support a compaction operation
+should set the \c compact field of their WT_DATA_SOURCE structure to
+NULL.
 
-<li>
+@subsection custom_data_source_create WT_DATA_SOURCE::create method
+
+When implementing a custom data source, you may want to consider the 'r'
+key and 't' value formats, and whether or not they should be implemented.
+
+The 'r' key format indicates keys are \c uint64_t typed record numbers.
+In this case, cursor methods will be passed and/or return a record
+number in the \c recno field of the WT_CURSOR:: structure.
+
+Cursor methods for data sources supporting fixed-length bit field
+column-stores (that is, a store with an 'r' type key and 't' type value)
+should accept and/or return a single byte in the value field of the
+WT_CURSOR:: structure, where between 1 and 8 of the low-order bits of
+that byte contain the bit-field's value.  For example, if the value
+format is "3t", the key's value is the bottom 3 bits.
+
+@section custom_data_source_cursor_methods WT_CURSOR:: methods
+
 The WT_DATA_SOURCE::open_cursor method is responsible for allocating and
 returning a WT_CURSOR structure.  The only fields of the WT_CURSOR
 structure that should be initialized by WT_DATA_SOURCE::open_cursor are
-the underlying methods it supports.
+a subset of the underlying methods it supports.
 
-The following methods of the WT_CURSOR structure should be initialized:
+The following methods of the WT_CURSOR structure must be initialized:
 <ul>
 <li>WT_CURSOR::close
 <li>WT_CURSOR::next
@@ -44,35 +62,84 @@ The following methods of the WT_CURSOR structure should be initialized:
 <li>WT_CURSOR::remove
 </ul>
 
-The following methods of the WT_CURSOR structure should <b>not</b> be
-initialized:
-<ul>
-<li>WT_CURSOR::get_key
-<li>WT_CURSOR::get_value
-<li>WT_CURSOR::set_key
-<li>WT_CURSOR::set_value
-<li>WT_CURSOR::compare
-</ul>
+No other methods of the WT_CURSOR structure should be initialized, for
+example initializing WT_CURSOR::get_key or WT_CURSOR::set_key will have
+no effect.
 
-Incorrectly configuring a WT_CURSOR method will likely result in a core
+Incorrectly configuring the WT_CURSOR:: methods will likely result in a core
 dump.
 
-The custom data source's WT_CURSOR::close method should discard the
-allocated WT_CURSOR structure returned by WT_DATA_SOURCE::open_cursor.
+The data source's WT_CURSOR::close method is responsible for discarding
+the allocated WT_CURSOR structure returned by WT_DATA_SOURCE::open_cursor.
 
+@subsection custom_data_source_cursor_insert WT_CURSOR::insert method
+
+Custom data sources supporting column-stores (that is, a store with an
+'r' type key) should consider the \c append configuration string
+optionally specified for the WT_DATA_SOURCE::open_cursor method.  The
+\c append string configures WT_CURSOR::insert to allocate and return an
+new record number key.
+
+Custom data sources should consider the \c overwrite configuration
+string optionally specified for the WT_DATA_SOURCE::open_cursor method.
+The \c overwrite string implies the WT_CURSOR::insert method should
+overwrite any already existing value for the key instead of returning
+an error.
+
+Custom data sources supporting fixed-length bit field column-stores
+(that is, a store with an 'r' type key and 't' type value) must support
+the semantic that inserting a new record after the current maximum
+record in a store implicitly creates the missing records as records with
+a value of 0.
+
+@section custom_data_source_cursor_fields WT_CURSOR:: key/value fields
+
+Custom data source cursor methods are expected to use the \c recno,
+\c key and \c value fields of the WT_CURSOR handle.
+
+The \c recno field is a uint64_t type and is the record number set or
+retrieved using the cursor when the data source was configured for
+record number keys.
+
+The \c key and \c value fields are WT_ITEM structures.  The \c key.data,
+\c key.size, \c value.data and \c value.size  fields are read by the
+cursor methods storing items in the underlying data source and set by
+the cursor methods retrieving items from the underlying data source.
+
+@section custom_data_source_error_handling Error handling
+
+Some specific errors should be mapped to WiredTiger errors:
+<ul>
 <li>
+attempts to insert an existing key should return WT_DUPLICATE_KEY
+<li>
+failure to find a key/value pair should return WT_NOTFOUND
+<li>
+fatal errors requiring the database restart should return WT_PANIC
+</ul>
+
+Otherwise, successful return from custom data source methods should be
+indicated by a return value of zero; error returns may be any value
+other than zero or an error in WiredTiger's @ref error.  A simple
+approach is to always return either a system error value (that is, \c
+errno), or \c WT_ERROR.   Error messages can be displayed using the
+WT_SESSION::msg_printf method.  For example:
+
+@snippet kvs_bdb.c Data-source: error message
+
+@section custom_data_source_configuration Configuration strings
+
 Arrays of configuration strings are provided to WT_DATA_SOURCE methods.
 These strings are simple "key=value" pairs, where value may be either a
 string or a single "1" or "0" character (for "true" or "false" booleans).
 For example, boolean configuration values might be parsed as follows:
 
-@snippet kvs.c Data-source: boolean configuration
+@snippet kvs_bdb.c Data-source: boolean configuration
 
 And string configuration values might be parsed as follows:
 
-@snippet kvs.c Data-source: string configuration
+@snippet kvs_bdb.c Data-source: string configuration
 
-<li>
 The \c key_format and \c value_format configuration strings are provided
 to both the WT_DATA_SOURCE::create and WT_DATA_SOURCE::open_cursor methods.
 An \c append and \c overwrite configuration boolean is optionally provided
@@ -96,49 +163,15 @@ application.
 Using the parsing examples above, the WT_DATA_SOURCE::open_cursor method
 might check for the configuration strings as follows:
 
-@snippet kvs.c Data-source: open_cursor configuration
+@snippet kvs_bdb.c Data-source: open_cursor configuration
 
-<li>
-Custom data source cursor methods are expected to use the \c recno,
-\c key and \c value fields of the WT_CURSOR handle.
+@section custom_data_source_cursor_serialize Serialization
 
-The \c recno field is a uint64_t type and is the record number set or
-retrieved using the cursor when the data source was configured for
-record number keys.
-
-The \c key and \c value fields are WT_ITEM structures.  The \c key.data,
-\c key.size, \c value.data and \c value.size  fields are read by the
-cursor methods storing items in the underlying data source and set by
-the cursor methods retrieving items from the underlying data source.
-
-<li>
-Some specific errors should be mapped to WiredTiger errors:
-<ul>
-<li>
-attempts to insert an existing key should return WT_DUPLICATE_KEY
-<li>
-failure to find a key/value pair should return WT_NOTFOUND
-<li>
-fatal errors requiring the database restart should return WT_PANIC
-</ul>
-
-Otherwise, successful return from custom data source methods should be
-indicated by a return value of zero; error returns may be any value
-other than zero or an error in WiredTiger's @ref error.  A simple
-approach is to always return either a system error value (that is, \c
-errno), or \c WT_ERROR.   Error messages can be displayed using the
-WT_SESSION::msg_printf method.  For example:
-
-@snippet kvs.c Data-source: error message
-
-<li>
 WiredTiger does not serialize calls to the WT_DATA_SOURCE methods or to
 cursor methods configured by WT_DATA_SOURCE::open_cursor, and the
 methods may be called from multiple threads concurrently.  It is the
 responsibility of the implementation to protect any shared data.  For
 example, object operations such as WT_DATA_SOURCE::drop might not be
 permitted while there are open cursors for the WT_DATA_SOURCE object.
-
-</ol>
 
 */

@@ -96,8 +96,8 @@ wts_open(void)
 	g.wts_conn = conn;
 
 	/* Open any underlying key/value store data-source. */
-	if (DATASOURCE("kvs"))
-		kvs_init(conn, RUNDIR_KVS);
+	if (DATASOURCE("kvsbdb"))
+		kvsbdb_init(conn, RUNDIR_KVS);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
@@ -219,8 +219,8 @@ wts_close()
 
 	conn = g.wts_conn;
 
-	if (DATASOURCE("kvs"))
-		kvs_close(conn);
+	if (DATASOURCE("kvsbdb"))
+		kvsbdb_close(conn);
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
 }
@@ -232,7 +232,7 @@ wts_dump(const char *tag, int dump_bdb)
 	char cmd[256];
 
 	/* Data-sources don't support dump comparisons. */
-	if (DATASOURCE("kvs"))
+	if (DATASOURCE("kvsbdb"))
 		return;
 
 	track("dump files and compare", 0ULL, NULL);
@@ -260,7 +260,7 @@ wts_salvage(void)
 	int ret;
 
 	/* Data-sources don't support salvage. */
-	if (DATASOURCE("kvs"))
+	if (DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;
@@ -326,7 +326,7 @@ wts_stats(void)
 	int ret;
 
 	/* Data-sources don't support statistics. */
-	if (DATASOURCE("kvs"))
+	if (DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;

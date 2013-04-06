@@ -5,7 +5,7 @@ AM_CPPFLAGS = -DWIREDTIGER_TEST_COMPRESS_RAW \
 noinst_PROGRAMS = t
 noinst_SCRIPTS = s_dumpcmp
 t_SOURCES =\
-	config.h format.h bdb.c config.c kvs.c t.c util.c wts.c \
+	config.h format.h bdb.c config.c kvs_bdb.c t.c util.c wts.c \
 	wts_bulk.c wts_ops.c
 t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BDB)/build_unix -ldb
 t_LDFLAGS = -static

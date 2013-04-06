@@ -900,7 +900,7 @@ kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 void die(int, const char *, ...);
 
 void
-kvs_init(WT_CONNECTION *conn, const char *dir)
+kvsbdb_init(WT_CONNECTION *conn, const char *dir)
 {
 	int ret;
 
@@ -931,7 +931,7 @@ kvs_init(WT_CONNECTION *conn, const char *dir)
 }
 
 void
-kvs_close(WT_CONNECTION *conn)
+kvsbdb_close(WT_CONNECTION *conn)
 {
 	int ret;
 
