@@ -25,15 +25,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/stat.h>
-#include <sys/time.h>
-
+#include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <build_unix/db.h>
 #include <wiredtiger.h>
