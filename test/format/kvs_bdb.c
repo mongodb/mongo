@@ -73,10 +73,11 @@ struct __cursor_source {
 	DB	*db;				/* Berkeley DB handles */
 	DBC	*dbc;
 	DBT	 key, value;
+	db_recno_t recno;
 
-	int	 append;			/* config "append" */
-	int	 overwrite;			/* config "overwrite" */
-	int	 recno;				/* config "key_format=r" */
+	int	 config_append;			/* config "append" */
+	int	 config_overwrite;		/* config "overwrite" */
+	int	 config_recno;			/* config "key_format=r" */
 };
 
 static void
@@ -102,26 +103,6 @@ single_thread(WT_DATA_SOURCE *dsrc)
 		unlock();
 		return (EBUSY);
 	}
-	return (0);
-}
-
-static int
-recno_convert(WT_CURSOR *wt_cursor, uint32_t *recnop)
-{
-	CURSOR_SOURCE *cursor;
-	WT_SESSION *session;
-
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
-
-	if (wt_cursor->recno > UINT32_MAX) {
-		(void)session->msg_printf(session,
-		    "record number %" PRIuMAX ": %s",
-		    (uintmax_t)wt_cursor->recno, strerror(ERANGE));
-		return (ERANGE);
-	}
-
-	*recnop = (uint32_t)wt_cursor->recno;
 	return (0);
 }
 
@@ -186,6 +167,91 @@ cfg_parse_str(
 }
 /*! [Data-source: string configuration] */
 
+static inline int
+recno_convert(WT_CURSOR *wt_cursor, db_recno_t *recnop)
+{
+	CURSOR_SOURCE *cursor;
+	WT_SESSION *session;
+
+	cursor = (CURSOR_SOURCE *)wt_cursor;
+	session = cursor->session;
+
+	if (wt_cursor->recno > UINT32_MAX) {
+		(void)session->msg_printf(session,
+		    "record number %" PRIuMAX ": %s",
+		    (uintmax_t)wt_cursor->recno, strerror(ERANGE));
+		return (ERANGE);
+	}
+
+	*recnop = (uint32_t)wt_cursor->recno;
+	return (0);
+}
+
+static inline int
+copyin_key(WT_CURSOR *wt_cursor)
+{
+	CURSOR_SOURCE *cursor;
+	DBT *key;
+	int ret;
+
+	cursor = (CURSOR_SOURCE *)wt_cursor;
+	key = &cursor->key;
+
+	if (cursor->config_recno) {
+		if ((ret = recno_convert(wt_cursor, &cursor->recno)) != 0)
+			return (ret);
+		key->data = &cursor->recno;
+		key->size = sizeof(db_recno_t);
+	} else {
+		key->data = (char *)wt_cursor->key.data;
+		key->size = wt_cursor->key.size;
+	}
+	return (0);
+}
+
+static inline void
+copyin_value(WT_CURSOR *wt_cursor)
+{
+	CURSOR_SOURCE *cursor;
+	DBT *value;
+
+	cursor = (CURSOR_SOURCE *)wt_cursor;
+	value = &cursor->value;
+
+	value->data = (char *)wt_cursor->value.data;
+	value->size = wt_cursor->value.size;
+}
+
+static inline void
+copyout_key(WT_CURSOR *wt_cursor)
+{
+	CURSOR_SOURCE *cursor;
+	DBT *key;
+
+	cursor = (CURSOR_SOURCE *)wt_cursor;
+	key = &cursor->key;
+
+	if (cursor->config_recno)
+		wt_cursor->recno = *(db_recno_t *)key->data;
+	else {
+		wt_cursor->key.data = key->data;
+		wt_cursor->key.size = key->size;
+	}
+}
+
+static inline void
+copyout_value(WT_CURSOR *wt_cursor)
+{
+	CURSOR_SOURCE *cursor;
+	DBT *value;
+
+	cursor = (CURSOR_SOURCE *)wt_cursor;
+	value = &cursor->value;
+
+	wt_cursor->value.data = value->data;
+	wt_cursor->value.size = value->size;
+}
+
 #ifdef HAVE_DIAGNOSTIC
 static int
 bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
@@ -215,7 +281,7 @@ bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
 
 	printf("==> %s\n", tag);
 	while ((ret = dbc->get(dbc, key, value, DB_NEXT)) == 0)
-		if (cursor->recno)
+		if (cursor->config_recno)
 			printf("\t%llu/%.*s\n",
 			    (unsigned long long)*(db_recno_t *)key->data,
 			    (int)value->size, (char *)value->data);
@@ -250,14 +316,8 @@ kvs_cursor_next(WT_CURSOR *wt_cursor)
 	value = &cursor->value;
 
 	if ((ret = dbc->get(dbc, key, value, DB_NEXT)) == 0)  {
-		if (cursor->recno)
-			wt_cursor->recno = *(db_recno_t *)key->data;
-		else {
-			wt_cursor->key.data = key->data;
-			wt_cursor->key.size = key->size;
-		}
-		wt_cursor->value.data = value->data;
-		wt_cursor->value.size = value->size;
+		copyout_key(wt_cursor);
+		copyout_value(wt_cursor);
 		return (0);
 	}
 
@@ -284,14 +344,8 @@ kvs_cursor_prev(WT_CURSOR *wt_cursor)
 	value = &cursor->value;
 
 	if ((ret = dbc->get(dbc, key, value, DB_PREV)) == 0)  {
-		if (cursor->recno)
-			wt_cursor->recno = *(db_recno_t *)key->data;
-		else {
-			wt_cursor->key.data = key->data;
-			wt_cursor->key.size = key->size;
-		}
-		wt_cursor->value.data = value->data;
-		wt_cursor->value.size = value->size;
+		copyout_key(wt_cursor);
+		copyout_value(wt_cursor);
 		return (0);
 	}
 
@@ -340,7 +394,6 @@ kvs_cursor_search(WT_CURSOR *wt_cursor)
 	DBC *dbc;
 	DBT *key, *value;
 	WT_SESSION *session;
-	db_recno_t recno;
 	int ret;
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
@@ -349,25 +402,12 @@ kvs_cursor_search(WT_CURSOR *wt_cursor)
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if (cursor->recno) {
-		if ((ret = recno_convert(wt_cursor, &recno)) != 0)
-			return (ret);
-		key->data = &recno;
-		key->size = sizeof(db_recno_t);
-	} else {
-		key->data = (char *)wt_cursor->key.data;
-		key->size = wt_cursor->key.size;
-	}
+	if ((ret = copyin_key(wt_cursor)) != 0)
+		return (ret);
 
 	if ((ret = dbc->get(dbc, key, value, DB_SET)) == 0) {
-		if (cursor->recno)
-			wt_cursor->recno = *(db_recno_t *)key->data;
-		else {
-			wt_cursor->key.data = key->data;
-			wt_cursor->key.size = key->size;
-		}
-		wt_cursor->value.data = value->data;
-		wt_cursor->value.size = value->size;
+		copyout_key(wt_cursor);
+		copyout_value(wt_cursor);
 		return (0);
 	}
 
@@ -385,10 +425,8 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 	DBC *dbc;
 	DBT *key, *value;
 	WT_SESSION *session;
-	db_recno_t recno;
+	uint32_t len;
 	int ret;
-
-	(void)exact;				/* Unused parameters */
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
 	session = cursor->session;
@@ -396,26 +434,47 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if (cursor->recno) {
-		if ((ret = recno_convert(wt_cursor, &recno)) != 0)
-			return (ret);
-		key->data = &recno;
-		key->size = sizeof(db_recno_t);
-	} else {
-		key->data = (char *)wt_cursor->key.data;
-		key->size = wt_cursor->key.size;
+	if ((ret = copyin_key(wt_cursor)) != 0)
+		return (ret);
+
+retry:	if ((ret = dbc->get(dbc, key, value, DB_SET_RANGE)) == 0) {
+		/*
+		 * WiredTiger returns the logically adjacent key (which might
+		 * be less than, equal to, or greater than the specified key),
+		 * Berkeley DB returns a key equal to or greater than the
+		 * specified key.  Check for an exact match, otherwise Berkeley
+		 * DB must have returned a larger key than the one specified.
+		 */
+		if (key->size == wt_cursor->key.size &&
+		    memcmp(key->data, wt_cursor->key.data, key->size) == 0)
+			*exact = 0;
+		else
+			*exact = 1;
+		copyout_key(wt_cursor);
+		copyout_value(wt_cursor);
+		return (0);
 	}
 
-	if ((ret = dbc->get(dbc, key, value, DB_SET_RANGE)) == 0) {
-		if (cursor->recno)
-			wt_cursor->recno = *(db_recno_t *)key->data;
-		else {
-			wt_cursor->key.data = key->data;
-			wt_cursor->key.size = key->size;
+	/*
+	 * Berkeley DB only returns keys equal to or greater than the specified
+	 * key, while WiredTiger returns adjacent keys, that is, if there's a
+	 * key smaller than the specified key, it's supposed to be returned.  In
+	 * other words, WiredTiger only fails if the store is empty.  Read the
+	 * last key in the store, and see if it's less than the specified key,
+	 * in which case we have the right key to return.  If it's not less than
+	 * the specified key, we're racing with some other thread, throw up our
+	 * hands and try again.
+	 */
+	if ((ret = dbc->get(dbc, key, value, DB_LAST)) == 0) {
+		len = key->size < wt_cursor->key.size ?
+		    key->size : wt_cursor->key.size;
+		if (memcmp(key->data, wt_cursor->key.data, len) < 0) {
+			*exact = -1;
+			copyout_key(wt_cursor);
+			copyout_value(wt_cursor);
+			return (0);
 		}
-		wt_cursor->value.data = value->data;
-		wt_cursor->value.size = value->size;
-		return (0);
+		goto retry;
 	}
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
@@ -433,7 +492,6 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	DBC *dbc;
 	DBT *key, *value;
 	WT_SESSION *session;
-	db_recno_t recno;
 	int ret;
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
@@ -443,19 +501,11 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if (cursor->recno) {
-		if ((ret = recno_convert(wt_cursor, &recno)) != 0)
-			return (ret);
-		key->data = &recno;
-		key->size = sizeof(db_recno_t);
-	} else {
-		key->data = (char *)wt_cursor->key.data;
-		key->size = wt_cursor->key.size;
-	}
-	value->data = (char *)wt_cursor->value.data;
-	value->size = wt_cursor->value.size;
+	if ((ret = copyin_key(wt_cursor)) != 0)
+		return (ret);
+	copyin_value(wt_cursor);
 
-	if (cursor->append) {
+	if (cursor->config_append) {
 		/*
 		 * Berkeley DB cursors have no operation to append/create a
 		 * new record and set the cursor; use the DB handle instead
@@ -476,7 +526,7 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 			    session, "DbCursor.get: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
-	} else if (cursor->overwrite) {
+	} else if (cursor->config_overwrite) {
 		if ((ret = dbc->put(dbc, key, value, DB_KEYFIRST)) != 0) {
 			(void)session->msg_printf(
 			    session, "DbCursor.put: %s", db_strerror(ret));
@@ -496,7 +546,6 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 			    session, "Db.put: %s", db_strerror(ret));
 			return (WT_ERROR);
 		}
-
 		if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0) {
 			(void)session->msg_printf(
 			    session, "DbCursor.get: %s", db_strerror(ret));
@@ -514,7 +563,6 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 	DBC *dbc;
 	DBT *key, *value;
 	WT_SESSION *session;
-	db_recno_t recno;
 	int ret;
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
@@ -523,17 +571,9 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if (cursor->recno) {
-		if ((ret = recno_convert(wt_cursor, &recno)) != 0)
-			return (ret);
-		key->data = &recno;
-		key->size = sizeof(db_recno_t);
-	} else {
-		key->data = (char *)wt_cursor->key.data;
-		key->size = wt_cursor->key.size;
-	}
-	value->data = (char *)wt_cursor->value.data;
-	value->size = wt_cursor->value.size;
+	if ((ret = copyin_key(wt_cursor)) != 0)
+		return (ret);
+	copyin_value(wt_cursor);
 
 	if ((ret = dbc->put(dbc, key, value, DB_KEYFIRST)) != 0) {
 		(void)session->msg_printf(
@@ -551,7 +591,6 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 	DBC *dbc;
 	DBT *key, *value;
 	WT_SESSION *session;
-	db_recno_t recno;
 	int ret;
 
 	cursor = (CURSOR_SOURCE *)wt_cursor;
@@ -560,15 +599,8 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if (cursor->recno) {
-		if ((ret = recno_convert(wt_cursor, &recno)) != 0)
-			return (ret);
-		key->data = &recno;
-		key->size = sizeof(db_recno_t);
-	} else {
-		key->data = (char *)wt_cursor->key.data;
-		key->size = wt_cursor->key.size;
-	}
+	if ((ret = copyin_key(wt_cursor)) != 0)
+		return (ret);
 
 	if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0) {
 		if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
@@ -735,11 +767,11 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	cursor->dsrc = dsrc;
 						/* Parse configuration */
 /*! [Data-source: open_cursor configuration] */
-	cfg_parse_bool(cfg, "append", &cursor->append);
-	cfg_parse_bool(cfg, "overwrite", &cursor->overwrite);
+	cfg_parse_bool(cfg, "append", &cursor->config_append);
+	cfg_parse_bool(cfg, "overwrite", &cursor->config_overwrite);
 	if ((ret = cfg_parse_str(session, cfg, "key_format", &key_format)) != 0)
 		goto err;
-	cursor->recno = strcmp(key_format, "r") == 0;
+	cursor->config_recno = strcmp(key_format, "r") == 0;
 	free(key_format);
 /*! [Data-source: open_cursor configuration] */
 
@@ -752,8 +784,8 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		goto err;
 	}
 	db = cursor->db;
-	if ((tret = db->open(db, NULL, name,
-	    NULL, cursor->recno ? DB_RECNO : DB_BTREE, DB_CREATE, 0)) != 0) {
+	if ((tret = db->open(db, NULL, name, NULL,
+	    cursor->config_recno ? DB_RECNO : DB_BTREE, DB_CREATE, 0)) != 0) {
 		(void)session->msg_printf(
 		    session, "Db.open: %s", db_strerror(tret));
 		ret = WT_ERROR;
