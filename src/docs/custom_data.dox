@@ -165,6 +165,12 @@ might check for the configuration strings as follows:
 
 @snippet kvs_bdb.c Data-source: open_cursor configuration
 
+@section custom_data_source_cursor_collator WT_COLLATOR
+
+Custom data sources do not support custom ordering of records, and
+attempting to create a custom data source with a collator configured
+will fail.
+
 @section custom_data_source_cursor_serialize Serialization
 
 WiredTiger does not serialize calls to the WT_DATA_SOURCE methods or to
