@@ -926,7 +926,7 @@ kvsbdb_init(WT_CONNECTION *conn, const char *dir)
 	ds.dsrc.truncate = kvs_truncate;
 	ds.dsrc.verify = kvs_verify;
 	if ((ret =
-	    conn->add_data_source(conn, "kvs:", &ds.dsrc, NULL)) != 0)
+	    conn->add_data_source(conn, "kvsbdb:", &ds.dsrc, NULL)) != 0)
 		die(ret, "WT_CONNECTION.add_data_source");
 }
 
