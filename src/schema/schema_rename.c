@@ -228,18 +228,18 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	WT_RET(__wt_schema_name_check(session, uri));
 	WT_RET(__wt_schema_name_check(session, newuri));
 
-	/*
-	 * We track rename operations, if we fail in the middle, we want to
-	 * back it all out.
-	 */
-	WT_RET(__wt_meta_track_on(session));
-
 	/* The target type must match the source type. */
 	for (p = uri, t = newuri; *p == *t && *p != ':'; ++p, ++t)
 		;
 	if (*p != ':' || *t != ':')
 		WT_RET_MSG(session, EINVAL,
 		    "rename target type must match URI: %s to %s", uri, newuri);
+
+	/*
+	 * We track rename operations, if we fail in the middle, we want to
+	 * back it all out.
+	 */
+	WT_RET(__wt_meta_track_on(session));
 
 	if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __rename_file(session, uri, newuri);
