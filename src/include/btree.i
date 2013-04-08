@@ -451,9 +451,10 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			page->ref->state = WT_REF_MEM;
 			return (ret);
 		}
+		__wt_evict_list_clr_page(session, page);
 		if ((ret = __wt_evict_page(session, page)) == EBUSY)
-                        ret = 0;
-                return (ret);
+			ret = 0;
+		return (ret);
 	}
 
 	return (__wt_hazard_clear(session, page));

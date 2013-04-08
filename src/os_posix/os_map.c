@@ -45,14 +45,44 @@ __wt_mmap_read(WT_SESSION_IMPL *session, void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to 4096 bytes */
+	WT_BM *bm = S2BT(session)->bm;
 	WT_DECL_RET;
 	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)4095);
 	size += WT_PTRDIFF(p, blk);
 
+	/* XXX proxy for "am I doing a scan?" -- manual read-ahead */
+	if (F_ISSET(session, WT_SESSION_NO_CACHE)) {
+		/* Read in 2MB blocks every 1MB of data. */
+		if (((uintptr_t)((uint8_t *)blk + size) &
+		    (uintptr_t)((1<<20) - 1)) < (uintptr_t)blk)
+			return (0);
+		size = WT_MIN(WT_MAX(20 * size, 2 << 20),
+		    WT_PTRDIFF((uint8_t *)bm->map + bm->maplen, blk));
+	}
+
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
-		WT_RET_MSG(session, ret, "posix_madvise");
+		WT_RET_MSG(session, ret, "posix_madvise will need");
 #endif
 
+	return (0);
+}
+
+/*
+ * __wt_mmap_read --
+ *	Cause a section of a memory map to be faulted in.
+ */
+int
+__wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
+{
+#ifdef HAVE_POSIX_MADVISE
+	/* Linux requires the address be aligned to 4096 bytes */
+	WT_DECL_RET;
+	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)4095);
+	size += WT_PTRDIFF(p, blk);
+
+	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)
+		WT_RET_MSG(session, ret, "posix_madvise don't need");
+#endif
 	return (0);
 }
 

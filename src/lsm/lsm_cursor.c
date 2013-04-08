@@ -195,7 +195,7 @@ __clsm_open_cursors(
 			    chunk->uri, &clsm->iface, NULL, cp);
 		WT_ERR(ret);
 
-#ifdef HAVE_POSIX_MADVISE
+#if 0 && defined(HAVE_POSIX_MADVISE)
 		{
 		WT_BM *bm = ((WT_CURSOR_BTREE *)*cp)->btree->bm;
 

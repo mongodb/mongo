@@ -73,7 +73,11 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	}
 
 	/* Free any allocated disk image. */
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC))
+	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC)) {
+		if (page->dsk != NULL)
+			__wt_mmap_discard(
+			    session, page->dsk, page->dsk->mem_size);
+	} else
 		__wt_free(session, page->dsk);
 
 	__wt_overwrite_and_free(session, page);

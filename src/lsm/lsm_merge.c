@@ -72,7 +72,7 @@ __wt_lsm_merge(
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
-	WT_LSM_CHUNK *chunk;
+	WT_LSM_CHUNK *chunk, *youngest;
 	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
 	    "bulk,raw");
 	const char *rand_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
@@ -130,6 +130,7 @@ __wt_lsm_merge(
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
+		youngest = lsm_tree->chunk[end_chunk];
 		nchunks = (end_chunk - start_chunk) + 1;
 
 		/* If the chunk is already involved in a merge, stop. */
@@ -137,8 +138,7 @@ __wt_lsm_merge(
 			break;
 
 		/* Don't merge across more than 2 generations. */
-		if (chunk->generation >=
-		    lsm_tree->chunk[end_chunk]->generation + 2)
+		if (chunk->generation >= youngest->generation + 2)
 			break;
 
 		/*
@@ -153,8 +153,8 @@ __wt_lsm_merge(
 		 * are multiple threads.  If there is a single thread, wait for
 		 * 30 seconds looking for small merges before trying a big one.
 		 */
-		if (id == 0 && nchunks > 0 && chunk->generation !=
-		    lsm_tree->chunk[end_chunk]->generation &&
+		if (id == 0 && nchunks > 0 &&
+		    chunk->generation > youngest->generation &&
 		    (lsm_tree->merge_threads > 1 || stalls < 30))
 			break;
 
@@ -163,17 +163,17 @@ __wt_lsm_merge(
 		--start_chunk;
 
 		if (nchunks == max_chunks) {
-			F_CLR(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_MERGING);
-			record_count -= lsm_tree->chunk[end_chunk--]->count;
+			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
+			record_count -= youngest->count;
+			--end_chunk;
 		}
 	}
 
 	nchunks = (end_chunk - start_chunk) + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
-	/* Don't do small merges unless we have waited for 2s. */
-	if (nchunks <= 1 ||
-	    (id == 0 && stalls < 2 && nchunks < max_chunks / 2)) {
+	/* Don't do small merges. */
+	if (nchunks <= 1 || (id == 0 && nchunks < max_chunks / 2)) {
 		for (i = 0; i < nchunks; i++)
 			F_CLR(lsm_tree->chunk[start_chunk + i],
 			    WT_LSM_CHUNK_MERGING);
@@ -286,7 +286,7 @@ __wt_lsm_merge(
 	 * stall and block each other reading them in.
 	 */
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, rand_cfg, &dest));
-	for (r = 0; ret == 0 && r < 1 + (insert_count >> 20); r++)
+	for (r = 0; ret == 0 && r < 100 + (insert_count >> 16); r++)
 		WT_TRET(dest->next(dest));
 	WT_TRET(dest->close(dest));
 	dest = NULL;
