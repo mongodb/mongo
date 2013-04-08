@@ -190,26 +190,6 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		page = top;
 
 	/*
-	 * Find the first slot in the eviction queue that doesn't already
-	 * contain a forced eviction candidate. There is a possibility that
-	 * we will race here, and another forced candidate will be added to
-	 * the slot we have chosen. That's OK, the winner will replace the
-	 * prior candidate in the queue and it's WT_REF_EVICT_FORCE state will
-	 * be reset to WT_REF_MEM.
-	 */
-	for (candidate = cache->evict;
-	    candidate < cache->evict + cache->evict_entries &&
-	    candidate->page != NULL &&
-	    candidate->page->ref->state == WT_REF_EVICT_FORCE;
-	    candidate++) {}
-	/*
-	 * Nothing to do if the eviction list is already full of forced
-	 * eviction candidates.
-	 */
-	if (candidate == cache->evict + cache->evict_entries)
-		return;
-
-	/*
 	 * Try to lock the page.  If this succeeds, we're going to queue
 	 * it for forced eviction.  We don't go right to the EVICT_FORCED
 	 * state, because that is cleared by __wt_evict_list_clr_page.
@@ -221,6 +201,31 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_evict_list_clr_page(session, page);
 
 	__wt_spin_lock(session, &cache->evict_lock);
+
+	/*
+	 * Find the first slot in the eviction queue that doesn't already
+	 * contain a forced eviction candidate. There is a possibility that
+	 * we will race here, and another forced candidate will be added to
+	 * the slot we have chosen. That's OK, the winner will replace the
+	 * prior candidate in the queue and it's WT_REF_EVICT_FORCE state will
+	 * be reset to WT_REF_MEM.
+	 */
+	for (candidate = cache->evict;
+	    candidate < cache->evict + cache->evict_entries &&
+	    candidate->page != NULL &&
+	    candidate->page->ref->state == WT_REF_EVICT_FORCE;
+	    candidate++)
+		;
+
+	/*
+	 * Nothing to do if the eviction list is already full of forced
+	 * eviction candidates.
+	 */
+	if (candidate == cache->evict + cache->evict_entries) {
+		page->ref->state = WT_REF_MEM;
+		__wt_spin_unlock(session, &cache->evict_lock);
+		return;
+	}
 
 	/* Add the page to the eviction queue. */
 	__evict_init_candidate(session, candidate, page);
@@ -462,6 +467,7 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 	uint32_t curr_entry, force_entries;
 
 	cache = S2C(session)->cache;
+
 	/*
 	 * Short circuit if there are no forced entries. If the count drops to
 	 * zero between this test and acquiring the lock - we'll do a small
@@ -471,6 +477,11 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 		return (0);
 
 	__wt_spin_lock(session, &cache->evict_lock);
+
+	if (cache->force_entries == 0) {
+		__wt_spin_unlock(session, &cache->evict_lock);
+		return (0);
+	}
 
 	/*
 	 * Try to evict any pages marked as forced. Gather the set of
@@ -493,11 +504,7 @@ __evict_forced_pages(WT_SESSION_IMPL *session)
 		if (!WT_ATOMIC_CAS(candidate->page->ref->state,
 		    WT_REF_EVICT_FORCE, WT_REF_LOCKED))
 			continue;
-		force_candidates[force_entries].btree =
-		    candidate->btree;
-		force_candidates[force_entries].page =
-		    candidate->page;
-		force_entries++;
+		force_candidates[force_entries++] = *candidate;
 		__evict_list_clr(session, candidate);
 	}
 	WT_ASSERT(session,

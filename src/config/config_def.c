@@ -442,7 +442,7 @@ __wt_confchk_statistics_log_subconfigs[] = {
 	{ "path", "string", NULL, NULL },
 	{ "sources", "list", NULL, NULL },
 	{ "timestamp", "string", NULL, NULL },
-	{ "wait", "int", "min=5,max=100000", NULL },
+	{ "wait", "int", "min=1,max=100000", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 

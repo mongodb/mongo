@@ -1331,7 +1331,7 @@ struct __wt_connection {
  * \c "%b %d %H:%M:%S".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
  * between each write of the log records; setting this value configures \c
- * statistics and statistics logging., an integer between 5 and 100000; default
+ * statistics and statistics logging., an integer between 1 and 100000; default
  * \c 0.}
  * @config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
