@@ -62,6 +62,10 @@ __wt_mmap_read(WT_SESSION_IMPL *session, void *p, size_t size)
 
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
 		WT_RET_MSG(session, ret, "posix_madvise will need");
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(p);
+	WT_UNUSED(size);
 #endif
 
 	return (0);
@@ -82,6 +86,10 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
 
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)
 		WT_RET_MSG(session, ret, "posix_madvise don't need");
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(p);
+	WT_UNUSED(size);
 #endif
 	return (0);
 }
