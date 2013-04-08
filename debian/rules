@@ -24,7 +24,7 @@ build-stamp: configure-stamp
 	dh_testdir
 
         # Add here commands to compile the package.
-	scons 
+	scons --sharedclient
         #docbook-to-man debian/mongodb.sgml > mongodb.1
 	ls debian/*.1 > debian/mongodb.manpages
 
@@ -64,7 +64,7 @@ install: build
 	dh_prep
 	dh_installdirs
 
-	scons --prefix=$(CURDIR)/debian/mongodb/usr install
+	scons --sharedclient --prefix=$(CURDIR)/debian/mongodb/usr install
 	mkdir -p $(CURDIR)/debian/mongodb/etc
 	cp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/mongodb/etc/mongodb.conf 
 
