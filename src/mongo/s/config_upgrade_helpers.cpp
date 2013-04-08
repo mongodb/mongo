@@ -247,8 +247,10 @@ namespace mongo {
 
         Timer t;
         int64_t docCount = 0;
-        const int32_t maxBatchSize = BSONObjMaxUserSize / 2;
+        const int32_t maxBatchSize = BSONObjMaxUserSize / 16;
         try {
+            log() << "About to copy " << fromNS << " to " << toNS << endl;
+
             ScopedDbConnection& conn = *connPtr;
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(fromNS, BSONObj())));
 
@@ -256,7 +258,7 @@ namespace mongo {
             int32_t insertSize = 0;
             while (cursor->more()) {
 
-                BSONObj next = cursor->nextSafe();
+                BSONObj next = cursor->nextSafe().getOwned();
                 ++docCount;
 
                 if (insertSize + next.objsize() > maxBatchSize ) {
@@ -269,10 +271,10 @@ namespace mongo {
                 insertBatch.push_back(next);
                 insertSize += next.objsize();
 
-                if (t.seconds() > 10) {
+                if (t.seconds() >= 10) {
                     t.reset();
                     log() << "Copied " << docCount << " documents so far from "
-                          << fromNS << " to " << toNS;
+                          << fromNS << " to " << toNS << endl;
                 }
             }
 
@@ -280,6 +282,10 @@ namespace mongo {
                 conn->insert(toNS, insertBatch);
                 _checkGLE(conn);
             }
+
+            log() << "Finished copying " << docCount << " documents from "
+                  << fromNS << " to " << toNS << endl;
+
         }
         catch (const DBException& e) {
             return e.toStatus("could not copy data into new collection");
