@@ -63,10 +63,7 @@ __wt_config_check(WT_SESSION_IMPL *session,
 		else if (strcmp(checks[i].type, "list") == 0)
 			badtype = (v.len > 0 && v.type != ITEM_STRUCT);
 		else if (strcmp(checks[i].type, "category") == 0) {
-			/*
-			 * Deal with categories that could are of the form:
-			 * XXX=(XXX=blah)
-			 */
+			/* Deal with categories of the form: XXX=(XXX=blah). */
 			ret = __wt_config_check(session,
 			    checks[i].subconfigs,
 			    k.str + strlen(checks[i].name) + 1, v.len);
