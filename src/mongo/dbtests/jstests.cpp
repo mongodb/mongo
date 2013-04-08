@@ -1145,7 +1145,7 @@ namespace JSTests {
         class Timestamp : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendTimestamp( "a", (unsigned long long) 20000, 5 );
+                b.appendTimestamp( "a", 20000ULL, 5 );
                 return b.obj();
             }
             virtual string json() const {
