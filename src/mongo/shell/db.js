@@ -178,11 +178,15 @@ DB.prototype.auth = function( username , pass ){
 */
 DB.prototype.createCollection = function(name, opt) {
     var options = opt || {};
-    var cmd = { create: name, capped: options.capped, size: options.size };
+    var cmd = { create: name };
     if (options.max != undefined)
         cmd.max = options.max;
     if (options.autoIndexId != undefined)
         cmd.autoIndexId = options.autoIndexId;
+    if (options.capped != undefined)
+        cmd.capped = options.capped;
+    if (options.size != undefined)
+        cmd.size = options.size;
     var res = this._dbCommand(cmd);
     return res;
 }
