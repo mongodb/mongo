@@ -32,7 +32,7 @@ namespace mongo {
 
         verify(0 == descriptor->version() || 1 == descriptor->version());
         _interface = BtreeInterface::interfaces[descriptor->version()];
-   }
+    }
 
     // Find the keys for obj, put them in the tree pointing to loc
     Status BtreeBasedAccessMethod::insert(const BSONObj& obj, const DiskLoc& loc,
