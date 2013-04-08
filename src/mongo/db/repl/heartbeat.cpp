@@ -73,7 +73,7 @@ namespace mongo {
 
             MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
                 const BSONObj& data = delay.getData();
-                sleep(data["delay"].numberInt());
+                sleepsecs(data["delay"].numberInt());
             }
 
             /* we don't call ReplSetCommand::check() here because heartbeat
