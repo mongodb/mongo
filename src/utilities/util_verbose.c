@@ -49,7 +49,9 @@ __handle_progress_verbose(
 static WT_EVENT_HANDLER __event_handler_verbose = {
 	__handle_error_verbose,
 	__handle_message_verbose,
-	__handle_progress_verbose
+	__handle_progress_verbose,
+	NULL	/* Close handler. */
+
 };
 
 WT_EVENT_HANDLER *verbose_handler = &__event_handler_verbose;

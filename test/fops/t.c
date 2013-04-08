@@ -141,7 +141,8 @@ wt_startup(char *config_open)
 	static WT_EVENT_HANDLER event_handler = {
 		handle_error,
 		handle_message,
-		NULL
+		NULL,
+		NULL	/* Close handler. */
 	};
 	int ret;
 	char config_buf[128];

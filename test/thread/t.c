@@ -152,7 +152,8 @@ wt_connect(char *config_open)
 	static WT_EVENT_HANDLER event_handler = {
 		handle_error,
 		handle_message,
-		NULL
+		NULL,
+		NULL	/* Close handler. */
 	};
 	int ret;
 	char config[128];

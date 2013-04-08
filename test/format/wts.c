@@ -55,7 +55,8 @@ handle_progress(
 static WT_EVENT_HANDLER event_handler = {
 	NULL,
 	handle_message,
-	handle_progress
+	handle_progress,
+	NULL	/* Close handler. */
 };
 
 void

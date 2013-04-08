@@ -50,7 +50,8 @@ __handle_progress_default(
 static WT_EVENT_HANDLER __event_handler_default = {
 	__handle_error_default,
 	__handle_message_default,
-	__handle_progress_default
+	__handle_progress_default,
+	NULL	/* Default close handler. */
 };
 
 /*

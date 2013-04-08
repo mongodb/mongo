@@ -61,7 +61,8 @@ static void usage(void);
 static WT_EVENT_HANDLER event_handler = {
 	NULL,
 	handle_message,
-	NULL
+	NULL,
+	NULL	/* Close handler. */
 };
 
 int

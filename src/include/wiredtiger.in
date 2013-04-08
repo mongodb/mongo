@@ -1415,6 +1415,20 @@ struct __wt_event_handler {
 	 */
 	int (*handle_progress)(WT_EVENT_HANDLER *handler,
 	    const char *operation, uint64_t progress);
+
+	/*!
+	 * Callback to handle automatic close of a WiredTiger handle.
+	 *
+	 * Close handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
+	 *
+	 * @param session The handle that is being closed
+	 * @param cursor The cursor handle that is being closed, or NULL if
+	 * it is a session handle being closed.
+	 */
+	int (*handle_close)(WT_EVENT_HANDLER *handler,
+	    WT_SESSION *session, WT_CURSOR *cursor);
 };
 
 /*! @name Data packing and unpacking
