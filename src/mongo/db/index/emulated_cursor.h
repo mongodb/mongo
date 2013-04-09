@@ -24,8 +24,12 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
+
+    static const string SPHERE_2D_NAME = "2dsphere";
+    static const string HASH_NAME = "hashed";
 
     /**
      * This class is a crutch to help migrate from the old everything-is-a-Cursor world to the new
@@ -35,6 +39,7 @@ namespace mongo {
     class EmulatedCursor : public Cursor {
     public:
         /**
+         * Create a new EmulatedCursor.
          * Takes ownership of the provided indexAccessMethod indexCursor.
          * Takes ownership of the IndexDescriptor inside the indexAccessMethod.
          */
@@ -72,12 +77,12 @@ namespace mongo {
         }
 
         virtual void noteLocation() {
-            verify(_supportYields);
+            verify(_supportYields || _supportGetMore);
             _indexCursor->savePosition();
         }
 
         virtual void checkLocation() {
-            verify(_supportYields);
+            verify(_supportYields || _supportGetMore);
             _indexCursor->restorePosition();
             // Somebody might have inserted a multikey during a yield.
             checkMultiKeyProperties();
@@ -88,7 +93,11 @@ namespace mongo {
             return _matcher.get();
         }
 
-        // XXX: this is true for everything but '2d'.
+        virtual BSONObj indexKeyPattern() {
+            return _descriptor->keyPattern();
+        }
+
+        // XXX: I think this is true for everything.
         virtual bool supportGetMore() { return _supportGetMore; }
 
         // XXX: this is true for everything but '2d'.
@@ -106,34 +115,18 @@ namespace mongo {
 
         virtual bool getsetdup(DiskLoc loc) {
             if (_shouldGetSetDup) {
-                pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
+                pair<unordered_set<DiskLoc, DiskLoc::Hasher>::iterator, bool> p = _dups.insert(loc);
                 return !p.second;
             } else {
                 return false;
             }
         }
 
-    private:
-        void seek(const BSONObj& query) {
-            _indexCursor->seek(query);
-
-            if (!_indexCursor->isEOF()) {
-                _nscanned = 1;
-            } else {
-                _nscanned = 0;
-            }
-
-            if ("hashed" == _pluginName) {
-                // Quoted from hashindex.cpp:
-                // Force a match of the query against the actual document by giving
-                // the cursor a matcher with an empty indexKeyPattern.  This ensures the
-                // index is not used as a covered index.
-                // NOTE: this forcing is necessary due to potential hash collisions
-                _matcher = shared_ptr<CoveredIndexMatcher>(
-                    new CoveredIndexMatcher(query, BSONObj()));
-            }
+        virtual void aboutToDeleteBucket(const DiskLoc& b) {
+            _indexCursor->aboutToDeleteBucket(b);
         }
 
+    private:
         EmulatedCursor(IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod,
                        const BSONObj& order, int numWanted, const BSONObj& keyPattern)
             : _descriptor(descriptor), _indexAccessMethod(indexAccessMethod),
@@ -143,24 +136,75 @@ namespace mongo {
             indexAccessMethod->newCursor(&cursor);
             _indexCursor.reset(cursor);
 
-            if ("hashed" == _pluginName) {
+            if (HASH_NAME == _pluginName) {
                 _supportYields = true;
                 _supportGetMore = true;
                 _modifiedKeys = true;
+                _shouldGetSetDup = false;
+            } else if (SPHERE_2D_NAME == _pluginName) {
+                _supportYields = true;
+                _supportGetMore = true;
+                _modifiedKeys = true;
+                // XXX: this duplicates the de-duplication in near cursors.  maybe fix near cursors
+                // to not de-dup themselves.
+                _shouldGetSetDup = true;
             } else {
                 verify(0);
             }
 
+            // _isMultiKey and _shouldGetSetDup are set in this.
             checkMultiKeyProperties();
         }
 
-        void checkMultiKeyProperties() {
-            if ("hashed" == _pluginName) {
-                _shouldGetSetDup = _descriptor->isMultikey();
+        void seek(const BSONObj& query) {
+            Status seekStatus = _indexCursor->seek(query);
+
+            // Our seek could be malformed.  Code above us expects an exception if so.
+            if (Status::OK() != seekStatus) {
+                uasserted(seekStatus.location(), seekStatus.reason());
+            }
+
+            if (!_indexCursor->isEOF()) {
+                _nscanned = 1;
+            } else {
+                _nscanned = 0;
+            }
+
+            if (HASH_NAME == _pluginName) {
+                // Quoted from hashindex.cpp:
+                // Force a match of the query against the actual document by giving
+                // the cursor a matcher with an empty indexKeyPattern.  This ensures the
+                // index is not used as a covered index.
+                // NOTE: this forcing is necessary due to potential hash collisions
+                _matcher = shared_ptr<CoveredIndexMatcher>(
+                    new CoveredIndexMatcher(query, BSONObj()));
+            } else if (SPHERE_2D_NAME == _pluginName) {
+                // Technically, the non-geo indexed fields are in the key, though perhaps not in the
+                // exact format the matcher expects (arrays).  So, we match against all non-geo
+                // fields.  This could possibly be relaxed in some fashion in the future?  Requires
+                // query work.
+                BSONObjBuilder fieldsToNuke;
+                BSONObjIterator keyIt(_keyPattern);
+
+                while (keyIt.more()) {
+                    BSONElement e = keyIt.next();
+                    if (e.type() == String && SPHERE_2D_NAME == e.valuestr()) {
+                        fieldsToNuke.append(e.fieldName(), "");
+                    }
+                }
+
+                BSONObj filteredQuery = query.filterFieldsUndotted(fieldsToNuke.obj(), false);
+
+                _matcher = shared_ptr<CoveredIndexMatcher>(
+                    new CoveredIndexMatcher(filteredQuery, _keyPattern));
             }
         }
 
-        set<DiskLoc> _dups;
+        void checkMultiKeyProperties() {
+            _isMultiKey = _shouldGetSetDup = _descriptor->isMultikey();
+        }
+
+        unordered_set<DiskLoc, DiskLoc::Hasher> _dups;
 
         scoped_ptr<IndexDescriptor> _descriptor;
         scoped_ptr<IndexAccessMethod> _indexAccessMethod;

@@ -18,7 +18,6 @@
 
 #include <vector>
 
-#include "mongo/bson/ordering.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index/btree_interface.h"

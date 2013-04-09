@@ -54,6 +54,8 @@ namespace mongo {
         Status savePosition();
         Status restorePosition();
 
+        void aboutToDeleteBucket(const DiskLoc& bucket);
+
     private:
         string _hashedField;
         scoped_ptr<BtreeCursor> _oldCursor;

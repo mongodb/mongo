@@ -18,6 +18,7 @@
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/keypattern.h"
 
 namespace mongo {
@@ -34,13 +35,15 @@ namespace mongo {
 
         static bool isIndexMigrated(const BSONObj& keyPattern) {
             string type = KeyPattern::findPluginName(keyPattern);
-            return "hashed" == type;
+            return "hashed" == type || "2dsphere" == type;
         }
 
         static IndexAccessMethod* getSpecialIndex(IndexDescriptor* desc) {
             string type = KeyPattern::findPluginName(desc->keyPattern());
             if ("hashed" == type) {
                 return new HashAccessMethod(desc);
+            } else if ("2dsphere" == type) {
+                return new S2AccessMethod(desc);
             } else {
                 verify(0);
                 return NULL;

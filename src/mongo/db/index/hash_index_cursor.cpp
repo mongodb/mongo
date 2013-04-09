@@ -111,4 +111,8 @@ namespace mongo {
     Status HashIndexCursor::savePosition() { _oldCursor->noteLocation(); return Status::OK(); }
     Status HashIndexCursor::restorePosition() { _oldCursor->checkLocation(); return Status::OK(); }
 
+    void HashIndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
+        _oldCursor->aboutToDeleteBucket(bucket);
+    }
+
 }  // namespace mongo
