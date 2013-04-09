@@ -789,6 +789,7 @@ EXCLUDE_SYMBOLS        = __F
 # the \include command).
 
 EXAMPLE_PATH           = ../../examples/c \
+			 ../../ext/compressors/nop \
 			 ../../test/format
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 

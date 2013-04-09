@@ -1052,13 +1052,21 @@ extern void __wt_errx(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern int __wt_verrx(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
+extern int __wt_api_err_printf(WT_SESSION *wt_session,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
+    2,
+    3)));
 extern int __wt_msg(WT_SESSION_IMPL *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern int __wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
+extern int __wt_api_msg_printf(WT_SESSION *wt_session,
+    const char *fmt,
+    ...) WT_GCC_ATTRIBUTE((format (printf,
+    2,
+    3)));
 extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v);
 extern int __wt_verbose(WT_SESSION_IMPL *session,
     const char *fmt,

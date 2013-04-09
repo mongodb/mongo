@@ -51,8 +51,6 @@ bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, u_int,
 static WT_COMPRESSOR bzip2_compressor = {
     bzip2_compress, NULL, bzip2_decompress, NULL };
 
-#define	__UNUSED(v)	((void)(v))
-
 /* between 0-4: set the amount of verbosity to stderr */
 static int bz_verbosity = 0;
 
@@ -74,7 +72,7 @@ wiredtiger_extension_init(
 {
 	WT_CONNECTION *conn;
 
-	__UNUSED(config);
+	(void)config;					/* Unused */
 
 	wt_api = api;
 	conn = session->connection;
@@ -156,7 +154,7 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	bz_stream bz;
 	int ret;
 
-	__UNUSED(compressor);
+	(void)compressor;				/* Unused */
 
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;
@@ -217,10 +215,10 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	uint32_t take, twenty_pct;
 	int compression_failed, ret;
 
-	__UNUSED(page_max);
-	__UNUSED(split_pct);
-	__UNUSED(extra);
-	__UNUSED(final);
+	(void)page_max;					/* Unused */
+	(void)split_pct;
+	(void)extra;
+	(void)final;
 
 	/*
 	 * This function is used by the test/format utility to test the
@@ -286,7 +284,7 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	bz_stream bz;
 	int ret, tret;
 
-	__UNUSED(compressor);
+	(void)compressor;				/* Unused */
 
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;

@@ -1,4 +1,5 @@
 LDADD = $(top_builddir)/libwiredtiger.la
+AM_CPPFLAGS = -I$(top_srcdir)/src/include
 
 noinst_PROGRAMS = \
 	ex_access \

@@ -716,23 +716,6 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
- * __session_msg_printf --
- *	WT_SESSION->msg_printf method.
- */
-static int
-__session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
-{
-	WT_DECL_RET;
-	va_list ap;
-
-	va_start(ap, fmt);
-	ret = __wt_vmsg((WT_SESSION_IMPL *)wt_session, fmt, ap);
-	va_end(ap);
-
-	return (ret);
-}
-
-/*
  * __wt_open_session --
  *	Allocate a session handle.  The internal parameter is used for sessions
  *	opened by WiredTiger for its own use.
@@ -758,8 +741,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_begin_transaction,
 		__session_commit_transaction,
 		__session_rollback_transaction,
-		__session_checkpoint,
-		__session_msg_printf
+		__session_checkpoint
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;

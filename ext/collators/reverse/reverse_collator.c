@@ -31,16 +31,14 @@
 
 WT_EXTENSION_API *wt_api;
 
-#define	__UNUSED(v)     ((void)(v))
-
 static int
 collate_reverse(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *k1, const WT_ITEM *k2, int *cmp)
 {
 	size_t len;
 
-	__UNUSED(collator);
-	__UNUSED(session);
+	(void)collator;					/* Unused */
+	(void)session;
 
 	len = (k1->size < k2->size) ? k1->size : k2->size;
 	if ((*cmp = memcmp(k2->data, k1->data, len)) == 0)
@@ -56,7 +54,7 @@ wiredtiger_extension_init(
 {
 	WT_CONNECTION *conn;
 
-	__UNUSED(config);
+	(void)config;					/* Unused */
 
 	wt_api = api;
 	conn = session->connection;

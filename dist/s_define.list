@@ -25,6 +25,7 @@ __F
 __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
 wiredtiger_err_printf
+wiredtiger_msg_printf
 wiredtiger_scr_alloc
 wiredtiger_scr_free
 

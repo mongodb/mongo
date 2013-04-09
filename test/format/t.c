@@ -28,6 +28,7 @@
 #include "format.h"
 
 GLOBAL g;
+WT_EXTENSION_API *wt_api;
 
 static void onint(int);
 static void startup(void);

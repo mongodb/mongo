@@ -46,15 +46,13 @@ wt_snappy_pre_size(WT_COMPRESSOR *, WT_SESSION *, uint8_t *, size_t, size_t *);
 static WT_COMPRESSOR wt_snappy_compressor = {
     wt_snappy_compress, NULL, wt_snappy_decompress, wt_snappy_pre_size };
 
-#define	__UNUSED(v)	((void)(v))
-
 int
 wiredtiger_extension_init(
     WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
 {
 	WT_CONNECTION *conn;
 
-	__UNUSED(config);
+	(void)config;					/* Unused */
 
 	wt_api = api;
 	conn = session->connection;
@@ -100,7 +98,7 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	size_t snaplen;
 	char *snapbuf;
 
-	__UNUSED(compressor);
+	(void)compressor;				/* Unused */
 
 	/*
 	 * dst_len was computed in wt_snappy_pre_size, so we know it's big
@@ -141,7 +139,7 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	snappy_status snret;
 	size_t snaplen;
 
-	__UNUSED(compressor);
+	(void)compressor;				/* Unused */
 
 	/* retrieve the saved length */
 	snaplen = *(size_t *)src;
@@ -169,9 +167,9 @@ wt_snappy_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     size_t *result_lenp)
 {
-	__UNUSED(compressor);
-	__UNUSED(session);
-	__UNUSED(src);
+	(void)compressor;				/* Unused */
+	(void)session;
+	(void)src;
 
 	/*
 	 * Snappy requires the dest buffer be somewhat larger than the source.

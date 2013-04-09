@@ -44,6 +44,7 @@
 #include "build_unix/db.h"
 #endif
 #include <wiredtiger.h>
+#include <wiredtiger_ext.h>
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
 #define	BZIP_PATH							\

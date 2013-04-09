@@ -43,6 +43,12 @@
 
 #include <wiredtiger.h>
 
+/*! [Declare WT_EXTENSION_API] */
+#include <wiredtiger_ext.h>
+
+WT_EXTENSION_API *wt_api;
+/*! [Declare WT_EXTENSION_API] */
+
 int add_collator(WT_CONNECTION *conn);
 int add_compressor(WT_CONNECTION *conn);
 int add_data_source(WT_CONNECTION *conn);
@@ -534,11 +540,6 @@ session_ops(WT_SESSION *session)
 	/*! [Compact a table] */
 	ret = session->compact(session, "table:mytable", NULL);
 	/*! [Compact a table] */
-
-	/*! [Print to the message stream] */
-	ret = session->msg_printf(
-	    session, "process ID %" PRIuMAX, (uintmax_t)getpid());
-	/*! [Print to the message stream] */
 
 	/*! [Rename a table] */
 	ret = session->rename(session, "table:old", "table:new", NULL);
@@ -1190,6 +1191,10 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 #endif
+
+	/*! [Initialize WT_EXTENSION_API] */
+	wiredtiger_extension_api(&wt_api);
+	/*! [Initialize WT_EXTENSION_API] */
 
 	/*! [Get the WiredTiger library version #1] */
 	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));

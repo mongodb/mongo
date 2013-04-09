@@ -67,6 +67,8 @@ wts_open(void)
 	int ret;
 	char config[2048], *end, *p;
 
+	wiredtiger_extension_api(&wt_api);	/* Extension functions. */
+
 	/*
 	 * Open configuration.
 	 *
@@ -298,12 +300,12 @@ wts_verify(const char *tag)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if (g.logging != 0)
-		(void)session->msg_printf(session,
+		(void)wt_api->msg_printf(session,
 		    "=============== verify start ===============");
 	if ((ret = session->verify(session, g.uri, NULL)) != 0)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if (g.logging != 0)
-		(void)session->msg_printf(session,
+		(void)wt_api->msg_printf(session,
 		    "=============== verify stop ===============");
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");

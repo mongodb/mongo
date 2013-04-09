@@ -9,27 +9,22 @@
 
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
-/*
- * api_err_printf --
- *	Extension API call to print to the error stream.
- */
-static int
-__api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
-{
-	WT_DECL_RET;
-	va_list ap;
-
-	va_start(ap, fmt);
-	ret = __wt_verrx((WT_SESSION_IMPL *)wt_session, fmt, ap);
-	va_end(ap);
-	return (ret);
-}
-
-static WT_EXTENSION_API __api = {
-	__api_err_printf,
+static WT_EXTENSION_API __wiredtiger_extension_api = {
+	__wt_api_err_printf,
 	__wt_scr_alloc_ext,
-	__wt_scr_free_ext
+	__wt_scr_free_ext,
+	__wt_api_msg_printf
 };
+
+/*
+ * wiredtiger_extension_api --
+ *	Return a reference to the extension functions.
+ */
+void
+wiredtiger_extension_api(WT_EXTENSION_API **wt_apip)
+{
+	*wt_apip = &__wiredtiger_extension_api;
+}
 
 /*
  * __conn_load_extension --
@@ -67,7 +62,7 @@ __conn_load_extension(
 	WT_ERR(__wt_dlsym(session, dlh, entry_name, &entry));
 
 	/* Call the entry function. */
-	WT_ERR(entry(&session->iface, &__api, config));
+	WT_ERR(entry(&session->iface, &__wiredtiger_extension_api, config));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);

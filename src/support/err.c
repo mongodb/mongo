@@ -250,38 +250,28 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 }
 
 /*
- * __wt_verrx --
- *	Interface to support the extension API.
+ * __wt_api_err_printf --
+ *	Extension API call to print to the error stream.
  */
 int
-__wt_verrx(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
-{
-	return (__eventv(session, 0, 0, NULL, 0, fmt, ap));
-}
-/*
- * __wt_msg --
- * 	Informational message.
- */
-int
-__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
+__wt_api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	ret = __wt_vmsg(session, fmt, ap);
+	ret = __eventv((WT_SESSION_IMPL *)wt_session, 0, 0, NULL, 0, fmt, ap);
 	va_end(ap);
-
 	return (ret);
 }
 
 /*
- * __wt_vmsg --
+ * info_msg --
  * 	Informational message.
  */
-int
-__wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
+static int
+info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
 
@@ -296,6 +286,41 @@ __wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	handler = session->event_handler;
 	return (handler->handle_message(handler, s));
+}
+
+/*
+ * __wt_msg --
+ * 	Informational message.
+ */
+int
+__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	WT_DECL_RET;
+	va_list ap;
+
+	va_start(ap, fmt);
+	ret = info_msg(session, fmt, ap);
+	va_end(ap);
+
+	return (ret);
+}
+
+/*
+ * __wt_api_msg_printf --
+ *	Extension API call to print to the message stream.
+ */
+int
+__wt_api_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	WT_DECL_RET;
+	va_list ap;
+
+	va_start(ap, fmt);
+	ret = info_msg((WT_SESSION_IMPL *)wt_session, fmt, ap);
+	va_end(ap);
+	return (ret);
 }
 
 /*
