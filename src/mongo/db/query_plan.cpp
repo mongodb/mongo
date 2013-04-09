@@ -258,8 +258,9 @@ doneCheckOrder:
             if (testIndexMigrations && CatalogHack::isIndexMigrated(_type->keyPattern())) {
                 IndexDescriptor* descriptor = CatalogHack::getDescriptor(_d, _idxNo);
                 IndexAccessMethod* iam = CatalogHack::getSpecialIndex(descriptor);
-                return shared_ptr<Cursor>(new EmulatedCursor(descriptor, iam, _originalQuery,
-                                                             _order, numWanted));
+                return shared_ptr<Cursor>(EmulatedCursor::make(descriptor, iam, _originalQuery,
+                                                               _order, numWanted,
+                                                               descriptor->keyPattern()));
             }
 
             return _type->newCursor( _originalQuery, _order, numWanted );

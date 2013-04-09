@@ -38,37 +38,19 @@ namespace mongo {
          * Takes ownership of the provided indexAccessMethod indexCursor.
          * Takes ownership of the IndexDescriptor inside the indexAccessMethod.
          */
-        EmulatedCursor(IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod,
-                       const BSONObj& query, const BSONObj& order, int numWanted)
-            : _descriptor(descriptor), _indexAccessMethod(indexAccessMethod) {
+        static EmulatedCursor* make(IndexDescriptor* descriptor,
+                                    IndexAccessMethod* indexAccessMethod,
+                                    const BSONObj& query,
+                                    const BSONObj& order,
+                                    int numWanted,
+                                    const BSONObj& keyPattern) {
 
-            IndexCursor *cursor;
-            indexAccessMethod->newCursor(&cursor);
-            _indexCursor.reset(cursor);
-            _indexCursor->seek(query);
-
-            if (!_indexCursor->isEOF()) {
-                _nscanned = 1;
-            } else {
-                _nscanned = 0;
-            }
-
-            if ("hashed" == KeyPattern::findPluginName(descriptor->keyPattern())) {
-                // Quoted from hashindex.cpp:
-                // Force a match of the query against the actual document by giving
-                // the cursor a matcher with an empty indexKeyPattern.  This ensures the
-                // index is not used as a covered index.
-                // NOTE: this forcing is necessary due to potential hash collisions
-                _matcher = shared_ptr<CoveredIndexMatcher>(
-                    new CoveredIndexMatcher(query, BSONObj()));
-                _supportYields = true;
-                _supportGetMore = true;
-                _modifiedKeys = true;
-            } else {
-                verify(0);
-            }
-
-            checkMultiKeyProperties();
+            EmulatedCursor* ret = new EmulatedCursor(descriptor, indexAccessMethod,
+                                                     order, numWanted, keyPattern);
+            // Why do we have to do this?  No reading from disk is allowed in constructors,
+            // and seeking involves reading from disk.
+            ret->seek(query);
+            return ret;
         }
 
         // We defer everything we can to the underlying cursor.
@@ -97,6 +79,7 @@ namespace mongo {
         virtual void checkLocation() {
             verify(_supportYields);
             _indexCursor->restorePosition();
+            // Somebody might have inserted a multikey during a yield.
             checkMultiKeyProperties();
         }
 
@@ -131,8 +114,48 @@ namespace mongo {
         }
 
     private:
+        void seek(const BSONObj& query) {
+            _indexCursor->seek(query);
+
+            if (!_indexCursor->isEOF()) {
+                _nscanned = 1;
+            } else {
+                _nscanned = 0;
+            }
+
+            if ("hashed" == _pluginName) {
+                // Quoted from hashindex.cpp:
+                // Force a match of the query against the actual document by giving
+                // the cursor a matcher with an empty indexKeyPattern.  This ensures the
+                // index is not used as a covered index.
+                // NOTE: this forcing is necessary due to potential hash collisions
+                _matcher = shared_ptr<CoveredIndexMatcher>(
+                    new CoveredIndexMatcher(query, BSONObj()));
+            }
+        }
+
+        EmulatedCursor(IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod,
+                       const BSONObj& order, int numWanted, const BSONObj& keyPattern)
+            : _descriptor(descriptor), _indexAccessMethod(indexAccessMethod),
+              _keyPattern(keyPattern), _pluginName(KeyPattern::findPluginName(keyPattern)) {
+
+            IndexCursor *cursor;
+            indexAccessMethod->newCursor(&cursor);
+            _indexCursor.reset(cursor);
+
+            if ("hashed" == _pluginName) {
+                _supportYields = true;
+                _supportGetMore = true;
+                _modifiedKeys = true;
+            } else {
+                verify(0);
+            }
+
+            checkMultiKeyProperties();
+        }
+
         void checkMultiKeyProperties() {
-            if ("hashed" == KeyPattern::findPluginName(_descriptor->keyPattern())) {
+            if ("hashed" == _pluginName) {
                 _shouldGetSetDup = _descriptor->isMultikey();
             }
         }
@@ -151,6 +174,9 @@ namespace mongo {
         bool _isMultiKey;
         bool _modifiedKeys;
         bool _shouldGetSetDup;
+
+        BSONObj _keyPattern;
+        string _pluginName;
     };
 
 }  // namespace mongo
