@@ -1996,7 +1996,6 @@
     <ClInclude Include="..\..\third_party\v8\src\zone-inl.h">
       <Filter>third_party\v8\src\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="..\..\third_party\s2\base\basictypes.h">
       <Filter>third_party\s2\base</Filter>
@@ -2312,6 +2311,21 @@
     </ClInclude>
     <ClInclude Include="..\db\index\index_descriptor.h">
       <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\btree_interface.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\emulated_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\hash_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\hash_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_builder.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -4356,6 +4370,21 @@
     </ClCompile>
     <ClCompile Include="dbhelper_tests.cpp">
       <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\btree_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\btree_interface.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\hash_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\hash_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_builder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

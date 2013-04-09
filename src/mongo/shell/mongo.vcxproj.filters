@@ -1507,7 +1507,6 @@
     <ClInclude Include="..\util\stacktrace.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\util\timer-win32-inl.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>

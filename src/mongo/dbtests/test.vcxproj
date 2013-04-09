@@ -662,11 +662,16 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\index\btree_access_method.h" />
     <ClInclude Include="..\db\index\btree_access_method_internal.h" />
     <ClInclude Include="..\db\index\btree_index_cursor.h" />
+    <ClInclude Include="..\db\index\btree_interface.h" />
     <ClInclude Include="..\db\index\btree_key_generator.h" />
     <ClInclude Include="..\db\index\catalog_hack.h" />
+    <ClInclude Include="..\db\index\emulated_cursor.h" />
+    <ClInclude Include="..\db\index\hash_access_method.h" />
+    <ClInclude Include="..\db\index\hash_index_cursor.h" />
     <ClInclude Include="..\db\index\index_access_method.h" />
     <ClInclude Include="..\db\index\index_cursor.h" />
     <ClInclude Include="..\db\index\index_descriptor.h" />
+    <ClInclude Include="..\db\index_builder.h" />
     <ClInclude Include="..\db\index_insertion_continuation.h" />
     <ClInclude Include="..\db\index_rebuilder.h" />
     <ClInclude Include="..\db\index_set.h" />
@@ -834,7 +839,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\s\type_shard.h" />
     <ClInclude Include="..\s\type_tags.h" />
     <ClInclude Include="..\s\util.h" />
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h" />
     <ClInclude Include="..\client\connpool.h" />
@@ -2588,7 +2592,12 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\hashindex.cpp" />
     <ClCompile Include="..\db\index\btree_access_method.cpp" />
+    <ClCompile Include="..\db\index\btree_index_cursor.cpp" />
+    <ClCompile Include="..\db\index\btree_interface.cpp" />
     <ClCompile Include="..\db\index\btree_key_generator.cpp" />
+    <ClCompile Include="..\db\index\hash_access_method.cpp" />
+    <ClCompile Include="..\db\index\hash_index_cursor.cpp" />
+    <ClCompile Include="..\db\index_builder.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
     <ClCompile Include="..\db\index_set.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />

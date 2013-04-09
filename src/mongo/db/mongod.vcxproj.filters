@@ -1862,9 +1862,23 @@
     <ClCompile Include="index\btree_key_generator.cpp">
       <Filter>db\index</Filter>
     </ClCompile>
+    <ClCompile Include="index\btree_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\btree_interface.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\hash_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\hash_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index_builder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\third_party\snappy\config.h">
       <Filter>third_party\snappy</Filter>
     </ClInclude>
@@ -3947,6 +3961,21 @@
     </ClInclude>
     <ClInclude Include="index\index_descriptor.h">
       <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\btree_interface.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\emulated_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\hash_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\hash_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index_builder.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

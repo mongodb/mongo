@@ -1451,7 +1451,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\engine_spidermonkey.h" />
     <ClInclude Include="..\s\d_chunk_manager.h" />
     <ClInclude Include="..\s\shard.h" />
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\util\allocator.h" />
     <ClInclude Include="..\util\assert_util.h" />
     <ClInclude Include="..\util\background.h" />
