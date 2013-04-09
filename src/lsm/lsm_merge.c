@@ -73,14 +73,11 @@ __wt_lsm_merge(
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk;
-	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "bulk,raw");
-	const char *rand_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,next_random");
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count, r;
 	u_int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
 	int create_bloom;
+	const char *cfg[3];
 
 	src = dest = NULL;
 	bloom = NULL;
@@ -235,7 +232,10 @@ __wt_lsm_merge(
 		    lsm_tree->bloom_hash_count, &bloom));
 	}
 
-	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &dest));
+	cfg[0] = WT_CONFIG_VALUE(session, session_open_cursor);
+	cfg[1] = "bulk,raw";
+	cfg[2] = NULL;
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % 1000 &&
@@ -283,7 +283,10 @@ __wt_lsm_merge(
 	 * enough internal pages in cache so that application threads don't
 	 * stall and block each other reading them in.
 	 */
-	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, rand_cfg, &dest));
+	cfg[0] = WT_CONFIG_VALUE(session, session_open_cursor);
+	cfg[1] = "checkpoint=WiredTigerCheckpoint,next_random";
+	cfg[2] = NULL;
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 	for (r = 0; ret == 0 && r < 1 + (insert_count >> 20); r++)
 		WT_TRET(dest->next(dest));
 	WT_TRET(dest->close(dest));

@@ -554,8 +554,8 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 #endif
 
 	/* Check the configuration string. */
-	WT_ERR(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, cbuf->data, 0));
+	WT_ERR(__wt_config_check(session,
+	    WT_CONFIG_CHECKS(session, wiredtiger_open), cbuf->data, 0));
 
 	/*
 	 * The configuration file falls between the default configuration and
@@ -605,8 +605,8 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 		    "lacks privileges to use that environment variable");
 
 	/* Check the configuration string. */
-	WT_RET(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, env_config, 0));
+	WT_RET(__wt_config_check(session,
+	    WT_CONFIG_CHECKS(session, wiredtiger_open), env_config, 0));
 
 	/*
 	 * The environment setting comes second-to-last: it overrides the
@@ -823,8 +823,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] =
-	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL, NULL };
+	const char *cfg[3];
 	int exist;
 
 	*wt_connp = NULL;
@@ -855,9 +854,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Remaining basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));
 
-	/* Check the configuration strings. */
-	WT_ERR(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, config, 0));
+	/* Check/set the configuration strings. */
+	WT_ERR(__wt_config_check(session,
+	    WT_CONFIG_CHECKS(session, wiredtiger_open), config, 0));
+	cfg[0] = WT_CONFIG_VALUE(session, wiredtiger_open);
+	cfg[1] = config;
+	cfg[2] = NULL;
 
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));

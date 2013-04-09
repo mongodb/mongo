@@ -27,6 +27,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */
 
+	/* Configuration. */
+	__wt_conn_config_init(conn);
+
 	/* Statistics. */
 	__wt_stat_init_connection_stats(&conn->stats);
 

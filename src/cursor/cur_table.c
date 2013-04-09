@@ -674,7 +674,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_CURSOR **cp, *primary;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
+	const char *cfg[2];
 	u_int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
@@ -691,6 +691,8 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 		    "Bulk load is not supported for tables with indices");
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 
+	cfg[0] = WT_CONFIG_VALUE(session, session_open_cursor);
+	cfg[1] = NULL;
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
 		WT_RET(__wt_open_cursor(session, table->indices[i]->source,
 		    &ctable->iface, cfg, cp));

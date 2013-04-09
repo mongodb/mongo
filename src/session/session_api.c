@@ -255,13 +255,14 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  * which only wants to dump the schema information needed for load.
  */
 int
-__wt_session_create_strip(
-    WT_SESSION *session, const char *v1, const char *v2, const char **value_ret)
+__wt_session_create_strip(WT_SESSION *wt_session,
+    const char *v1, const char *v2, const char **value_ret)
 {
-	WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
-	const char *cfg[] = { __wt_confdfl_session_create, v1, v2, NULL };
+	WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
+	const char *cfg[] =
+	    { WT_CONFIG_VALUE(session, session_create), v1, v2, NULL };
 
-	return (__wt_config_collapse(session_impl, cfg, value_ret));
+	return (__wt_config_collapse(session, cfg, value_ret));
 }
 
 /*

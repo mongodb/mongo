@@ -209,7 +209,8 @@ __wt_lsm_tree_setup_chunk(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
 	WT_ITEM buf;
-	const char *cfg[] = API_CONF_DEFAULTS(session, drop, "force");
+	const char *cfg[] =
+	    { WT_CONFIG_VALUE(session, session_drop), "force", NULL };
 
 	WT_CLEAR(buf);
 
@@ -293,7 +294,8 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
+	const char *cfg[] =
+	    { WT_CONFIG_VALUE(session, session_create), config, NULL };
 	const char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
@@ -404,17 +406,15 @@ err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
  *	Validate the configuration of an LSM tree.
  */
 static int
-__lsm_tree_open_check(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_CONFIG_ITEM cval;
-	const char *cfg[] = API_CONF_DEFAULTS(
-	    session, create, lsm_tree->file_config);
 	uint64_t required;
 	uint32_t maxleafpage;
+	const char *cfg[] = { WT_CONFIG_VALUE(
+	    session, session_create), lsm_tree->file_config, NULL };
 
-	WT_RET(__wt_config_gets(
-	    session, cfg, "leaf_page_max", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
 	maxleafpage = (uint32_t)cval.val;
 
 	/* Three chunks, plus one page for each participant in a merge. */
