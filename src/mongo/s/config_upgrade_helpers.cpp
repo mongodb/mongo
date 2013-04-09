@@ -261,15 +261,15 @@ namespace mongo {
                 BSONObj next = cursor->nextSafe().getOwned();
                 ++docCount;
 
-                if (insertSize + next.objsize() > maxBatchSize ) {
+                insertBatch.push_back(next);
+                insertSize += next.objsize();
+
+                if (insertSize > maxBatchSize ) {
                     conn->insert(toNS, insertBatch);
                     _checkGLE(conn);
                     insertBatch.clear();
                     insertSize = 0;
                 }
-
-                insertBatch.push_back(next);
-                insertSize += next.objsize();
 
                 if (t.seconds() >= 10) {
                     t.reset();
