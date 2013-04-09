@@ -14,7 +14,7 @@ t = db.objNestTest;
 t.drop();
 t.ensureIndex({a:1});
 
-nestedObj = makeNestObj(500);
+nestedObj = makeNestObj(300);
 
 t.insert( { tst : "test1", a : nestedObj }, true );
 t.insert( { tst : "test2", a : nestedObj }, true );
