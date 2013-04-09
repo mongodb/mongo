@@ -18,6 +18,7 @@ Import("darwin windows solaris linux nix")
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
                 'db/fts/SConscript',
+                'db/ops/SConscript',
                 'db/SConscript',
                 'platform/SConscript',
                 's/SConscript',

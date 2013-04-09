@@ -1,0 +1,10 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary('update', ['path_support.cpp'],
+                  LIBDEPS=['$BUILD_DIR/mongo/bson',
+                           '$BUILD_DIR/mongo/foundation',
+                           '$BUILD_DIR/mongo/db/common'])
+
+env.CppUnitTest('path_support_test', ['path_support_test.cpp'], LIBDEPS=['update'])
