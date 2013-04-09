@@ -63,6 +63,7 @@ clientSourceBasic = [
     'mongo/util/fail_point.cpp',
     'mongo/util/fail_point_registry.cpp',
     'mongo/util/fail_point_service.cpp',
+    'mongo/util/hex.cpp',
     'mongo/util/histogram.cpp',
     'mongo/util/intrusive_counter.cpp',
     'mongo/util/log.cpp',
@@ -106,6 +107,7 @@ exampleSourceMap = [
         ('secondExample', 'mongo/client/examples/second.cpp'),
         ('tutorial', 'mongo/client/examples/tutorial.cpp'),
         ('whereExample', 'mongo/client/examples/whereExample.cpp'),
+        ('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp'),
         ]
 
 clientHeaderDirectories = [
@@ -144,9 +146,6 @@ env.Alias('mongoclient', mongoclient_install)
 clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target,
                           [source, mongoclient_lib]) for (target, source) in exampleSourceMap])
-
-clientTests.append(
-    clientEnv.Install('#/', clientEnv.Program('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp')))
 
 clientEnv.Alias('clientTests', clientTests, [])
 

@@ -50,7 +50,7 @@ env.StaticLibrary('foundation',
 
 env.CppUnitTest('text_test', 'util/text_test.cpp', LIBDEPS=['foundation'])
 
-env.StaticLibrary('stringutils', ['util/stringutils.cpp', 'util/base64.cpp',])
+env.StaticLibrary('stringutils', ['util/stringutils.cpp', 'util/base64.cpp', 'util/hex.cpp'])
 
 env.StaticLibrary('md5', [
         'util/md5.cpp'

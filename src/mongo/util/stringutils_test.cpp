@@ -19,6 +19,7 @@
 
 #include "mongo/bson/util/misc.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 
@@ -169,5 +170,20 @@ namespace mongo {
 
         assertCmp( 0, StringData("0001", 3), StringData("0000", 3), false );
 
+    }
+
+    TEST( IntegerToHex, VariousConversions ) {
+        ASSERT_EQUALS(std::string("0"), integerToHex(0));
+        ASSERT_EQUALS(std::string("1"), integerToHex(1));
+        ASSERT_EQUALS(std::string("1337"), integerToHex(0x1337));
+        ASSERT_EQUALS(std::string("FFFFD499"), integerToHex(-11111));
+        ASSERT_EQUALS(std::string("F1FE60C4"), integerToHex(-234987324));
+        ASSERT_EQUALS(std::string("C0DE4F00D"), integerToHex(0xc0de4f00d));
+        ASSERT_EQUALS(std::string("80000000"), integerToHex(std::numeric_limits<int>::min()));
+        ASSERT_EQUALS(std::string("7FFFFFFF"), integerToHex(std::numeric_limits<int>::max()));
+        ASSERT_EQUALS(std::string("7FFFFFFFFFFFFFFF"), 
+                      integerToHex(std::numeric_limits<long long>::max()));
+        ASSERT_EQUALS(std::string("8000000000000000"), 
+                      integerToHex(std::numeric_limits<long long>::min()));
     }
 }
