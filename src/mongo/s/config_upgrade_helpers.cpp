@@ -251,8 +251,17 @@ namespace mongo {
         try {
             log() << "About to copy " << fromNS << " to " << toNS << endl;
 
+            // Lower the query's batchSize so that we incur in getMore()'s more frequently.
+            // The rationale here is that, if for some reason the config server is extremely
+            // slow, we wouldn't time this cursor out.
             ScopedDbConnection& conn = *connPtr;
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(fromNS, BSONObj())));
+            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(fromNS,
+                                                                      BSONObj(),
+                                                                      0 /* nToReturn */,
+                                                                      0 /* nToSkip */,
+                                                                      NULL /* fieldsToReturn */,
+                                                                      0 /* queryOptions */,
+                                                                      1024 /* batchSize */)));
 
             vector<BSONObj> insertBatch;
             int32_t insertSize = 0;
