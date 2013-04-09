@@ -1408,6 +1408,7 @@ namespace mongo {
                     BSONObjBuilder b;
                     e.getInfo().append( b );
                     cmdResult = b.obj();
+                    errmsg = cmdResult.toString();
                 }
 
                 if ( exceptionCode == PrepareConfigsFailedCode ) {
@@ -1430,6 +1431,8 @@ namespace mongo {
                     }
 
                     log() << "Shard version successfully reset to clean up failed migration" << endl;
+
+                    errmsg = "Failed to send migrate commit to configs because " + errmsg;
                     return false;
 
                 }
@@ -1459,6 +1462,7 @@ namespace mongo {
 
                         if ( checkVersion.isEquivalentTo( nextVersion ) ) {
                             log() << "moveChunk commit confirmed" << migrateLog;
+                            errmsg.clear();
 
                         }
                         else {

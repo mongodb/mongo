@@ -505,21 +505,20 @@ namespace mongo {
         conn.done();
 
         if ( lockObj.isEmpty() ) {
-            *errMsg = str::stream() << "could not assert if lock " << _name << " "
-                                    << "was held because there was correspondant document in the "
-                                    << "locks collection";
+            *errMsg = str::stream() << "no lock for " << _name << " exists in the locks collection";
             return false;
         }
 
         if ( lockObj[LocksType::state()].numberInt() < 2 ) {
-            *errMsg = str::stream() << "lock " << _name << " is not held because its current "
-                                    << "state is " << lockObj[LocksType::state()].numberInt();
+            *errMsg = str::stream() << "lock " << _name << " current state is not held ("
+                                    << lockObj[LocksType::state()].numberInt() << ")";
             return false;
         }
 
         if ( lockObj[LocksType::process()].String() != _processId ) {
             *errMsg = str::stream() << "lock " << _name << " is currently being held by "
-                                    << " another process " << lockObj[LocksType::process()].String();
+                                    << "another process ("
+                                    << lockObj[LocksType::process()].String() << ")";
             return false;
         }
 
