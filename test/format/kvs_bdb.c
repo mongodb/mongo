@@ -935,7 +935,7 @@ kvsbdb_init(WT_CONNECTION *conn, const char *dir)
 {
 	int ret;
 
-	wiredtiger_extension_api(&wtext);
+	wiredtiger_extension_api(&wtext);	/* Aquire the extension API. */
 
 	memset(&ds, 0, sizeof(ds));
 
