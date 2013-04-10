@@ -159,10 +159,57 @@ of a configuration string as follows:
 
 @snippet ex_data_source.c WT_EXTENSION_CONFIG string
 
-Note that strings returned from WT_EXTENSION_API::config are not necessarily
-nul-terminated, and the associated length must be used instead of a nul byte.
-
 @subsection custom_ds_config_add Creating data-specific configuration strings
+
+Applications can add their own configuration strings to WiredTiger
+methods using WT_CONNECTION::configure_method.
+
+WT_CONNECTION::configure_method takes the following arguments:
+
+- the name of the method being extended.  For example, \c "session.create"
+would add new configuration strings to the WT_SESSION::create method,
+and \c "session.open_cursor" would add the configuration string to the
+WT_SESSION::open_cursor method.
+
+- the object type of the data source being extended.  For example, \c "table:"
+would extend the configuration arguments for table objects, and \c "my_data:"
+could be used to extend the configuration arguments for a data source with
+URIs beginning with the "my_data" prefix.  A NULL value for the object type
+implies all object types.
+
+- the name of the additional configuration string.  The name can be supplied
+with a default value as well, by appending an equals sign and a value.  For
+example, for a new configuration string with the name argument \c "device"
+the name arguments \c "device=/path" or \c "device=35" would give it default
+values.
+
+- the type of the additional configuration, which must one of \c "boolean",
+\c "int", \c "list" or \c "string".
+
+- value checking information for the additional configuration, or NULL if
+no checking information is provided.
+
+For example, an application might add new boolean, integer, string or
+list configuration strings as follows:
+
+@snippet ex_data_source.c WT_DATA_SOURCE configure boolean
+@snippet ex_data_source.c WT_DATA_SOURCE configure integer
+@snippet ex_data_source.c WT_DATA_SOURCE configure string
+@snippet ex_data_source.c WT_DATA_SOURCE configure list
+
+Once these additional configuration calls have returned, application calls to
+the WT_SESSION::open_cursor method could then include configuration strings
+such as \c my_boolean=false, or \c my_integer=37, or \c my_source=/home.
+
+Additional checking information can be provided for \c integer or \c list type
+configuration strings.   For integers, either or both of a maximum or minimum
+value can be provided as follows:
+
+@snippet ex_data_source.c WT_DATA_SOURCE configure integer with checking
+
+For lists, a set of possible choices can be provided as follows:
+
+@snippet ex_data_source.c WT_DATA_SOURCE configure list with checking
 
 @section custom_ds_cursor_collator WT_COLLATOR
 

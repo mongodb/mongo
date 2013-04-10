@@ -264,6 +264,43 @@ main(void)
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
 	/*! [WT_DATA_SOURCE register] */
 
+	/*! [WT_DATA_SOURCE configure boolean] */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", NULL, "my_boolean=true", "boolean", NULL);
+	/*! [WT_DATA_SOURCE configure boolean] */
+
+	/*! [WT_DATA_SOURCE configure integer] */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", NULL, "my_integer=5", "int", NULL);
+	/*! [WT_DATA_SOURCE configure integer] */
+
+	/*! [WT_DATA_SOURCE configure string] */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", NULL, "my_string=name", "string", NULL);
+	/*! [WT_DATA_SOURCE configure string] */
+
+	/*! [WT_DATA_SOURCE configure list] */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", NULL, "my_list=name", "list", NULL);
+	/*! [WT_DATA_SOURCE configure list] */
+
+	/*! [WT_DATA_SOURCE configure integer with checking] */
+	/*
+	 * Limit the number of devices to between 1 and 30; the default is 5.
+	 */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", NULL, "devices=5", "int", "min=1,max=30");
+	/*! [WT_DATA_SOURCE configure integer with checking] */
+
+	/*! [WT_DATA_SOURCE configure list with checking] */
+	/*
+	 * Limit paths to one of /device, /home or /target; default to /home.
+	 */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", NULL,
+	    "path=/home", "list", "choices=[/device, /home, /target]");
+	/*! [WT_DATA_SOURCE configure list with checking] */
+
 	(void)conn->close(conn, NULL);
 
 	return (ret);

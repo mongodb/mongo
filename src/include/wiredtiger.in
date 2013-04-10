@@ -1093,15 +1093,15 @@ struct __wt_connection {
 	 */
 	const char *__F(get_home)(WT_CONNECTION *connection);
 
-	/*! Add configuration options for a method.  See @ref custom_config for
-	 * more information.
+	/*! Add configuration options for a method.  See
+	 * @ref custom_ds_config_add for more information.
 	 *
 	 * @snippet ex_all.c Configure method configuration
 	 *
 	 * @param connection the connection handle
 	 * @param method the name of the method
 	 * @param uri the object type or NULL for all object types
-	 * @param name the additional configuration's name
+	 * @param name the additional configuration's name and default value
 	 * @param type the additional configuration's type (must be one of
 	 * \c "boolean"\, \c "int", \c "list" or \c "string")
 	 * @param check the additional configuration check string, or NULL if
