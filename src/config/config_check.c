@@ -244,7 +244,7 @@ config_check(WT_SESSION_IMPL *session,
 
 		/* Search for a matching entry. */
 		for (i = 0; checks[i].name != NULL; i++)
-			if (WT_STRING_CASE_MATCH(checks[i].name, k.str, k.len))
+			if (WT_STRING_MATCH(checks[i].name, k.str, k.len))
 				break;
 		if (checks[i].name == NULL)
 			WT_RET_MSG(session, EINVAL,
