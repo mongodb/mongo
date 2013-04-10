@@ -244,7 +244,8 @@ __curds_close(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	ret = cursor->data_source->close(cursor->data_source);
+	if (cursor->data_source != NULL)
+		ret = cursor->data_source->close(cursor->data_source);
 
 	/*
 	 * The key/value formats are in allocated memory, which isn't standard
