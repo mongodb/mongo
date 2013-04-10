@@ -25,7 +25,7 @@
 namespace mongo {
 
     class IndexCursor;
-    class S2IndexingParams;
+    struct S2IndexingParams;
 
     class S2AccessMethod : public BtreeBasedAccessMethod {
     public:
