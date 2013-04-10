@@ -1538,6 +1538,21 @@
     <ClCompile Include="index_builder.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="index\s2_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\s2_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\s2_near_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\s2_simple_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\path_support.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3160,6 +3175,24 @@
     </ClInclude>
     <ClInclude Include="index_builder.h">
       <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_common.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_near_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_simple_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\path_support.h">
+      <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

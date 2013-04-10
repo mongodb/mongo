@@ -2570,6 +2570,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="index\btree_key_generator.cpp" />
     <ClCompile Include="index\hash_access_method.cpp" />
     <ClCompile Include="index\hash_index_cursor.cpp" />
+    <ClCompile Include="index\s2_access_method.cpp" />
+    <ClCompile Include="index\s2_index_cursor.cpp" />
+    <ClCompile Include="index\s2_near_cursor.cpp" />
+    <ClCompile Include="index\s2_simple_cursor.cpp" />
     <ClCompile Include="index_builder.cpp" />
     <ClCompile Include="index_rebuilder.cpp" />
     <ClCompile Include="index_set.cpp" />
@@ -2578,6 +2582,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
     <ClCompile Include="field_ref.cpp" />
+    <ClCompile Include="ops\path_support.cpp" />
     <ClCompile Include="parsed_query.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
@@ -3294,6 +3299,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index\index_access_method.h" />
     <ClInclude Include="index\index_cursor.h" />
     <ClInclude Include="index\index_descriptor.h" />
+    <ClInclude Include="index\s2_access_method.h" />
+    <ClInclude Include="index\s2_common.h" />
+    <ClInclude Include="index\s2_index_cursor.h" />
+    <ClInclude Include="index\s2_near_cursor.h" />
+    <ClInclude Include="index\s2_simple_cursor.h" />
     <ClInclude Include="index_builder.h" />
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="index_rebuilder.h" />
@@ -3314,6 +3324,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="field_ref.h" />
     <ClInclude Include="ops\modifier_base.h" />
+    <ClInclude Include="ops\path_support.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
     <ClInclude Include="parsed_query.h" />
