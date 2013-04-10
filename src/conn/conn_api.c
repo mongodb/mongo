@@ -103,8 +103,13 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 
 	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->collqh, ncoll, q);
+	ncoll = NULL;
 	__wt_spin_unlock(session, &conn->api_lock);
-err:	__wt_free(session, ncoll);
+
+err:	if (ncoll != NULL) {
+		__wt_free(session, ncoll->name);
+		__wt_free(session, ncoll);
+	}
 
 	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -160,8 +165,7 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	__wt_spin_unlock(session, &conn->api_lock);
 
 err:	if (ncomp != NULL) {
-		if (ncomp->name != NULL)
-			__wt_free(session, ncomp->name);
+		__wt_free(session, ncomp->name);
 		__wt_free(session, ncomp);
 	}
 
@@ -214,11 +218,11 @@ __conn_add_data_source(WT_CONNECTION *wt_conn,
 	/* Link onto the environment's list of data sources. */
 	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->dsrcqh, ndsrc, q);
+	ndsrc = NULL;
 	__wt_spin_unlock(session, &conn->api_lock);
 
-	if (0) {
-err:		if (ndsrc != NULL)
-			__wt_free(session, ndsrc->prefix);
+err:	if (ndsrc != NULL) {
+		__wt_free(session, ndsrc->prefix);
 		__wt_free(session, ndsrc);
 	}
 
