@@ -29,8 +29,6 @@
 
 #include <wiredtiger_ext.h>
 
-WT_EXTENSION_API *wt_api;
-
 static int
 collate_reverse(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *k1, const WT_ITEM *k2, int *cmp)
@@ -55,9 +53,8 @@ wiredtiger_extension_init(
 	WT_CONNECTION *conn;
 
 	(void)config;					/* Unused */
+	(void)api;
 
-	wt_api = api;
 	conn = session->connection;
-
 	return (conn->add_collator(conn, "reverse", &reverse_collator, NULL));
 }

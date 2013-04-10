@@ -33,7 +33,7 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-WT_EXTENSION_API *wt_api;
+static WT_EXTENSION_API *wt_api;
 
 static int
 bzip2_compress(WT_COMPRESSOR *, WT_SESSION *,
@@ -128,7 +128,7 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 		break;
 	}
 
-	(void)wiredtiger_err_printf(
+	(void)wt_api->err_printf(
 	    session, "bzip2 error: %s: %s: %d", call, msg, bzret);
 	return (WT_ERROR);
 }
@@ -136,13 +136,13 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 static void *
 bzalloc(void *cookie, int number, int size)
 {
-	return (wiredtiger_scr_alloc(cookie, (size_t)(number * size)));
+	return (wt_api->scr_alloc(cookie, (size_t)(number * size)));
 }
 
 static void
 bzfree(void *cookie, void *p)
 {
-	wiredtiger_scr_free(cookie, p);
+	wt_api->scr_free(cookie, p);
 }
 
 static int

@@ -32,7 +32,7 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-WT_EXTENSION_API *wt_api;
+static WT_EXTENSION_API *wt_api;
 
 static int
 wt_snappy_compress(WT_COMPRESSOR *, WT_SESSION *,
@@ -83,7 +83,7 @@ wt_snappy_error(WT_SESSION *session, const char *call, snappy_status snret)
 		break;
 	}
 
-	(void)wiredtiger_err_printf(
+	(void)wt_api->err_printf(
 	    session, "snappy error: %s: %s: %d", call, msg, snret);
 	return (WT_ERROR);
 }
@@ -144,7 +144,7 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	/* retrieve the saved length */
 	snaplen = *(size_t *)src;
 	if (snaplen + sizeof(size_t) > src_len) {
-		(void)wiredtiger_err_printf(
+		(void)wt_api->err_printf(
 		    session,
 		    "wt_snappy_decompress: stored size exceeds buffer size");
 		return (WT_ERROR);

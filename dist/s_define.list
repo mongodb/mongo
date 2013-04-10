@@ -24,10 +24,6 @@ WT_STAT_DECR
 __F
 __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
-wiredtiger_err_printf
-wiredtiger_msg_printf
-wiredtiger_scr_alloc
-wiredtiger_scr_free
 
 # List of queue.h #defines that are "unused", but it's OK.
 LIST_EMPTY

@@ -61,7 +61,6 @@ struct __wt_extension_api {
 	 * @errors
 	 */
 	int (*err_printf)(WT_SESSION *, const char *fmt, ...);
-#define	wiredtiger_err_printf	wt_api->err_printf
 
 	/*! Allocate short-term use scratch memory.
 	 *
@@ -70,7 +69,6 @@ struct __wt_extension_api {
 	 * @returns A valid memory reference on success or NULL on error
 	 */
 	void *(*scr_alloc)(WT_SESSION *, size_t bytes);
-#define	wiredtiger_scr_alloc	wt_api->scr_alloc
 
 	/*! Free short-term use scratch memory.
 	 *
@@ -78,7 +76,6 @@ struct __wt_extension_api {
 	 * @param ref a memory reference returned by WT_EXTENSION_API::scr_alloc
 	 */
 	void (*scr_free)(WT_SESSION *, void *ref);
-#define	wiredtiger_scr_free	wt_api->scr_free
 
 	/*! Insert a message into the WiredTiger message stream.
 	 *
@@ -87,11 +84,7 @@ struct __wt_extension_api {
 	 * @errors
 	 */
 	int (*msg_printf)(WT_SESSION *, const char *fmt, ...);
-#define	wiredtiger_msg_printf	wt_api->msg_printf
 };
-
-/*! This global variable must appear in each extension module. */
-extern WT_EXTENSION_API	*wt_api;
 
 /*! @} */
 

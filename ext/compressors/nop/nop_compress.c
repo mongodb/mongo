@@ -31,7 +31,7 @@
 /*! [Declare WT_EXTENSION_API] */
 #include <wiredtiger_ext.h>
 
-WT_EXTENSION_API *wt_api;
+static WT_EXTENSION_API *wt_api;
 /*! [Declare WT_EXTENSION_API] */
 
 static int
