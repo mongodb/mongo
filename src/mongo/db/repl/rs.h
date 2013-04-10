@@ -47,6 +47,9 @@
 
 namespace mongo {
 
+    const int SleepToAllowBatchingMillis = 2;
+    const int BatchIsSmallish = 80000; // bytes
+
     class Cloner;
     class DBClientConnection;
     struct HowToFixUp;

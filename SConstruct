@@ -197,6 +197,7 @@ add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
+
 add_option( "win2008plus",
             "use newer operating system API features (deprecated, use win-version-min instead)" ,
             0 , False )
@@ -608,6 +609,7 @@ elif "win32" == os.sys.platform:
     if has_option('win-version-min') and has_option('win2008plus'):
         print("Can't specify both 'win-version-min' and 'win2008plus'")
         Exit(1)
+
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
         if os.path.exists(os.path.join(pathdir, 'cl.exe')):

@@ -186,6 +186,7 @@ namespace mongo {
             const BSONElement &toMatch, const BSONObj &obj,
             const ElementMatcher&bm, MatchDetails * details ) const;
 
+        bool _matches(const BSONObj&, MatchDetails * details) const;
     public:
         static int opDirection(int op) {
             return op <= BSONObj::LTE ? -1 : 1;
@@ -227,9 +228,7 @@ namespace mongo {
         
         bool atomic() const { return _atomic; }
 
-        string toString() const {
-            return _jsobj.toString();
-        }
+        string toString() const;
 
         /**
          * @return true if this key matcher will return the same true/false
@@ -260,6 +259,18 @@ namespace mongo {
         const BSONObj *getQuery() const { return &_jsobj; };
 
     private:
+        class TsGTEShortCircuit { 
+        public:
+            TsGTEShortCircuit();
+            bool init(const BSONObj& matchExpr);
+            bool ok() const { return _ok; }
+            bool matches(const BSONObj&) const;
+            bool selfTest() const;
+        private:
+            Date_t _ts;
+            bool _ok;
+        } shortCircuit;
+
         /**
          * Generate a matcher for the provided index key format using the
          * provided full doc matcher.
@@ -286,7 +297,7 @@ namespace mongo {
 
         Where *_where;                    // set if query uses $where
         BSONObj _jsobj;                  // the query pattern.  e.g., { name: "joe" }
-        BSONObj _constrainIndexKey;
+        const BSONObj _constrainIndexKey;
         vector<ElementMatcher> _basics;
         bool _haveSize;
         bool _all;

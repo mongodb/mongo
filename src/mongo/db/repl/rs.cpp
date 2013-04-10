@@ -97,7 +97,7 @@ namespace mongo {
         // reset minvalid so that we can't become primary prematurely
         setMinValid(oldest);
 
-        sethbmsg("error RS102 too stale to catch up");
+        sethbmsg("error RS102 too stale to catch up (at least from the up members)");
         changeState(MemberState::RS_RECOVERING);
     }
 

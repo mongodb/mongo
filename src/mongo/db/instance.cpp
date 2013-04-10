@@ -614,7 +614,7 @@ namespace mongo {
 
         DbMessage d(m);
 
-        const char *ns = d.getns();
+        const char * const ns = d.getns();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
 
@@ -622,18 +622,17 @@ namespace mongo {
         curop.debug().ntoreturn = ntoreturn;
         curop.debug().cursorid = cursorid;
 
-        shared_ptr<AssertionException> ex;
+        scoped_ptr<AssertionException> ex;
         scoped_ptr<Timer> timer;
         int pass = 0;
         bool exhaust = false;
         QueryResult* msgdata = 0;
         OpTime last;
+        const NamespaceString nsString( ns );
+        uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
         while( 1 ) {
             bool isCursorAuthorized = false;
             try {
-                const NamespaceString nsString( ns );
-                uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
-
                 Status status = cc().getAuthorizationManager()->checkAuthForGetMore(ns);
                 uassert(16543, status.reason(), status.isOK());
 
@@ -687,6 +686,9 @@ namespace mongo {
                         pass = 10000;
                     }
                 }
+                // we want to sleep some on an awaitdata at the end of a tailable cursor 
+                // (for the oplog that is) as we don't want to immediately send a batch after 
+                // just one write op has occurred.  rather we want a little bit of batching to occur.
                 pass++;
                 if (debug)
                     sleepmillis(20);

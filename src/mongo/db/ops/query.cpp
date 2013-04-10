@@ -151,7 +151,7 @@ namespace mongo {
                             continue;
 
                         if( n == 0 && (queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
-                            return 0;
+                            return 0; // 0 is sentinel indicating to caller waiting can/should occur
                         }
 
                         break;

@@ -20,57 +20,83 @@
 
 #include "mutex.h"
 
+#if( BOOST_VERSION >= 103500 ) 
+
+# if defined(_WIN32)
+#  include "shared_mutex_win.hpp"
+// modified_shared_mutex has a tweak/fix to the boost::shared_mutex windows implementation
+namespace mongo { typedef boost::modified_shared_mutex shared_mutex; }
+# else
+#  include <boost/thread/shared_mutex.hpp>
+namespace mongo { using boost::shared_mutex; }
+# endif
+
+namespace mongo { 
+    class RWLockBase_Boost : boost::noncopyable {
+        shared_mutex _m;
+    public:
+        void lock() { _m.lock(); }
+        void unlock() { _m.unlock(); }
+        void lockAsUpgradable() { _m.lock_upgrade(); }
+        void unlockFromUpgradable() { // upgradable -> unlocked
+            _m.unlock_upgrade();
+        }
+        void upgrade() { // upgradable -> exclusive lock
+            _m.unlock_upgrade_and_lock();
+        }
+        void lock_shared() { _m.lock_shared(); }
+        void unlock_shared() { _m.unlock_shared(); }
+        bool lock_shared_try( int millis ) {
+            return _m.timed_lock_shared( boost::posix_time::milliseconds(millis) );
+        }
+        bool lock_try( int millis = 0 ) {
+            return _m.timed_lock( boost::posix_time::milliseconds(millis) );
+        }
+    public:
+        const char * implType() const { return "boost"; }
+    };
+}
+
+#endif
+
 #if defined(RWLOCK_TEST)
 namespace mongo { 
     typedef RWLockBase1 RWLockBase;
 }
+
 #elif defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
 
-// windows slimreaderwriter version.  newer windows versions only
+// windows implementation, uses SlimReaderWriter locks when possible (dynamically loaded).
 
 namespace mongo {
-    unsigned long long curTimeMicros64();
+
+    class RW_Interface { 
+    public:
+        virtual ~RW_Interface() { }
+        virtual void lock() = 0;
+        virtual void unlock() = 0;
+        virtual void lock_shared() = 0;
+        virtual void unlock_shared() = 0;
+    };
+    class RWTry_Interface : public RW_Interface { 
+    public:
+        virtual bool lock_shared_try( int millis ) = 0;
+        virtual bool lock_try( int millis = 0 ) = 0;
+    };
 
     class RWLockBase : boost::noncopyable {
+        scoped_ptr<RWTry_Interface> i;
         friend class SimpleRWLock;
-        SRWLOCK _lock;
     protected:
-        RWLockBase() { InitializeSRWLock(&_lock); }
-        ~RWLockBase() {
-            // no special action needed to destroy a SRWLOCK
-        }
-        void lock()          { AcquireSRWLockExclusive(&_lock); }
-        void unlock()        { ReleaseSRWLockExclusive(&_lock); }
-        void lock_shared()   { AcquireSRWLockShared(&_lock); }
-        void unlock_shared() { ReleaseSRWLockShared(&_lock); }
-        bool lock_shared_try( int millis ) {
-            if( TryAcquireSRWLockShared(&_lock) )
-                return true;
-            if( millis == 0 )
-                return false;
-            unsigned long long end = curTimeMicros64() + millis*1000;
-            while( 1 ) {
-                Sleep(1);
-                if( TryAcquireSRWLockShared(&_lock) )
-                    return true;
-                if( curTimeMicros64() >= end )
-                    break;
-            }
-            return false;
-        }
-        bool lock_try( int millis = 0 ) {
-            if( TryAcquireSRWLockExclusive(&_lock) ) // quick check to optimistically avoid calling curTimeMicros64
-                return true;
-            if( millis == 0 )
-                return false;
-            unsigned long long end = curTimeMicros64() + millis*1000;
-            do {
-                Sleep(1);
-                if( TryAcquireSRWLockExclusive(&_lock) )
-                    return true;
-            } while( curTimeMicros64() < end );
-            return false;
-        }
+        RWLockBase();
+        ~RWLockBase();
+        void lock()          { i->lock(); }
+        void unlock()        { i->unlock(); }
+        void lock_shared()   { i->lock_shared(); }
+        void unlock_shared() { i->unlock_shared(); }
+        bool lock_shared_try( int millis ) { return i->lock_shared_try(millis); }
+        bool lock_try( int millis = 0 )    { return i->lock_try(millis); }
+
         // no upgradable for this impl
         void lockAsUpgradable() { lock(); }
         void unlockFromUpgradable() { unlock(); }
@@ -144,50 +170,8 @@ namespace mongo {
 
 #else
 
-// Boost version
-
-# if defined(_WIN32)
-#  include "shared_mutex_win.hpp"
-namespace mongo { typedef boost::modified_shared_mutex shared_mutex; }
-# else
-#  include <boost/thread/shared_mutex.hpp>
-namespace mongo { using boost::shared_mutex; }
-# endif
-
-namespace mongo { 
-    class RWLockBase : boost::noncopyable {
-        friend class SimpleRWLock;
-        shared_mutex _m;
-    protected:
-        void lock() {
-             _m.lock();
-        }
-        void unlock() {
-            _m.unlock();
-        }
-        void lockAsUpgradable() { 
-            _m.lock_upgrade();
-        }
-        void unlockFromUpgradable() { // upgradable -> unlocked
-            _m.unlock_upgrade();
-        }
-        void upgrade() { // upgradable -> exclusive lock
-            _m.unlock_upgrade_and_lock();
-        }
-        void lock_shared() {
-            _m.lock_shared();
-        }
-        void unlock_shared() {
-            _m.unlock_shared();
-        }
-        bool lock_shared_try( int millis ) {
-            return _m.timed_lock_shared( boost::posix_time::milliseconds(millis) );
-        }
-        bool lock_try( int millis = 0 ) {
-            return _m.timed_lock( boost::posix_time::milliseconds(millis) );
-        }
-    public:
-        const char * implType() const { return "boost"; }
+namespace mongo {
+    class RWLockBase : public RWLockBase_Boost { 
     };
 }
 

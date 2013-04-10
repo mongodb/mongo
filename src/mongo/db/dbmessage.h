@@ -111,12 +111,13 @@ namespace mongo {
     */
     class DbMessage {
     public:
-        DbMessage(const Message& _m) : m(_m) , mark(0) {
+        DbMessage(const Message& _m) : 
+            m(_m), 
+            data(_m.singleData()->_data+4),
+            theEnd(_m.singleData()->_data + _m.header()->dataLen()),
+            mark(0)
+        {
             // for received messages, Message has only one buffer
-            theEnd = _m.singleData()->_data + _m.header()->dataLen();
-            char *r = _m.singleData()->_data;
-            reserved = (int *) r;
-            data = r + 4;
             nextjsobj = data;
         }
 
@@ -125,7 +126,16 @@ namespace mongo {
          * 0: InsertOption_ContinueOnError
          * 1: fromWriteback
          */
-        int& reservedField() { return *reserved; }
+        int reservedField() const { 
+            const char *p = data - 4;
+            const int *d = reinterpret_cast<const int *>(p); 
+            return *d;
+        }
+        int& reservedField() { 
+            char *p = data - 4;
+            int *d = reinterpret_cast<int *>(p); 
+            return *d;
+        }
 
         const char * getns() const {
             return data;
@@ -160,6 +170,8 @@ namespace mongo {
         void resetPull() { nextjsobj = data; }
         int pullInt() const { return pullInt(); }
         int& pullInt() {
+            // todo: we need to check that the namespace has a null char i.e. use strilen or something.
+            // perhaps this moves to hte constructor or something.
             if ( nextjsobj == data )
                 nextjsobj += strlen(data) + 1; // skip namespace
             int& i = *((int *)nextjsobj);
@@ -236,12 +248,10 @@ namespace mongo {
 
     private:
         const Message& m;
-        int* reserved;
-        const char *data;
+        char * const data;
         const char *nextjsobj;
-        const char *theEnd;
-
-        const char * mark;
+        const char * const theEnd;
+        const char *mark;
     };
 
 

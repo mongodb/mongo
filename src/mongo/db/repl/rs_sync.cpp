@@ -602,8 +602,13 @@ namespace replset {
             golive=true;
         }
         else {
-            sethbmsg(str::stream() << "still syncing, not yet to minValid optime " <<
+            if( str::contains(_hbmsg, "RS102") ) { 
+                // don't stomp on that more important message...
+            }
+            else {
+                sethbmsg(str::stream() << "still syncing, not yet to minValid optime " <<
                      minvalid.toString());
+            }
         }
 
         if( golive ) {
