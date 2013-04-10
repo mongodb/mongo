@@ -276,7 +276,7 @@ namespace mongo {
          * Create a V8 string with a local handle
          */
         static inline v8::Handle<v8::String> v8StringData(StringData str) {
-            return v8::String::New(str.rawData());
+            return v8::String::New(str.rawData(), str.size());
         }
 
         /**
