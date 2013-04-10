@@ -87,10 +87,10 @@ class test_config04(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_bad_config(self):
+	msg = '/unknown configuration key/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'),
-            "wiredtiger_open: Unknown configuration key"
-            " found: 'not_valid': Invalid argument\n")
+	    msg)
 
     def test_cache_size_number(self):
         # Use a number without multipliers
