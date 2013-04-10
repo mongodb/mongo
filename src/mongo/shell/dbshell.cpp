@@ -655,7 +655,6 @@ static void edit( const string& whatToEdit ) {
 }
 
 int _main( int argc, char* argv[], char **envp ) {
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::isShell = true;
     setupSignals();
 
@@ -841,6 +840,7 @@ int _main( int argc, char* argv[], char **envp ) {
     if ( ! mongo::cmdLine.quiet )
         cout << "MongoDB shell version: " << mongo::versionString << endl;
 
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::StartupTest::runTests();
 
     if ( !nodb ) { // connect to db

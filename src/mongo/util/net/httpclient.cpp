@@ -105,7 +105,7 @@ namespace mongo {
             const SSLParams params(cmdLine.sslPEMKeyFile, 
                                    cmdLine.sslPEMKeyPassword);
             // never deleted
-            SSLManager* mgr = new SSLManager(params);
+            SSLManager* mgr = getSSLManager();
 
             sock.secure(mgr);
 #else
