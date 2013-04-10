@@ -87,6 +87,8 @@ __rename_tree(WT_SESSION_IMPL *session,
 	int is_colgroup;
 
 	olduri = table->name;
+	value = NULL;
+
 	newname = newuri;
 	(void)WT_PREFIX_SKIP(newname, "table:");
 
