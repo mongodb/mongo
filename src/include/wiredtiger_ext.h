@@ -14,6 +14,34 @@
 extern "C" {
 #endif
 
+/*! The configuration information returned by the WiredTiger extension function
+ * WT_EXTENSION_API::config.
+ */
+struct __wt_extension_config {
+	/*! The memory reference of a configuration string.
+	 *
+	 * Regardless of the type of the configuration string, the \c str field
+	 * will reference the value of the configuration string.  Note the bytes
+	 * referenced by \c str <b>may not</b> be nul-terminated, use the \c len
+	 * field instead of a terminating nul byte.
+	 */
+	const char *str;
+
+	/*! The number of bytes in the string referenced by \c str. */
+	size_t len;
+
+	/*! The value of a configuration boolean or integer.
+	 *
+	 * If the configuration string is set to "true" or "false", the \c value
+	 * field will be set to 1 (true), or 0 (false).
+	 *
+	 * If the configuration string can be legally interpreted as an integer,
+	 * using the strtoll function rules as specified in ISO/IEC 9899:1990
+	 * ("ISO C90"), that integer will be stored in the \c value field.
+	 */
+	int64_t value;
+};
+
 /*! @addtogroup wt_ext
  * @{
  */
@@ -34,8 +62,8 @@ extern "C" {
  *
  * The following code is from the sample compression module:
  *
- * @snippet nop_compress.c Declare WT_EXTENSION_API
- * @snippet nop_compress.c Initialize WT_EXTENSION_API
+ * @snippet nop_compress.c WT_EXTENSION_API declaration
+ * @snippet nop_compress.c WT_EXTENSION_API initialization
  *
  * The extension functions may also be used by modules that are linked with
  * the WiredTiger library, for example, a data source configured using the
@@ -49,8 +77,7 @@ extern "C" {
  *
  * For example:
  *
- * @snippet ex_all.c Declare WT_EXTENSION_API
- * @snippet ex_all.c Initialize WT_EXTENSION_API
+ * @snippet ex_data_source.c WT_EXTENSION_API declaration
  */
 struct __wt_extension_api {
 /* !!! To maintain backwards compatibility, this structure is append-only. */
@@ -60,7 +87,7 @@ struct __wt_extension_api {
 	 * @param fmt a printf-like format specification
 	 * @errors
 	 */
-	int (*err_printf)(WT_SESSION *, const char *fmt, ...);
+	int (*err_printf)(WT_SESSION *session, const char *fmt, ...);
 
 	/*! Allocate short-term use scratch memory.
 	 *
@@ -68,14 +95,14 @@ struct __wt_extension_api {
 	 * @param bytes the number of bytes of memory needed
 	 * @returns A valid memory reference on success or NULL on error
 	 */
-	void *(*scr_alloc)(WT_SESSION *, size_t bytes);
+	void *(*scr_alloc)(WT_SESSION *session, size_t bytes);
 
 	/*! Free short-term use scratch memory.
 	 *
 	 * @param session the session handle
 	 * @param ref a memory reference returned by WT_EXTENSION_API::scr_alloc
 	 */
-	void (*scr_free)(WT_SESSION *, void *ref);
+	void (*scr_free)(WT_SESSION *session, void *ref);
 
 	/*! Insert a message into the WiredTiger message stream.
 	 *
@@ -83,7 +110,19 @@ struct __wt_extension_api {
 	 * @param fmt a printf-like format specification
 	 * @errors
 	 */
-	int (*msg_printf)(WT_SESSION *, const char *fmt, ...);
+	int (*msg_printf)(WT_SESSION *session, const char *fmt, ...);
+
+	/*! Return the value of a configuration string.
+	 *
+	 * @param session the session handle
+	 * @param key configuration key string
+	 * @param config the configuration information passed to a
+	 * WT_DATA_SOURCE:: method
+	 * @param value the returned value
+	 * @errors
+	 */
+	int (*config)(WT_SESSION *session,
+	    const char *key, void *config, WT_EXTENSION_CONFIG *value);
 };
 
 /*! @} */

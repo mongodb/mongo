@@ -789,8 +789,7 @@ EXCLUDE_SYMBOLS        = __F
 # the \include command).
 
 EXAMPLE_PATH           = ../../examples/c \
-			 ../../ext/compressors/nop \
-			 ../../test/format
+			 ../../ext/compressors/nop
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
@@ -1595,6 +1594,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_data_source:=WT_DATA_SOURCE \
                          __wt_event_handler:=WT_EVENT_HANDLER \
                          __wt_extension_api:=WT_EXTENSION_API \
+                         __wt_extension_config:=WT_EXTENSION_CONFIG \
                          __wt_extractor:=WT_EXTRACTOR \
                          __wt_item:=WT_ITEM \
                          __wt_session:=WT_SESSION

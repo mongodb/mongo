@@ -652,6 +652,28 @@ __wt_config_gets(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_ext_config --
+ *	Given a NULL-terminated list of configuration strings, find the final
+ *	value for a given string key (external API version).
+ */
+int
+__wt_ext_config(WT_SESSION *wt_session,
+    const char *key, void *cfg, WT_EXTENSION_CONFIG *value)
+{
+	WT_CONFIG_ITEM v;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	WT_RET(__wt_config_gets(session, cfg, key, &v));
+
+	value->str = v.str;
+	value->len = v.len;
+	value->value = v.val;
+	return (0);
+}
+
+/*
  * __wt_config_getone --
  *	Get the value for a given key from a single config string.
  */

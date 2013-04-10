@@ -286,7 +286,8 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor, *dsc;
 	WT_DECL_RET;
-	const char *dscfg[3], **dscfgp, *metaconf;
+	const char **cfgp, *dscfg[5];
+	const char *metaconf;
 
 	metaconf = NULL;
 
@@ -309,20 +310,21 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	WT_ERR(
 	    __wt_strndup(session, cval.str, cval.len, &cursor->value_format));
 
-	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
-
 	/*
-	 * Open the application's cursor.  Initialize everything the data-source
-	 * function doesn't know about (inside of WiredTiger, this is all done
-	 * by the cursor initialization #define).
+	 * And, we'll need to pass that information down to the underlying
+	 * data-source.
 	 */
-	dscfgp = dscfg;
-	*dscfgp++ = metaconf;
-	if (F_ISSET(cursor, WT_CURSTD_APPEND))
-		*dscfgp++ = "append=1";
-	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE))
-		*dscfgp++ = "overwrite=1";
-	*dscfgp = NULL;
+	cfgp = dscfg;
+	if (cfg[0] != NULL)
+		*cfgp++ = cfg[0];
+	if (cfg[1] != NULL)
+		*cfgp++ = cfg[1];
+	if (cfg[2] != NULL)
+		*cfgp++ = cfg[2];
+	*cfgp++ = metaconf;
+	*cfgp = NULL;
+
+	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	WT_ERR(dsrc->open_cursor(dsrc, &session->iface, uri, dscfg, &dsc));
 	memset(&dsc->q, 0, sizeof(dsc->q));

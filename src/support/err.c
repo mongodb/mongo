@@ -250,11 +250,11 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 }
 
 /*
- * __wt_api_err_printf --
+ * __wt_ext_err_printf --
  *	Extension API call to print to the error stream.
  */
 int
-__wt_api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
+__wt_ext_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	WT_DECL_RET;
@@ -307,11 +307,11 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
 }
 
 /*
- * __wt_api_msg_printf --
+ * __wt_ext_msg_printf --
  *	Extension API call to print to the message stream.
  */
 int
-__wt_api_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
+__wt_ext_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	WT_DECL_RET;

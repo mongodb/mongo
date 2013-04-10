@@ -10,10 +10,11 @@
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
 static WT_EXTENSION_API __wiredtiger_extension_api = {
-	__wt_api_err_printf,
-	__wt_scr_alloc_ext,
-	__wt_scr_free_ext,
-	__wt_api_msg_printf
+	__wt_ext_err_printf,
+	__wt_ext_scr_alloc,
+	__wt_ext_scr_free,
+	__wt_ext_msg_printf,
+	__wt_ext_config
 };
 
 /*

@@ -43,15 +43,8 @@
 
 #include <wiredtiger.h>
 
-/*! [Declare WT_EXTENSION_API] */
-#include <wiredtiger_ext.h>
-
-WT_EXTENSION_API *wt_api;
-/*! [Declare WT_EXTENSION_API] */
-
 int add_collator(WT_CONNECTION *conn);
 int add_compressor(WT_CONNECTION *conn);
-int add_data_source(WT_CONNECTION *conn);
 int add_extractor(WT_CONNECTION *conn);
 int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
@@ -653,152 +646,6 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	return (ret);
 }
 
-/*! [WT_DATA_SOURCE create] */
-static int
-my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, int exclusive, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)uri;
-	(void)exclusive;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE create] */
-
-/*! [WT_DATA_SOURCE compact] */
-static int
-my_compact(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)uri;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE compact] */
-
-/*! [WT_DATA_SOURCE drop] */
-static int
-my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)uri;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE drop] */
-
-/*! [WT_DATA_SOURCE open_cursor] */
-static int
-my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *cfg[], WT_CURSOR **new_cursor)
-{
-	/* Unused parameters */
-	(void)dsrc;
-
-	(void)session;
-	(void)uri;
-	(void)cfg;
-	(void)new_cursor;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE open_cursor] */
-
-/*! [WT_DATA_SOURCE rename] */
-static int
-my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *newname, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)uri;
-	(void)newname;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE rename] */
-
-/*! [WT_DATA_SOURCE salvage] */
-static int
-my_salvage(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)uri;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE salvage] */
-
-/*! [WT_DATA_SOURCE truncate] */
-static int
-my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)uri;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE truncate] */
-
-/*! [WT_DATA_SOURCE verify] */
-static int
-my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)uri;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE verify] */
-
-int
-add_data_source(WT_CONNECTION *conn)
-{
-	int ret;
-
-	/*! [WT_DATA_SOURCE register] */
-	static WT_DATA_SOURCE my_dsrc = {
-		my_create,
-		my_compact,
-		my_drop,
-		my_open_cursor,
-		my_rename,
-		my_salvage,
-		my_truncate,
-		my_verify
-	};
-	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
-	/*! [WT_DATA_SOURCE register] */
-
-	return (ret);
-}
-
 /*! [Implement WT_COLLATOR] */
 /*
  * A simple example of the collator API: compare the keys as strings.
@@ -988,7 +835,6 @@ connection_ops(WT_CONNECTION *conn)
 #endif
 
 	add_collator(conn);
-	add_data_source(conn);
 	add_extractor(conn);
 
 	/*! [Reconfigure a connection] */
@@ -1210,10 +1056,6 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 #endif
-
-	/*! [Initialize WT_EXTENSION_API] */
-	wiredtiger_extension_api(&wt_api);
-	/*! [Initialize WT_EXTENSION_API] */
 
 	/*! [Get the WiredTiger library version #1] */
 	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));

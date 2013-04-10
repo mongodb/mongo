@@ -28,11 +28,11 @@
 #include <string.h>
 
 #include <wiredtiger.h>
-/*! [Declare WT_EXTENSION_API] */
+/*! [WT_EXTENSION_API declaration] */
 #include <wiredtiger_ext.h>
 
 static WT_EXTENSION_API *wt_api;
-/*! [Declare WT_EXTENSION_API] */
+/*! [WT_EXTENSION_API declaration] */
 
 static int
 nop_compress(WT_COMPRESSOR *, WT_SESSION *,
@@ -44,7 +44,7 @@ nop_decompress(WT_COMPRESSOR *, WT_SESSION *,
 static WT_COMPRESSOR nop_compressor = {
     nop_compress, NULL, nop_decompress, NULL };
 
-/*! [Initialize WT_EXTENSION_API] */
+/*! [WT_EXTENSION_API initialization] */
 int
 wiredtiger_extension_init(
     WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
@@ -58,7 +58,7 @@ wiredtiger_extension_init(
 
 	return (conn->add_compressor(conn, "nop", &nop_compressor, NULL));
 }
-/*! [Initialize WT_EXTENSION_API] */
+/*! [WT_EXTENSION_API initialization] */
 
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 static int

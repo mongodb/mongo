@@ -15,9 +15,9 @@ implementation of other custom data sources.
 Applications register their WT_DATA_SOURCE interface implementations
 with WiredTiger using the WT_CONNECTION::add_data_source method:
 
-@snippet ex_all.c WT_DATA_SOURCE register
+@snippet ex_data_source.c WT_DATA_SOURCE register
 
-@section custom_data_source_methods WT_DATA_SOURCE:: methods
+@section custom_ds_methods WT_DATA_SOURCE:: methods
 
 Any of the WT_DATA_SOURCE methods may be initialized to NULL.  Calling
 uninitialized WT_DATA_SOURCE methods through a WiredTiger API will
@@ -26,7 +26,7 @@ underlying data source that does not support a compaction operation
 should set the \c compact field of their WT_DATA_SOURCE structure to
 NULL.
 
-@subsection custom_data_source_create WT_DATA_SOURCE::create method
+@subsection custom_ds_create WT_DATA_SOURCE::create method
 
 When implementing a custom data source, you may want to consider the 'r'
 key and 't' value formats, and whether or not they should be implemented.
@@ -42,7 +42,7 @@ WT_CURSOR:: structure, where between 1 and 8 of the low-order bits of
 that byte contain the bit-field's value.  For example, if the value
 format is "3t", the key's value is the bottom 3 bits.
 
-@section custom_data_source_cursor_methods WT_CURSOR:: methods
+@section custom_ds_cursor_methods WT_CURSOR:: methods
 
 The WT_DATA_SOURCE::open_cursor method is responsible for allocating and
 returning a WT_CURSOR structure.  The only fields of the WT_CURSOR
@@ -72,7 +72,7 @@ dump.
 The data source's WT_CURSOR::close method is responsible for discarding
 the allocated WT_CURSOR structure returned by WT_DATA_SOURCE::open_cursor.
 
-@subsection custom_data_source_cursor_insert WT_CURSOR::insert method
+@subsection custom_ds_cursor_insert WT_CURSOR::insert method
 
 Custom data sources supporting column-stores (that is, a store with an
 'r' type key) should consider the \c append configuration string
@@ -92,7 +92,7 @@ the semantic that inserting a new record after the current maximum
 record in a store implicitly creates the missing records as records with
 a value of 0.
 
-@section custom_data_source_cursor_fields WT_CURSOR:: key/value fields
+@section custom_ds_cursor_fields WT_CURSOR:: key/value fields
 
 Custom data source cursor methods are expected to use the \c recno,
 \c key and \c value fields of the WT_CURSOR handle.
@@ -106,7 +106,7 @@ The \c key and \c value fields are WT_ITEM structures.  The \c key.data,
 cursor methods storing items in the underlying data source and set by
 the cursor methods retrieving items from the underlying data source.
 
-@section custom_data_source_error_handling Error handling
+@section custom_ds_error_handling Error handling
 
 Some specific errors should be mapped to WiredTiger errors:
 <ul>
@@ -125,47 +125,46 @@ approach is to always return either a system error value (that is, \c
 errno), or \c WT_ERROR.   Error messages can be displayed using the
 WT_SESSION::msg_printf method.  For example:
 
-@snippet kvs_bdb.c Data-source: error message
+@snippet ex_data_source.c WT_DATA_SOURCE error message
 
-@section custom_data_source_configuration Configuration strings
+@section custom_ds_config Configuration strings
 
-Arrays of configuration strings are provided to WT_DATA_SOURCE methods.
-These strings are simple "key=value" pairs, where value may be either a
-string or a single "1" or "0" character (for "true" or "false" booleans).
-For example, boolean configuration values might be parsed as follows:
+@subsection custom_ds_config_parsing Parsing configuration strings
 
-@snippet kvs_bdb.c Data-source: boolean configuration
+Configuration information is provided to each WT_DATA_SOURCE:: method as an
+argument.  This configuration information can be parsed using the
+WT_EXTENSION_API::config method, and is returned in a WT_EXTENSION_CONFIG
+structure.
 
-And string configuration values might be parsed as follows:
+For example, the \c append, \c overwrite \c key_format and \c value_format
+configuration strings may be required for the WT_DATA_SOURCE::open_cursor
+method to correctly configure itself.
 
-@snippet kvs_bdb.c Data-source: string configuration
+A \c key_format value of "r" indicates the data source is being configured
+to use record numbers as keys.  In this case initialized WT_CURSOR methods
+must take their key value from the cursor's \c recno field, and not the
+cursor's \c key field.  (It is not required that record numbers be supported
+by a custom data source, the WT_DATA_SOURCE::open_cursor method can return
+an error if an application attempts to configure a data source with a
+\c key_format of "r".)
 
-The \c key_format and \c value_format configuration strings are provided
-to both the WT_DATA_SOURCE::create and WT_DATA_SOURCE::open_cursor methods.
-An \c append and \c overwrite configuration boolean is optionally provided
-to the WT_DATA_SOURCE::open_cursor method.
+The WT_DATA_SOURCE::open_cursor method might retrieve the boolean or
+integer value of a configuration string as follows:
 
-The \c key_format and \c value_format configuration strings are intended
-to allow the WT_DATA_SOURCE::open_cursor method to correctly configure
-itself.  Specifically, a \c key_format value of "r" indicates the data
-source is being configured to use record numbers as keys.  In this case
-initialized WT_CURSOR methods must take their key value from the
-cursor's \c recno field, and not the cursor's \c key field.  (It is not
-required that record numbers be supported by a custom data source, the
-WT_DATA_SOURCE::open_cursor method can return an error if an application
-attempts to configure a data source with a \c key_format of "r".)
+@snippet ex_data_source.c WT_EXTENSION_CONFIG boolean
+@snippet ex_data_source.c WT_EXTENSION_CONFIG integer
 
-The \c append and \c overwrite configuration strings are as described
-for the default WT_SESSION::open_cursor method and intended to allow
-WT_DATA_SOURCE cursors to change their behavior as configured by the
-application.
+The WT_DATA_SOURCE::open_cursor method might retrieve the string value
+of a configuration string as follows:
 
-Using the parsing examples above, the WT_DATA_SOURCE::open_cursor method
-might check for the configuration strings as follows:
+@snippet ex_data_source.c WT_EXTENSION_CONFIG string
 
-@snippet kvs_bdb.c Data-source: open_cursor configuration
+Note that strings returned from WT_EXTENSION_API::config are not necessarily
+nul-terminated, and the associated length must be used instead of a nul byte.
 
-@section custom_data_source_cursor_collator WT_COLLATOR
+@subsection custom_ds_config_add Creating data-specific configuration strings
+
+@section custom_ds_cursor_collator WT_COLLATOR
 
 Custom data sources do not support custom ordering of records, and
 attempting to create a custom data source with a collator configured

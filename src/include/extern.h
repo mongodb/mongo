@@ -471,6 +471,10 @@ extern int __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
+extern int __wt_ext_config(WT_SESSION *wt_session,
+    const char *key,
+    void *cfg,
+    WT_EXTENSION_CONFIG *value);
 extern  int __wt_config_getone(WT_SESSION_IMPL *session,
     const char *config,
     WT_CONFIG_ITEM *key,
@@ -1059,7 +1063,7 @@ extern void __wt_errx(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern int __wt_api_err_printf(WT_SESSION *wt_session,
+extern int __wt_ext_err_printf(WT_SESSION *wt_session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
@@ -1069,7 +1073,7 @@ extern int __wt_msg(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern int __wt_api_msg_printf(WT_SESSION *wt_session,
+extern int __wt_ext_msg_printf(WT_SESSION *wt_session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
@@ -1190,8 +1194,8 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session,
  );
 extern void __wt_scr_free(WT_ITEM **bufp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
-extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);
-extern void __wt_scr_free_ext(WT_SESSION *wt_session, void *p);
+extern void *__wt_ext_scr_alloc(WT_SESSION *wt_session, size_t size);
+extern void __wt_ext_scr_free(WT_SESSION *wt_session, void *p);
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern void __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats);
