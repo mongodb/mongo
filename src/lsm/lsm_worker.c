@@ -293,7 +293,7 @@ __lsm_bloom_create(
 	    lsm_tree->bloom_config, chunk->count,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
-	cfg[0] = WT_CONFIG_VALUE(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_NAME(session, session_open_cursor);
 	cfg[1] = "raw";
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &src));
@@ -338,7 +338,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	u_int i;
 	int locked, progress;
 	const char *drop_cfg[] =
-	    { WT_CONFIG_VALUE(session, session_drop), NULL };
+	    { WT_CONFIG_NAME(session, session_drop), NULL };
 
 	locked = progress = 0;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {

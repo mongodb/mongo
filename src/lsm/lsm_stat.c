@@ -23,10 +23,10 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	uint64_t value;
 	u_int i;
 	int locked, stat_key;
-	const char *cfg[] = { WT_CONFIG_VALUE(
+	const char *cfg[] = { WT_CONFIG_NAME(
 	    session, session_open_cursor), "statistics_fast=on", NULL };
 	const char *disk_cfg[] =
-	   { WT_CONFIG_VALUE(session, session_open_cursor),
+	   { WT_CONFIG_NAME(session, session_open_cursor),
 	   "checkpoint=WiredTigerCheckpoint,statistics_fast=on", NULL };
 	const char *desc, *pvalue;
 

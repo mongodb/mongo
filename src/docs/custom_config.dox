@@ -1,0 +1,6 @@
+/*! @page custom_config Custom Method Configuration
+
+Applications can add their own configuration strings to WiredTiger
+methods using the WT_CONNECTION::configure_method method.
+
+*/

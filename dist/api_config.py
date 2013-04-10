@@ -219,8 +219,8 @@ def getsubconfigstr(c):
     else:
         return 'NULL'
 
-# Write structures of arrays of allowable configuration options, including an
-# empty string as a terminator for iteration.
+# Write structures of arrays of allowable configuration options, including a
+# NULL as a terminator for iteration.
 for name in sorted(api_data.methods.keys()):
     ctype = api_data.methods[name].config
     if ctype:
@@ -243,12 +243,11 @@ config_defines = ''
 for name in sorted(api_data.methods.keys()):
     ctype = api_data.methods[name].config
     slot += 1
-    name = name.replace('.', '_')
 
     # Build a list of #defines that reference specific slots in the list (the
     # #defines are used to avoid a list search where we know the correct slot).
     config_defines +=\
-	'#define\tWT_CONFIG_ENTRY_' + name + '\t' * \
+	'#define\tWT_CONFIG_ENTRY_' + name.replace('.', '_') + '\t' * \
 	    max(1, 6 - int ((len('WT_CONFIG_ENTRY_' + name)) / 8)) + \
 	    "%2s" % str(slot) + '\n'
 
@@ -265,9 +264,8 @@ for name in sorted(api_data.methods.keys()):
 
     # Write the checks reference, or NULL if no related checks structure.
     tfile.write('\n\t  ')
-    name = name.replace('.', '_')
     if ctype:
-        tfile.write('confchk_' + name)
+        tfile.write('confchk_' + name.replace('.', '_'))
     else:
         tfile.write('NULL')
 
@@ -275,15 +273,19 @@ for name in sorted(api_data.methods.keys()):
     # used when the information is extended at run-time.
     tfile.write(',\n\t  NULL\n\t},')
 
+# Write a NULL as a terminator for iteration.
+tfile.write('\n\t{ NULL, NULL, NULL, NULL, NULL }')
 tfile.write('\n};\n')
 
 # Write the routine that connects the WT_CONNECTION_IMPL structure to the list
 # of configuration entry structures.
 tfile.write('''
 void
-__wt_conn_config_init(WT_CONNECTION_IMPL *conn)
+__wt_conn_config_init(WT_SESSION_IMPL *session)
 {
-	conn->config_entries = config_entries;
+	S2C(session)->config_entries = config_entries;
+	S2C(session)->config_entries_count =
+	    sizeof(config_entries)/sizeof(config_entries[0]);
 }
 ''')
 

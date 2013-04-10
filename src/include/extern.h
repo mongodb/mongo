@@ -491,8 +491,15 @@ extern  int __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
+extern void __wt_conn_config_discard(WT_SESSION_IMPL *session);
+extern int __wt_configure_method(WT_SESSION_IMPL *session,
+    const char *method,
+    const char *uri,
+    const char *name,
+    const char *type,
+    const char *check);
 extern int __wt_config_check(WT_SESSION_IMPL *session,
-    const WT_CONFIG_CHECK checks[],
+    const WT_CONFIG_ENTRY *entry,
     const char *config,
     size_t config_len);
 extern int __wt_config_collapse( WT_SESSION_IMPL *session,
@@ -501,7 +508,7 @@ extern int __wt_config_collapse( WT_SESSION_IMPL *session,
 extern int __wt_config_concat( WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);
-extern void __wt_conn_config_init(WT_CONNECTION_IMPL *conn);
+extern void __wt_conn_config_init(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
@@ -778,7 +785,7 @@ extern int __wt_strndup(WT_SESSION_IMPL *session,
     size_t len,
     void *retp);
 extern int __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp);
-extern void __wt_free_int(WT_SESSION_IMPL *session, void *p_arg);
+extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
 extern int __wt_dlopen(WT_SESSION_IMPL *session,
     const char *path,
     WT_DLH **dlhp);

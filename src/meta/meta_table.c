@@ -107,7 +107,7 @@ __wt_metadata_cursor(
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	const char *cfg[] =
-	    { WT_CONFIG_VALUE(session, session_open_cursor), config, NULL };
+	    { WT_CONFIG_NAME(session, session_open_cursor), config, NULL };
 
 	saved_dhandle = session->dhandle;
 	WT_ERR(__wt_metadata_open(session));

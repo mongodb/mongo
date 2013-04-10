@@ -43,11 +43,11 @@ __conn_load_extension(
 	const char *entry_name;
 
 	dlh = NULL;
+	entry_name = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
-	entry_name = NULL;
 	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
 
@@ -91,6 +91,8 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	WT_NAMED_COLLATOR *ncoll;
 	WT_SESSION_IMPL *session;
 
+	ncoll = NULL;
+
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
 	WT_UNUSED(cfg);
@@ -102,7 +104,6 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->collqh, ncoll, q);
 	__wt_spin_unlock(session, &conn->api_lock);
-	ncoll = NULL;
 err:	__wt_free(session, ncoll);
 
 	API_END_NOTFOUND_MAP(session, ret);
@@ -143,6 +144,7 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 
 	WT_UNUSED(name);
 	WT_UNUSED(compressor);
+	ncomp = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
@@ -154,9 +156,14 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 
 	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
-	__wt_spin_unlock(session, &conn->api_lock);
 	ncomp = NULL;
-err:	__wt_free(session, ncomp);
+	__wt_spin_unlock(session, &conn->api_lock);
+
+err:	if (ncomp != NULL) {
+		if (ncomp->name != NULL)
+			__wt_free(session, ncomp->name);
+		__wt_free(session, ncomp);
+	}
 
 	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -260,10 +267,34 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
+/*
+ * __conn_get_home --
+ *	WT_CONNECTION.get_home method.
+ */
 static const char *
 __conn_get_home(WT_CONNECTION *wt_conn)
 {
 	return (((WT_CONNECTION_IMPL *)wt_conn)->home);
+}
+
+/*
+ * __conn_configure_method --
+ *	WT_CONNECTION.configure_method method.
+ */
+static int
+__conn_configure_method(WT_CONNECTION *wt_conn, const char *method,
+    const char *uri, const char *name, const char *type, const char *check)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL_NOCONF(conn, session, configure_method);
+
+	ret = __wt_configure_method(session, method, uri, name, type, check);
+
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -550,7 +581,7 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 
 	/* Check the configuration string. */
 	WT_ERR(__wt_config_check(session,
-	    WT_CONFIG_CHECKS(session, wiredtiger_open), cbuf->data, 0));
+	    WT_CONFIG_CALL(session, wiredtiger_open), cbuf->data, 0));
 
 	/*
 	 * The configuration file falls between the default configuration and
@@ -601,7 +632,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 
 	/* Check the configuration string. */
 	WT_RET(__wt_config_check(session,
-	    WT_CONFIG_CHECKS(session, wiredtiger_open), env_config, 0));
+	    WT_CONFIG_CALL(session, wiredtiger_open), env_config, 0));
 
 	/*
 	 * The environment setting comes second-to-last: it overrides the
@@ -796,6 +827,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_close,
 		__conn_reconfigure,
 		__conn_get_home,
+		__conn_configure_method,
 		__conn_is_new,
 		__conn_open_session,
 		__conn_load_extension,
@@ -851,8 +883,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Check/set the configuration strings. */
 	WT_ERR(__wt_config_check(session,
-	    WT_CONFIG_CHECKS(session, wiredtiger_open), config, 0));
-	cfg[0] = WT_CONFIG_VALUE(session, wiredtiger_open);
+	    WT_CONFIG_CALL(session, wiredtiger_open), config, 0));
+	cfg[0] = WT_CONFIG_NAME(session, wiredtiger_open);
 	cfg[1] = config;
 	cfg[2] = NULL;
 

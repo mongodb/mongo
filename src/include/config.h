@@ -29,16 +29,15 @@ struct __wt_config_check {
 	const WT_CONFIG_CHECK *subconfigs;
 };
 
+#define	WT_CONFIG_CALL(session, n)					\
+	(&S2C(session)->config_entries[WT_CONFIG_ENTRY_##n])
 struct __wt_config_entry {
 	const char *method;			/* method name */
 	const char *uri;			/* uri or NULL if global */
 
-#define	WT_CONFIG_VALUE(session, name)					\
-	(S2C(session)->config_entries[WT_CONFIG_ENTRY_##name].value)
-	const char *value;			/* configuration base */
+#define	WT_CONFIG_NAME(session, n)	(WT_CONFIG_CALL(session, n)->name)
+	const char *name;			/* configuration base */
 
-#define	WT_CONFIG_CHECKS(session, name)					\
-	(S2C(session)->config_entries[WT_CONFIG_ENTRY_##name].checks)
 	const WT_CONFIG_CHECK *checks;		/* check array */
 
 	WT_CONFIG_ENTRY *extend;		/* extended value */

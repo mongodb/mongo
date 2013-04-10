@@ -66,8 +66,9 @@ struct __wt_named_data_source {
 struct __wt_connection_impl {
 	WT_CONNECTION iface;
 
-					/* Configuration table */
+	u_int config_entries_count;	/* Configuration table count and copy */
 	const WT_CONFIG_ENTRY *config_entries;
+	WT_CONFIG_ENTRY *config_entries_copy;
 
 	/* For operations without an application-supplied session */
 	WT_SESSION_IMPL *default_session;
