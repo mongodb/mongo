@@ -23,7 +23,7 @@ wiredtiger_strerror(int error)
 	case WT_ERROR:
 		return ("WT_ERROR: non-specific WiredTiger error");
 	case WT_NOTFOUND:
-		return ("WT_NOTFOUND: cursor item not found");
+		return ("WT_NOTFOUND: item not found");
 	case WT_PANIC:
 		return ("WT_PANIC: WiredTiger library panic");
 	case WT_RESTART:
