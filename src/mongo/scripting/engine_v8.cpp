@@ -33,6 +33,10 @@ namespace mongo {
         extern const JSFile assert;
     }
 
+    static V8Scope* getScope(v8::Isolate* isolate) {
+        return static_cast<V8Scope*>(isolate->GetData());
+    }
+
     /**
      * Unwraps a BSONObj from the JS wrapper
      */
@@ -88,8 +92,7 @@ namespace mongo {
             if (elmt.eoo())
                 return handle_scope.Close(v8::Handle<v8::Value>());
 
-            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-            V8Scope* scope = (V8Scope*)(scp->Value());
+            V8Scope* scope = getScope(info.GetIsolate());
             val = scope->mongoToV8Element(elmt, holder->_readOnly);
 
             if (obj.objsize() > 128 || val->IsObject()) {
@@ -125,8 +128,7 @@ namespace mongo {
             BSONElement elmt = obj.getField(key.c_str());
             if (elmt.eoo())
                 return handle_scope.Close(v8::Handle<v8::Value>());
-            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-            V8Scope* scope = (V8Scope*)(scp->Value());
+            V8Scope* scope = getScope(info.GetIsolate());
             val = scope->mongoToV8Element(elmt, true);
         }
         catch (const DBException &dbEx) {
@@ -159,8 +161,7 @@ namespace mongo {
         BSONObj obj = holder->_obj;
         v8::Handle<v8::Array> out = v8::Array::New();
         int outIndex = 0;
-        v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-        V8Scope* scope = (V8Scope*)(scp->Value());
+        V8Scope* scope = getScope(info.GetIsolate());
 
         unordered_set<string> added;
         // note here that if keys are parseable number, v8 will access them using index
@@ -212,8 +213,7 @@ namespace mongo {
                 return handle_scope.Close(realObject->Get(index));
             }
             string key = str::stream() << index;
-            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-            V8Scope* scope = (V8Scope*)(scp->Value());
+            V8Scope* scope = getScope(info.GetIsolate());
 
             BSONHolder* holder = unwrapHolder(info.Holder());
             if (!holder) return v8::Handle<v8::Value>();
@@ -264,8 +264,7 @@ namespace mongo {
         v8::Handle<v8::Value> val;
         try {
             string key = str::stream() << index;
-            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-            V8Scope* scope = (V8Scope*)(scp->Value());
+            V8Scope* scope = getScope(info.GetIsolate());
 
             BSONObj obj = unwrapBSONObj(info.Holder());
             BSONElement elmt = obj.getField(key);
@@ -498,6 +497,8 @@ namespace mongo {
         _context = v8::Context::New();
         v8::Context::Scope context_scope(_context);
 
+        _isolate->SetData(this);
+
         // display heap statistics on MarkAndSweep GC run
         v8::V8::AddGCPrologueCallback(gcCallback<GCPrologueState>, v8::kGCTypeMarkSweepCompact);
         v8::V8::AddGCEpilogueCallback(gcCallback<GCEpilogueState>, v8::kGCTypeMarkSweepCompact);
@@ -513,9 +514,9 @@ namespace mongo {
         lzObjectTemplate = v8::Persistent<v8::ObjectTemplate>::New(v8::ObjectTemplate::New());
         lzObjectTemplate->SetInternalFieldCount(2);
         lzObjectTemplate->SetNamedPropertyHandler(namedGet, namedSet, 0, namedDelete,
-                                                  namedEnumerator, v8::External::New(this));
+                                                  namedEnumerator);
         lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, indexedSet, 0, indexedDelete,
-                                                    namedEnumerator, v8::External::New(this));
+                                                    namedEnumerator);
         lzObjectTemplate->NewInstance()->GetPrototype()->ToObject()->ForceSet(
                                                                          v8::String::New("_bson"),
                                                                          v8::Boolean::New(true),
@@ -524,11 +525,9 @@ namespace mongo {
         roObjectTemplate = v8::Persistent<v8::ObjectTemplate>::New(v8::ObjectTemplate::New());
         roObjectTemplate->SetInternalFieldCount(2);
         roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0,
-                                                  NamedReadOnlyDelete, namedEnumerator,
-                                                  v8::External::New(this));
+                                                  NamedReadOnlyDelete, namedEnumerator);
         roObjectTemplate->SetIndexedPropertyHandler(indexedGetRO, IndexedReadOnlySet, 0,
-                                                    IndexedReadOnlyDelete, 0,
-                                                    v8::External::New(this));
+                                                    IndexedReadOnlyDelete, 0);
         roObjectTemplate->NewInstance()->GetPrototype()->ToObject()->ForceSet(
                                                                          v8::String::New("_bson"),
                                                                          v8::Boolean::New(true),
@@ -540,8 +539,7 @@ namespace mongo {
         // this it creates issues when calling certain methods that check array type
         lzArrayTemplate = v8::Persistent<v8::ObjectTemplate>::New(v8::ObjectTemplate::New());
         lzArrayTemplate->SetInternalFieldCount(1);
-        lzArrayTemplate->SetIndexedPropertyHandler(indexedGet, 0, 0, 0, 0,
-                                                   v8::External::New(this));
+        lzArrayTemplate->SetIndexedPropertyHandler(indexedGet, 0, 0, 0, 0);
         lzArrayTemplate->NewInstance()->GetPrototype()->ToObject()->ForceSet(
                                                                         v8::String::New("_bson"),
                                                                         v8::Boolean::New(true),
@@ -641,8 +639,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> V8Scope::v8Callback(const v8::Arguments &args) {
         v8::HandleScope handle_scope;
-        v8::Local<v8::External> scp = v8::External::Cast(*args.Data());
-        V8Scope* scope = (V8Scope*)(scp->Value());
+        V8Scope* scope = getScope(args.GetIsolate());
 
         if (!scope->nativePrologue())
             // execution terminated
@@ -1122,8 +1119,7 @@ namespace mongo {
     }
 
     v8::Handle<v8::FunctionTemplate> V8Scope::createV8Function(v8Function func) {
-        v8::Handle<v8::FunctionTemplate> ft = v8::FunctionTemplate::New(v8Callback,
-                                                                        v8::External::New(this));
+        v8::Handle<v8::FunctionTemplate> ft = v8::FunctionTemplate::New(v8Callback);
         ft->Set(v8::String::New("_v8_function"), v8::External::New(reinterpret_cast<void*>(func)),
                 static_cast<v8::PropertyAttribute>(v8::DontEnum | v8::ReadOnly));
         return ft;
