@@ -123,10 +123,10 @@ namespace mongo {
         bool ok() const { return _addr.size() > 0; }
 
         // Set internal to true to run the command with internal authentication privileges.
-        BSONObj runCommand( const string& db , const string& simple , bool internal = false ) const {
-            return runCommand( db , BSON( simple << 1 ) , internal );
+        BSONObj runCommand( const string& db , const string& simple ) const {
+            return runCommand( db , BSON( simple << 1 ) );
         }
-        BSONObj runCommand( const string& db , const BSONObj& cmd , bool internal = false) const ;
+        BSONObj runCommand( const string& db , const BSONObj& cmd ) const ;
 
         ShardStatus getStatus() const ;
         
@@ -290,8 +290,16 @@ namespace mongo {
          */
         bool runCommand( const string& db , const BSONObj& cmd , BSONObj& res );
 
+        static bool releaseConnectionsAfterResponse;
+
         /** checks all of my thread local connections for the version of this ns */
         static void checkMyConnectionVersions( const string & ns );
+
+        /**
+         * Returns all the current sharded connections to the pool.
+         * Note: This is *dangerous* if we have GLE state.
+         */
+        static void releaseMyConnections();
 
         /**
          * Clears all connections in the sharded pool, including connections in the

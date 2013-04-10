@@ -17,22 +17,22 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
-#include "../cmdline.h"
-#include "../commands.h"
-#include "../../util/mmap.h"
-#include "../../util/mongoutils/str.h"
-#include "health.h"
-#include "rs.h"
-#include "rs_config.h"
-#include "../dbhelpers.h"
-#include "../oplog.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/repl/health.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_config.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace bson;
 using namespace mongoutils;

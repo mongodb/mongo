@@ -123,7 +123,15 @@ namespace mongo {
          * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( const string& why , bool reenter = false, BSONObj * other = 0 );
+        bool lock_try( const string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
+
+        /**
+         * Returns true if we currently believe we hold this lock and it was possible to
+         * confirm that, within 'timeout' seconds, if provided, with the config servers. If the
+         * lock is not held or if we failed to contact the config servers within the timeout,
+         * returns false.
+         */
+        bool isLockHeld( double timeout, string* errMsg );
 
         /**
          * Releases a previously taken lock.
@@ -223,9 +231,9 @@ namespace mongo {
     	    return *this;
     	}
 
-        dist_lock_try( DistributedLock * lock , const std::string& why )
+        dist_lock_try( DistributedLock * lock , const std::string& why, double timeout = 0.0 )
             : _lock(lock), _why(why) {
-            _got = _lock->lock_try( why , false , &_other );
+            _got = _lock->lock_try( why , false , &_other, timeout );
         }
 
         ~dist_lock_try() {
@@ -235,16 +243,23 @@ namespace mongo {
             }
         }
 
-        bool reestablish(){
-            return retry();
-        }
+        /**
+         * Returns false if the lock is known _not_ to be held, otherwise asks the underlying
+         * lock to issue a 'isLockHeld' call and returns whatever that calls does.
+         */
+        bool isLockHeld( double timeout, string* errMsg) {
+            if ( !_lock ) {
+                *errMsg = "Lock is not currently set up";
+                return false;
+            }
 
-        bool retry() {
-            verify( _lock );
-            verify( _got );
-            verify( ! _other.isEmpty() );
+            if ( !_got ) {
+                *errMsg = str::stream() << "Lock " << _lock->_name << " is currently held by "
+                                        << _other;
+                return false;
+            }
 
-            return _got = _lock->lock_try( _why , true, &_other );
+            return _lock->isLockHeld( timeout, errMsg );
         }
 
         bool got() const { return _got; }

@@ -1,6 +1,11 @@
 // Test handling of messages up to and over isMaster().maxMessageSizeBytes
 
 function go() { // using a function to ensure that all resources can be freed after test
+    if (db.serverStatus().mem.bits == 32) {
+        print("skipping max_message_size.js on 32bit system");
+        return;
+    }
+
     var t = db.max_message_size;
 
     var maxMessageSize = db.isMaster().maxMessageSizeBytes;
@@ -75,12 +80,9 @@ function go() { // using a function to ensure that all resources can be freed af
     works(maxMessageSize - 1);
     works(maxMessageSize);
 
-    // Don't test failing because it forces a reconnect which is currently broken on some platforms
-    if (0) { // reenable when SERVER-8532 is fixed
-        fails(maxMessageSize + 1);
-        works(maxMessageSize); // make sure we still work after failure
-        fails(maxMessageSize + 1024*1024);
-        works(maxMessageSize);
-    }
+    fails(maxMessageSize + 1);
+    works(maxMessageSize); // make sure we still work after failure
+    fails(maxMessageSize + 1024*1024);
+    works(maxMessageSize);
 }
 go();

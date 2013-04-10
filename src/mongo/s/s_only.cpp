@@ -108,18 +108,20 @@ namespace mongo {
         std::string dbname = nsToDatabase(ns);
 
         // Access control checks
-        if (!noauth) {
+        if (AuthorizationManager::isAuthEnabled()) {
             std::vector<Privilege> privileges;
             c->addRequiredPrivileges(dbname, cmdObj, &privileges);
             AuthorizationManager* authManager = client.getAuthorizationManager();
-            if (c->requiresAuth() && (!authManager->checkAuthForPrivileges(privileges).isOK())) {
+            if (!authManager->checkAuthForPrivileges(privileges).isOK()) {
                 result.append("note", str::stream() << "not authorized for command: " <<
                                     c->name << " on database " << dbname);
                 appendCommandStatus(result, false, "unauthorized");
                 return;
             }
         }
-        if (c->adminOnly() && c->localHostOnlyIfNoAuth(cmdObj) && noauth &&
+        if (c->adminOnly() &&
+                c->localHostOnlyIfNoAuth(cmdObj) &&
+                !AuthorizationManager::isAuthEnabled() &&
                 !client.getIsLocalHostConnection()) {
             log() << "command denied: " << cmdObj.toString() << endl;
             appendCommandStatus(result,

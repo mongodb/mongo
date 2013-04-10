@@ -60,7 +60,7 @@ LIBRARY_FLAGS = {
       'CCFLAGS':      ['-ansi', '-pedantic'],
     },
     'os:macos': {
-      'CCFLAGS':      ['-ansi', '-pedantic', '-mmacosx-version-min=10.4'],
+      'CCFLAGS':      ['-ansi', '-pedantic'],
     },
     'os:freebsd': {
       'CCFLAGS':      ['-ansi'],

@@ -50,13 +50,13 @@ namespace mongo {
     int getSysctlByNameWithDefault<uintptr_t>(const char* sysctlName,
                                               const uintptr_t& defaultValue,
                                               uintptr_t* result) {
-        uintptr_t value;
+        uintptr_t value = 0;
         size_t len = sizeof(value);
         if (sysctlbyname(sysctlName, &value, &len, NULL, 0) == -1) {
             *result = defaultValue;
             return errno;
         }
-        if (len != sizeof(value)) {
+        if (len > sizeof(value)) {
             *result = defaultValue;
             return EINVAL;
         }
@@ -69,7 +69,7 @@ namespace mongo {
     int getSysctlByNameWithDefault<string>(const char* sysctlName,
                                            const string& defaultValue,
                                            string* result) {
-        char value[256];
+        char value[256] = {0};
         size_t len = sizeof(value);
         if (sysctlbyname(sysctlName, &value, &len, NULL, 0) == -1) {
             *result = defaultValue;
@@ -84,9 +84,9 @@ namespace mongo {
     }
 
     int ProcessInfo::getVirtualMemorySize() {
-        kvm_t *kd;
-        int cnt;
-        char err[_POSIX2_LINE_MAX];
+        kvm_t *kd = NULL;
+        int cnt = 0;
+        char err[_POSIX2_LINE_MAX] = {0};
         if ((kd = kvm_open(NULL, "/dev/null", "/dev/null", O_RDONLY, err)) == NULL)
             return -1;
         kinfo_proc * task = kvm_getprocs(kd, KERN_PROC_PID, _pid, &cnt);
@@ -95,9 +95,9 @@ namespace mongo {
     }
 
     int ProcessInfo::getResidentSize() {
-        kvm_t *kd;
-        int cnt;
-        char err[_POSIX2_LINE_MAX];
+        kvm_t *kd = NULL;
+        int cnt = 0;
+        char err[_POSIX2_LINE_MAX] = {0};
         if ((kd = kvm_open(NULL, "/dev/null", "/dev/null", O_RDONLY, err)) == NULL)
             return -1;
         kinfo_proc * task = kvm_getprocs(kd, KERN_PROC_PID, _pid, &cnt);
@@ -112,12 +112,12 @@ namespace mongo {
         int status = getSysctlByNameWithDefault("kern.version", string("unknown"), &osVersion);
         if (status != 0)
             log() << "Unable to collect OS Version. (errno: " 
-                  << errno << " msg: " << strerror(errno) << ")" << endl;
+                  << status << " msg: " << strerror(status) << ")" << endl;
 
         status = getSysctlByNameWithDefault("hw.machine_arch", string("unknown"), &cpuArch);
         if (status != 0)
             log() << "Unable to collect Machine Architecture. (errno: "
-                  << errno << " msg: " << strerror(errno) << ")" << endl;
+                  << status << " msg: " << strerror(status) << ")" << endl;
         addrSize = cpuArch.find("64") != std::string::npos ? 64 : 32;
 
         uintptr_t numBuffer;
@@ -126,13 +126,13 @@ namespace mongo {
         memSize = numBuffer;
         if (status != 0)
             log() << "Unable to collect Physical Memory. (errno: "
-                  << errno << " msg: " << strerror(errno) << ")" << endl;
+                  << status << " msg: " << strerror(status) << ")" << endl;
 
         status = getSysctlByNameWithDefault("hw.ncpu", defaultNum, &numBuffer);
         numCores = numBuffer;
         if (status != 0)
             log() << "Unable to collect Number of CPUs. (errno: "
-                  << errno << " msg: " << strerror(errno) << ")" << endl;
+                  << status << " msg: " << strerror(status) << ")" << endl;
 
         pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
 

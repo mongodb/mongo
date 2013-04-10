@@ -17,6 +17,7 @@
  * Unit tests of the Initializer type.
  */
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/initializer_dependency_graph.h"
 #include "mongo/base/make_string_vector.h"
@@ -50,15 +51,15 @@
 #define CONSTRUCT_DEPENDENCY_GRAPH(GRAPH, FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8) \
     do {                                                                \
         InitializerDependencyGraph& _graph_ = (GRAPH);                  \
-        ASSERT_ADD_INITIALIZER(_graph_, "n0", FN0, (), ());             \
-        ASSERT_ADD_INITIALIZER(_graph_, "n1", FN1, (), ());             \
-        ASSERT_ADD_INITIALIZER(_graph_, "n2", FN2, ("n0", "n1"), ());   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n3", FN3, ("n0", "n2"), ());   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n4", FN4, ("n2", "n1"), ());   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n5", FN5, ("n3", "n4"), ());   \
-        ASSERT_ADD_INITIALIZER(_graph_, "n6", FN6, ("n4"), ());         \
-        ASSERT_ADD_INITIALIZER(_graph_, "n7", FN7, ("n3"), ());         \
-        ASSERT_ADD_INITIALIZER(_graph_, "n8", FN8, ("n5", "n6", "n7"), ()); \
+        ASSERT_ADD_INITIALIZER(_graph_, "n0", FN0, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS); \
+        ASSERT_ADD_INITIALIZER(_graph_, "n1", FN1, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS); \
+        ASSERT_ADD_INITIALIZER(_graph_, "n2", FN2, ("n0", "n1"), MONGO_NO_DEPENDENTS);   \
+        ASSERT_ADD_INITIALIZER(_graph_, "n3", FN3, ("n0", "n2"), MONGO_NO_DEPENDENTS);   \
+        ASSERT_ADD_INITIALIZER(_graph_, "n4", FN4, ("n2", "n1"), MONGO_NO_DEPENDENTS);   \
+        ASSERT_ADD_INITIALIZER(_graph_, "n5", FN5, ("n3", "n4"), MONGO_NO_DEPENDENTS);   \
+        ASSERT_ADD_INITIALIZER(_graph_, "n6", FN6, ("n4"), MONGO_NO_DEPENDENTS);         \
+        ASSERT_ADD_INITIALIZER(_graph_, "n7", FN7, ("n3"), MONGO_NO_DEPENDENTS);         \
+        ASSERT_ADD_INITIALIZER(_graph_, "n8", FN8, ("n5", "n6", "n7"), MONGO_NO_DEPENDENTS); \
     } while (false)
 
 namespace mongo {

@@ -107,10 +107,7 @@ namespace mongo {
                 Date_t pingTime;
 
                 try {
-                    scoped_ptr<ScopedDbConnection> connPtr(
-                            ScopedDbConnection::getInternalScopedDbConnection( addr.toString(),
-                                                                               30.0 ) );
-                    ScopedDbConnection& conn = *connPtr;
+                    ScopedDbConnection conn(addr.toString(), 30.0);
 
                     pingTime = jsTime();
 
@@ -376,17 +373,16 @@ namespace mongo {
     Date_t DistributedLock::remoteTime( const ConnectionString& cluster, unsigned long long maxNetSkew ) {
 
         ConnectionString server( *cluster.getServers().begin() );
-        scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getInternalScopedDbConnection( server.toString() ) );
+        ScopedDbConnection conn(server.toString());
 
         BSONObj result;
         long long delay;
 
         try {
             Date_t then = jsTime();
-            bool success = conn->get()->runCommand( string("admin"),
-                                                    BSON( "serverStatus" << 1 ),
-                                                    result );
+            bool success = conn->runCommand( string("admin"),
+                                             BSON( "serverStatus" << 1 ),
+                                             result );
             delay = jsTime() - then;
 
             if( !success )
@@ -403,11 +399,11 @@ namespace mongo {
                                              << maxNetSkew << "ms", 13648 );
         }
         catch(...) {
-            conn->done();
+            conn.done();
             throw;
         }
 
-        conn->done();
+        conn.done();
 
         return result["localTime"].Date() - (delay / 2);
 
@@ -492,12 +488,56 @@ namespace mongo {
         return true;
     }
 
+
+    bool DistributedLock::isLockHeld( double timeout, string* errMsg ) {
+        ScopedDbConnection conn(_conn.toString(), timeout );
+
+        BSONObj lockObj;
+        try {
+            lockObj = conn->findOne( LocksType::ConfigNS,
+                                     BSON( LocksType::name(_name) ) ).getOwned();
+        }
+        catch ( DBException& e ) {
+            *errMsg = str::stream() << "error checking whether lock " << _name << " is held "
+                                    << causedBy( e );
+            return false;
+        }
+        conn.done();
+
+        if ( lockObj.isEmpty() ) {
+            *errMsg = str::stream() << "no lock for " << _name << " exists in the locks collection";
+            return false;
+        }
+
+        if ( lockObj[LocksType::state()].numberInt() < 2 ) {
+            *errMsg = str::stream() << "lock " << _name << " current state is not held ("
+                                    << lockObj[LocksType::state()].numberInt() << ")";
+            return false;
+        }
+
+        if ( lockObj[LocksType::process()].String() != _processId ) {
+            *errMsg = str::stream() << "lock " << _name << " is currently being held by "
+                                    << "another process ("
+                                    << lockObj[LocksType::process()].String() << ")";
+            return false;
+        }
+
+        if ( distLockPinger.willUnlockOID( lockObj[LocksType::lockID()].OID() ) ) {
+            *errMsg = str::stream() << "lock " << _name << " is not held and is currently being "
+                                    << "scheduled for lazy unlock by "
+                                    << lockObj[LocksType::lockID()].OID();
+            return false;
+        }
+
+        return true;
+    }
+
     // Semantics of this method are basically that if the lock cannot be acquired, returns false, can be retried.
     // If the lock should not be tried again (some unexpected error) a LockException is thrown.
     // If we are only trying to re-enter a currently held lock, reenter should be true.
     // Note:  reenter doesn't actually make this lock re-entrant in the normal sense, since it can still only
     // be unlocked once, instead it is used to verify that the lock is already held.
-    bool DistributedLock::lock_try( const string& why , bool reenter, BSONObj * other ) {
+    bool DistributedLock::lock_try( const string& why , bool reenter, BSONObj * other, double timeout ) {
 
         // TODO:  Start pinging only when we actually get the lock?
         // If we don't have a thread pinger, make sure we shouldn't have one
@@ -519,9 +559,7 @@ namespace mongo {
         if ( other == NULL )
             other = &dummyOther;
 
-        scoped_ptr<ScopedDbConnection> connPtr(
-                ScopedDbConnection::getInternalScopedDbConnection( _conn.toString() ) );
-        ScopedDbConnection& conn = *connPtr;
+        ScopedDbConnection conn(_conn.toString(), timeout );
 
         BSONObjBuilder queryBuilder;
         queryBuilder.append( LocksType::name() , _name );
@@ -806,9 +844,7 @@ namespace mongo {
             //   our own safe ts value and not be unlocked afterward.
             for ( unsigned i = 0; i < up.size(); i++ ) {
 
-                scoped_ptr<ScopedDbConnection> indDBPtr(
-                        ScopedDbConnection::getInternalScopedDbConnection( up[i].first ) );
-                ScopedDbConnection& indDB = *indDBPtr;
+                ScopedDbConnection indDB(up[i].first);
                 BSONObj indUpdate;
 
                 try {
@@ -965,9 +1001,7 @@ namespace mongo {
 
         while ( ++attempted <= maxAttempts ) {
 
-            scoped_ptr<ScopedDbConnection> connPtr(
-                    ScopedDbConnection::getInternalScopedDbConnection( _conn.toString() ) );
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(_conn.toString());
 
             try {
 
@@ -1047,9 +1081,8 @@ namespace mongo {
     }
 
     bool ScopedDistributedLock::tryAcquire(string* errMsg) {
-        bool acquired = false;
         try {
-            acquired = _lock.lock_try(_why, false, &_other);
+            _acquired = _lock.lock_try(_why, false, &_other);
         }
         catch (const DBException& e) {
 
@@ -1059,7 +1092,7 @@ namespace mongo {
             return false;
         }
 
-        return acquired;
+        return _acquired;
     }
 
     void ScopedDistributedLock::unlock() {
@@ -1090,7 +1123,7 @@ namespace mongo {
             if (msgTimer.seconds() > 10) {
 
                 log() << "waited " << timer.seconds() << "s for distributed lock " << _lock._name
-                      << " for " << _why;
+                      << " for " << _why << endl;
 
                 msgTimer.reset();
             }

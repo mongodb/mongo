@@ -5,7 +5,7 @@
 load('./jstests/multiVersion/libs/verify_versions.js');
 
 // Check our oldest and newest versions
-var versionsToCheck = [ "1.8",
+var versionsToCheck = [ "oldest-supported",
                         "latest"];
 
 for( var i = 0; i < versionsToCheck.length; i++ ){

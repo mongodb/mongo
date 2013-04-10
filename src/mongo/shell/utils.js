@@ -222,7 +222,9 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/queryoptimizera.js",
                                    "jstests/loglong.js",// log might overflow before 
                                                         // this has a chance to see the message
-                                   "jstests/connections_opened.js" // counts connections, globally
+                                   "jstests/connections_opened.js", // counts connections, globally
+                                   "jstests/opcounters.js",
+                                   "jstests/currentop.js"// SERVER-8673, plus rwlock yielding issues
                                   ] );
         
         // some tests can't be run in parallel with each other
@@ -339,14 +341,6 @@ shellPrint = function( x ){
     }
 }
 
-printjson = function(x){
-    print( tojson( x ) );
-}
-
-printjsononeline = function(x){
-    print( tojsononeline( x ) );
-}
-
 if ( typeof TestData == "undefined" ){
     TestData = undefined
 }
@@ -377,6 +371,7 @@ jsTestOptions = function(){
                               keyFile : TestData.keyFile,
                               authUser : "__system",
                               authPassword : TestData.keyFileData,
+                              authMechanism : TestData.authMechanism,
                               adminUser : TestData.adminUser || "admin",
                               adminPassword : TestData.adminPassword || "password" });
     }
@@ -567,20 +562,23 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
     var universalMethods = "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split( ' ' );
 
     var builtinMethods = {}; // uses constructor objects as keys
-    builtinMethods[Array] = "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some".split( ' ' );
+    builtinMethods[Array] = "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some isArray reduce reduceRight".split( ' ' );
     builtinMethods[Boolean] = "".split( ' ' ); // nothing more than universal methods
-    builtinMethods[Date] = "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC".split( ' ' );
-    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split( ' ' );
+    builtinMethods[Date] = "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toISOString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC now".split( ' ' );
+    if (typeof JSON != "undefined") { // JSON is new in V8
+        builtinMethods["[object JSON]"] = "parse stringify".split(' ');
+    }
+    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(' ');
     builtinMethods[Number] = "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split( ' ' );
     builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split( ' ' );
-    builtinMethods[String] = "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase".split( ' ' );
-    builtinMethods[Function] = "call apply".split( ' ' );
-    builtinMethods[Object] = "bsonsize".split( ' ' );
+    builtinMethods[String] = "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase trim trimLeft trimRight".split(' ');
+    builtinMethods[Function] = "call apply bind".split( ' ' );
+    builtinMethods[Object] = "bsonsize create defineProperty defineProperties getPrototypeOf keys seal freeze preventExtensions isSealed isFrozen isExtensible getOwnPropertyDescriptor getOwnPropertyNames".split(' ');
 
-    builtinMethods[Mongo] = "find update insert remove".split( ' ' );
-    builtinMethods[BinData] = "hex base64 length subtype".split( ' ' );
+    builtinMethods[Mongo] = "find update insert remove".split(' ');
+    builtinMethods[BinData] = "hex base64 length subtype".split(' ');
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp".split( ' ' );
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp JSON".split( ' ' );
 
     var isPrivate = function( name ) {
         if ( shellAutocomplete.showPrivate ) return false;
@@ -780,17 +778,39 @@ shellHelper.show = function (what) {
 
     if (what == "dbs" || what == "databases") {
         var dbs = db.getMongo().getDBs();
-        var size = {};
-        dbs.databases.forEach(function (x) { size[x.name] = x.sizeOnDisk; });
-        var names = dbs.databases.map(function (z) { return z.name; }).sort();
-        names.forEach(function (n) {
-            if (size[n] > 1) {
-                print(n + "\t" + size[n] / 1024 / 1024 / 1024 + "GB");
+        var dbinfo = [];
+        var maxNameLength = 0;
+        var maxGbDigits = 0;
+
+        dbs.databases.forEach(function (x){
+            var sizeStr = (x.sizeOnDisk / 1024 / 1024 / 1024).toFixed(3);
+            var nameLength = x.name.length;
+            var gbDigits = sizeStr.indexOf(".");
+
+            if( nameLength > maxNameLength) maxNameLength = nameLength;
+            if( gbDigits > maxGbDigits ) maxGbDigits = gbDigits;
+
+            dbinfo.push({
+                name:      x.name,
+                size:      x.sizeOnDisk,
+                size_str:  sizeStr,
+                name_size: nameLength,
+                gb_digits: gbDigits
+            });
+        });
+
+        dbinfo.sort(function (a,b) { a.name - b.name });
+        dbinfo.forEach(function (db) {
+            var namePadding = maxNameLength - db.name_size;
+            var sizePadding = maxGbDigits   - db.gb_digits;
+            var padding = Array(namePadding + sizePadding + 3).join(" ");
+            if (db.size > 1) {
+                print(db.name + padding + db.size_str + "GB");
             } else {
-                print(n + "\t(empty)");
+                print(db.name + padding + "(empty)");
             }
         });
-        //db.getMongo().getDBNames().sort().forEach(function (x) { print(x) });
+
         return "";
     }
     
@@ -799,7 +819,11 @@ shellHelper.show = function (what) {
         if ( args.length > 0 )
             n = args[0]
         
-        var res = db.adminCommand( { getLog : n } )
+        var res = db.adminCommand( { getLog : n } );
+        if ( ! res.ok ) {
+            print("Error while trying to show " + n + " log: " + res.errmsg);
+            return "";
+        }
         for ( var i=0; i<res.log.length; i++){
             print( res.log[i] )
         }
@@ -808,6 +832,10 @@ shellHelper.show = function (what) {
 
     if (what == "logs" ) {
         var res = db.adminCommand( { getLog : "*" } )
+        if ( ! res.ok ) {
+            print("Error while trying to show logs: " + res.errmsg);
+            return "";
+        }
         for ( var i=0; i<res.names.length; i++){
             print( res.names[i] )
         }
@@ -833,6 +861,9 @@ shellHelper.show = function (what) {
                 for ( var i=0; i<res.log.length; i++){
                     print( res.log[i] )
                 }
+                return "";
+            } else if (res.errmsg == "unauthorized") {
+                // Don't print of startupWarnings command failed due to auth
                 return "";
             } else {
                 print("Error while trying to show server startup warnings: " + res.errmsg);
@@ -883,6 +914,25 @@ Random.genExp = function( mean ) {
         }
     }
     return -Math.log( r ) * mean;
+}
+
+/**
+ * Generate a random value from the normal distribution with specified 'mean' and
+ * 'standardDeviation'.
+ */
+Random.genNormal = function( mean, standardDeviation ) {    
+
+    // See http://en.wikipedia.org/wiki/Marsaglia_polar_method
+    while ( true ) {
+        var x = ( 2 * Random.rand() ) - 1;
+        var y = ( 2 * Random.rand() ) - 1;
+        var s = ( x * x ) + ( y * y );
+
+        if ( s > 0 && s < 1 ) {
+            var standardNormal = x * Math.sqrt( -2 * Math.log( s ) / s );
+            return mean + ( standardDeviation * standardNormal );
+        }
+    }
 }
 
 Geo = {};

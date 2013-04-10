@@ -40,6 +40,7 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard.h"
 #include "mongo/util/queue.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 using namespace std;
@@ -61,6 +62,12 @@ namespace mongo {
         else {
             verify( server == _configServer );
         }
+    }
+
+    void ShardingState::initialize(const string& server) {
+        ShardedConnectionInfo::addHook();
+        shardingState.enable(server);
+        configServer.init(server);
     }
 
     void ShardingState::gotShardName( const string& name ) {
@@ -268,6 +275,10 @@ namespace mongo {
         }
 
         {
+            // NOTE: This lock prevents the ns version from changing while a write operation occurs.
+            Lock::DBRead readLk(ns);
+            
+            // This lock prevents simultaneous metadata changes using the same map
             scoped_lock lk( _mutex );
 
             // since we loaded the chunk manager unlocked, other thread may have done the same
@@ -370,9 +381,13 @@ namespace mongo {
     }
 
     void ShardedConnectionInfo::addHook() {
+        static mongo::mutex lock("ShardedConnectionInfo::addHook mutex");
         static bool done = false;
+
+        scoped_lock lk(lock);
         if (!done) {
-            LOG(1) << "adding sharding hook" << endl;
+            log() << "first cluster operation detected, adding sharding hook to enable versioning "
+                    "and authentication to remote servers" << endl;
             pool.addHook(new ShardingConnectionHook(false));
             shardConnectionPool.addHook(new ShardingConnectionHook(true));
             done = true;
@@ -478,9 +493,7 @@ namespace mongo {
             }
             
             if ( locked ) {
-                ShardedConnectionInfo::addHook();
-                shardingState.enable( configdb );
-                configServer.init( configdb );
+                ShardingState::initialize(configdb);
                 return true;
             }
 

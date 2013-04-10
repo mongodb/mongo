@@ -20,6 +20,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/fts/fts_index_format.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -70,6 +71,15 @@ namespace mongo {
 
             // create index keys from raw scores
             // only 1 per string
+
+            uassert( 16732,
+                     mongoutils::str::stream() << "too many unique keys for a single document to"
+                     << " have a text index, max is " << term_freqs.size() << obj["_id"],
+                     term_freqs.size() <= 400000 );
+
+            long long keyBSONSize = 0;
+            const int MaxKeyBSONSizeMB = 4;
+
             for ( TermFrequencyMap::const_iterator i = term_freqs.begin();
                   i != term_freqs.end();
                   ++i ) {
@@ -96,6 +106,15 @@ namespace mongo {
                 verify( guess >= res.objsize() );
 
                 keys->insert( res );
+
+                keyBSONSize += res.objsize();
+
+                uassert( 16733,
+                         mongoutils::str::stream()
+                         << "trying to index text where term list is too big, max is "
+                         << MaxKeyBSONSizeMB << "mb " << obj["_id"],
+                         keyBSONSize <= ( MaxKeyBSONSizeMB * 1024 * 1024 ) );
+
             }
         }
 

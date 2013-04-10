@@ -245,6 +245,15 @@ namespace mongo {
         LockStat& lockStat() { return _lockStat; }
 
         void setKillWaiterFlags();
+
+        /**
+         * Find a currently running operation matching the given criteria. This assumes that you're
+         * going to kill the operation, so it must be called multiple times to get multiple matching
+         * operations.
+         * @param criteria the search to do against the infoNoauth() BSONObj
+         * @return a pointer to a matching op or NULL if no ops match
+         */
+        static CurOp* getOp(const BSONObj& criteria);
     private:
         friend class Client;
         void _reset();

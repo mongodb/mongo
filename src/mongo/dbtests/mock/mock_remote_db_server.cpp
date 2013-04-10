@@ -24,6 +24,7 @@ using std::string;
 using std::vector;
 
 namespace mongo {
+
     MockRemoteDBServer::CircularBSONIterator::CircularBSONIterator(
             const vector<BSONObj>& replyVector) {
         for (std::vector<mongo::BSONObj>::const_iterator iter = replyVector.begin();
@@ -54,6 +55,7 @@ namespace mongo {
             _cmdCount(0),
             _queryCount(0),
             _instanceID(0) {
+        insert(IdentityNS, BSON(HostField(hostAndPort)), 0);
     }
 
     MockRemoteDBServer::~MockRemoteDBServer() {

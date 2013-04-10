@@ -37,7 +37,7 @@ namespace mongo {
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
     /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
-       contains records up to that size.  All records > 4mb are placed into the 16mb bucket.
+       contains records up to that size.  All records >= 4mb are placed into the 16mb bucket.
     */
     int bucketSizes[] = {
         0x20,     0x40,     0x80,     0x100,
@@ -235,10 +235,9 @@ namespace mongo {
         int bucketSize = bucketSizes[bucketIdx];
         int quantizeUnit = bucketSize / 16;
         if (allocSize >= (1 << 22)) // 4mb
-            // all allocatons > 4mb result in 4mb/16 quantization units, even if allocated in
-            // the 8mb+ bucket.  idea is to reduce quantization overhead of large records at
-            // the cost of increasing the DeletedRecord size distribution in the largest bucket
-            // by factor of 4.
+            // all allocatons >= 4mb result in 4mb/16 quantization units, even if >= 8mb.  idea is
+            // to reduce quantization overhead of large records at the cost of increasing the
+            // DeletedRecord size distribution in the largest bucket by factor of 4.
             quantizeUnit = (1 << 18); // 256k
         if (allocSize % quantizeUnit == 0)
             // size is already quantized
@@ -248,7 +247,17 @@ namespace mongo {
         return quantizedSpace;
     }
 
-    /* predetermine location of the next alloc without actually doing it. 
+    int NamespaceDetails::quantizePowerOf2AllocationSpace(int allocSize) {
+        int allocationSize = bucketSizes[ bucket( allocSize ) ];
+        if ( allocationSize == bucketSizes[MaxBucket] ) {
+            // if we get here, it means we're allocating more than 4mb, so round
+            // to the nearest megabyte
+            allocationSize = 1 + ( allocSize | ( ( 1 << 20 ) - 1 ) );
+        }
+        return allocationSize;
+    }
+
+    /* predetermine location of the next alloc without actually doing it.
         if cannot predetermine returns null (so still call alloc() then)
     */
     DiskLoc NamespaceDetails::allocWillBeAt(const char *ns, int lenToAlloc) {
@@ -265,11 +274,7 @@ namespace mongo {
     */
     DiskLoc NamespaceDetails::alloc(const char* ns, int lenToAlloc) {
         {
-            // align very slightly.  
-            // note that if doing more coarse-grained quantization (really just if it isn't always
-            //   a constant amount but if it varied by record size) then that quantization should 
-            //   NOT be done here but rather in getRecordAllocationSize() so that we can grab a
-            //   deletedrecord that is just big enough if we happen to run into one.
+            // align very slightly.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         }
 
@@ -290,6 +295,22 @@ namespace mongo {
         int left = regionlen - lenToAlloc;
         if ( ! isCapped() ) {
             if ( left < 24 || left < (lenToAlloc >> 3) ) {
+                // you get the whole thing.
+                return loc;
+            }
+        }
+
+        // don't quantize:
+        //   - capped collections: just wastes space
+        //   - $ collections (indexes) as we already have those aligned the way we want SERVER-8425
+        if ( !isCapped() && NamespaceString::normal( ns ) ) {
+            // we quantize here so that it only impacts newly sized records
+            // this prevents oddities with older records and space re-use SERVER-8435
+            lenToAlloc = std::min( r->lengthWithHeaders(),
+                                   NamespaceDetails::quantizeAllocationSpace( lenToAlloc ) );
+            left = regionlen - lenToAlloc;
+
+            if ( left < 24 ) {
                 // you get the whole thing.
                 return loc;
             }
@@ -325,7 +346,7 @@ namespace mongo {
         int extra = 5; // look for a better fit, a little.
         int chain = 0;
         while ( 1 ) {
-            {
+            { // defensive check
                 int fileNumber = cur.a();
                 int fileOffset = cur.getOfs();
                 if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
@@ -830,6 +851,10 @@ namespace mongo {
 
 
     int NamespaceDetails::getRecordAllocationSize( int minRecordSize ) {
+
+        if ( isCapped() )
+            return minRecordSize;
+
         if ( _paddingFactor == 0 ) {
             warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
             setPaddingFactor(1.0);
@@ -838,24 +863,12 @@ namespace mongo {
 
         
         if ( isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
-            int allocationSize = bucketSizes[ bucket( minRecordSize ) ];
-            if ( allocationSize == bucketSizes[MaxBucket] ) {
-                // if we get here, it means we're allocating more than 4mb, so round
-                // to the nearest megabyte
-                allocationSize = 1 + ( minRecordSize | ( ( 1 << 20 ) - 1 ) );
-            }
-            return allocationSize;
+            // quantize to the nearest bucketSize (or nearest 1mb boundary for large sizes).
+            return quantizePowerOf2AllocationSpace(minRecordSize);
         }
 
         // adjust for padding factor
-        int allocationSize = static_cast<int>(minRecordSize * _paddingFactor);
-
-        if (isCapped())
-            // pad record size for capped collections, but do not quantize
-            return allocationSize;
-
-        // quantize to the nearest 1/16th bucketSize
-        return quantizeAllocationSpace(allocationSize);
+        return static_cast<int>(minRecordSize * _paddingFactor);
     }
 
     /* ------------------------------------------------------------------------- */

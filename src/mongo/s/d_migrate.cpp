@@ -47,17 +47,17 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pagefault.h"
-#include "mongo/db/queryoptimizer.h"
-#include "mongo/db/repl.h"
-#include "mongo/db/repl_block.h"
+#include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
+#include "mongo/db/repl/write_concern.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/queue.h"
@@ -217,11 +217,9 @@ namespace mongo {
                     return;
                 }
 
+                IndexChunk chunk( ns, min, max, indexKeyPattern );
                 long long numDeleted =
-                        Helpers::removeRange( ns,
-                                              min,
-                                              max,
-                                              indexKeyPattern,
+                        Helpers::removeRange( chunk,
                                               false, /*maxInclusive*/
                                               secondaryThrottle,
                                               cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -740,7 +738,7 @@ namespace mongo {
         Client::initThread((string(cleanUpThreadName) + string("-") +
                                                         OID::gen().toString()).c_str());
 
-        if (!noauth) {
+        if (AuthorizationManager::isAuthEnabled()) {
             cc().getAuthorizationManager()->grantInternalAuthorization("_cleanupOldData");
         }
 
@@ -967,8 +965,7 @@ namespace mongo {
                     return false;
                 }
                 string configdb = cmdObj["configdb"].String();
-                shardingState.enable( configdb );
-                configServer.init( configdb );
+                ShardingState::initialize(configdb);
             }
 
             MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , errmsg );
@@ -1000,7 +997,7 @@ namespace mongo {
             dist_lock_try dlk;
 
             try{
-                dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString() );
+                dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString(), 30.0 /*timeout*/ );
             }
             catch( LockException& e ){
                 errmsg = str::stream() << "error locking distributed lock for migration " << "migrate-" << min.toString() << causedBy( e );
@@ -1020,18 +1017,16 @@ namespace mongo {
             ChunkVersion startingVersion;
             string myOldShard;
             {
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection(
-                                shardingState.getConfigServer(), 30));
+                ScopedDbConnection conn(shardingState.getConfigServer(), 30);
 
                 BSONObj x;
                 BSONObj currChunk;
                 try{
-                    x = conn->get()->findOne(ChunkType::ConfigNS,
+                    x = conn->findOne(ChunkType::ConfigNS,
                                              Query(BSON(ChunkType::ns(ns)))
                                                   .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
 
-                    currChunk = conn->get()->findOne(ChunkType::ConfigNS,
+                    currChunk = conn->findOne(ChunkType::ConfigNS,
                                                      shardId.wrap(ChunkType::name().c_str()));
                 }
                 catch( DBException& e ){
@@ -1045,7 +1040,7 @@ namespace mongo {
                 verify(currChunk[ChunkType::min()].type());
                 verify(currChunk[ChunkType::max()].type());
                 myOldShard = currChunk[ChunkType::shard()].String();
-                conn->done();
+                conn.done();
 
                 BSONObj currMin = currChunk[ChunkType::min()].Obj();
                 BSONObj currMax = currChunk[ChunkType::max()].Obj();
@@ -1123,21 +1118,20 @@ namespace mongo {
                 if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
                     return false;
 
-                scoped_ptr<ScopedDbConnection> connTo(
-                        ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                ScopedDbConnection connTo(toShard.getConnString());
                 BSONObj res;
                 bool ok;
                 try{
-                    ok = connTo->get()->runCommand( "admin" ,
-                                                    BSON( "_recvChunkStart" << ns <<
-                                                          "from" << fromShard.getConnString() <<
-                                                          "min" << min <<
-                                                          "max" << max <<
-                                                          "shardKeyPattern" << shardKeyPattern <<
-                                                          "configServer" << configServer.modelServer() <<
-                                                          "secondaryThrottle" << secondaryThrottle
-                                                          ) ,
-                                                    res );
+                    ok = connTo->runCommand( "admin" ,
+                                             BSON( "_recvChunkStart" << ns <<
+                                                   "from" << fromShard.getConnString() <<
+                                                   "min" << min <<
+                                                   "max" << max <<
+                                                   "shardKeyPattern" << shardKeyPattern <<
+                                                   "configServer" << configServer.modelServer() <<
+                                                   "secondaryThrottle" << secondaryThrottle
+                                             ) ,
+                                             res );
                 }
                 catch( DBException& e ){
                     errmsg = str::stream() << "moveChunk could not contact to: shard "
@@ -1146,7 +1140,7 @@ namespace mongo {
                     return false;
                 }
 
-                connTo->done();
+                connTo.done();
 
                 if ( ! ok ) {
                     errmsg = "moveChunk failed to engage TO-shard in the data transfer: ";
@@ -1166,12 +1160,11 @@ namespace mongo {
                 // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few
                 // iterations, since we want empty chunk migrations to be fast.
                 sleepmillis( 1 << std::min( i , 10 ) );
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                ScopedDbConnection conn(toShard.getConnString());
                 BSONObj res;
                 bool ok;
                 try {
-                    ok = conn->get()->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
+                    ok = conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
                     res = res.getOwned();
                 }
                 catch( DBException& e ){
@@ -1180,7 +1173,7 @@ namespace mongo {
                     return false;
                 }
 
-                conn->done();
+                conn.done();
 
                 LOG(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
@@ -1197,13 +1190,12 @@ namespace mongo {
                 if ( migrateFromStatus.mbUsed() > (500 * 1024 * 1024) ) {
                     // this is too much memory for us to use for this
                     // so we're going to abort the migrate
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                    ScopedDbConnection conn(toShard.getConnString());
 
                     BSONObj res;
-                    conn->get()->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
+                    conn->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
                     res = res.getOwned();
-                    conn->done();
+                    conn.done();
                     error() << "aborting migrate because too much memory used res: " << res << migrateLog;
                     errmsg = "aborting migrate because too much memory used";
                     result.appendBool( "split" , true );
@@ -1215,6 +1207,22 @@ namespace mongo {
             timing.done(4);
 
             // 5.
+
+            // Before we get into the critical section of the migration, let's double check
+            // that the config servers are reachable and the lock is in place.
+            log() << "About to check if it is safe to enter critical section";
+
+            string lockHeldMsg;
+            bool lockHeld = dlk.isLockHeld( 30.0 /* timeout */, &lockHeldMsg );
+            if ( !lockHeld ) {
+                errmsg = str::stream() << "not entering migrate critical section because "
+                                       << lockHeldMsg;
+                warning() << errmsg << endl;
+                return false;
+            }
+
+            log() << "About to enter migrate critical section";
+
             {
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
@@ -1238,14 +1246,12 @@ namespace mongo {
                 // could be ongoing
                 {
                     BSONObj res;
-                    scoped_ptr<ScopedDbConnection> connTo(
-                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString(),
-                                                                       35.0 ) );
+                    ScopedDbConnection connTo(toShard.getConnString(), 35.0);
 
                     bool ok;
 
                     try{
-                        ok = connTo->get()->runCommand( "admin" ,
+                        ok = connTo->runCommand( "admin" ,
                                                         BSON( "_recvChunkCommit" << 1 ) ,
                                                         res );
                     }
@@ -1255,7 +1261,7 @@ namespace mongo {
                         ok = false;
                     }
 
-                    connTo->done();
+                    connTo.done();
 
                     if ( ! ok ) {
                         log() << "moveChunk migrate commit not accepted by TO-shard: " << res
@@ -1387,25 +1393,50 @@ namespace mongo {
                 BSONObj cmd = cmdBuilder.obj();
                 LOG(7) << "moveChunk update: " << cmd << migrateLog;
 
+                int exceptionCode = OkCode;
                 bool ok = false;
                 BSONObj cmdResult;
                 try {
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getInternalScopedDbConnection(
-                                    shardingState.getConfigServer(),
-                                    10.0 ) );
-                    ok = conn->get()->runCommand( "config" , cmd , cmdResult );
-                    conn->done();
+                    ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
+                    ok = conn->runCommand( "config" , cmd , cmdResult );
+                    conn.done();
                 }
                 catch ( DBException& e ) {
                     warning() << e << migrateLog;
                     ok = false;
+                    exceptionCode = e.getCode();
                     BSONObjBuilder b;
                     e.getInfo().append( b );
                     cmdResult = b.obj();
+                    errmsg = cmdResult.toString();
                 }
 
-                if ( ! ok ) {
+                if ( exceptionCode == PrepareConfigsFailedCode ) {
+
+                    // In the process of issuing the migrate commit, the SyncClusterConnection
+                    // checks that the config servers are reachable. If they are not, we are
+                    // sure that the applyOps command was not sent to any of the configs, so we
+                    // can safely back out of the migration here, by resetting the shard
+                    // version that we bumped up to in the donateChunk() call above.
+
+                    log() << "About to acquire moveChunk global lock to reset shard version from "
+                          << "failed migration" << endl;
+
+                    {
+                        Lock::GlobalWrite lk;
+
+                        // Revert the chunk manager back to the state before "forgetting"
+                        // about the chunk.
+                        shardingState.undoDonateChunk( ns , min , max , startingVersion );
+                    }
+
+                    log() << "Shard version successfully reset to clean up failed migration" << endl;
+
+                    errmsg = "Failed to send migrate commit to configs because " + errmsg;
+                    return false;
+
+                }
+                else if ( ! ok || exceptionCode != OkCode ) {
 
                     // this could be a blip in the connectivity
                     // wait out a few seconds and check if the commit request made it
@@ -1418,32 +1449,30 @@ namespace mongo {
                     sleepsecs( 10 );
 
                     try {
-                        scoped_ptr<ScopedDbConnection> conn(
-                                ScopedDbConnection::getInternalScopedDbConnection(
-                                        shardingState.getConfigServer(),
-                                        10.0 ) );
+                        ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
 
                         // look for the chunk in this shard whose version got bumped
                         // we assume that if that mod made it to the config, the applyOps was successful
-                        BSONObj doc = conn->get()->findOne(ChunkType::ConfigNS,
-                                                           Query(BSON(ChunkType::ns(ns)))
-                                                               .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+                        BSONObj doc = conn->findOne(ChunkType::ConfigNS,
+                                                    Query(BSON(ChunkType::ns(ns)))
+                                                        .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
 
                         ChunkVersion checkVersion =
                             ChunkVersion::fromBSON(doc[ChunkType::DEPRECATED_lastmod()]);
 
                         if ( checkVersion.isEquivalentTo( nextVersion ) ) {
                             log() << "moveChunk commit confirmed" << migrateLog;
+                            errmsg.clear();
 
                         }
                         else {
-                            error() << "moveChunk commit failed: version is at"
+                            error() << "moveChunk commit failed: version is at "
                                             << checkVersion << " instead of " << nextVersion << migrateLog;
                             error() << "TERMINATING" << migrateLog;
                             dbexit( EXIT_SHARDING_ERROR );
                         }
 
-                        conn->done();
+                        conn.done();
 
                     }
                     catch ( ... ) {
@@ -1564,9 +1593,7 @@ namespace mongo {
             string errmsg;
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , errmsg );
 
-            scoped_ptr<ScopedDbConnection> connPtr(
-                    ScopedDbConnection::getScopedDbConnection( from ) );
-            ScopedDbConnection& conn = *connPtr;
+            ScopedDbConnection conn(from);
             conn->getLastError(); // just test connection
 
             {
@@ -1619,10 +1646,8 @@ namespace mongo {
 
                 // 2. delete any data already in range
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                long long num = Helpers::removeRange( ns,
-                                                      min,
-                                                      max,
-                                                      indexKeyPattern,
+                IndexChunk chunk( ns, min, max, indexKeyPattern );
+                long long num = Helpers::removeRange( chunk,
                                                       false, /*maxInclusive*/
                                                       secondaryThrottle, /* secondaryThrottle */
                                                       cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -1848,10 +1873,8 @@ namespace mongo {
                     BSONObj idIndexPattern = Helpers::inferKeyPattern( id );
 
                     // TODO: create a better interface to remove objects directly
-                    Helpers::removeRange( ns ,
-                                          id ,
-                                          id,
-                                          idIndexPattern ,
+                    IndexChunk chunk( ns, id, id, idIndexPattern );
+                    Helpers::removeRange( chunk ,
                                           true , /*maxInclusive*/
                                           false , /* secondaryThrottle */
                                           cmdLine.moveParanoia ? &rs : 0 , /*callback*/
@@ -1976,7 +1999,7 @@ namespace mongo {
 
     void migrateThread() {
         Client::initThread( "migrateThread" );
-        if (!noauth) {
+        if (AuthorizationManager::isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
             cc().getAuthorizationManager()->grantInternalAuthorization("_migrateThread");
         }
@@ -2012,7 +2035,7 @@ namespace mongo {
             }
 
             if ( ! configServer.ok() )
-                configServer.init( cmdObj["configServer"].String() );
+                ShardingState::initialize(cmdObj["configServer"].String());
 
             migrateStatus.prepare();
 

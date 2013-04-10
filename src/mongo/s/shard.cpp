@@ -46,15 +46,13 @@ namespace mongo {
 
             list<BSONObj> all;
             {
-                scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection(
-                                configServer.getPrimary().getConnString(), 30));
-                auto_ptr<DBClientCursor> c = conn->get()->query(ShardType::ConfigNS , Query());
+                ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
+                auto_ptr<DBClientCursor> c = conn->query(ShardType::ConfigNS , Query());
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
                 while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
                 }
-                conn->done();
+                conn.done();
             }
 
             scoped_lock lk( _mutex );
@@ -341,29 +339,23 @@ namespace mongo {
         out.flush();
     }
 
-    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd , bool internal ) const {
-        scoped_ptr<ScopedDbConnection> conn;
-
-        if ( internal ) {
-            conn.reset( ScopedDbConnection::getInternalScopedDbConnection( getConnString() ) );
-        } else {
-            conn.reset( ScopedDbConnection::getScopedDbConnection( getConnString() ) );
-        }
+    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
+        ScopedDbConnection conn(getConnString());
         BSONObj res;
-        bool ok = conn->get()->runCommand( db , cmd , res );
+        bool ok = conn->runCommand( db , cmd , res );
         if ( ! ok ) {
             stringstream ss;
             ss << "runCommand (" << cmd << ") on shard (" << _name << ") failed : " << res;
-            conn->done();
+            conn.done();
             throw UserException( 13136 , ss.str() );
         }
         res = res.getOwned();
-        conn->done();
+        conn.done();
         return res;
     }
 
     ShardStatus Shard::getStatus() const {
-        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) , true ) );
+        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
     }
 
     void Shard::reloadShardInfo() {
@@ -410,7 +402,7 @@ namespace mongo {
     }
 
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
-        if( !noauth ) {
+        if(AuthorizationManager::isAuthEnabled()) {
             string err;
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
 
@@ -421,7 +413,8 @@ namespace mongo {
                                       false );
 
             uassert( 15847, str::stream() << "can't authenticate to server "
-                                          << conn->getServerAddress() << causedBy( err ), result );
+                                          << conn->getServerAddress() << causedBy( err ), 
+                     result );
         }
 
         if ( _shardedConnections && versionManager.isVersionableCB( conn ) ) {

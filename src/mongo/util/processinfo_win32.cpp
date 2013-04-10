@@ -49,8 +49,10 @@ namespace mongo {
             }
             supported = false;
         }
-    } psapiGlobal;
-                
+    };
+
+    static PsApiInit* psapiGlobal = NULL;
+
     int _wconvertmtos( SIZE_T s ) {
         return (int)( s / ( 1024 * 1024 ) );
     }
@@ -191,6 +193,9 @@ namespace mongo {
         osVersion = verstr.str();
         hasNuma = checkNumaEnabled();
         _extraStats = bExtra.obj();
+        if (psapiGlobal == NULL) {
+            psapiGlobal = new PsApiInit();
+        }
 
     }
 
@@ -199,7 +204,7 @@ namespace mongo {
     }
 
     bool ProcessInfo::blockCheckSupported() {
-        return psapiGlobal.supported;
+        return psapiGlobal->supported;
     }
 
     bool ProcessInfo::blockInMemory(const void* start) {
@@ -219,7 +224,7 @@ namespace mongo {
 #endif
         PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
         wsinfo.VirtualAddress = const_cast<void*>(start);
-        BOOL result = psapiGlobal.QueryWSEx( GetCurrentProcess(), &wsinfo, sizeof(wsinfo) );
+        BOOL result = psapiGlobal->QueryWSEx( GetCurrentProcess(), &wsinfo, sizeof(wsinfo) );
         if ( result )
             if ( wsinfo.VirtualAttributes.Valid )
                 return true;
@@ -237,7 +242,7 @@ namespace mongo {
                     reinterpret_cast<unsigned long long>(startOfFirstPage) + i * getPageSize());
         }
 
-        BOOL result = psapiGlobal.QueryWSEx(GetCurrentProcess(),
+        BOOL result = psapiGlobal->QueryWSEx(GetCurrentProcess(),
                                             wsinfo.get(),
                                             sizeof(PSAPI_WORKING_SET_EX_INFORMATION) * numPages);
 

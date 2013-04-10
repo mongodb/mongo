@@ -170,7 +170,7 @@ namespace mongo {
         const char *colon = strrchr(p, ':');
         if( colon ) {
             int port = atoi(colon+1);
-            uassert(13095, "HostAndPort: bad port #", port > 0);
+            massert(13095, "HostAndPort: bad port #", port > 0);
             _host = string(p,colon-p);
             _port = port;
         }

@@ -38,6 +38,12 @@ namespace mongo {
         void waitToBeNotified();
 
         /*
+         * Blocks until the method 'notifyOne()' is called or the time interval elapses.
+         * Returns true if notified, false if timeout.
+         */
+        bool timedWaitToBeNotified( int millis );
+
+        /*
          * Notifies the waiter of '*this' that it can proceed.  Can only be called once.
          */
         void notifyOne();

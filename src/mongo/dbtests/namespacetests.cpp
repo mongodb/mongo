@@ -23,6 +23,7 @@
 
 #include "../db/db.h"
 #include "../db/json.h"
+#include "mongo/db/hashindex.h"
 #include "mongo/db/queryutil.h"
 
 #include "dbtests.h"
@@ -921,17 +922,123 @@ namespace NamespaceTests {
         
     } // namespace IndexDetailsTests
 
-    namespace IndexSpecTests {
+    namespace IndexSpecSuitability {
         
-        class Suitability {
+        /** An index is helpful for a query on the indexed field. */
+        class IndexedQueryField {
         public:
             void run() {
                 IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
-                FieldRangeSet frs1( "", BSON( "a" << 2 << "b" << 3 ), true , true );
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs1 , BSONObj() ) );
-                FieldRangeSet frs2( "", BSON( "b" << 3 ), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs2, BSONObj() ) );
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs2, BSON( "a" << 1 ) ) );
+                FieldRangeSet frs( "n/a", BSON( "a" << 2 ), true , true );
+                // Checking a return value of HELPFUL instead of OPTIMAL is descriptive rather than
+                // normative.  See SERVER-4485.
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+            }
+        };
+        
+        /** An index is useless for a query not on an indexed field. */
+        class NoIndexedQueryField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSON( "b" << 2 ), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+            }
+        };
+        
+        /** An index is useless for a query on the child of the indexed field. */
+        class ChildOfIndexQueryField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSON( "a.b" << 2 ), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+            }
+        };
+        
+        /** An index is useless for a query on the parent of the indexed field. */
+        class ParentOfIndexQueryField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSON( "a" << 2 ), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+            }
+        };
+        
+        /**
+         * An index is useless for an equality query containing a field name completing the indexed
+         * field path.
+         */
+        class ObjectMatchCompletingIndexField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSON( "a" << BSON( "b" << 2 ) ), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+            }
+        };
+        
+        /** An index is helpful for an ordering on the indexed field. */
+        class IndexedOrderField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSONObj(), true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSON( "a" << 1 ) ) );
+            }
+        };
+        
+        /** An index is helpful for a reverse direction ordering on the indexed field. */
+        class IndexedReverseOrderField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << -1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSONObj(), true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSON( "a" << 1 ) ) );
+            }
+        };
+        
+        /**
+         * An index is helpful for an ordering containing the indexed field, even if the first
+         * ordered field is not indexed.  This is a descriptive rather than normative test.
+         */
+        class NonPrefixIndexedOrderField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSONObj(), true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSON( "b" << 1 << "a" << 1 ) ) );
+            }
+        };
+
+        /** An index is useless for an ordering on an unindexed field. */
+        class NoIndexedOrderField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSONObj(), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSON( "b" << 1 ) ) );
+            }
+        };
+        
+        /** An index is useless for an ordering on the child of an indexed field. */
+        class ChildOfIndexOrderField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSONObj(), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSON( "a.b" << 1 ) ) );
+            }
+        };
+        
+        /** An index is useless for an ordering on the parent of an indexed field. */
+        class ParentOfIndexOrderField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                FieldRangeSet frs( "n/a", BSONObj(), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -940,12 +1047,456 @@ namespace NamespaceTests {
         public:
             void run() {
                 IndexSpec spec( BSON( "1" << 1 ), BSONObj() );
-                FieldRangeSet frs1( "", BSON( "1" << 2 ), true , true );
+                FieldRangeSet frs1( "n/a", BSON( "1" << 2 ), true , true );
                 ASSERT_EQUALS( HELPFUL, spec.suitability( frs1, BSONObj() ) );
-                FieldRangeSet frs2( "", BSON( "01" << 3), true , true );
+                FieldRangeSet frs2( "n/a", BSON( "01" << 3), true , true );
                 ASSERT_EQUALS( USELESS, spec.suitability( frs2, BSON( "01" << 1 ) ) );
-                FieldRangeSet frs3( "", BSONObj() , true , true );
+                FieldRangeSet frs3( "n/a", BSONObj() , true , true );
                 ASSERT_EQUALS( HELPFUL, spec.suitability( frs3, BSON( "1" << 1 ) ) );
+            }
+        };
+
+        namespace TwoD {
+
+            /** A 2d index is optimal for a $within predicate on the indexed field. */
+            class Within {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$within:{$box:[[100,0],[120,100]]}}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2d index is useless for a $within predicate not on the indexed field. */
+            class WithinUnindexed {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$within:{$box:[[100,0],[120,100]]}}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "b" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2d index is optimal for a $near predicate on the indexed field. */
+            class Near {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$near:[100,0]}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A 2d index is helpful for a location object equality predicate on the indexed field.
+             */
+            class LocationObject {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{lat:4,lon:5}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A 2d index is helpful for a predicate object on the indexed field.  This is a
+             * descriptive rather than normative test.  See SERVER-8644.
+             */
+            class PredicateObject {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$gt:4,$lt:5}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2d index is helpful for an array equality predicate on the indexed field. */
+            class Array {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:[1,1]}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2d index is useless for a numeric equality predicate on the indexed field. */
+            class Number {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:1}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2d index is useless without a predicate on the indexed field. */
+            class Missing {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+
+            /**
+             * A 2d index is useless for a $near predicate on the indexed field within a $and
+             * clause.  This is a descriptive rather than normative test.  See SERVER-4572.
+             */
+            class InsideAnd {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{$and:[{a:{$near:[100,0]}}]}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A 2d index is optimal for a $near predicate on the indexed field adjacent to a $or
+             * expression.
+             */
+            class OutsideOr {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$near:[100,0]},$or:[{b:1}]}" );
+                    OrRangeGenerator org( "n/a", query, true );
+                    scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
+                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( OPTIMAL,
+                                   spec.suitability( frsp->getSingleKeyFRS(), BSONObj() ) );
+                }
+            };
+
+        } // namespace TwoD
+
+        namespace S2 {
+
+            /** A 2dsphere index is optimal for a $geoIntersects predicate on the indexed field. */
+            class GeoIntersects {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$geoIntersects:{$geometry:{type:'Point',"
+                                              "coordinates:[40,5]}}}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2dsphere index is useless for a $geoIntersects predicate on an unindexed field. */
+            class GeoIntersectsUnindexed {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$geoIntersects:{$geometry:{type:'Point',"
+                                              "coordinates:[40,5]}}}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "b" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2dsphere index is optimal for a $near predicate on the indexed field. */
+            class Near {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$near:[100,0]}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A 2dsphere index is useless for a location object equality predicate on the indexed
+             * field.
+             */
+            class LocationObject {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{lat:4,lon:5}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2dsphere index is useless for a predicate object on the indexed field. */
+            class PredicateObject {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$gt:4,$lt:5}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2dsphere index is helpful for an array equality predicate on the indexed field. */
+            class Array {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:[1,1]}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A 2dsphere index is useless for a numeric equality predicate on the indexed field.
+             */
+            class Number {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:1}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A 2dsphere index is useless without a predicate on the indexed field. */
+            class Missing {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+
+            /**
+             * A 2dsphere index is useless for a $near predicate on the indexed field within a $and
+             * clause.  This is a descriptive rather than normative test.  See SERVER-4572.
+             */
+            class InsideAnd {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{$and:[{a:{$near:[100,0]}}]}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A 2dsphere index is optimal for a $near predicate on the indexed field adjacent to a
+             * $or expression.
+             */
+            class OutsideOr {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$near:[100,0]},$or:[{b:1}]}" );
+                    OrRangeGenerator org( "n/a", query, true );
+                    scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
+                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( OPTIMAL,
+                                   spec.suitability( frsp->getSingleKeyFRS(), BSONObj() ) );
+                }
+            };
+
+        } // namespace S2
+
+        namespace Hashed {
+
+            /** A hashed index is helpful for an equality predicate on the indexed field. */
+            class Equality {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:5}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A hashed index is useless for a range predicate on the indexed field. */
+            class GreaterThan {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$gt:4}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /** A hashed index is helpful for a set membership predicate on the indexed field. */
+            class InSet {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:{$in:[1,2]}}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A hashed index is helpful for an equality predicate on the indexed field, within a
+             * singleton $and clause.
+             */
+            class AndEqualitySingleton {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{$and:[{a:5}]}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A hashed index is helpful for an equality predicate on the indexed field, within a
+             * non singleton $and clause.
+             */
+            class AndEqualityNonSingleton {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{$and:[{a:5},{b:5}]}" );
+                    FieldRangeSet frs( "n/a", query, true, true );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A hashed index is helpful for an equality predicate on the indexed field, within a
+             * singleton $or clause.
+             */
+            class EqualityInsideSingletonOr {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{$or:[{a:5}]}" );
+                    OrRangeGenerator org( "n/a", query, true );
+                    scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                                                              BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A hashed index is helpful for an equality predicate on the indexed field, within a
+             * non standalone singleton $or clause.
+             */
+            class EqualityInsideNonStandaloneSingletonOr {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{z:5,$or:[{a:5}]}" );
+                    OrRangeGenerator org( "n/a", query, true );
+                    scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                                                              BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A hashed index is helpful for an equality predicate on the indexed field, within a
+             * non singleton $or clause.
+             */
+            class EqualityInsideNonSingletonOr {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{$or:[{a:5},{b:5}]}" );
+                    OrRangeGenerator org( "n/a", query, true );
+                    scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                                                              BSONObj() ) );
+                }
+            };
+            
+            /**
+             * A hashed index is helpful for an equality predicate on the indexed field, adjacent to
+             * a $or clause.
+             */
+            class EqualityOutsideOr {
+            public:
+                void run() {
+                    BSONObj query = fromjson( "{a:5,$or:[{z:5}]}" );
+                    OrRangeGenerator org( "n/a", query, true );
+                    scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
+                    IndexSpec spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                                                              BSONObj() ) );
+                }
+            };
+
+        } // namespace Hashed
+
+        // GeoHaystack does not implement its own suitability().  See SERVER-8645.
+         
+    } // namespace IndexSpecSuitability
+
+    namespace IndexSpecTests {
+
+        /** A missing field is represented as null in a btree index. */
+        class BtreeIndexMissingField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ) );
+                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
+            }
+        };
+        
+        /** A missing field is represented as null in a 2d index. */
+        class TwoDIndexMissingField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << "2d" ) );
+                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
+            }
+        };
+        
+        /** A missing field is represented with the hash of null in a hashed index. */
+        class HashedIndexMissingField {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << "hashed" ) );
+                BSONObj nullObj = BSON( "a" << BSONNULL );
+                BSONObjSet nullFieldKeySet;
+                spec.getKeys( nullObj, nullFieldKeySet );
+                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
+                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0 ),
+                               nullFieldFromKey.Long() );
+                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
+                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
+            }
+        };
+
+        /**
+         * A missing field is represented with the hash of null in a hashed index.  This hash value
+         * depends on the hash seed.
+         */
+        class HashedIndexMissingFieldAlternateSeed {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << "hashed" ), BSON( "seed" << 0x5eed ) );
+                BSONObj nullObj = BSON( "a" << BSONNULL );
+                BSONObjSet nullFieldKeySet;
+                spec.getKeys( BSONObj(), nullFieldKeySet );
+                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
+                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0x5eed ),
+                               nullFieldFromKey.Long() );
+                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
+                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
             }
         };
         
@@ -1015,6 +1566,44 @@ namespace NamespaceTests {
                 string as( 187, 'a' );
                 b.append( "a", as );
                 return b.obj();
+            }
+
+            /** Return the smallest DeletedRecord in deletedList, or DiskLoc() if none. */
+            DiskLoc smallestDeletedRecord() {
+                for( int i = 0; i < Buckets; ++i ) {
+                    if ( !nsd()->deletedList[ i ].isNull() ) {
+                        return nsd()->deletedList[ i ];
+                    }
+                }
+                return DiskLoc();
+            }
+
+            /**
+             * 'cook' the deletedList by shrinking the smallest deleted record to size
+             * 'newDeletedRecordSize'.
+             */
+            void cookDeletedList( int newDeletedRecordSize ) {
+
+                // Extract the first DeletedRecord from the deletedList.
+                DiskLoc deleted;
+                for( int i = 0; i < Buckets; ++i ) {
+                    if ( !nsd()->deletedList[ i ].isNull() ) {
+                        deleted = nsd()->deletedList[ i ];
+                        nsd()->deletedList[ i ].writing().Null();
+                        break;
+                    }
+                }
+                ASSERT( !deleted.isNull() );
+
+                // Shrink the DeletedRecord's size to newDeletedRecordSize.
+                ASSERT_GREATER_THAN_OR_EQUALS( deleted.drec()->lengthWithHeaders(),
+                                               newDeletedRecordSize );
+                getDur().writingInt( deleted.drec()->lengthWithHeaders() ) = newDeletedRecordSize;
+
+                // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
+                // new size.
+                nsd()->deletedList[ NamespaceDetails::bucket( newDeletedRecordSize ) ].writing() =
+                        deleted;
             }
         };
 
@@ -1162,6 +1751,315 @@ namespace NamespaceTests {
             }
         };
 
+        /**
+         * Except for the largest bucket, quantizePowerOf2AllocationSpace quantizes to the nearest
+         * bucket size.
+         */
+        class QuantizePowerOf2ToBucketSize : public Base {
+        public:
+            void run() {
+                create();
+                for( int iBucket = 0; iBucket < MaxBucket - 1; ++iBucket ) {
+                    int bucketSize = bucketSizes[ iBucket ];
+                    int nextBucketSize = bucketSizes[ iBucket + 1 ];
+
+                    // bucketSize - 1 is quantized to bucketSize.
+                    ASSERT_EQUALS( bucketSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace
+                                           ( bucketSize - 1 ) );
+
+                    // bucketSize is quantized to nextBucketSize.
+                    // Descriptive rather than normative test.
+                    // SERVER-8311 A pre quantized size is rounded to the next quantum level.
+                    ASSERT_EQUALS( nextBucketSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace
+                                           ( bucketSize ) );
+
+                    // bucketSize + 1 is quantized to nextBucketSize.
+                    ASSERT_EQUALS( nextBucketSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace
+                                           ( bucketSize + 1 ) );
+                }
+
+                // The next to largest bucket size - 1 is quantized to the next to largest bucket
+                // size.
+                ASSERT_EQUALS( bucketSizes[ MaxBucket - 1 ],
+                               NamespaceDetails::quantizePowerOf2AllocationSpace
+                                       ( bucketSizes[ MaxBucket - 1 ] - 1 ) );
+            }
+        };
+
+        /**
+         * Within the largest bucket, quantizePowerOf2AllocationSpace quantizes to the nearest
+         * megabyte boundary.
+         */
+        class QuantizeLargePowerOf2ToMegabyteBoundary : public Base {
+        public:
+            void run() {
+                create();
+                
+                // Iterate iSize over all 1mb boundaries from the size of the next to largest bucket
+                // to the size of the largest bucket + 1mb.
+                for( int iSize = bucketSizes[ MaxBucket - 1 ];
+                     iSize <= bucketSizes[ MaxBucket ] + 0x100000;
+                     iSize += 0x100000 ) {
+
+                    // iSize - 1 is quantized to iSize.
+                    ASSERT_EQUALS( iSize,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize - 1 ) );
+
+                    // iSize is quantized to iSize + 1mb.
+                    // Descriptive rather than normative test.
+                    // SERVER-8311 A pre quantized size is rounded to the next quantum level.
+                    ASSERT_EQUALS( iSize + 0x100000,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize ) );
+
+                    // iSize + 1 is quantized to iSize + 1mb.
+                    ASSERT_EQUALS( iSize + 0x100000,
+                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize + 1 ) );
+                }
+            }
+        };
+
+        /** getRecordAllocationSize() returns its argument when the padding factor is 1.0. */
+        class GetRecordAllocationSizeNoPadding : public Base {
+        public:
+            void run() {
+                create();
+                ASSERT_EQUALS( 1.0, nsd()->paddingFactor() );
+                ASSERT_EQUALS( 300, nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** getRecordAllocationSize() multiplies by a padding factor > 1.0. */
+        class GetRecordAllocationSizeWithPadding : public Base {
+        public:
+            void run() {
+                create();
+                double paddingFactor = 1.2;
+                nsd()->setPaddingFactor( paddingFactor );
+                ASSERT_EQUALS( paddingFactor, nsd()->paddingFactor() );
+                ASSERT_EQUALS( static_cast<int>( 300 * paddingFactor ),
+                               nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /**
+         * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
+         * is set.
+         */
+        class GetRecordAllocationSizePowerOf2 : public Base {
+        public:
+            void run() {
+                create();
+                ASSERT( nsd()->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                ASSERT_EQUALS( 512, nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        
+        /**
+         * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
+         * is set, ignoring the padding factor.
+         */
+        class GetRecordAllocationSizePowerOf2PaddingIgnored : public Base {
+        public:
+            void run() {
+                create();
+                ASSERT( nsd()->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                nsd()->setPaddingFactor( 2.0 );
+                ASSERT_EQUALS( 2.0, nsd()->paddingFactor() );
+                ASSERT_EQUALS( 512, nsd()->getRecordAllocationSize( 300 ) );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** alloc() quantizes the requested size using quantizeAllocationSpace() rules. */
+        class AllocQuantized : public Base {
+        public:
+            void run() {
+                create();
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+
+                // The expected location returned by allocWillBeAt() matches alloc().
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+
+                // The length of the allocated record is quantized.
+                ASSERT_EQUALS( 320, actualLocation.rec()->lengthWithHeaders() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** alloc() does not quantize records in capped collections. */
+        class AllocCappedNotQuantized : public Base {
+        public:
+            void run() {
+                create();
+                DiskLoc loc = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( 300, loc.rec()->lengthWithHeaders() );
+            }
+            virtual string spec() const { return "{capped:true,size:2048}"; }
+        };
+
+        /**
+         * alloc() does not quantize records in index collections using quantizeAllocationSpace()
+         * rules.
+         */
+        class AllocIndexNamespaceNotQuantized : public Base {
+        public:
+            void run() {
+                create();
+
+                // Find the indexNamespace name and indexNsd metadata pointer.
+                int idIndexNo = nsd()->findIdIndex();
+                IndexDetails& idx = nsd()->idx( idIndexNo );
+                string indexNamespace = idx.indexNamespace();
+                ASSERT( !NamespaceString::normal( indexNamespace.c_str() ) );
+                NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
+
+                // Check that no quantization is performed.
+                DiskLoc expectedLocation = indexNsd->allocWillBeAt( indexNamespace.c_str(), 300 );
+                DiskLoc actualLocation = indexNsd->alloc( indexNamespace.c_str(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
+            }
+        };
+
+        /** alloc() quantizes records in index collections to the nearest multiple of 4. */
+        class AllocIndexNamespaceSlightlyQuantized : public Base {
+        public:
+            void run() {
+                create();
+
+                // Find the indexNamespace name and indexNsd metadata pointer.
+                int idIndexNo = nsd()->findIdIndex();
+                IndexDetails& idx = nsd()->idx( idIndexNo );
+                string indexNamespace = idx.indexNamespace();
+                ASSERT( !NamespaceString::normal( indexNamespace.c_str() ) );
+                NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
+
+                // Check that multiple of 4 quantization is performed.
+                DiskLoc expectedLocation = indexNsd->allocWillBeAt( indexNamespace.c_str(), 298 );
+                DiskLoc actualLocation = indexNsd->alloc( indexNamespace.c_str(), 298 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
+            }
+        };
+
+        /** alloc() returns a non quantized record larger than the requested size. */
+        class AllocUseNonQuantizedDeletedRecord : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 310 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 310, actualLocation.rec()->lengthWithHeaders() );
+
+                // No deleted records remain after alloc returns the non quantized record.
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** alloc() returns a non quantized record equal to the requested size. */
+        class AllocExactSizeNonQuantizedDeletedRecord : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 300 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /**
+         * alloc() returns a non quantized record equal to the quantized size plus some extra space
+         * too small to make a DeletedRecord.
+         */
+        class AllocQuantizedWithExtra : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 343 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+                ASSERT_EQUALS( 343, actualLocation.rec()->lengthWithHeaders() );
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+        
+        /**
+         * alloc() returns a quantized record when the extra space in the reclaimed deleted record
+         * is large enough to form a new deleted record.
+         */
+        class AllocQuantizedWithoutExtra : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 344 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+
+                // The returned record is quantized from 300 to 320.
+                ASSERT_EQUALS( 320, actualLocation.rec()->lengthWithHeaders() );
+
+                // A new 24 byte deleted record is split off.
+                ASSERT_EQUALS( 24, smallestDeletedRecord().drec()->lengthWithHeaders() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /**
+         * A non quantized deleted record within 1/8 of the requested size is returned as is, even
+         * if a quantized portion of the deleted record could be used instead.
+         */
+        class AllocNotQuantizedNearDeletedSize : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 344 );
+                DiskLoc expectedLocation = nsd()->allocWillBeAt( ns(), 319 );
+                DiskLoc actualLocation = nsd()->alloc( ns(), 319 );
+                ASSERT_EQUALS( expectedLocation, actualLocation );
+
+                // Even though 319 would be quantized to 320 and 344 - 320 == 24 could become a new
+                // deleted record, the entire deleted record is returned because
+                // ( 344 - 320 ) < ( 320 >> 3 ).
+                ASSERT_EQUALS( 344, actualLocation.rec()->lengthWithHeaders() );
+                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
+            }
+            virtual string spec() const { return ""; }
+        };
+
+        /** An attempt to allocate a record larger than the largest deleted record fails. */
+        class AllocFailsWithTooSmallDeletedRecord : public Base {
+        public:
+            void run() {
+                create();
+                cookDeletedList( 299 );
+
+                // allocWillBeAt() and alloc() fail.
+                ASSERT( nsd()->allocWillBeAt( ns(), 300 ).isNull() );
+                ASSERT( nsd()->alloc( ns(), 300 ).isNull() );
+            }
+            virtual string spec() const { return ""; }
+        };
+        
         /* test  NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc)
         */
         class TruncateCapped : public Base {
@@ -1430,14 +2328,74 @@ namespace NamespaceTests {
             add< IndexDetailsTests::MissingField >();
             add< IndexDetailsTests::SubobjectMissing >();
             add< IndexDetailsTests::CompoundMissing >();
-            add< IndexSpecTests::Suitability >();
-            add< IndexSpecTests::NumericFieldSuitability >();
+            add< IndexSpecSuitability::IndexedQueryField >();
+            add< IndexSpecSuitability::NoIndexedQueryField >();
+            add< IndexSpecSuitability::ChildOfIndexQueryField >();
+            add< IndexSpecSuitability::ParentOfIndexQueryField >();
+            add< IndexSpecSuitability::ObjectMatchCompletingIndexField >();
+            add< IndexSpecSuitability::NoIndexedQueryField >();
+            add< IndexSpecSuitability::IndexedOrderField >();
+            add< IndexSpecSuitability::IndexedReverseOrderField >();
+            add< IndexSpecSuitability::NonPrefixIndexedOrderField >();
+            add< IndexSpecSuitability::NoIndexedOrderField >();
+            add< IndexSpecSuitability::ChildOfIndexOrderField >();
+            add< IndexSpecSuitability::ParentOfIndexOrderField >();
+            add< IndexSpecSuitability::NumericFieldSuitability >();
+            add< IndexSpecSuitability::TwoD::Within >();
+            add< IndexSpecSuitability::TwoD::WithinUnindexed >();
+            add< IndexSpecSuitability::TwoD::Near >();
+            add< IndexSpecSuitability::TwoD::LocationObject >();
+            add< IndexSpecSuitability::TwoD::PredicateObject >();
+            add< IndexSpecSuitability::TwoD::Array >();
+            add< IndexSpecSuitability::TwoD::Number >();
+            add< IndexSpecSuitability::TwoD::Missing >();
+            add< IndexSpecSuitability::TwoD::InsideAnd >();
+            add< IndexSpecSuitability::TwoD::OutsideOr >();
+            add< IndexSpecSuitability::S2::GeoIntersects >();
+            add< IndexSpecSuitability::S2::GeoIntersectsUnindexed >();
+            add< IndexSpecSuitability::S2::Near >();
+            add< IndexSpecSuitability::S2::LocationObject >();
+            add< IndexSpecSuitability::S2::PredicateObject >();
+            add< IndexSpecSuitability::S2::Array >();
+            add< IndexSpecSuitability::S2::Number >();
+            add< IndexSpecSuitability::S2::Missing >();
+            add< IndexSpecSuitability::S2::InsideAnd >();
+            add< IndexSpecSuitability::S2::OutsideOr >();
+            add< IndexSpecSuitability::Hashed::Equality >();
+            add< IndexSpecSuitability::Hashed::GreaterThan >();
+            add< IndexSpecSuitability::Hashed::InSet >();
+            add< IndexSpecSuitability::Hashed::AndEqualitySingleton >();
+            add< IndexSpecSuitability::Hashed::AndEqualityNonSingleton >();
+            add< IndexSpecSuitability::Hashed::EqualityInsideSingletonOr >();
+            add< IndexSpecSuitability::Hashed::EqualityInsideNonStandaloneSingletonOr >();
+            add< IndexSpecSuitability::Hashed::EqualityInsideNonSingletonOr >();
+            add< IndexSpecSuitability::Hashed::EqualityOutsideOr >();
+            add< IndexSpecTests::BtreeIndexMissingField >();
+            add< IndexSpecTests::TwoDIndexMissingField >();
+            add< IndexSpecTests::HashedIndexMissingField >();
+            add< IndexSpecTests::HashedIndexMissingFieldAlternateSeed >();
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
             add< NamespaceDetailsTests::QuantizeMinMaxBound >();
             add< NamespaceDetailsTests::QuantizeFixedBuckets >();
             add< NamespaceDetailsTests::QuantizeRecordBoundary >();
+            add< NamespaceDetailsTests::QuantizePowerOf2ToBucketSize >();
+            add< NamespaceDetailsTests::QuantizeLargePowerOf2ToMegabyteBoundary >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizeNoPadding >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizeWithPadding >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizePowerOf2 >();
+            add< NamespaceDetailsTests::GetRecordAllocationSizePowerOf2PaddingIgnored >();
+            add< NamespaceDetailsTests::AllocQuantized >();
+            add< NamespaceDetailsTests::AllocCappedNotQuantized >();
+            add< NamespaceDetailsTests::AllocIndexNamespaceNotQuantized >();
+            add< NamespaceDetailsTests::AllocIndexNamespaceSlightlyQuantized >();
+            add< NamespaceDetailsTests::AllocUseNonQuantizedDeletedRecord >();
+            add< NamespaceDetailsTests::AllocExactSizeNonQuantizedDeletedRecord >();
+            add< NamespaceDetailsTests::AllocQuantizedWithExtra >();
+            add< NamespaceDetailsTests::AllocQuantizedWithoutExtra >();
+            add< NamespaceDetailsTests::AllocNotQuantizedNearDeletedSize >();
+            add< NamespaceDetailsTests::AllocFailsWithTooSmallDeletedRecord >();
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::TruncateCapped >();
             add< NamespaceDetailsTests::Migrate >();

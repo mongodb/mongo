@@ -2,11 +2,6 @@
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongod", "mongod.vcxproj", "{215B2D68-0A70-4D10-8E75-B31010C62A91}"
-	ProjectSection(ProjectDependencies) = postProject
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A} = {7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SpiderMonkey pre-build step", "..\..\third_party\js-1.7\SpiderMonkey-prebuild.vcxproj", "{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,21 +31,6 @@ Global
 		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusRelease|Win32.Build.0 = Win2008PlusRelease|Win32
 		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|x64
 		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Win2008PlusRelease|x64.Build.0 = Win2008PlusRelease|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|Win32.ActiveCfg = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|Win32.Build.0 = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|x64.ActiveCfg = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|x64.Build.0 = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|Win32.ActiveCfg = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|Win32.Build.0 = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|x64.ActiveCfg = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|Win32.ActiveCfg = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|Win32.Build.0 = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|x64.ActiveCfg = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|x64.Build.0 = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|Win32.ActiveCfg = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|Win32.Build.0 = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|x64.ActiveCfg = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

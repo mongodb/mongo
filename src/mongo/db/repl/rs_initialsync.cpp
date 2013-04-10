@@ -14,17 +14,18 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/repl/rs.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/oplog.h"
-#include "mongo/db/oplogreader.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/rs_optime.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -158,22 +159,21 @@ namespace mongo {
         // find the member with the lowest ping time that has more data than me
 
         // Find primary's oplog time. Reject sync candidates that are more than
-        // MAX_SLACK_TIME seconds behind.
+        // maxSyncSourceLagSecs seconds behind.
         OpTime primaryOpTime;
-        static const unsigned maxSlackDurationSeconds = 10 * 60; // 10 minutes
         if (primary)
             primaryOpTime = primary->hbinfo().opTime;
         else
             // choose a time that will exclude no candidates, since we don't see a primary
-            primaryOpTime = OpTime(maxSlackDurationSeconds, 0);
+            primaryOpTime = OpTime(maxSyncSourceLagSecs, 0);
 
-        if ( primaryOpTime.getSecs() < maxSlackDurationSeconds ) {
+        if (primaryOpTime.getSecs() < static_cast<unsigned int>(maxSyncSourceLagSecs)) {
             // erh - I think this means there was just a new election
             // and we don't yet know the new primary's optime
-            primaryOpTime = OpTime(maxSlackDurationSeconds, 0);
+            primaryOpTime = OpTime(maxSyncSourceLagSecs, 0);
         }
 
-        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSlackDurationSeconds, 0);
+        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSyncSourceLagSecs, 0);
 
         Member *closest = 0;
         time_t now = 0;

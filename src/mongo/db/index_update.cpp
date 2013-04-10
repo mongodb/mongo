@@ -522,6 +522,11 @@ namespace mongo {
         BackgroundIndexBuildJob(const char *ns) : BackgroundOperation(ns) { }
 
         unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx) {
+
+            // clear cached things since we are changing state
+            // namely what fields are indexed
+            NamespaceDetailsTransient::get(ns.c_str()).addedIndex();
+
             unsigned long long n = 0;
 
             prep(ns.c_str(), d);
@@ -548,8 +553,10 @@ namespace mongo {
     void buildAnIndex(const std::string& ns,
                       NamespaceDetails* d,
                       IndexDetails& idx,
-                      bool background,
                       bool mayInterrupt) {
+
+        bool background = idx.info.obj()["background"].trueValue();
+
         tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;

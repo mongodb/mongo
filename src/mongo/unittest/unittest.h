@@ -51,12 +51,12 @@
 /**
  * Assert that a Status code is OK.
  */
-#define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(Status::OK(), (EXPRESSION))
+#define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
 
 /**
  * Assert that a status code is anything but OK.
  */
-#define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(Status::OK(), (EXPRESSION))
+#define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
 
 /**
  * Fails if "EXPRESSION" is true.
@@ -79,7 +79,7 @@
 /**
  * Binary comparison utility macro.  Do not use directly.
  */
-#define _ASSERT_COMPARISON(COMPARISON, a, b) mongo::unittest::ComparisonAssertion( \
+#define _ASSERT_COMPARISON(COMPARISON, a, b) ::mongo::unittest::ComparisonAssertion( \
             #a, #b , __FILE__ , __LINE__ ).assert##COMPARISON( (a), (b) )
 
 /**

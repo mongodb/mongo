@@ -50,6 +50,9 @@ namespace mongo {
         
         void doTTLForDB( const string& dbName ) {
 
+            //check isMaster before becoming god
+            bool isMaster = isMasterNs( dbName.c_str() );
+
             Client::GodScope god;
 
             vector<BSONObj> indexes;
@@ -100,7 +103,7 @@ namespace mongo {
                         nsd->syncUserFlags( ns );
                     }
                     // only do deletes if on master
-                    if ( ! isMasterNs( dbName.c_str() ) ) {
+                    if ( ! isMaster ) {
                         continue;
                     }
 

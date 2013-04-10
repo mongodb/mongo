@@ -37,9 +37,6 @@
 
 namespace mongo {
 
-    // this is a config setting, set at startup and not changing after initialization.
-    bool noauth = true;
-
     AuthInfo::AuthInfo() {
         user = "__system";
     }
@@ -52,6 +49,7 @@ namespace mongo {
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
 
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
+    bool AuthorizationManager::_authEnabled = false;
 
 namespace {
     const std::string ADMIN_DBNAME = "admin";
@@ -99,6 +97,7 @@ namespace {
         readRoleActions.addAction(ActionType::dbHash);
         readRoleActions.addAction(ActionType::dbStats);
         readRoleActions.addAction(ActionType::find);
+        readRoleActions.addAction(ActionType::indexRead);
         readRoleActions.addAction(ActionType::killCursors);
 
         // Read-write role
@@ -130,6 +129,7 @@ namespace {
         dbAdminRoleActions.addAction(ActionType::dropCollection);
         dbAdminRoleActions.addAction(ActionType::dropIndexes);
         dbAdminRoleActions.addAction(ActionType::ensureIndex);
+        dbAdminRoleActions.addAction(ActionType::indexRead);
         dbAdminRoleActions.addAction(ActionType::indexStats);
         dbAdminRoleActions.addAction(ActionType::profileEnable);
         dbAdminRoleActions.addAction(ActionType::profileRead);
@@ -239,6 +239,14 @@ namespace {
 
     void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
         _doesSupportOldStylePrivileges = enabled;
+    }
+
+    void AuthorizationManager::setAuthEnabled(bool enabled) {
+        _authEnabled = enabled;
+    }
+
+    bool AuthorizationManager::isAuthEnabled() {
+        return _authEnabled;
     }
 
     static inline Status _oldPrivilegeFormatNotSupported() {
@@ -559,9 +567,9 @@ namespace {
      *
      * Returns non-OK status if "role" is not a defined role in "dbname".
      */
-    static Status _addPrivilegesForSystemRole(const std::string& dbname,
-                                              const std::string& role,
-                                              std::vector<Privilege>* outPrivileges) {
+    static void _addPrivilegesForSystemRole(const std::string& dbname,
+                                            const std::string& role,
+                                            std::vector<Privilege>* outPrivileges) {
         const bool isAdminDB = (dbname == ADMIN_DBNAME);
 
         if (role == SYSTEM_ROLE_READ) {
@@ -596,11 +604,9 @@ namespace {
                     Privilege(PrivilegeSet::WILDCARD_RESOURCE, clusterAdminRoleActions));
         }
         else {
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() <<"No such role, " << role <<
-                          ", in database " << dbname);
+            warning() << "No such role, \"" << role << "\", in database " << dbname <<
+                    ". No privileges will be acquired from this role" << endl;
         }
-        return Status::OK();
     }
 
     /**
@@ -628,9 +634,7 @@ namespace {
             BSONElement roleElement = *iter;
             if (roleElement.type() != String)
                 return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
-            Status status = _addPrivilegesForSystemRole(dbname, roleElement.str(), outPrivileges);
-            if (!status.isOK())
-                return status;
+            _addPrivilegesForSystemRole(dbname, roleElement.str(), outPrivileges);
         }
         return Status::OK();
     }
@@ -765,9 +769,12 @@ namespace {
             newActions.removeAction(ActionType::update);
             newActions.removeAction(ActionType::remove);
             newActions.addAction(ActionType::userAdmin);
-        } else if (collectionName == "system.profile" && newActions.contains(ActionType::find)) {
+        } else if (collectionName == "system.profile") {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::profileRead);
+        } else if (collectionName == "system.indexes" && newActions.contains(ActionType::find)) {
+            newActions.removeAction(ActionType::find);
+            newActions.addAction(ActionType::indexRead);
         }
 
         return Privilege(privilege.getResource(), newActions);

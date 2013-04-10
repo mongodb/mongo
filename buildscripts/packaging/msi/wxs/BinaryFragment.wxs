@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Fragment>
+    <DirectoryRef Id="BIN">
+      <Component Id="c_bsondump" Guid="DEEA45CA-5175-453B-9D0B-6168B4C0C891">
+        <File Id="f_bsondump" Name="bsondump.exe" Source="$(var.BinarySource)\bsondump.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongo" Guid="395C3DA5-A905-409C-AD96-29BFFF5E12D6">
+        <File Id="f_mongo" Name="mongo.exe" Source="$(var.BinarySource)\mongo.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongod" Guid="7EDFB4A2-5A45-4C41-8F6D-976558B3A9D6">
+        <File Id="f_mongod" Name="mongod.exe" Source="$(var.BinarySource)\mongod.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongodPdb" Guid="8B41A2E2-911C-4399-8E9F-D3C1AD3B9EDD">
+        <File Id="f_mongodPdb" Name="mongod.pdb" Source="$(var.BinarySource)\mongod.pdb"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongodump" Guid="FFE32884-ACAD-4EC6-AF84-6BC94F55819E">
+        <File Id="f_mongodump" Name="mongodump.exe" Source="$(var.BinarySource)\mongodump.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongoexport" Guid="FD5FFDE2-53A1-45F3-9CCA-3AC311DF647C">
+        <File Id="f_mongoexport" Name="mongoexport.exe" Source="$(var.BinarySource)\mongoexport.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongofiles" Guid="CF8696D3-92B4-4CB9-B4D0-16155D726FE6">
+        <File Id="f_mongofiles" Name="mongofiles.exe" Source="$(var.BinarySource)\mongofiles.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongoimport" Guid="A4C06F69-2BB3-4068-A7E7-25347CCF01DE">
+        <File Id="f_mongoimport" Name="mongoimport.exe" Source="$(var.BinarySource)\mongoimport.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongooplog" Guid="FAD84CBB-4666-4C22-A0DF-E1D2AEEC1601">
+        <File Id="f_mongooplog" Name="mongooplog.exe" Source="$(var.BinarySource)\mongooplog.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongoperf" Guid="B046CCD2-39DC-4CB4-8A58-A7790148C41E">
+        <File Id="f_mongoperf" Name="mongoperf.exe" Source="$(var.BinarySource)\mongoperf.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongorestore" Guid="72A16D11-242E-4368-93C9-5F6162C548FC">
+        <File Id="f_mongorestore" Name="mongorestore.exe" Source="$(var.BinarySource)\mongorestore.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongos" Guid="3CA63864-9FA0-4DAE-A664-2BE9A157FB60">
+        <File Id="f_mongos" Name="mongos.exe" Source="$(var.BinarySource)\mongos.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongosPdb" Guid="F1694AB8-4B0D-4096-AD67-948063FF2A6C">
+        <File Id="f_mongosPdb" Name="mongos.pdb" Source="$(var.BinarySource)\mongos.pdb"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongostat" Guid="0A881C85-AB39-4247-BADD-C8191F2FFF0C">
+        <File Id="f_mongostat" Name="mongostat.exe" Source="$(var.BinarySource)\mongostat.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongotop" Guid="616C562D-0504-4F2D-A6E7-CC21A58F9F81">
+        <File Id="f_mongotop" Name="mongotop.exe" Source="$(var.BinarySource)\mongotop.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

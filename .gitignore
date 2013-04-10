@@ -44,6 +44,7 @@
 /src/mongo/*/*/*Debug*/
 /src/mongo/*/*Release*/
 /src/mongo/*/*/*Release*/
+/src/ipch
 /src/mongo/*/ipch
 /src/mongo/*/*/ipch
 /src/mongo/db/.gdb*
@@ -89,6 +90,8 @@ scratch
 /mongooplog
 /mongoperf
 /bsondump
+/loadgen
+/docgen
 
 *.tgz
 *.zip

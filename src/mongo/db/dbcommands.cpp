@@ -35,10 +35,12 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dur_stats.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -48,10 +50,10 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/queryoptimizer.h"
-#include "mongo/db/repl.h"
-#include "mongo/db/repl_block.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/repl/write_concern.h"
 #include "mongo/db/replutil.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/s/d_writeback.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
@@ -77,7 +79,6 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -113,7 +114,6 @@ namespace mongo {
         virtual LockType locktype() const { return NONE;  }
         virtual bool logTheOp()           { return false; }
         virtual bool slaveOk() const      { return true;  }
-        virtual bool requiresAuth()       { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -187,7 +187,9 @@ namespace mongo {
             BSONElement e = cmdObj["w"];
             if ( e.ok() ) {
 
-                if ( cmdLine.configsvr ) {
+                if ( cmdLine.configsvr && (!e.isNumber() || e.numberInt() > 1) ) {
+                    // w:1 on config servers should still work, but anything greater than that
+                    // should not.
                     result.append( "wnote", "can't use w on config servers" );
                     result.append( "err", "norepl" );
                     return true;
@@ -280,7 +282,6 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -382,6 +383,17 @@ namespace mongo {
         virtual bool lockGlobally() const { return true; }
 
         virtual LockType locktype() const { return WRITE; }
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj) {
+            std::string systemIndexes = dbname+".system.indexes";
+            std::string toDeleteRegex = "^"+dbname+"\\.";
+            BSONObj criteria = BSON("ns" << systemIndexes <<
+                                    "op" << "insert" <<
+                                    "insert.ns" << BSON("$regex" << toDeleteRegex));
+            return IndexBuilder::killMatchingIndexBuilds(criteria);
+        }
+
         CmdDropDatabase() : Command("dropDatabase") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // disallow dropping the config database
@@ -394,6 +406,7 @@ namespace mongo {
             int p = (int) e.number();
             if ( p != 1 )
                 return false;
+            stopIndexBuilds(dbname, cmdObj);
             dropDatabase(dbname);
             result.append( "dropped" , dbname );
             log() << "dropDatabase " << dbname << " finished" << endl;
@@ -424,19 +437,37 @@ namespace mongo {
             out->push_back(Privilege(dbname, actions));
         }
         CmdRepairDatabase() : Command("repairDatabase") {}
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj) {
+            std::string systemIndexes = dbname+".system.indexes";
+            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert");
+            return IndexBuilder::killMatchingIndexBuilds(criteria);
+        }
+
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
             log() << "repairDatabase " << dbname << endl;
             int p = (int) e.number();
+
+            std::vector<BSONObj> indexesInProg;
             if ( p != 1 ) {
                 errmsg = "bad option";
                 return false;
             }
+
+            std::vector<BSONObj> indexes = stopIndexBuilds(dbname, cmdObj);
+
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
-            return repairDatabase( dbname, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
+            bool ok =
+                repairDatabase( dbname, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
+
+            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexesInProg);
+
+            return ok;
         }
     } cmdRepairDatabase;
 
@@ -567,6 +598,17 @@ namespace mongo {
         }
         virtual void help( stringstream& help ) const { help << "drop a collection\n{drop : <collectionName>}"; }
         virtual LockType locktype() const { return WRITE; }
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj) {
+            std::string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
+            std::string systemIndexes = dbname+".system.indexes";
+            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" <<
+                                    "insert.ns" << nsToDrop);
+
+            return IndexBuilder::killMatchingIndexBuilds(criteria);
+        }
+
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
             NamespaceDetails *d = nsdetails(nsToDrop);
@@ -576,7 +618,12 @@ namespace mongo {
                 errmsg = "ns not found";
                 return false;
             }
-            uassert( 10039 ,  "can't drop collection with reserved $ character in name", strchr(nsToDrop.c_str(), '$') == 0 );
+
+            uassert(10039, "can't drop collection with reserved $ character in name",
+                    strchr(nsToDrop.c_str(), '$') == 0);
+
+            stopIndexBuilds(dbname, cmdObj);
+
             dropCollection( nsToDrop, errmsg, result );
             return true;
         }
@@ -698,6 +745,42 @@ namespace mongo {
             actions.addAction(ActionType::dropIndexes);
             out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
         }
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj) {
+            std::string systemIndexes = dbname+".system.indexes";
+            std::string toDeleteNs = dbname+"."+cmdObj.firstElement().valuestr();
+            BSONObjBuilder builder;
+            builder.append("ns", systemIndexes);
+            builder.append("op", "insert");
+            builder.append("insert.ns", toDeleteNs);
+
+            // Get index name to drop
+            BSONElement toDrop = cmdObj.getField("index");
+
+            if (toDrop.type() == String) {
+                // Kill all in-progress indexes
+                if (strcmp("*", toDrop.valuestr()) == 0) {
+                    BSONObj criteria = builder.done();
+                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                }
+                // Kill an in-progress index by name
+                else {
+                    builder.append("insert.name", toDrop.valuestr());
+                    BSONObj criteria = builder.done();
+                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                }
+            }
+            // Kill an in-progress index build by index key
+            else if (toDrop.type() == Object) {
+                builder.append("insert.key", toDrop.Obj());
+                BSONObj criteria = builder.done();
+                return IndexBuilder::killMatchingIndexBuilds(criteria);
+            }
+
+            return std::vector<BSONObj>();
+        }
+
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
             BSONElement e = jsobj.firstElement();
@@ -706,6 +789,8 @@ namespace mongo {
             if ( !cmdLine.quiet )
                 tlog() << "CMD: dropIndexes " << toDeleteNs << endl;
             if ( d ) {
+                stopIndexBuilds(dbname, jsobj);
+
                 BSONElement f = jsobj.getField("index");
                 if ( f.type() == String ) {
                     return dropIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder, false );
@@ -751,6 +836,16 @@ namespace mongo {
             out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
         }
         CmdReIndex() : Command("reIndex") { }
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj) {
+            std::string systemIndexes = dbname+".system.indexes";
+            std::string ns = dbname + '.' + cmdObj["reIndex"].valuestrsafe();
+            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+
+            return IndexBuilder::killMatchingIndexBuilds(criteria);
+        }
+
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             static DBDirectClient db;
 
@@ -764,6 +859,9 @@ namespace mongo {
                 errmsg = "ns not found";
                 return false;
             }
+
+            std::vector<BSONObj> indexesInProg;
+            stopIndexBuilds(dbname, jsobj);
 
             list<BSONObj> all;
             auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
@@ -791,6 +889,8 @@ namespace mongo {
 
             result.append( "nIndexes" , (int)all.size() );
             result.appendArray( "indexes" , b.obj() );
+
+            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexesInProg);
             return true;
         }
     } cmdReIndex;
@@ -965,8 +1065,7 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] << "n" << GTE << n );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            shared_ptr<Cursor> cursor = NamespaceDetailsTransient::bestGuessCursor(ns.c_str(),
-                                                                                   query, sort);
+            shared_ptr<Cursor> cursor = getBestGuessCursor(ns.c_str(), query, sort);
             if ( ! cursor ) {
                 errmsg = "need an index on { files_id : 1 , n : 1 }";
                 return false;
@@ -1463,6 +1562,14 @@ namespace mongo {
             if( d )
                 result.appendNumber( "nsSizeMB", (int) d->namespaceIndex.fileLength() / 1024 / 1024 );
 
+            BSONObjBuilder dataFileVersion( result.subobjStart( "dataFileVersion" ) );
+            if ( d && !d->isEmpty() ) {
+                DataFileHeader* header = d->getFile( 0 )->getHeader();
+                dataFileVersion.append( "major", header->version );
+                dataFileVersion.append( "minor", header->versionMinor );
+            }
+            dataFileVersion.done();
+
             return true;
         }
     } cmdDBStats;
@@ -1621,7 +1728,6 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "{whatsmyuri:1}";
         }
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -1641,7 +1747,6 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }
         // No auth needed because it only works when enabled via command line.
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
@@ -1781,7 +1886,6 @@ namespace mongo {
             help << "w:true write lock. secs:<seconds>";
         }
         // No auth needed because it only works when enabled via command line.
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
@@ -1817,7 +1921,6 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
         // No auth needed because it only works when enabled via command line.
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
@@ -1856,17 +1959,33 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         virtual bool logTheOp() { return true; }
         // No auth needed because it only works when enabled via command line.
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj) {
+            std::string systemIndexes = dbname+".system.indexes";
+            std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
+            std::string ns = dbname + '.' + coll;
+            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+
+            return IndexBuilder::killMatchingIndexBuilds(criteria);
+        }
+
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             NamespaceDetails *nsd = nsdetails( ns );
             massert( 13429, "emptycapped no such collection", nsd );
+
+            std::vector<BSONObj> indexes = stopIndexBuilds(dbname, cmdObj);
+
             nsd->emptyCappedCollection( ns.c_str() );
+
+            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+
             return true;
         }
     };
@@ -1923,7 +2042,9 @@ namespace mongo {
 
         std::string dbname = nsToDatabase( cmdns );
 
-        if (c->adminOnly() && c->localHostOnlyIfNoAuth(cmdObj) && noauth &&
+        if (c->adminOnly() &&
+                c->localHostOnlyIfNoAuth(cmdObj) &&
+                !AuthorizationManager::isAuthEnabled() &&
                 !client.getIsLocalHostConnection()) {
             log() << "command denied: " << cmdObj.toString() << endl;
             appendCommandStatus(result,
@@ -1939,7 +2060,7 @@ namespace mongo {
             return;
         }
 
-        if (!noauth && c->requiresAuth()) {
+        if (AuthorizationManager::isAuthEnabled()) {
             std::vector<Privilege> privileges;
             c->addRequiredPrivileges(dbname, cmdObj, &privileges);
             Status status = client.getAuthorizationManager()->checkAuthForPrivileges(privileges);

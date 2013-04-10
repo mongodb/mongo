@@ -20,6 +20,12 @@ namespace mongo {
 
     // pdfile versions
     const int PDFILE_VERSION = 4;
-    const int PDFILE_VERSION_MINOR = 5;
+    const int PDFILE_VERSION_MINOR_22_AND_OLDER = 5;
+    const int PDFILE_VERSION_MINOR_24_AND_NEWER = 6;
+
+    // For backward compatibility with versions before 2.4.0 all new DBs start
+    // with PDFILE_VERSION_MINOR_22_AND_OLDER and are converted when the first
+    // index using a new plugin is created. See the logic in
+    // prepareToBuildIndex() and upgradeMinorVersionOrAssert() for details
 
 } // namespace mongo

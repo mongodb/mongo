@@ -23,6 +23,7 @@
 #include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -90,10 +91,21 @@ namespace {
 
     void createSystemIndexes(const NamespaceString& ns) {
         if (ns.coll == "system.users") {
-            Helpers::ensureIndex(ns.ns().c_str(),
-                                 extendedSystemUsersKeyPattern,
-                                 true,  // unique
-                                 extendedSystemUsersIndexName.c_str());
+            try {
+                Helpers::ensureIndex(ns.ns().c_str(),
+                                     extendedSystemUsersKeyPattern,
+                                     true,  // unique
+                                     extendedSystemUsersIndexName.c_str());
+            } catch (const DBException& e) {
+                if (e.getCode() == ASSERT_ID_DUPKEY) {
+                    log() << "Duplicate key exception while trying to build unique index on " <<
+                            ns << ".  You most likely have user documents with duplicate \"user\" "
+                            "fields.  To resolve this, start up with a version of MongoDB prior to "
+                            "2.4, drop the duplicate user documents, then start up again with the "
+                            "current version." << endl;
+                }
+                throw;
+            }
         }
     }
 

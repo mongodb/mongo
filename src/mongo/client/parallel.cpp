@@ -1673,7 +1673,7 @@ namespace mongo {
     void Future::CommandResult::init(){
         try {
             if ( ! _conn ){
-                _connHolder.reset( ScopedDbConnection::getScopedDbConnection( _server ) );
+                _connHolder.reset( new ScopedDbConnection( _server ) );
                 _conn = _connHolder->get();
             }
 

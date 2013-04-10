@@ -89,14 +89,14 @@ namespace mongo {
             const IndexDetails& id = d->idx( idxMatches[0] );
             BSONObj indexPrefix;
 
+            FTSIndex* ftsIndex = static_cast<FTSIndex*>(id.getSpec().getType());
             if ( language == "" ) {
-                FTSIndex* ftsIndex = static_cast<FTSIndex*>(id.getSpec().getType());
                 language = ftsIndex->getFtsSpec().defaultLanguage();
-                Status s = ftsIndex->getFtsSpec().getIndexPrefix( filter, &indexPrefix );
-                if ( !s.isOK() ) {
-                    errmsg = s.toString();
-                    return false;
-                }
+            }
+            Status s = ftsIndex->getFtsSpec().getIndexPrefix( filter, &indexPrefix );
+            if ( !s.isOK() ) {
+                errmsg = s.toString();
+                return false;
             }
 
 

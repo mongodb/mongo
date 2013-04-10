@@ -63,6 +63,9 @@ namespace mongo {
         // superclass but it only supports testing against S2Cells.  We need
         // the most specific class we can get.
         shared_ptr<S2Cell> _cell;
+        // If we have _cell we have _point.  We need _cell in some cases, _point in others.
+        shared_ptr<S2Point> _point;
+
         shared_ptr<S2Polyline> _line;
         shared_ptr<S2Polygon> _polygon;
         shared_ptr<S2Cap> _cap;

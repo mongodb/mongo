@@ -1,3 +1,6 @@
+// Wrap whole file in a function to avoid polluting the global namespace
+(function() {
+
 _parsePath = function() {
     var dbpath = "";
     for( var i = 0; i < arguments.length; ++i )
@@ -108,12 +111,12 @@ MongoRunner.VersionSub = function(regex, version) {
 // These patterns allow substituting the binary versions used for each
 // version string to support the dev/stable MongoDB release cycle.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
-                               new MongoRunner.VersionSub(/^last-stable$/, "2.2"),
+                               new MongoRunner.VersionSub(/^last-stable$/, "2.4"),
                                new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
                                // Latest unstable and next stable are effectively the
                                // same release
-                               new MongoRunner.VersionSub(/^2\.3(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^2\.4(\..*){0,1}/, "") ];
+                               new MongoRunner.VersionSub(/^2\.5(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^2\.6(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
  
@@ -729,20 +732,32 @@ startMongos = function(args){
 }
 
 /**
+ * Returns a new argArray with any test-specific arguments added.
+ */
+function getTestArgs(argArray) {
+    var programName = argArray[0];
+    if (programName.endsWith('mongod') || programName.endsWith('mongos')) {
+        if (jsTest.options().enableTestCommands) {
+            argArray.push.apply(argArray, ['--setParameter', "enableTestCommands=1"]);
+        }
+        if (jsTest.options().authMechanism && jsTest.options().authMechanism != "MONGODB-CR") {
+            argArray.push.apply(argArray,
+                                ['--setParameter',
+                                 "authenticationMechanisms=" + jsTest.options().authMechanism]);
+        }
+    }
+    return argArray;
+};
+
+/**
  * Start a mongo process with a particular argument array.  If we aren't waiting for connect, 
  * return null.
  */
 MongoRunner.startWithArgs = function(argArray, waitForConnect) {
-
-    var port = _parsePort.apply(null, argArray);
-    
-    // Enable test commands.
     // TODO: Make there only be one codepath for starting mongo processes
-    var programName = argArray[0];
-    if (jsTest.options().enableTestCommands && (programName.endsWith('mongod') || programName.endsWith('mongos'))) {
-        argArray.push.apply(argArray, ['--setParameter', 'enableTestCommands=1']);
-    }
-    
+
+    argArray = getTestArgs(argArray);
+    var port = _parsePort.apply(null, argArray);
     var pid = _startMongoProgram.apply(null, argArray);
 
     var conn = null;
@@ -782,11 +797,7 @@ startMongoProgram = function(){
     // TODO: Make this work better with multi-version testing so that we can support
     // enabling this on 2.4 when testing 2.6
     var args = argumentsToArray( arguments );
-    var programName = args[0];
-    if (jsTest.options().enableTestCommands && (programName.endsWith('mongod') || programName.endsWith('mongos'))) {
-        args.push.apply(args, ['--setParameter', 'enableTestCommands=1']);
-    }
-
+    args = getTestArgs(args);
     var pid = _startMongoProgram.apply( null, args );
 
     var m;
@@ -816,8 +827,12 @@ runMongoProgram = function() {
     if ( jsTestOptions().auth ) {
         var progName = args[0];
         args = args.slice(1);
-        args.unshift( progName, '-u', jsTestOptions().adminUser,
-                      '-p', jsTestOptions().adminPassword );
+        args.unshift( progName,
+                      '-u', jsTestOptions().adminUser,
+                      '-p', jsTestOptions().adminPassword,
+                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
+                      '--authenticationDatabase=admin'
+                    );
     }
     return _runMongoProgram.apply( null, args );
 }
@@ -830,9 +845,11 @@ startMongoProgramNoConnect = function() {
     if ( jsTestOptions().auth ) {
         var progName = args[0];
         args = args.slice(1);
-        args.unshift(progName, '-u', jsTestOptions().adminUser,
+        args.unshift(progName,
+                     '-u', jsTestOptions().adminUser,
                      '-p', jsTestOptions().adminPassword,
-                     '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism);
+                     '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
+                     '--authenticationDatabase=admin');
     }
     return _startMongoProgram.apply( null, args );
 }
@@ -844,3 +861,5 @@ myPort = function() {
     else
         return 27017;
 }
+
+}());

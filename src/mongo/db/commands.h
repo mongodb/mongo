@@ -108,11 +108,6 @@ namespace mongo {
 
         virtual void help( stringstream& help ) const;
 
-        /* Return true if authentication and security applies to the commands.  Some commands
-           (e.g., getnonce, authenticate) can be done by anyone even unauthorized.
-        */
-        virtual bool requiresAuth() { return true; }
-
         /**
          * Appends to "*out" the privileges required to run this command on database "dbname" with
          * the invocation described by "cmdObj".
@@ -154,6 +149,10 @@ namespace mongo {
         static map<string,Command*> * _webCommands;
 
     public:
+        // Stop all index builds required to run this command and return index builds killed.
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj);
+
         static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }
         static const map<string,Command*>* webCommands() { return _webCommands; }
         /** @return if command was found */
@@ -185,32 +184,6 @@ namespace mongo {
 
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;
-    };
-
-    // This will be registered instead of the real implementations of any commands that don't work
-    // when auth is enabled.
-    class NotWithAuthCmd : public Command {
-    public:
-        NotWithAuthCmd(const char* cmdName) : Command(cmdName) { }
-        virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {}
-        virtual void help( stringstream &help ) const {
-            help << name << " is not supported when running with authentication enabled";
-        }
-        virtual bool run(const string&,
-                         BSONObj& cmdObj,
-                         int,
-                         string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-            errmsg = name + " is not supported when running with authentication enabled";
-            log() << errmsg << std::endl;
-            return false;
-        }
     };
 
     class CmdShutdown : public Command {

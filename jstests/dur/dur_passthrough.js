@@ -33,7 +33,7 @@ function doTest() {
             print(" *******************************************");
             print("         Test : " + x.name + " ...");
             print("                " + Date.timeFunc(function () { load(x.name); }, 1) + "ms");
-
+            gc(); // TODO SERVER-8683: remove gc() calls once resolved
         }
     );
 

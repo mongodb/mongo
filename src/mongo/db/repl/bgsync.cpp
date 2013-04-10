@@ -20,6 +20,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/base/counter.h"
@@ -443,8 +444,8 @@ namespace replset {
         // this is just to get the op off the queue, it's been peeked at
         // and queued for application already
         BSONObj op = _buffer.blockingPop();
-        bufferCountGauge.increment(-1);
-        bufferSizeGauge.increment(-getSize(op));
+        bufferCountGauge.decrement(1);
+        bufferSizeGauge.decrement(getSize(op));
     }
 
     bool BackgroundSync::isStale(OplogReader& r, BSONObj& remoteOldestOp) {

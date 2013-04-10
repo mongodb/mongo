@@ -203,6 +203,13 @@ namespace mongo {
         _cursors.erase( id );
     }
     
+    void CursorCache::removeRef( long long id ) {
+        verify( id );
+        scoped_lock lk( _mutex );
+        _refs.erase( id );
+        _refsNS.erase( id );
+    }
+
     void CursorCache::storeRef(const std::string& server, long long id, const std::string& ns) {
         LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
         verify( id );
@@ -318,10 +325,9 @@ namespace mongo {
             LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
 
             verify( server.size() );
-            scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( server ) );
-            conn->get()->killCursor( id );
-            conn->done();
+            ScopedDbConnection conn(server);
+            conn->killCursor( id );
+            conn.done();
         }
     }
 
@@ -363,7 +369,7 @@ namespace mongo {
     };
 
     void CursorCache::startTimeoutThread() {
-        task::repeat( new CursorTimeoutTask , 400 );
+        task::repeat( new CursorTimeoutTask , 4000 );
     }
 
     class CmdCursorInfo : public Command {

@@ -31,6 +31,7 @@ var doTest = function(useDollarQuerySyntax) {
             }
             else {
                 node.tags = SEC_TAGS[secIdx++];
+                node.priority = 0;
             }
         }
 

@@ -59,15 +59,25 @@ function uniformPoints(origin, count, minDist, maxDist){
         var pointLat = asin((sin(lat) * cos(distance)) + (cos(lat) * sin(distance) * cos(angle)));
         var pointDLng = atan2(sin(angle) * sin(distance) * cos(lat), cos(distance) - sin(lat) * sin(pointLat));
         var pointLng = ((lng - pointDLng + PI) % 2*PI) - PI;
+
+        // Latitude must be [-90, 90]
+        var newLat = lat + pointLat;
+        if (newLat > 90) newLat -= 180;
+        if (newLat < -90) newLat += 180;
+
+        // Longitude must be [-180, 180]
+        var newLng = lng + pointLng;
+        if (newLng > 180) newLng -= 360;
+        if (newLng < -180) newLng += 360;
+
         var newPoint = {
             geo: {
                 type: "Point",
-                coordinates: [lng + pointLng, lat + pointLat]
+                //coordinates: [lng + pointLng, lat + pointLat]
+                coordinates: [newLng, newLat]
             }
         };
-        if(lat + pointLat > 90.0){
-            continue;
-        }
+
         points.push(newPoint);
     }
     for(i=0; i < points.length; i++){

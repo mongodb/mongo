@@ -16,12 +16,15 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/query_optimizer_internal.h"
+
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/query.h"
-#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/dbtests/dbtests.h"
 
 
@@ -753,24 +756,22 @@ namespace {
             temp = BSON( "b" << 1 );
             theDataFileMgr.insertWithObjMod( ns(), temp );
 
-            boost::shared_ptr< Cursor > c =
-            NamespaceDetailsTransient::bestGuessCursor( ns(), BSON( "b" << 1 ), BSON( "a" << 1 ) );
+            boost::shared_ptr< Cursor > c = getBestGuessCursor( ns(),
+                                                                BSON( "b" << 1 ),
+                                                                BSON( "a" << 1 ) );
             ASSERT_EQUALS( string( "a" ), c->indexKeyPattern().firstElement().fieldName() );
             
-            c = NamespaceDetailsTransient::bestGuessCursor( ns(), BSON( "a" << 1 ),
-                                                           BSON( "b" << 1 ) );
+            c = getBestGuessCursor( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ) );
             ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElementFieldName() );
             ASSERT( c->matcher() );
             ASSERT( c->currentMatches() ); // { b:1 } document
             c->advance();
             ASSERT( !c->currentMatches() ); // { a:1 } document
             
-            c = NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ),
-                                                         BSON( "a" << 1 ) );
+            c = getBestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ), BSON( "a" << 1 ) );
             ASSERT_EQUALS( string( "a" ), c->indexKeyPattern().firstElement().fieldName() );
 
-            c = NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ),
-                                                         BSON( "b" << 1 ) );
+            c = getBestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) );
             ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElementFieldName() );
 
             FieldRangeSet frs( "ns", BSON( "a" << 1 ), true, true );
@@ -782,8 +783,7 @@ namespace {
                                                         CandidatePlanCharacter( true, true ) ) );
             }
             
-            c = NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ),
-                                                           BSON( "b" << 1 ) );
+            c = getBestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) );
             ASSERT_EQUALS( string( "b" ),
                           c->indexKeyPattern().firstElement().fieldName() );
         }

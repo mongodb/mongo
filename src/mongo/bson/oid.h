@@ -147,7 +147,7 @@ namespace mongo {
     inline StringBuilder& operator<< (StringBuilder& s, const OID& o) { return (s << o.str()); }
 
     /** Formatting mode for generating JSON from BSON.
-        See <http://mongodb.onconfluence.com/display/DOCS/Mongo+Extended+JSON>
+        See <http://dochub.mongodb.org/core/mongodbextendedjson>
         for details.
     */
     enum JsonStringFormat {

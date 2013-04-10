@@ -63,7 +63,8 @@ namespace mongo {
 namespace mongo { 
     typedef RWLockBase1 RWLockBase;
 }
-#elif defined(_WIN32)
+
+#elif defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
 
 // windows implementation, uses SlimReaderWriter locks when possible (dynamically loaded).
 

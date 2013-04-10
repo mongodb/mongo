@@ -176,6 +176,10 @@ printShardingStatus(config, true);
 
 jsTest.log("Upgrading config db from v3 to v4...");
 
+// Just stop the balancer, but don't wait for it to stop, to simulate race conds
+st.setBalancer(false);
+printjson(config.settings.find().toArray());
+
 var startTime = new Date();
 
 // Make sure up

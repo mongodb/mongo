@@ -347,7 +347,7 @@ namespace mongo {
                 bool check = ! e["check"].eoo();
                 if( check ){
                     if ( e["check"].type() == CodeWScope || e["check"].type() == Code || e["check"].type() == String ) {
-                        scope = globalScriptEngine->getPooledScope( ns + "benchrun" );
+                        scope = globalScriptEngine->getPooledScope( ns, "benchrun" );
                         verify( scope.get() );
 
                         if ( e.type() == CodeWScope ) {

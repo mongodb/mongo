@@ -199,7 +199,7 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5(nonce + username + _hashPassword(username, pass));
 }
 
-DB.prototype._defaultAuthenticationMechanism = "MONGO-CR";
+DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
 
 DB.prototype._authOrThrow = function () {
     var params;
@@ -269,11 +269,15 @@ DB.prototype.auth = function() {
 */
 DB.prototype.createCollection = function(name, opt) {
     var options = opt || {};
-    var cmd = { create: name, capped: options.capped, size: options.size };
+    var cmd = { create: name };
     if (options.max != undefined)
         cmd.max = options.max;
     if (options.autoIndexId != undefined)
         cmd.autoIndexId = options.autoIndexId;
+    if (options.capped != undefined)
+        cmd.capped = options.capped;
+    if (options.size != undefined)
+        cmd.size = options.size;
     var res = this._dbCommand(cmd);
     return res;
 }
@@ -435,7 +439,7 @@ DB.prototype.repairDatabase = function() {
 
 DB.prototype.help = function() {
     print("DB methods:");
-    print("\tdb.addUser(username, password[, readOnly=false])");
+    print("\tdb.addUser(userDocument)");
     print("\tdb.adminCommand(nameOrDocument) - switches to 'admin' db, and runs command [ just calls db.runCommand(...) ]");
     print("\tdb.auth(username, password)");
     print("\tdb.cloneDatabase(fromhost)");
@@ -761,7 +765,7 @@ DB.prototype.killOP = DB.prototype.killOp;
 
 DB.tsToSeconds = function(x){
     if ( x.t && x.i )
-        return x.t / 1000;
+        return x.t;
     return x / 4294967296; // low 32 bits are ordinal #s within a second
 }
 

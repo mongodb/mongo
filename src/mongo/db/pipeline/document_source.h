@@ -427,7 +427,7 @@ namespace mongo {
 
           @param pBsonObj the query to record
          */
-        void setQuery(const shared_ptr<BSONObj> &pBsonObj);
+        void setQuery(const BSONObj& query) { _query = query; }
 
         /*
           Record the sort that was specified for the cursor this wraps, if
@@ -440,7 +440,7 @@ namespace mongo {
 
           @param pBsonObj the sort to record
          */
-        void setSort(const shared_ptr<BSONObj> &pBsonObj);
+        void setSort(const BSONObj& sort) { _sort = sort; }
 
         void setProjection(const BSONObj& projection, const ParsedDeps& deps);
     protected:
@@ -465,8 +465,8 @@ namespace mongo {
           source.  Therefore, bson dependencies must appear before pCursor
           in order cause its destructor to be called *after* pCursor's.
          */
-        shared_ptr<BSONObj> pQuery;
-        shared_ptr<BSONObj> pSort;
+        BSONObj _query;
+        BSONObj _sort;
         shared_ptr<Projection> _projection; // shared with pClientCursor
         ParsedDeps _dependencies;
 
@@ -509,9 +509,9 @@ namespace mongo {
 
           This is used after filter analysis has moved as many filters to
           as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated wiki documentation for the
-          format.  This conversion is used to move back to the low-level
-          find() Cursor mechanism.
+          See db/Matcher.h and the associated documentation for the format.
+          This conversion is used to move back to the low-level find()
+          Cursor mechanism.
 
           @param pBuilder the builder to write to
          */
@@ -576,9 +576,9 @@ namespace mongo {
 
           This is used after filter analysis has moved as many filters to
           as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated wiki documentation for the
-          format.  This conversion is used to move back to the low-level
-          find() Cursor mechanism.
+          See db/Matcher.h and the associated documentation for the format.
+          This conversion is used to move back to the low-level find()
+          Cursor mechanism.
 
           @param pBuilder the builder to write to
          */
@@ -739,9 +739,9 @@ namespace mongo {
 
           This is used after filter analysis has moved as many filters to
           as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated wiki documentation for the
-          format.  This conversion is used to move back to the low-level
-          find() Cursor mechanism.
+          See db/Matcher.h and the associated documentation for the format.
+          This conversion is used to move back to the low-level find()
+          Cursor mechanism.
 
           @param pBuilder the builder to write to
          */

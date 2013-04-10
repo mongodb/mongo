@@ -124,6 +124,13 @@ print( "checkpoint E")
 x = db.runCommand( "connPoolStats" );
 printjson( x )
 for ( host in x.hosts ){
+    
+    // Ignore all non-shard connections in this check for used sharded
+    // connections, only check those with 0 timeout.
+    if (!/.*::0$/.test(host)) continue;
+
+    // Connection pooling may change in the near future
+    // TODO: Refactor / remove this test to make sure it stays relevant
     var foo = x.hosts[host];
     assert.lt( 0 , foo.available , "pool: " + host );
 }

@@ -44,7 +44,7 @@ namespace mongo {
         };
 
         Tool( string name , DBAccess access=ALL, string defaultDB="test" ,
-              string defaultCollection="", bool usesstdout=true);
+              string defaultCollection="", bool usesstdout=true, bool quiet=false);
         virtual ~Tool();
 
         int main( int argc , char ** argv );
@@ -81,6 +81,8 @@ namespace mongo {
             return _db + "." + _coll;
         }
 
+        string getAuthenticationDatabase();
+
         void useStandardOutput( bool mode ) {
             _usesstdout = mode;
         }
@@ -115,6 +117,7 @@ namespace mongo {
         string _authenticationMechanism;
 
         bool _usesstdout;
+        bool _quiet;
         bool _noconnection;
         bool _autoreconnect;
 

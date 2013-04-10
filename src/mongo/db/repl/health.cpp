@@ -23,6 +23,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
@@ -444,6 +445,11 @@ namespace mongo {
 
             if (m->hbinfo().authIssue) {
                 bb.append("authenticated", false);
+            }
+
+            string syncingTo = m->hbinfo().syncingTo;
+            if (!syncingTo.empty()) {
+                bb.append("syncingTo", syncingTo);
             }
 
             v.push_back(bb.obj());

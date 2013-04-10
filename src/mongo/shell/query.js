@@ -38,6 +38,9 @@ DBQuery.prototype.help = function () {
     print("\t.showDiskLoc() - adds a $diskLoc field to each returned object")
     print("\t.min(idxDoc)")
     print("\t.max(idxDoc)")
+    print("\t.comment(comment)")
+    print("\t.snapshot()")
+    print("\t.readPref(mode, tagset)")
     
     print("\nCursor methods");
     print("\t.toArray() - iterates through docs and returns an array of the results")
@@ -235,7 +238,7 @@ DBQuery.prototype.max = function( max ) {
 }
 
 DBQuery.prototype.showDiskLoc = function() {
-    return this._addSpecial( "$showDiskLoc" , true);
+    return this._addSpecial( "$showDiskLoc" , true );
 }
 
 /**
@@ -274,18 +277,15 @@ DBQuery.prototype.map = function( func ){
 DBQuery.prototype.arrayAccess = function( idx ){
     return this.toArray()[idx];
 }
+
 DBQuery.prototype.comment = function (comment) {
-    var n = this.clone();
-    n._ensureSpecial();
-    n._addSpecial("$comment", comment);
-    return this.next();
+    return this._addSpecial( "$comment" , comment );
 }
 
 DBQuery.prototype.explain = function (verbose) {
     /* verbose=true --> include allPlans, oldPlan fields */
     var n = this.clone();
-    n._ensureSpecial();
-    n._query.$explain = true;
+    n._addSpecial( "$explain", true );
     n._limit = Math.abs(n._limit) * -1;
     var e = n.next();
 
@@ -321,9 +321,7 @@ DBQuery.prototype.explain = function (verbose) {
 }
 
 DBQuery.prototype.snapshot = function(){
-    this._ensureSpecial();
-    this._query.$snapshot = true;
-    return this;
+    return this._addSpecial( "$snapshot" , true );
 }
 
 DBQuery.prototype.pretty = function(){

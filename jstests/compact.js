@@ -56,6 +56,7 @@ t.ensureIndex({ z: 1, k: 1 });
 //t.ensureIndex({ z: 1, k: 1 }, { dropDups: true, unique:true });
 
 res = db.runCommand({ compact: 'compacttest', dev: true, paddingFactor: 1.2, force:true });
+printjson(res);
 assert(res.ok);
 assert(t.count() > 13);
 var v = t.validate(true);

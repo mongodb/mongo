@@ -30,7 +30,7 @@ var doTest = function (mongo, callSetParam) {
     });
 };
 
-var mongo = MongoRunner.runMongod({ port: 27017, verbose: 5 });
+var mongo = MongoRunner.runMongod({ verbose: 5 });
 doTest(mongo);
 MongoRunner.stopMongod(mongo.port);
 

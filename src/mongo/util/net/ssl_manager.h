@@ -25,6 +25,12 @@
 #include <openssl/ssl.h>
 
 namespace mongo {
+    class SSLManager;
+
+    // Access SSL functions through this instance, after
+    // calling initializeSSL() via runMongoInitializers initialization
+    SSLManager* getSSLManager();
+
     class SSLParams {
     public:
         SSLParams(const std::string& pemfile, 

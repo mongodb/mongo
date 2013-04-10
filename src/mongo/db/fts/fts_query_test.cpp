@@ -57,6 +57,13 @@ namespace mongo {
             ASSERT_EQUALS( "fun|phrase|test||||phrase test||", q.debugString() );
         }
 
+        TEST( FTSQuery, Phrase2 ) {
+            FTSQuery q;
+            ASSERT( q.parse( "doing a \"phrase-test\" for fun", "english" ).isOK() );
+            ASSERT_EQUALS( 1U, q.getPhr().size() );
+            ASSERT_EQUALS( "phrase-test", q.getPhr()[0] );
+        }
+
         TEST( FTSQuery, NegPhrase1 ) {
             FTSQuery q;
             ASSERT( q.parse( "doing a -\"phrase test\" for fun", "english" ).isOK() );

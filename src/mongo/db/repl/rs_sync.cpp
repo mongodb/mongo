@@ -25,9 +25,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/db/prefetch.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/util/fail_point_service.h"
@@ -41,6 +42,8 @@ namespace mongo {
 
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
+
+    const int ReplSetImpl::maxSyncSourceLagSecs = 30;
 
 namespace replset {
 
@@ -478,7 +481,7 @@ namespace replset {
         if ((op["op"].valuestrsafe()[0] == 'c') ||
             // Index builds are acheived through the use of an insert op, not a command op.
             // The following line is the same as what the insert code uses to detect an index build.
-            (strstr(op["ns"].valuestrsafe(), ".system.indexes"))) {
+            (NamespaceString(op["ns"].valuestrsafe()).coll == "system.indexes")) {
             if (ops->empty()) {
                 // apply commands one-at-a-time
                 ops->push_back(op);
@@ -692,7 +695,8 @@ namespace replset {
 
     bool ReplSetImpl::shouldChangeSyncTarget(const OpTime& targetOpTime) const {
         for (Member *m = _members.head(); m; m = m->next()) {
-            if (m->syncable() && targetOpTime.getSecs()+30 < m->hbinfo().opTime.getSecs()) {
+            if (m->syncable() &&
+                targetOpTime.getSecs()+maxSyncSourceLagSecs < m->hbinfo().opTime.getSecs()) {
                 return true;
             }
         }
@@ -858,6 +862,9 @@ namespace replset {
         }
 
         try {
+            // haveCursor() does not necessarily tell us if we have a non-dead cursor, so we check
+            // tailCheck() as well; see SERVER-8420
+            slave->reader.tailCheck();
             if (!slave->reader.haveCursor()) {
                 if (!slave->reader.connect(id, slave->slave->id(), target->fullName())) {
                     // error message logged in OplogReader::connect

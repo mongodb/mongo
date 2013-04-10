@@ -145,7 +145,7 @@ namespace mongo {
             statsSnapshots.outputLockInfoHTML( ss );
 
             ss << "<a "
-               "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\" "
+               "href=\"http://dochub.mongodb.org/core/concurrency\" "
                "title=\"snapshot: was the db in the write lock when this page was generated?\">";
             ss << "write locked now:</a> " << (Lock::isW() ? "true" : "false") << "\n";
         }

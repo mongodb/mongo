@@ -26,6 +26,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/bench.h"
 #include "mongo/util/file.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
     long long Scope::_lastVersion = 1;
@@ -94,8 +95,11 @@ namespace mongo {
 
     bool Scope::execFile(const string& filename, bool printResult, bool reportError,
                          int timeoutMs) {
-
+#ifdef _WIN32
+        boost::filesystem::path p(toWideString(filename.c_str()));
+#else
         boost::filesystem::path p(filename);
+#endif
         if (!exists(p)) {
             log() << "file [" << filename << "] doesn't exist" << endl;
             return false;
@@ -111,7 +115,7 @@ namespace mongo {
                 boost::filesystem::path sub(*it);
                 if (!endsWith(sub.string().c_str(), ".js"))
                     continue;
-                if (!execFile(sub.string().c_str(), printResult, reportError, timeoutMs))
+                if (!execFile(sub.string(), printResult, reportError, timeoutMs))
                     return false;
             }
 
@@ -183,9 +187,15 @@ namespace mongo {
             uassert(10209, str::stream() << "name has to be a string: " << n, n.type() == String);
             uassert(10210, "value has to be set", v.type() != EOO);
 
-            setElement(n.valuestr(), v);
-            thisTime.insert(n.valuestr());
-            _storedNames.insert(n.valuestr());
+            try {
+                setElement(n.valuestr(), v);
+                thisTime.insert(n.valuestr());
+                _storedNames.insert(n.valuestr());
+            }
+            catch (const DBException& setElemEx) {
+                log() << "unable to load stored JavaScript function " << n.valuestr()
+                      << "(): " << setElemEx.what() << endl;
+            }
         }
 
         // remove things from scope that were removed from the system.js collection
@@ -213,12 +223,16 @@ namespace mongo {
             }
         }
 
-        map<string, ScriptingFunction>::iterator i = _cachedFunctions.find(code);
+        FunctionCacheMap::iterator i = _cachedFunctions.find(code);
         if (i != _cachedFunctions.end())
             return i->second;
-        ScriptingFunction f = _createFunction(code);
-        _cachedFunctions[code] = f;
-        return f;
+        // NB: we calculate the function number for v8 so the cache can be utilized to
+        //     lookup the source on an exception, but SpiderMonkey uses the value
+        //     returned by JS_CompileFunction.
+        ScriptingFunction defaultFunctionNumber = getFunctionCache().size() + 1;
+        ScriptingFunction& actualFunctionNumber = _cachedFunctions[code];
+        actualFunctionNumber = _createFunction(code, defaultFunctionNumber);
+        return actualFunctionNumber;
     }
 
     namespace JSFiles {
@@ -268,7 +282,7 @@ namespace mongo {
             bool oom = s->hasOutOfMemoryException();
 
             // do not keep too many contexts, or use them for too long
-            if (l.size() > 10 || s->getTimeUsed() > 10 || oom) {
+            if (l.size() > 10 || s->getTimeUsed() > 10 || oom || !s->getError().empty()) {
                 delete s;
             }
             else {
@@ -339,6 +353,8 @@ namespace mongo {
         void reset() { _real->reset(); }
         void init(const BSONObj* data) { _real->init(data); }
         void localConnect(const char* dbName) { _real->localConnect(dbName); }
+        void setLocalDB(const string& dbName) { _real->setLocalDB(dbName); }
+        void loadStored(bool ignoreNotConnected = false) { _real->loadStored(ignoreNotConnected); }
         void externalSetup() { _real->externalSetup(); }
         void gc() { _real->gc(); }
         bool isKillPending() const { return _real->isKillPending(); }
@@ -351,7 +367,7 @@ namespace mongo {
         bool getBoolean(const char* field) { return _real->getBoolean(field); }
         BSONObj getObject(const char* field) { return _real->getObject(field); }
         void setNumber(const char* field, double val) { _real->setNumber(field, val); }
-        void setString(const char* field, const char* val) { _real->setString(field, val); }
+        void setString(const char* field, const StringData& val) { _real->setString(field, val); }
         void setElement(const char* field, const BSONElement& val) {
             _real->setElement(field, val);
         }
@@ -363,7 +379,6 @@ namespace mongo {
         void setBoolean(const char* field, bool val) { _real->setBoolean(field, val); }
         void setFunction(const char* field, const char* code) { _real->setFunction(field, code); }
         ScriptingFunction createFunction(const char* code) { return _real->createFunction(code); }
-        ScriptingFunction _createFunction(const char* code) { return _real->createFunction(code); }
         int invoke(ScriptingFunction func, const BSONObj* args, const BSONObj* recv,
                    int timeoutMs, bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv) {
             return _real->invoke(func, args, recv, timeoutMs, ignoreReturn,
@@ -384,22 +399,31 @@ namespace mongo {
             _real->append(builder, fieldName, scopeName);
         }
 
+    protected:
+        FunctionCacheMap& getFunctionCache() { return _real->getFunctionCache(); }
+
+        ScriptingFunction _createFunction(const char* code, ScriptingFunction functionNumber = 0) {
+            return _real->_createFunction(code, functionNumber);
+        }
+
     private:
         string _pool;
         Scope* _real;
     };
 
     /** Get a scope from the pool of scopes matching the supplied pool name */
-    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool) {
+    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool, const string& scopeType) {
         if (!scopeCache.get())
             scopeCache.reset(new ScopeCache());
 
-        Scope* s = scopeCache->get(pool);
+        Scope* s = scopeCache->get(pool + scopeType);
         if (!s)
             s = newScope();
 
         auto_ptr<Scope> p;
-        p.reset(new PooledScope(pool, s));
+        p.reset(new PooledScope(pool + scopeType, s));
+        p->setLocalDB(pool);
+        p->loadStored(true);
         return p;
     }
 
@@ -419,8 +443,24 @@ namespace mongo {
         if (x == string::npos)
             return false;
 
-        return (x == 0 || !isalpha(code[x-1])) &&
-               !isalpha(code[x+6]);
+        int quoteCount = 0;
+        int singleQuoteCount = 0;
+        for (size_t i = 0; i < x; i++) {
+            if (code[i] == '"') {
+                quoteCount++;
+            } else if(code[i] == '\'') {
+                singleQuoteCount++;
+            }
+        }
+        // if we are in either single quotes or double quotes return false
+        if (quoteCount % 2 != 0 || singleQuoteCount % 2 != 0) {
+            return false;
+        }
+
+        // return is at start OR preceded by space
+        // AND return is not followed by digit or letter
+        return (x == 0 || isspace(code[x-1])) &&
+               !(isalpha(code[x+6]) || isdigit(code[x+6]));
     }
 
     const char* jsSkipWhiteSpace(const char* raw) {

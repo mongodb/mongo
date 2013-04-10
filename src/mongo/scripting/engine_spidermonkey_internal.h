@@ -47,6 +47,9 @@ namespace spidermonkey {
 
     using std::string;
 
+    typedef std::map<uint32_t, NativeFunction> FunctionMap;
+    typedef std::map<uint32_t, void*> ArgumentMap;
+
     string trim( string s );
 
     class BSONFieldIterator;
@@ -216,7 +219,7 @@ namespace spidermonkey {
 
         void setElement( const char *field , const BSONElement& val );
         void setNumber( const char *field , double val );
-        void setString( const char *field , const char * val );
+        void setString( const char *field , const StringData& val );
         void setObject( const char *field , const BSONObj& obj , bool readOnly );
         void setBoolean( const char *field , bool val );
         void setThis( const BSONObj * obj );
@@ -225,7 +228,7 @@ namespace spidermonkey {
 
         // ---- functions -----
 
-        ScriptingFunction _createFunction( const char * code );
+        ScriptingFunction _createFunction(const char* code, ScriptingFunction functionNumber);
 
         struct TimeoutSpec {
             boost::posix_time::ptime start;
@@ -294,6 +297,11 @@ namespace spidermonkey {
         virtual void gc();
 
         JSContext *SavedContext() const { return _context; }
+
+        // map from internal function id to function pointer
+        FunctionMap _functionMap;
+        // map from internal function argument id to function pointer
+        ArgumentMap _argumentMap;
 
     private:
         void _postCreateHacks();

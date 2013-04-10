@@ -16,13 +16,13 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "count.h"
+#include "mongo/db/ops/count.h"
 
-#include "../client.h"
-#include "../clientcursor.h"
-#include "../namespace.h"
-#include "../queryutil.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/client.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
@@ -76,11 +76,7 @@ namespace mongo {
             limit  = -limit;
         }
 
-        shared_ptr<Cursor> cursor =
-                NamespaceDetailsTransient::getCursor( ns,
-                                                      query,
-                                                      BSONObj(),
-                                                      _countPlanPolicies );
+        shared_ptr<Cursor> cursor = getOptimizedCursor( ns, query, BSONObj(), _countPlanPolicies );
         ClientCursor::Holder ccPointer;
         ElapsedTracker timeToStartYielding( 256, 20 );
         try {

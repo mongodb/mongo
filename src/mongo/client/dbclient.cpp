@@ -500,11 +500,19 @@ namespace mongo {
         return getLastErrorString( info );
     }
 
-    string DBClientWithCommands::getLastErrorString( const BSONObj& info ) {
-        BSONElement e = info["err"];
-        if( e.eoo() ) return "";
-        if( e.type() == Object ) return e.toString();
-        return e.str();
+    string DBClientWithCommands::getLastErrorString(const BSONObj& info) {
+        if (info["ok"].trueValue()) {
+            BSONElement e = info["err"];
+            if (e.eoo()) return "";
+            if (e.type() == Object) return e.toString();
+            return e.str();
+        } else {
+            // command failure
+            BSONElement e = info["errmsg"];
+            if (e.eoo()) return "";
+            if (e.type() == Object) return "getLastError command failed: " + e.toString();
+            return "getLastError command failed: " + e.str();
+        }
     }
 
     const BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
@@ -536,7 +544,7 @@ namespace mongo {
                                                saslCommandMechanismFieldName,
                                                &mechanism));
 
-        if (mechanism == StringData("MONGO-CR", StringData::LiteralTag())) {
+        if (mechanism == StringData("MONGODB-CR", StringData::LiteralTag())) {
             std::string userSource;
             uassertStatusOK(bsonExtractStringField(params,
                                                    saslCommandPrincipalSourceFieldName,
@@ -578,7 +586,7 @@ namespace mongo {
                                     string& errmsg,
                                     bool digestPassword) {
         try {
-            _auth(BSON(saslCommandMechanismFieldName << "MONGO-CR" <<
+            _auth(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
                        saslCommandPrincipalSourceFieldName << dbname <<
                        saslCommandPrincipalFieldName << username <<
                        saslCommandPasswordFieldName << password_text <<
@@ -605,7 +613,7 @@ namespace mongo {
         BSONObj info;
         string nonce;
         if( !runCommand(dbname, getnoncecmdobj, info) ) {
-            errmsg = "getnonce fails - connection problem?";
+            errmsg = "getnonce failed: " + info.toString();
             return false;
         }
         {
@@ -1390,15 +1398,8 @@ namespace mongo {
         SimpleMutex::scoped_lock lk(s_mtx);
         if (s_sslMgr) 
             return s_sslMgr;
-        const SSLParams params(cmdLine.sslPEMKeyFile, 
-                               cmdLine.sslPEMKeyPassword,
-                               cmdLine.sslCAFile,
-                               cmdLine.sslCRLFile,
-                               cmdLine.sslWeakCertificateValidation,
-                               cmdLine.sslFIPSMode);
-        s_sslMgr = new SSLManager(params);
+        s_sslMgr = getSSLManager();
         
-
         return s_sslMgr;
     }
 #endif

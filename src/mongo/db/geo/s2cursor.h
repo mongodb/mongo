@@ -20,12 +20,13 @@
 #include "mongo/db/cursor.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/matcher.h"
-#include "mongo/db/queryutil.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {
+
     class BtreeCursor;
+    class IndexDetails;
 
     class S2Cursor : public Cursor {
     public:
@@ -39,7 +40,8 @@ namespace mongo {
         virtual bool isMultiKey() const { return true; }
         virtual bool autoDedup() const { return false; }
         virtual bool modifiedKeys() const { return true; }
-        virtual bool getsetdup(DiskLoc loc) { return false; }
+        virtual bool getsetdup(DiskLoc loc);
+        virtual void aboutToDeleteBucket(const DiskLoc& b);
         virtual string toString() { return "S2Cursor"; }
         BSONObj indexKeyPattern() { return _keyPattern; }
         virtual bool ok();

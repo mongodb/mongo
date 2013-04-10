@@ -19,7 +19,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/util/queue.h"
-#include "mongo/db/oplogreader.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/jsobj.h"
 

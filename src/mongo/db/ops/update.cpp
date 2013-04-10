@@ -16,15 +16,20 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "mongo/db/oplog.h"
-#include "mongo/db/pagefault.h"
-#include "mongo/db/queryutil.h"
+#include "mongo/db/ops/update.h"
+
 #include "mongo/client/dbclientinterface.h"
-
-#include "update.h"
-#include "update_internal.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/namespace_details.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/db/record.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/ops/update_internal.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -161,7 +166,7 @@ namespace mongo {
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ) {
             mods.reset( new ModSet(updateobj, nsdt->indexKeys(), forReplication) );
-            modsIsIndexed = mods->isIndexed();
+            modsIsIndexed = mods->maxNumIndexUpdated();
         }
 
         if( planPolicy.permitOptimalIdPlan() && !multi && isSimpleIdQuery(patternOrig) && d &&
@@ -201,8 +206,7 @@ namespace mongo {
 
         int numModded = 0;
         debug.nscanned = 0;
-        shared_ptr<Cursor> c =
-            NamespaceDetailsTransient::getCursor( ns, patternOrig, BSONObj(), planPolicy );
+        shared_ptr<Cursor> c = getOptimizedCursor( ns, patternOrig, BSONObj(), planPolicy );
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get(ns);
         bool autoDedup = c->autoDedup();
@@ -243,14 +247,9 @@ namespace mongo {
                         if ( ! d )
                             break;
                         nsdt = &NamespaceDetailsTransient::get(ns);
-                        if ( mods.get() && ! mods->isIndexed() ) {
-                            set<string> bgKeys;
-                            for (int i = 0; i < d->indexBuildsInProgress; i++) {
-                                // we need to re-check indexes
-                                d->idx(d->nIndexes+i).keyPattern().getFieldNames(bgKeys);
-                            }
-                            mods->updateIsIndexed( nsdt->indexKeys() );
-                            modsIsIndexed = mods->isIndexed();
+                        if ( mods.get() ) {
+                            mods->setIndexedStatus( nsdt->indexKeys() );
+                            modsIsIndexed = mods->maxNumIndexUpdated();
                         }
 
                     }
@@ -348,7 +347,7 @@ namespace mongo {
                     // order to ensure that they are validated inside DataFileMgr::updateRecord(.).
                     bool isSystemUsersMod = (NamespaceString(ns).coll == "system.users");
 
-                    if ( modsIsIndexed <= 0 && mss->canApplyInPlace() && !isSystemUsersMod ) {
+                    if ( !mss->isUpdateIndexed() && mss->canApplyInPlace() && !isSystemUsersMod ) {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );

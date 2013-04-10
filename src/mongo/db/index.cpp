@@ -26,6 +26,9 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_cursor.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/ops/delete.h"
@@ -287,6 +290,43 @@ namespace mongo {
         return true;
     }
 
+    static bool needToUpgradeMinorVersion(const string& newPluginName) {
+        if (IndexPlugin::existedBefore24(newPluginName))
+            return false;
+
+        DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
+        if (dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER)
+            return false; // these checks have already been done
+
+        fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
+
+        return true;
+    }
+
+    static void upgradeMinorVersionOrAssert(const string& newPluginName) {
+        const string systemIndexes = cc().database()->name + ".system.indexes";
+        shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
+        for ( ; cursor && cursor->ok(); cursor->advance()) {
+            const BSONObj index = cursor->current();
+            const BSONObj key = index.getObjectField("key");
+            const string plugin = IndexPlugin::findPluginName(key);
+            if (IndexPlugin::existedBefore24(plugin))
+                continue;
+
+            const string errmsg = str::stream()
+                << "Found pre-existing index " << index << " with invalid type '" << plugin << "'. "
+                << "Disallowing creation of new index type '" << newPluginName << "'. See "
+                << "http://dochub.mongodb.org/core/index-type-changes"
+                ;
+
+            error() << errmsg << endl;
+            uasserted(16738, errmsg);
+        }
+
+        DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
+        getDur().writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
+    }
+
     bool prepareToBuildIndex(const BSONObj& io,
                              bool mayInterrupt,
                              bool god,
@@ -367,8 +407,16 @@ namespace mongo {
         }
 
         string pluginName = IndexPlugin::findPluginName( key );
-        IndexPlugin * plugin = pluginName.size() ? IndexPlugin::get( pluginName ) : 0;
+        IndexPlugin * plugin = NULL;
+        if (pluginName.size()) {
+            plugin = IndexPlugin::get(pluginName);
+            uassert(16734, str::stream() << "Unknown index plugin '" << pluginName << "' "
+                                         << "in index "<< key
+                   , plugin);
 
+            if (needToUpgradeMinorVersion(pluginName))
+                upgradeMinorVersionOrAssert(pluginName);
+        }
 
         { 
             BSONObj o = io;
@@ -409,19 +457,25 @@ namespace mongo {
         return true;
     }
 
-    void IndexSpec::reset( const IndexDetails * details ) {
+    void IndexSpec::reset(const IndexDetails * details) {
+        const DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
+        IndexSpec::PluginRules rules = dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER
+                                            ? IndexSpec::RulesFor24
+                                            : IndexSpec::RulesFor22
+                                            ;
+
         _details = details;
-        reset( details->info );
+        reset(details->info, rules);
     }
 
-    void IndexSpec::reset( const BSONObj& _info ) {
+    void IndexSpec::reset(const BSONObj& _info, PluginRules rules) {
         info = _info;
         keyPattern = info["key"].embeddedObjectUserCheck();
         if ( keyPattern.objsize() == 0 ) {
             out() << info.toString() << endl;
             verify(false);
         }
-        _init();
+        _init(rules);
     }
 
     void IndexChanges::dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {

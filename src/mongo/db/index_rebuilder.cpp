@@ -22,11 +22,13 @@
 
 namespace mongo {
 
-    // Disabled until locking at startup can be ironed out.
-    // See SERVER-8344 and SERVER-8536
-    //IndexRebuilder indexRebuilder;
+    IndexRebuilder indexRebuilder;
 
     IndexRebuilder::IndexRebuilder() {}
+
+    std::string IndexRebuilder::name() const {
+        return "IndexRebuilder";
+    }
 
     /**
      * This resets memory tracking to its original value after all indexes are rebuilt.
@@ -46,8 +48,8 @@ namespace mongo {
         ON_BLOCK_EXIT(resetMemoryTracking, Record::MemoryTrackingEnabled);
         Record::MemoryTrackingEnabled = false;
 
+        Client::initThread(name().c_str()); 
         Client::GodScope gs;
-        Lock::GlobalWrite lk;
 
         bool firstTime = true;
         std::vector<std::string> dbNames;
@@ -72,6 +74,8 @@ namespace mongo {
             BSONObj nsDoc = cursor->next();
             const char* ns = nsDoc["name"].valuestrsafe();
 
+            // This write lock is held throughout the index building process
+            // for this namespace.
             Client::WriteContext ctx(ns);
             NamespaceDetails* nsd = nsdetails(ns);
 
@@ -79,9 +83,9 @@ namespace mongo {
                 continue;
             }
 
-            log() << "Found interrupted index build on " << ns << endl;
+            log() << "found interrupted index build(s) on " << ns << endl;
             if (*firstTime) {
-                log() << "Restart the server with --noIndexBuildRetry to skip index rebuilds"
+                log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds"
                       << endl;
                 *firstTime = false;
             }
@@ -91,6 +95,7 @@ namespace mongo {
                 // If we crash between unsetting the inProg flag and cleaning up the index, the
                 // index space will be lost.
                 int inProg = nsd->indexBuildsInProgress;
+
                 getDur().writingInt(nsd->indexBuildsInProgress) = 0;
 
                 for (int i = 0; i < inProg; i++) {
@@ -123,23 +128,19 @@ namespace mongo {
         // Clean up the in-progress index build
         getDur().writingInt(nsd->indexBuildsInProgress) -= 1;
         details.kill_idx();
+
         // The index has now been removed from system.indexes, so the only record of it is in-
         // memory. If there is a journal commit between now and when insert() rewrites the entry and
         // the db crashes before the new system.indexes entry is journalled, the index will be lost
         // forever.  Thus, we're assuming no journaling will happen between now and the entry being
         // re-written.
 
-        // We need to force a foreground index build to prevent replication from replaying an
-        // incompatible op (like a drop) during a yield.
-        // TODO: once commands can interrupt/wait for index builds, this can be removed.
-        indexObj = indexObj.removeField("background");
-
         try {
             const std::string ns = dbName + ".system.indexes";
             theDataFileMgr.insert(ns.c_str(), indexObj.objdata(), indexObj.objsize(), false, true);
         }
         catch (const DBException& e) {
-            log() << "Rebuilding index failed: " << e.what() << " (" << e.getCode() << ")"
+            log() << "building index failed: " << e.what() << " (" << e.getCode() << ")"
                   << endl;
         }
     }

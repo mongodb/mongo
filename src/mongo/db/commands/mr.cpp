@@ -28,6 +28,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/db/replutil.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/s/d_chunk_manager.h"
@@ -193,7 +194,7 @@ namespace mongo {
 
             Scope * s = _func.scope();
 
-            s->invokeSafe( _func.func() , &args, 0, 0, false, true, true );
+            s->invokeSafe( _func.func() , &args, 0, 0, false, false, true );
             ++numReduces;
 
             if ( s->type( "__returnValue" ) == Array ) {
@@ -603,8 +604,7 @@ namespace mongo {
                     error() << "couldn't cleanup after map reduce: " << e.what() << endl;
                 }
             }
-
-            if (_scope && !_scope->isKillPending()) {
+            if (_scope && !_scope->isKillPending() && _scope->getError().empty()) {
                 // cleanup js objects
                 try {
                     ScriptingFunction cleanup =
@@ -623,7 +623,7 @@ namespace mongo {
          */
         void State::init() {
             // setup js
-            _scope.reset(globalScriptEngine->getPooledScope( _config.dbname + "mapreduce" ).release() );
+            _scope.reset(globalScriptEngine->getPooledScope( _config.dbname, "mapreduce" ).release() );
 
             if ( ! _config.scopeSetup.isEmpty() )
                 _scope->init( &_config.scopeSetup );
@@ -860,10 +860,9 @@ namespace mongo {
                                         "M/R: (3/3) Final Reduce Progress",
                                         _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
 
-            shared_ptr<Cursor> temp =
-            NamespaceDetailsTransient::bestGuessCursor(_config.incLong.c_str(),
-                                                       BSONObj(),
-                                                       sortKey);
+            shared_ptr<Cursor> temp = getBestGuessCursor(_config.incLong.c_str(),
+                                                         BSONObj(),
+                                                         sortKey);
             ClientCursor::Holder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
                                                          temp,
                                                          _config.incLong.c_str()));
@@ -1133,7 +1132,9 @@ namespace mongo {
                     Client::ReadContext ctx( config.ns );
 
                     // Get a very basic cursor, prevents deletion of migrated data while we m/r
-                    shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), BSONObj(), BSONObj() );
+                    shared_ptr<Cursor> temp = getOptimizedCursor( config.ns.c_str(),
+                                                                  BSONObj(),
+                                                                  BSONObj() );
                     uassert( 15876, str::stream() << "could not create cursor over " << config.ns << " to hold data while prepping m/r", temp.get() );
                     holdCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
                     uassert( 15877, str::stream() << "could not create m/r holding client cursor over " << config.ns, holdCursor );
@@ -1182,7 +1183,9 @@ namespace mongo {
                         Client::Context ctx(config.ns, dbpath, false);
 
                         // obtain full cursor on data to apply mr to
-                        shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort );
+                        shared_ptr<Cursor> temp = getOptimizedCursor( config.ns.c_str(),
+                                                                      config.filter,
+                                                                      config.sort );
                         uassert( 16052, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
                         ClientCursor::Holder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
                                                                      temp,

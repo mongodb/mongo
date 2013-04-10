@@ -58,8 +58,10 @@ namespace mongo {
          * validate the cloner query was successful
          * @param cur   Cursor the query was executed on
          * @param errCode out  Error code encountered during the query
+         * @param errmsg out  Error message encountered during the query
          */
-        static bool validateQueryResults(const auto_ptr<DBClientCursor>& cur, int32_t* errCode);
+        static bool validateQueryResults(const auto_ptr<DBClientCursor>& cur, int32_t* errCode,
+                                         string& errmsg);
 
         /**
          * @param errmsg out  - Error message (if encountered).

@@ -44,7 +44,7 @@ namespace mongo {
             DBConfigPtr config = grid.getDBConfig(ns);
             Shard s = config->getShard(ns);
 
-            return ScopedDbConnection::getInternalScopedDbConnection(s.getConnString(), 30.0);
+            return new ScopedDbConnection(s.getConnString(), 30.0);
         }
     }
 

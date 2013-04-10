@@ -33,6 +33,7 @@
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
@@ -362,8 +363,17 @@ namespace mongo {
                 "  force - allows to run on a replica set primary\n"
                 "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer (defaults to true in this version)\n";
         }
-        virtual bool requiresAuth() { return true; }
         CompactCmd() : Command("compact") { }
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+                                                     const BSONObj& cmdObj) {
+            std::string systemIndexes = dbname+".system.indexes";
+            std::string coll = cmdObj.firstElement().valuestr();
+            std::string ns = dbname + "." + coll;
+            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+
+            return IndexBuilder::killMatchingIndexBuilds(criteria);
+        }
 
         virtual bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
@@ -415,8 +425,13 @@ namespace mongo {
                 verify( pb >= 0 && pb <= 1024 * 1024 );
             }
 
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
+
             bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
             bool ok = compact(ns, errmsg, validate, result, pf, pb);
+
+            IndexBuilder::restoreIndexes(db+".system.indexes", indexesInProg);
+
             return ok;
         }
     };

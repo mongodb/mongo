@@ -1,5 +1,3 @@
-// @file queryoptimizercursorimpl.h - A cursor interleaving multiple candidate cursors.
-
 /**
  *    Copyright (C) 2011 10gen Inc.
  *
@@ -18,7 +16,7 @@
 
 #pragma once
 
-#include "mongo/db/queryutil.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/querypattern.h"
 
@@ -27,7 +25,8 @@ namespace mongo {
     class MultiCursor;
     class MultiPlanScanner;
     class QueryPlanRunner;
-    class QueryPlanSummary;
+    class QueryPlanSelectionPolicy;
+    struct QueryPlanSummary;
     
     /** Dup tracking class, optimizing one common case with small set and few initial reads. */
     class SmallDupSet {
@@ -274,9 +273,7 @@ namespace mongo {
         bool mayShortcutQueryOptimizer() const {
             return min().isEmpty() && max().isEmpty() && !hasFields() && _argumentsHint.isEmpty();
         }
-        BSONObj hint() const {
-            return _argumentsHint.isEmpty() ? _planPolicy.planHint( _ns ) : _argumentsHint;
-        }
+        BSONObj hint() const;
         
         void setArgumentsHint();
         shared_ptr<Cursor> shortcutCursor() const;

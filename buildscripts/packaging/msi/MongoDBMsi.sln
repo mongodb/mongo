@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "MongoDB", "MongoDB.wixproj", "{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}"
+EndProject
+Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "MongoDB_64", "MongoDB_64.wixproj", "{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2E84BEF1-F2D9-4A6B-B102-EC941AF313AF}"
+	ProjectSection(SolutionItems) = preProject
+		build32bitmsi.bat = build32bitmsi.bat
+		build64bitmsi.bat = build64bitmsi.bat
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Mixed Platforms = Debug|Mixed Platforms
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Mixed Platforms = Release|Mixed Platforms
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Debug|x64.ActiveCfg = Debug|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Debug|x86.ActiveCfg = Debug|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Debug|x86.Build.0 = Debug|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Release|Mixed Platforms.Build.0 = Release|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Release|x64.ActiveCfg = Release|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Release|x86.ActiveCfg = Release|x86
+		{FC40EA06-5D8C-4EDF-9E19-A0BDD9A3A7D5}.Release|x86.Build.0 = Release|x86
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Debug|x64.ActiveCfg = Debug|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Debug|x64.Build.0 = Debug|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Debug|x86.ActiveCfg = Debug|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Release|Mixed Platforms.Build.0 = Release|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Release|x64.ActiveCfg = Release|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Release|x64.Build.0 = Release|x64
+		{FA9DF7FC-A283-4EB8-B0C6-F9FA31E22CBC}.Release|x86.ActiveCfg = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

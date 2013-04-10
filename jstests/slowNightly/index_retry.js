@@ -1,5 +1,3 @@
-
-if (0) { // SERVER-8536 / SERVER-8344
 // Check index rebuild when MongoDB is killed
 
 var ports = allocatePorts(1);
@@ -14,7 +12,7 @@ t.drop();
 
 // Insert a large number of documents, enough to ensure that an index build on these documents can
 // be interrupted before complete.
-for (i = 0; i < 1e6; ++i) {
+for (i = 0; i < 1e5; ++i) {
     t.save( { a:i } );
     if (i % 10000 == 0) {
         print("i: " + i);
@@ -57,7 +55,8 @@ function indexBuildInProgress() {
 function abortDuringIndexBuild(options) {
 
     // Create an index asynchronously by using a new connection.
-    new Mongo(test.getMongo().host ).getCollection( t.toString() ).createIndex( { a:1 }, options);
+    new Mongo(test.getMongo().host).getCollection(t.toString()).createIndex( 
+        { a:1 }, { background:true } );
 
     // Wait for the index build to start.
     var times = 0;
@@ -71,12 +70,11 @@ function abortDuringIndexBuild(options) {
     stopMongod(ports[0], /* signal */ 9);
 }
 
-abortDuringIndexBuild({background:true});
-
-print("sleeping");
-sleep(2000);
+abortDuringIndexBuild();
 
 conn = mongod.start(/* reuseData */ true);
+
+
 
 assert.soon(
     function() {
@@ -96,4 +94,3 @@ print("Index built");
 
 stopMongod(ports[0]);
 print("SUCCESS!");
-}

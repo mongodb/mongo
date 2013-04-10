@@ -103,7 +103,6 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual void help(stringstream& h) const { h << "test how long to write and fsync to a test file in the journal/ directory"; }
         // No auth needed because it only works when enabled via command line.
-        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
@@ -338,8 +337,11 @@ namespace mongo {
                     shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                     int n = 0;
                     int nInvalid = 0;
+                    long long nQuantizedSize = 0;
+                    long long nPowerOf2QuantizedSize = 0;
                     long long len = 0;
                     long long nlen = 0;
+                    long long bsonLen = 0;
                     int outOfOrder = 0;
                     DiskLoc cl_last;
                     while ( c->ok() ) {
@@ -357,6 +359,25 @@ namespace mongo {
                         Record *r = c->_current();
                         len += r->lengthWithHeaders();
                         nlen += r->netLength();
+                        
+                        if ( r->lengthWithHeaders() ==
+                                NamespaceDetails::quantizeAllocationSpace
+                                    ( r->lengthWithHeaders() ) ) {
+                            // Count the number of records having a size consistent with
+                            // the quantizeAllocationSpace quantization implementation.
+                            ++nQuantizedSize;
+                        }
+
+                        if ( r->lengthWithHeaders() ==
+                                NamespaceDetails::quantizePowerOf2AllocationSpace
+                                    ( r->lengthWithHeaders() - 1 ) ) {
+                            // Count the number of records having a size consistent with the
+                            // quantizePowerOf2AllocationSpace quantization implementation.
+                            // Because of SERVER-8311, power of 2 quantization is not idempotent and
+                            // r->lengthWithHeaders() - 1 must be checked instead of the record
+                            // length itself.
+                            ++nPowerOf2QuantizedSize;
+                        }
 
                         if (full){
                             BSONObj obj = BSONObj::make(r);
@@ -379,6 +400,9 @@ namespace mongo {
                                     log() << "Invalid bson detected in " << ns << " and couldn't find _id" << endl;
                                 }
                             }
+                            else {
+                                bsonLen += obj.objsize();
+                            }
                         }
 
                         c->advance();
@@ -396,8 +420,14 @@ namespace mongo {
                         result.append("invalidObjects", nInvalid);
                     }
 
+                    result.appendNumber("nQuantizedSize", nQuantizedSize);
+                    result.appendNumber("nPowerOf2QuantizedSize", nPowerOf2QuantizedSize);
                     result.appendNumber("bytesWithHeaders", len);
                     result.appendNumber("bytesWithoutHeaders", nlen);
+
+                    if (full) {
+                        result.appendNumber("bytesBson", bsonLen);
+                    }
                 }
 
                 BSONArrayBuilder deletedListArray;
@@ -407,6 +437,7 @@ namespace mongo {
 
                 int ndel = 0;
                 long long delSize = 0;
+                BSONArrayBuilder delBucketSizes;
                 int incorrect = 0;
                 for ( int i = 0; i < Buckets; i++ ) {
                     DiskLoc loc = d->deletedList[i];
@@ -440,6 +471,7 @@ namespace mongo {
                             k++;
                             killCurrentOp.checkForInterrupt();
                         }
+                        delBucketSizes << k;
                     }
                     catch (...) {
                         errors << ("exception in deleted chain for bucket " + BSONObjBuilder::numStr(i));
@@ -448,6 +480,9 @@ namespace mongo {
                 }
                 result.appendNumber("deletedCount", ndel);
                 result.appendNumber("deletedSize", delSize);
+                if ( full ) {
+                    result << "delBucketSizes" << delBucketSizes.arr();
+                }
 
                 if ( incorrect ) {
                     errors << (BSONObjBuilder::numStr(incorrect) + " records from datafile are in deleted list");

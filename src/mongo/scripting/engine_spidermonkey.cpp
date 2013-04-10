@@ -592,7 +592,7 @@ namespace spidermonkey {
             case Timestamp: {
                 JSObject * o = JS_NewObject( _context , &timestamp_class , 0 , 0 );
                 CHECKNEWOBJECT(o,_context,"Timestamp1");
-                setProperty( o , "t" , toval( (double)(e.timestampTime()) ) );
+                setProperty( o , "t" , toval( (double)(e.timestampTime() / 1000) ) );
                 setProperty( o , "i" , toval( (double)(e.timestampInc()) ) );
                 return OBJECT_TO_JSVAL( o );
             }
@@ -1071,11 +1071,25 @@ namespace spidermonkey {
     JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
         try {
             Convertor c(cx);
-            NativeFunction func = reinterpret_cast<NativeFunction>(
-                    static_cast<long long>( c.getNumber( obj , "x" ) ) );
-            void* data = reinterpret_cast<void*>(
-                    static_cast<long long>( c.getNumber( obj , "y" ) ) );
-            verify( func );
+
+            // get function pointer from JS caller's argument property 'x'
+            massert(16740, "nativeHelper argument requires object with 'x' property",
+                    c.hasProperty(obj, "x"));
+            FunctionMap::iterator funcIter = currentScope->_functionMap.find(c.getNumber(obj, "x"));
+            massert(16742, "JavaScript function not in map",
+                    funcIter != currentScope->_functionMap.end());
+            NativeFunction func = funcIter->second;
+            verify(func);
+
+            // get data pointer from JS caller's argument property 'y'
+            void* data = NULL;
+            if (c.hasProperty(obj, "y")) {
+                ArgumentMap::iterator argIter =
+                        currentScope->_argumentMap.find(c.getNumber(obj, "y"));
+                massert(16741, "nativeHelper 'y' parameter must be in the argumentMap",
+                         argIter != currentScope->_argumentMap.end());
+                data = argIter->second;
+            }
 
             BSONObj a;
             if ( argc > 0 ) {
@@ -1494,9 +1508,9 @@ namespace spidermonkey {
             verify( JS_SetProperty( _context , _global , field , &v ) );
     }
 
-    void SMScope::setString( const char *field , const char * val ) {
+    void SMScope::setString( const char *field , const StringData& val ) {
             smlock;
-            jsval v = _convertor->toval( val );
+            jsval v = _convertor->toval( val.toString().c_str() );
             verify( JS_SetProperty( _context , _global , field , &v ) );
     }
 
@@ -1540,7 +1554,7 @@ namespace spidermonkey {
             verify( JS_SetProperty( _context , _global , from , &v ) );
     }
 
-    ScriptingFunction SMScope::_createFunction( const char * code ) {
+    ScriptingFunction SMScope::_createFunction(const char* code, ScriptingFunction functionNumber) {
             smlock;
             precall();
             return (ScriptingFunction)_convertor->compileFunction( code );
@@ -1725,12 +1739,16 @@ namespace spidermonkey {
             smlock;
             string name = field;
             jsval v;
-            v = _convertor->toval( static_cast<double>( reinterpret_cast<long long>(func) ) );
+            uint32_t funcId = _functionMap.size();
+            _functionMap.insert(make_pair(funcId, func));
+            v = _convertor->toval(static_cast<double>(funcId));
             _convertor->setProperty( _global, (name + "_").c_str(), v );
 
             stringstream code;
             if (data) {
-                v = _convertor->toval( static_cast<double>( reinterpret_cast<long long>(data) ) );
+                uint32_t argsId = _argumentMap.size();
+                _argumentMap.insert(make_pair(argsId, data));
+                v = _convertor->toval(static_cast<double>(argsId));
                 _convertor->setProperty( _global, (name + "_data_").c_str(), v );
                 code << field << "_" << " = { x : " << field << "_ , y: " << field << "_data_ }; ";
             } else {
@@ -1810,17 +1828,17 @@ namespace spidermonkey {
 
         s.localConnect( "foo" );
 
-        s.exec( "verify( db.getMongo() )" );
-        s.exec( "verify( db.bar , 'collection getting does not work' ); " );
+        s.exec( "assert( db.getMongo() )" );
+        s.exec( "assert( db.bar , 'collection getting does not work' ); " );
         s.exec( "assert.eq( db._name , 'foo' );" );
-        s.exec( "verify( _mongo == db.getMongo() ); " );
-        s.exec( "verify( _mongo == db._mongo ); " );
-        s.exec( "verify( typeof DB.bar == 'undefined' ); " );
-        s.exec( "verify( typeof DB.prototype.bar == 'undefined' , 'resolution is happening on prototype, not object' ); " );
+        s.exec( "assert( _mongo == db.getMongo() ); " );
+        s.exec( "assert( _mongo == db._mongo ); " );
+        s.exec( "assert( typeof DB.bar == 'undefined' ); " );
+        s.exec( "assert( typeof DB.prototype.bar == 'undefined' , 'resolution is happening on prototype, not object' ); " );
 
-        s.exec( "verify( db.bar ); " );
-        s.exec( "verify( typeof db.addUser == 'function' )" );
-        s.exec( "verify( db.addUser == DB.prototype.addUser )" );
+        s.exec( "assert( db.bar ); " );
+        s.exec( "assert( typeof db.addUser == 'function' )" );
+        s.exec( "assert( db.addUser == DB.prototype.addUser )" );
         s.exec( "assert.eq( 'foo.bar' , db.bar._fullName ); " );
         s.exec( "db.bar.verify();" );
 

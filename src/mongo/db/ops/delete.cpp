@@ -16,11 +16,14 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "delete.h"
-#include "../queryutil.h"
-#include "../oplog.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/ops/delete.h"
+
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
@@ -54,7 +57,7 @@ namespace mongo {
 
         long long nDeleted = 0;
 
-        shared_ptr< Cursor > creal = NamespaceDetailsTransient::getCursor( ns, pattern );
+        shared_ptr< Cursor > creal = getOptimizedCursor( ns, pattern );
 
         if( !creal->ok() )
             return nDeleted;

@@ -37,6 +37,7 @@ using namespace std;
 
 namespace mongo {
 
+
     SimpleRWLock::SimpleRWLock(const StringData& p) :
         name(p.toString())
     { }    
@@ -123,6 +124,10 @@ namespace mongo {
         if( !inited )
             init();
         return tryAcquireSRWLockExclusive == 0;
+#endif
+#if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
+    SimpleRWLock::SimpleRWLock(const StringData& p) : name(p.toString()) {
+        InitializeSRWLock(&_lock);
     }
 
     RWTry_Interface* getBestRWLock() { 

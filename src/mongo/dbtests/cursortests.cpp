@@ -23,6 +23,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -382,11 +383,10 @@ namespace CursorTests {
                 BSONObj query = BSON( "a" << BSON( "$in" << inVals.arr() ) );
                 int matchCount = 0;
                 Client::ReadContext ctx( ns() );
-                boost::shared_ptr<Cursor> c =
-                        NamespaceDetailsTransient::getCursor( ns(),
-                                                              query,
-                                                              BSONObj(),
-                                                              _requestMatcherFalse );
+                boost::shared_ptr<Cursor> c = getOptimizedCursor( ns(),
+                                                                  query,
+                                                                  BSONObj(),
+                                                                  _requestMatcherFalse );
                 // The BtreeCursor attempts to find each of the values 0, 1, 2, ... etc in the
                 // btree.  Because the values 0.5, 1.5, etc are present in the btree, the
                 // BtreeCursor will explicitly look for all the values in the $in list during
@@ -425,11 +425,10 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 << 2 ) ) );
                 _c.insert( ns(), BSON( "_id" << 1 << "a" << 9 ) );
                 Client::ReadContext ctx( ns() );
-                boost::shared_ptr<Cursor> c =
-                        NamespaceDetailsTransient::getCursor( ns(),
-                                                              BSON( "a" << GT << 0 << LT << 5 ),
-                                                              BSONObj(),
-                                                              _requestMatcherFalse );
+                boost::shared_ptr<Cursor> c = getOptimizedCursor( ns(),
+                                                                  BSON( "a" << GT << 0 << LT << 5 ),
+                                                                  BSONObj(),
+                                                                  _requestMatcherFalse );
                 while( c->ok() ) {
                     // A Matcher is provided even though 'requestMatcher' is false.
                     ASSERT( c->matcher() );
@@ -460,11 +459,10 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "a" << BSON_ARRAY( BSON( "b" << 2 << "c" << 3 ) <<
                                                           BSONObj() ) ) );
                 Client::ReadContext ctx( ns() );
-                boost::shared_ptr<Cursor> c =
-                        NamespaceDetailsTransient::getCursor( ns(),
-                                                              BSON( "a.b" << 2 << "a.c" << 2 ),
-                                                              BSONObj(),
-                                                              _requestMatcherFalse );
+                boost::shared_ptr<Cursor> c = getOptimizedCursor( ns(),
+                                                                  BSON( "a.b" << 2 << "a.c" << 2 ),
+                                                                  BSONObj(),
+                                                                  _requestMatcherFalse );
                 while( c->ok() ) {
                     // A Matcher is provided even though 'requestMatcher' is false.
                     ASSERT( c->matcher() );
@@ -489,11 +487,10 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "_id" << 0 << "a" << "a" ) );
                 _c.insert( ns(), BSON( "_id" << 1 << "a" << BSONObj() ) );
                 Client::ReadContext ctx( ns() );
-                boost::shared_ptr<Cursor> c =
-                        NamespaceDetailsTransient::getCursor( ns(),
-                                                              BSON( "a" << GTE << "" ),
-                                                              BSONObj(),
-                                                              _requestMatcherFalse );
+                boost::shared_ptr<Cursor> c = getOptimizedCursor( ns(),
+                                                                  BSON( "a" << GTE << "" ),
+                                                                  BSONObj(),
+                                                                  _requestMatcherFalse );
                 while( c->ok() ) {
                     ASSERT( !c->matcher() );
                     if ( c->currentMatches() ) {
@@ -517,11 +514,10 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "_id" << 0 << "a" << Date_t( 1 ) ) );
                 _c.insert( ns(), BSON( "_id" << 1 << "a" << true ) );
                 Client::ReadContext ctx( ns() );
-                boost::shared_ptr<Cursor> c =
-                        NamespaceDetailsTransient::getCursor( ns(),
-                                                              BSON( "a" << LTE << Date_t( 1 ) ),
-                                                              BSONObj(),
-                                                              _requestMatcherFalse );
+                boost::shared_ptr<Cursor> c = getOptimizedCursor( ns(),
+                                                                  BSON( "a" << LTE << Date_t( 1 ) ),
+                                                                  BSONObj(),
+                                                                  _requestMatcherFalse );
                 while( c->ok() ) {
                     ASSERT( !c->matcher() );
                     if ( c->currentMatches() ) {
@@ -591,8 +587,9 @@ namespace CursorTests {
                 {
                     Client::ReadContext ctx( ns() );
                     // The query will utilize the _id index for both the first and second clauses.
-                    cursor = NamespaceDetailsTransient::getCursor
-                            ( ns(), fromjson( "{$or:[{_id:{$gte:0,$lte:148}},{_id:149}]}" ) );
+                    cursor = getOptimizedCursor( ns(),
+                                                 fromjson( "{$or:[{_id:{$gte:0,$lte:148}},"
+                                                           "{_id:149}]}" ) );
                     clientCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
                                                           ns() ) );
                     // Advance to the last iterate of the first clause.
@@ -630,7 +627,7 @@ namespace CursorTests {
 
                 // Generate a cursor from the supplied query and advance it to the iterate to be
                 // deleted.
-                boost::shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query() );
+                boost::shared_ptr<Cursor> cursor = getOptimizedCursor( ns(), query() );
                 while( !isExpectedIterate( cursor->current() ) ) {
                     ASSERT( cursor->advance() );
                 }

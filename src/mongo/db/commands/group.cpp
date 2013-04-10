@@ -23,10 +23,11 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/query_optimizer.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/db/clientcursor.h"
 
 namespace mongo {
 
@@ -72,15 +73,15 @@ namespace mongo {
                     string& errmsg,
                     BSONObjBuilder& result ) {
 
-            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname + "group");
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname, "group");
 
             if ( reduceScope )
                 s->init( reduceScope );
 
             s->setObject( "$initial" , initial , true );
 
-            s->exec( "$reduce = " + reduceCode , "reduce setup" , false , true , true , 100 );
-            s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
+            s->exec( "$reduce = " + reduceCode , "$group reduce setup" , false , true , true , 100 );
+            s->exec( "$arr = [];" , "$group reduce setup 2" , false , true , true , 100 );
             ScriptingFunction f = s->createFunction(
                                       "function(){ "
                                       "  if ( $arr[n] == null ){ "
@@ -105,7 +106,7 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor(ns.c_str() , query);
+            shared_ptr<Cursor> cursor = getOptimizedCursor(ns.c_str() , query);
             ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
                                                              ns ) );
 
@@ -150,7 +151,7 @@ namespace mongo {
             ccPointer.reset();
 
             if (!finalize.empty()) {
-                s->exec( "$finalize = " + finalize , "finalize define" , false , true , true , 100 );
+                s->exec( "$finalize = " + finalize , "$group finalize define" , false , true , true , 100 );
                 ScriptingFunction g = s->createFunction(
                                           "function(){ "
                                           "  for(var i=0; i < $arr.length; i++){ "
@@ -165,7 +166,7 @@ namespace mongo {
             result.appendArray( "retval" , s->getObject( "$arr" ) );
             result.append( "count" , keynum - 1 );
             result.append( "keys" , (int)(map.size()) );
-            s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
+            s->exec( "$arr = [];" , "$group reduce setup 2" , false , true , true , 100 );
             s->gc();
 
             return true;

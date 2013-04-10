@@ -68,9 +68,29 @@ ISODate = function(isoDateStr){
     var date = parseInt(res[3],10) || 0;
     var hour = parseInt(res[5],10) || 0;
     var min = parseInt(res[7],10) || 0;
-    var sec = parseFloat(res[9]) || 0;
-    var ms = Math.round((sec%1) * 1000)
-    sec -= ms/1000
+    var sec = parseInt((res[9] && res[9].substr(0,2)),10) || 0;
+    var ms = Math.round((parseFloat(res[10]) || 0) * 1000);
+    if (ms == 1000) {
+        ms = 0;
+        ++sec;
+    }
+    if (sec == 60) {
+        sec = 0;
+        ++min;
+    }
+    if (min == 60) {
+        min = 0;
+        ++hour;
+    }
+    if (hour == 24) {
+        hour = 0;   // the day wrapped, let JavaScript figure out the rest
+        var tempTime = Date.UTC(year, month, date, hour, min, sec, ms);
+        tempTime += 24 * 60 * 60 * 1000;    // milliseconds in a day
+        var tempDate = new Date(tempTime);
+        year = tempDate.getUTCFullYear();
+        month = tempDate.getUTCMonth();
+        date = tempDate.getUTCDate();
+    }
 
     var time = Date.UTC(year, month, date, hour, min, sec, ms);
 
@@ -539,7 +559,7 @@ tojson = function(x, indent, nolint){
     case "object":{
         var s = tojsonObject(x, indent, nolint);
         if ((nolint == null || nolint == true) && s.length < 80 && (indent == null || indent.length == 0)){
-            s = s.replace(/[\s\r\n ]+/gm, " ");
+            s = s.replace(/[\t\r\n]+/gm, " ");
         }
         return s;
     }
@@ -600,7 +620,11 @@ tojsonObject = function(x, indent, nolint){
     var num = 1;
     for (var k in keys){
         var val = x[k];
-        if (val == DB.prototype || val == DBCollection.prototype)
+
+        // skip internal DB types to avoid issues with interceptors
+        if (typeof DB != 'undefined' && val == DB.prototype)
+            continue;
+        if (typeof DBCollection != 'undefined' && val == DBCollection.prototype)
             continue;
 
         s += indent + "\"" + k + "\" : " + tojson(val, indent, nolint);
@@ -614,6 +638,14 @@ tojsonObject = function(x, indent, nolint){
     // pop one level of indent
     indent = indent.substring(1);
     return s + indent + "}";
+}
+
+printjson = function(x){
+    print( tojson( x ) );
+}
+
+printjsononeline = function(x){
+    print( tojsononeline( x ) );
 }
 
 isString = function(x){

@@ -38,6 +38,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
+#include "mongo/db/cloner.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/db.h"
@@ -49,10 +50,11 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/lasterror.h"
 #include "mongo/db/memconcept.h"
 #include "mongo/db/namespace-inl.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/replutil.h"
 #include "mongo/db/sort_phase_one.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/hashtab.h"
@@ -448,10 +450,12 @@ namespace mongo {
         verify( sz % 4096 == 0 );
         if( sz < 64*1024*1024 && !cmdLine.smallfiles ) { 
             if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) { 
-                log() << "info openExisting file size " << sz << " but cmdLine.smallfiles=false" << endl;
+                log() << "info openExisting file size " << sz << " but cmdLine.smallfiles=false: "
+                      << filename << endl;
             }
             else {
-                log() << "openExisting size " << sz << " less then minimum file size expectation " << filename << endl;
+                log() << "openExisting size " << sz << " less then minimum file size expectation "
+                      << filename << endl;
                 verify(false);
             }
         }
@@ -1076,7 +1080,7 @@ namespace mongo {
                 s->nrecords--;
             }
 
-            if ( strstr(ns, ".system.indexes") ) {
+            if (NamespaceString(ns).coll ==  "system.indexes") {
                 /* temp: if in system.indexes, don't reuse, and zero out: we want to be
                    careful until validated more, as IndexDetails has pointers
                    to this disk location.  so an incorrectly done remove would cause
@@ -1408,7 +1412,7 @@ namespace mongo {
         uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
         if ( strstr(ns, ".system.") ) {
             // later:check for dba-type permissions here if have that at some point separate
-            if ( strstr(ns, ".system.indexes" ) )
+            if (NamespaceString(ns).coll == "system.indexes")
                 wouldAddIndex = true;
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
@@ -1447,17 +1451,11 @@ namespace mongo {
                                         const string& tabletoidxns,
                                         const DiskLoc& loc,
                                         bool mayInterrupt) {
-        uassert( 13143 , "can't create index on system.indexes" , tabletoidxns.find( ".system.indexes" ) == string::npos );
+        uassert(13143,
+                "can't create index on system.indexes",
+                NamespaceString(tabletoidxns).coll != "system.indexes");
 
         BSONObj info = loc.obj();
-        bool background = info["background"].trueValue();
-        if (background && !isMasterNs(tabletoidxns.c_str())) {
-            /* don't do background indexing on slaves.  there are nuances.  this could be added later
-                but requires more code.
-                */
-            log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
-            background = false;
-        }
 
         // The total number of indexes right before we write to the collection
         int oldNIndexes = -1;
@@ -1479,7 +1477,7 @@ namespace mongo {
 
             try {
                 getDur().writingInt(tableToIndex->indexBuildsInProgress) += 1;
-                buildAnIndex(tabletoidxns, tableToIndex, idx, background, mayInterrupt);
+                buildAnIndex(tabletoidxns, tableToIndex, idx, mayInterrupt);
             }
             catch (DBException& e) {
                 // save our error msg string as an exception or dropIndexes will overwrite our message
@@ -1538,6 +1536,13 @@ namespace mongo {
             // clear transient info caches so they refresh; increments nIndexes
             tableToIndex->addIndex(tabletoidxns.c_str());
             getDur().writingInt(tableToIndex->indexBuildsInProgress) -= 1;
+
+            IndexType* indexType = idx.getSpec().getType();
+            const IndexPlugin *plugin = indexType ? indexType->getPlugin() : NULL;
+            if (plugin) {
+                plugin->postBuildHook( idx.getSpec() );
+            }
+
         }
         catch (...) {
             // Generally, this will be called as an exception from building the index bubbles up.

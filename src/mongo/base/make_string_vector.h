@@ -25,7 +25,7 @@
  * Usage:  MONGO_MAKE_STRING_VECTOR("a", "b", "c") returns a vector containing
  * std::strings "a", "b", "c", in that order.
  */
-#define MONGO_MAKE_STRING_VECTOR(...) ::mongo::_makeStringVector(0, NULL, ##__VA_ARGS__, NULL)
+#define MONGO_MAKE_STRING_VECTOR(...) ::mongo::_makeStringVector(0, __VA_ARGS__, NULL)
 
 namespace mongo {
 
@@ -35,9 +35,10 @@ namespace mongo {
      * WARNING: Only intended for use by MONGO_MAKE_STRING_VECTOR macro, defined above.  Aborts
      * ungracefully if you misuse it, so stick to the macro.
      *
-     * The first parameter is ignored in all circumstances.  The second parameter must be NULL, as
-     * must be the last parameter.  The third through penultimate parameters should be const char*
-     * C-style strings.
+     * The first parameter is ignored in all circumstances. The subsequent parameters must be
+     * const char* C-style strings, or NULL. Of these parameters, at least one must be
+     * NULL. Parameters at and beyond the NULL are not inserted. Typically, the NULL will be
+     * the last parameter. The MONGO_MAKE_STRING_VECTOR macro enforces this.
      *
      * Returns a vector of std::strings.
      */

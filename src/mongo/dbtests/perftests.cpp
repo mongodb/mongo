@@ -43,6 +43,10 @@
 #include "../util/fail_point.h"
 #include <boost/filesystem/operations.hpp>
 
+#if (__cplusplus >= 201103L)
+#include <mutex>
+#endif
+
 using namespace bson;
 
 namespace mongo {
@@ -528,6 +532,12 @@ namespace PerfTests {
     RWLock lk("testrw");
     SimpleMutex m("simptst");
     mongo::mutex mtest("mtest");
+    boost::mutex mboost;
+    boost::timed_mutex mboost_timed;
+#if (__cplusplus >= 201103L)
+    std::mutex mstd;
+    std::timed_mutex mstd_timed;
+#endif
     SpinLock s;
     boost::condition c;
 
@@ -549,6 +559,24 @@ namespace PerfTests {
             mongo::mutex::scoped_lock lk(mtest);
         }
     };
+    class boostmutexspeed : public B {
+    public:
+        string name() { return "boost::mutex"; }
+        virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            boost::mutex::scoped_lock lk(mboost);
+        }
+    };
+    class boosttimed_mutexspeed : public B {
+    public:
+        string name() { return "boost::timed_mutex"; }
+        virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            boost::timed_mutex::scoped_lock lk(mboost_timed);
+        }
+    };
     class simplemutexspeed : public B {
     public:
         string name() { return "simplemutex"; }
@@ -558,6 +586,26 @@ namespace PerfTests {
             SimpleMutex::scoped_lock lk(m);
         }
     };
+#if (__cplusplus >= 201103L)
+    class stdmutexspeed : public B {
+    public:
+        string name() { return "std::mutex"; }
+        virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            std::lock_guard<std::mutex> lk(mstd);
+        }
+    };
+    class stdtimed_mutexspeed : public B {
+    public:
+        string name() { return "std::timed_mutex"; }
+        virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            std::lock_guard<std::timed_mutex> lk(mstd_timed);
+        }
+    };
+#endif
     class spinlockspeed : public B {
     public:
         string name() { return "spinlock"; }
@@ -1228,6 +1276,12 @@ namespace PerfTests {
                 add< NotifyOne >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();
+                add< boostmutexspeed >();
+                add< boosttimed_mutexspeed >();
+#if (__cplusplus >= 201103L)
+                add< stdmutexspeed >();
+                add< stdtimed_mutexspeed >();
+#endif
                 add< spinlockspeed >();
 #ifdef RUNCOMPARESWAP
                 add< casspeed >();

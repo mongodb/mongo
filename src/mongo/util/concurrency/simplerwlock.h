@@ -23,7 +23,11 @@
 namespace mongo {
 
     class SimpleRWLock : boost::noncopyable { 
+#if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
+        SRWLOCK _lock;
+#else
         RWLockBase m;
+#endif
     public:
         const string name;
         SimpleRWLock(const StringData& name = "" );

@@ -65,6 +65,7 @@ function go() {
     // take down the slave and make sure it fails over
     repset1.stop(1);
     repset1.stop(2);
+    db.getMongo().adminCommand({setParameter: 1, logLevel:1});
     db.getMongo().setSlaveOk();
     print("trying some queries");
     assert.soon(function() { try {
@@ -87,4 +88,4 @@ function go() {
 }
 
 //Uncomment below to execute
-go()
+//go()

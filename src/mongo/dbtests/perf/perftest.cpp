@@ -24,7 +24,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/query_optimizer_internal.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/unittest/unittest.h"

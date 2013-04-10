@@ -42,7 +42,7 @@ namespace mongo {
         //
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            connPtr.reset(new ScopedDbConnection(configLoc, 30));
             ScopedDbConnection& conn = *connPtr;
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(MongosType::ConfigNS,
                                                                       Query())));
@@ -70,8 +70,9 @@ namespace mongo {
                 Date_t lastPing = ping.getPing();
 
                 long long quietIntervalMillis = 0;
-                if ((jsTime() - lastPing) >= 0) {
-                    quietIntervalMillis = static_cast<long long>(jsTime() - lastPing);
+                Date_t currentJsTime = jsTime();
+                if (currentJsTime >= lastPing) {
+                    quietIntervalMillis = static_cast<long long>(currentJsTime - lastPing);
                 }
                 long long quietIntervalMins = quietIntervalMillis / (60 * 1000);
 
@@ -165,8 +166,7 @@ namespace mongo {
                 BSONObj serverStatus;
 
                 try {
-                    serverConnPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(serverLoc,
-                                                                                          30));
+                    serverConnPtr.reset(new ScopedDbConnection(serverLoc, 30));
                     ScopedDbConnection& serverConn = *serverConnPtr;
 
                     resultOk = serverConn->runCommand("admin",
@@ -211,7 +211,7 @@ namespace mongo {
         scoped_ptr<ScopedDbConnection> connPtr;
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            connPtr.reset(new ScopedDbConnection(configLoc, 30));
 
             ScopedDbConnection& conn = *connPtr;
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(CollectionType::ConfigNS,
@@ -221,7 +221,8 @@ namespace mongo {
 
                 BSONObj collDoc = cursor->nextSafe();
 
-                CollectionType* coll = new CollectionType();
+                // Replace with unique_ptr (also owned ptr map goes away)
+                auto_ptr<CollectionType> coll(new CollectionType());
                 string errMsg;
                 coll->parseBSON(collDoc, &errMsg);
 
@@ -245,8 +246,10 @@ namespace mongo {
                 if (optionalEpochs && epochNotSet) {
                     coll->setEpoch(OID());
                 }
-
-                collections->mutableMap().insert(make_pair(coll->getNS(), coll));
+    
+                // Get NS before releasing
+                string ns = coll->getNS();
+                collections->mutableMap().insert(make_pair(ns, coll.release()));
             }
         }
         catch (const DBException& e) {
@@ -277,7 +280,7 @@ namespace mongo {
         scoped_ptr<DBClientCursor> cursor;
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            connPtr.reset(new ScopedDbConnection(configLoc, 30));
             ScopedDbConnection& conn = *connPtr;
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ChunkType::ConfigNS,
                                                                       BSON(ChunkType::ns(ns)))));
@@ -286,7 +289,8 @@ namespace mongo {
 
                 BSONObj chunkDoc = cursor->nextSafe();
 
-                ChunkType* chunk = new ChunkType();
+                // TODO: replace with unique_ptr when available
+                auto_ptr<ChunkType> chunk(new ChunkType());
                 string errMsg;
                 if (!chunk->parseBSON(chunkDoc, &errMsg) || !chunk->isValid(&errMsg)) {
                     connPtr->done();
@@ -295,7 +299,7 @@ namespace mongo {
                                            << " read from the config server" << causedBy(errMsg));
                 }
 
-                chunks->mutableVector().push_back(chunk);
+                chunks->mutableVector().push_back(chunk.release());
             }
         }
         catch (const DBException& e) {
@@ -335,7 +339,7 @@ namespace mongo {
         scoped_ptr<ScopedDbConnection> connPtr;
 
         try {
-            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            connPtr.reset(new ScopedDbConnection(configLoc, 30));
             ScopedDbConnection& conn = *connPtr;
 
             // TODO: better way here

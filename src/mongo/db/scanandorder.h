@@ -26,6 +26,8 @@
 
 namespace mongo {
 
+    class ParsedQuery;
+
     static const int ScanAndOrderMemoryLimitExceededAssertionCode = 10128;
 
     class KeyType : boost::noncopyable {
@@ -34,8 +36,9 @@ namespace mongo {
         FieldRangeVector _keyCutter;
     public:
         KeyType(const BSONObj &pattern, const FieldRangeSet &frs):
-        _spec((verify(!pattern.isEmpty()),pattern)),
+        _spec(pattern, BSONObj(), IndexSpec::NoPlugins),
         _keyCutter(frs, _spec, 1) {
+            verify(!pattern.isEmpty());
         }
 
         /**

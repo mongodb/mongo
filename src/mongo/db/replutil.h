@@ -19,13 +19,12 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "json.h"
-#include "repl.h"
 #include "cmdline.h"
 #include "repl/rs.h"
+#include "mongo/db/repl/master_slave.h"  // replAllDead
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
 
 namespace mongo {
-
-    extern const char *replAllDead;
 
     /* note we always return true for the "local" namespace.
 
@@ -77,13 +76,5 @@ namespace mongo {
             return false;
         return ns[5] == 0 || ns[5] == '.';
     }
-
-    inline void notMasterUnless(bool expr) {
-        uassert( 10107 , "not master" , expr );
-    }
-
-    class ParsedQuery;
-    
-    void replVerifyReadsOk(const ParsedQuery* pq = 0);
 
 } // namespace mongo

@@ -1,5 +1,3 @@
-// @file queryutil.cpp
-
 /*    Copyright 2009 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,19 +16,13 @@
 #include "pch.h"
 
 #include "mongo/db/queryutil.h"
+
 #include "pdfile.h"
 #include "../util/startup_test.h"
-#include "dbmessage.h"
 #include "../util/mongoutils/str.h"
 
 namespace mongo {
 
-    ParsedQuery::ParsedQuery( QueryMessage& qm )
-    : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
-        init( qm.query );
-        initFields( qm.fields );
-    }
-    
     extern BSONObj staticNull;
     extern BSONObj staticUndefined;
 

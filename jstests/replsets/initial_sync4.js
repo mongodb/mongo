@@ -1,7 +1,5 @@
 // Test update modifier uassert during initial sync. SERVER-4781
 
-if( 0 ) { // SERVER-4781
-
 load("jstests/replsets/rslib.js");
 basename = "jstests_initsync4";
 
@@ -16,8 +14,9 @@ mc = m.getDB("d")["c"];
 
 print("2. Insert some data");
 N = 500000;
+mc.ensureIndex({x:1})
 for( i = 0; i < N; ++i ) {
-    mc.save( {_id:i,a:{}} );
+    mc.save( {_id:i,x:i,a:{}} );
 }
 md.getLastError();
 
@@ -56,6 +55,12 @@ for( i = N-1; i >= N-10000; --i ) {
     mc.update( {_id:i}, {$set:{a:1}} );    
 }
 
+for ( i = N; i < N*2; i++ ) {
+    mc.insert( { _id : i, x : i } )
+}
+
+assert.eq( N*2, mc.count() );
+
 print("7. Wait for new node to become SECONDARY");
 wait(function() {
      var status = s.getDB("admin").runCommand({replSetGetStatus:1});
@@ -64,4 +69,16 @@ wait(function() {
      (status.members[1].state == 2);
      });
 
-}
+print("8. Wait for new node to have all the data")
+wait(function() {
+    return sc.count() == mc.count();
+} );
+
+
+assert.eq( mc.getIndexKeys().length,
+           sc.getIndexKeys().length );
+
+assert.eq( mc.find().sort( { x : 1 } ).itcount(),
+           sc.find().sort( { x : 1 } ).itcount() );
+
+replTest.stopSet( 15 );

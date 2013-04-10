@@ -24,9 +24,10 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/platform/bits.h"
@@ -452,8 +453,6 @@ namespace mongo {
         return ret.release();
     }
 
-    void newReplUp();
-
     void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
         Lock::DBRead lk(rsoplog);
         BSONObj o;
@@ -770,7 +769,7 @@ namespace mongo {
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (yet)" << rsLog;
                     }
 
-                    sleepsecs(10);
+                    sleepsecs(1);
                     continue;
                 }
 
@@ -862,7 +861,7 @@ namespace mongo {
     }
 
     void replLocalAuth() {
-        if ( noauth )
+        if (!AuthorizationManager::isAuthEnabled())
             return;
         cc().getAuthorizationManager()->grantInternalAuthorization("_repl");
     }

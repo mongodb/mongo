@@ -43,14 +43,16 @@ namespace mongo {
     CmdLine cmdLine;
 
     Tool::Tool( string name , DBAccess access , string defaultDB ,
-                string defaultCollection , bool usesstdout ) :
+                string defaultCollection , bool usesstdout , bool quiet) :
         _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) ,
-        _usesstdout(usesstdout), _noconnection(false), _autoreconnect(false), _conn(0), _slaveConn(0), _paired(false) {
+        _usesstdout(usesstdout) , _quiet(quiet) , _noconnection(false) ,
+        _autoreconnect(false) , _conn(0) , _slaveConn(0) , _paired(false) {
 
         _options = new po::options_description( "options" );
         _options->add_options()
         ("help","produce help message")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
+        ("quiet", "silence all non error diagnostic messages" )
         ("version", "print the program's version and exit" )
         ;
 
@@ -69,7 +71,7 @@ namespace mongo {
              po::value<string>(&_authenticationDatabase)->default_value(""),
              "user source (defaults to dbname)" )
             ("authenticationMechanism",
-             po::value<string>(&_authenticationMechanism)->default_value("MONGO-CR"),
+             po::value<string>(&_authenticationMechanism)->default_value("MONGODB-CR"),
              "authentication mechanism")
             ;
 
@@ -179,6 +181,9 @@ namespace mongo {
             }
         }
 
+        if ( hasParam("quiet") ) {
+            _quiet = true;
+        }
 
 #ifdef MONGO_SSL
         if (_params.count("ssl")) {
@@ -216,7 +221,9 @@ namespace mongo {
                     ::_exit(-1);
                 }
 
-                (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
+                if (!_quiet) {
+                    (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
+                }
             }
 
         }
@@ -270,7 +277,7 @@ namespace mongo {
 
         int ret = -1;
         try {
-            if (!useDirectClient)
+            if (!useDirectClient && !_noconnection)
                 auth();
             ret = run();
         }
@@ -356,7 +363,7 @@ namespace mongo {
     void Tool::addFieldOptions() {
         add_options()
         ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )
-        ("fieldFile" , po::value<string>() , "file with fields names - 1 per line" )
+        ("fieldFile" , po::value<string>() , "file with field names - 1 per line" )
         ;
     }
 
@@ -406,6 +413,18 @@ namespace mongo {
         throw UserException( 9998 , "you need to specify fields" );
     }
 
+    std::string Tool::getAuthenticationDatabase() {
+        if (!_authenticationDatabase.empty()) {
+            return _authenticationDatabase;
+        }
+
+        if (!_db.empty()) {
+            return _db;
+        }
+
+        return "admin";
+    }
+
     /**
      * Validate authentication on the server for the given dbname.
      */
@@ -422,17 +441,7 @@ namespace mongo {
             return;
         }
 
-        std::string userSource = _authenticationDatabase;
-        if ( userSource.empty() ) {
-            if ( !_db.empty() ) {
-                userSource = _db;
-            }
-            else {
-                userSource = "admin";
-            }
-        }
-
-        _conn->auth( BSON( saslCommandPrincipalSourceFieldName << userSource <<
+        _conn->auth( BSON( saslCommandPrincipalSourceFieldName << getAuthenticationDatabase() <<
                            saslCommandPrincipalFieldName << _username <<
                            saslCommandPasswordFieldName << _password  <<
                            saslCommandMechanismFieldName << _authenticationMechanism ) );
@@ -467,14 +476,16 @@ namespace mongo {
         unsigned long long fileLength = file_size( root );
 
         if ( fileLength == 0 ) {
-            out() << "file " << _fileName << " empty, skipping" << endl;
+            if (!_quiet) {
+                (_usesstdout ? cout : cerr ) << "file " << _fileName << " empty, skipping" << endl;
+            }
             return 0;
         }
 
 
         FILE* file = fopen( _fileName.c_str() , "rb" );
         if ( ! file ) {
-            log() << "error opening file: " << _fileName << " " << errnoWithDescription() << endl;
+            cerr << "error opening file: " << _fileName << " " << errnoWithDescription() << endl;
             return 0;
         }
 
@@ -482,7 +493,9 @@ namespace mongo {
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        LOG(1) << "\t file size: " << fileLength << endl;
+        if (!_quiet && logLevel >= 1) {
+            (_usesstdout ? cout : cerr ) << "\t file size: " << fileLength << endl;
+        }
 
         unsigned long long read = 0;
         unsigned long long num = 0;
@@ -507,7 +520,7 @@ namespace mongo {
 
             BSONObj o( buf );
             if ( _objcheck && ! o.valid() ) {
-                cerr << "INVALID OBJECT - going try and pring out " << endl;
+                cerr << "INVALID OBJECT - going to try and print out " << endl;
                 cerr << "size: " << size << endl;
                 BSONObjIterator i(o);
                 while ( i.more() ) {
@@ -537,9 +550,11 @@ namespace mongo {
         fclose( file );
 
         uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        (_usesstdout ? cout : cerr ) << m.hits() << " objects found" << endl;
-        if ( _matcher.get() )
-            (_usesstdout ? cout : cerr ) << processed << " objects processed" << endl;
+        if (!_quiet) {
+            (_usesstdout ? cout : cerr ) << m.hits() << " objects found" << endl;
+            if ( _matcher.get() )
+                (_usesstdout ? cout : cerr ) << processed << " objects processed" << endl;
+        }
         return processed;
     }
 

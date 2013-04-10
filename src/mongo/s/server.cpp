@@ -21,37 +21,34 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/base/initializer.h"
+#include "mongo/client/connpool.h"
+#include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
-#include "../util/net/message.h"
-#include "../util/startup_test.h"
-#include "../client/connpool.h"
-#include "../util/net/message_server.h"
-#include "../util/stringutils.h"
-#include "../util/version.h"
-#include "../util/ramlog.h"
-#include "../util/signal_handlers.h"
-#include "../util/admin_access.h"
-#include "../util/concurrency/task.h"
-#include "../db/dbwebserver.h"
-#include "../scripting/engine.h"
-
-#include "server.h"
-#include "request.h"
-#include "client_info.h"
-#include "config.h"
-#include "chunk.h"
-#include "balance.h"
-#include "grid.h"
-#include "cursors.h"
-#include "../util/processinfo.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/s/balance.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/config.h"
 #include "mongo/s/config_upgrade.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request.h"
+#include "mongo/s/server.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/admin_access.h"
+#include "mongo/util/concurrency/task.h"
 #include "mongo/util/exception_filter_win32.h"
-
-#if defined(_WIN32)
-# include "../util/ntservice.h"
-#endif
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/message_server.h"
+#include "mongo/util/ntservice.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/ramlog.h"
+#include "mongo/util/signal_handlers.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/stringutils.h"
+#include "mongo/util/text.h"
+#include "mongo/util/version.h"
 
 namespace {
     bool _isUpgradeSwitchSet = false;
@@ -107,6 +104,12 @@ namespace mongo {
             try {
                 r.init();
                 r.process();
+
+                // Release connections after non-write op 
+                if ( ShardConnection::releaseConnectionsAfterResponse && r.expectResponse() ) {
+                    LOG(2) << "release thread local connections back to pool" << endl;
+                    ShardConnection::releaseMyConnections();
+                }
             }
             catch ( AssertionException & e ) {
                 LOG( e.isUserAssertion() ? 1 : 0 ) << "AssertionException while processing op type : " << m.operation() << " to : " << r.getns() << causedBy(e) << endl;
@@ -265,8 +268,13 @@ static bool runMongosServer( bool doUpgrade ) {
     VersionType initVersionInfo;
     VersionType versionInfo;
     string errMsg;
-    bool upgraded = checkAndUpgradeConfigVersion(ConnectionString(configServer.getPrimary()
-                                                         .getConnString()),
+    string configServerURL = configServer.getPrimary().getConnString();
+    ConnectionString configServerConnString = ConnectionString::parse(configServerURL, errMsg);
+    if (!configServerConnString.isValid()) {
+        error() << "Invalid connection string for config servers: " << configServerURL << endl;
+        return false;
+    }
+    bool upgraded = checkAndUpgradeConfigVersion(configServerConnString,
                                                  doUpgrade,
                                                  &initVersionInfo,
                                                  &versionInfo,
@@ -498,10 +506,10 @@ namespace mongo {
 }  // namespace mongo
 #endif
 
-int main(int argc, char* argv[], char** envp) {
+int mongoSMain(int argc, char* argv[], char** envp) {
     static StaticObserver staticObserver;
     if (argc < 1)
-        ::_exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
 
     mongosCommand = argv[0];
 
@@ -510,7 +518,7 @@ int main(int argc, char* argv[], char** envp) {
     CmdLine::censor(argc, argv);
     try {
         int exitCode = _main();
-        ::_exit(exitCode);
+        return exitCode;
     }
     catch(SocketException& e) {
         cout << "uncaught SocketException in mongos main:" << endl;
@@ -527,8 +535,26 @@ int main(int argc, char* argv[], char** envp) {
     catch(...) {
         cout << "uncaught unknown exception in mongos main" << endl;
     }
-    ::_exit(20);
+    return 20;
 }
+
+#if defined(_WIN32)
+// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
+// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
+// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
+// and makes them available through the argv() and envp() members.  This enables mongoSMain()
+// to process UTF-8 encoded arguments and environment variables without regard to platform.
+int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+    WindowsCommandLine wcl(argc, argvW, envpW);
+    int exitCode = mongoSMain(argc, wcl.argv(), wcl.envp());
+    ::_exit(exitCode);
+}
+#else
+int main(int argc, char* argv[], char** envp) {
+    int exitCode = mongoSMain(argc, argv, envp);
+    ::_exit(exitCode);
+}
+#endif
 
 #undef exit
 

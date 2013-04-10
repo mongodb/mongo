@@ -19,12 +19,17 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
+
+    const std::string IdentityNS("local.me");
+    const BSONField<string> HostField("host");
+
     /**
      * A very simple mock that acts like a database server. Every object keeps track of its own
      * InstanceID, which initially starts at zero and increments every time it is restarted.
@@ -51,6 +56,9 @@ namespace mongo {
          * 1. hostAndPort of this server should start with $.
          * 2. No other instance has the same hostAndPort as this.
          *
+         * This server will also contain the hostAndPort inside the IdentityNS
+         * collection. This is convenient for testing query routing.
+         *
          * @param hostAndPort the host name with port for this server.
          *
          * @see MockConnRegistry
@@ -70,7 +78,7 @@ namespace mongo {
         /**
          * Shuts down this server. Any operations on this server with an InstanceID
          * less than or equal to the current one will throw a mongo::SocketException.
-         * To bring the server up again, use the #reboot method.
+         * To bring the server up again, use the reboot method.
          */
         void shutdown();
 

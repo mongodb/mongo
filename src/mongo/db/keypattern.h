@@ -80,6 +80,12 @@ namespace mongo {
             return _pattern.isPrefixOf( other.toBSON() );
         }
 
+        /**
+         * Return the first string value in the provided object.  For an index key pattern,
+         * a field with a non-string value indicates a "special" (not straight Btree) index.
+         */
+        static string findPluginName(const BSONObj& keyPattern);
+
         /* Takes a BSONObj whose field names are a prefix of the fields in this keyPattern, and
          * outputs a new bound with MinKey values appended to match the fields in this keyPattern
          * (or MaxKey values for descending -1 fields). This is useful in sharding for

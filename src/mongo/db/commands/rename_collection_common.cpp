@@ -32,22 +32,21 @@ namespace rename_collection {
                                                   std::vector<Privilege>* out) {
         NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));
         NamespaceString targetNS = NamespaceString(cmdObj.getStringField("to"));
+        ActionSet sourceActions;
+        ActionSet targetActions;
+
         if (sourceNS.db == targetNS.db) {
-            ActionSet actions;
-            actions.addAction(ActionType::renameCollectionSameDB);
-            out->push_back(Privilege(sourceNS.db, actions));
-            return;
+            sourceActions.addAction(ActionType::renameCollectionSameDB);
+            targetActions.addAction(ActionType::renameCollectionSameDB);
+        } else {
+            sourceActions.addAction(ActionType::cloneCollectionLocalSource);
+            sourceActions.addAction(ActionType::dropCollection);
+            targetActions.addAction(ActionType::createCollection);
+            targetActions.addAction(ActionType::cloneCollectionTarget);
+            targetActions.addAction(ActionType::ensureIndex);
         }
 
-        ActionSet sourceActions;
-        sourceActions.addAction(ActionType::cloneCollectionLocalSource);
-        sourceActions.addAction(ActionType::dropCollection);
         out->push_back(Privilege(sourceNS.ns(), sourceActions));
-
-        ActionSet targetActions;
-        targetActions.addAction(ActionType::createCollection);
-        targetActions.addAction(ActionType::cloneCollectionTarget);
-        targetActions.addAction(ActionType::ensureIndex);
         out->push_back(Privilege(targetNS.ns(), targetActions));
     }
 

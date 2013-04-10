@@ -343,7 +343,10 @@
                                                           false,
                                                           1 ) );
             while( c->ok() ) {
-                if ( c->curKeyHasChild() ) {
+                bool has_child =
+                    c->getBucket().btree()->keyNode(c->getKeyOfs()).prevChildBucket.isNull();
+
+                if (has_child) {
                     toDel.push_back( c->currKey().firstElement().valuestr() );
                 }
                 else {

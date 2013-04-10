@@ -108,14 +108,15 @@ namespace mongo {
         /** so we don't have to lock the groupCommitMutex too often */
         class ThreadLocalIntents {
             enum { N = 21 };
-            dur::WriteIntent i[N];
-            int n;
+            std::vector<dur::WriteIntent> intents;
+            bool condense();
         public:
-            ThreadLocalIntents() : n(0) { }
+            ThreadLocalIntents() : intents(N) { intents.clear(); }
+            ~ThreadLocalIntents();
             void _unspool();
             void unspool();
             void push(const WriteIntent& i);
-            int n_informational() const { return n; }
+            int n_informational() const { return intents.size(); }
             static AtomicUInt nSpooled;
         };
 

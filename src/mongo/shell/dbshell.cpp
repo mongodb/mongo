@@ -42,6 +42,7 @@
 #ifdef _WIN32
 #include <io.h>
 #define isatty _isatty
+#define fileno _fileno
 #else
 #include <unistd.h>
 #endif
@@ -298,6 +299,35 @@ bool isUseCmd( const std::string& code ) {
     return cmd == "use";
 }
 
+/**
+ * Skip over a quoted string, including quotes escaped with backslash
+ * 
+ * @param code      String
+ * @param start     Starting position within string, always > 0
+ * @param quote     Quote character (single or double quote)
+ * @return          Position of ending quote, or code.size() if no quote found
+ */
+size_t skipOverString(const std::string& code, size_t start, char quote) {
+    size_t pos = start;
+    while (pos < code.size()) {
+        pos = code.find(quote, pos);
+        if (pos == std::string::npos) {
+            return code.size();
+        }
+        // We want to break if the quote we found is not escaped, but we need to make sure
+        // that the escaping backslash is not itself escaped.  Comparisons of start and pos
+        // are to keep us from reading beyond the beginning of the quoted string.
+        //
+        if (start == pos     || code[pos - 1] != '\\' || // previous char was backslash
+            start == pos - 1 || code[pos - 2] == '\\'    // char before backslash was not another
+        ) {
+            break;  // The quote we found was not preceded by an unescaped backslash; it is real
+        }
+        ++pos;      // The quote we found was escaped with backslash, so it doesn't count
+    }
+    return pos;
+}
+
 bool isBalanced( const std::string& code ) {
     if (isUseCmd( code ))
         return true;  // don't balance "use <dbname>" in case dbname contains special chars
@@ -339,12 +369,11 @@ bool isBalanced( const std::string& code ) {
             parens--;
             break;
         case '"':
-            i++;
-            while ( i < code.size() && code[i] != '"' ) i++;
-            break;
         case '\'':
-            i++;
-            while ( i < code.size() && code[i] != '\'' ) i++;
+            i = skipOverString(code, i + 1, code[i]);
+            if (i >= code.size()) {
+                return true;            // Do not let unterminated strings enter multi-line mode
+            }
             break;
         case '\\':
             if ( i + 1 < code.size() && code[i+1] == '/' ) i++;
@@ -381,15 +410,29 @@ public:
         verify( ! isBalanced( "\"//\" {" ) );
         verify( isBalanced( "{x:/x\\//}" ) );
         verify( ! isBalanced( "{ \\/// }" ) );
-        verify( isBalanced( "x = 5 + y ") );
-        verify( ! isBalanced( "x = ") );
-        verify( ! isBalanced( "x = // hello") );
-        verify( ! isBalanced( "x = 5 +") );
-        verify( isBalanced( " x ++") );
-        verify( isBalanced( "-- x") );
-        verify( !isBalanced( "a.") );
-        verify( !isBalanced( "a. ") );
-        verify( isBalanced( "a.b") );
+        verify( isBalanced( "x = 5 + y " ) );
+        verify( ! isBalanced( "x = " ) );
+        verify( ! isBalanced( "x = // hello" ) );
+        verify( ! isBalanced( "x = 5 +" ) );
+        verify( isBalanced( " x ++" ) );
+        verify( isBalanced( "-- x" ) );
+        verify( !isBalanced( "a." ) );
+        verify( !isBalanced( "a. " ) );
+        verify( isBalanced( "a.b" ) );
+
+        // SERVER-5809 and related cases -- 
+        verify( isBalanced( "a = {s:\"\\\"\"}" ) );             // a = {s:"\""}
+        verify( isBalanced( "db.test.save({s:\"\\\"\"})" ) );   // db.test.save({s:"\""})
+        verify( isBalanced( "printjson(\" \\\" \")" ) );        // printjson(" \" ") -- SERVER-8554
+        verify( isBalanced( "var a = \"\\\\\";" ) );            // var a = "\\";
+        verify( isBalanced( "var a = (\"\\\\\") //\"" ) );      // var a = ("\\") //"
+        verify( isBalanced( "var a = (\"\\\\\") //\\\"" ) );    // var a = ("\\") //\"
+        verify( isBalanced( "var a = (\"\\\\\") //" ) );        // var a = ("\\") //
+        verify( isBalanced( "var a = (\"\\\\\")" ) );           // var a = ("\\")
+        verify( isBalanced( "var a = (\"\\\\\\\"\")" ) );       // var a = ("\\\"")
+        verify( ! isBalanced( "var a = (\"\\\\\" //\"" ) );     // var a = ("\\" //"
+        verify( ! isBalanced( "var a = (\"\\\\\" //" ) );       // var a = ("\\" //
+        verify( ! isBalanced( "var a = (\"\\\\\"" ) );          // var a = ("\\"
     }
 } balanced_test;
 
@@ -434,10 +477,14 @@ void show_help_text( const char* name, po::options_description options ) {
          << "unless --shell is specified" << endl;
 };
 
-bool fileExists( string file ) {
+bool fileExists(const std::string& file) {
     try {
-        boost::filesystem::path p( file );
-        return boost::filesystem::exists( file );
+#ifdef _WIN32
+        boost::filesystem::path p(toWideString(file.c_str()));
+#else
+        boost::filesystem::path p(file);
+#endif
+        return boost::filesystem::exists(p);
     }
     catch ( ... ) {
         return false;
@@ -608,7 +655,6 @@ static void edit( const string& whatToEdit ) {
 }
 
 int _main( int argc, char* argv[], char **envp ) {
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::isShell = true;
     setupSignals();
 
@@ -653,7 +699,7 @@ int _main( int argc, char* argv[], char **envp ) {
      po::value<string>(&authenticationDatabase)->default_value(""),
      "user source (defaults to dbname)" )
     ("authenticationMechanism",
-     po::value<string>(&authenticationMechanism)->default_value("MONGO-CR"),
+     po::value<string>(&authenticationMechanism)->default_value("MONGODB-CR"),
      "authentication mechanism")
     ( "help,h", "show this usage information" )
     ( "version", "show version information" )
@@ -794,6 +840,7 @@ int _main( int argc, char* argv[], char **envp ) {
     if ( ! mongo::cmdLine.quiet )
         cout << "MongoDB shell version: " << mongo::versionString << endl;
 
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::StartupTest::runTests();
 
     if ( !nodb ) { // connect to db
@@ -808,42 +855,42 @@ int _main( int argc, char* argv[], char **envp ) {
 
         if ( params.count( "password" ) && password.empty() )
             password = mongo::askPassword();
-
-        // Construct the authentication-related code to execute on shell startup.
-        //
-        // This constructs and immediately executes an anonymous function, to avoid
-        // the shell's default behavior of printing statement results to the console.
-        //
-        // It constructs a statement of the following form:
-        //
-        // (function() {
-        //    // Set default authentication mechanism and, maybe, authenticate.
-        //  }())
-        stringstream authStringStream;
-        authStringStream << "(function() { " << endl;
-        if ( !authenticationMechanism.empty() ) {
-            authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
-                authenticationMechanism << "\";" << endl;
-        }
-
-        if ( username.size() ) {
-            authStringStream << "var username = \"" << username << "\";" << endl;
-            authStringStream << "var password = \"" << password << "\";" << endl;
-            if (authenticationDatabase.empty()) {
-                authStringStream << "var authDb = db;" << endl;
-            }
-            else {
-                authStringStream << "var authDb = db.getSiblingDB(\"" << authenticationDatabase <<
-                    "\");" << endl;
-            }
-            authStringStream << "authDb._authOrThrow({ " <<
-                saslCommandPrincipalFieldName << ": username, " <<
-                saslCommandPasswordFieldName << ": password });" << endl;
-        }
-        authStringStream << "}())";
-
-        mongo::shell_utils::_dbAuth = authStringStream.str();
     }
+
+    // Construct the authentication-related code to execute on shell startup.
+    //
+    // This constructs and immediately executes an anonymous function, to avoid
+    // the shell's default behavior of printing statement results to the console.
+    //
+    // It constructs a statement of the following form:
+    //
+    // (function() {
+    //    // Set default authentication mechanism and, maybe, authenticate.
+    //  }())
+    stringstream authStringStream;
+    authStringStream << "(function() { " << endl;
+    if ( !authenticationMechanism.empty() ) {
+        authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
+            authenticationMechanism << "\";" << endl;
+    }
+
+    if (!nodb && username.size()) {
+        authStringStream << "var username = \"" << username << "\";" << endl;
+        authStringStream << "var password = \"" << password << "\";" << endl;
+        if (authenticationDatabase.empty()) {
+            authStringStream << "var authDb = db;" << endl;
+        }
+        else {
+            authStringStream << "var authDb = db.getSiblingDB(\"" << authenticationDatabase <<
+                "\");" << endl;
+        }
+        authStringStream << "authDb._authOrThrow({ " <<
+            saslCommandPrincipalFieldName << ": username, " <<
+            saslCommandPasswordFieldName << ": password });" << endl;
+    }
+    authStringStream << "}())";
+    mongo::shell_utils::_dbAuth = authStringStream.str();
+
 
     mongo::ScriptEngine::setConnectCallback( mongo::shell_utils::onConnect );
     mongo::ScriptEngine::setup();
@@ -886,7 +933,9 @@ int _main( int argc, char* argv[], char **envp ) {
                 rcLocation = str::stream() << getenv( "HOME" ) << "/.mongorc.js" ;
 #else
             if ( getenv( "HOMEDRIVE" ) != NULL && getenv( "HOMEPATH" ) != NULL )
-                rcLocation = str::stream() << getenv( "HOMEDRIVE" ) << getenv( "HOMEPATH" ) << "\\.mongorc.js";
+                rcLocation = str::stream() << toUtf8String(_wgetenv(L"HOMEDRIVE"))
+                                           << toUtf8String(_wgetenv(L"HOMEPATH"))
+                                           << "\\.mongorc.js";
 #endif
             if ( !rcLocation.empty() && fileExists(rcLocation) ) {
                 hasMongoRC = true;
@@ -897,17 +946,16 @@ int _main( int argc, char* argv[], char **envp ) {
             }
         }
 
-        if ( !hasMongoRC && isatty(0) ) {
-           cout << "Welcome to the MongoDB shell.\n"
-                   "For interactive help, type \"help\".\n"
-                   "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
-                   "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user" << endl;
-           fstream f;
-           f.open(rcLocation.c_str(), ios_base::out );
-           f.close();
+        if ( !hasMongoRC && isatty(fileno(stdin)) ) {
+            cout << "Welcome to the MongoDB shell.\n"
+                    "For interactive help, type \"help\".\n"
+                    "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
+                    "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user" << endl;
+            File f;
+            f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
         }
 
-        if ( !nodb ) {
+        if ( !nodb && !mongo::cmdLine.quiet && isatty(fileno(stdin)) ) {
             scope->exec( "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings", false, true, false );
         }
 
@@ -1040,7 +1088,7 @@ int _main( int argc, char* argv[], char **envp ) {
 }
 
 #ifdef _WIN32
-int wmain( int argc, wchar_t* argvW[] ) {
+int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     static mongo::StaticObserver staticObserver;
     UINT initialConsoleInputCodePage = GetConsoleCP();
     UINT initialConsoleOutputCodePage = GetConsoleOutputCP();
@@ -1048,8 +1096,8 @@ int wmain( int argc, wchar_t* argvW[] ) {
     SetConsoleOutputCP( CP_UTF8 );
     int returnCode;
     try {
-        WindowsCommandLine wcl( argc, argvW );
-        returnCode = _main( argc, wcl.argv(), NULL );  // TODO: Convert wide env to utf8 env.
+        WindowsCommandLine wcl(argc, argvW, envpW);
+        returnCode = _main(argc, wcl.argv(), wcl.envp());
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;

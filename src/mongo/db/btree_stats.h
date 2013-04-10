@@ -38,7 +38,7 @@ namespace mongo {
 
 
         // used without a mutex intentionally (can race)
-        void btree( char * node ) {
+        void btree( const char* node ) {
             if ( ! _memSupported )
                 return;
             btree( Record::likelyInPhysicalMemory( node ) );
@@ -70,5 +70,5 @@ namespace mongo {
         long long _btreeAccesses;
     };
 
-    extern IndexCounters globalIndexCounters;
+    extern IndexCounters* globalIndexCounters;
 }

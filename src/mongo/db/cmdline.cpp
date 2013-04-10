@@ -418,12 +418,17 @@ namespace {
         if (params.count("sslOnNormalPorts")) {
             cmdLine.sslOnNormalPorts = true;
             if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
-                log() << "need sslPEMKeyFile" << endl;
+                log() << "need sslPEMKeyFile with sslOnNormalPorts" << endl;
                 return false;
             }
             if (cmdLine.sslWeakCertificateValidation &&
                 cmdLine.sslCAFile.empty()) {
                 log() << "need sslCAFile with sslWeakCertificateValidation" << endl;
+                return false;
+            }
+            if (!cmdLine.sslCRLFile.empty() &&
+                cmdLine.sslCAFile.empty()) {
+                log() << "need sslCAFile with sslCRLFile" << endl;
                 return false;
             }
             if (params.count("sslFIPSMode")) {

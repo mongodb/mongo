@@ -62,7 +62,7 @@ def discover_modules(module_root):
 
     return found_modules
 
-def configure_modules(modules, conf, env):
+def configure_modules(modules, conf):
     """ Run the configure() function in the build.py python modules for each module in "modules"
     (as created by discover_modules).
 
@@ -73,7 +73,7 @@ def configure_modules(modules, conf, env):
         print "configuring module: %s" % name
 
         root = os.path.dirname(module.__file__)
-        module.configure(conf, env)
+        module.configure(conf, conf.env)
 
 def get_module_sconscripts(modules):
     sconscripts = []

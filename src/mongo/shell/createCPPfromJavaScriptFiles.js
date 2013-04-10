@@ -24,15 +24,7 @@
 
 var whitespace = " \t";
 function cppEscape( s ) {
-    for ( var i = 0, len = s.length; i < len; ++i ) {
-        if ( whitespace.indexOf( s.charAt( i ) ) === -1 ) {
-            s = s.substring( i );
-            break;
-        }
-    }
-    if ( i == len )
-        return "";
-    for ( i = s.length - 1; i >= 0; --i ) {
+    for ( var i = s.length - 1; i >= 0; --i ) {
         if ( whitespace.indexOf( s.charAt( i ) ) === -1 ) {
             s = s.substr( 0, i + 1 );
             break;

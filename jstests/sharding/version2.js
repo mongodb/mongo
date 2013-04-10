@@ -10,8 +10,8 @@ a = s._connections[0].getDB( "admin" );
 
 // setup from one client
 
-assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.i == 0 );
-assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.i == 0 );
+assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.i, 0 );
+assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.i, 0 );
 
 assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , authoritative : true ,
                         version : new NumberLong( 4294967296 ), // 1|0
@@ -19,14 +19,14 @@ assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._c
 
 printjson( s.config.chunks.findOne() );
 
-assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.t == 1000 );
-assert( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.t == 1000 );
+assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.t, 1 );
+assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.t, 1 );
 
 // from another client
 
 a2 = connect( s._connections[0].name + "/admin" );
 
-assert.eq( a2.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.t , 1000 , "a2 global 1" );
+assert.eq( a2.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.t , 1 , "a2 global 1" );
 assert.eq( a2.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.i , 0 , "a2 mine 1" );
 
 function simpleFindOne(){

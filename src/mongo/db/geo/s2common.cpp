@@ -1,3 +1,4 @@
+// XXX THIS FILE IS DEPRECATED.  PLEASE DON'T MODIFY.
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
