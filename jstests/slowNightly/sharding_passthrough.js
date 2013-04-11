@@ -114,6 +114,7 @@ files.forEach(function(x) {
         'queryoptimizera|' +
         'indexStatsCommand|' +
         'reversecursor|' +
+        'block_check_supported|' +
         'stats' + // tests db.stats().dataFileVersion, which doesn't appear in sharded db.stats()
         ')\.js$');
 
