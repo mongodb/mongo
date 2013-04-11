@@ -223,36 +223,36 @@ namespace mongo {
          */
         mongo::BSONObj v8ToMongo(v8::Handle<v8::Object> obj, int depth = 0);
         void v8ToMongoElement(BSONObjBuilder& b,
-                              const string& sname,
+                              const StringData& sname,
                               v8::Handle<v8::Value> value,
                               int depth = 0,
                               BSONObj* originalParent = 0);
         void v8ToMongoObject(BSONObjBuilder& b,
-                             const string& sname,
+                             const StringData& sname,
                              v8::Handle<v8::Value> value,
                              int depth,
                              BSONObj* originalParent);
         void v8ToMongoNumber(BSONObjBuilder& b,
-                             const string& elementName,
+                             const StringData& elementName,
                              v8::Handle<v8::Value> value,
                              BSONObj* originalParent);
         void v8ToMongoNumberLong(BSONObjBuilder& b,
-                                 const string& elementName,
+                                 const StringData& elementName,
                                  v8::Handle<v8::Object> obj);
         void v8ToMongoInternal(BSONObjBuilder& b,
-                               const string& elementName,
+                               const StringData& elementName,
                                v8::Handle<v8::Object> obj);
         void v8ToMongoRegex(BSONObjBuilder& b,
-                            const string& elementName,
+                            const StringData& elementName,
                             v8::Handle<v8::Object> v8Regex);
         void v8ToMongoDBRef(BSONObjBuilder& b,
-                            const string& elementName,
+                            const StringData& elementName,
                             v8::Handle<v8::Object> obj);
         void v8ToMongoBinData(BSONObjBuilder& b,
-                              const string& elementName,
+                              const StringData& elementName,
                               v8::Handle<v8::Object> obj);
         void v8ToMongoObjectID(BSONObjBuilder& b,
-                               const string& elementName,
+                               const StringData& elementName,
                                v8::Handle<v8::Object> obj);
 
         v8::Function* getNamedCons(const char* name);
