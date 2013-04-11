@@ -190,6 +190,7 @@ Skiplist
 Solaris
 Split's
 StoreLoad
+Strsep
 Subtree
 Subtrees
 TAILQ
@@ -275,6 +276,7 @@ btrees
 buf
 builtin
 bytelock
+bytestring
 bzCompressEnd
 bzCompressInit
 bzDecompress
@@ -530,6 +532,7 @@ minorp
 minprefix
 mkdir
 mmap
+mnt
 msg
 msgv
 mtx
@@ -679,6 +682,7 @@ strftime
 stringin
 strncpy
 strndup
+strsep
 strtoll
 strtouq
 struct

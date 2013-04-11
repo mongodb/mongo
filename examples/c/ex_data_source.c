@@ -186,7 +186,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Strings returned from WT_EXTENSION_API::config are not necessarily
 	 * nul-terminated; the associated length must be used instead.
 	 *
-	 * The strsep function requries nul-termination of the list.  Allocate
+	 * The strsep function requires nul-termination of the list.  Allocate
 	 * memory and copy the list so it's nul-terminated.   Parse the list,
 	 * counting entries.
 	 *
