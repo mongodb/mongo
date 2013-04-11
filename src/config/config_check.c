@@ -90,6 +90,20 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	checks = NULL;
 
 	/*
+	 * Argument checking.
+	 * We only support a limited number of types.
+	 */
+	if (name == NULL)
+		WT_RET_MSG(session, EINVAL, "no configuration name specified");
+	if (type == NULL)
+		WT_RET_MSG(session, EINVAL, "no configuration type specified");
+	if (strcmp(type, "boolean") != 0 && strcmp(type, "int") != 0 &&
+	    strcmp(type, "list") != 0 && strcmp(type, "string") != 0)
+		WT_RET_MSG(session, EINVAL,
+		    "type must be one of \"boolean\", \"int\", \"list\" or "
+		    "\"string\"");
+
+	/*
 	 * If we haven't yet allocated our local copy of the configuration
 	 * information, do so now.
 	 */
@@ -112,8 +126,6 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_def(session, 1, &entry));
 	if (uri != NULL)
 		WT_ERR(__wt_strdup(session, uri, &entry->uri));
-	if (name == NULL)
-		WT_ERR_MSG(session, EINVAL, "no name specified");
 	WT_ERR(__wt_strdup(session, name, &entry->name));
 	WT_ERR(__wt_calloc_def(session, 2, &checks));
 	/*
@@ -124,8 +136,6 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	if ((t = strchr(p, '=')) != NULL)
 		*t = '\0';
 	checks->name = p;
-	if (type == NULL)
-		WT_ERR_MSG(session, EINVAL, "no type specified");
 	WT_ERR(__wt_strdup(session, type, &checks->type));
 	if (check != NULL)
 		WT_ERR(__wt_strdup(session, check, &checks->checks));
