@@ -265,23 +265,28 @@ main(void)
 	/*! [WT_DATA_SOURCE register] */
 
 	/*! [WT_DATA_SOURCE configure boolean] */
+	/* my_boolean defaults to true. */
 	ret = conn->configure_method(conn,
 	    "session.open_cursor", NULL, "my_boolean=true", "boolean", NULL);
 	/*! [WT_DATA_SOURCE configure boolean] */
 
 	/*! [WT_DATA_SOURCE configure integer] */
+	/* my_integer defaults to 5. */
 	ret = conn->configure_method(conn,
 	    "session.open_cursor", NULL, "my_integer=5", "int", NULL);
 	/*! [WT_DATA_SOURCE configure integer] */
 
 	/*! [WT_DATA_SOURCE configure string] */
+	/* my_string defaults to "name". */
 	ret = conn->configure_method(conn,
 	    "session.open_cursor", NULL, "my_string=name", "string", NULL);
 	/*! [WT_DATA_SOURCE configure string] */
 
 	/*! [WT_DATA_SOURCE configure list] */
+	/* my_list defaults to "first" and "second". */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "my_list=name", "list", NULL);
+	    "session.open_cursor",
+	    NULL, "my_list=[first, second]", "list", NULL);
 	/*! [WT_DATA_SOURCE configure list] */
 
 	/*! [WT_DATA_SOURCE configure integer with checking] */
@@ -289,16 +294,26 @@ main(void)
 	 * Limit the number of devices to between 1 and 30; the default is 5.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "devices=5", "int", "min=1,max=30");
+	    "session.open_cursor", NULL, "devices=5", "int", "min=1, max=30");
 	/*! [WT_DATA_SOURCE configure integer with checking] */
 
-	/*! [WT_DATA_SOURCE configure list with checking] */
+	/*! [WT_DATA_SOURCE configure string with checking] */
 	/*
-	 * Limit paths to one of /device, /home or /target; default to /home.
+	 * Limit target to one of /device, /home or /target; default to /home.
 	 */
 	ret = conn->configure_method(conn,
 	    "session.open_cursor", NULL,
-	    "path=/home", "list", "choices=[/device, /home, /target]");
+	    "target=/home", "string", "choices=[/device, /home, /target]");
+	/*! [WT_DATA_SOURCE configure string with checking] */
+
+	/*! [WT_DATA_SOURCE configure list with checking] */
+	/*
+	 * The paths are optional, so there's no default; limit paths to one or
+	 * more of /device, /home, /mnt or /target.
+	 */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", NULL,
+	    "paths", "list", "choices=[/device, /home, /mnt, /target]");
 	/*! [WT_DATA_SOURCE configure list with checking] */
 
 	(void)conn->close(conn, NULL);

@@ -189,26 +189,32 @@ values.
 - value checking information for the additional configuration, or NULL if
 no checking information is provided.
 
-For example, an application might add new boolean, integer, string or
-list configuration strings as follows:
+For example, an application might add new boolean, integer, list or
+string type configuration strings as follows:
 
 @snippet ex_data_source.c WT_DATA_SOURCE configure boolean
 @snippet ex_data_source.c WT_DATA_SOURCE configure integer
-@snippet ex_data_source.c WT_DATA_SOURCE configure string
 @snippet ex_data_source.c WT_DATA_SOURCE configure list
+@snippet ex_data_source.c WT_DATA_SOURCE configure string
 
 Once these additional configuration calls have returned, application calls to
 the WT_SESSION::open_cursor method could then include configuration strings
 such as \c my_boolean=false, or \c my_integer=37, or \c my_source=/home.
 
-Additional checking information can be provided for \c integer or \c list type
-configuration strings.   For integers, either or both of a maximum or minimum
-value can be provided as follows:
+Additional checking information can be provided for \c int, \c list or
+\c string type configuration strings.
+
+For integers, either or both of a maximum or minimum value can be
+provided, so an error will result if the application attempts to set the
+value outside of the acceptable range:
 
 @snippet ex_data_source.c WT_DATA_SOURCE configure integer with checking
 
-For lists, a set of possible choices can be provided as follows:
+For lists and strings, a set of valid choices can also be provided, so
+an error will result if the application attempts to set the value to a
+string not listed as a valid choice:
 
+@snippet ex_data_source.c WT_DATA_SOURCE configure string with checking
 @snippet ex_data_source.c WT_DATA_SOURCE configure list with checking
 
 @section custom_ds_cursor_collator WT_COLLATOR
