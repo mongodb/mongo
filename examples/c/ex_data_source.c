@@ -27,6 +27,9 @@
  * ex_data_source.c
  * 	demonstrates how to create and access a data source
  */
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 #include <wiredtiger.h>
 
 /*! [WT_EXTENSION_API declaration] */
@@ -146,7 +149,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	{
 	/*! [WT_EXTENSION_CONFIG string] */
 	WT_EXTENSION_CONFIG value;
-	const char *my_data_source_type;
+	const char *my_data_source_key;
 
 	if ((ret =
 	    wt_api->config(session, "key_format", config, &value)) != 0) {
@@ -160,10 +163,55 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * nul-terminated; the associated length must be used instead.
 	 */
 	if (value.len == 1 && value.str[0] == 'r')
-		my_data_source_type = "integer";
+		my_data_source_key = "recno";
 	else
-		my_data_source_type = "string";
+		my_data_source_key = "bytestring";
 	/*! [WT_EXTENSION_CONFIG string] */
+	}
+
+	{
+	/*! [WT_EXTENSION_CONFIG list] */
+	WT_EXTENSION_CONFIG value;
+	size_t cnt;
+	char **ap, **argv, *copy, *p, *t;
+
+	if ((ret =
+	    wt_api->config(session, "paths", config, &value)) != 0) {
+		(void)wt_api->err_printf(session,
+		    "paths configuration: %s", wiredtiger_strerror(ret));
+		return (ret);
+	}
+
+	/*
+	 * Strings returned from WT_EXTENSION_API::config are not necessarily
+	 * nul-terminated; the associated length must be used instead.
+	 *
+	 * The strsep function requries nul-termination of the list.  Allocate
+	 * memory and copy the list so it's nul-terminated.   Parse the list,
+	 * counting entries.
+	 *
+	 * Allocate an array of pointers large enough to hold a reference to
+	 * each list element, then re-parse the list, this time filling in the
+	 * array.   Strsep nul-terminates each element in the list, so there's
+	 * no addition work required.
+	 *
+	 * Finally, display the list.
+	 */
+	copy = calloc(1, value.len + 1);
+	memcpy(copy, value.str, value.len);
+	for (p = copy, cnt = 0; (t = strsep(&p, ",\t ")) != NULL;)
+		if (*t != '\0')
+			++cnt;
+
+	memcpy(copy, value.str, value.len);
+	argv = calloc(sizeof(char *), cnt + 1);
+	for (ap = argv, p = copy; (*ap = strsep(&p, ",\t ")) != NULL;)
+		if (**ap != '\0')
+			++ap;
+
+	for (ap = argv; *ap != NULL; ++ap)
+		printf("%s\n", *ap);
+	/*! [WT_EXTENSION_CONFIG list] */
 	}
 
 	/*! [WT_DATA_SOURCE error message] */
