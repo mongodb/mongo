@@ -984,10 +984,6 @@ namespace mongo {
                 BSONElement next = it.next();
                 args[i] = mongoToV8Element(next, readOnlyArgs);
             }
-            setObject("args", *argsObject, readOnlyArgs); // for backwards compatibility
-        }
-        else {
-            _global->ForceSet(v8::String::New("args"), v8::Undefined());
         }
 
         v8::Handle<v8::Object> v8recv;
