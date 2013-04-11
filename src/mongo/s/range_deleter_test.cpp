@@ -50,8 +50,13 @@ namespace {
         deleter.stopWorkers();
 
         string errMsg;
-        ASSERT_FALSE(deleter.queueDelete("test.user", BSON("x" << 120), BSON("x" << 200),
-                                         true, NULL /* notifier not needed */, &errMsg));
+        ASSERT_FALSE(deleter.queueDelete("test.user",
+                                         BSON("x" << 120),
+                                         BSON("x" << 200),
+                                         BSON("x" << 1),
+                                         true,
+                                         NULL /* notifier not needed */,
+                                         &errMsg));
         ASSERT_FALSE(errMsg.empty());
         ASSERT_FALSE(env->deleteOccured());
     }
@@ -67,8 +72,8 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), true,
-                                        &notifyDone, NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
+                                        true, &notifyDone, NULL /* errMsg not needed */));
 
         env->waitForNthGetCursor(1u);
 
@@ -77,7 +82,6 @@ namespace {
         ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::PendingDeletesField,
                                          &pendingCount, NULL /* don't care errMsg */));
         ASSERT_EQUALS(1, pendingCount);
-
         ASSERT_FALSE(env->deleteOccured());
 
         // Set the open cursors to a totally different sets of cursorIDs.
@@ -106,8 +110,9 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), true,
-                                        &notifyDone, NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10),  BSON("x" << 1),
+                                        true, &notifyDone, NULL /* errMsg not needed */));
+
 
         env->waitForNthGetCursor(1u);
 
@@ -131,6 +136,7 @@ namespace {
                                                                 ns,
                                                                 BSON("x" << 0),
                                                                 BSON("x" << 10),
+                                                                BSON("x" << 1),
                                                                 true,
                                                                 &errMsg));
 
@@ -159,6 +165,7 @@ namespace {
         ASSERT_EQUALS(ns, deletedChunk.ns);
         ASSERT_TRUE(deletedChunk.min.equal(BSON("x" << 0)));
         ASSERT_TRUE(deletedChunk.max.equal(BSON("x" << 10)));
+        ASSERT_TRUE(deletedChunk.shardKeyPattern.equal(BSON("x" << 1)));
 
         deleter.stopWorkers();
     }
@@ -178,6 +185,7 @@ namespace {
                                                                 ns,
                                                                 BSON("x" << 0),
                                                                 BSON("x" << 10),
+                                                                BSON("x" << 1),
                                                                 true,
                                                                 &errMsg));
 
@@ -218,8 +226,13 @@ namespace {
         env->pauseDeletes();
 
         Notification notifyDone1;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 10), BSON("x" << 20), true,
-                                        &notifyDone1, NULL /* don't care errMsg */));
+        ASSERT_TRUE(deleter.queueDelete(ns,
+                                        BSON("x" << 10),
+                                        BSON("x" << 20),
+                                        BSON("x" << 1),
+                                        true,
+                                        &notifyDone1,
+                                        NULL /* don't care errMsg */));
 
         env->waitForNthPausedDelete(1u);
 
@@ -231,12 +244,22 @@ namespace {
         ASSERT_EQUALS(1, inProgressCount);
 
         Notification notifyDone2;
-        ASSERT_TRUE(deleter.queueDelete(blockedNS, BSON("x" << 20), BSON("x" << 30), true,
-                                        &notifyDone2, NULL /* don't care errMsg */));
+        ASSERT_TRUE(deleter.queueDelete(blockedNS,
+                                        BSON("x" << 20),
+                                        BSON("x" << 30),
+                                        BSON("x" << 1),
+                                        true,
+                                        &notifyDone2,
+                                        NULL /* don't care errMsg */));
 
         Notification notifyDone3;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 30), BSON("x" << 40), true,
-                                        &notifyDone3, NULL /* don't care errMsg */));
+        ASSERT_TRUE(deleter.queueDelete(ns,
+                                        BSON("x" << 30),
+                                        BSON("x" << 40),
+                                        BSON("x" << 1),
+                                        true,
+                                        &notifyDone3,
+                                        NULL /* don't care errMsg */));
 
         // Now, the setup is:
         // { x: 10 } => { x: 20 } in progress.
@@ -273,6 +296,7 @@ namespace {
         ASSERT_EQUALS(ns, deleted1.ns);
         ASSERT_TRUE(deleted1.min.equal(BSON("x" << 10)));
         ASSERT_TRUE(deleted1.max.equal(BSON("x" << 20)));
+        ASSERT_TRUE(deleted1.shardKeyPattern.equal(BSON("x" << 1)));
 
         // Let the second delete proceed.
         env->resumeOneDelete();
@@ -286,6 +310,7 @@ namespace {
         ASSERT_EQUALS(ns, deleted2.ns);
         ASSERT_TRUE(deleted2.min.equal(BSON("x" << 30)));
         ASSERT_TRUE(deleted2.max.equal(BSON("x" << 40)));
+        ASSERT_TRUE(deleted2.shardKeyPattern.equal(BSON("x" << 1)));
 
         env->removeCursorId(blockedNS, 345);
         // Let the last delete proceed.
@@ -297,6 +322,7 @@ namespace {
         ASSERT_EQUALS(blockedNS, deleted3.ns);
         ASSERT_TRUE(deleted3.min.equal(BSON("x" << 20)));
         ASSERT_TRUE(deleted3.max.equal(BSON("x" << 30)));
+        ASSERT_TRUE(deleted3.shardKeyPattern.equal(BSON("x" << 1)));
 
         deleter.stopWorkers();
     }
@@ -314,13 +340,13 @@ namespace {
         ASSERT_TRUE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.queueDelete(ns, BSON("x" << 120), BSON("x" << 140), false,
-                                         NULL /* notifier not needed */, &errMsg));
+        ASSERT_FALSE(deleter.queueDelete(ns, BSON("x" << 120), BSON("x" << 140),  BSON("x" << 1),
+                                         false, NULL /* notifier not needed */, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         errMsg.clear();
         ASSERT_FALSE(deleter.deleteNow(ns, BSON("x" << 120), BSON("x" << 140),
-                                       false, &errMsg));
+                                       BSON("x" << 1), false, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         ASSERT_FALSE(env->deleteOccured());
@@ -362,7 +388,7 @@ namespace {
         env->addCursorId(ns, 58);
 
         Notification notifyDone;
-        deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10),
+        deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
                             false, &notifyDone, NULL /* errMsg not needed */);
 
         string errMsg;
@@ -395,6 +421,7 @@ namespace {
                                                                 ns,
                                                                 BSON("x" << 64),
                                                                 BSON("x" << 70),
+                                                                BSON("x" << 1),
                                                                 true,
                                                                 &delErrMsg));
 
@@ -429,7 +456,7 @@ namespace {
         ASSERT_FALSE(deleter.removeFromBlackList(ns, BSON("x" << 1234), BSON("x" << 9000)));
 
         // Range should still be blacklisted
-        ASSERT_FALSE(deleter.deleteNow(ns, BSON("x" << 2000), BSON("x" << 4000),
+        ASSERT_FALSE(deleter.deleteNow(ns, BSON("x" << 2000), BSON("x" << 4000), BSON("x" << 1),
                                        false, NULL /* errMsg not needed */));
 
         deleter.stopWorkers();
@@ -447,13 +474,14 @@ namespace {
 
         errMsg.clear();
         ASSERT_FALSE(deleter.deleteNow(ns, BSON("x" << 600), BSON("x" << 700),
-                                       false, &errMsg));
+                                       BSON("x" << 1), false, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         ASSERT_TRUE(deleter.removeFromBlackList(ns, BSON("x" << 500), BSON("x" << 801)));
 
         errMsg.clear();
-        ASSERT_TRUE(deleter.deleteNow(ns, BSON("x" << 600), BSON("x" << 700), false, &errMsg));
+        ASSERT_TRUE(deleter.deleteNow(ns, BSON("x" << 600), BSON("x" << 700),
+                                      BSON("x" << 1), false, &errMsg));
         ASSERT_TRUE(errMsg.empty());
 
         deleter.stopWorkers();
@@ -468,7 +496,7 @@ namespace {
                                NULL /* errMsg not needed */);
 
         ASSERT_TRUE(deleter.deleteNow("test.user", BSON("x" << 120), BSON("x" << 140),
-                                      true, NULL /* errMsg not needed */));
+                                      BSON("x" << 1), true, NULL /* errMsg not needed */));
 
         deleter.stopWorkers();
     }

@@ -73,8 +73,13 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10),
-                                        true, &notifyDone, &errMsg));
+        ASSERT_TRUE(deleter.queueDelete(ns,
+                                        BSON("x" << 0),
+                                        BSON("x" << 10),
+                                        BSON("x" << 1),
+                                        true,
+                                        &notifyDone,
+                                        &errMsg));
         ASSERT_TRUE(errMsg.empty());
 
         env->waitForNthGetCursor(1u);
@@ -110,8 +115,13 @@ namespace {
 
         Notification deleteDone;
         string errMsg;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), true,
-                                        &deleteDone, &errMsg));
+        ASSERT_TRUE(deleter.queueDelete(ns,
+                                        BSON("x" << 0),
+                                        BSON("x" << 10),
+                                        BSON("x" << 1),
+                                        true,
+                                        &deleteDone,
+                                        &errMsg));
         ASSERT_TRUE(errMsg.empty());
 
         env->waitForNthPausedDelete(1u);
@@ -148,8 +158,13 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10),
-                                        true, &notifyDone, &errMsg));
+        ASSERT_TRUE(deleter.queueDelete(ns,
+                                        BSON("x" << 0),
+                                        BSON("x" << 10),
+                                        BSON("x" << 1),
+                                        true,
+                                        &notifyDone,
+                                        &errMsg));
         ASSERT_TRUE(errMsg.empty());
 
         notifyDone.waitToBeNotified();
@@ -189,9 +204,9 @@ namespace {
                                                                 ns,
                                                                 BSON("x" << 0),
                                                                 BSON("x" << 10),
+                                                                BSON("x" << 1),
                                                                 true,
                                                                 &errMsg));
-
         env->waitForNthGetCursor(1u);
 
         const BSONObj stats(deleter.getStats()->toBSON());
@@ -232,6 +247,7 @@ namespace {
                                                                 ns,
                                                                 BSON("x" << 0),
                                                                 BSON("x" << 10),
+                                                                BSON("x" << 1),
                                                                 true,
                                                                 &errMsg));
 
@@ -268,7 +284,8 @@ namespace {
 
         const string ns("test.user");
         string errMsg;
-        ASSERT_TRUE(deleter.deleteNow(ns, BSON("x" << 0), BSON("x" << 10), true, &errMsg));
+        ASSERT_TRUE(deleter.deleteNow(ns, BSON("x" << 0), BSON("x" << 10),
+                                      BSON("x" << 1), true, &errMsg));
 
         const BSONObj stats(deleter.getStats()->toBSON());
 

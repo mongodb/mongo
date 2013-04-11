@@ -72,6 +72,11 @@ namespace mongo {
         // Exclusive upper range.
         BSONObj max;
 
+        // The key pattern of the index the range refers to.
+        // This is relevant especially with special indexes types
+        // like hash indexes.
+        BSONObj shardKeyPattern;
+
         bool secondaryThrottle;
 
         // Sets of cursors to wait to close until this can be ready
@@ -179,6 +184,7 @@ namespace mongo {
     bool RangeDeleter::queueDelete(const std::string& ns,
                                    const BSONObj& min,
                                    const BSONObj& max,
+                                   const BSONObj& shardKeyPattern,
                                    bool secondaryThrottle,
                                    Notification* notifyDone,
                                    std::string* errMsg) {
@@ -189,6 +195,7 @@ namespace mongo {
         toDelete->ns = ns;
         toDelete->min = min.getOwned();
         toDelete->max = max.getOwned();
+        toDelete->shardKeyPattern = shardKeyPattern.getOwned();
         toDelete->secondaryThrottle = secondaryThrottle;
         toDelete->notifyDone = notifyDone;
 
@@ -228,6 +235,7 @@ namespace mongo {
     bool RangeDeleter::deleteNow(const std::string& ns,
                                  const BSONObj& min,
                                  const BSONObj& max,
+                                 const BSONObj& shardKeyPattern,
                                  bool secondaryThrottle,
                                  string* errMsg) {
         if (stopRequested()) {
@@ -295,7 +303,8 @@ namespace mongo {
             sleepmillis(checkIntervalMillis);
         }
 
-        bool result = _env->deleteRange(ns, min, max, secondaryThrottle, errMsg);
+        bool result = _env->deleteRange(ns, min, max, shardKeyPattern,
+                                        secondaryThrottle, errMsg);
 
         {
             scoped_lock sl(_queueMutex);
@@ -437,8 +446,12 @@ namespace mongo {
                 _stats->incInProgressDeletes_inlock();
             }
 
-            if (!_env->deleteRange(nextTask->ns, nextTask->min, nextTask->max,
-                                   nextTask->secondaryThrottle, &errMsg)) {
+            if (!_env->deleteRange(nextTask->ns,
+                                   nextTask->min,
+                                   nextTask->max,
+                                   nextTask->shardKeyPattern,
+                                   nextTask->secondaryThrottle,
+                                   &errMsg)) {
                 warning() << "Error encountered while trying to delete range: "
                           << errMsg << endl;
             }
