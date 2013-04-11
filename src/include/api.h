@@ -19,12 +19,12 @@
 
 #define	API_CALL(s, h, n, cur, dh, config, cfg) do {			\
 	const char *cfg[] =						\
-	    { WT_CONFIG_NAME(s, h##_##n), config, NULL };		\
+	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
 	WT_ERR(((config) != NULL) ?					\
 	    __wt_config_check((s),					\
-	    WT_CONFIG_CALL(session, h##_##n), (config), 0) : 0)
+	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL) {						\

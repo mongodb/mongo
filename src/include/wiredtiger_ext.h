@@ -18,28 +18,42 @@ extern "C" {
  * WT_EXTENSION_API::config.
  */
 struct __wt_extension_config {
-	/*! The memory reference of a configuration string.
+	/*! The value of a configuration string.
 	 *
-	 * Regardless of the type of the configuration string, the \c str field
-	 * will reference the value of the configuration string.  Note the bytes
-	 * referenced by \c str <b>may not</b> be nul-terminated, use the \c len
-	 * field instead of a terminating nul byte.
+	 * Regardless of the type of the configuration string (boolean, int,
+	 * list or string), the \c str field will reference the value of the
+	 * configuration string.
+	 *
+	 * The bytes referenced by \c str may <b>not</b> be nul-terminated,
+	 * use the \c len field instead of a terminating nul byte.
 	 */
 	const char *str;
 
-	/*! The number of bytes in the string referenced by \c str. */
+	/*! The number of bytes in the value referenced by \c str. */
 	size_t len;
 
 	/*! The value of a configuration boolean or integer.
 	 *
-	 * If the configuration string is set to "true" or "false", the \c value
-	 * field will be set to 1 (true), or 0 (false).
+	 * If the configuration string's value is "true" or "false", the
+	 * \c value field will be set to 1 (true), or 0 (false).
 	 *
 	 * If the configuration string can be legally interpreted as an integer,
 	 * using the strtoll function rules as specified in ISO/IEC 9899:1990
 	 * ("ISO C90"), that integer will be stored in the \c value field.
 	 */
 	int64_t value;
+
+	/*! The value of a configuration list.
+	 *
+	 * If the configuration string type is of type list, the \c argv field
+	 * will reference a NULL-terminated array of pointers to nul-terminated
+	 * strings.
+	 *
+	 * The argv array, and each string it references, will be returned in
+	 * allocated memory; both the strings and the array must be freed by
+	 * the application to avoid memory leaks.
+	 */
+	 char **argv;
 };
 
 /*! @addtogroup wt_ext
@@ -86,6 +100,8 @@ struct __wt_extension_api {
 	 * @param session the session handle
 	 * @param fmt a printf-like format specification
 	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API err_printf
 	 */
 	int (*err_printf)(WT_SESSION *session, const char *fmt, ...);
 
@@ -94,6 +110,8 @@ struct __wt_extension_api {
 	 * @param session the session handle
 	 * @param bytes the number of bytes of memory needed
 	 * @returns A valid memory reference on success or NULL on error
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API scr_alloc
 	 */
 	void *(*scr_alloc)(WT_SESSION *session, size_t bytes);
 
@@ -101,6 +119,8 @@ struct __wt_extension_api {
 	 *
 	 * @param session the session handle
 	 * @param ref a memory reference returned by WT_EXTENSION_API::scr_alloc
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API scr_free
 	 */
 	void (*scr_free)(WT_SESSION *session, void *ref);
 
@@ -109,6 +129,8 @@ struct __wt_extension_api {
 	 * @param session the session handle
 	 * @param fmt a printf-like format specification
 	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API msg_printf
 	 */
 	int (*msg_printf)(WT_SESSION *session, const char *fmt, ...);
 
@@ -120,6 +142,8 @@ struct __wt_extension_api {
 	 * WT_DATA_SOURCE:: method
 	 * @param value the returned value
 	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG string
 	 */
 	int (*config)(WT_SESSION *session,
 	    const char *key, void *config, WT_EXTENSION_CONFIG *value);

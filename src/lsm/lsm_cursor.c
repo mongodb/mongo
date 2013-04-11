@@ -123,7 +123,7 @@ __clsm_open_cursors(
 	c = &clsm->iface;
 	chunk = NULL;
 
-	cfg[0] = WT_CONFIG_NAME(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	cfg[1] = "checkpoint=WiredTigerCheckpoint,raw";
 	cfg[2] = NULL;
 

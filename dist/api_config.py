@@ -251,10 +251,9 @@ for name in sorted(api_data.methods.keys()):
 	    max(1, 6 - int ((len('WT_CONFIG_ENTRY_' + name)) / 8)) + \
 	    "%2s" % str(slot) + '\n'
 
-    # Write the method name, the uri and the value.
+    # Write the method name and base.
     tfile.write('''
 \t{ "%(name)s",
-\t  NULL,
 %(config)s,''' % {
     'config' : '\n'.join('\t  "%s"' % line
         for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
@@ -269,23 +268,45 @@ for name in sorted(api_data.methods.keys()):
     else:
         tfile.write('NULL')
 
-    # Write the extended reference, always NULL initially, this slot is
-    # used when the information is extended at run-time.
-    tfile.write(',\n\t  NULL\n\t},')
+    tfile.write('\n\t},')
 
 # Write a NULL as a terminator for iteration.
-tfile.write('\n\t{ NULL, NULL, NULL, NULL, NULL }')
+tfile.write('\n\t{ NULL, NULL, NULL }')
 tfile.write('\n};\n')
 
 # Write the routine that connects the WT_CONNECTION_IMPL structure to the list
 # of configuration entry structures.
 tfile.write('''
-void
+int
 __wt_conn_config_init(WT_SESSION_IMPL *session)
 {
-	S2C(session)->config_entries = config_entries;
-	S2C(session)->config_entries_count =
-	    sizeof(config_entries)/sizeof(config_entries[0]);
+\tWT_CONNECTION_IMPL *conn;
+\tconst WT_CONFIG_ENTRY *ep, **epp;
+
+\tconn = S2C(session);
+
+\t/* Build a list of pointers to the configuration information. */
+\tWT_RET(__wt_calloc_def(session,
+\t    sizeof(config_entries) / sizeof(config_entries[0]), &epp));
+\tconn->config_entries = epp;
+
+\t/* Fill in the list to reference the default information. */
+\tfor (ep = config_entries;;) {
+\t\t*epp++ = ep++;
+\t\tif (ep->method == NULL)
+\t\t\tbreak;
+\t}
+\treturn (0);
+}
+
+void
+__wt_conn_config_discard(WT_SESSION_IMPL *session)
+{
+\tWT_CONNECTION_IMPL *conn;
+
+\tconn = S2C(session);
+
+\t__wt_free(session, conn->config_entries);
 }
 ''')
 

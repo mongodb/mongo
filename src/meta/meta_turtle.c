@@ -40,7 +40,7 @@ __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp)
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "key_format=S,value_format=S,version=(major=%d,minor=%d)",
 	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
-	cfg[0] = WT_CONFIG_NAME(session, file_meta);
+	cfg[0] = WT_CONFIG_BASE(session, file_meta);
 	cfg[1] = buf->data;
 	cfg[2] = NULL;
 	WT_ERR(__wt_config_collapse(session, cfg, &metaconf));

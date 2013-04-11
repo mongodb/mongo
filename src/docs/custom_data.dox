@@ -182,11 +182,11 @@ could be used to extend the configuration arguments for a data source with
 URIs beginning with the "my_data" prefix.  A NULL value for the object type
 implies all object types.
 
-- the name of the additional configuration string.  The name can be supplied
-with a default value as well, by appending an equals sign and a value.  For
-example, for a new configuration string with the name argument \c "device"
-the name arguments \c "device=/path" or \c "device=35" would give it default
-values.
+- the additional configuration string, which consists of the name of the
+configuration string and an optional default value.  The default value
+is specified by appending an equals sign and a value.  For example, for
+a new configuration string with the name \c "device", specifying either
+\c "device=/path" or \c "device=35" would configure the default values.
 
 - the type of the additional configuration, which must one of \c "boolean",
 \c "int", \c "list" or \c "string".

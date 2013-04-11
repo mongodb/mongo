@@ -27,9 +27,10 @@
  * ex_data_source.c
  * 	demonstrates how to create and access a data source
  */
+#include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <wiredtiger.h>
 
 /*! [WT_EXTENSION_API declaration] */
@@ -52,10 +53,38 @@ my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 {
 	/* Unused parameters */
 	(void)dsrc;
-	(void)session;
 	(void)uri;
 	(void)exclusive;
 	(void)config;
+
+	{
+	const char *msg = "string";
+	/*! [WT_EXTENSION_API err_printf] */
+	(void)wt_api->err_printf(session, "extension error message: %s", msg);
+	/*! [WT_EXTENSION_API err_printf] */
+	}
+
+	{
+	const char *msg = "string";
+	/*! [WT_EXTENSION_API msg_printf] */
+	(void)wt_api->msg_printf(session, "extension message: %s", msg);
+	/*! [WT_EXTENSION_API msg_printf] */
+	}
+
+	{
+	/*! [WT_EXTENSION_API scr_alloc] */
+	void *buffer;
+	if ((buffer = wt_api->scr_alloc(session, 512)) == NULL) {
+		(void)wt_api->err_printf(session,
+		    "buffer allocation: %s", wiredtiger_strerror(ENOMEM));
+		return (ENOMEM);
+	}
+	/*! [WT_EXTENSION_API scr_alloc] */
+
+	/*! [WT_EXTENSION_API scr_free] */
+	wt_api->scr_free(session, buffer);
+	/*! [WT_EXTENSION_API scr_free] */
+	}
 
 	return (0);
 }
@@ -121,6 +150,10 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	WT_EXTENSION_CONFIG value;
 	int my_data_source_overwrite;
 
+	/*
+	 * Retrieve the value of the boolean type configuration string
+	 * "overwrite".
+	 */
 	if ((ret =
 	    wt_api->config(session, "overwrite", config, &value)) != 0) {
 		(void)wt_api->err_printf(session,
@@ -136,6 +169,10 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	WT_EXTENSION_CONFIG value;
 	int64_t my_data_source_page_size;
 
+	/*
+	 * Retrieve the value of the integer type configuration string
+	 * "page_size".
+	 */
 	if ((ret =
 	    wt_api->config(session, "page_size", config, &value)) != 0) {
 		(void)wt_api->err_printf(session,
@@ -151,6 +188,10 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	WT_EXTENSION_CONFIG value;
 	const char *my_data_source_key;
 
+	/*
+	 * Retrieve the value of the string type configuration string
+	 * "key_format".
+	 */
 	if ((ret =
 	    wt_api->config(session, "key_format", config, &value)) != 0) {
 		(void)wt_api->err_printf(session,
@@ -159,8 +200,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	/*
-	 * Strings returned from WT_EXTENSION_API::config are not necessarily
-	 * nul-terminated; the associated length must be used instead.
+	 * Values returned from WT_EXTENSION_API::config in the str field are
+	 * not nul-terminated; the associated length must be used instead.
 	 */
 	if (value.len == 1 && value.str[0] == 'r')
 		my_data_source_key = "recno";
@@ -172,45 +213,26 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	{
 	/*! [WT_EXTENSION_CONFIG list] */
 	WT_EXTENSION_CONFIG value;
-	size_t cnt;
-	char **ap, **argv, *copy, *p, *t;
+	char **argv;
 
-	if ((ret =
-	    wt_api->config(session, "paths", config, &value)) != 0) {
+	/*
+	 * Retrieve the value of the list type configuration string "paths".
+	 */
+	if ((ret = wt_api->config(session, "paths", config, &value)) != 0) {
 		(void)wt_api->err_printf(session,
 		    "paths configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
 	}
 
 	/*
-	 * Strings returned from WT_EXTENSION_API::config are not necessarily
-	 * nul-terminated; the associated length must be used instead.
-	 *
-	 * The strsep function requires nul-termination of the list.  Allocate
-	 * memory and copy the list so it's nul-terminated.   Parse the list,
-	 * counting entries.
-	 *
-	 * Allocate an array of pointers large enough to hold a reference to
-	 * each list element, then re-parse the list, this time filling in the
-	 * array.   Strsep nul-terminates each element in the list, so there's
-	 * no addition work required.
-	 *
-	 * Finally, display the list.
+	 * Strings returned from WT_EXTENSION_API::config in the argv array are
+	 * nul-terminated.  The array and memory it references must be freed.
 	 */
-	copy = calloc(1, value.len + 1);
-	memcpy(copy, value.str, value.len);
-	for (p = copy, cnt = 0; (t = strsep(&p, ",\t ")) != NULL;)
-		if (*t != '\0')
-			++cnt;
-
-	memcpy(copy, value.str, value.len);
-	argv = calloc(sizeof(char *), cnt + 1);
-	for (ap = argv, p = copy; (*ap = strsep(&p, ",\t ")) != NULL;)
-		if (**ap != '\0')
-			++ap;
-
-	for (ap = argv; *ap != NULL; ++ap)
-		printf("%s\n", *ap);
+	for (argv = value.argv; *argv != NULL; ++argv)
+		printf("%s\n", *argv);
+	for (argv = value.argv; *argv != NULL; ++argv)
+		free(*argv);
+	free(argv);
 	/*! [WT_EXTENSION_CONFIG list] */
 	}
 
@@ -347,21 +369,22 @@ main(void)
 
 	/*! [WT_DATA_SOURCE configure string with checking] */
 	/*
-	 * Limit target to one of /device, /home or /target; default to /home.
+	 * Limit the target string to one of /device, /home or /target; default
+	 * to /home.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL,
-	    "target=/home", "string", "choices=[/device, /home, /target]");
+	    "session.open_cursor", NULL, "target=\"/home\"", "string",
+	    "choices=[\"/device\", \"/home\", \"/target\"]");
 	/*! [WT_DATA_SOURCE configure string with checking] */
 
 	/*! [WT_DATA_SOURCE configure list with checking] */
 	/*
-	 * The paths are optional, so there's no default; limit paths to one or
-	 * more of /device, /home, /mnt or /target.
+	 * Limit the paths list to one or more of /device, /home, /mnt or
+	 * /target; default to /mnt.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL,
-	    "paths", "list", "choices=[/device, /home, /mnt, /target]");
+	    "session.open_cursor", NULL, "paths=[\"/mnt\"]", "list",
+	    "choices=[\"/device\", \"/home\", \"/mnt\", \"/target\"]");
 	/*! [WT_DATA_SOURCE configure list with checking] */
 
 	(void)conn->close(conn, NULL);

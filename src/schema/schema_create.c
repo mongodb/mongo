@@ -46,7 +46,7 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_scr_alloc(session, 0, &val));
 		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
-		filecfg[0] = WT_CONFIG_NAME(session, file_meta);
+		filecfg[0] = WT_CONFIG_BASE(session, file_meta);
 		filecfg[1] = config;
 		filecfg[2] = val->data;
 		filecfg[3] = NULL;
@@ -117,7 +117,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_TABLE *table;
 	size_t tlen;
 	const char *cfg[4] =
-	    { WT_CONFIG_NAME(session, colgroup_meta), config, NULL, NULL };
+	    { WT_CONFIG_BASE(session, colgroup_meta), config, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
 	const char **cfgp;
 	const char *cgconf, *cgname, *sourceconf, *oldconf;
@@ -247,7 +247,7 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_ITEM confbuf, extra_cols, fmt, namebuf;
 	WT_TABLE *table;
 	const char *cfg[4] =
-	    { WT_CONFIG_NAME(session, index_meta), NULL, NULL, NULL };
+	    { WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
 	const char *sourceconf, *source, *idxconf, *idxname;
 	const char *tablename;
@@ -379,7 +379,7 @@ __create_table(WT_SESSION_IMPL *session,
 	int ncolgroups;
 	char *cgname;
 	const char *cfg[4] =
-	    { WT_CONFIG_NAME(session, table_meta), config, NULL, NULL };
+	    { WT_CONFIG_BASE(session, table_meta), config, NULL, NULL };
 	const char *tableconf, *tablename;
 
 	cgname = NULL;

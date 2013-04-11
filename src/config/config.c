@@ -660,17 +660,57 @@ int
 __wt_ext_config(WT_SESSION *wt_session,
     const char *key, void *cfg, WT_EXTENSION_CONFIG *value)
 {
-	WT_CONFIG_ITEM v;
+	WT_CONFIG conf;
+	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int cnt;
+	char **argv, **ap;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	argv = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, key, &v));
+	memset(value, 0, sizeof(value));
 
-	value->str = v.str;
-	value->len = v.len;
-	value->value = v.val;
+	WT_RET(__wt_config_gets(session, cfg, key, &cval));
+
+	value->str = cval.str;
+	value->len = cval.len;
+	value->value = cval.val;
+
+	/*
+	 * Parse lists into a NULL-terminated  array of nul-terminated strings.
+	 */
+	if (cval.type == ITEM_STRUCT && cval.len != 0) {
+		/* Count out how many slots we'll need. */
+		WT_RET(__wt_config_subinit(session, &conf, &cval));
+		for (cnt = 0;
+		    (ret = __wt_config_next(&conf, &k, &v)) == 0; ++cnt)
+			;
+		if (ret != WT_NOTFOUND)
+			WT_RET(ret);
+
+		/* Allocate the argv array and fill it in. */
+		WT_RET(__wt_calloc_def(session, cnt + 1, &argv));
+
+		WT_RET(__wt_config_subinit(session, &conf, &cval));
+		for (cnt = 0;
+		    (ret = __wt_config_next(&conf, &k, &v)) == 0; ++cnt)
+			WT_ERR(
+			    __wt_strndup(session, k.str, k.len, &argv[cnt]));
+		if (ret != WT_NOTFOUND)
+			WT_ERR(ret);
+
+		value->argv = argv;
+	}
 	return (0);
+
+err:	if (argv != NULL) {
+		for (ap = argv; *ap != NULL; ++ap)
+			__wt_free(session, *ap);
+		__wt_free(session, argv);
+	}
+	return (ret);
 }
 
 /*

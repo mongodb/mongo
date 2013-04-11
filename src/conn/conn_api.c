@@ -288,7 +288,7 @@ __conn_get_home(WT_CONNECTION *wt_conn)
  */
 static int
 __conn_configure_method(WT_CONNECTION *wt_conn, const char *method,
-    const char *uri, const char *name, const char *type, const char *check)
+    const char *uri, const char *config, const char *type, const char *check)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -297,7 +297,7 @@ __conn_configure_method(WT_CONNECTION *wt_conn, const char *method,
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL_NOCONF(conn, session, configure_method);
 
-	ret = __wt_configure_method(session, method, uri, name, type, check);
+	ret = __wt_configure_method(session, method, uri, config, type, check);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -586,7 +586,7 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 
 	/* Check the configuration string. */
 	WT_ERR(__wt_config_check(session,
-	    WT_CONFIG_CALL(session, wiredtiger_open), cbuf->data, 0));
+	    WT_CONFIG_REF(session, wiredtiger_open), cbuf->data, 0));
 
 	/*
 	 * The configuration file falls between the default configuration and
@@ -637,7 +637,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 
 	/* Check the configuration string. */
 	WT_RET(__wt_config_check(session,
-	    WT_CONFIG_CALL(session, wiredtiger_open), env_config, 0));
+	    WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
 
 	/*
 	 * The environment setting comes second-to-last: it overrides the
@@ -888,8 +888,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Check/set the configuration strings. */
 	WT_ERR(__wt_config_check(session,
-	    WT_CONFIG_CALL(session, wiredtiger_open), config, 0));
-	cfg[0] = WT_CONFIG_NAME(session, wiredtiger_open);
+	    WT_CONFIG_REF(session, wiredtiger_open), config, 0));
+	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
 	cfg[2] = NULL;
 

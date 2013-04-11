@@ -11,63 +11,70 @@ static int config_check(
     WT_SESSION_IMPL *, const WT_CONFIG_CHECK *, const char *, size_t);
 
 /*
- * configure_copy --
- *	Copy the default configuration in preparation for an extension.
+ * __wt_conn_foc_add --
+ *	Add a new entry into the connection's free-on-close list.
  */
 static int
-configure_copy(WT_SESSION_IMPL *session)
+__wt_conn_foc_add(WT_SESSION_IMPL *session, ...)
 {
 	WT_CONNECTION_IMPL *conn;
+	va_list ap;
+	size_t cnt;
+	void *p;
 
 	conn = S2C(session);
 
 	/*
-	 * Unless the application extends the configuration information, we
-	 * use a shared, read-only copy.  If the application wants to extend
-	 * it, make a local copy and replace the original.  Our caller is
-	 * holding the (probably unnecessary) lock to avoid a race.
+	 * Instead of using locks to protect configuration information, assume
+	 * we can atomically update a pointer to a chunk of memory, and because
+	 * a pointer is never partially written, readers will correctly see the
+	 * original or new versions of the memory.  Readers might be using the
+	 * old version as it's being updated, though, which means we cannot free
+	 * the old chunk of memory until all possible readers have finished.
+	 * Currently, that's on connection close: in other words, we can use
+	 * this because it's small amounts of memory, and we really, really do
+	 * not want to acquire locks every time we access configuration strings,
+	 * since that's done on every API call.
+	 *
+	 * Our caller is expected to be holding any locks we need.
 	 */
-	WT_RET(__wt_calloc_def(
-	    session, conn->config_entries_count, &conn->config_entries_copy));
-	memcpy(conn->config_entries_copy, conn->config_entries,
-	    conn->config_entries_count * sizeof(WT_CONFIG_ENTRY));
-	conn->config_entries = conn->config_entries_copy;
+	/* Count the slots. */
+	va_start(ap, session);
+	for (cnt = 0; va_arg(ap, void *) != NULL; ++cnt)
+		;
+	va_end(ap);
+
+	if (conn->foc_cnt + cnt >= conn->foc_size) {
+		WT_RET(__wt_realloc(session, NULL,
+		    (conn->foc_size + cnt + 20) * sizeof(void *), &conn->foc));
+		conn->foc_size += cnt + 20;
+	}
+	va_start(ap, session);
+	while ((p = va_arg(ap, void *)) != NULL)
+		conn->foc[conn->foc_cnt++] = p;
+	va_end(ap);
 	return (0);
 }
 
 /*
- * __wt_conn_config_discard --
- *	Discard the connection's configuration table.
+ * __wt_conn_foc_discard --
+ *	Discard any memory the connection accumulated.
  */
 void
-__wt_conn_config_discard(WT_SESSION_IMPL *session)
+__wt_conn_foc_discard(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_CONFIG_ENTRY *ep, *f, *next;
+	size_t i;
 
 	conn = S2C(session);
 
 	/*
-	 * If we never extended the table, we never allocated a copy, we're
-	 * done.
+	 * If we have a list of chunks to free, run through the list, then
+	 * free the list itself.
 	 */
-	if (conn->config_entries_copy == NULL)
-		return;
-
-	/* Free any extensions, then free the copied table. */
-	for (ep = conn->config_entries_copy; ep->method != NULL; ++ep)
-		for (f = ep->extend; f != NULL; f = next) {
-			next = f->extend;
-
-			__wt_free(session, f->method);
-			__wt_free(session, f->uri);
-			__wt_free(session, f->name);
-			__wt_free(session, f->checks->name);
-			__wt_free(session, f->checks->type);
-			__wt_free(session, f->checks->checks);
-			__wt_free(session, f);
-		}
-	__wt_free(session, conn->config_entries_copy);
+	for (i = 0; i < conn->foc_cnt; ++i)
+		__wt_free(session, conn->foc[i]);
+	__wt_free(session, conn->foc);
 }
 
 /*
@@ -77,24 +84,39 @@ __wt_conn_config_discard(WT_SESSION_IMPL *session)
 int
 __wt_configure_method(WT_SESSION_IMPL *session,
     const char *method, const char *uri,
-    const char *name, const char *type, const char *check)
+    const char *config, const char *type, const char *check)
 {
+	const WT_CONFIG_CHECK *cp;
+	WT_CONFIG_CHECK *checks, *newcheck;
+	const WT_CONFIG_ENTRY **epp;
+	WT_CONFIG_ENTRY *entry;
 	WT_CONNECTION_IMPL *conn;
-	WT_CONFIG_ENTRY *ep, *entry;
-	WT_CONFIG_CHECK *checks;
 	WT_DECL_RET;
-	char *p, *t;
-
-	conn = S2C(session);
-	entry = NULL;
-	checks = NULL;
+	size_t cnt;
+	char *newcheck_name, *p;
 
 	/*
-	 * Argument checking.
-	 * We only support a limited number of types.
+	 * !!!
+	 * We ignore the specified uri, that is, all new configuration options
+	 * will be valid for all data sources.   That's shouldn't be too bad
+	 * as the worst that can happen is an application might specify some
+	 * configuration option and not get an error -- the option should be
+	 * ignored by the underlying implementation since it's unexpected, so
+	 * there shouldn't be any real problems.  Eventually I expect we will
+	 * get the whole data-source thing sorted, at which time there may be
+	 * configuration arrays for each data source, and that's when the uri
+	 * will matter.
 	 */
-	if (name == NULL)
-		WT_RET_MSG(session, EINVAL, "no configuration name specified");
+	WT_UNUSED(uri);
+
+	conn = S2C(session);
+	checks = newcheck = NULL;
+	entry = NULL;
+	newcheck_name = NULL;
+
+	/* Argument checking; we only support a limited number of types. */
+	if (config == NULL)
+		WT_RET_MSG(session, EINVAL, "no configuration specified");
 	if (type == NULL)
 		WT_RET_MSG(session, EINVAL, "no configuration type specified");
 	if (strcmp(type, "boolean") != 0 && strcmp(type, "int") != 0 &&
@@ -103,125 +125,112 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 		    "type must be one of \"boolean\", \"int\", \"list\" or "
 		    "\"string\"");
 
-	/*
-	 * If we haven't yet allocated our local copy of the configuration
-	 * information, do so now.
-	 */
-	if (conn->config_entries_copy == NULL) {
-		__wt_spin_lock(session, &conn->api_lock);
-		ret = configure_copy(session);
-		__wt_spin_unlock(session, &conn->api_lock);
-		WT_RET(ret);
-	}
-
-	/* Find a match for the method. */
-	for (ep = conn->config_entries_copy; ep->method != NULL; ++ep)
-		if (strcmp(ep->method, method) == 0)
+	/* Find a match for the method name. */
+	for (epp = conn->config_entries; (*epp)->method != NULL; ++epp)
+		if (strcmp((*epp)->method, method) == 0)
 			break;
-	if (ep == NULL)
+	if ((*epp)->method == NULL)
 		WT_RET_MSG(session,
 		    WT_NOTFOUND, "no method matching %s found", method);
 
-	/* Allocate an extension entry. */
-	WT_ERR(__wt_calloc_def(session, 1, &entry));
-	if (uri != NULL)
-		WT_ERR(__wt_strdup(session, uri, &entry->uri));
-	WT_ERR(__wt_strdup(session, name, &entry->name));
-	WT_ERR(__wt_calloc_def(session, 2, &checks));
 	/*
-	 * There may be a default value in the name specified, we don't that as
-	 * part of the checks name field.
+	 * Technically possible for threads to race, lock the connection while
+	 * adding the new configuration information.  We're holding the lock
+	 * for an extended period of time, but configuration changes should be
+	 * rare and only happen during startup.
 	 */
-	WT_ERR(__wt_strdup(session, name, &p));
-	if ((t = strchr(p, '=')) != NULL)
-		*t = '\0';
-	checks->name = p;
-	WT_ERR(__wt_strdup(session, type, &checks->type));
+	__wt_spin_lock(session, &conn->api_lock);
+
+	/*
+	 * Allocate new configuration entry and fill it in.
+	 *
+	 * The new base value is the previous base value, a separator and the
+	 * new configuration string.
+	 */
+	WT_ERR(__wt_calloc_def(session, 1, &entry));
+	entry->method = (*epp)->method;
+	WT_ERR(__wt_calloc_def(session,
+	    strlen((*epp)->base) + strlen(",") + strlen(config) + 1, &p));
+	(void)strcpy(p, (*epp)->base);
+	(void)strcat(p, ",");
+	(void)strcat(p, config);
+	entry->base = p;
+
+	/*
+	 * Build a new checks entry name field.  There may be a default value
+	 * in the config argument we're passed , we don't want that as part of
+	 * the checks entry name field.
+	 */
+	WT_ERR(__wt_strdup(session, config, &newcheck_name));
+	if ((p = strchr(newcheck_name, '=')) != NULL)
+		*p = '\0';
+
+	/*
+	 * Build a new checks array.  The new configuration name may replace
+	 * an existing check with new information, in that case skip the old
+	 * version.
+	 */
+	for (cnt = 0, cp = (*epp)->checks; cp->name != NULL; ++cp)
+		++cnt;
+	WT_ERR(__wt_calloc_def(session, cnt + 2, &checks));
+	for (cnt = 0, cp = (*epp)->checks; cp->name != NULL; ++cp)
+		if (strcmp(newcheck_name, cp->name) != 0)
+			checks[cnt++] = *cp;
+	newcheck = &checks[cnt];
+
+	newcheck->name = newcheck_name;
+	WT_ERR(__wt_strdup(session, type, &newcheck->type));
 	if (check != NULL)
-		WT_ERR(__wt_strdup(session, check, &checks->checks));
+		WT_ERR(__wt_strdup(session, check, &newcheck->checks));
 
 	entry->checks = checks;
 
-	/* Confirm the configuration string passes any checks we're given. */
-	if (check != NULL)
-		WT_ERR(config_check(session, checks, name, 0));
+	/* Confirm the configuration string passes the new set of checks. */
+	WT_ERR(config_check(session, entry->checks, config, 0));
 
 	/*
-	 * Technically possible for threads to race, lock the connection while
-	 * appending the new value to the method's linked list of configuration
-	 * information.
+	 * The next time this configuration is updated, we don't want to figure
+	 * out which of these pieces of memory were allocated and will need to
+	 * be free'd on close, add them to the list now.
 	 */
-	__wt_spin_lock(session, &conn->api_lock);
-	while (ep->extend != NULL)
-		ep = ep->extend;
-	ep->extend = entry;
+	WT_ERR(__wt_conn_foc_add(session,
+	    entry, entry->base,
+	    checks, newcheck->name, newcheck->type, newcheck->checks, NULL));
+
+	*epp = entry;
+
+	if (0) {
+err:		if (entry != NULL) {
+			__wt_free(session, entry->base);
+			__wt_free(session, entry);
+		}
+		__wt_free(session, checks);
+		if (newcheck != NULL) {
+			__wt_free(session, newcheck->type);
+			__wt_free(session, newcheck->checks);
+		}
+		__wt_free(session, newcheck_name);
+	}
+
 	__wt_spin_unlock(session, &conn->api_lock);
-
-	return (0);
-
-err:	if (entry != NULL) {
-		__wt_free(session, entry->method);
-		__wt_free(session, entry->uri);
-		__wt_free(session, entry->name);
-	}
-	if (checks != NULL) {
-		__wt_free(session, checks->name);
-		__wt_free(session, checks->type);
-		__wt_free(session, checks->checks);
-	}
 	return (ret);
 }
 
 /*
  * __wt_config_check--
  *	Check the keys in an application-supplied config string match what is
- * specified in all of the entry's check strings.
+ * specified in an array of check strings.
  */
 int
 __wt_config_check(WT_SESSION_IMPL *session,
     const WT_CONFIG_ENTRY *entry, const char *config, size_t config_len)
 {
-	const WT_CONFIG_CHECK *checks, *cp;
-	const WT_CONFIG_ENTRY *ep;
-	WT_CONFIG_CHECK *copy;
-	WT_DECL_RET;
-	size_t cnt;
-
-	copy = NULL;
-
-	/* It is always okay to not provide a configuration string. */
-	if (config == NULL)
-		return (0);
-
 	/*
-	 * If the call was ever extended build a combined set of checks.  This
-	 * is slow, and it's per call to the configuration method, but I don't
-	 * see much reason to get fancy until this gets used a lot more than I
-	 * expect it will be.
-	 *
-	 * It's always okay to not provide any checks.
+	 * Callers don't check, it's a fast call without a configuration or
+	 * check array.
 	 */
-	if (entry->extend == NULL) {
-		if ((checks = entry->checks) == NULL)
-			return (0);
-	} else {
-		for (cnt = 0, ep = entry; ep != NULL; ep = ep->extend)
-			for (cp = ep->checks; cp->name != NULL; ++cp)
-				++cnt;
-		if (cnt == 0)
-			return (0);
-		WT_RET(__wt_calloc_def(session, cnt + 1, &copy));
-		for (cnt = 0, ep = entry; ep != NULL; ep = ep->extend)
-			for (cp = ep->checks; cp->name != NULL; ++cp)
-				copy[cnt++] = *cp;
-		checks = copy;
-	}
-
-	ret = config_check(session, checks, config, config_len);
-
-	if (copy != NULL)
-		__wt_free(session, copy);
-	return (ret);
+	return (config == NULL || entry->checks == NULL ?
+	    0 : config_check(session, entry->checks, config, config_len));
 }
 
 /*

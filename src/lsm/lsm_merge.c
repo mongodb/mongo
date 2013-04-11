@@ -232,7 +232,7 @@ __wt_lsm_merge(
 		    lsm_tree->bloom_hash_count, &bloom));
 	}
 
-	cfg[0] = WT_CONFIG_NAME(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	cfg[1] = "bulk,raw";
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
@@ -283,7 +283,7 @@ __wt_lsm_merge(
 	 * enough internal pages in cache so that application threads don't
 	 * stall and block each other reading them in.
 	 */
-	cfg[0] = WT_CONFIG_NAME(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	cfg[1] = "checkpoint=WiredTigerCheckpoint,next_random";
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));

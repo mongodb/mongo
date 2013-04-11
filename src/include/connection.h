@@ -66,10 +66,6 @@ struct __wt_named_data_source {
 struct __wt_connection_impl {
 	WT_CONNECTION iface;
 
-	u_int config_entries_count;	/* Configuration table count and copy */
-	const WT_CONFIG_ENTRY *config_entries;
-	WT_CONFIG_ENTRY *config_entries_copy;
-
 	/* For operations without an application-supplied session */
 	WT_SESSION_IMPL *default_session;
 	WT_SESSION_IMPL  dummy_session;
@@ -89,6 +85,13 @@ struct __wt_connection_impl {
 	int is_new;			/* Connection created database */
 
 	int connection_initialized;	/* Connection is initialized */
+
+					/* Configuration */
+	const WT_CONFIG_ENTRY **config_entries;
+
+	void  **foc;			/* Free-on-close array */
+	size_t  foc_cnt;		/* Array entries */
+	size_t  foc_size;		/* Array size */
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
