@@ -14,8 +14,6 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/index_update.h"
 
 #include "mongo/client/dbclientinterface.h"
@@ -24,6 +22,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index.h"
+#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
@@ -35,186 +34,150 @@
 
 namespace mongo {
     
-    /* unindex all keys in index for this record. */
-    static void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
-        BSONObjSet keys;
-        id.getKeysFromObject(obj, keys);
-        IndexInterface& ii = id.idxInterface();
-        for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
-            BSONObj j = *i;
+    /**
+     * Remove the provided (obj, dl) pair from the provided index.
+     */
+    static void _unindexRecord(NamespaceDetails *d, int idxNo, const BSONObj& obj,
+                               const DiskLoc& dl, bool logIfError = true) {
+        IndexDetails &id = d->idx(idxNo);
 
-            bool ok = false;
-            try {
-                ok = ii.unindex(id.head, id, j, dl);
-            }
-            catch (AssertionException& e) {
-                problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
-                out() << "Assertion failure: _unindex failed: " << e.what() << '\n';
-                out() << "  obj:" << obj.toString() << '\n';
-                out() << "  key:" << j.toString() << '\n';
-                out() << "  dl:" << dl.toString() << endl;
-                logContext();
-            }
+        if (CatalogHack::testIndexMigration() && CatalogHack::isIndexMigrated(id.keyPattern())) {
+            auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(d, idxNo));
+            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(desc.get()));
+            InsertDeleteOptions options;
+            options.logIfError = logIfError;
 
-            if ( !ok && logMissing ) {
-                log() << "unindex failed (key too big?) " << id.indexNamespace() << " key: " << j << " " << obj["_id"] << endl;
+            int64_t removed;
+            Status ret = iam->remove(obj, dl, options, &removed);
+            if (Status::OK() != ret) {
+                problem() << "Couldn't unindex record " << obj.toString() << " status: "
+                    << ret.toString() << endl;
+            }
+        } else {
+            // DEPRECATED: this goes away when the migration finishes.
+            BSONObjSet keys;
+            id.getKeysFromObject(obj, keys);
+            IndexInterface& ii = id.idxInterface();
+            for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                BSONObj j = *i;
+
+                bool ok = false;
+                try {
+                    ok = ii.unindex(id.head, id, j, dl);
+                }
+                catch (AssertionException& e) {
+                    problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
+                    out() << "Assertion failure: _unindex failed: " << e.what() << '\n';
+                    out() << "  obj:" << obj.toString() << '\n';
+                    out() << "  key:" << j.toString() << '\n';
+                    out() << "  dl:" << dl.toString() << endl;
+                    logContext();
+                }
+
+                if ( !ok && logIfError ) {
+                    log() << "unindex failed (key too big?) " << id.indexNamespace() << " key: " << j << " " << obj["_id"] << endl;
+                }
             }
         }
     }
 
-//zzz
-    /* unindex all keys in all indexes for this record. */
-    void unindexRecord(NamespaceDetails *d, 
-                       Record *todelete, 
-                       const DiskLoc& dl, 
+    /**
+     * Remove the provided (obj, dl) pair from all indices.
+     */
+    void unindexRecord(NamespaceDetails* nsd, Record* todelete, const DiskLoc& dl,
                        bool noWarn /* = false */) {
-        BSONObj obj = BSONObj::make(todelete);
-        int n = d->nIndexes;
-        for ( int i = 0; i < n; i++ )
-            _unindexRecord(d->idx(i), obj, dl, !noWarn);
 
-        for (int i = 0; i < d->indexBuildsInProgress; i++) { // background index
-            // Always pass nowarn here, as this one may be missing for valid reasons as we are
-            // concurrently building it
-            _unindexRecord(d->idx(n+i), obj, dl, false);
+        BSONObj obj = BSONObj::make(todelete);
+        int numIndices = nsd->getTotalIndexCount();
+
+        for (int i = 0; i < numIndices; i++) {
+            // If i >= d->nIndexes, it's a background index, and we DO NOT want to log anything.
+            bool logIfError = (i < nsd->nIndexes) ? !noWarn : false;
+            _unindexRecord(nsd, i, obj, dl, logIfError);
         }
     }
 
-    /* step one of adding keys to index idxNo for a new record
-    */
-    void fetchIndexInserters(BSONObjSet & /*out*/keys,
-                             IndexInterface::IndexInserter &inserter,
-                             NamespaceDetails *d,
-                             int idxNo,
-                             const BSONObj& obj,
-                             DiskLoc recordLoc,
-                             const bool allowDups) {
-        IndexDetails &idx = d->idx(idxNo);
-        idx.getKeysFromObject(obj, keys);
-        if( keys.empty() )
-            return;
-        bool dupsAllowed = !idx.unique() || allowDups;
-        Ordering ordering = Ordering::make(idx.keyPattern());
-        
-        try {
-            // we can't do the two step method with multi keys as insertion of one key changes the indexes 
-            // structure.  however we can do the first key of the set so we go ahead and do that FWIW
-            inserter.addInsertionContinuation(
-                    idx.idxInterface().beginInsertIntoIndex(
-                            idxNo, idx, recordLoc, *keys.begin(), ordering, dupsAllowed));
-        }
-        catch (AssertionException& e) {
-            if( e.getCode() == 10287 && idxNo >= d->nIndexes ) {
-                DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
+    /**
+     * Add the provided (obj, dl) pair to the provided index.
+     */
+    static void addKeysToIndex(const char *ns, NamespaceDetails *d, int idxNo, const BSONObj& obj,
+                               const DiskLoc &recordLoc, bool dupsAllowed) {
+        IndexDetails& id = d->idx(idxNo);
+        if (CatalogHack::testIndexMigration() && CatalogHack::isIndexMigrated(id.keyPattern())) {
+            auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(d, idxNo));
+            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(desc.get()));
+            InsertDeleteOptions options;
+            options.logIfError = false;
+            options.dupsAllowed = (!KeyPattern::isIdKeyPattern(id.keyPattern()) && !id.unique())
+                || ignoreUniqueIndex(id);
+
+            int64_t inserted;
+            Status ret = iam->insert(obj, recordLoc, options, &inserted);
+            if (Status::OK() != ret) {
+                uasserted(ret.location(), ret.reason());
             }
-            else {
+        } else {
+            // DEPRECATED: this goes away when the migration finishes.
+            BSONObjSet keys;
+            id.getKeysFromObject(obj, keys);
+            if( keys.empty() ) 
+                return;
+            BSONObj order = id.keyPattern();
+            IndexInterface& ii = id.idxInterface();
+            Ordering ordering = Ordering::make(order);
+            int n = 0;
+            for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                if( ++n == 2 ) {
+                    d->setIndexIsMultikey(ns, idxNo);
+                }
+                verify( !recordLoc.isNull() );
+                try {
+                    ii.bt_insert(id.head, recordLoc, *i, ordering, dupsAllowed, id);
+                }
+                catch (AssertionException& e) {
+                    if( e.getCode() == 10287 && idxNo >= d->nIndexes ) {
+                        DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
+                        continue;
+                    }
+                    if( !dupsAllowed ) {
+                        // dup key exception, presumably.
+                        throw;
+                    }
+                    problem() << " caught assertion addKeysToIndex " << id.indexNamespace() << " " << obj["_id"] << endl;
+                }
+            }
+        }
+    }
+
+    /**
+     * Add the provided (obj, loc) pair to all indices.
+     */
+    void indexRecord(const char *ns, NamespaceDetails *d, const BSONObj &obj, const DiskLoc &loc) {
+        int numIndices = d->getTotalIndexCount();
+
+        for (int i = 0; i < numIndices; ++i) {
+            IndexDetails &id = d->idx(i);
+
+            try {
+                addKeysToIndex(ns, d, i, obj, loc, !id.unique() || ignoreUniqueIndex(id));
+            } catch (AssertionException& e) {
+                // TODO: the new index layer indexes either all or no keys, so j <= i can be j < i.
+                for (int j = 0; j <= i; j++) {
+                    try {
+                        _unindexRecord(d, j, obj, loc, false);
+                    } catch(...) {
+                        LOG(3) << "unindex fails on rollback after unique "
+                                  "key constraint prevented insert\n";
+                    }
+                }
                 throw;
             }
         }
     }
 
-    /** add index keys for a newly inserted record 
-        done in two steps/phases to allow potential deferal of write lock portion in the future
-    */
-    void indexRecordUsingTwoSteps(const char *ns, NamespaceDetails *d, BSONObj obj,
-                                         DiskLoc loc, bool shouldBeUnlocked) {
-        vector<int> multi;
-        vector<BSONObjSet> multiKeys;
-
-        IndexInterface::IndexInserter inserter;
-
-        // Step 1, read phase.
-        int n = d->getTotalIndexCount();
-        {
-            BSONObjSet keys;
-            for ( int i = 0; i < n; i++ ) {
-                // this call throws on unique constraint violation.  we haven't done any writes yet so that is fine.
-                fetchIndexInserters(/*out*/keys, 
-                                    inserter, 
-                                    d, 
-                                    i, 
-                                    obj, 
-                                    loc, 
-                                    ignoreUniqueIndex(d->idx(i)));
-                if( keys.size() > 1 ) {
-                    multi.push_back(i);
-                    multiKeys.push_back(BSONObjSet());
-                    multiKeys[multiKeys.size()-1].swap(keys);
-                }
-                keys.clear();
-            }
-        }
-
-        inserter.finishAllInsertions();  // Step 2, write phase.
-
-        // now finish adding multikeys
-        for( unsigned j = 0; j < multi.size(); j++ ) {
-            unsigned i = multi[j];
-            BSONObjSet& keys = multiKeys[j];
-            IndexDetails& idx = d->idx(i);
-            bool dupsAllowed = !idx.unique() || ignoreUniqueIndex(idx);
-            IndexInterface& ii = idx.idxInterface();
-            Ordering ordering = Ordering::make(idx.keyPattern());
-            d->setIndexIsMultikey(ns, i);
-            for( BSONObjSet::iterator k = ++keys.begin()/*skip 1*/; k != keys.end(); k++ ) {
-                try {
-                    ii.bt_insert(idx.head, loc, *k, ordering, dupsAllowed, idx);
-                } catch (AssertionException& e) {
-                    if( e.getCode() == 10287 && (int) i >= d->nIndexes ) {
-                        DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
-                    }
-                    else {
-                        /* roll back previously added index entries
-                           note must do self index as it is multikey and could require some cleanup itself
-                        */
-                        for( int j = 0; j < n; j++ ) {
-                            try {
-                                _unindexRecord(d->idx(j), obj, loc, false);
-                            }
-                            catch(...) {
-                                LOG(3) << "unindex fails on rollback after unique key constraint prevented insert\n";
-                            }
-                        }
-                        throw;
-                    }
-                }
-            }
-        }
-    }
-
-    /* add keys to index idxNo for a new record */
-    static void addKeysToIndex(const char *ns, NamespaceDetails *d, int idxNo, BSONObj& obj,
-                               DiskLoc recordLoc, bool dupsAllowed) {
-        IndexDetails& idx = d->idx(idxNo);
-        BSONObjSet keys;
-        idx.getKeysFromObject(obj, keys);
-        if( keys.empty() ) 
-            return;
-        BSONObj order = idx.keyPattern();
-        IndexInterface& ii = idx.idxInterface();
-        Ordering ordering = Ordering::make(order);
-        int n = 0;
-        for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
-            if( ++n == 2 ) {
-                d->setIndexIsMultikey(ns, idxNo);
-            }
-            verify( !recordLoc.isNull() );
-            try {
-                ii.bt_insert(idx.head, recordLoc, *i, ordering, dupsAllowed, idx);
-            }
-            catch (AssertionException& e) {
-                if( e.getCode() == 10287 && idxNo >= d->nIndexes ) {
-                    DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
-                    continue;
-                }
-                if( !dupsAllowed ) {
-                    // dup key exception, presumably.
-                    throw;
-                }
-                problem() << " caught assertion addKeysToIndex " << idx.indexNamespace() << " " << obj["_id"] << endl;
-            }
-        }
-    }
+    //
+    // Bulk index building
+    //
 
     void addKeysToPhaseOne( const char* ns,
                             const IndexDetails& idx,
@@ -577,7 +540,7 @@ namespace mongo {
         tlog() << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
     }
 
-    extern BSONObj id_obj; // { _id : 1 }
+    extern BSONObj id_obj;  // { _id : 1 }
 
     void ensureHaveIdIndex(const char* ns, bool mayInterrupt) {
         NamespaceDetails *d = nsdetails(ns);
@@ -618,20 +581,7 @@ namespace mongo {
             ((tmp >> (x+1)) << x);
     }
 
-    class IndexUpdateTest : public StartupTest {
-    public:
-        void run() {
-            verify( removeBit(1, 0) == 0 );
-            verify( removeBit(2, 0) == 1 );
-            verify( removeBit(2, 1) == 0 );
-            verify( removeBit(255, 1) == 127 );
-            verify( removeBit(21, 2) == 9 );
-            verify( removeBit(0x4000000000000001ULL, 62) == 1 );
-        }
-    } iu_unittest;
-
-    bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
-
+    bool dropIndexes(NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex) {
         BackgroundOperation::assertNoBgOpInProgForNs(ns);
 
         d = d->writingWithExtra();
@@ -703,4 +653,51 @@ namespace mongo {
         return true;
     }
 
-}
+    /**
+     * DEPRECATED -- only used by prefetch.cpp
+     *  step one of adding keys to index idxNo for a new record
+     */
+    void fetchIndexInserters(BSONObjSet & /*out*/keys,
+                             IndexInterface::IndexInserter &inserter,
+                             NamespaceDetails *d,
+                             int idxNo,
+                             const BSONObj& obj,
+                             DiskLoc recordLoc,
+                             const bool allowDups) {
+        IndexDetails &idx = d->idx(idxNo);
+        idx.getKeysFromObject(obj, keys);
+        if( keys.empty() )
+            return;
+        bool dupsAllowed = !idx.unique() || allowDups;
+        Ordering ordering = Ordering::make(idx.keyPattern());
+        
+        try {
+            // we can't do the two step method with multi keys as insertion of one key changes the indexes 
+            // structure.  however we can do the first key of the set so we go ahead and do that FWIW
+            inserter.addInsertionContinuation(
+                    idx.idxInterface().beginInsertIntoIndex(
+                            idxNo, idx, recordLoc, *keys.begin(), ordering, dupsAllowed));
+        }
+        catch (AssertionException& e) {
+            if( e.getCode() == 10287 && idxNo >= d->nIndexes ) {
+                DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
+            }
+            else {
+                throw;
+            }
+        }
+    }
+
+    class IndexUpdateTest : public StartupTest {
+    public:
+        void run() {
+            verify( removeBit(1, 0) == 0 );
+            verify( removeBit(2, 0) == 1 );
+            verify( removeBit(2, 1) == 0 );
+            verify( removeBit(255, 1) == 127 );
+            verify( removeBit(21, 2) == 9 );
+            verify( removeBit(0x4000000000000001ULL, 62) == 1 );
+        }
+    } iu_unittest;
+
+}  // namespace mongo

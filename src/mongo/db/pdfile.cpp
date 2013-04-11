@@ -1677,45 +1677,13 @@ namespace mongo {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 
-        bool earlyIndex = true;
-        DiskLoc loc;
-        if( idToInsert.needed() || tableToIndex || d->isCapped() ) {
-            // if need id, we don't do the early indexing. this is not the common case so that is sort of ok
-            earlyIndex = false;
-            loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
-        }
-        else {
-            loc = d->allocWillBeAt(ns, lenWHdr);
-            if( loc.isNull() ) {
-                // need to get a new extent so we have to do the true alloc now (not common case)
-                earlyIndex = false;
-                loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
-            }
-        }
+        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+
         if ( loc.isNull() ) {
-            log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->isCapped() << endl;
+            log() << "insert: couldn't alloc space for object ns:" << ns
+                  << " capped:" << d->isCapped() << endl;
             verify(d->isCapped());
             return DiskLoc();
-        }
-
-        if( earlyIndex ) { 
-            // add record to indexes using two step method so we can do the reading outside a write lock
-            if ( d->nIndexes ) {
-                verify( obuf );
-                BSONObj obj((const char *) obuf);
-                try {
-                    indexRecordUsingTwoSteps(ns, d, obj, loc, true);
-                }
-                catch( AssertionException& ) {
-                    // should be a dup key error on _id index
-                    dassert( !tableToIndex && !d->isCapped() );
-                    // no need to delete/rollback the record as it was not added yet
-                    throw;
-                }
-            }
-            // really allocate now
-            DiskLoc real = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
-            verify( real == loc );
         }
 
         Record *r = loc.rec();
@@ -1753,16 +1721,11 @@ namespace mongo {
         }
 
         /* add this record to our indexes */
-        if ( !earlyIndex && d->nIndexes ) {
+        if (d->nIndexes) {
             try {
                 BSONObj obj(r->data());
-                // not sure which of these is better -- either can be used.  oldIndexRecord may be faster, 
-                // but twosteps handles dup key errors more efficiently.
-                //oldIndexRecord(d, obj, loc);
-                indexRecordUsingTwoSteps(ns, d, obj, loc, false);
-
-            }
-            catch( AssertionException& e ) {
+                indexRecord(ns, d, obj, loc);
+            } catch( AssertionException& e ) {
                 // should be a dup key error on _id index
                 if( tableToIndex || d->isCapped() ) {
                     massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );

@@ -253,11 +253,10 @@ doneCheckOrder:
             }
 
             // TODO(hk): Migrate!
-            bool testIndexMigrations = true;
-
-            if (testIndexMigrations && CatalogHack::isIndexMigrated(_type->keyPattern())) {
+            if (CatalogHack::testCursorMigration()
+                && CatalogHack::isIndexMigrated(_type->keyPattern())) {
                 IndexDescriptor* descriptor = CatalogHack::getDescriptor(_d, _idxNo);
-                IndexAccessMethod* iam = CatalogHack::getSpecialIndex(descriptor);
+                IndexAccessMethod* iam = CatalogHack::getIndex(descriptor);
                 return shared_ptr<Cursor>(EmulatedCursor::make(descriptor, iam, _originalQuery,
                                                                _order, numWanted,
                                                                descriptor->keyPattern()));

@@ -81,6 +81,12 @@ namespace mongo {
         }
 
         /**
+         * Is the provided key pattern the index over the ID field?
+         * The always required ID index is always {_id: 1} or {_id: -1}.
+         */
+        static bool isIdKeyPattern(const BSONObj& pattern);
+
+        /**
          * Return the first string value in the provided object.  For an index key pattern,
          * a field with a non-string value indicates a "special" (not straight Btree) index.
          */

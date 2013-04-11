@@ -35,6 +35,7 @@ namespace mongo {
         using BtreeBasedAccessMethod::_ordering;
 
         HashAccessMethod(IndexDescriptor* descriptor);
+        virtual ~HashAccessMethod() { }
 
         virtual Status newCursor(IndexCursor** out);
 

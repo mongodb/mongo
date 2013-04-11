@@ -122,11 +122,7 @@ namespace mongo {
      */
     class UpdateTicket {
     public:
-        UpdateTicket() : _isValid(false), _isMultiKey(false) { }
-
-        // Multikey is a bit set in the on-disk catalog.  If an update is multi-key we have
-        // to set that bit.  We propagate this up so the caller can do that.
-        bool isMultiKey() const { return _isMultiKey; }
+        UpdateTicket() : _isValid(false) { }
 
     protected:
         // These friends are the classes that actually fill out an UpdateStatus.
@@ -135,7 +131,6 @@ namespace mongo {
         class PrivateUpdateData;
 
         bool _isValid;
-        bool _isMultiKey;
 
         // This is meant to be filled out only by the friends above.
         scoped_ptr<PrivateUpdateData> _indexSpecificUpdateData;

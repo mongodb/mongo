@@ -66,7 +66,8 @@ namespace mongo {
         _order = indexDetails.keyPattern();
     }
     
-    void BtreeCursor::init( const BSONObj& sk, const BSONObj& ek, bool endKeyInclusive, int direction ) {
+    void BtreeCursor::init(const BSONObj& sk, const BSONObj& ek, bool endKeyInclusive,
+                           int direction ) {
         _finishConstructorInit();
         startKey = sk;
         endKey = ek;

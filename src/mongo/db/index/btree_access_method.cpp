@@ -52,8 +52,9 @@ namespace mongo {
                                       options.dupsAllowed, _descriptor->getOnDisk(), true);
                 ++*numInserted;
             } catch (AssertionException& e) {
-                if (10287 == e.getCode() && options.dupsAllowed) {
-                    // Duplicate key, but our options say to ignore it.
+                if (10287 == e.getCode() && _descriptor->isBackgroundIndex()) {
+                    // This is the duplicate key exception.  We ignore it for some reason in BG
+                    // indexing.
                     DEV log() << "info: key already in index during bg indexing (ok)\n";
                 } else if (!options.dupsAllowed) {
                     // Assuming it's a duplicate key exception.  Clean up any inserted keys.
@@ -69,6 +70,10 @@ namespace mongo {
                     ret = Status(ErrorCodes::InternalError, e.what(), e.getCode());
                 }
             }
+        }
+
+        if (*numInserted > 1) {
+            _descriptor->setMultikey();
         }
 
         return ret;
@@ -161,8 +166,6 @@ namespace mongo {
         data->loc = record;
         data->dupsAllowed = options.dupsAllowed;
 
-        status->_isMultiKey = data->newKeys.size() > 1;
-
         setDifference(data->oldKeys, data->newKeys, &data->removed);
         setDifference(data->newKeys, data->oldKeys, &data->added);
 
@@ -192,6 +195,10 @@ namespace mongo {
 
         BtreeBasedPrivateUpdateData* data =
             static_cast<BtreeBasedPrivateUpdateData*>(ticket._indexSpecificUpdateData.get());
+
+        if (data->oldKeys.size() + data->added.size() - data->removed.size() > 1) {
+            _descriptor->setMultikey();
+        }
 
         for (size_t i = 0; i < data->added.size(); ++i) {
             _interface->bt_insert(_descriptor->getHead(), data->loc, *data->added[i], _ordering,

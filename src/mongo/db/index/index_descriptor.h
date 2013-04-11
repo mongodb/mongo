@@ -130,6 +130,19 @@ namespace mongo {
         // Return a (rather compact) string representation.
         string toString() { return _infoObj.toString(); }
 
+        // Return the info object.
+        BSONObj infoObj() { return _infoObj; }
+
+        // Set multikey attribute.  We never unset it.
+        void setMultikey() {
+            _namespaceDetails->setIndexIsMultikey(parentNS().c_str(), _indexNumber);
+        }
+
+        // Is this index being created in the background?
+        bool isBackgroundIndex() {
+            return _indexNumber >= _namespaceDetails->nIndexes;
+        }
+
     private:
         // Related catalog information.
         NamespaceDetails* _namespaceDetails;

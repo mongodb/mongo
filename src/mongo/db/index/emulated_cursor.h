@@ -50,12 +50,12 @@ namespace mongo {
                                     int numWanted,
                                     const BSONObj& keyPattern) {
 
-            EmulatedCursor* ret = new EmulatedCursor(descriptor, indexAccessMethod,
-                                                     order, numWanted, keyPattern);
+            auto_ptr<EmulatedCursor> ret(new EmulatedCursor(descriptor, indexAccessMethod,
+                                                            order, numWanted, keyPattern));
             // Why do we have to do this?  No reading from disk is allowed in constructors,
             // and seeking involves reading from disk.
             ret->seek(query);
-            return ret;
+            return ret.release();
         }
 
         // We defer everything we can to the underlying cursor.

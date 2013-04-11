@@ -37,9 +37,7 @@ namespace mongo {
                       bool mayInterrupt);
 
     // add index keys for a newly inserted record 
-    // done in two steps/phases to allow potential deferal of write lock portion in the future
-    void indexRecordUsingTwoSteps(const char *ns, NamespaceDetails *d, BSONObj obj,
-                                         DiskLoc loc, bool shouldBeUnlocked);
+    void indexRecord(const char *ns, NamespaceDetails *d, const BSONObj& obj, const DiskLoc &loc);
 
     // Given an object, populate "inserter" with information necessary to update indexes.
     void fetchIndexInserters(BSONObjSet & /*out*/keys,
