@@ -64,7 +64,15 @@ namespace mongo {
         virtual BSONObj current() { return BSONObj::make(_current()); }
         virtual DiskLoc currLoc() { return _indexCursor->getValue(); }
         virtual BSONObj currKey() const { return _indexCursor->getKey(); }
-        virtual DiskLoc refLoc() { return currLoc(); }
+        virtual DiskLoc refLoc() {
+            // This will sometimes get called even if we're not OK.
+            // See ClientCursor::prepareToYield/updateLocation.
+            if (!ok()) {
+                return DiskLoc();
+            } else {
+                return currLoc();
+            }
+        }
         virtual long long nscanned() { return _nscanned; }
         virtual string toString() { return _indexCursor->toString(); }
 
