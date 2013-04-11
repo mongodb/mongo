@@ -7,4 +7,8 @@ env.StaticLibrary('update', ['path_support.cpp'],
                            '$BUILD_DIR/mongo/foundation',
                            '$BUILD_DIR/mongo/db/common'])
 
-env.CppUnitTest('path_support_test', ['path_support_test.cpp'], LIBDEPS=['update'])
+env.CppUnitTest('field_checker_test', ['field_checker_test.cpp'], LIBDEPS=['update'])
+
+env.CppUnitTest('path_support_test', ['path_support_test.cpp'],
+                LIBDEPS=['update', '$BUILD_DIR/mongo/mutable_bson_test_utils'])
+

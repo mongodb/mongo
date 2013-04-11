@@ -19,17 +19,13 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
-    namespace mutablebson {
-        class Element;
-    }
-
-    class PathSupport {
-    public:
+    namespace pathsupport {
 
         /**
          * Finds the longest portion of 'prefix' that exists in document rooted at 'root' and is
@@ -62,11 +58,25 @@ namespace mongo {
          *   'a.0.b' is NOT a viable path in {a: 1}, because a would have changed types
          *   'a.5.b' is a viable path in in {a: []} (padding would occur)
          */
-        static Status findLongestPrefix(const FieldRef& prefix,
-                                        mutablebson::Element root,
-                                        int32_t* idxFound,
-                                        mutablebson::Element* elemFound);
+        Status findLongestPrefix(const FieldRef& prefix,
+                                 mutablebson::Element root,
+                                 int32_t* idxFound,
+                                 mutablebson::Element* elemFound);
 
-    };
+        /**
+         * Creates the parts 'prefix[idxRoot]', 'prefix[idxRoot+1]', ...,
+         * 'prefix[<numParts>-1]' under 'elemFound' and adds 'newElem' as a child of that
+         * path. Returns OK, if successful, or an error code describing why not, otherwise.
+         *
+         * createPathAt is designed to work with 'findLongestPrefix' in that it can create the
+         * field parts in 'prefix' that are missing from a given document. 'elemFound' points
+         * to the element in the doc that is the parent of prefix[idxRoot].
+         */
+        Status createPathAt(const FieldRef& prefix,
+                            int32_t idxRoot,
+                            mutablebson::Element elemFound,
+                            mutablebson::Element newElem);
+
+    } // namespace pathsupport
 
 } // namespace mongo

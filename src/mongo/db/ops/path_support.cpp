@@ -18,9 +18,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace pathsupport {
 
     namespace {
 
@@ -38,12 +41,27 @@ namespace mongo {
             return true;
         }
 
+        Status maybePadTo(mutablebson::Element* elemArray,
+                          size_t sizeRequired) {
+            dassert(elemArray.getType() == Array);
+
+            size_t currSize = mutablebson::countChildren(*elemArray);
+            size_t toPad = sizeRequired - currSize;
+            for (size_t i = 0; i < toPad; i++) {
+                Status status = elemArray->appendNull("");
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+            return Status::OK();
+        }
+
     } // unnamed namespace
 
-    Status PathSupport::findLongestPrefix(const FieldRef& prefix,
-                                          mutablebson::Element root,
-                                          int32_t* idxFound,
-                                          mutablebson::Element* elemFound) {
+    Status findLongestPrefix(const FieldRef& prefix,
+                             mutablebson::Element root,
+                             int32_t* idxFound,
+                             mutablebson::Element* elemFound) {
 
         // If root is empty or the prefix is so, there's no point in looking for a prefix.
         const size_t prefixSize = prefix.numParts();
@@ -117,4 +135,111 @@ namespace mongo {
         }
     }
 
+    Status createPathAt(const FieldRef& prefix,
+                        int32_t idxFound,
+                        mutablebson::Element elemFound,
+                        mutablebson::Element newElem) {
+        Status status = Status::OK();
+
+        // idxFound can't be negative
+        if (idxFound < 0) {
+            return Status(ErrorCodes::BadValue, "index must be greater or equal to zero");
+        }
+
+        // Sanity check that 'idxField' is an actual part.
+        const int32_t size = prefix.numParts();
+        if (idxFound >= size) {
+            return Status(ErrorCodes::BadValue, "index larger than path size");
+        }
+
+        mutablebson::Document& doc = elemFound.getDocument();
+
+        // If we are creating children under an array and a numeric index is next, then perhaps
+        // we need padding.
+        int32_t i = idxFound;
+        bool inArray = false;
+        if (elemFound.getType() == mongo::Array) {
+            size_t newIdx = 0;
+            if (!isNumeric(prefix.getPart(idxFound), &newIdx)) {
+                return Status(ErrorCodes::InvalidPath, "Array require numeric fields");
+            }
+
+            status = maybePadTo(&elemFound, newIdx);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // If there is a next field, that would be an array element. We'd like to mark that
+            // field because we create array elements differently than we do regular objects.
+            if (++i < size) {
+                inArray = true;
+            }
+        }
+
+        // Create all the remaining parts but the last one.
+        for (; i < size - 1 ; i++) {
+            mutablebson::Element elem = doc.makeElementObject(prefix.getPart(i));
+            if (!elem.ok()) {
+                return Status(ErrorCodes::InternalError, "cannot create path");
+            }
+
+            // If this field is an array element, we wrap it in an object (because array
+            // elements are wraped in { "N": <element> } objects.
+            if (inArray) {
+                // TODO pass empty StringData to makeElementObject, when that's supported.
+                mutablebson::Element arrayObj = doc.makeElementObject("" /* it's an array */);
+                if (!arrayObj.ok()) {
+                    return Status(ErrorCodes::InternalError, "cannot create item on array");
+                }
+                status = arrayObj.pushBack(elem);
+                if (!status.isOK()) {
+                    return status;
+                }
+                status = elemFound.pushBack(arrayObj);
+                if (!status.isOK()) {
+                    return status;
+                }
+                inArray = false;
+            }
+            else {
+                status = elemFound.pushBack(elem);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
+            elemFound = elem;
+        }
+
+        // Attach the last element. Here again, if we're in a field that is an array element,
+        // we wrap it in an object first.
+        if (inArray) {
+            // TODO pass empty StringData to makeElementObject, when that's supported.
+            mutablebson::Element arrayObj = doc.makeElementObject("" /* it's an array */);
+            if (!arrayObj.ok()) {
+                return Status(ErrorCodes::InternalError, "cannot create item on array");
+            }
+
+            status = arrayObj.pushBack(newElem);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            status = elemFound.pushBack(arrayObj);
+            if (!status.isOK()) {
+                return status;
+            }
+
+        }
+        else {
+            status = elemFound.pushBack(newElem);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        return Status::OK();
+    }
+
+} // namespace pathsupport
 } // namespace mongo

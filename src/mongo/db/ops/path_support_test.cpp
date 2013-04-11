@@ -14,32 +14,49 @@
  *    limitations under the License.
  */
 
+#include "mongo/db/ops/path_support.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
+    using mongo::BSONObj;
     using mongo::ErrorCodes;
     using mongo::FieldRef;
-    using mongo::mutablebson::Document;
-    using mongo::mutablebson::Element;
-    using mongo::PathSupport;
+    using mongo::fromjson;
+    using mongo::jstNULL;
+    using mongo::NumberInt;
+    using mongo::Object;
+    using mongo::pathsupport::findLongestPrefix;
+    using mongo::pathsupport::createPathAt;
     using mongo::Status;
     using mongo::StringData;
+    using mongo::mutablebson::checkDoc;
+    using mongo::mutablebson::countChildren;
+    using mongo::mutablebson::getNthChild;
+    using mongo::mutablebson::Document;
+    using mongo::mutablebson::Element;
 
     class EmptyDoc : public mongo::unittest::Test {
     public:
         EmptyDoc() : _doc() {}
 
+        Document& doc() { return _doc; }
+
         Element root() { return _doc.root(); }
 
         FieldRef& field() { return _field; }
+
         void setField(StringData str) { _field.parse(str); }
 
     private:
@@ -47,13 +64,12 @@ namespace {
         FieldRef _field;
     };
 
-
     TEST_F(EmptyDoc, EmptyPath) {
         setField("");
 
         int32_t idxFound;
         Element elemFound = root();
-        Status status = PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound);
+        Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
     }
 
@@ -62,8 +78,13 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        Status status = PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound);
+        Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+
+        Element newElem = doc().makeElementInt("a", 1);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_OK(createPathAt(field(), 0, root(), newElem));
+        ASSERT_TRUE(checkDoc(doc(), fromjson("{a: 1}")));
     }
 
     class SimpleDoc : public mongo::unittest::Test {
@@ -73,6 +94,13 @@ namespace {
         virtual void setUp() {
             // {a: 1}
             ASSERT_OK(root().appendInt("a", 1));
+        }
+
+        Document& doc() { return _doc; }
+
+        bool checkDoc(const Document& doc, const BSONObj& obj) {
+            BSONObj res = doc.getObject();
+            return res.woCompare(obj) == 0;
         }
 
         Element root() { return _doc.root(); }
@@ -90,7 +118,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        Status status = PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound);
+        Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
     }
 
@@ -99,7 +127,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 0);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
@@ -110,7 +138,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        Status status = PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound);
+        Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::PathNotViable);
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 0);
@@ -122,8 +150,26 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        Status status = PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound);
+        Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
+
+        // From this point on, handles the creation of the '.b' part that wasn't found.
+        Element newElem = doc().makeElementInt("b", 1);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(countChildren(root()), 1u);
+
+        ASSERT_OK(createPathAt(field(), 0, root(), newElem));
+        ASSERT_EQUALS(newElem.getFieldName(), "b");
+        ASSERT_EQUALS(newElem.getType(), NumberInt);
+        ASSERT_TRUE(newElem.hasValue());
+        ASSERT_EQUALS(newElem.getValueInt(), 1);
+
+        ASSERT_TRUE(newElem.parent().ok() /* root an ok parent */);
+        ASSERT_EQUALS(countChildren(root()), 2u);
+        ASSERT_EQUALS(root().leftChild().getFieldName(), "a");
+        ASSERT_EQUALS(root().leftChild().rightSibling().getFieldName(), "b");
+        ASSERT_EQUALS(root().rightChild().getFieldName(), "b");
+        ASSERT_EQUALS(root().rightChild().leftSibling().getFieldName(), "a");
     }
 
     class NestedDoc : public mongo::unittest::Test {
@@ -144,6 +190,13 @@ namespace {
             ASSERT_OK(root().pushBack(elemA));
         }
 
+        Document& doc() { return _doc; }
+
+        bool checkDoc(const Document& doc, const BSONObj& obj) {
+            BSONObj res = doc.getObject();
+            return res.woCompare(obj) == 0;
+        }
+
         Element root() { return _doc.root(); }
 
         FieldRef& field() { return _field; }
@@ -159,7 +212,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 0);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
@@ -170,7 +223,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_EQUALS(idxFound, 1);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]), 0);
     }
@@ -180,7 +233,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 2);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
@@ -192,7 +245,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        Status status = PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound);
+        Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 2);
@@ -200,12 +253,31 @@ namespace {
 
     }
 
+    TEST_F(NestedDoc, NewFieldNested) {
+        setField("a.b.d");
+
+        int32_t idxFound;
+        Element elemFound = root();
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_EQUALS(idxFound, 1);
+        ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]), 0);
+
+        // From this point on, handles the creation of the '.d' part that wasn't found.
+        Element newElem = doc().makeElementInt("d", 1);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(countChildren(elemFound), 1u); // 'c' is a child of 'b'
+
+        ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
+        BSONObj obj = fromjson("{a: {b: {c: 1, d: 1}}}");
+        ASSERT_TRUE(checkDoc(doc(), obj));
+    }
+
     TEST_F(NestedDoc, NotStartingFromRoot) {
         setField("b.c");
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root()["a"], &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root()["a"], &idxFound, &elemFound));
         ASSERT_EQUALS(idxFound, 1);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
     }
@@ -230,9 +302,17 @@ namespace {
             ASSERT_OK(root().pushBack(elemB));
         }
 
+        Document& doc() { return _doc; }
+
+        bool checkDoc(const Document& doc, const BSONObj& obj) {
+            BSONObj res = doc.getObject();
+            return res.woCompare(obj) == 0;
+        }
+
         Element root() { return _doc.root(); }
 
         FieldRef& field() { return _field; }
+
         void setField(StringData str) { _field.parse(str); }
 
     private:
@@ -245,7 +325,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 0);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
@@ -256,7 +336,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 1);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]), 0);
@@ -267,10 +347,70 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 2);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]["c"]), 0);
+    }
+
+    TEST_F(ArrayDoc, ExtendingExistingObject) {
+        setField("b.0.d");
+
+        int32_t idxFound;
+        Element elemFound = root();
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_TRUE(elemFound.ok());
+        ASSERT_EQUALS(idxFound, 1);
+        ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]), 0);
+
+        // From this point on, handles the creation of the '.0.d' part that wasn't found.
+        Element newElem = doc().makeElementInt("d", 1);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of b.0
+
+        ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
+        BSONObj obj = fromjson("{a: [], b: [{c:1, d:1}]}");
+        ASSERT_TRUE(checkDoc(doc(), obj));
+    }
+
+    TEST_F(ArrayDoc, NewObjectInsideArray) {
+        setField("b.1.c");
+
+        int32_t idxFound;
+        Element elemFound = root();
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_TRUE(elemFound.ok());
+        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
+
+        // From this point on, handles the creation of the '.1.c' part that wasn't found.
+        Element newElem = doc().makeElementInt("c", 2);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of 'b'
+
+        ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
+        BSONObj obj = fromjson("{a: [], b: [{c:1},{c:2}]}");
+        ASSERT_TRUE(checkDoc(doc(), obj));
+    }
+
+    TEST_F(ArrayDoc, NewNestedObjectInsideArray) {
+        setField("b.1.c.d");
+
+        int32_t idxFound;
+        Element elemFound = root();
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_TRUE(elemFound.ok());
+        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
+
+        // From this point on, handles the creation of the '.1.c.d' part that wasn't found.
+        Element newElem = doc().makeElementInt("d", 2);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of 'b'
+
+        ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
+        BSONObj obj = fromjson("{a: [], b: [{c:1},{c:{d:2}}]}");
+        ASSERT_TRUE(checkDoc(doc(), obj));
     }
 
     TEST_F(ArrayDoc, ArrayPaddingNecessary) {
@@ -278,10 +418,19 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        ASSERT_OK(PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound));
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 0);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
+
+        // From this point on, handles the creation of the '.5' part that wasn't found.
+        Element newElem = doc().makeElementInt("", 1);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of 'b'
+
+        ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
+        BSONObj obj = fromjson("{a: [], b: [{c:1},null,null,null,null,1]}");
+        ASSERT_TRUE(checkDoc(doc(), obj));
     }
 
     TEST_F(ArrayDoc, NonNumericPathInArray) {
@@ -289,7 +438,7 @@ namespace {
 
         int32_t idxFound;
         Element elemFound = root();
-        Status status = PathSupport::findLongestPrefix(field(), root(), &idxFound, &elemFound);
+        Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
         ASSERT_TRUE(elemFound.ok());
         ASSERT_EQUALS(idxFound, 0);
