@@ -431,7 +431,7 @@ namespace mongo {
             try {
                 bob res;
                 string errmsg;
-                LOG(1) << "replSet rollback drop: " << *i << rsLog;
+                log() << "replSet rollback drop: " << *i << rsLog;
                 dropCollection(*i, errmsg, res);
             }
             catch(...) {
