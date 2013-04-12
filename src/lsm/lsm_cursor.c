@@ -195,16 +195,6 @@ __clsm_open_cursors(
 			    chunk->uri, &clsm->iface, NULL, cp);
 		WT_ERR(ret);
 
-#if 0 && defined(HAVE_POSIX_MADVISE)
-		{
-		WT_BM *bm = ((WT_CURSOR_BTREE *)*cp)->btree->bm;
-
-		if (F_ISSET(clsm, WT_CLSM_MERGE) && bm->map != NULL)
-			WT_ERR(posix_madvise(
-			    bm->map, bm->maplen, POSIX_MADV_SEQUENTIAL));
-		}
-#endif
-
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
 		    !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
@@ -784,7 +774,7 @@ __clsm_put(
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	int full;
+	int ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 
@@ -831,24 +821,28 @@ __clsm_put(
 	 * In LSM there are multiple btrees active at one time. The tree
 	 * switch code needs to use btree API methods, and it wants to
 	 * operate on the btree for the primary chunk. Set that up now.
+	 *
+	 * If the tree is locked, attempting to switch will block.  Set a flag
+	 * so the worker thread will switch when it gets a chance to avoid
+	 * introducing high latency into application threads.  Don't do this
+	 * indefinitely: if a chunk grows 50% larger than the configured
+	 * size, block until it can be switched.
 	 */
-#if 0
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-		    full = __wt_btree_size_overflow(
+		    ovfl = __wt_btree_size_overflow(
 		    session, lsm_tree->chunk_size));
 
-		if (full) {
+		if (ovfl && F_ISSET(lsm_tree, WT_LSM_TREE_LOCKED)) {
 			F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-			WT_RET(__wt_cond_signal(session, lsm_tree->ckpt_cond));
+			ovfl = 0;
 		}
-	}
-#else
-	WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-	    full = __wt_btree_size_overflow(
-	    session, lsm_tree->chunk_size));
+	} else
+		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+		    ovfl = __wt_btree_size_overflow(
+		    session, 3 * lsm_tree->chunk_size / 2));
 
-	if (full) {
+	if (ovfl) {
 		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
@@ -856,7 +850,7 @@ __clsm_put(
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 		WT_RET(ret);
 	}
-#endif
+
 	return (0);
 }
 

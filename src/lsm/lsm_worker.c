@@ -200,11 +200,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 	for (;;) {
 		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
-			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 				WT_WITH_SCHEMA_LOCK(session, ret =
 				    __wt_lsm_tree_switch(session, lsm_tree));
-				F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-			}
 			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 			WT_ERR(ret);
 		}
@@ -270,9 +268,11 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointing %u", i);
 
+			F_SET(lsm_tree, WT_LSM_TREE_LOCKED);
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, NULL, 0));
+			F_CLR(lsm_tree, WT_LSM_TREE_LOCKED);
 
 			if (ret != 0) {
 				__wt_err(session, ret, "LSM checkpoint");

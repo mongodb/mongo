@@ -1374,6 +1374,7 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 
 		btree = dhandle->handle;
 		if (btree->root_page == NULL ||
+		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 		    btree->bulk_load_ok)
 			continue;
 
