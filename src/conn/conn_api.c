@@ -855,7 +855,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
-	const char *cfg[3];
+	const char *cfg[5];
 	int exist;
 
 	*wt_connp = NULL;
@@ -891,7 +891,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    WT_CONFIG_REF(session, wiredtiger_open), config, 0));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
-	cfg[2] = NULL;
+	/* Leave space for optional additional configuration. */
+	cfg[2] = cfg[3] = cfg[4] = NULL;
 
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));

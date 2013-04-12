@@ -761,6 +761,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 %ignore wiredtiger_version;
 
+%ignore wiredtiger_extension_api;
 %ignore wiredtiger_extension_init;
 
 %ignore wiredtiger_open;

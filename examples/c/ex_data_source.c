@@ -38,7 +38,7 @@
 
 static WT_EXTENSION_API *wt_api;
 
-void
+static void
 my_data_source_init()
 {
 	wiredtiger_extension_api(&wt_api);
@@ -119,12 +119,13 @@ my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (0);
 }
 
-int
+static int
 data_source_cursor(void)
 {
 	return (0);
 }
-const char *
+
+static const char *
 data_source_error(int v)
 {
 	return (v == 0 ? "one" : "two");
@@ -162,6 +163,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 	my_data_source_overwrite = value.value != 0;
 	/*! [WT_EXTENSION_CONFIG boolean] */
+
+	(void)my_data_source_overwrite;
 	}
 
 	{
@@ -181,6 +184,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 	my_data_source_page_size = value.value;
 	/*! [WT_EXTENSION_CONFIG integer] */
+
+	(void)my_data_source_page_size;
 	}
 
 	{
@@ -208,6 +213,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	else
 		my_data_source_key = "bytestring";
 	/*! [WT_EXTENSION_CONFIG string] */
+
+	(void)my_data_source_key;
 	}
 
 	{
@@ -320,6 +327,9 @@ main(void)
 
 	ret = wiredtiger_open(NULL, NULL, "create", &conn);
 
+	my_data_source_init();
+
+	{
 	/*! [WT_DATA_SOURCE register] */
 	static WT_DATA_SOURCE my_dsrc = {
 		my_create,
@@ -333,6 +343,7 @@ main(void)
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
 	/*! [WT_DATA_SOURCE register] */
+	}
 
 	/*! [WT_DATA_SOURCE configure boolean] */
 	/* my_boolean defaults to true. */

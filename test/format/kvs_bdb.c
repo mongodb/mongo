@@ -40,6 +40,13 @@
 #define	UINT32_MAX	4294967295U
 #endif
 
+/*
+ * Exported functions, required by -Wmissing-prototypes.
+ * These are listed in format.h but we don't include that here.
+ */
+void kvsbdb_init(WT_CONNECTION *, const char *);
+void kvsbdb_close(WT_CONNECTION *);
+
 static DB_ENV *dbenv;				/* Enclosing environment */
 static WT_EXTENSION_API *wt_ext;		/* Extension functions */
 
