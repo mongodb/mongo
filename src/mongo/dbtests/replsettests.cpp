@@ -118,18 +118,12 @@ namespace ReplSetTests {
     private:
         static DBDirectClient client_;
     protected:
-        BackgroundSyncTest* _bgsync;
-        replset::SyncTail* _tailer;
+        static BackgroundSyncTest* _bgsync;
+        static replset::SyncTail* _tailer;
     public:
         Base() {
-            cmdLine._replSet = "foo";
-            cmdLine.oplogSize = 5 * 1024 * 1024;
-            createOplog();
-            setup();
         }
         ~Base() {
-            delete _bgsync;
-            delete _tailer;
         }
 
         static const char *ns() {
@@ -159,7 +153,11 @@ namespace ReplSetTests {
 
             dropCollection( string(ns()), errmsg, result );
         }
-        void setup() {
+        static void setup() {
+            cmdLine._replSet = "foo";
+            cmdLine.oplogSize = 5 * 1024 * 1024;
+            createOplog();
+
             // setup background sync instance
             _bgsync = new BackgroundSyncTest();
 
@@ -169,12 +167,15 @@ namespace ReplSetTests {
             // setup theReplSet
             ReplSetTest *rst = ReplSetTest::make();
             rst->setSyncTail(_bgsync);
+
             delete theReplSet;
             theReplSet = rst;
         }
     };
 
     DBDirectClient Base::client_;
+    BackgroundSyncTest* Base::_bgsync = NULL;
+    replset::SyncTail* Base::_tailer = NULL;
 
     class IndexBuildThread : public BackgroundJob {
     public:
@@ -1092,6 +1093,7 @@ namespace ReplSetTests {
         }
 
         void setupTests() {
+            Base::setup();
             add< TestInitApplyOp >();
             add< TestInitApplyOp2 >();
             add< CappedInitialSync >();
