@@ -30,38 +30,26 @@ namespace mongo {
         return "IndexRebuilder";
     }
 
-    /**
-     * This resets memory tracking to its original value after all indexes are rebuilt.
-     *
-     * Before the server starts listening, all memory accesses are counted as taking 0 time (because
-     * the timer hasn't started yet).  The Record class warns about these 0-time accesses (actually,
-     * the warning is in Rolling, which is used by Record) so run() turns off the tracking to
-     * silence these warnings.  We want to make sure that they're turned back on, though, no matter
-     * how run() exits.
-     */
-    static void resetMemoryTracking(bool originalTracking) {
-        Record::MemoryTrackingEnabled = originalTracking;
-    }
-
     void IndexRebuilder::run() {
-        // Disable record access timer warnings
-        ON_BLOCK_EXIT(resetMemoryTracking, Record::MemoryTrackingEnabled);
-        Record::MemoryTrackingEnabled = false;
-
         Client::initThread(name().c_str()); 
+        ON_BLOCK_EXIT_OBJ(cc(), &Client::shutdown);
         Client::GodScope gs;
 
         bool firstTime = true;
         std::vector<std::string> dbNames;
         getDatabaseNames(dbNames);
 
-        for (std::vector<std::string>::const_iterator it = dbNames.begin();
-             it < dbNames.end();
-             it++) {
-            checkDB(*it, &firstTime);
+        try {
+            for (std::vector<std::string>::const_iterator it = dbNames.begin();
+                 it < dbNames.end();
+                 it++) {
+                checkDB(*it, &firstTime);
+            }
         }
-
-        cc().shutdown();
+        catch (const DBException& e) {
+            warning() << "index rebuilding did not complete" << endl;
+        }
+        LOG(1) << "checking complete" << endl;
     }
 
     void IndexRebuilder::checkDB(const std::string& dbName, bool* firstTime) {
@@ -71,9 +59,9 @@ namespace mongo {
 
         // This depends on system.namespaces not changing while we iterate
         while (cursor->more()) {
-            BSONObj nsDoc = cursor->next();
+            BSONObj nsDoc = cursor->nextSafe();
             const char* ns = nsDoc["name"].valuestrsafe();
-
+            LOG(1) << "checking ns " << ns << " for interrupted index builds" << endl;
             // This write lock is held throughout the index building process
             // for this namespace.
             Client::WriteContext ctx(ns);
