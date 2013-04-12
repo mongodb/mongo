@@ -104,10 +104,6 @@ namespace mongo {
     Listener::~Listener() {
         if ( _timeTracker == this )
             _timeTracker = 0;
-#ifdef MONGO_SSL
-        delete _ssl;
-        _ssl = 0;
-#endif
     }
 
     bool Listener::_setupSockets( const vector<SockAddr>& mine , vector<SOCKET>& socks ) {

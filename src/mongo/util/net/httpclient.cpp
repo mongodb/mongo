@@ -104,7 +104,7 @@ namespace mongo {
 #ifdef MONGO_SSL
             const SSLParams params(cmdLine.sslPEMKeyFile, 
                                    cmdLine.sslPEMKeyPassword);
-            // never deleted
+            // pointer to global singleton instance
             SSLManager* mgr = getSSLManager();
 
             sock.secure(mgr);
