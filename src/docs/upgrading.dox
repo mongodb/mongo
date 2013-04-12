@@ -1,7 +1,53 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_153 Upgrading to Version 1.5.3
+<dl>
+
+<dt>Configuration strings</dt>
+<dd>
+An undocumented feature where configuration string case was ignored has
+been removed, and all configuration strings are now case-dependent.
+Applications may require modifications to resolve run-time errors.
+</dd>
+
+<dt>WT_DATA_SOURCE:: and WT_EXTENSION_API::</dt>
+<dd>
+The following changes are only applicable to applications providing new
+implementations of the WiredTiger WT_DATA_SOURCE:: class and/or using
+the WiredTiger extension functions described in WT_EXTENSION_API::.
+
+<ul>
+<li>
+The undocumented \c wiredtiger_XXX defines for WT_EXTENSION_API:: extension
+functions have been removed from the \c wiredtiger_ext.h include file;
+applications should instead use the method handles referenced by the
+WT_EXTENSION_API:: handle to call those functions.
+
+<li>
+The WT_SESSION::msg_printf method was replaced by WT_EXTENSION_API::msg_printf;
+applications may require modifications.
+
+<li>
+The WT_DATA_SOURCE:: class has three new methods: WT_DATA_SOURCE::compact,
+WT_DATA_SOURCE::salvage, and WT_DATA_SOURCE::verify; applications may
+require modifications to resolve compile errors.
+
+<li>
+The type of the configuration argument to the WT_DATA_SOURCE:: class
+methods has changed from \c "const char *" to \c "void *"; applications
+may require modifications to resolve compile errors.
+
+<li>
+The \c owner argument to the WT_DATA_SOURCE::open_cursor method has been
+removed; applications may require modifications to resolve compile errors.
+</ul>
+</dd>
+
+</dl>
+<hr>
 @section version_143 Upgrading to Version 1.4.3
 <dl>
+
 <dt>Statistics</dt>
 <dd>
 WiredTiger statistics are no longer maintained by default; to configure
