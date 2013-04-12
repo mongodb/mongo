@@ -226,6 +226,7 @@ WiredTigerCheckpoint
 WiredTigerHome
 WiredTigerStat
 WithSeeds
+Wmissing
 Wuninitialized
 XP
 __wt_epoch
