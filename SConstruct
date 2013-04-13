@@ -801,7 +801,9 @@ if not use_system_version_of_library("boost"):
                 CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Prepend(CPPPATH=['$BUILD_DIR/third_party/s2'])
-env.Prepend(CPPPATH=['$BUILD_DIR/third_party/libstemmer_c/include'])
+
+if not use_system_version_of_library("stemmer"):
+    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/libstemmer_c/include'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
