@@ -8,7 +8,6 @@ import re
 
 import SCons
 
-Import('env')
 Import('clientEnv')
 Import('has_option')
 Import('installSetup')
@@ -113,15 +112,15 @@ def InstallVersionedSharedLibrary(env, destination, lib):
     return ilib
 
 
-env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
+clientEnv.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
             ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
             '$PYTHON $SOURCES $TARGETS')
 
-env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'], 
+clientEnv.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
             ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
             '$PYTHON $SOURCES $TARGETS')
 
-clientSourceBasic = [
+clientSource = [
     'mongo/base/configuration_variable_manager.cpp',
     'mongo/base/error_codes.cpp',
     'mongo/base/global_initializer.cpp',
@@ -144,7 +143,6 @@ clientSourceBasic = [
     'mongo/client/dbclient.cpp',
     'mongo/client/dbclient_rs.cpp',
     'mongo/client/dbclientcursor.cpp',
-    'mongo/client/distlock.cpp',
     'mongo/client/gridfs.cpp',
     'mongo/client/model.cpp',
     'mongo/client/sasl_client_authenticate.cpp',
@@ -156,9 +154,6 @@ clientSourceBasic = [
     'mongo/db/dbmessage.cpp',
     'mongo/pch.cpp',
     'mongo/platform/random.cpp',
-    'mongo/s/field_parser.cpp',
-    'mongo/s/type_lockpings.cpp',
-    'mongo/s/type_locks.cpp',
     'mongo/util/assert_util.cpp',
     'mongo/util/background.cpp',
     'mongo/util/base64.cpp',
@@ -170,7 +165,6 @@ clientSourceBasic = [
     'mongo/util/concurrency/mutexdebugger.cpp',
     'mongo/util/debug_util.cpp',
     'mongo/util/stacktrace.cpp',
-    'mongo/util/file.cpp',
     'mongo/util/file_allocator.cpp',
     'mongo/util/fail_point.cpp',
     'mongo/util/fail_point_registry.cpp',
@@ -187,7 +181,6 @@ clientSourceBasic = [
     'mongo/util/net/sock.cpp',
     'mongo/util/net/ssl_manager.cpp',
     'mongo/util/password.cpp',
-    'mongo/util/processinfo.cpp',
     'mongo/util/ramlog.cpp',
     'mongo/util/signal_handlers.cpp',
     'mongo/util/stringutils.cpp',
@@ -196,23 +189,14 @@ clientSourceBasic = [
     'mongo/util/timer.cpp',
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
-    'mongo/util/version.cpp',
     ]
 
-processInfoPlatformFile = env.File('mongo/util/processinfo_${PYSYSPLATFORM}.cpp')
-if not os.path.exists(str(processInfoPlatformFile)):
-    processInfoPlatformFile = env.File('mongo/util/processinfo_none.cpp')
-clientSourceBasic.append(processInfoPlatformFile)
-
-clientSourceSasl = ['mongo/client/sasl_client_authenticate_impl.cpp',
-                    'mongo/util/gsasl_session.cpp']
-
-clientSourceAll = clientSourceBasic + clientSourceSasl
-
-if env['MONGO_BUILD_SASL_CLIENT']:
-    clientSource = clientSourceAll
-else:
-    clientSource = clientSourceBasic
+if clientEnv['MONGO_BUILD_SASL_CLIENT']:
+    clientSource += [
+        'mongo/client/sasl_client_authenticate_impl.cpp',
+        'mongo/util/gsasl_session.cpp'
+    ]
+    clientEnv.Append(LIBS="gsasl")
 
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),
@@ -251,8 +235,34 @@ for path in clientHeaderDirectories:
     clientHeaders.extend(Glob('mongo/%s/*.h' % path))
     clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
-mongoclient_lib = env.Library('mongoclient', clientSource),
-mongoclient_install = env.Install('#/', mongoclient_lib)
+staticLibrary = clientEnv.Library('mongoclient', clientSource)
+
+if has_option('sharedclient'):
+    assert(MONGODB_VERSION.count('.') <= 2)
+
+    soname = 0
+    for version_id, version in enumerate(MONGODB_VERSION.split('.')):
+        version = int(version)
+        assert(version < 10)
+
+        if version_id == 0:
+            soname += version * 100
+        elif version_id == 1:
+            soname += version * 10
+        elif version_id == 2:
+            soname += version
+    soname = str(soname) + '.0.0'
+
+    mongoclient_lib = sharedLibrary = VersionedSharedLibrary(
+        clientEnv, 'libmongoclient', soname, clientSource)
+else:
+    mongoclient_lib = staticLibrary
+
+if installSetup.libraries:
+    clientEnv.Alias('mongoclient', [
+        clientEnv.Install('$INSTALL_DIR/$NIX_LIB_DIR', staticLibrary),
+        InstallVersionedSharedLibrary(clientEnv, '$INSTALL_DIR/$NIX_LIB_DIR', sharedLibrary)
+    ])
 
 clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target,
@@ -263,9 +273,9 @@ clientTests.append(
 
 clientEnv.Alias('clientTests', clientTests, [])
 
-env.Install(
+clientEnv.Install(
     '#/',
-    env.Command('$CLIENT_ARCHIVE',
+    clientEnv.Command('$CLIENT_ARCHIVE',
                 ['#buildscripts/make_archive.py',
                  '$CLIENT_SCONSTRUCT',
                  '$CLIENT_LICENSE',
@@ -275,7 +285,7 @@ env.Install(
                  'mongo/db/auth/generate_action_types.py',
                  'mongo/db/auth/action_types.txt',
                  '#buildscripts/make_archive.py',
-                 clientSourceAll,
+                 clientSource,
                  clientHeaders,
                  [source for (target, source) in exampleSourceMap],
                  'mongo/bson/bsondemo/bsondemo.cpp',
@@ -289,28 +299,6 @@ env.Install(
 
 if installSetup.headers:
     for path in clientHeaderDirectories:
-        inst = env.Install('$INSTALL_DIR/include/mongo/' + path,
+        inst = clientEnv.Install('$INSTALL_DIR/include/mongo/' + path,
                            [Glob('mongo/%s/*.h' % path), Glob('mongo/%s/*.hpp' % path)])
-        env.AddPostAction(inst, Chmod('$TARGET', 0644))
-
-if installSetup.libraries:
-    env.Install('$INSTALL_DIR/$NIX_LIB_DIR', '#${LIBPREFIX}mongoclient${LIBSUFFIX}')
-
-    if has_option('sharedclient'):
-        assert(MONGODB_VERSION.count('.') <= 2)
-
-        soname = 0
-        for version_id, version in enumerate(MONGODB_VERSION.split('.')):
-            version = int(version)
-            assert(version < 10)
-
-            if version_id == 0:
-                soname += version * 100
-            elif version_id == 1:
-                soname += version * 10
-            elif version_id == 2:
-                soname += version
-        soname = str(soname) + '.0.0'
-
-        sharedLibrary = VersionedSharedLibrary(env, 'libmongoclient', soname, clientSource)
-        InstallVersionedSharedLibrary(env, '$INSTALL_DIR/$NIX_LIB_DIR', sharedLibrary)
+        clientEnv.AddPostAction(inst, Chmod('$TARGET', 0644))
