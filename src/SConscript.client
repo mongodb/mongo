@@ -3,17 +3,18 @@
 # This SConscript describes build and install rules for the Mongo C++ driver and associated exmaple
 # programs.
 
-Import('env clientEnv')
+Import('clientEnv')
+Import("has_option")
 
-env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
+clientEnv.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
             ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
             '$PYTHON $SOURCES $TARGETS')
 
-env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'], 
+clientEnv.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
             ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
             '$PYTHON $SOURCES $TARGETS')
 
-clientSourceBasic = [
+clientSource = [
     'mongo/base/configuration_variable_manager.cpp',
     'mongo/base/error_codes.cpp',
     'mongo/base/global_initializer.cpp',
@@ -36,7 +37,6 @@ clientSourceBasic = [
     'mongo/client/dbclient.cpp',
     'mongo/client/dbclient_rs.cpp',
     'mongo/client/dbclientcursor.cpp',
-    'mongo/client/distlock.cpp',
     'mongo/client/gridfs.cpp',
     'mongo/client/model.cpp',
     'mongo/client/sasl_client_authenticate.cpp',
@@ -83,18 +83,14 @@ clientSourceBasic = [
     'mongo/util/timer.cpp',
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
-    'mongo/util/version.cpp',
     ]
 
-clientSourceSasl = ['mongo/client/sasl_client_authenticate_impl.cpp',
-                    'mongo/util/gsasl_session.cpp']
-
-clientSourceAll = clientSourceBasic + clientSourceSasl
-
-if env['MONGO_BUILD_SASL_CLIENT']:
-    clientSource = clientSourceAll
-else:
-    clientSource = clientSourceBasic
+if clientEnv['MONGO_BUILD_SASL_CLIENT']:
+    clientSource += [
+        'mongo/client/sasl_client_authenticate_impl.cpp',
+        'mongo/util/gsasl_session.cpp'
+    ]
+    clientEnv.Append(LIBS="gsasl")
 
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),
@@ -133,25 +129,27 @@ for path in clientHeaderDirectories:
     clientHeaders.extend(Glob('mongo/%s/*.h' % path))
     clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
-mongoclient_lib = env.Library('mongoclient', clientSource),
-mongoclient_install = env.Install('#/', [
-        mongoclient_lib,
-        #env.SharedLibrary('mongoclient', clientSource),
-        ])
-env.Alias('mongoclient', mongoclient_install)
+
+mongoclient_libs = [ clientEnv.Library('mongoclient', clientSource) ]
+if has_option( "sharedclient" ):
+	mongoclient_libs.append( clientEnv.SharedLibrary('mongoclient', clientSource) )
+
+mongoclient_install = clientEnv.Install('#/', mongoclient_libs)
+
+clientEnv.Alias('mongoclient', mongoclient_install)
 
 clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target,
-                          [source, mongoclient_lib]) for (target, source) in exampleSourceMap])
+                          [source, mongoclient_libs[-1]]) for (target, source) in exampleSourceMap])
 
 clientTests.append(
     clientEnv.Install('#/', clientEnv.Program('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp')))
 
 clientEnv.Alias('clientTests', clientTests, [])
 
-env.Install(
+clientEnv.Install(
     '#/',
-    env.Command('$CLIENT_ARCHIVE',
+    clientEnv.Command('$CLIENT_ARCHIVE',
                 ['#buildscripts/make_archive.py',
                  '$CLIENT_SCONSTRUCT',
                  '$CLIENT_LICENSE',
@@ -161,7 +159,7 @@ env.Install(
                  'mongo/db/auth/generate_action_types.py',
                  'mongo/db/auth/action_types.txt',
                  '#buildscripts/make_archive.py',
-                 clientSourceAll,
+                 clientSource,
                  clientHeaders,
                  [source for (target, source) in exampleSourceMap],
                  'mongo/bson/bsondemo/bsondemo.cpp',
@@ -176,9 +174,11 @@ env.Install(
 # install
 prefix = GetOption("prefix")
 
-env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
+clientEnv.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
+if has_option( "sharedclient" ):
+	clientEnv.Install(prefix + "/lib", '${SHLIBPREFIX}mongoclient${SHLIBSUFFIX}')
 
 for x in clientHeaderDirectories:
-    inst = env.Install(prefix + "/include/mongo/" + x,
+    inst = clientEnv.Install(prefix + "/include/mongo/" + x,
                        [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
-    env.AddPostAction(inst, Chmod('$TARGET', 0644))
+    clientEnv.AddPostAction(inst, Chmod('$TARGET', 0644))
