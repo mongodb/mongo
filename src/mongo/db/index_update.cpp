@@ -160,14 +160,16 @@ namespace mongo {
 
             try {
                 addKeysToIndex(ns, d, i, obj, loc, !id.unique() || ignoreUniqueIndex(id));
-            } catch (AssertionException& e) {
+            }
+            catch (AssertionException&) {
                 // TODO: the new index layer indexes either all or no keys, so j <= i can be j < i.
                 for (int j = 0; j <= i; j++) {
                     try {
                         _unindexRecord(d, j, obj, loc, false);
-                    } catch(...) {
+                    }
+                    catch(...) {
                         LOG(3) << "unindex fails on rollback after unique "
-                                  "key constraint prevented insert\n";
+                                  "key constraint prevented insert" << std::endl;
                     }
                 }
                 throw;
@@ -592,7 +594,7 @@ namespace mongo {
 
         // delete a specific index or all?
         if ( *name == '*' && name[1] == 0 ) {
-            LOG(4) << "  d->nIndexes was " << d->nIndexes << '\n';
+            LOG(4) << "  d->nIndexes was " << d->nIndexes << std::endl;
             anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
             IndexDetails *idIndex = 0;
             if( d->nIndexes ) {
