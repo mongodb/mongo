@@ -21,9 +21,8 @@
 
 #include <string>
 
-#include "libstemmer.h"
-
 #include "mongo/base/string_data.h"
+#include "third_party/libstemmer_c/include/libstemmer.h"
 
 namespace mongo {
 
