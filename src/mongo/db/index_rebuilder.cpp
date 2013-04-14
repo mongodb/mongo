@@ -46,7 +46,7 @@ namespace mongo {
                 checkDB(*it, &firstTime);
             }
         }
-        catch (const DBException& e) {
+        catch (const DBException&) {
             warning() << "index rebuilding did not complete" << endl;
         }
         LOG(1) << "checking complete" << endl;
