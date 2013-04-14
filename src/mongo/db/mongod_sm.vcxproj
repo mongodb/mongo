@@ -2175,8 +2175,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="index\btree_index_cursor.cpp" />
     <ClCompile Include="index\btree_interface.cpp" />
     <ClCompile Include="index\btree_key_generator.cpp" />
+    <ClCompile Include="index\fts_access_method.cpp" />
     <ClCompile Include="index\hash_access_method.cpp" />
     <ClCompile Include="index\hash_index_cursor.cpp" />
+    <ClCompile Include="index\haystack_access_method.cpp" />
     <ClCompile Include="index\s2_access_method.cpp" />
     <ClCompile Include="index\s2_index_cursor.cpp" />
     <ClCompile Include="index\s2_near_cursor.cpp" />
@@ -2641,8 +2643,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index\btree_key_generator.h" />
     <ClInclude Include="index\catalog_hack.h" />
     <ClInclude Include="index\emulated_cursor.h" />
+    <ClInclude Include="index\fts_access_method.h" />
     <ClInclude Include="index\hash_access_method.h" />
     <ClInclude Include="index\hash_index_cursor.h" />
+    <ClInclude Include="index\haystack_access_method.h" />
+    <ClInclude Include="index\haystack_access_method_internal.h" />
     <ClInclude Include="index\index_access_method.h" />
     <ClInclude Include="index\index_cursor.h" />
     <ClInclude Include="index\index_descriptor.h" />

@@ -1856,6 +1856,15 @@
     <ClInclude Include="..\db\ops\path_support.h">
       <Filter>db\ops</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\index\fts_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\haystack_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\haystack_access_method_internal.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3590,6 +3599,12 @@
     </ClCompile>
     <ClCompile Include="..\db\ops\path_support.cpp">
       <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\fts_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\haystack_access_method.cpp">
+      <Filter>db\index</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

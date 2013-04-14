@@ -2568,8 +2568,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="index\btree_index_cursor.cpp" />
     <ClCompile Include="index\btree_interface.cpp" />
     <ClCompile Include="index\btree_key_generator.cpp" />
+    <ClCompile Include="index\fts_access_method.cpp" />
     <ClCompile Include="index\hash_access_method.cpp" />
     <ClCompile Include="index\hash_index_cursor.cpp" />
+    <ClCompile Include="index\haystack_access_method.cpp" />
     <ClCompile Include="index\s2_access_method.cpp" />
     <ClCompile Include="index\s2_index_cursor.cpp" />
     <ClCompile Include="index\s2_near_cursor.cpp" />
@@ -2776,6 +2778,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\..\third_party\s2\util\math\vector3.h" />
     <ClInclude Include="..\..\third_party\s2\util\math\vector4-inl.h" />
     <ClInclude Include="..\..\third_party\s2\util\math\vector4.h" />
+    <ClInclude Include="..\..\third_party\snappy\snappy-stubs-public.h" />
     <ClInclude Include="..\..\third_party\v8\include\v8-debug.h" />
     <ClInclude Include="..\..\third_party\v8\include\v8-preparser.h" />
     <ClInclude Include="..\..\third_party\v8\include\v8-profiler.h" />
@@ -3294,8 +3297,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index\btree_key_generator.h" />
     <ClInclude Include="index\catalog_hack.h" />
     <ClInclude Include="index\emulated_cursor.h" />
+    <ClInclude Include="index\fts_access_method.h" />
     <ClInclude Include="index\hash_access_method.h" />
     <ClInclude Include="index\hash_index_cursor.h" />
+    <ClInclude Include="index\haystack_access_method.h" />
+    <ClInclude Include="index\haystack_access_method_internal.h" />
     <ClInclude Include="index\index_access_method.h" />
     <ClInclude Include="index\index_cursor.h" />
     <ClInclude Include="index\index_descriptor.h" />

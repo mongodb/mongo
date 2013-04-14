@@ -666,8 +666,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\index\btree_key_generator.h" />
     <ClInclude Include="..\db\index\catalog_hack.h" />
     <ClInclude Include="..\db\index\emulated_cursor.h" />
+    <ClInclude Include="..\db\index\fts_access_method.h" />
     <ClInclude Include="..\db\index\hash_access_method.h" />
     <ClInclude Include="..\db\index\hash_index_cursor.h" />
+    <ClInclude Include="..\db\index\haystack_access_method.h" />
+    <ClInclude Include="..\db\index\haystack_access_method_internal.h" />
     <ClInclude Include="..\db\index\index_access_method.h" />
     <ClInclude Include="..\db\index\index_cursor.h" />
     <ClInclude Include="..\db\index\index_descriptor.h" />
@@ -2560,8 +2563,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\index\btree_index_cursor.cpp" />
     <ClCompile Include="..\db\index\btree_interface.cpp" />
     <ClCompile Include="..\db\index\btree_key_generator.cpp" />
+    <ClCompile Include="..\db\index\fts_access_method.cpp" />
     <ClCompile Include="..\db\index\hash_access_method.cpp" />
     <ClCompile Include="..\db\index\hash_index_cursor.cpp" />
+    <ClCompile Include="..\db\index\haystack_access_method.cpp" />
     <ClCompile Include="..\db\index\s2_access_method.cpp" />
     <ClCompile Include="..\db\index\s2_index_cursor.cpp" />
     <ClCompile Include="..\db\index\s2_near_cursor.cpp" />
