@@ -44,7 +44,11 @@
 namespace mongo {
 
     // from d_migrate.cpp
-    void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
+    void logOpForSharding( const char * opstr,
+                           const char * ns,
+                           const BSONObj& obj,
+                           BSONObj * patt,
+                           const BSONObj* fullObj );
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static NamespaceDetails *localOplogMainDetails = 0;
@@ -327,12 +331,18 @@ namespace mongo {
           d delete / remove
           u update
     */
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b, bool fromMigrate) {
+    void logOp(const char* opstr,
+               const char* ns,
+               const BSONObj& obj,
+               BSONObj* patt,
+               bool* b,
+               bool fromMigrate,
+               const BSONObj* fullObj) {
         if ( replSettings.master ) {
             _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
-        logOpForSharding( opstr , ns , obj , patt );
+        logOpForSharding( opstr , ns , obj , patt , fullObj );
     }
 
     void createOplog() {

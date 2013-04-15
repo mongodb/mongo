@@ -254,7 +254,17 @@ namespace mongo {
         return _handlePossibleShardedMessage(m, dbresponse);
     }
 
-    void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
+    /**
+     * If a migration for the chunk in 'ns' where 'obj' lives is occurring, save this log entry
+     * if it's relevant. The entries saved here are later transferred to the receiving side of
+     * the migration. A relevant entry is an insertion, a deletion, or an update.
+     */
+    void logOpForSharding( const char * opstr,
+                           const char * ns,
+                           const BSONObj& obj,
+                           BSONObj * patt,
+                           const BSONObj* fullObj );
+
     void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl );
 
 }
