@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static void __evict_cache_dump(WT_SESSION_IMPL *);
-static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int __evict_forced_pages(WT_SESSION_IMPL *);
 static void __evict_init_candidate(
@@ -18,6 +16,10 @@ static int  __evict_lru_cmp(const void *, const void *);
 static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *, int);
 static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, int);
 static int  __evict_worker(WT_SESSION_IMPL *);
+#ifdef HAVE_DIAGNOSTIC
+static void __evict_cache_dump(WT_SESSION_IMPL *);
+static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
+#endif
 
 /*
  * Tuning constants: I hesitate to call this tuning, but we want to review some
@@ -370,8 +372,10 @@ __evict_worker(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
-	static int dumping = 0;
 	int clean, loop;
+#ifdef HAVE_DIAGNOSTIC
+	static int verbose_wait = 0;
+#endif
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -419,10 +423,12 @@ __evict_worker(WT_SESSION_IMPL *session)
 			clean = 1;
 
 #ifdef HAVE_DIAGNOSTIC
-		/* Periodically dump information about the cache. */
-		if (loop == 0 && ++dumping == 10) {
+		/* Verify and dump information about the cache. */
+		if (WT_VERBOSE_ISSET(session, evictserver) &&
+		    loop == 0 && ++verbose_wait == 10) {
 			__evict_cache_dump(session);
-			dumping = 0;
+			__evict_dirty_validate(conn);
+			verbose_wait = 0;
 		}
 #endif
 
@@ -432,8 +438,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 */
 		F_SET(cache, WT_EVICT_NO_PROGRESS);
 		WT_RET(__evict_lru(session, clean));
-
-		__evict_dirty_validate(conn);
 
 		/*
 		 * If we're making progress, keep going; if we're not making
@@ -1339,6 +1343,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	return (ret);
 }
 
+#ifdef HAVE_DIAGNOSTIC
 /*
  * __evict_dirty_validate --
  *	Walk the cache counting dirty entries so we can validate dirty counts.
@@ -1348,7 +1353,6 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 static void
 __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 {
-#if 0 && defined(HAVE_DIAGNOSTIC)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DATA_HANDLE *dhandle;
@@ -1373,9 +1377,8 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 			continue;
 
 		btree = dhandle->handle;
-		if (btree->root_page == NULL ||
-		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-		    btree->bulk_load_ok)
+		/* Skip empty and read only files. */
+		if (btree->root_page == NULL || btree->ckpt != NULL)
 			continue;
 
 		/* Reference the correct data handle. */
@@ -1398,9 +1401,6 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 		    "Cache dirty count mismatch. Expected a value between: %"
 		    PRIu64 " and %" PRIu64 " got: %" PRIu64,
 		    bytes_baseline, __wt_cache_bytes_dirty(cache), bytes);
-#else
-	WT_UNUSED(conn);
-#endif
 }
 
 /*
@@ -1410,7 +1410,6 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 static void
 __evict_cache_dump(WT_SESSION_IMPL *session)
 {
-#if 0 && defined(HAVE_DIAGNOSTIC)
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -1456,8 +1455,6 @@ __evict_cache_dump(WT_SESSION_IMPL *session)
 	    " vs tracked inuse %" PRIu64 "MB\n",
 	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
 	fflush(stdout);
-#else
-	WT_UNUSED(session);
-#endif
 }
+#endif
 
