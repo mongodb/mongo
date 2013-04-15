@@ -1,4 +1,4 @@
-LDADD = $(top_builddir)/libwiredtiger.la
+LDADD = $(top_builddir)/libwiredtiger.la -lm
 
 noinst_PROGRAMS = wtperf
 
