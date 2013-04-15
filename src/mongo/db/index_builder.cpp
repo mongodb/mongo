@@ -60,10 +60,14 @@ namespace mongo {
             killCurrentOp.blockingKill(op->opNum());
             indexes.push_back(index);
         }
+        if (indexes.size() > 0) {
+            log() << "halted " << indexes.size() << " index build(s)" << endl;
+        }
         return indexes;
     }
 
     void IndexBuilder::restoreIndexes(const std::string& ns, const std::vector<BSONObj>& indexes) {
+        log() << "restarting " << indexes.size() << " index build(s)" << endl;
         for (int i = 0; i < static_cast<int>(indexes.size()); i++) {
             IndexBuilder* indexBuilder = new IndexBuilder(ns, indexes[i]);
             // This looks like a memory leak, but indexBuilder deletes itself when it finishes

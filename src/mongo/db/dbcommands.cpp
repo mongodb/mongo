@@ -440,7 +440,7 @@ namespace mongo {
 
         virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
+            std::string systemIndexes = dbname + ".system.indexes";
             BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert");
             return IndexBuilder::killMatchingIndexBuilds(criteria);
         }
@@ -450,13 +450,12 @@ namespace mongo {
             log() << "repairDatabase " << dbname << endl;
             int p = (int) e.number();
 
-            std::vector<BSONObj> indexesInProg;
             if ( p != 1 ) {
                 errmsg = "bad option";
                 return false;
             }
 
-            std::vector<BSONObj> indexes = stopIndexBuilds(dbname, cmdObj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(dbname, cmdObj);
 
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
@@ -839,7 +838,7 @@ namespace mongo {
 
         virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
+            std::string systemIndexes = dbname + ".system.indexes";
             std::string ns = dbname + '.' + cmdObj["reIndex"].valuestrsafe();
             BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
 
@@ -860,8 +859,7 @@ namespace mongo {
                 return false;
             }
 
-            std::vector<BSONObj> indexesInProg;
-            stopIndexBuilds(dbname, jsobj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(dbname, jsobj);
 
             list<BSONObj> all;
             auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
@@ -890,7 +888,7 @@ namespace mongo {
             result.append( "nIndexes" , (int)all.size() );
             result.appendArray( "indexes" , b.obj() );
 
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexesInProg);
+            IndexBuilder::restoreIndexes(dbname + ".system.indexes", indexesInProg);
             return true;
         }
     } cmdReIndex;
@@ -1965,7 +1963,7 @@ namespace mongo {
 
         virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
+            std::string systemIndexes = dbname + ".system.indexes";
             std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             std::string ns = dbname + '.' + coll;
             BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
@@ -1984,7 +1982,7 @@ namespace mongo {
 
             nsd->emptyCappedCollection( ns.c_str() );
 
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+            IndexBuilder::restoreIndexes(dbname + ".system.indexes", indexes);
 
             return true;
         }
