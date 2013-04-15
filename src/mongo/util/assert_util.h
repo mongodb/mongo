@@ -237,15 +237,13 @@ namespace mongo {
 # define MONGO_debug_and(x) debugCompare(false, (x))
 #endif
 
-#ifdef MONGO_EXPOSE_MACROS
-# define dcompare MONGO_debug_and
-# define dassert MONGO_dassert
-# define verify MONGO_verify
-# define uassert MONGO_uassert
-# define uassertStatusOK MONGO_uassertStatusOK
-# define wassert MONGO_wassert
-# define massert MONGO_massert
-#endif
+#define dcompare MONGO_debug_and
+#define dassert MONGO_dassert
+#define verify MONGO_verify
+#define uassert MONGO_uassert
+#define uassertStatusOK MONGO_uassertStatusOK
+#define wassert MONGO_wassert
+#define massert MONGO_massert
 
     // some special ids that we want to duplicate
 
