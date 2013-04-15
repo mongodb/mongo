@@ -1,19 +1,126 @@
 # -*- mode: python -*-
 
-# This SConscript describes build and install rules for the Mongo C++ driver and associated exmaple
+# This SConscript describes build and install rules for the Mongo C++ driver and associated example
 # programs.
 
-Import('env clientEnv')
+import os
+import re
 
-env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
+import SCons
+
+Import('clientEnv')
+Import('has_option')
+Import('installSetup')
+
+MONGODB_VERSION = '2.4.1'
+
+
+# Cope with scons's failure to set SONAME in its builtins.
+#
+# Written by Eric Raymond <esr@snark.thyrsus.com> at
+# http://scons.tigris.org/ds/viewMessage.do?dsForumId=1268&dsMessageId=2824057
+#
+# Inspired by Richard Levitte's <richard@levitte.org> code at
+# http://markmail.org/message/spttz3o4xrsftofr
+
+def VersionedSharedLibrary(env, libname, libversion, lib_objs=[], parse_flags=[]):
+    platform = env.subst('$PLATFORM')
+    shlib_pre_action = None
+    shlib_suffix = env.subst('$SHLIBSUFFIX')
+    shlib_post_action = None
+    shlink_flags = SCons.Util.CLVar(env.subst('$SHLINKFLAGS'))
+
+    if platform == 'posix':
+        shlib_post_action = ['rm -f $TARGET', 'ln -s ${SOURCE.file} $TARGET']
+        shlib_post_action_output_re = [
+            '%s\\.[0-9\\.]*$' % re.escape(shlib_suffix),
+            shlib_suffix ]
+        shlib_suffix += '.' + libversion
+        (major, age, revision) = libversion.split('.')
+        soname = libname + '.' + major
+        shlink_flags += ['-Wl,-Bsymbolic', '-Wl,-soname=%s' % soname]
+    elif platform == 'aix':
+        shlib_pre_action = [
+            "nm -Pg $SOURCES &gt; ${TARGET}.tmp1",
+            "grep ' [BDT] ' &lt; ${TARGET}.tmp1 &gt; ${TARGET}.tmp2",
+            "cut -f1 -d' ' &lt; ${TARGET}.tmp2 &gt; ${TARGET}",
+            "rm -f ${TARGET}.tmp[12]" ]
+        shlib_pre_action_output_re = ['$', '.exp']
+        shlib_post_action = ['rm -f $TARGET', 'ln -s $SOURCE $TARGET']
+        shlib_post_action_output_re = [
+            '%s\\.[0-9\\.]*' % re.escape(shlib_suffix),
+            shlib_suffix ]
+        shlib_suffix += '.' + libversion
+        shlink_flags += ['-G', '-bE:${TARGET}.exp', '-bM:SRE']
+    elif platform == 'cygwin':
+        shlink_flags += [ '-Wl,-Bsymbolic',
+                          '-Wl,--out-implib,${TARGET.base}.a' ]
+    elif platform == 'darwin':
+        shlib_suffix = '.' + libversion + shlib_suffix
+        shlink_flags += ['-current_version', '%s' % libversion,
+                         '-undefined', 'dynamic_lookup' ]
+
+    lib = env.SharedLibrary(libname, lib_objs, SHLIBSUFFIX=shlib_suffix,
+                            SHLINKFLAGS=shlink_flags, parse_flags=parse_flags)
+
+    if shlib_pre_action:
+        shlib_pre_action_output = re.sub(shlib_pre_action_output_re[0],
+                                         shlib_pre_action_output_re[1],
+                                         str(lib[0]))
+        env.Command(shlib_pre_action_output, [ lib_objs ],
+                     shlib_pre_action)
+        env.Depends(lib, shlib_pre_action_output)
+
+    if shlib_post_action:
+        shlib_post_action_output = re.sub(shlib_post_action_output_re[0],
+                                          shlib_post_action_output_re[1],
+                                          str(lib[0]))
+        env.Command(shlib_post_action_output, lib, shlib_post_action)
+
+    return lib
+
+def InstallVersionedSharedLibrary(env, destination, lib):
+    platform = env.subst('$PLATFORM')
+    shlib_suffix = env.subst('$SHLIBSUFFIX')
+    shlib_install_pre_action = None
+    shlib_install_post_action = None
+
+    if platform == 'posix':
+        shlib_post_action = ['rm -f $TARGET',
+                             'ln -s ${SOURCE.file} $TARGET']
+        shlib_post_action_output_re = ['%s\\.[0-9\\.]*$' % re.escape(shlib_suffix),
+                                       shlib_suffix ]
+        shlib_install_post_action = shlib_post_action
+        shlib_install_post_action_output_re = shlib_post_action_output_re
+
+    ilib = env.Install(destination, lib)
+
+    if shlib_install_pre_action:
+        shlib_install_pre_action_output = re.sub(shlib_install_pre_action_output_re[0],
+                                                 shlib_install_pre_action_output_re[1],
+                                                 str(ilib[0]))
+        env.Command(shlib_install_pre_action_output, ilib,
+                    shlib_install_pre_action)
+        env.Depends(shlib_install_pre_action_output, ilib)
+
+    if shlib_install_post_action:
+        shlib_install_post_action_output = re.sub(shlib_install_post_action_output_re[0],
+                                                  shlib_install_post_action_output_re[1],
+                                                  str(ilib[0]))
+        env.Command(shlib_install_post_action_output, ilib,
+                    shlib_install_post_action)
+    return ilib
+
+
+clientEnv.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
             ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
             '$PYTHON $SOURCES $TARGETS')
 
-env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'], 
+clientEnv.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
             ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
             '$PYTHON $SOURCES $TARGETS')
 
-clientSourceBasic = [
+clientSource = [
     'mongo/base/configuration_variable_manager.cpp',
     'mongo/base/error_codes.cpp',
     'mongo/base/global_initializer.cpp',
@@ -36,7 +143,6 @@ clientSourceBasic = [
     'mongo/client/dbclient.cpp',
     'mongo/client/dbclient_rs.cpp',
     'mongo/client/dbclientcursor.cpp',
-    'mongo/client/distlock.cpp',
     'mongo/client/gridfs.cpp',
     'mongo/client/model.cpp',
     'mongo/client/sasl_client_authenticate.cpp',
@@ -83,18 +189,14 @@ clientSourceBasic = [
     'mongo/util/timer.cpp',
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
-    'mongo/util/version.cpp',
     ]
 
-clientSourceSasl = ['mongo/client/sasl_client_authenticate_impl.cpp',
-                    'mongo/util/gsasl_session.cpp']
-
-clientSourceAll = clientSourceBasic + clientSourceSasl
-
-if env['MONGO_BUILD_SASL_CLIENT']:
-    clientSource = clientSourceAll
-else:
-    clientSource = clientSourceBasic
+if clientEnv['MONGO_BUILD_SASL_CLIENT']:
+    clientSource += [
+        'mongo/client/sasl_client_authenticate_impl.cpp',
+        'mongo/util/gsasl_session.cpp'
+    ]
+    clientEnv.Append(LIBS="gsasl")
 
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),
@@ -133,12 +235,34 @@ for path in clientHeaderDirectories:
     clientHeaders.extend(Glob('mongo/%s/*.h' % path))
     clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
-mongoclient_lib = env.Library('mongoclient', clientSource),
-mongoclient_install = env.Install('#/', [
-        mongoclient_lib,
-        #env.SharedLibrary('mongoclient', clientSource),
-        ])
-env.Alias('mongoclient', mongoclient_install)
+staticLibrary = clientEnv.Library('mongoclient', clientSource)
+
+if has_option('sharedclient'):
+    assert(MONGODB_VERSION.count('.') <= 2)
+
+    soname = 0
+    for version_id, version in enumerate(MONGODB_VERSION.split('.')):
+        version = int(version)
+        assert(version < 10)
+
+        if version_id == 0:
+            soname += version * 100
+        elif version_id == 1:
+            soname += version * 10
+        elif version_id == 2:
+            soname += version
+    soname = str(soname) + '.0.0'
+
+    mongoclient_lib = sharedLibrary = VersionedSharedLibrary(
+        clientEnv, 'libmongoclient', soname, clientSource)
+else:
+    mongoclient_lib = staticLibrary
+
+if installSetup.libraries:
+    clientEnv.Alias('mongoclient', [
+        clientEnv.Install('$INSTALL_DIR/$NIX_LIB_DIR', staticLibrary),
+        InstallVersionedSharedLibrary(clientEnv, '$INSTALL_DIR/$NIX_LIB_DIR', sharedLibrary)
+    ])
 
 clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target,
@@ -149,9 +273,9 @@ clientTests.append(
 
 clientEnv.Alias('clientTests', clientTests, [])
 
-env.Install(
+clientEnv.Install(
     '#/',
-    env.Command('$CLIENT_ARCHIVE',
+    clientEnv.Command('$CLIENT_ARCHIVE',
                 ['#buildscripts/make_archive.py',
                  '$CLIENT_SCONSTRUCT',
                  '$CLIENT_LICENSE',
@@ -161,7 +285,7 @@ env.Install(
                  'mongo/db/auth/generate_action_types.py',
                  'mongo/db/auth/action_types.txt',
                  '#buildscripts/make_archive.py',
-                 clientSourceAll,
+                 clientSource,
                  clientHeaders,
                  [source for (target, source) in exampleSourceMap],
                  'mongo/bson/bsondemo/bsondemo.cpp',
@@ -173,12 +297,8 @@ env.Install(
                 '--transform =$CLIENT_DIST_BASENAME/ '
                 '${TEMPFILE(SOURCES[1:])}'))
 
-# install
-prefix = GetOption("prefix")
-
-env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
-
-for x in clientHeaderDirectories:
-    inst = env.Install(prefix + "/include/mongo/" + x,
-                       [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
-    env.AddPostAction(inst, Chmod('$TARGET', 0644))
+if installSetup.headers:
+    for path in clientHeaderDirectories:
+        inst = clientEnv.Install('$INSTALL_DIR/include/mongo/' + path,
+                           [Glob('mongo/%s/*.h' % path), Glob('mongo/%s/*.hpp' % path)])
+        clientEnv.AddPostAction(inst, Chmod('$TARGET', 0644))
