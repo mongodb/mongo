@@ -7,6 +7,10 @@ env = env.Clone()
 env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 env.Append(CCFLAGS=['-Isrc/third_party/gflags-2.0/src'])
 
+if solaris:
+    # Enables declaration of isinf() on Solaris
+    env.Append(CPPDEFINES=['__C99FEATURES__'])
+
 env.StaticLibrary("math",
                 [ "mathutil.cc",
                  # "mathlimits.cc",
