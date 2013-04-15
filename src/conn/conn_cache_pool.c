@@ -428,10 +428,10 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 	grew = 0;
 	force = (cp->currently_used > cp->size);
 	if (WT_VERBOSE_ISSET(session, shared_cache)) {
-		WT_VERBOSE_RET(session, shared_cache, 
+		WT_VERBOSE_RET(session, shared_cache,
 		    "Cache pool distribution: ");
-		WT_VERBOSE_RET(session, shared_cache, 
-		    "\tcache_size, read_pressure, skips: ");
+		WT_VERBOSE_RET(session, shared_cache,
+		    "\t" "cache_size, read_pressure, skips: ");
 	}
 
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
@@ -440,7 +440,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 		adjusted = 0;
 
 		read_pressure = cache->cp_current_evict / highest;
-		WT_VERBOSE_RET(session, shared_cache, 
+		WT_VERBOSE_RET(session, shared_cache,
 		    "\t%"PRIu64", %"PRIu64", %d",
 		    entry->cache_size, read_pressure, cache->cp_skip_count);
 
