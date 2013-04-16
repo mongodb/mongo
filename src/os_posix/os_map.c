@@ -37,11 +37,11 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 }
 
 /*
- * __wt_mmap_read --
+ * __wt_mmap_preload --
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_read(WT_SESSION_IMPL *session, void *p, size_t size)
+__wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to 4096 bytes */

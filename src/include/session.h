@@ -101,9 +101,6 @@ struct __wt_session_impl {
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
 
-	int syncop;			/* File operation */
-	int syncop_ret;			/* Return value */
-
 	uint32_t id;			/* Offset in conn->session_array */
 
 	uint32_t flags;

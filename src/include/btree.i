@@ -444,13 +444,22 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page == NULL || WT_PAGE_IS_ROOT(page))
 		return (0);
 
-	/* Try to immediately evict pages marked as not needed. */
+	/*
+	 * Try to immediately evict pages with the special "oldest" read
+	 * generation.
+	 */
 	if (page->read_gen == WT_READ_GEN_OLDEST &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
 			page->ref->state = WT_REF_MEM;
 			return (ret);
 		}
+
+		/*
+		 * Make sure the page isn't already scheduled for eviction.  We
+		 * have it locked, so after this, LRU eviction won't consider
+		 * it.
+		 */
 		__wt_evict_list_clr_page(session, page);
 		if ((ret = __wt_evict_page(session, page)) == EBUSY)
 			ret = 0;

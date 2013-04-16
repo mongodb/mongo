@@ -455,10 +455,20 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	u_int i;
 	int progress;
 
-	progress = 0;
+	/*
+	 * Take a copy of the current state of the LSM tree and look for chunks
+	 * to drop.  We do it this way to avoid holding the LSM tree lock while
+	 * doing I/O or waiting on the schema lock.
+	 *
+	 * This is safe because only one thread will be in this function at a
+	 * time because there is only one LSM worker thread.  Merges may
+	 * complete concurrently, and the old_chunks array may be extended, but
+	 * the offset we're working on won't change, and we lock the tree for
+	 * that update.
+	 */
 	WT_CLEAR(cookie);
 	WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 1));
-	for (i = 0; i < cookie.nchunks; i++) {
+	for (i = 0, progress = 0; i < cookie.nchunks; i++) {
 		if ((chunk = cookie.chunk_array[i]) == NULL)
 			continue;
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {

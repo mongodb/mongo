@@ -264,7 +264,6 @@ extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
-extern int __wt_sync_file_serial_func(WT_SESSION_IMPL *session, void *args);
 extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page);
@@ -860,7 +859,7 @@ extern int __wt_mmap(WT_SESSION_IMPL *session,
     WT_FH *fh,
     void *mapp,
     size_t *lenp);
-extern int __wt_mmap_read(WT_SESSION_IMPL *session, void *p, size_t size);
+extern int __wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size);
 extern int __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size);
 extern int __wt_munmap(WT_SESSION_IMPL *session,
     WT_FH *fh,

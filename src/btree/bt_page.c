@@ -106,7 +106,7 @@ __wt_page_in_func(
 			/*
 			 * If we read the page and we are configured to not
 			 * trash the cache, set the oldest read generation so
-			 * the page is forcible evicted as soon as possible.
+			 * the page is forcibly evicted as soon as possible.
 			 */
 			if (oldgen && page->read_gen == WT_READ_GEN_NOTSET)
 				page->read_gen = WT_READ_GEN_OLDEST;

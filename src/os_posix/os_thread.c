@@ -32,16 +32,8 @@ __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid)
 {
 	WT_DECL_RET;
 
-#if 0 && defined(HAVE_PTHREAD_TIMEDJOIN_NP)
-	struct timespec abstime;
-
-	WT_RET(__wt_epoch(session, &abstime));
-	abstime.tv_sec += 60;			/* Wait a max of 60 seconds. */
-	ret = pthread_timedjoin_np(tid, NULL, &abstime);
-#else
-	ret = pthread_join(tid, NULL);
-#endif
-	if (ret == 0)
+	if ((ret = pthread_join(tid, NULL)) == 0)
 		return (0);
+
 	WT_RET_MSG(session, ret, "pthread_join");
 }

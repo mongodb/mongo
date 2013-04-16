@@ -193,14 +193,20 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	trk_orig = session->meta_track;
 	trk = session->meta_track_next;
 
-	/*
-	 * If it was a nested transaction or there were no changes, we're done.
-	 */
-	if (--session->meta_track_nest != 0 || trk == NULL)
+	/* If it was a nested transaction, there is nothing to do. */
+	if (--session->meta_track_nest != 0)
 		return (0);
 
 	/* Turn off tracking for unroll. */
 	session->meta_track_next = session->meta_track_sub = NULL;
+
+	/*
+	 * If there were no operations logged, return now and avoid unnecessary
+	 * metadata checkpoints.  For example, this happens if attempting to
+	 * create a data source that already exists (or drop one that doesn't).
+	 */
+	if (trk == trk_orig)
+		return (0);
 
 	while (--trk >= trk_orig)
 		WT_TRET(__meta_track_apply(session, trk, unroll));

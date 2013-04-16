@@ -279,33 +279,6 @@ __wt_insert_new_ins_taken(void *untyped_args)
 }
 
 typedef struct {
-	int syncop;
-} __wt_sync_file_args;
-
-static inline int
-__wt_sync_file_serial(
-	WT_SESSION_IMPL *session, int syncop) {
-	__wt_sync_file_args _args, *args = &_args;
-	WT_DECL_RET;
-
-	args->syncop = syncop;
-
-	__wt_spin_lock(session, &S2C(session)->serial_lock);
-	ret = __wt_sync_file_serial_func(session, args);
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
-	return (ret);
-}
-
-static inline void
-__wt_sync_file_unpack(
-    void *untyped_args, int *syncopp)
-{
-	__wt_sync_file_args *args = (__wt_sync_file_args *)untyped_args;
-
-	*syncopp = args->syncop;
-}
-
-typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_UPDATE **srch_upd;

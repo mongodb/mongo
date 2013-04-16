@@ -518,7 +518,7 @@ __btree_warm_cache(WT_SESSION_IMPL *session)
 		return (WT_NOTFOUND);
 
 	if (page->parent->dsk < btree->root_page->dsk)
-		WT_RET(__wt_mmap_read(
+		WT_RET(__wt_mmap_preload(
 		    session, page->parent->dsk,
 		    WT_PTRDIFF(btree->root_page->dsk, page->parent->dsk)));
 

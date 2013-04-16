@@ -7,7 +7,6 @@
 
 #include "wt_internal.h"
 
-static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int __evict_forced_pages(WT_SESSION_IMPL *);
 static void __evict_init_candidate(
     WT_SESSION_IMPL *, WT_EVICT_ENTRY *, WT_PAGE *);
@@ -275,32 +274,6 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __sync_file_serial_func --
- *	Eviction serialization function called when a tree is being flushed
- *	or closed.
- */
-int
-__wt_sync_file_serial_func(WT_SESSION_IMPL *session, void *args)
-{
-	WT_CACHE *cache;
-	int syncop;
-
-	__wt_sync_file_unpack(args, &syncop);
-
-	/*
-	 * Publish: there must be a barrier to ensure the structure fields are
-	 * set before the eviction thread can see the request.
-	 */
-	WT_PUBLISH(session->syncop, syncop);
-
-	/* We're serialized at this point, no lock needed. */
-	cache = S2C(session)->cache;
-	++cache->sync_request;
-
-	return (0);
-}
-
-/*
  * __wt_cache_evict_server --
  *	Thread to evict pages from the cache.
  */
@@ -371,7 +344,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 	int clean, loop;
 
@@ -380,18 +352,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
-		/*
-		 * Block out concurrent eviction while we are handling requests.
-		 */
-		__wt_spin_lock(session, &cache->evict_lock);
-
-		/* If there is a file sync request, satisfy it. */
-		while (ret == 0 && cache->sync_complete != cache->sync_request)
-			ret = __evict_file_request_walk(session);
-
-		__wt_spin_unlock(session, &cache->evict_lock);
-		WT_RET(ret);
-
 		WT_RET(__evict_forced_pages(session));
 
 		/*
@@ -599,79 +559,6 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __evict_file_request_walk --
- *	Walk the session list looking for sync/close requests.  If we find a
- * request, perform it, clear the request, and wake up the requesting thread.
- */
-static int
-__evict_file_request_walk(WT_SESSION_IMPL *session)
-{
-	WT_CACHE *cache;
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *request_session;
-	uint32_t i, session_cnt;
-	int syncop;
-	const char *msg;
-
-	/* No longer used. */
-	WT_ASSERT(session, 0);
-
-	conn = S2C(session);
-	cache = conn->cache;
-
-	/* Make progress, regardless of success or failure. */
-	++cache->sync_complete;
-
-	/*
-	 * No lock is required because the session array is fixed size, but it
-	 * it may contain inactive entries.
-	 *
-	 * If we don't find a request, something went wrong; complain, but don't
-	 * return an error code, the eviction thread doesn't need to exit.
-	 */
-	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (request_session = conn->sessions,
-	    i = 0; i < session_cnt; ++request_session, ++i)
-		if (request_session->active && request_session->syncop != 0)
-			break;
-	if (i == session_cnt) {
-		__wt_errx(session,
-		    "failed to find handle's sync operation request");
-		return (0);
-	}
-
-	/*
-	 * Clear the session's request (we don't want to find it again
-	 * on our next walk, and doing it now should help avoid coding
-	 * errors later).  No publish is required, all we care about is
-	 * that we see it change.
-	 */
-	syncop = request_session->syncop;
-	request_session->syncop = 0;
-
-	switch (syncop) {
-	case WT_SYNC_DISCARD:
-		msg = "sync-discard";
-		break;
-	case WT_SYNC_DISCARD_NOWRITE:
-		msg = "sync-discard-nowrite";
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
-	WT_VERBOSE_RET(
-	    session, evictserver, "eviction server request: %s", msg);
-
-	/*
-	 * Handle the request and publish the result: there must be a barrier
-	 * to ensure the return value is set before the requesting thread
-	 * wakes.
-	 */
-	WT_PUBLISH(request_session->syncop_ret,
-	    __wt_evict_file(request_session, syncop));
-	return (__wt_cond_signal(request_session, request_session->cond));
-}
-
-/*
  * __wt_evict_file --
  *	Flush pages for a specific file as part of a close or compact operation.
  */
@@ -691,14 +578,17 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	F_SET(btree, WT_BTREE_NO_EVICTION);
 
 	/*
-	 * The eviction candidate list might reference pages we are
-	 * about to discard; clear it.
+	 * The eviction candidate list might reference pages we are about to
+	 * discard; clear it.
 	 */
 	__evict_list_clr_range(session, 0);
 	__wt_spin_unlock(session, &cache->evict_lock);
 
-	/* Wait for LRU eviction activity to drain. */
-	while (S2BT(session)->lru_count > 0)
+	/*
+	 * We have disabled further eviction: wait for concurrent LRU eviction
+	 * activity to drain.
+	 */
+	while (btree->lru_count > 0)
 		__wt_yield();
 
 	/* Clear any existing LRU eviction walk, we're discarding the tree. */
@@ -982,9 +872,8 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	__wt_txn_get_oldest(session);
 
 	/*
-	 * NOTE: we don't hold the schema lock: files can't be removed without
-	 * the eviction server being involved, and when we're here, we aren't
-	 * servicing eviction requests.
+	 * NOTE: we don't hold the schema lock, so we have to take care
+	 * that the handles we see are open and valid.
 	 */
 	i = WT_EVICT_WALK_BASE;
 retry:	file_count = 0;
