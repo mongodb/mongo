@@ -227,8 +227,7 @@ namespace mongo {
             out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
         }
         virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            fassert(16175, rotateLogs());
-            return 1;
+            return rotateLogs();
         }
 
     } logRotateCmd;

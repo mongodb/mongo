@@ -141,7 +141,7 @@ namespace mongo {
 
         bool rotate() {
             if ( ! _enabled ) {
-                cout << "LoggingManager not enabled" << endl;
+                cout << "logRotate is not possible: loggingManager not enabled" << endl;
                 return true;
             }
 
@@ -156,7 +156,7 @@ namespace mongo {
                 ss << _path << "." << terseCurrentTime( false );
                 string s = ss.str();
                 if (0 != rename(_path.c_str(), s.c_str())) {
-                    error() << "Failed to rename '" << _path
+                    error() << "failed to rename '" << _path
                             << "' to '" << s
                             << "': " << errnoWithDescription() << endl;
                     return false;
@@ -187,7 +187,7 @@ namespace mongo {
             tmp = freopen(_path.c_str(), _append ? "a" : "w", stdout);
 #endif
             if ( !tmp ) {
-                cerr << "can't open: " << _path.c_str() << " for log file" << endl;
+                error() << "can't open: " << _path.c_str() << " for log file" << endl;
                 return false;
             }
 
