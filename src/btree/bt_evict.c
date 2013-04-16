@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static void __evict_cache_dump(WT_SESSION_IMPL *);
-static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int __evict_forced_pages(WT_SESSION_IMPL *);
 static void __evict_init_candidate(
@@ -347,6 +345,11 @@ __wt_cache_evict_server(void *arg)
 			    "cache server: exiting with %" PRIu64 " bytes in "
 			    "memory and %" PRIu64 " bytes evicted",
 			    cache->bytes_inmem, cache->bytes_evict);
+		if (cache->bytes_dirty != 0 || cache->pages_dirty != 0)
+			__wt_errx(session,
+			    "cache server: exiting with %" PRIu64
+			    " bytes dirty and %" PRIu64 " pages dirty",
+			    cache->bytes_dirty, cache->pages_dirty);
 	} else
 err:		WT_PANIC_ERR(session, ret, "eviction server error");
 
@@ -370,7 +373,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
-	static int dumping = 0;
 	int clean, loop;
 
 	conn = S2C(session);
@@ -418,22 +420,12 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 			clean = 1;
 
-#ifdef HAVE_DIAGNOSTIC
-		/* Periodically dump information about the cache. */
-		if (loop == 0 && ++dumping == 10) {
-			__evict_cache_dump(session);
-			dumping = 0;
-		}
-#endif
-
 		/*
 		 * Track whether pages are being evicted.  This will be cleared
 		 * by the next thread to successfully evict a page.
 		 */
 		F_SET(cache, WT_EVICT_NO_PROGRESS);
 		WT_RET(__evict_lru(session, clean));
-
-		__evict_dirty_validate(conn);
 
 		/*
 		 * If we're making progress, keep going; if we're not making
@@ -766,6 +758,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				S2BT(session)->root_page = NULL;
+			if (__wt_page_is_modified(page))
+				__wt_cache_dirty_decr(
+				    session, page->memory_footprint);
 			__wt_page_out(session, &page);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -1339,78 +1334,18 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	return (ret);
 }
 
+#ifdef HAVE_DIAGNOSTIC
 /*
- * __evict_dirty_validate --
- *	Walk the cache counting dirty entries so we can validate dirty counts.
- *	This belongs in eviction, because it's the only time we can safely
- *	traverse the btree queue without locking.
+ * __wt_cache_dump --
+ *	Dump debugging information to stdout about the size of the files in the
+ *	cache.
+ *
+ *	NOTE: this function is not called anywhere, it is intended to be called
+ *	from a debugger.
  */
-static void
-__evict_dirty_validate(WT_CONNECTION_IMPL *conn)
+void
+__wt_cache_dump(WT_SESSION_IMPL *session)
 {
-#if 0 && defined(HAVE_DIAGNOSTIC)
-	WT_BTREE *btree;
-	WT_CACHE *cache;
-	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
-	WT_PAGE *page;
-	WT_SESSION_IMPL *session;
-	uint64_t bytes, bytes_baseline;
-
-	cache = conn->cache;
-	session = conn->default_session;
-	page = NULL;
-	bytes = 0;
-
-	if (!WT_VERBOSE_ISSET(session, evictserver))
-		return;
-
-	bytes_baseline = __wt_cache_bytes_dirty(cache);
-
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
-		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
-		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
-			continue;
-
-		btree = dhandle->handle;
-		if (btree->root_page == NULL ||
-		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-		    btree->bulk_load_ok)
-			continue;
-
-		/* Reference the correct data handle. */
-		session->dhandle = dhandle;
-		while ((ret = __wt_tree_walk(
-		    session, &page, WT_TREE_CACHE)) == 0 &&
-		    page != NULL) {
-			if (__wt_page_is_modified(page))
-				bytes += page->memory_footprint;
-		}
-		session->dhandle = NULL;
-	}
-
-	if (WT_VERBOSE_ISSET(session, evictserver) &&
-	    (ret == 0 || ret == WT_NOTFOUND) &&
-	    bytes != 0 &&
-	    (bytes < WT_MIN(bytes_baseline, __wt_cache_bytes_dirty(cache)) ||
-	    bytes > WT_MAX(bytes_baseline, __wt_cache_bytes_dirty(cache))))
-		(void)__wt_verbose(session,
-		    "Cache dirty count mismatch. Expected a value between: %"
-		    PRIu64 " and %" PRIu64 " got: %" PRIu64,
-		    bytes_baseline, __wt_cache_bytes_dirty(cache), bytes);
-#else
-	WT_UNUSED(conn);
-#endif
-}
-
-/*
- * __evict_cache_dump --
- *	Dump debugging information about the size of the files in the cache.
- */
-static void
-__evict_cache_dump(WT_SESSION_IMPL *session)
-{
-#if 0 && defined(HAVE_DIAGNOSTIC)
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -1456,8 +1391,6 @@ __evict_cache_dump(WT_SESSION_IMPL *session)
 	    " vs tracked inuse %" PRIu64 "MB\n",
 	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
 	fflush(stdout);
-#else
-	WT_UNUSED(session);
-#endif
 }
+#endif
 
