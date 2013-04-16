@@ -23,9 +23,9 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/replutil.h"
 
 namespace mongo {
 

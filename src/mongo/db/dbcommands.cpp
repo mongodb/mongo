@@ -51,9 +51,9 @@
 #include "mongo/db/ops/count.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
-#include "mongo/db/repl/write_concern.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/s/d_writeback.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException

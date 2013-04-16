@@ -26,7 +26,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/util/processinfo.h"

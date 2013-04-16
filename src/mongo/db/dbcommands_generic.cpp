@@ -37,7 +37,6 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/write_concern.h"
-#include "mongo/db/replutil.h"
 #include "mongo/server.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/scripting/engine.h"

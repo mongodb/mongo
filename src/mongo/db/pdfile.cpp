@@ -52,7 +52,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/file.h"

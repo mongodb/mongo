@@ -18,9 +18,9 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/parsed_query.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/replutil.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

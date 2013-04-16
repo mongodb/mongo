@@ -16,9 +16,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "mr.h"
+#include "mongo/db/commands/mr.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
@@ -29,7 +29,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/query_optimizer.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/s/d_chunk_manager.h"
 #include "mongo/s/d_logic.h"

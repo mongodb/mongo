@@ -17,18 +17,21 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "../util/net/miniwebserver.h"
-#include "../util/mongoutils/html.h"
-#include "../util/md5.hpp"
-#include "instance.h"
-#include "dbwebserver.h"
-#include "dbhelpers.h"
-#include "replutil.h"
-#include "clientcursor.h"
-#include "background.h"
+#include "mongo/pch.h"
 
-#include "restapi.h"
+#include "mongo/db/restapi.h"
+
+#include "mongo/db/background.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/dbwebserver.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/util/md5.hpp"
+#include "mongo/util/mongoutils/html.h"
+#include "mongo/util/net/miniwebserver.h"
 
 namespace mongo {
 
