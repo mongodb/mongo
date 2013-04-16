@@ -446,7 +446,7 @@ __create_data_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	const char *cfg[3], *fileconf;
+	const char *cfg[4], *fileconf;
 
 	fileconf = NULL;
 
@@ -471,16 +471,21 @@ __create_data_source(WT_SESSION_IMPL *session,
 	/*
 	 * Set a default key/value format, and insert the configuration into
 	 * the metadata.
+	 *
+	 * XXX
+	 * Use the session_create information, even though it includes a ton of
+	 * things we don't care about (like checksum configuration).  We should
+	 * be stripping that information out.
 	 */
-	cfg[0] = "key_format=u,value_format=u";
-	cfg[1] = config;
-	cfg[2] = NULL;
+	cfg[0] = WT_CONFIG_BASE(session, session_create);
+	cfg[1] = "key_format=u,value_format=u";
+	cfg[2] = config;
+	cfg[3] = NULL;
 	WT_RET(__wt_config_collapse(session, cfg, &fileconf));
 	if ((ret = __wt_metadata_insert(session, uri, fileconf)) == 0) {
 		cfg[0] = fileconf;
 		cfg[1] = NULL;
-		WT_ERR(dsrc->create(
-		    dsrc, &session->iface, uri, exclusive, cfg));
+		WT_ERR(dsrc->create(dsrc, &session->iface, uri, cfg));
 	} else if (ret == WT_DUPLICATE_KEY)
 		ret = EEXIST;
 

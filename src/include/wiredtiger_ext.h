@@ -143,10 +143,20 @@ struct __wt_extension_api {
 	 * @param value the returned value
 	 * @errors
 	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG string
+	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG config
 	 */
 	int (*config)(WT_SESSION *session,
 	    const char *key, void *config, WT_EXTENSION_CONFIG *value);
+
+	/*! Return a default WT_SESSION:: handle.
+	 * If extension API calls need to be made and no session handle has been
+	 * created, a temporary handle is available for temporary use.
+	 *
+	 * @param conn the connection handle
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API default_session
+	 */
+	WT_SESSION * (*default_session)(WT_CONNECTION *conn);
 };
 
 /*! @} */

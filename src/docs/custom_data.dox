@@ -157,7 +157,7 @@ integer value of a configuration string as follows:
 The WT_DATA_SOURCE::open_cursor method might retrieve the string value
 of a configuration string as follows:
 
-@snippet ex_data_source.c WT_EXTENSION_CONFIG string
+@snippet ex_data_source.c WT_EXTENSION_CONFIG config
 
 The WT_DATA_SOURCE::open_cursor method might retrieve the list value
 of a configuration string as follows:

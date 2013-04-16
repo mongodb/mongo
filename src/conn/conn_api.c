@@ -9,12 +9,22 @@
 
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
+static WT_SESSION *
+__wt_ext_default_session(WT_CONNECTION *wt_conn)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	return ((WT_SESSION *)conn->default_session);
+}
+
 static WT_EXTENSION_API __wiredtiger_extension_api = {
 	__wt_ext_err_printf,
 	__wt_ext_scr_alloc,
 	__wt_ext_scr_free,
 	__wt_ext_msg_printf,
-	__wt_ext_config
+	__wt_ext_config,
+	__wt_ext_default_session,
 };
 
 /*
