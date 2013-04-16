@@ -193,14 +193,10 @@ namespace mongo {
 
     static void ignoreSignal( int sig ) {}
 
-    static void rotateLogsOrDie(int sig) {
-        fassert(16176, rotateLogs());
-    }
-
     void setupCoreSignals() {
 #if !defined(_WIN32)
-        verify( signal(SIGUSR1 , rotateLogsOrDie ) != SIG_ERR );
         verify( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
+        verify( signal(SIGUSR2, ignoreSignal ) != SIG_ERR );
 #endif
     }
 
