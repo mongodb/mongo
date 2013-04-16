@@ -47,14 +47,13 @@ my_data_source_init()
 
 /*! [WT_DATA_SOURCE create] */
 static int
-my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, int exclusive, void *config)
+my_create(
+    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
 /*! [WT_DATA_SOURCE create] */
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)uri;
-	(void)exclusive;
 	(void)config;
 
 	{
@@ -189,7 +188,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	{
-	/*! [WT_EXTENSION_CONFIG string] */
+	/*! [WT_EXTENSION_CONFIG config] */
 	WT_EXTENSION_CONFIG value;
 	const char *my_data_source_key;
 
@@ -212,7 +211,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		my_data_source_key = "recno";
 	else
 		my_data_source_key = "bytestring";
-	/*! [WT_EXTENSION_CONFIG string] */
+	/*! [WT_EXTENSION_CONFIG config] */
 
 	(void)my_data_source_key;
 	}
@@ -397,6 +396,11 @@ main(void)
 	    "session.open_cursor", NULL, "paths=[\"/mnt\"]", "list",
 	    "choices=[\"/device\", \"/home\", \"/mnt\", \"/target\"]");
 	/*! [WT_DATA_SOURCE configure list with checking] */
+
+	/*! [WT_EXTENSION_API default_session] */
+	(void)wt_api->msg_printf(
+	    wt_api->default_session(conn), "configuration complete");
+	/*! [WT_EXTENSION_API default_session] */
 
 	(void)conn->close(conn, NULL);
 
