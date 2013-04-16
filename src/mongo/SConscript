@@ -163,12 +163,15 @@ commonFiles = [ "pch.cpp",
                 "db/dbmessage.cpp"
                 ]
 
-commonSysLibdeps = []
+extraCommonLibdeps = []
 
 if env['MONGO_BUILD_SASL_CLIENT']:
-    commonFiles.extend(['client/sasl_client_authenticate_impl.cpp',
-                        'client/sasl_client_session.cpp'])
-    commonSysLibdeps.append('sasl2')
+    env.StaticLibrary('sasl_client_session',
+                      ['client/sasl_client_session.cpp'],
+                      LIBDEPS=['foundation'],
+                      SYSLIBDEPS=['sasl2'])
+    commonFiles.extend(['client/sasl_client_authenticate_impl.cpp'])
+    extraCommonLibdeps.append('sasl_client_session')
 
 # handle processinfo*
 processInfoFiles = [ "util/processinfo.cpp" ]
@@ -216,8 +219,8 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'fail_point',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                           '$BUILD_DIR/third_party/shim_boost'],
-                  SYSLIBDEPS=commonSysLibdeps)
+                           '$BUILD_DIR/third_party/shim_boost'] +
+                           extraCommonLibdeps)
 
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",

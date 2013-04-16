@@ -15,11 +15,104 @@
 
 #include "mongo/client/sasl_client_session.h"
 
+#include "mongo/base/init.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
+
+    /*
+     * Allocator functions to be used by the SASL library, if the client
+     * doesn't initialize the library for us.
+     */
+
+    void* saslOurMalloc(unsigned long sz) {
+        return ourmalloc(sz);
+    }
+
+    void* saslOurCalloc(unsigned long count, unsigned long size) {
+        void* ptr = calloc(count, size);
+        if (!ptr) printStackAndExit(0);
+        return ptr;
+    }
+
+    void* saslOurRealloc(void* ptr, unsigned long sz) {
+        return ourrealloc(ptr, sz);
+    }
+
+    /*
+     * Mutex functions to be used by the SASL library, if the client doesn't initialize the library
+     * for us.
+     */
+
+    void* saslMutexAlloc(void) {
+        return new SimpleMutex("sasl");
+    }
+
+    int saslMutexLock(void* mutex) {
+        static_cast<SimpleMutex*>(mutex)->lock();
+        return SASL_OK;
+    }
+
+    int saslMutexUnlock(void* mutex) {
+        static_cast<SimpleMutex*>(mutex)->unlock();
+        return SASL_OK;
+    }
+
+    void saslMutexFree(void* mutex) {
+        delete static_cast<SimpleMutex*>(mutex);
+    }
+
+    /**
+     * Configures the SASL library to use allocator and mutex functions we specify,
+     * unless the client application has previously initialized the SASL library.
+     */
+    MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexes)(InitializerContext*) {
+        sasl_set_alloc(saslOurMalloc,
+                       saslOurCalloc,
+                       saslOurRealloc,
+                       free);
+
+        sasl_set_mutex(saslMutexAlloc,
+                       saslMutexLock,
+                       saslMutexUnlock,
+                       saslMutexFree);
+        return Status::OK();
+    }
+
+    /**
+     * Initializes the client half of the SASL library, but is effectively a no-op if the client
+     * application has already done it.
+     *
+     * If a client wishes to override this initialization but keep the allocator and mutex
+     * initialization, it should implement a MONGO_INITIALIZER_GENERAL with
+     * CyrusSaslAllocatorsAndMutexes as a prerequisite and SaslClientContext as a dependent.  If it
+     * wishes to override both, it should implement a MONGO_INITIALIZER_GENERAL with
+     * CyrusSaslAllocatorsAndMutexes and SaslClientContext as dependents, or initialize the library
+     * before calling mongo::runGlobalInitializersOrDie().
+     */
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SaslClientContext, ("CyrusSaslAllocatorsAndMutexes"))(
+            InitializerContext* context) {
+
+        static sasl_callback_t saslClientGlobalCallbacks[] = { { SASL_CB_LIST_END } };
+
+        // If the client application has previously called sasl_client_init(), the callbacks passed
+        // in here are ignored.
+        //
+        // TODO: Call sasl_client_done() at shutdown when we have a story for orderly shutdown.
+        int result = sasl_client_init(saslClientGlobalCallbacks);
+        if (result != SASL_OK) {
+            return Status(ErrorCodes::UnknownError,
+                          mongoutils::str::stream() <<
+                          "Could not initialize sasl client components (" <<
+                          sasl_errstring(result, NULL, NULL) <<
+                          ")");
+        }
+        return Status::OK();
+    }
 
     /**
      * Callback registered on the sasl_conn_t underlying a SaslClientSession to allow the Cyrus SASL
