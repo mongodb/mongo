@@ -758,6 +758,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				S2BT(session)->root_page = NULL;
+			if (__wt_page_is_modified(page))
+				__wt_cache_dirty_decr(
+				    session, page->memory_footprint);
 			__wt_page_out(session, &page);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
