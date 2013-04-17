@@ -99,9 +99,11 @@ wts_open(void)
 	/* Open any underlying key/value store data-source. */
 	if (DATASOURCE("kvsbdb"))
 		wiredtiger_kvs_bdb_init(conn);
-#if 0
 	if (DATASOURCE("kvsstec"))
+#if 0
 		wiredtiger_kvs_stec_init(conn);
+#else
+		die(ret, "kvsstec not loaded");
 #endif
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -231,9 +233,11 @@ wts_close()
 
 	if (DATASOURCE("kvsbdb"))
 		wiredtiger_kvs_bdb_close(conn);
-#if 0
 	if (DATASOURCE("kvsstec"))
+#if 0
 		wiredtiger_kvs_stec_close(conn);
+#else
+		die(ret, "kvsstec not loaded");
 #endif
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
