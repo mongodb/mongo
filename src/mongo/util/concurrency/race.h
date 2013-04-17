@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "../goodies.h" // printStackTrace
-#include "mutexdebugger.h"
+#include "mongo/util/concurrency/mutexdebugger.h"
+#include "mongo/util/goodies.h" // printStackTrace
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {

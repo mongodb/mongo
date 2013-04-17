@@ -16,10 +16,12 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "d_globals.h"
-#include "../util/concurrency/rwlock.h"
-#include "clientcursor.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/d_globals.h"
+
+#include "mongo/db/clientcursor.h"
+#include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo { 
 

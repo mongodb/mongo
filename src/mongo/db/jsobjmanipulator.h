@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "jsobj.h"
-//#include "dur.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

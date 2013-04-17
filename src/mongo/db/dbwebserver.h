@@ -17,7 +17,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../util/admin_access.h"
+#include <string>
+#include <vector>
+
+#include "mongo/util/admin_access.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 

@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "../util/alignedbuilder.h"
-#include "../util/mongoutils/hash.h"
-#include "../util/concurrency/synchronization.h"
-#include "cmdline.h"
-#include "durop.h"
-#include "dur.h"
-#include "taskqueue.h"
-#include "d_concurrency.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/durop.h"
+#include "mongo/db/taskqueue.h"
+#include "mongo/util/alignedbuilder.h"
+#include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/mongoutils/hash.h"
 
 namespace mongo {
     namespace dur {

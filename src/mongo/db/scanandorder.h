@@ -20,9 +20,9 @@
 
 #pragma once
 
-#include "indexkey.h"
-#include "queryutil.h"
-#include "projection.h"
+#include "mongo/db/indexkey.h"
+#include "mongo/db/projection.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 

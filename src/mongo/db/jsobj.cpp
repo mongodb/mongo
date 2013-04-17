@@ -17,7 +17,8 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
 #include "mongo/db/jsobj.h"
 
 #include <limits>
@@ -31,15 +32,14 @@
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/platform/float_utils.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
-
 
 // make sure our assumptions are valid
 BOOST_STATIC_ASSERT( sizeof(short) == 2 );

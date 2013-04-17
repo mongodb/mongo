@@ -18,7 +18,9 @@
 
 
 #include "mongo/pch.h"
-#include "lockstat.h"
+
+#include "mongo/db/lockstat.h"
+
 #include "mongo/db/jsobj.h"
 
 namespace mongo { 

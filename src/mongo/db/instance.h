@@ -19,11 +19,10 @@
 
 #pragma once
 
-
-#include "curop-inl.h"
-#include "cmdline.h"
-#include "client.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/curop-inl.h"
 
 namespace mongo {
 

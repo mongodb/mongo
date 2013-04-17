@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "../../util/concurrency/value.h"
+#include "mongo/util/concurrency/value.h"
 
 namespace mongo {
 

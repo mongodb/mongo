@@ -16,22 +16,24 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "d_concurrency.h"
-#include "../util/concurrency/qlock.h"
-#include "../util/concurrency/threadlocal.h"
-#include "../util/concurrency/rwlock.h"
-#include "../util/concurrency/mapsf.h"
-#include "../util/assert_util.h"
-#include "../util/stacktrace.h"
-#include "client.h"
-#include "curop.h"
-#include "namespacestring.h"
-#include "d_globals.h"
-#include "server.h"
-#include "dur.h"
-#include "lockstat.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/d_concurrency.h"
+
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/d_globals.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/lockstat.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/server.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/mapsf.h"
+#include "mongo/util/concurrency/qlock.h"
+#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/stacktrace.h"
 
 // oplog locking
 // no top level read locks

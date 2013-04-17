@@ -22,7 +22,7 @@
 */
 
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <string>
 #include <vector>
@@ -31,14 +31,14 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "jsobj.h"
-#include "pdfile.h"
-#include "namespace-inl.h"
-#include "commands.h"
-#include "cmdline.h"
-#include "curop-inl.h"
-#include "../util/background.h"
-#include "../scripting/engine.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 

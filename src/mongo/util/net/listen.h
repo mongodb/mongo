@@ -17,9 +17,9 @@
 
 #pragma once
 
-#include "sock.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 

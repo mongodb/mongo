@@ -15,6 +15,7 @@
  */
 
 #include "mongo/db/field_ref.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

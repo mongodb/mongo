@@ -15,21 +15,20 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
 
 #ifndef USE_ASIO
 
-#include "message.h"
-#include "message_port.h"
-#include "message_server.h"
-#include "listen.h"
-
-#include "../../db/cmdline.h"
-#include "../../db/lasterror.h"
-#include "../../db/stats/counters.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/message_port.h"
+#include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 
 #ifdef __linux__  // TODO: consider making this ifndef _WIN32

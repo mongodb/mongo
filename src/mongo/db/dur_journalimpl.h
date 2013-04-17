@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "dur_journalformat.h"
-#include "../util/logfile.h"
+#include "mongo/db/dur_journalformat.h"
+#include "mongo/util/logfile.h"
 
 namespace mongo {
     namespace dur {

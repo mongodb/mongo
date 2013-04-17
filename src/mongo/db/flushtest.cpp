@@ -14,10 +14,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include <stdio.h>
-#include "../util/goodies.h"
+#include "mongo/pch.h"
+
 #include <fcntl.h>
+#include <stdio.h>
+
+#include "mongo/util/goodies.h"
 
 namespace mongo {
 

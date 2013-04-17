@@ -17,17 +17,19 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "pdfile.h"
-#include "db.h"
-#include "../util/mmap.h"
-#include "../util/hashtab.h"
-#include "../scripting/engine.h"
+#include "mongo/pch.h"
+
 #include <algorithm>
 #include <list>
-#include "json.h"
-#include "clientcursor.h"
-#include "index_update.h"
+
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/db.h"
+#include "mongo/db/index_update.h"
+#include "mongo/db/json.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/hashtab.h"
+#include "mongo/util/mmap.h"
 
 /*
  capped collection layout

@@ -18,8 +18,10 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "scanandorder.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/scanandorder.h"
+
 #include "mongo/db/matcher.h"
 #include "mongo/db/parsed_query.h"
 #include "mongo/util/mongoutils/str.h"

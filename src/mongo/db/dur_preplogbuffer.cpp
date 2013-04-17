@@ -24,19 +24,20 @@
      @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
 
-#include "pch.h"
-#include "cmdline.h"
-#include "dur.h"
-#include "dur_journal.h"
-#include "dur_journalimpl.h"
-#include "dur_commitjob.h"
-#include "../util/mongoutils/hash.h"
-#include "../util/mongoutils/str.h"
-#include "../util/alignedbuilder.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/cmdline.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/dur_journal.h"
+#include "mongo/db/dur_journalimpl.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/server.h"
+#include "mongo/util/alignedbuilder.h"
+#include "mongo/util/mongoutils/hash.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
-#include "../util/timer.h"
-#include "dur_stats.h"
-#include "../server.h"
+#include "mongo/util/timer.h"
 
 using namespace mongoutils;
 

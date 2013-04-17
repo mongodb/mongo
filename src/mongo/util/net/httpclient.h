@@ -18,7 +18,8 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "sock.h"
+
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 

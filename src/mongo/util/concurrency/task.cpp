@@ -15,14 +15,16 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/condition.hpp>
 
-#include "task.h"
-#include "../goodies.h"
-#include "../startup_test.h"
-#include "../time_support.h"
+#include "mongo/util/concurrency/task.h"
+
+#include "mongo/util/concurrency/msg.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -81,7 +83,7 @@ namespace mongo {
     }
 }
 
-#include "msg.h"
+
 
 /* task::Server */
 

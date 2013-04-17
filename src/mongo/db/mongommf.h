@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "../util/mmap.h"
-#include "../util/paths.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/paths.h"
 
 namespace mongo {
 

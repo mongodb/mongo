@@ -16,12 +16,14 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "dur_commitjob.h"
-#include "dur_stats.h"
-#include "taskqueue.h"
-#include "client.h"
-#include "../util/concurrency/threadlocal.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/dur_commitjob.h"
+
+#include "mongo/db/client.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/db/taskqueue.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {

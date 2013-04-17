@@ -15,21 +15,20 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/net/message_port.h"
 
 #include <fcntl.h>
 #include <time.h>
 
-#include "message.h"
-#include "message_port.h"
-#include "listen.h"
-
-#include "../goodies.h"
-#include "../background.h"
-#include "../time_support.h"
-#include "../../db/cmdline.h"
-#include "../scopeguard.h"
-
+#include "mongo/db/cmdline.h"
+#include "mongo/util/background.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 #ifndef _WIN32
 # ifndef __sunos__

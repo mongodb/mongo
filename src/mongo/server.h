@@ -33,7 +33,7 @@
 #include <vector>
 #include <set>
 
-#include "bson/inline_decls.h"
+#include "mongo/bson/inline_decls.h"
 
 //using namespace std;
 //using namespace bson;

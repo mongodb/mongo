@@ -14,10 +14,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "../commands.h"
-#include "rs.h"
-#include "multicmd.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/commands.h"
+#include "mongo/db/repl/multicmd.h"
+#include "mongo/db/repl/rs.h"
 
 namespace mongo {
 

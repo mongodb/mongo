@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "diskloc.h"
-#include "mongommf.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/mongommf.h"
 
 namespace mongo {
 

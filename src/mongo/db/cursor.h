@@ -18,9 +18,9 @@
 
 #include "mongo/pch.h"
 
-#include "jsobj.h"
-#include "diskloc.h"
-#include "matcher.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher.h"
 #include "mongo/db/projection.h"
 
 namespace mongo {

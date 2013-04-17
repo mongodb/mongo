@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../background.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 

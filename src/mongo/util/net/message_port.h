@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "sock.h"
-#include "message.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 

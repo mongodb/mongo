@@ -15,13 +15,15 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "httpclient.h"
-#include "sock.h"
-#include "message.h"
-#include "message_port.h"
-#include "../mongoutils/str.h"
-#include "../../bson/util/builder.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/net/httpclient.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/message_port.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 
