@@ -316,6 +316,29 @@ public:
         return true;
     }
 
+    void importDocument (const std::string &ns, const BSONObj& o) {
+        bool doUpsert = _upsert;
+        BSONObjBuilder b;
+        if (_upsert) {
+            for (vector<string>::const_iterator it = _upsertFields.begin(),
+                 end = _upsertFields.end(); it != end; ++it) {
+                BSONElement e = o.getFieldDotted(it->c_str());
+                if (e.eoo()) {
+                    doUpsert = false;
+                    break;
+                }
+                b.appendAs(e, *it);
+            }
+        }
+
+        if (doUpsert) {
+            conn().update(ns, Query(b.obj()), o, true);
+        }
+        else {
+            conn().insert(ns.c_str(), o);
+        }
+    }
+
     int run() {
         string filename = getParam( "file" );
         long long fileSize = 0;
@@ -447,27 +470,9 @@ public:
                     _headerLine = false;
                 }
                 else if (_doimport) {
-                    bool doUpsert = _upsert;
-                    BSONObjBuilder b;
-                    if (_upsert) {
-                        for (vector<string>::const_iterator it=_upsertFields.begin(), end=_upsertFields.end(); it!=end; ++it) {
-                            BSONElement e = o.getFieldDotted(it->c_str());
-                            if (e.eoo()) {
-                                doUpsert = false;
-                                break;
-                            }
-                            b.appendAs(e, *it);
-                        }
-                    }
+                    importDocument(ns, o);
 
-                    if (doUpsert) {
-                        conn().update(ns, Query(b.obj()), o, true);
-                    }
-                    else {
-                        conn().insert( ns.c_str() , o );
-                    }
-
-                    if( num < 10 ) { 
+                    if (num < 10) {
                         // we absolutely want to check the first and last op of the batch. we do 
                         // a few more as that won't be too time expensive.
                         checkLastError();
