@@ -47,18 +47,16 @@ static WT_COMPRESSOR wt_snappy_compressor = {
     wt_snappy_compress, NULL, wt_snappy_decompress, wt_snappy_pre_size };
 
 int
-wiredtiger_extension_init(
-    WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, const char *config)
 {
-	WT_CONNECTION *conn;
+	(void)config;				/* Unused parameters */
 
-	(void)config;					/* Unused */
+						/* Find the extension API */
+	wt_api = connection->get_extension_api(connection);
 
-	wt_api = api;
-	conn = session->connection;
-
-	return (
-	    conn->add_compressor(conn, "snappy", &wt_snappy_compressor, NULL));
+						/* Load the compressor */
+	return (connection->add_compressor(
+	    connection, "snappy", &wt_snappy_compressor, NULL));
 }
 
 /* Snappy WT_COMPRESSOR for WT_CONNECTION::add_compressor. */

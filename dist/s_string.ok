@@ -319,6 +319,7 @@ conf
 config
 conn
 connectionp
+const
 cp
 crc
 cref

@@ -94,7 +94,7 @@ wts_open(void)
 		die(ret, "wiredtiger_open");
 	g.wts_conn = conn;
 						/* Load extension functions. */
-	wiredtiger_extension_api(conn, &wt_api);
+	wt_api = conn->get_extension_api(conn);
 
 	/* Open any underlying key/value store data-source. */
 	if (DATASOURCE("kvsbdb"))

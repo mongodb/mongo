@@ -10,35 +10,59 @@ been removed, and all configuration strings are now case-dependent.
 Applications may require modifications to resolve run-time errors.
 </dd>
 
-<dt>WT_DATA_SOURCE:: and WT_EXTENSION_API::</dt>
+<dt>Loading extensions and WT_EXTENSION_API::</dt>
 <dd>
-The following changes are only applicable to applications providing new
-implementations of the WiredTiger WT_DATA_SOURCE:: class and/or using
-the WiredTiger extension functions described in WT_EXTENSION_API::.
+The following changes are only applicable to applications loading
+extensions and/or using the WiredTiger extension functions described in
+WT_EXTENSION_API::.
 
 <ul>
 <li>
+The function called when loading an extension's signature has changed
+from <code>(WT_SESSION *session, WT_EXTENSION_API *api)</code> to
+<code>(WT_CONNECTION *connection)</code>, and the
+WT_CONNECTION::get_extension_api added to support retrieval of the
+extension API.  Applications may require modifications.
+
+<li>
+The type of all configuration arguments to extension methods has changed
+from \c "const char *" to \c "void *", and the WT_EXTENSION::config
+method added to support configuration parsing; applications may require
+modifications.
+
+<li>
 The undocumented \c wiredtiger_XXX defines for WT_EXTENSION_API:: extension
-functions have been removed from the \c wiredtiger_ext.h include file;
+methods have been removed from the \c wiredtiger_ext.h include file;
 applications should instead use the method handles referenced by the
-WT_EXTENSION_API:: handle to call those functions.
+WT_EXTENSION_API:: handle to call extension functions.
+
+<li>
+The extension API methods have all changed to require an additional parameter,
+the WT_EXTENSION_API method handle; applications may require modifications.
 
 <li>
 The WT_SESSION::msg_printf method was replaced by WT_EXTENSION_API::msg_printf;
 applications may require modifications.
+</ul>
+</dd>
 
+<dt>WT_DATA_SOURCE::</dt>
+<dd>
+The following changes are only applicable to applications providing new
+implementations of the WiredTiger WT_DATA_SOURCE:: class.
+
+<ul>
 <li>
 The WT_DATA_SOURCE:: class has three new methods: WT_DATA_SOURCE::compact,
 WT_DATA_SOURCE::salvage, and WT_DATA_SOURCE::verify; applications may
 require modifications to resolve compile errors.
 
 <li>
-The type of the configuration argument to the WT_DATA_SOURCE:: class
-methods has changed from \c "const char *" to \c "void *"; applications
-may require modifications to resolve compile errors.
+The \c owner argument to the WT_DATA_SOURCE::open_cursor method has been
+removed; applications may require modifications to resolve compile errors.
 
 <li>
-The \c owner argument to the WT_DATA_SOURCE::open_cursor method has been
+The \c exclusive argument to the WT_DATA_SOURCE::create method has been
 removed; applications may require modifications to resolve compile errors.
 </ul>
 </dd>

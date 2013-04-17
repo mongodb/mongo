@@ -828,7 +828,7 @@ wiredtiger_kvs_bdb_init(WT_CONNECTION *conn)
 	int ret;
 
 						/* Acquire the extension API. */
-	wiredtiger_extension_api(conn, &wt_ext);
+	wt_ext = conn->get_extension_api(conn);
 
 	memset(&ds, 0, sizeof(ds));
 

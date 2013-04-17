@@ -67,21 +67,21 @@ static int bz_workfactor = 0;
 static int bz_small = 0;
 
 int
-wiredtiger_extension_init(
-    WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, const char *config)
 {
-	WT_CONNECTION *conn;
+	(void)config;				/* Unused parameters */
 
-	(void)config;					/* Unused */
+						/* Find the extension API */
+	wt_api = connection->get_extension_api(connection);
 
-	wt_api = api;
-	conn = session->connection;
-
+						/* Load the compressor */
 #ifdef WIREDTIGER_TEST_COMPRESS_RAW
 	bzip2_compressor.compress_raw = bzip2_compress_raw;
-	return (conn->add_compressor(conn, "raw", &bzip2_compressor, NULL));
+	return (connection->add_compressor(
+	    connection, "raw", &bzip2_compressor, NULL));
 #else
-	return (conn->add_compressor(conn, "bzip2", &bzip2_compressor, NULL));
+	return (connection->add_compressor(
+	    connection, "bzip2", &bzip2_compressor, NULL));
 #endif
 }
 

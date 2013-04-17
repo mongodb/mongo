@@ -46,17 +46,16 @@ static WT_COMPRESSOR nop_compressor = {
 
 /*! [WT_EXTENSION_API initialization] */
 int
-wiredtiger_extension_init(
-    WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, const char *config)
 {
-	WT_CONNECTION *conn;
+	(void)config;				/* Unused parameters */
 
-	(void)config;					/* Unused */
+						/* Find the extension API */
+	wt_api = connection->get_extension_api(connection);
 
-	wt_api = api;
-	conn = session->connection;
-
-	return (conn->add_compressor(conn, "nop", &nop_compressor, NULL));
+						/* Load the compressor */
+	return (connection->add_compressor(
+	    connection, "nop", &nop_compressor, NULL));
 }
 /*! [WT_EXTENSION_API initialization] */
 

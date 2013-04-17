@@ -41,7 +41,7 @@ static WT_EXTENSION_API *wt_api;
 static void
 my_data_source_init(WT_CONNECTION *conn)
 {
-	wiredtiger_extension_api(conn, &wt_api);
+	wt_api = conn->get_extension_api(conn);
 }
 /*! [WT_EXTENSION_API declaration] */
 
