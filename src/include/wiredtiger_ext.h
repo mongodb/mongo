@@ -42,18 +42,6 @@ struct __wt_extension_config {
 	 * ("ISO C90"), that integer will be stored in the \c value field.
 	 */
 	int64_t value;
-
-	/*! The value of a configuration list.
-	 *
-	 * If the configuration string type is of type list, the \c argv field
-	 * will reference a NULL-terminated array of pointers to nul-terminated
-	 * strings.
-	 *
-	 * The argv array, and each string it references, will be returned in
-	 * allocated memory; both the strings and the array must be freed by
-	 * the application to avoid memory leaks.
-	 */
-	 char **argv;
 };
 
 /*! @addtogroup wt_ext
@@ -157,10 +145,25 @@ struct __wt_extension_api {
 	 * @param value the returned value
 	 * @errors
 	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG config
+	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG get_config
 	 */
 	int (*get_config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
 	    const char *key, void *config, WT_EXTENSION_CONFIG *value);
+
+	/*! Return the list entries of a configuration string value.
+	 * This method steps through the entries found in the last returned
+	 * value from WT_EXTENSION_API::get_config.  The last returned value
+	 * should be of type "list".
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param value the returned value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG get_config_next
+	 */
+	int (*get_config_next)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    WT_EXTENSION_CONFIG *value);
 };
 
 /*! @} */

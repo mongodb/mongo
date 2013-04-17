@@ -189,7 +189,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	{
-	/*! [WT_EXTENSION_CONFIG config] */
+	/*! [WT_EXTENSION_CONFIG get_config] */
 	WT_EXTENSION_CONFIG value;
 	const char *my_data_source_key;
 
@@ -212,15 +212,14 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		my_data_source_key = "recno";
 	else
 		my_data_source_key = "bytestring";
-	/*! [WT_EXTENSION_CONFIG config] */
+	/*! [WT_EXTENSION_CONFIG get_config] */
 
 	(void)my_data_source_key;
 	}
 
 	{
-	/*! [WT_EXTENSION_CONFIG list] */
+	/*! [WT_EXTENSION_CONFIG get_config_next] */
 	WT_EXTENSION_CONFIG value;
-	char **argv;
 
 	/*
 	 * Retrieve the value of the list type configuration string "paths".
@@ -233,15 +232,11 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	/*
-	 * Strings returned from WT_EXTENSION_API::config in the argv array are
-	 * nul-terminated.  The array and memory it references must be freed.
+	 * Step through the list of entries.
 	 */
-	for (argv = value.argv; *argv != NULL; ++argv)
-		printf("%s\n", *argv);
-	for (argv = value.argv; *argv != NULL; ++argv)
-		free(*argv);
-	free(argv);
-	/*! [WT_EXTENSION_CONFIG list] */
+	while ((ret = wt_api->get_config_next(wt_api, session, &value)) == 0)
+		printf("%.*s\n", (int)value.len, value.str);
+	/*! [WT_EXTENSION_CONFIG get_config_next] */
 	}
 
 	/*! [WT_DATA_SOURCE error message] */

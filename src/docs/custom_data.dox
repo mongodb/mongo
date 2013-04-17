@@ -157,12 +157,12 @@ integer value of a configuration string as follows:
 The WT_DATA_SOURCE::open_cursor method might retrieve the string value
 of a configuration string as follows:
 
-@snippet ex_data_source.c WT_EXTENSION_CONFIG config
+@snippet ex_data_source.c WT_EXTENSION_CONFIG get_config
 
 The WT_DATA_SOURCE::open_cursor method might retrieve the list value
 of a configuration string as follows:
 
-@snippet ex_data_source.c WT_EXTENSION_CONFIG list
+@snippet ex_data_source.c WT_EXTENSION_CONFIG get_config_next
 
 @subsection custom_ds_config_add Creating data-specific configuration strings
 

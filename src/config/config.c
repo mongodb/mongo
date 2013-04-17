@@ -660,59 +660,60 @@ int
 __wt_ext_get_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
     const char *key, void *cfg, WT_EXTENSION_CONFIG *value)
 {
-	WT_CONFIG conf;
-	WT_CONFIG_ITEM cval, k, v;
-	WT_DECL_RET;
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
-	int cnt;
-	char **argv, **ap;
 
+	conn = (WT_CONNECTION_IMPL *)wt_api;
 	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
-		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
-
-	argv = NULL;
+		session = conn->default_session;
 
 	memset(value, 0, sizeof(value));
 
 	WT_RET(__wt_config_gets(session, cfg, key, &cval));
 
+	/* Prepare for sequential traversal if it's a list. */
+	if (cval.type == ITEM_STRUCT) {
+		WT_RET(__wt_config_subinit(session, &conn->ext_conf, &cval));
+		conn->ext_conf_set = 1;
+	} else
+		conn->ext_conf_set = 0;
+
 	value->str = cval.str;
 	value->len = cval.len;
 	value->value = cval.val;
 
-	/*
-	 * Parse lists into a NULL-terminated  array of nul-terminated strings.
-	 */
-	if (cval.type == ITEM_STRUCT && cval.len != 0) {
-		/* Count out how many slots we'll need. */
-		WT_RET(__wt_config_subinit(session, &conf, &cval));
-		for (cnt = 0;
-		    (ret = __wt_config_next(&conf, &k, &v)) == 0; ++cnt)
-			;
-		if (ret != WT_NOTFOUND)
-			WT_RET(ret);
-
-		/* Allocate the argv array and fill it in. */
-		WT_RET(__wt_calloc_def(session, cnt + 1, &argv));
-
-		WT_RET(__wt_config_subinit(session, &conf, &cval));
-		for (cnt = 0;
-		    (ret = __wt_config_next(&conf, &k, &v)) == 0; ++cnt)
-			WT_ERR(
-			    __wt_strndup(session, k.str, k.len, &argv[cnt]));
-		if (ret != WT_NOTFOUND)
-			WT_ERR(ret);
-
-		value->argv = argv;
-	}
 	return (0);
+}
 
-err:	if (argv != NULL) {
-		for (ap = argv; *ap != NULL; ++ap)
-			__wt_free(session, *ap);
-		__wt_free(session, argv);
-	}
-	return (ret);
+/*
+ * __wt_ext_get_config_next --
+ *	Return the next entry from a configuration string that contains a list
+ * (external API only).
+ */
+int
+__wt_ext_get_config_next(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, WT_EXTENSION_CONFIG *value)
+{
+	WT_CONFIG_ITEM k, v;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	if (!conn->ext_conf_set)
+		WT_RET_MSG(session,
+		    EINVAL, "no configuration list available to step through");
+
+	WT_RET(__wt_config_next(&conn->ext_conf, &k, &v));
+
+	value->str = k.str;
+	value->len = k.len;
+	value->value = k.val;
+
+	return (0);
 }
 
 /*

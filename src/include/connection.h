@@ -87,6 +87,8 @@ struct __wt_connection_impl {
 	int connection_initialized;	/* Connection is initialized */
 
 	WT_EXTENSION_API extension_api;	/* Extension API */
+	WT_CONFIG ext_conf;		/* Extension API configuration */
+	int	  ext_conf_set;
 
 					/* Configuration */
 	const WT_CONFIG_ENTRY **config_entries;
