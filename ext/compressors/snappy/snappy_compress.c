@@ -47,7 +47,7 @@ static WT_COMPRESSOR wt_snappy_compressor = {
     wt_snappy_compress, NULL, wt_snappy_decompress, wt_snappy_pre_size };
 
 int
-wiredtiger_extension_init(WT_CONNECTION *connection, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, void *config)
 {
 	(void)config;				/* Unused parameters */
 

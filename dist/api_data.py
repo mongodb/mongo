@@ -509,7 +509,7 @@ methods = {
 	Config('entry', 'wiredtiger_extension_init', r'''
 		the entry point of the extension, called when the extension
 		is loaded.  The signature of the entry point is
-		<code>entry(WT_CONNECTION *, const char *config)</code>'''),
+		<code>entry(WT_CONNECTION *, void *config)</code>'''),
 	Config('prefix', '', r'''
 		a prefix for all names registered by this extension (e.g., to
 		make namespaces distinct or during upgrades'''),

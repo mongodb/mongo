@@ -46,7 +46,7 @@ static WT_COMPRESSOR nop_compressor = {
 
 /*! [WT_EXTENSION_API initialization] */
 int
-wiredtiger_extension_init(WT_CONNECTION *connection, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, void *config)
 {
 	(void)config;				/* Unused parameters */
 
