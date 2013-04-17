@@ -657,10 +657,9 @@ __wt_config_gets(WT_SESSION_IMPL *session,
  *	value for a given string key (external API version).
  */
 int
-__wt_ext_get_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
-    const char *key, void *cfg, WT_EXTENSION_CONFIG *value)
+__wt_ext_get_config(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, const char *key, void *cfg, WT_CONFIG_ITEM *cval)
 {
-	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
 
@@ -668,20 +667,14 @@ __wt_ext_get_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
 	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
 		session = conn->default_session;
 
-	memset(value, 0, sizeof(value));
-
-	WT_RET(__wt_config_gets(session, cfg, key, &cval));
+	WT_RET(__wt_config_gets(session, cfg, key, cval));
 
 	/* Prepare for sequential traversal if it's a list. */
-	if (cval.type == ITEM_STRUCT) {
-		WT_RET(__wt_config_subinit(session, &conn->ext_conf, &cval));
+	if (cval->type == ITEM_STRUCT) {
+		WT_RET(__wt_config_subinit(session, &conn->ext_conf, cval));
 		conn->ext_conf_set = 1;
 	} else
 		conn->ext_conf_set = 0;
-
-	value->str = cval.str;
-	value->len = cval.len;
-	value->value = cval.val;
 
 	return (0);
 }
@@ -692,10 +685,10 @@ __wt_ext_get_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
  * (external API only).
  */
 int
-__wt_ext_get_config_next(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session, WT_EXTENSION_CONFIG *value)
+__wt_ext_get_config_next(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ITEM *cval)
 {
-	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_ITEM v;
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
 
@@ -707,13 +700,7 @@ __wt_ext_get_config_next(WT_EXTENSION_API *wt_api,
 		WT_RET_MSG(session,
 		    EINVAL, "no configuration list available to step through");
 
-	WT_RET(__wt_config_next(&conn->ext_conf, &k, &v));
-
-	value->str = k.str;
-	value->len = k.len;
-	value->value = k.val;
-
-	return (0);
+	return (__wt_config_next(&conn->ext_conf, cval, &v));
 }
 
 /*

@@ -412,6 +412,7 @@ typedef int int_void;
 %immutable __wt_session::connection;
 
 %ignore __wt_buf;
+%ignore __wt_config_item;
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
 %ignore __wt_item;

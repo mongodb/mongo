@@ -70,13 +70,12 @@ extern "C" {
  *******************************************/
 struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
 struct __wt_compressor;	    typedef struct __wt_compressor WT_COMPRESSOR;
+struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
 struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
 struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
 struct __wt_data_source;    typedef struct __wt_data_source WT_DATA_SOURCE;
 struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
 struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
-struct __wt_extension_config;
-	typedef struct __wt_extension_config WT_EXTENSION_CONFIG;
 struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
 struct __wt_session;	    typedef struct __wt_session WT_SESSION;
@@ -2071,6 +2070,40 @@ struct __wt_extractor {
 	int (*extract)(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	    const WT_ITEM *key, const WT_ITEM *value,
 	    WT_ITEM *result);
+};
+
+/*! The configuration information returned by the WiredTiger extension function
+ * WT_EXTENSION_API::get_config.
+ */
+struct __wt_config_item {
+	/*! The value of a configuration string.
+	 *
+	 * Regardless of the type of the configuration string (boolean, int,
+	 * list or string), the \c str field will reference the value of the
+	 * configuration string.
+	 *
+	 * The bytes referenced by \c str are <b>not</b> be nul-terminated,
+	 * use the \c len field instead of a terminating nul byte.
+	 */
+	const char *str;
+
+	/*! The number of bytes in the value referenced by \c str. */
+	size_t len;
+
+	/*! The value of a configuration boolean or integer.
+	 *
+	 * If the configuration string's value is "true" or "false", the
+	 * \c val field will be set to 1 (true), or 0 (false).
+	 *
+	 * If the configuration string can be legally interpreted as an integer,
+	 * using the strtoll function rules as specified in ISO/IEC 9899:1990
+	 * ("ISO C90"), that integer will be stored in the \c val field.
+	 */
+	int64_t val;
+
+#if !defined(DOXYGEN) && !defined(SWIG)
+	enum { ITEM_STRING, ITEM_BOOL, ITEM_ID, ITEM_NUM, ITEM_STRUCT } type;
+#endif
 };
 
 /*! Entry point to an extension, implemented by loadable modules.

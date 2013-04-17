@@ -93,8 +93,6 @@ struct __wt_config_check;
     typedef struct __wt_config_check WT_CONFIG_CHECK;
 struct __wt_config_entry;
     typedef struct __wt_config_entry WT_CONFIG_ENTRY;
-struct __wt_config_item;
-    typedef struct __wt_config_item WT_CONFIG_ITEM;
 struct __wt_connection_impl;
     typedef struct __wt_connection_impl WT_CONNECTION_IMPL;
 struct __wt_connection_stats;

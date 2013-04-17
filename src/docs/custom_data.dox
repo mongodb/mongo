@@ -133,7 +133,7 @@ WT_SESSION::msg_printf method.  For example:
 
 Configuration information is provided to each WT_DATA_SOURCE:: method as an
 argument.  This configuration information can be parsed using the
-WT_EXTENSION_API::config method, and is returned in a WT_EXTENSION_CONFIG
+WT_EXTENSION_API::config method, and is returned in a WT_CONFIG_ITEM
 structure.
 
 For example, the \c append, \c overwrite \c key_format and \c value_format
@@ -157,12 +157,12 @@ integer value of a configuration string as follows:
 The WT_DATA_SOURCE::open_cursor method might retrieve the string value
 of a configuration string as follows:
 
-@snippet ex_data_source.c WT_EXTENSION_CONFIG get_config
+@snippet ex_data_source.c WT_EXTENSION get_config
 
 The WT_DATA_SOURCE::open_cursor method might retrieve the list value
 of a configuration string as follows:
 
-@snippet ex_data_source.c WT_EXTENSION_CONFIG get_config_next
+@snippet ex_data_source.c WT_EXTENSION get_config_next
 
 @subsection custom_ds_config_add Creating data-specific configuration strings
 

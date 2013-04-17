@@ -574,7 +574,7 @@ kvs_create(
 {
 	DB *db;
 	DBTYPE type;
-	WT_EXTENSION_CONFIG value;
+	WT_CONFIG_ITEM v;
 	uint32_t flags;
 	int ret, tret;
 	const char *name;
@@ -587,18 +587,18 @@ kvs_create(
 
 						/* Check key/value formats */
 	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "key_format", config, &value)) != 0)
+	    wt_ext, session, "key_format", config, &v)) != 0)
 		ERET(ret, session,
 		    "key_format configuration: %s", wiredtiger_strerror(ret));
-	type = value.len == 1 && value.str[0] == 'r' ? DB_RECNO : DB_BTREE;
+	type = v.len == 1 && v.str[0] == 'r' ? DB_RECNO : DB_BTREE;
 	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "value_format", config, &value)) != 0)
+	    wt_ext, session, "value_format", config, &v)) != 0)
 		ERET(ret, session,
 		    "value_format configuration: %s", wiredtiger_strerror(ret));
-	if (value.len == 2 && isdigit(value.str[0]) && value.str[1] == 't')
+	if (v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't')
 		ERET(EINVAL, session,
 		    "kvs_create: unsupported value format %.*s",
-		    (int)value.len, value.str);
+		    (int)v.len, v.str);
 
 	flags = DB_CREATE;
 
@@ -647,7 +647,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc,
 	CURSOR_SOURCE *cursor;
 	DATA_SOURCE *data;
 	DB *db;
-	WT_EXTENSION_CONFIG value;
+	WT_CONFIG_ITEM v;
 	int locked, ret, tret;
 	const char *name;
 
@@ -662,26 +662,26 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc,
 	cursor->dsrc = dsrc;
 						/* Parse configuration */
 	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "append", config, &value)) != 0) {
+	    wt_ext, session, "append", config, &v)) != 0) {
 		ESET(ret, session,
 		    "append configuration: %s", wiredtiger_strerror(ret));
 		goto err;
 	}
-	cursor->config_append = value.value != 0;
+	cursor->config_append = v.val != 0;
 	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "overwrite", config, &value)) != 0) {
+	    wt_ext, session, "overwrite", config, &v)) != 0) {
 		ESET(ret, session,
 		    "overwrite configuration: %s", wiredtiger_strerror(ret));
 		goto err;
 	}
-	cursor->config_overwrite = value.value != 0;
+	cursor->config_overwrite = v.val != 0;
 	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "key_format", config, &value)) != 0) {
+	    wt_ext, session, "key_format", config, &v)) != 0) {
 		ESET(ret, session,
 		    "key_format configuration: %s", wiredtiger_strerror(ret));
 		goto err;
 	}
-	cursor->config_recno = value.len == 1 && value.str[0] == 'r';
+	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
 
 	lock();
 	locked = 1;

@@ -14,36 +14,6 @@
 extern "C" {
 #endif
 
-/*! The configuration information returned by the WiredTiger extension function
- * WT_EXTENSION_API::get_config.
- */
-struct __wt_extension_config {
-	/*! The value of a configuration string.
-	 *
-	 * Regardless of the type of the configuration string (boolean, int,
-	 * list or string), the \c str field will reference the value of the
-	 * configuration string.
-	 *
-	 * The bytes referenced by \c str may <b>not</b> be nul-terminated,
-	 * use the \c len field instead of a terminating nul byte.
-	 */
-	const char *str;
-
-	/*! The number of bytes in the value referenced by \c str. */
-	size_t len;
-
-	/*! The value of a configuration boolean or integer.
-	 *
-	 * If the configuration string's value is "true" or "false", the
-	 * \c value field will be set to 1 (true), or 0 (false).
-	 *
-	 * If the configuration string can be legally interpreted as an integer,
-	 * using the strtoll function rules as specified in ISO/IEC 9899:1990
-	 * ("ISO C90"), that integer will be stored in the \c value field.
-	 */
-	int64_t value;
-};
-
 /*! @addtogroup wt_ext
  * @{
  */
@@ -145,10 +115,10 @@ struct __wt_extension_api {
 	 * @param value the returned value
 	 * @errors
 	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG get_config
+	 * @snippet ex_data_source.c WT_EXTENSION get_config
 	 */
 	int (*get_config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
-	    const char *key, void *config, WT_EXTENSION_CONFIG *value);
+	    const char *key, void *config, WT_CONFIG_ITEM *value);
 
 	/*! Return the list entries of a configuration string value.
 	 * This method steps through the entries found in the last returned
@@ -160,10 +130,10 @@ struct __wt_extension_api {
 	 * @param value the returned value
 	 * @errors
 	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG get_config_next
+	 * @snippet ex_data_source.c WT_EXTENSION get_config_next
 	 */
 	int (*get_config_next)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
-	    WT_EXTENSION_CONFIG *value);
+	    WT_CONFIG_ITEM *value);
 };
 
 /*! @} */

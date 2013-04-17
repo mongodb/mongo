@@ -15,13 +15,6 @@ struct __wt_config {
 	const int8_t *go;
 };
 
-struct __wt_config_item {
-	const char *str;
-	size_t len;
-	int64_t val;
-	enum { ITEM_STRING, ITEM_BOOL, ITEM_ID, ITEM_NUM, ITEM_STRUCT } type;
-};
-
 struct __wt_config_check {
 	const char *name;
 	const char *type;
