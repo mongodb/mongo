@@ -361,19 +361,10 @@ namespace mongo {
                 limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
 
             int idxNum = idxs[0];
-            IndexDetails& id = nsd->idx(idxNum);
-            if (CatalogHack::testIndexMigration()) {
-                auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, idxNum));
-                auto_ptr<HaystackAccessMethod> ham(new HaystackAccessMethod(desc.get()));
-                ham->searchCommand(nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
-                                   &result, limit);
-            } else {
-                GeoHaystackSearchIndex *si =
-                    static_cast<GeoHaystackSearchIndex*>(id.getSpec().getType());
-                verify(&id == si->getDetails());
-                si->searchCommand(nsd, nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
-                                  result, limit);
-            }
+            auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, idxNum));
+            auto_ptr<HaystackAccessMethod> ham(new HaystackAccessMethod(desc.get()));
+            ham->searchCommand(nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
+                               &result, limit);
             return 1;
         }
     } nameSearchCommand;

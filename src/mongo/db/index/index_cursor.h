@@ -147,6 +147,12 @@ namespace mongo {
 
         // Return a string describing the cursor.
         virtual string toString() = 0;
+
+        /**
+         *  Add debugging info to the provided builder.
+         * TODO(hk/alerner): We can do this better, perhaps with a more structured format.
+         */
+        virtual void explainDetails(BSONObjBuilder* b) { }
     };
 
     // All the options we might want to set on a cursor.
@@ -158,6 +164,10 @@ namespace mongo {
         };
 
         Direction direction;
+
+        // 2d indices need to know exactly how many results you want beforehand.
+        // Ignored by every other index.
+        int numWanted;
     };
 
 }  // namespace mongo

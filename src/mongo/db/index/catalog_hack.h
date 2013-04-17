@@ -14,6 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
@@ -35,31 +36,22 @@ namespace mongo {
             return new IndexDescriptor(nsd, idxNo, &id, id.info.obj());
         }
 
-        static bool isIndexMigrated(const BSONObj& keyPattern) {
-            string type = KeyPattern::findPluginName(keyPattern);
-            return "" == type || "fts" == type || "hashed" == type || "2dsphere" == type
-                   || "geoHaystack" == type;
-        }
-
-        // If true, use EmulatedCursor + IndexCursor when answering "special" queries.
-        static bool testCursorMigration() { return true; }
-
-        // If true, use IndexAccessMethod for insert/delete when possible.
-        static bool testIndexMigration() { return true; }
-
         static IndexAccessMethod* getIndex(IndexDescriptor* desc) {
             string type = KeyPattern::findPluginName(desc->keyPattern());
             if ("hashed" == type) {
                 return new HashAccessMethod(desc);
             } else if ("2dsphere" == type) {
                 return new S2AccessMethod(desc);
-            } else if ("fts" == type) {
+            } else if ("text" == type || "_fts" == type) {
                 return new FTSAccessMethod(desc);
             } else if ("geoHaystack" == type) {
                 return new HaystackAccessMethod(desc);
             } else if ("" == type) {
                 return new BtreeAccessMethod(desc);
+            } else if ("2d" == type) {
+                return new TwoDAccessMethod(desc);
             } else {
+                cout << "Can't find index for keypattern " << desc->keyPattern() << endl;
                 verify(0);
                 return NULL;
             }

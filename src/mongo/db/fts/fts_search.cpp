@@ -36,20 +36,19 @@ namespace mongo {
          * @param language, language of the query
          * @param filter, filter object
          */
-        FTSSearch::FTSSearch( NamespaceDetails* ns,
-                              const IndexDetails& id,
+        FTSSearch::FTSSearch( IndexDescriptor* descriptor,
+                              const FTSSpec& ftsSpec,
                               const BSONObj& indexPrefix,
                               const FTSQuery& query,
                               const BSONObj& filter )
-            : _ns( ns ),
-              _id( id ),
-              _fts( static_cast<FTSIndex*>(_id.getSpec().getType()) ),
+            : _descriptor(descriptor),
+              _ftsSpec(ftsSpec),
               _indexPrefix( indexPrefix ),
               _query( query ),
-              _ftsMatcher( query, static_cast<FTSIndex*>(_id.getSpec().getType())->getFtsSpec() ) {
+              _ftsMatcher(query, ftsSpec) {
 
             if ( !filter.isEmpty() )
-                _matcher.reset( new CoveredIndexMatcher( filter, _fts->keyPattern() ) );
+                _matcher.reset( new CoveredIndexMatcher( filter, _descriptor->keyPattern() ) );
 
             _keysLookedAt = 0;
             _objectsLookedAt = 0;
@@ -75,7 +74,12 @@ namespace mongo {
                 const string& term = _query.getTerms()[i];
                 BSONObj min = FTSIndexFormat::getIndexKey( MAX_WEIGHT, term, _indexPrefix );
                 BSONObj max = FTSIndexFormat::getIndexKey( 0, term, _indexPrefix );
-                shared_ptr<BtreeCursor> c( BtreeCursor::make( _ns, _id, min, max, true, -1 ) );
+
+                shared_ptr<BtreeCursor> c( BtreeCursor::make(
+                    nsdetails(_descriptor->parentNS().c_str()),
+                    _descriptor->getOnDisk(),
+                    min, max, true, -1 ) );
+
                 cursors.push_back( c );
             }
 
@@ -137,9 +141,9 @@ namespace mongo {
             BSONObj key = cursor->currKey();
 
             BSONObjIterator i( key );
-            for ( unsigned j = 0; j < _fts->getFtsSpec().numExtraBefore(); j++ )
+            for ( unsigned j = 0; j < _ftsSpec.numExtraBefore(); j++)
                 i.next();
-            i.next(); // move pase indexToken
+            i.next(); // move past indexToken
             BSONElement scoreElement = i.next();
 
             double score = scoreElement.number();

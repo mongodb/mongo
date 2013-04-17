@@ -91,7 +91,7 @@ namespace mongo {
          * called.  If the index was changed, we may return an error, as our ticket may have been
          * invalidated.
          */
-        virtual Status update(const UpdateTicket& ticket) = 0;
+        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated) = 0;
 
         /**
          * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of

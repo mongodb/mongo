@@ -42,7 +42,6 @@ namespace mongo {
     class HaystackAccessMethod : public BtreeBasedAccessMethod {
     public:
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_interface;
 
         HaystackAccessMethod(IndexDescriptor* descriptor);
         virtual ~HaystackAccessMethod() { }

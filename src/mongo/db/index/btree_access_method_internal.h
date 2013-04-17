@@ -56,7 +56,7 @@ namespace mongo {
                                       const InsertDeleteOptions& options,
                                       UpdateTicket* ticket);
 
-        virtual Status update(const UpdateTicket& ticket);
+        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated);
 
         virtual Status newCursor(IndexCursor **out) = 0;
 

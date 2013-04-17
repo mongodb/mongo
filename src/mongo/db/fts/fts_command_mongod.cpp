@@ -23,6 +23,8 @@
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/db/fts/fts_search.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/projection.h"
 #include "mongo/util/mongoutils/str.h"
@@ -86,14 +88,14 @@ namespace mongo {
                 return false;
             }
 
-            const IndexDetails& id = d->idx( idxMatches[0] );
             BSONObj indexPrefix;
 
-            FTSIndex* ftsIndex = static_cast<FTSIndex*>(id.getSpec().getType());
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, idxMatches[0]));
+            auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(descriptor.get()));
             if ( language == "" ) {
-                language = ftsIndex->getFtsSpec().defaultLanguage();
+                language = fam->getSpec().defaultLanguage();
             }
-            Status s = ftsIndex->getFtsSpec().getIndexPrefix( filter, &indexPrefix );
+            Status s = fam->getSpec().getIndexPrefix( filter, &indexPrefix );
             if ( !s.isOK() ) {
                 errmsg = s.toString();
                 return false;
@@ -108,7 +110,7 @@ namespace mongo {
             result.append( "queryDebugString", query.debugString() );
             result.append( "language", language );
 
-            FTSSearch search( d, id, indexPrefix, query, filter );
+            FTSSearch search(descriptor.get(), fam->getSpec(), indexPrefix, query, filter );
             search.go( &results, limit );
 
             // grab underlying container inside priority queue

@@ -114,6 +114,12 @@ namespace mongo {
          * Get the DiskLoc that the key at (bucket, keyOffset) points at.
          */
         virtual DiskLoc recordAt(DiskLoc bucket, int keyOffset) const = 0;
+
+        /**
+         * keyAt and recordAt at the same time.
+         */
+        virtual void keyAndRecordAt(DiskLoc bucket, int keyOffset, BSONObj* keyOut,
+                                    DiskLoc* recordOut) const = 0;
     };
 
 }  // namespace mongo

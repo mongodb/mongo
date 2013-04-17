@@ -18,40 +18,41 @@
 
 #include <vector>
 
-#include "mongo/db/btreecursor.h"
+#include "mongo/base/status.h"
 #include "mongo/db/geo/geoquery.h"
+#include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/index_cursor.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/platform/unordered_set.h"
-#include "third_party/s2/s2cap.h"
-#include "third_party/s2/s2regionintersection.h"
 
 namespace mongo {
 
-    /**
-     * This is the cursor that the caller of S2AccessMethod::newCursor actually gets.  When you call
-     * seek on a S2IndexCursor, it creates another cursor depending on the predicate in the query.
-     * The behavior for $near is so different than the behavior for the other geo predicates that
-     * it's best to separate the cursors.
-     */
-    class S2IndexCursor : public IndexCursor {
-    public:
-        S2IndexCursor(const S2IndexingParams& params, IndexDescriptor* descriptor);
-        virtual ~S2IndexCursor() { }
+    class TwoDAccessMethod;
 
-        // Parse the query, figure out if it's a near or a non-near predicate, and create the
-        // appropriate sub-cursor.
+    namespace twod_internal {
+        class GeoCursorBase;
+    }
+
+    class TwoDIndexCursor : public IndexCursor {
+    public:
+        TwoDIndexCursor(TwoDAccessMethod* accessMethod);
+
+        /**
+         *  Parse the query, figure out if it's a near or a non-near predicate, and create the
+         * appropriate sub-cursor.
+         */
         virtual Status seek(const BSONObj& position);
+
+        /**
+         * We pay attention to the numWanted option.
+         */
+        virtual Status setOptions(const CursorOptions& options);
 
         // Not implemented:
         virtual Status seek(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
+                            const vector<bool>& inclusive) { return Status::OK(); }
         virtual Status skip(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
-        virtual Status setOptions(const CursorOptions& options);
+                            const vector<bool>& inclusive) { return Status::OK(); }
 
         // Implemented:
         virtual bool isEOF() const;
@@ -65,10 +66,12 @@ namespace mongo {
         virtual Status restorePosition();
 
         virtual void aboutToDeleteBucket(const DiskLoc& bucket);
+        virtual void explainDetails(BSONObjBuilder* b);
 
     private:
-        S2IndexingParams _params;
-        IndexDescriptor *_descriptor;
-        scoped_ptr<IndexCursor> _underlyingCursor;
+        TwoDAccessMethod* _accessMethod;
+        int _numWanted;
+
+        scoped_ptr<twod_internal::GeoCursorBase> _underlyingCursor;
     };
 }  // namespace mongo

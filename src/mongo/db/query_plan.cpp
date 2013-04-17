@@ -252,17 +252,11 @@ doneCheckOrder:
                 numWanted = _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
             }
 
-            // TODO(hk): Migrate!
-            if (CatalogHack::testCursorMigration()
-                && CatalogHack::isIndexMigrated(_type->keyPattern())) {
-                IndexDescriptor* descriptor = CatalogHack::getDescriptor(_d, _idxNo);
-                IndexAccessMethod* iam = CatalogHack::getIndex(descriptor);
-                return shared_ptr<Cursor>(EmulatedCursor::make(descriptor, iam, _originalQuery,
-                                                               _order, numWanted,
-                                                               descriptor->keyPattern()));
-            }
-
-            return _type->newCursor( _originalQuery, _order, numWanted );
+            IndexDescriptor* descriptor = CatalogHack::getDescriptor(_d, _idxNo);
+            IndexAccessMethod* iam = CatalogHack::getIndex(descriptor);
+            return shared_ptr<Cursor>(EmulatedCursor::make(descriptor, iam, _originalQuery,
+                                                           _order, numWanted,
+                                                           descriptor->keyPattern()));
         }
 
         if ( _utility == Impossible ) {

@@ -149,6 +149,24 @@ namespace mongo {
             return b->keyNode(keyOffset).recordLoc;
         }
 
+        virtual void keyAndRecordAt(DiskLoc bucket, int keyOffset, BSONObj* keyOut,
+                                    DiskLoc* recordOut) const {
+            verify(!bucket.isNull());
+            const BtreeBucket<Version> *b = bucket.btree<Version>();
+            int n = b->getN();
+            if (n == b->INVALID_N_SENTINEL) {
+                throw UserException(deletedBucketCode, "keyAt bucket deleted");
+            }
+            dassert( n >= 0 && n < 10000 );
+            if (keyOffset >= n) {
+                *keyOut = BSONObj();
+                *recordOut = DiskLoc();
+            } else {
+                *keyOut = b->keyNode(keyOffset).key.toBson();
+                *recordOut = b->keyNode(keyOffset).recordLoc;
+            }
+        }
+
         virtual string dupKeyError(DiskLoc bucket, const IndexDetails &idx,
                                    const BSONObj& keyObj) const {
             typename Version::KeyOwned key(keyObj);

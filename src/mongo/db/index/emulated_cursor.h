@@ -30,6 +30,7 @@ namespace mongo {
 
     static const string SPHERE_2D_NAME = "2dsphere";
     static const string HASH_NAME = "hashed";
+    static const string GEO_2D_NAME = "2d";
 
     /**
      * This class is a crutch to help migrate from the old everything-is-a-Cursor world to the new
@@ -49,6 +50,9 @@ namespace mongo {
                                     const BSONObj& order,
                                     int numWanted,
                                     const BSONObj& keyPattern) {
+
+            verify(descriptor);
+            verify(indexAccessMethod);
 
             auto_ptr<EmulatedCursor> ret(new EmulatedCursor(descriptor, indexAccessMethod,
                                                             order, numWanted, keyPattern));
@@ -75,6 +79,11 @@ namespace mongo {
         }
         virtual long long nscanned() { return _nscanned; }
         virtual string toString() { return _indexCursor->toString(); }
+
+        virtual void explainDetails(BSONObjBuilder& b) {
+            _indexCursor->explainDetails(&b);
+            return;
+        }
 
         virtual bool advance() {
             _indexCursor->next();
@@ -105,21 +114,11 @@ namespace mongo {
             return _descriptor->keyPattern();
         }
 
-        // XXX: I think this is true for everything.
         virtual bool supportGetMore() { return _supportGetMore; }
-
-        // XXX: this is true for everything but '2d'.
         virtual bool supportYields() { return _supportYields; }
-
-        // XXX: true for 2dsphere
-        // XXX: false for 2d, hash
-        // XXX: I think it's correct yet slow to leave as 'true'.
         virtual bool isMultiKey() const { return _isMultiKey; }
-
-        // XXX: currently is set to 'true' for 2d and 2dsphere.
-        // XXX: default is false, though hash doesn't set it to true (?)
-        // XXX: I think it's correct yet slow to leave as 'true'.
         virtual bool modifiedKeys() const { return _modifiedKeys; }
+        virtual bool autoDedup() const { return _autoDedup; }
 
         virtual bool getsetdup(DiskLoc loc) {
             if (_shouldGetSetDup) {
@@ -144,23 +143,36 @@ namespace mongo {
             indexAccessMethod->newCursor(&cursor);
             _indexCursor.reset(cursor);
 
+            CursorOptions options;
+            options.numWanted = numWanted;
+            cursor->setOptions(options);
+
             if (HASH_NAME == _pluginName) {
                 _supportYields = true;
                 _supportGetMore = true;
                 _modifiedKeys = true;
                 _shouldGetSetDup = false;
+                _autoDedup = true;
             } else if (SPHERE_2D_NAME == _pluginName) {
                 _supportYields = true;
                 _supportGetMore = true;
                 _modifiedKeys = true;
-                // XXX: this duplicates the de-duplication in near cursors.  maybe fix near cursors
+                // Note: this duplicates the de-duplication in near cursors.  Fix near cursors
                 // to not de-dup themselves.
                 _shouldGetSetDup = true;
+                _autoDedup = false;
+            } else if (GEO_2D_NAME == _pluginName) {
+                _supportYields = false;
+                _supportGetMore = true;
+                _modifiedKeys = true;
+                _isMultiKey = false;
+                _shouldGetSetDup = false;
+                _autoDedup = false;
             } else {
                 verify(0);
             }
 
-            // _isMultiKey and _shouldGetSetDup are set in this.
+            // _isMultiKey and _shouldGetSetDup are set in this unless it's 2d.
             checkMultiKeyProperties();
         }
 
@@ -205,11 +217,17 @@ namespace mongo {
 
                 _matcher = shared_ptr<CoveredIndexMatcher>(
                     new CoveredIndexMatcher(filteredQuery, _keyPattern));
+            } else if (GEO_2D_NAME == _pluginName) {
+                // No-op matcher.
+                _matcher = shared_ptr<CoveredIndexMatcher>(
+                    new CoveredIndexMatcher(BSONObj(), BSONObj()));
             }
         }
 
         void checkMultiKeyProperties() {
-            _isMultiKey = _shouldGetSetDup = _descriptor->isMultikey();
+            if (GEO_2D_NAME != _pluginName) {
+                _isMultiKey = _shouldGetSetDup = _descriptor->isMultikey();
+            }
         }
 
         unordered_set<DiskLoc, DiskLoc::Hasher> _dups;
@@ -226,6 +244,7 @@ namespace mongo {
         bool _isMultiKey;
         bool _modifiedKeys;
         bool _shouldGetSetDup;
+        bool _autoDedup;
 
         BSONObj _keyPattern;
         string _pluginName;

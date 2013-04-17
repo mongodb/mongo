@@ -188,7 +188,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeBasedAccessMethod::update(const UpdateTicket& ticket) {
+    Status BtreeBasedAccessMethod::update(const UpdateTicket& ticket, int64_t* numUpdated) {
         if (!ticket._isValid) {
             return Status(ErrorCodes::InternalError, "Invalid updateticket in update");
         }
@@ -209,6 +209,8 @@ namespace mongo {
             _interface->unindex(_descriptor->getHead(), _descriptor->getOnDisk(), *data->removed[i],
                                 data->loc);
         }
+
+        *numUpdated = data->added.size();
 
         return Status::OK();
     }

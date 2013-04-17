@@ -28,6 +28,7 @@
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher.h"
 
 namespace mongo {
@@ -57,16 +58,13 @@ namespace mongo {
 
             typedef std::map<Record*,double> Scores;
 
-            FTSSearch( NamespaceDetails* ns,
-                       const IndexDetails& id,
+            FTSSearch( IndexDescriptor* descriptor,
+                       const FTSSpec& ftsSpec,
                        const BSONObj& indexPrefix,
                        const FTSQuery& query,
                        const BSONObj& filter );
 
-
             void go(Results* results, unsigned limit );
-
-            const FTSIndex * getIndex() const { return _fts; }
 
             long long getKeysLookedAt() const { return _keysLookedAt; }
             long long getObjLookedAt() const { return _objectsLookedAt; }
@@ -81,9 +79,8 @@ namespace mongo {
              */
             bool _ok( Record* record ) const;
 
-            NamespaceDetails* _ns;
-            const IndexDetails& _id;
-            FTSIndex* _fts;
+            IndexDescriptor* _descriptor;
+            const FTSSpec& _ftsSpec;
             BSONObj _indexPrefix;
             FTSQuery _query;
             FTSMatcher _ftsMatcher;

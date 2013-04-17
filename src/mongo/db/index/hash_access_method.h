@@ -32,7 +32,6 @@ namespace mongo {
     class HashAccessMethod : public BtreeBasedAccessMethod {
     public:
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_ordering;
 
         HashAccessMethod(IndexDescriptor* descriptor);
         virtual ~HashAccessMethod() { }

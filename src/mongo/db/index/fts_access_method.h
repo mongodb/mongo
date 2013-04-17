@@ -24,6 +24,13 @@
 
 namespace mongo {
 
+    // Because they're in another namespace, FTSAccessMethod can't be friends w/them unless they're
+    // forward declared.
+    namespace fts {
+        class FTSCommand;
+        class FTSSearch;
+    }
+
     class FTSAccessMethod : public BtreeBasedAccessMethod {
     public:
         FTSAccessMethod(IndexDescriptor* descriptor);
@@ -31,6 +38,11 @@ namespace mongo {
 
         // Not implemented:
         virtual Status newCursor(IndexCursor** out);
+
+    protected:
+        friend class fts::FTSCommand;
+        friend class fts::FTSSearch;
+        fts::FTSSpec& getSpec() { return _ftsSpec; }
 
     private:
         // Implemented:

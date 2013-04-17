@@ -251,34 +251,6 @@ namespace mongo {
         }
     }
 
-    void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
-                         BSONObj newObj, BSONObj oldObj, bool &changedId) {
-        int z = d.getTotalIndexCount();
-        v.resize(z);
-        for( int i = 0; i < z; i++ ) {
-            IndexDetails& idx = d.idx(i);
-            BSONObj idxKey = idx.info.obj().getObjectField("key"); // eg { ts : 1 }
-            IndexChanges& ch = v[i];
-            idx.getKeysFromObject(oldObj, ch.oldkeys);
-            idx.getKeysFromObject(newObj, ch.newkeys);
-            if( ch.newkeys.size() > 1 )
-                d.setIndexIsMultikey(ns, i);
-            setDifference(ch.oldkeys, ch.newkeys, ch.removed);
-            setDifference(ch.newkeys, ch.oldkeys, ch.added);
-            if ( ch.removed.size() > 0 && ch.added.size() > 0 && idx.isIdIndex() ) {
-                changedId = true;
-            }
-        }
-    }
-
-    void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc) {
-        int z = d.getTotalIndexCount();
-        for( int i = 0; i < z; i++ ) {
-            IndexDetails& idx = d.idx(i);
-            v[i].dupCheck(idx, curObjLoc);
-        }
-    }
-
     // should be { <something> : <simpletype[1|-1]>, .keyp.. }
     static bool validKeyPattern(BSONObj kp) {
         BSONObjIterator i(kp);
@@ -476,17 +448,5 @@ namespace mongo {
             verify(false);
         }
         _init(rules);
-    }
-
-    void IndexChanges::dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
-        if (added.empty() || 
-            !idx.unique() || 
-            ignoreUniqueIndex(idx)) {
-            return;
-        }
-        const Ordering ordering = Ordering::make(idx.keyPattern());
-
-        // "E11001 duplicate key on update"
-        idx.idxInterface().uassertIfDups(idx, added, idx.head, curObjLoc, ordering);
     }
 }

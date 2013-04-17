@@ -30,8 +30,6 @@ namespace mongo {
     class S2AccessMethod : public BtreeBasedAccessMethod {
     public:
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_interface;
-        using BtreeBasedAccessMethod::_ordering;
 
         S2AccessMethod(IndexDescriptor* descriptor);
         virtual ~S2AccessMethod() { }

@@ -33,6 +33,7 @@ _ disallow system* manipulations from the database.
 #include <list>
 
 #include "mongo/base/counter.h"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/pdfile_private.h"
@@ -45,6 +46,9 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index_update.h"
+#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
@@ -55,6 +59,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/hashtab.h"
@@ -1170,14 +1175,30 @@ namespace mongo {
             uassertStatusOK(AuthorizationManager::checkValidPrivilegeDocument(nsstring.db, objNew));
         }
 
+        uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew,
+                objNew["_id"] == objOld["_id"]);
+
         /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
-        vector<IndexChanges> changes;
-        bool changedId = false;
-        getIndexChanges(changes, ns, *d, objNew, objOld, changedId);
-        uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew , ! changedId );
-        dupCheck(changes, *d, dl);
+        OwnedPointerVector<UpdateTicket> updateTickets;
+        updateTickets.mutableVector().resize(d->getTotalIndexCount());
+        for (int i = 0; i < d->getTotalIndexCount(); ++i) {
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, i));
+            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+            InsertDeleteOptions options;
+            options.logIfError = false;
+            options.dupsAllowed = !(KeyPattern::isIdKeyPattern(descriptor->keyPattern())
+                                    || descriptor->unique())
+                                  || ignoreUniqueIndex(descriptor->getOnDisk());
+            updateTickets.mutableVector()[i] = new UpdateTicket();
+            Status ret = iam->validateUpdate(objOld, objNew, dl, options,
+                                             updateTickets.mutableVector()[i]);
+
+            if (Status::OK() != ret) {
+                uasserted(ASSERT_ID_DUPKEY, "Update validation failed: " + ret.toString());
+            }
+        }
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
@@ -1198,45 +1219,18 @@ namespace mongo {
         nsdt->notifyOfWriteOp();
         d->paddingFits();
 
-        /* have any index keys changed? */
-        {
-            int keyUpdates = 0;
-            int z = d->getTotalIndexCount();
-            for ( int x = 0; x < z; x++ ) {
-                IndexDetails& idx = d->idx(x);
-                IndexInterface& ii = idx.idxInterface();
-                for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
-                    try {
-                        bool found = ii.unindex(idx.head, idx, *changes[x].removed[i], dl);
-                        if ( ! found ) {
-                            RARELY warning() << "ns: " << ns << " couldn't unindex key: " << *changes[x].removed[i] 
-                                             << " for doc: " << objOld["_id"] << endl;
-                        }
-                    }
-                    catch (AssertionException&) {
-                        debug.extra << " exception update unindex ";
-                        problem() << " caught assertion update unindex " << idx.indexNamespace() << endl;
-                    }
-                }
-                verify( !dl.isNull() );
-                BSONObj idxKey = idx.info.obj().getObjectField("key");
-                Ordering ordering = Ordering::make(idxKey);
-                keyUpdates += changes[x].added.size();
-                for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
-                    try {
-                        /* we did the dupCheck() above.  so we don't have to worry about it here. */
-                        ii.bt_insert(
-                            idx.head,
-                            dl, *changes[x].added[i], ordering, /*dupsAllowed*/true, idx);
-                    }
-                    catch (AssertionException& e) {
-                        debug.extra << " exception update index ";
-                        problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << " " << objNew["_id"] << endl;
-                    }
-                }
+        debug.keyUpdates = 0;
+
+        for (int i = 0; i < d->getTotalIndexCount(); ++i) {
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, i));
+            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+            int64_t updatedKeys;
+            Status ret = iam->update(*updateTickets.vector()[i], &updatedKeys);
+            if (Status::OK() != ret) {
+                // This shouldn't happen unless something disastrous occurred.
+                massert(16799, "update failed: " + ret.toString(), false);
             }
-            
-            debug.keyUpdates = keyUpdates;
+            debug.keyUpdates += updatedKeys;
         }
 
         //  update in place
