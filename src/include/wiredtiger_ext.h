@@ -18,38 +18,29 @@ extern "C" {
  * @{
  */
 
-/*! Table of WiredTiger extension functions.
+/*! Table of WiredTiger extension methods.
  *
- * This structure is used to provide a set of WiredTiger functions to extension
- * modules without needing to link the modules with the WiredTiger library, for
- * example, a compression module configured using the
- * WT_CONNECTION::add_compressor method.
+ * This structure is used to provide a set of WiredTiger methods to extension
+ * modules without needing to link the modules with the WiredTiger library.
  *
- * To use these functions in extension modules not linked with the WiredTiger
- * library:
+ * The extension methods may be used both by modules that are linked with
+ * the WiredTiger library (for example, a data source configured using the
+ * WT_CONNECTION::add_data_source method), and by modules not linked with the
+ * WiredTiger library (for example, a compression module configured using the
+ * WT_CONNECTION::add_compressor method).
+ *
+ * To use these functions:
  * - include the wiredtiger_ext.h header file,
  * - declare a variable which references a WT_EXTENSION_API structure, and
- * - initialize the variable using the argument passed to the module's
- * initialization function.
+ * - initialize the variable using WT_CONNECTION::get_extension_api method.
  *
- * The following code is from the sample compression module:
+ * @snippet ex_data_source.c WT_EXTENSION_API declaration
+ *
+ * The following code is from the sample compression module, where the
+ * extension functions are configured  in the extension's entry point:
  *
  * @snippet nop_compress.c WT_EXTENSION_API declaration
  * @snippet nop_compress.c WT_EXTENSION_API initialization
- *
- * The extension functions may also be used by modules that are linked with
- * the WiredTiger library, for example, a data source configured using the
- * WT_CONNECTION::add_data_source method.
- *
- * To use these functions in extension modules linked with the WiredTiger
- * library:
- * - include the wiredtiger_ext.h header file,
- * - declare a variable which references a WT_EXTENSION_API structure, and
- * - call the wiredtiger_extension_api function to initialize that variable.
- *
- * For example:
- *
- * @snippet ex_data_source.c WT_EXTENSION_API declaration
  */
 struct __wt_extension_api {
 /* !!! To maintain backwards compatibility, this structure is append-only. */
