@@ -161,6 +161,7 @@ namespace mongo {
         ::_exit(EXIT_ABRUPT);
     }
 
+#ifndef _WIN32
     sigset_t asyncSignals;
 
     void signalProcessingThread() {
@@ -182,11 +183,10 @@ namespace mongo {
     }
 
     void startSignalProcessingThread() {
-#ifndef _WIN32
         verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( signalProcessingThread );
-#endif
     }
+#endif  // not _WIN32
 
     void setupSignalHandlers() {
         setupSIGTRAPforGDB();
@@ -208,9 +208,11 @@ namespace mongo {
         signal( SIGPIPE , SIG_IGN );
 #endif
 
+#ifndef _WIN32
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGUSR1 );
         startSignalProcessingThread();
+#endif
 
         setWindowsUnhandledExceptionFilter();
         set_new_handler( my_new_handler );
