@@ -791,6 +791,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\repl\connections.h" />
     <ClInclude Include="..\db\repl\finding_start_cursor.h" />
     <ClInclude Include="..\db\repl\health.h" />
+    <ClInclude Include="..\db\repl\is_master.h" />
     <ClInclude Include="..\db\repl\master_slave.h" />
     <ClInclude Include="..\db\repl\multicmd.h" />
     <ClInclude Include="..\db\repl\oplog.h" />

@@ -2779,9 +2779,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="query_plan_selection_policy.h" />
     <ClInclude Include="query_plan_summary.h" />
     <ClInclude Include="record.h" />
-    <ClInclude Include="replutil.h" />
     <ClInclude Include="repl\bgsync.h" />
     <ClInclude Include="repl\finding_start_cursor.h" />
+    <ClInclude Include="repl\is_master.h" />
     <ClInclude Include="repl\master_slave.h" />
     <ClInclude Include="repl\oplog.h" />
     <ClInclude Include="repl\oplogreader.h" />

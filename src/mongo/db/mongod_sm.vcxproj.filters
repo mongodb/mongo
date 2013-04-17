@@ -2879,9 +2879,6 @@
     <ClInclude Include="record.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="replutil.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="restapi.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -3208,6 +3205,9 @@
     </ClInclude>
     <ClInclude Include="index\haystack_access_method_internal.h">
       <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\is_master.h">
+      <Filter>db\repl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

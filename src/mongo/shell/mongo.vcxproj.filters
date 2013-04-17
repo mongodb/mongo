@@ -1393,9 +1393,6 @@
     <ClInclude Include="..\db\queryutil.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\replutil.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\repl\rs.h">
       <Filter>db\repl</Filter>
     </ClInclude>
@@ -2397,6 +2394,9 @@
     </ClInclude>
     <ClInclude Include="..\platform\hash_namespace.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\repl\is_master.h">
+      <Filter>db\repl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

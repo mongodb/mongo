@@ -3407,9 +3407,6 @@
     <ClInclude Include="record.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="replutil.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="restapi.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -4027,6 +4024,9 @@
     </ClInclude>
     <ClInclude Include="..\..\third_party\snappy\snappy-stubs-public.h">
       <Filter>third_party\snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\is_master.h">
+      <Filter>db\repl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1865,6 +1865,9 @@
     <ClInclude Include="..\db\index\haystack_access_method_internal.h">
       <Filter>db\index</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\repl\is_master.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
