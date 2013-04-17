@@ -95,48 +95,17 @@ struct __wt_extension_config {
  */
 struct __wt_extension_api {
 /* !!! To maintain backwards compatibility, this structure is append-only. */
-	/*! Insert an error message into the WiredTiger error stream.
-	 *
-	 * @param session the session handle
-	 * @param fmt a printf-like format specification
-	 * @errors
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_API err_printf
+#if !defined(SWIG) && !defined(DOXYGEN)
+	/*
+	 * Private fields.
 	 */
-	int (*err_printf)(WT_SESSION *session, const char *fmt, ...);
-
-	/*! Allocate short-term use scratch memory.
-	 *
-	 * @param session the session handle
-	 * @param bytes the number of bytes of memory needed
-	 * @returns A valid memory reference on success or NULL on error
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_API scr_alloc
-	 */
-	void *(*scr_alloc)(WT_SESSION *session, size_t bytes);
-
-	/*! Free short-term use scratch memory.
-	 *
-	 * @param session the session handle
-	 * @param ref a memory reference returned by WT_EXTENSION_API::scr_alloc
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_API scr_free
-	 */
-	void (*scr_free)(WT_SESSION *session, void *ref);
-
-	/*! Insert a message into the WiredTiger message stream.
-	 *
-	 * @param session the session handle
-	 * @param fmt a printf-like format specification
-	 * @errors
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_API msg_printf
-	 */
-	int (*msg_printf)(WT_SESSION *session, const char *fmt, ...);
+	WT_CONNECTION *conn;		/* Enclosing connection */
+#endif
 
 	/*! Return the value of a configuration string.
 	 *
-	 * @param session the session handle
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
 	 * @param key configuration key string
 	 * @param config the configuration information passed to a
 	 * WT_DATA_SOURCE:: method
@@ -145,18 +114,54 @@ struct __wt_extension_api {
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG config
 	 */
-	int (*config)(WT_SESSION *session,
+	int (*config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
 	    const char *key, void *config, WT_EXTENSION_CONFIG *value);
 
-	/*! Return a default WT_SESSION:: handle.
-	 * If extension API calls need to be made and no session handle has been
-	 * created, a temporary handle is available for temporary use.
+	/*! Insert an error message into the WiredTiger error stream.
 	 *
-	 * @param conn the connection handle
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param fmt a printf-like format specification
+	 * @errors
 	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_API default_session
+	 * @snippet ex_data_source.c WT_EXTENSION_API err_printf
 	 */
-	WT_SESSION * (*default_session)(WT_CONNECTION *conn);
+	int (*err_printf)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *fmt, ...);
+
+	/*! Insert a message into the WiredTiger message stream.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param fmt a printf-like format specification
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API msg_printf
+	 */
+	int (*msg_printf)(
+	    WT_EXTENSION_API *, WT_SESSION *session, const char *fmt, ...);
+
+	/*! Allocate short-term use scratch memory.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param bytes the number of bytes of memory needed
+	 * @returns A valid memory reference on success or NULL on error
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API scr_alloc
+	 */
+	void *(*scr_alloc)(
+	    WT_EXTENSION_API *wt_api, WT_SESSION *session, size_t bytes);
+
+	/*! Free short-term use scratch memory.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param ref a memory reference returned by WT_EXTENSION_API::scr_alloc
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API scr_free
+	 */
+	void (*scr_free)(WT_EXTENSION_API *, WT_SESSION *session, void *ref);
 };
 
 /*! @} */

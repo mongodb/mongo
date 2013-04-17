@@ -657,7 +657,7 @@ __wt_config_gets(WT_SESSION_IMPL *session,
  *	value for a given string key (external API version).
  */
 int
-__wt_ext_config(WT_SESSION *wt_session,
+__wt_ext_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
     const char *key, void *cfg, WT_EXTENSION_CONFIG *value)
 {
 	WT_CONFIG conf;
@@ -667,7 +667,9 @@ __wt_ext_config(WT_SESSION *wt_session,
 	int cnt;
 	char **argv, **ap;
 
-	session = (WT_SESSION_IMPL *)wt_session;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
+
 	argv = NULL;
 
 	memset(value, 0, sizeof(value));

@@ -57,7 +57,7 @@ wts_ops(void)
 	if (g.logging != 0) {
 		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session");
-		(void)wt_api->msg_printf(session,
+		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== thread ops start ===============");
 	}
 
@@ -108,7 +108,7 @@ wts_ops(void)
 	}
 
 	if (g.logging != 0) {
-		(void)wt_api->msg_printf(session,
+		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== thread ops stop ===============");
 		if ((ret = session->close(session, NULL)) != 0)
 			die(ret, "session.close");
@@ -216,9 +216,9 @@ ops(void *arg)
 			 */
 			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
-		/* kvsbdb doesn't support compaction. */
+		/* kvs doesn't support compaction. */
 		if (cnt == compact_op &&
-		    !DATASOURCE("kvsbdb") &&
+		    !DATASOURCE("kvsbdb") && !DATASOURCE("kvsstec") &&
 		    (ret = session->compact(session, g.uri, NULL)) != 0)
 			die(ret, "session.compact");
 
@@ -380,7 +380,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
-		(void)wt_api->msg_printf(
+		(void)wt_api->msg_printf(wt_api,
 		    session, "%-10s%" PRIu64, "read", keyno);
 
 	/* Retrieve the key/value pair by key. */
@@ -524,20 +524,20 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	if (g.logging == LOG_OPS)
 		switch (g.type) {
 		case FIX:
-			(void)wt_api->msg_printf(
+			(void)wt_api->msg_printf(wt_api,
 			    session, "%-10s%" PRIu64 " {0x%02x}", which,
 			    keyno, ((char *)value.data)[0]);
 			break;
 		case ROW:
-			(void)wt_api->msg_printf(session, "%-10s{%.*s/%.*s}",
-			    which,
+			(void)wt_api->msg_printf(
+			    wt_api, session, "%-10s{%.*s/%.*s}", which,
 			    (int)key.size, (char *)key.data,
 			    (int)value.size, (char *)value.data);
 			break;
 		case VAR:
-			(void)wt_api->msg_printf(
-			    session, "%-10s%" PRIu64 " {%.*s}",
-			    which, keyno, (int)value.size, (char *)value.data);
+			(void)wt_api->msg_printf(wt_api, session,
+			    "%-10s%" PRIu64 " {%.*s}", which,
+			    keyno, (int)value.size, (char *)value.data);
 			break;
 		}
 }
@@ -560,7 +560,8 @@ row_update(
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
-		(void)wt_api->msg_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
+		(void)wt_api->msg_printf(wt_api, session,
+		    "%-10s{%.*s}\n%-10s{%.*s}",
 		    insert ? "insertK" : "putK",
 		    (int)key->size, (char *)key->data,
 		    insert ? "insertV" : "putV",
@@ -598,12 +599,12 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
 		if (g.type == FIX)
-			(void)wt_api->msg_printf(session,
+			(void)wt_api->msg_printf(wt_api, session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "update", keyno,
 			    ((uint8_t *)value->data)[0]);
 		else
-			(void)wt_api->msg_printf(session,
+			(void)wt_api->msg_printf(wt_api, session,
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "update", keyno,
 			    (int)value->size, (char *)value->data);
@@ -661,12 +662,12 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 
 	if (g.logging == LOG_OPS) {
 		if (g.type == FIX)
-			(void)wt_api->msg_printf(session,
+			(void)wt_api->msg_printf(wt_api, session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "insert", keyno,
 			    ((uint8_t *)value->data)[0]);
 		else
-			(void)wt_api->msg_printf(session,
+			(void)wt_api->msg_printf(wt_api, session,
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "insert", keyno,
 			    (int)value->size, (char *)value->data);
@@ -696,7 +697,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
 		(void)wt_api->msg_printf(
-		    session, "%-10s%" PRIu64, "remove", keyno);
+		    wt_api, session, "%-10s%" PRIu64, "remove", keyno);
 
 	cursor->set_key(cursor, key);
 	ret = cursor->remove(cursor);
@@ -731,7 +732,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
 		(void)wt_api->msg_printf(
-		    session, "%-10s%" PRIu64, "remove", keyno);
+		    wt_api, session, "%-10s%" PRIu64, "remove", keyno);
 
 	cursor->set_key(cursor, keyno);
 	ret = cursor->remove(cursor);

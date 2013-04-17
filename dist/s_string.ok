@@ -275,6 +275,7 @@ btmem
 btree
 btrees
 buf
+bufs
 builtin
 bytelock
 bytestring
@@ -486,6 +487,7 @@ keyv
 kv
 kvs
 kvsbdb
+kvsstec
 ld
 len
 lenp
@@ -676,6 +678,7 @@ stdarg
 stderr
 stdin
 stdout
+stec
 str
 strcmp
 strdup

@@ -67,8 +67,6 @@ wts_open(void)
 	int ret;
 	char config[2048], *end, *p;
 
-	wiredtiger_extension_api(&wt_api);	/* Extension functions. */
-
 	/*
 	 * Open configuration.
 	 *
@@ -77,10 +75,9 @@ wts_open(void)
 	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,cache_size=%" PRIu32 "MB,"
+	    "create,sync=false,cache_size=%" PRIu32 "MB,"
 	    "error_prefix=\"%s\","
-	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s,"
-	    "sync=false,",
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
 	    g.c_cache,
 	    g.progname,
 	    REVERSE_PATH,
@@ -96,10 +93,16 @@ wts_open(void)
 	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open");
 	g.wts_conn = conn;
+						/* Load extension functions. */
+	wiredtiger_extension_api(conn, &wt_api);
 
 	/* Open any underlying key/value store data-source. */
 	if (DATASOURCE("kvsbdb"))
-		kvsbdb_init(conn, RUNDIR_KVS);
+		wiredtiger_kvs_bdb_init(conn);
+#if 0
+	if (DATASOURCE("kvsstec"))
+		wiredtiger_kvs_stec_init(conn);
+#endif
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
@@ -206,6 +209,11 @@ wts_open(void)
 	/* Configure Btree split page percentage. */
 	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
+	/* Configure KVS devices. */
+	if (DATASOURCE("kvsstec"))
+		p += snprintf(
+		    p, (size_t)(end - p), ",kvs_devices=[RUNDIR/KVS]");
+
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
 
@@ -222,7 +230,11 @@ wts_close()
 	conn = g.wts_conn;
 
 	if (DATASOURCE("kvsbdb"))
-		kvsbdb_close(conn);
+		wiredtiger_kvs_bdb_close(conn);
+#if 0
+	if (DATASOURCE("kvsstec"))
+		wiredtiger_kvs_stec_close(conn);
+#endif
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
 }
@@ -234,7 +246,7 @@ wts_dump(const char *tag, int dump_bdb)
 	char cmd[256];
 
 	/* Data-sources don't support dump comparisons. */
-	if (DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		return;
 
 	track("dump files and compare", 0ULL, NULL);
@@ -262,7 +274,7 @@ wts_salvage(void)
 	int ret;
 
 	/* Data-sources don't support salvage. */
-	if (DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		return;
 
 	conn = g.wts_conn;
@@ -300,12 +312,12 @@ wts_verify(const char *tag)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if (g.logging != 0)
-		(void)wt_api->msg_printf(session,
+		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== verify start ===============");
 	if ((ret = session->verify(session, g.uri, NULL)) != 0)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if (g.logging != 0)
-		(void)wt_api->msg_printf(session,
+		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== verify stop ===============");
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
@@ -328,7 +340,7 @@ wts_stats(void)
 	int ret;
 
 	/* Data-sources don't support statistics. */
-	if (DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		return;
 
 	conn = g.wts_conn;

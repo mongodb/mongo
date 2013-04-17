@@ -39,9 +39,9 @@
 static WT_EXTENSION_API *wt_api;
 
 static void
-my_data_source_init()
+my_data_source_init(WT_CONNECTION *conn)
 {
-	wiredtiger_extension_api(&wt_api);
+	wiredtiger_extension_api(conn, &wt_api);
 }
 /*! [WT_EXTENSION_API declaration] */
 
@@ -59,29 +59,30 @@ my_create(
 	{
 	const char *msg = "string";
 	/*! [WT_EXTENSION_API err_printf] */
-	(void)wt_api->err_printf(session, "extension error message: %s", msg);
+	(void)wt_api->err_printf(
+	    wt_api, session, "extension error message: %s", msg);
 	/*! [WT_EXTENSION_API err_printf] */
 	}
 
 	{
 	const char *msg = "string";
 	/*! [WT_EXTENSION_API msg_printf] */
-	(void)wt_api->msg_printf(session, "extension message: %s", msg);
+	(void)wt_api->msg_printf(wt_api, session, "extension message: %s", msg);
 	/*! [WT_EXTENSION_API msg_printf] */
 	}
 
 	{
 	/*! [WT_EXTENSION_API scr_alloc] */
 	void *buffer;
-	if ((buffer = wt_api->scr_alloc(session, 512)) == NULL) {
-		(void)wt_api->err_printf(session,
+	if ((buffer = wt_api->scr_alloc(wt_api, session, 512)) == NULL) {
+		(void)wt_api->err_printf(wt_api, session,
 		    "buffer allocation: %s", wiredtiger_strerror(ENOMEM));
 		return (ENOMEM);
 	}
 	/*! [WT_EXTENSION_API scr_alloc] */
 
 	/*! [WT_EXTENSION_API scr_free] */
-	wt_api->scr_free(session, buffer);
+	wt_api->scr_free(wt_api, session, buffer);
 	/*! [WT_EXTENSION_API scr_free] */
 	}
 
@@ -154,9 +155,9 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the boolean type configuration string
 	 * "overwrite".
 	 */
-	if ((ret =
-	    wt_api->config(session, "overwrite", config, &value)) != 0) {
-		(void)wt_api->err_printf(session,
+	if ((ret = wt_api->config(
+	    wt_api, session, "overwrite", config, &value)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
 		    "overwrite configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
 	}
@@ -175,9 +176,9 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the integer type configuration string
 	 * "page_size".
 	 */
-	if ((ret =
-	    wt_api->config(session, "page_size", config, &value)) != 0) {
-		(void)wt_api->err_printf(session,
+	if ((ret = wt_api->config(
+	    wt_api, session, "page_size", config, &value)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
 		    "page_size configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
 	}
@@ -196,9 +197,9 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the string type configuration string
 	 * "key_format".
 	 */
-	if ((ret =
-	    wt_api->config(session, "key_format", config, &value)) != 0) {
-		(void)wt_api->err_printf(session,
+	if ((ret = wt_api->config(
+	    wt_api, session, "key_format", config, &value)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
 		    "key_format configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
 	}
@@ -224,8 +225,9 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	/*
 	 * Retrieve the value of the list type configuration string "paths".
 	 */
-	if ((ret = wt_api->config(session, "paths", config, &value)) != 0) {
-		(void)wt_api->err_printf(session,
+	if ((ret =
+	    wt_api->config(wt_api, session, "paths", config, &value)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
 		    "paths configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
 	}
@@ -248,7 +250,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * error within WiredTiger's name space.
 	 */
 	if ((ret = data_source_cursor()) != 0) {
-		(void)wt_api->err_printf(
+		(void)wt_api->err_printf(wt_api,
 		    session, "my_open_cursor: %s", data_source_error(ret));
 		return (WT_ERROR);
 	}
@@ -326,7 +328,7 @@ main(void)
 
 	ret = wiredtiger_open(NULL, NULL, "create", &conn);
 
-	my_data_source_init();
+	my_data_source_init(conn);
 
 	{
 	/*! [WT_DATA_SOURCE register] */
@@ -398,8 +400,7 @@ main(void)
 	/*! [WT_DATA_SOURCE configure list with checking] */
 
 	/*! [WT_EXTENSION_API default_session] */
-	(void)wt_api->msg_printf(
-	    wt_api->default_session(conn), "configuration complete");
+	(void)wt_api->msg_printf(wt_api, NULL, "configuration complete");
 	/*! [WT_EXTENSION_API default_session] */
 
 	(void)conn->close(conn, NULL);

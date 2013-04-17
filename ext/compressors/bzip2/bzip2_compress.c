@@ -128,7 +128,7 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 		break;
 	}
 
-	(void)wt_api->err_printf(
+	(void)wt_api->err_printf(wt_api,
 	    session, "bzip2 error: %s: %s: %d", call, msg, bzret);
 	return (WT_ERROR);
 }
@@ -136,13 +136,13 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 static void *
 bzalloc(void *cookie, int number, int size)
 {
-	return (wt_api->scr_alloc(cookie, (size_t)(number * size)));
+	return (wt_api->scr_alloc(wt_api, cookie, (size_t)(number * size)));
 }
 
 static void
 bzfree(void *cookie, void *p)
 {
-	wt_api->scr_free(cookie, p);
+	wt_api->scr_free(wt_api, cookie, p);
 }
 
 static int

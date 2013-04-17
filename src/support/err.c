@@ -254,14 +254,19 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
  *	Extension API call to print to the error stream.
  */
 int
-__wt_ext_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+__wt_ext_err_printf(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
+
 	va_start(ap, fmt);
-	ret = __eventv((WT_SESSION_IMPL *)wt_session, 0, 0, NULL, 0, fmt, ap);
+	ret = __eventv(session, 0, 0, NULL, 0, fmt, ap);
 	va_end(ap);
 	return (ret);
 }
@@ -311,14 +316,19 @@ __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
  *	Extension API call to print to the message stream.
  */
 int
-__wt_ext_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+__wt_ext_msg_printf(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
+
 	va_start(ap, fmt);
-	ret = info_msg((WT_SESSION_IMPL *)wt_session, fmt, ap);
+	ret = info_msg(session, fmt, ap);
 	va_end(ap);
 	return (ret);
 }

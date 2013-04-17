@@ -9,32 +9,25 @@
 
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
-static WT_SESSION *
-__wt_ext_default_session(WT_CONNECTION *wt_conn)
-{
-	WT_CONNECTION_IMPL *conn;
-
-	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	return ((WT_SESSION *)conn->default_session);
-}
-
-static WT_EXTENSION_API __wiredtiger_extension_api = {
-	__wt_ext_err_printf,
-	__wt_ext_scr_alloc,
-	__wt_ext_scr_free,
-	__wt_ext_msg_printf,
-	__wt_ext_config,
-	__wt_ext_default_session,
-};
-
 /*
  * wiredtiger_extension_api --
  *	Return a reference to the extension functions.
  */
 void
-wiredtiger_extension_api(WT_EXTENSION_API **wt_apip)
+wiredtiger_extension_api(WT_CONNECTION *wt_conn, WT_EXTENSION_API **wt_apip)
 {
-	*wt_apip = &__wiredtiger_extension_api;
+	WT_CONNECTION_IMPL *conn;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+
+	conn->extension_api.conn = wt_conn;
+	conn->extension_api.config = __wt_ext_config;
+	conn->extension_api.err_printf = __wt_ext_err_printf;
+	conn->extension_api.msg_printf = __wt_ext_msg_printf;
+	conn->extension_api.scr_alloc = __wt_ext_scr_alloc;
+	conn->extension_api.scr_free = __wt_ext_scr_free;
+
+	*wt_apip = &conn->extension_api;
 }
 
 /*
@@ -49,6 +42,7 @@ __conn_load_extension(
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_DLH *dlh;
+	WT_EXTENSION_API *wt_api;
 	WT_SESSION_IMPL *session;
 	int (*entry)(WT_SESSION *, WT_EXTENSION_API *, const char *);
 	const char *entry_name;
@@ -72,8 +66,9 @@ __conn_load_extension(
 	WT_ERR(__wt_dlopen(session, path, &dlh));
 	WT_ERR(__wt_dlsym(session, dlh, entry_name, &entry));
 
-	/* Call the entry function. */
-	WT_ERR(entry(&session->iface, &__wiredtiger_extension_api, config));
+	/* Fill in the extension structure and call the entry function. */
+	wiredtiger_extension_api(wt_conn, &wt_api);
+	WT_ERR(entry(&session->iface, wt_api, config));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);

@@ -1634,9 +1634,11 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  *
  * @snippet ex_data_source.c WT_EXTENSION_API declaration
  *
+ * @param wt_conn the WT_CONNECTION handle
  * @param wt_apip a reference to a pointer to a WT_EXTENSION_API:: structure.
  */
-void wiredtiger_extension_api(WT_EXTENSION_API **wt_apip);
+void wiredtiger_extension_api(
+    WT_CONNECTION *wt_conn, WT_EXTENSION_API **wt_apip);
 
 /*******************************************
  * Error returns

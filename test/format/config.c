@@ -69,7 +69,8 @@ config_setup(void)
 	if (!config_find_is_perm("file_type", strlen("file_type")))
 		switch (MMRAND(0, 2)) {
 		case 0:
-			if (!DATASOURCE("lsm") && !DATASOURCE("kvsbdb")) {
+			if (!DATASOURCE("lsm") &&
+			    !DATASOURCE("kvsbdb") && !DATASOURCE("kvsstec")) {
 				config_single("file_type=fix", 0);
 				break;
 			}
@@ -90,9 +91,9 @@ config_setup(void)
 	 * If data_source and file_type were both "permanent", we may still
 	 * have a mismatch.
 	 */
-	if (DATASOURCE("kvsbdb") && g.type == FIX) {
+	if (DATASOURCE("kvsbdb") && DATASOURCE("kvsstec") && g.type == FIX) {
 		fprintf(stderr,
-	    "%s: kvsbdb data_source not compatible with fix file_type\n",
+	    "%s: kvs data_source not compatible with fix file_type\n",
 		    g.progname);
 		exit(EXIT_FAILURE);
 	}
@@ -133,7 +134,7 @@ config_setup(void)
 	}
 
 	/* KVS doesn't support user-specified collations. */
-	if (DATASOURCE("kvsbdb"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		g.c_reverse = 0;
 
 	config_compression();
@@ -353,6 +354,7 @@ config_single(const char *s, int perm)
 		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
 		    strncmp("file", ep, strlen("file")) != 0 &&
 		    strncmp("kvsbdb", ep, strlen("kvsbdb")) != 0 &&
+		    strncmp("kvsstec", ep, strlen("kvsstec")) != 0 &&
 		    strncmp("lsm", ep, strlen("lsm")) != 0 &&
 		    strncmp("table", ep, strlen("table")) != 0) {
 			    fprintf(stderr,

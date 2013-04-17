@@ -178,8 +178,6 @@ void	 die(int, const char *, ...);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
-void	 kvsbdb_close(WT_CONNECTION *);
-void	 kvsbdb_init(WT_CONNECTION *, const char *);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
@@ -194,3 +192,8 @@ void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
+
+void	 wiredtiger_kvs_bdb_close(WT_CONNECTION *);
+void	 wiredtiger_kvs_bdb_init(WT_CONNECTION *);
+void	 wiredtiger_kvs_stec_close(WT_CONNECTION *);
+void	 wiredtiger_kvs_stec_init(WT_CONNECTION *);
