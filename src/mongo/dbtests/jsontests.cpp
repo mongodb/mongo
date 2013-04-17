@@ -1954,13 +1954,27 @@ namespace JsonTests {
 
         class UnquotedFieldNameBad18 : public Bad {
             string json() const {
-                return "{ fail\u1337 : 1 }";
+                //here we fill the memory directly to test unicode values 
+                //In this case we set \u0700 and \uFF00
+                //Setting it directly in memory avoids MSVC error c4566
+                unsigned char u[ 6 ];
+                u[ 0 ] = 0xdc;
+                u[ 1 ] = 0x80;
+
+                u[ 2 ] = 0xef;
+                u[ 3 ] = 0xbc;
+                u[ 4 ] = 0x80;
+
+                u[ 5 ] = 0;
+                std::stringstream ss;
+                ss << "{ " << u << " : 1 }";
+                return ss.str();
             }
         };
 
         class UnquotedFieldNameBad19 : public Bad {
             string json() const {
-                return "{ bl\u3333p: 1 }";
+                return "{ bl\\u3333p: 1 }";
             }
         };
 
