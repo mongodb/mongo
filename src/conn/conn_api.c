@@ -313,6 +313,13 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
 		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL)) {
 			wt_session = &s->iface;
+			/*
+			 * Notify the application if we are automatically
+			 * closing their session handle.
+			 */
+			if (s->event_handler->handle_close != NULL)
+				s->event_handler->handle_close(
+				    s->event_handler, wt_session, NULL);
 			WT_TRET(wt_session->close(wt_session, config));
 		}
 	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)

@@ -67,8 +67,16 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		WT_TRET(__session_rollback_transaction(wt_session, NULL));
 
 	/* Close all open cursors. */
-	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
+	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL) {
+		/*
+		 * Notify the application if we are automatically closing
+		 * their cursor handle.
+		 */
+		if (session->event_handler->handle_close != NULL)
+			session->event_handler->handle_close(
+			    session->event_handler, wt_session, cursor);
 		WT_TRET(cursor->close(cursor));
+	}
 
 	WT_ASSERT(session, session->ncursors == 0);
 
