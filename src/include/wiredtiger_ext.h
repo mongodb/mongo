@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 /*! The configuration information returned by the WiredTiger extension function
- * WT_EXTENSION_API::config.
+ * WT_EXTENSION_API::get_config.
  */
 struct __wt_extension_config {
 	/*! The value of a configuration string.
@@ -101,22 +101,6 @@ struct __wt_extension_api {
 	 */
 	WT_CONNECTION *conn;		/* Enclosing connection */
 #endif
-
-	/*! Return the value of a configuration string.
-	 *
-	 * @param wt_api the extension handle
-	 * @param session the session handle (or NULL if none available)
-	 * @param key configuration key string
-	 * @param config the configuration information passed to a
-	 * WT_DATA_SOURCE:: method
-	 * @param value the returned value
-	 * @errors
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG config
-	 */
-	int (*config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
-	    const char *key, void *config, WT_EXTENSION_CONFIG *value);
-
 	/*! Insert an error message into the WiredTiger error stream.
 	 *
 	 * @param wt_api the extension handle
@@ -162,6 +146,21 @@ struct __wt_extension_api {
 	 * @snippet ex_data_source.c WT_EXTENSION_API scr_free
 	 */
 	void (*scr_free)(WT_EXTENSION_API *, WT_SESSION *session, void *ref);
+
+	/*! Return the value of a configuration string.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key configuration key string
+	 * @param config the configuration information passed to a
+	 * WT_DATA_SOURCE:: method
+	 * @param value the returned value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_CONFIG config
+	 */
+	int (*get_config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    const char *key, void *config, WT_EXTENSION_CONFIG *value);
 };
 
 /*! @} */

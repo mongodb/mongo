@@ -21,11 +21,11 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	conn->extension_api.conn = wt_conn;
-	conn->extension_api.config = __wt_ext_config;
 	conn->extension_api.err_printf = __wt_ext_err_printf;
 	conn->extension_api.msg_printf = __wt_ext_msg_printf;
 	conn->extension_api.scr_alloc = __wt_ext_scr_alloc;
 	conn->extension_api.scr_free = __wt_ext_scr_free;
+	conn->extension_api.get_config = __wt_ext_get_config;
 
 	return (&conn->extension_api);
 }

@@ -652,12 +652,12 @@ __wt_config_gets(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_ext_config --
+ * __wt_ext_get_config --
  *	Given a NULL-terminated list of configuration strings, find the final
  *	value for a given string key (external API version).
  */
 int
-__wt_ext_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
+__wt_ext_get_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
     const char *key, void *cfg, WT_EXTENSION_CONFIG *value)
 {
 	WT_CONFIG conf;

@@ -471,7 +471,7 @@ extern int __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_ext_config(WT_EXTENSION_API *wt_api,
+extern int __wt_ext_get_config(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     const char *key,
     void *cfg,
