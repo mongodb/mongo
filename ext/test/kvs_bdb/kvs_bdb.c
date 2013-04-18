@@ -95,27 +95,6 @@ struct __cursor_source {
 	int	 config_recno;			/* config "key_format=r" */
 };
 
-/*
- * die --
- *	Report an error and quit.
- */
-static void
-die(int e, const char *fmt, ...)
-{
-	va_list ap;
-
-	if (fmt != NULL) {				/* Death message. */
-		fprintf(stderr, "kvs_bdb: ");
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
-		if (e != 0)
-			fprintf(stderr, ": %s", wiredtiger_strerror(e));
-		fprintf(stderr, "\n");
-	}
-	exit(EXIT_FAILURE);
-}
-
 static void
 lock(void)
 {
@@ -848,16 +827,16 @@ wiredtiger_extension_load(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 
 	memset(&ds, 0, sizeof(ds));
 
-	if (pthread_rwlock_init(&ds.rwlock, NULL) != 0)
-		die(errno, "pthread_rwlock_init");
+	if ((ret = pthread_rwlock_init(&ds.rwlock, NULL)) != 0)
+		ERET(NULL, WT_PANIC, "lock init: %s", strerror(ret));
 
 	if ((ret = db_env_create(&dbenv, 0)) != 0)
-		die(0, "db_env_create: %s", db_strerror(ret));
+		ERET(NULL, WT_ERROR, "db_env_create: %s", db_strerror(ret));
 	dbenv->set_errpfx(dbenv, "bdb");
 	dbenv->set_errfile(dbenv, stderr);
 	if ((ret = dbenv->open(dbenv, "RUNDIR/KVS",
 	    DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_PRIVATE, 0)) != 0)
-		die(0, "DbEnv.open: %s", db_strerror(ret));
+		ERET(NULL, WT_ERROR, "DbEnv.open: %s", db_strerror(ret));
 
 	ds.dsrc.create = kvs_create;
 	ds.dsrc.compact = NULL;			/* No compaction */
@@ -869,7 +848,7 @@ wiredtiger_extension_load(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 	ds.dsrc.verify = kvs_verify;
 	if ((ret =
 	    conn->add_data_source(conn, "kvsbdb:", &ds.dsrc, NULL)) != 0)
-		die(ret, "WT_CONNECTION.add_data_source");
+		ERET(NULL, ret, "WT_CONNECTION.add_data_source");
 
 	return (0);
 }
@@ -881,10 +860,11 @@ wiredtiger_extension_unload(WT_CONNECTION *conn)
 
 	(void)conn;				/* Unused parameters */
 
-	 (void)pthread_rwlock_destroy(&ds.rwlock);
+	 if ((ret = pthread_rwlock_destroy(&ds.rwlock)) != 0)
+		ERET(NULL, WT_PANIC, "lock destroy: %s", strerror(ret));
 
 	if (dbenv != NULL && (ret = dbenv->close(dbenv, 0)) != 0)
-		die(0, "DB_ENV.close: %s", db_strerror(ret));
+		ERET(NULL, WT_ERROR, "DbEnv.close: %s", db_strerror(ret));
 
 	return (0);
 }
