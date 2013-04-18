@@ -1657,8 +1657,11 @@ namespace mongo {
         }
 
         BSONObjBuilder b;
+
+        // We special case the _id field in top-level objects and move it to the front.
+        // This matches other drivers behavior and makes finding the _id field quicker in BSON.
         if (depth == 0) {
-            if (o->HasRealNamedProperty(v8::String::New("_id"))) {
+            if (o->HasOwnProperty(v8::String::New("_id"))) {
                 v8ToMongoElement(b, "_id", o->Get(v8::String::New("_id")), 0, &originalBSON);
             }
         }
@@ -1669,7 +1672,7 @@ namespace mongo {
             v8::Local<v8::Value> value = o->Get(name);
             const string sname = toSTLString(name);
             if (depth == 0 && sname == "_id")
-                continue;
+                continue; // already handled above
 
             v8ToMongoElement(b, sname, value, depth + 1, &originalBSON);
         }
