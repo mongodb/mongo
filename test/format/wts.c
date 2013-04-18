@@ -77,7 +77,7 @@ wts_open(void)
 	snprintf(config, sizeof(config),
 	    "create,sync=false,cache_size=%" PRIu32 "MB,"
 	    "error_prefix=\"%s\","
-	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
 	    g.c_cache,
 	    g.progname,
 	    REVERSE_PATH,
@@ -86,6 +86,7 @@ wts_open(void)
 	    (access(RAW_PATH, R_OK) == 0 &&
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    access(KVS_BDB_PATH, R_OK) == 0 ? KVS_BDB_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
@@ -97,8 +98,6 @@ wts_open(void)
 	wt_api = conn->get_extension_api(conn);
 
 	/* Open any underlying key/value store data-source. */
-	if (DATASOURCE("kvsbdb"))
-		wiredtiger_kvs_bdb_init(conn);
 	if (DATASOURCE("kvsstec"))
 #if 0
 		wiredtiger_kvs_stec_init(conn);
@@ -231,8 +230,6 @@ wts_close()
 
 	conn = g.wts_conn;
 
-	if (DATASOURCE("kvsbdb"))
-		wiredtiger_kvs_bdb_close(conn);
 	if (DATASOURCE("kvsstec"))
 #if 0
 		wiredtiger_kvs_stec_close(conn);
@@ -258,7 +255,7 @@ wts_dump(const char *tag, int dump_bdb)
 	offset = snprintf(cmd, sizeof(cmd), "sh s_dumpcmp");
 	if (dump_bdb)
 		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -b");
+		    sizeof(cmd) - (size_t)offset, " -b %s", BERKELEY_DB_PATH);
 	if (g.type == FIX || g.type == VAR)
 		offset += snprintf(cmd + offset,
 		    sizeof(cmd) - (size_t)offset, " -c");

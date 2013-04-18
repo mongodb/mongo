@@ -41,7 +41,7 @@
 #include <unistd.h>
 
 #ifdef BDB
-#include "build_unix/db.h"
+#include <db.h>
 #endif
 #include <wiredtiger.h>
 
@@ -55,6 +55,8 @@ extern WT_EXTENSION_API *wt_api;
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
+#define	KVS_BDB_PATH							\
+	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
