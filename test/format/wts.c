@@ -249,7 +249,7 @@ wts_dump(const char *tag, int dump_bdb)
 	int offset, ret;
 	char cmd[256];
 
-	/* Data-sources don't support dump comparisons. */
+	/* Data-sources that don't support dump comparisons. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		return;
 
@@ -277,7 +277,7 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	/* Data-sources don't support salvage. */
+	/* Data-sources that don't support salvage. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		return;
 
@@ -310,6 +310,10 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
+	/* Data-sources that don't support dump comparisons. */
+	if (DATASOURCE("kvsstec"))
+		return;
+
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
@@ -318,8 +322,7 @@ wts_verify(const char *tag)
 	if (g.logging != 0)
 		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== verify start ===============");
-	ret = session->verify(session, g.uri, NULL);
-	if (ret != 0 && ret != EOPNOTSUPP)
+	if ((ret = session->verify(session, g.uri, NULL)) != 0)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if (g.logging != 0)
 		(void)wt_api->msg_printf(wt_api, session,
@@ -344,7 +347,7 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	/* Data-sources don't support statistics. */
+	/* Data-sources that don't support statistics. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		return;
 
