@@ -2072,7 +2072,9 @@ struct __wt_extractor {
 	    WT_ITEM *result);
 };
 
-/*! The configuration information returned by the WiredTiger extension function
+#if !defined(SWIG)
+/*!
+ * The configuration information returned by the WiredTiger extension function
  * WT_EXTENSION_API::get_config.
  */
 struct __wt_config_item {
@@ -2101,10 +2103,11 @@ struct __wt_config_item {
 	 */
 	int64_t val;
 
-#if !defined(DOXYGEN) && !defined(SWIG)
+#if !defined(DOXYGEN)
 	enum { ITEM_STRING, ITEM_BOOL, ITEM_ID, ITEM_NUM, ITEM_STRUCT } type;
 #endif
 };
+#endif /* SWIG */
 
 /*! Entry point to an extension, implemented by loadable modules.
  *

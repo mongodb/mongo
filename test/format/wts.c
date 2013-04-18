@@ -237,7 +237,7 @@ wts_close()
 #if 0
 		wiredtiger_kvs_stec_close(conn);
 #else
-		die(ret, "kvsstec not loaded");
+		die(ENOTSUP, "kvsstec not loaded");
 #endif
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
