@@ -70,8 +70,6 @@ extern "C" {
  *******************************************/
 struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
 struct __wt_compressor;	    typedef struct __wt_compressor WT_COMPRESSOR;
-struct __wt_config_arg;     typedef struct __wt_config_arg WT_CONFIG_ARG;
-struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
 struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
 struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
 struct __wt_data_source;    typedef struct __wt_data_source WT_DATA_SOURCE;
@@ -1713,6 +1711,13 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * @{
  */
 
+/*******************************************
+ * Forward structure declarations for the extension API
+ *******************************************/
+struct __wt_config_arg;	    typedef struct __wt_config_arg WT_CONFIG_ARG;
+struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
+struct __wt_config_scan;    typedef struct __wt_config_scan WT_CONFIG_SCAN;
+
 /*!
  * The interface implemented by applications to provide custom ordering of
  * records.
@@ -2076,51 +2081,6 @@ struct __wt_extractor {
 	    const WT_ITEM *key, const WT_ITEM *value,
 	    WT_ITEM *result);
 };
-
-#if !defined(SWIG)
-/*!
- * @typedef WT_CONFIG_ARG
- *
- * A configuration object passed to some extension interfaces.  This is an
- * opaque type: configuration values can be queried using
- * WT_EXTENSION_API::get_config.
- */
-
-/*!
- * The configuration information returned by the WiredTiger extension function
- * WT_EXTENSION_API::get_config.
- */
-struct __wt_config_item {
-	/*! The value of a configuration string.
-	 *
-	 * Regardless of the type of the configuration string (boolean, int,
-	 * list or string), the \c str field will reference the value of the
-	 * configuration string.
-	 *
-	 * The bytes referenced by \c str are <b>not</b> be nul-terminated,
-	 * use the \c len field instead of a terminating nul byte.
-	 */
-	const char *str;
-
-	/*! The number of bytes in the value referenced by \c str. */
-	size_t len;
-
-	/*! The value of a configuration boolean or integer.
-	 *
-	 * If the configuration string's value is "true" or "false", the
-	 * \c val field will be set to 1 (true), or 0 (false).
-	 *
-	 * If the configuration string can be legally interpreted as an integer,
-	 * using the strtoll function rules as specified in ISO/IEC 9899:1990
-	 * ("ISO C90"), that integer will be stored in the \c val field.
-	 */
-	int64_t val;
-
-#if !defined(DOXYGEN)
-	enum { ITEM_STRING, ITEM_BOOL, ITEM_ID, ITEM_NUM, ITEM_STRUCT } type;
-#endif
-};
-#endif /* SWIG */
 
 /*! Entry point when loading an extension, implemented by loadable modules.
  *

@@ -607,13 +607,13 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		return (ret);
 
 						/* Check key/value formats */
-	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "key_format", config, &v)) != 0)
+	if ((ret = wt_ext->config_get(
+	    wt_ext, session, config, "key_format", &v)) != 0)
 		ERET(session, ret,
 		    "key_format configuration: %s", wiredtiger_strerror(ret));
 	type = v.len == 1 && v.str[0] == 'r' ? DB_RECNO : DB_BTREE;
-	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "value_format", config, &v)) != 0)
+	if ((ret = wt_ext->config_get(
+	    wt_ext, session, config, "value_format", &v)) != 0)
 		ERET(session, ret,
 		    "value_format configuration: %s", wiredtiger_strerror(ret));
 	if (v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't')
@@ -682,22 +682,22 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	cursor->session = session;
 	cursor->dsrc = dsrc;
 						/* Parse configuration */
-	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "append", config, &v)) != 0) {
+	if ((ret = wt_ext->config_get(
+	    wt_ext, session, config, "append", &v)) != 0) {
 		ESET(session, ret,
 		    "append configuration: %s", wiredtiger_strerror(ret));
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
-	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "overwrite", config, &v)) != 0) {
+	if ((ret = wt_ext->config_get(
+	    wt_ext, session, config, "overwrite", &v)) != 0) {
 		ESET(session, ret,
 		    "overwrite configuration: %s", wiredtiger_strerror(ret));
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
-	if ((ret = wt_ext->get_config(
-	    wt_ext, session, "key_format", config, &v)) != 0) {
+	if ((ret = wt_ext->config_get(
+	    wt_ext, session, config, "key_format", &v)) != 0) {
 		ESET(session, ret,
 		    "key_format configuration: %s", wiredtiger_strerror(ret));
 		goto err;

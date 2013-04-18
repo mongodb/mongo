@@ -1591,6 +1591,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_compressor:=WT_COMPRESSOR \
                          __wt_config_arg:=WT_CONFIG_ARG \
                          __wt_config_item:=WT_CONFIG_ITEM \
+                         __wt_config_scan:=WT_CONFIG_SCAN \
                          __wt_connection:=WT_CONNECTION \
                          __wt_cursor:=WT_CURSOR \
                          __wt_data_source:=WT_DATA_SOURCE \

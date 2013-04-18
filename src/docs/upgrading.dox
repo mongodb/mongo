@@ -38,10 +38,10 @@ method added to support configuration parsing; applications may require
 modifications.
 
 <li>
-The undocumented \c wiredtiger_XXX defines for WT_EXTENSION_API:: extension
+The undocumented \c wiredtiger_XXX defines for WT_EXTENSION_API extension
 methods have been removed from the \c wiredtiger_ext.h include file;
 applications should instead use the method handles referenced by the
-WT_EXTENSION_API:: handle to call extension functions.
+WT_EXTENSION_API handle to call extension functions.
 
 <li>
 The extension API methods have all changed to require an additional parameter,
@@ -57,11 +57,11 @@ applications may require modifications.
 <dt>WT_DATA_SOURCE::</dt>
 <dd>
 The following changes are only applicable to applications providing new
-implementations of the WiredTiger WT_DATA_SOURCE:: class.
+implementations of the WiredTiger WT_DATA_SOURCE class.
 
 <ul>
 <li>
-The WT_DATA_SOURCE:: class has three new methods: WT_DATA_SOURCE::compact,
+The WT_DATA_SOURCE class has three new methods: WT_DATA_SOURCE::compact,
 WT_DATA_SOURCE::salvage, and WT_DATA_SOURCE::verify; applications may
 require modifications to resolve compile errors.
 

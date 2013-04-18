@@ -256,7 +256,8 @@ config_check(WT_SESSION_IMPL *session,
 	else
 		WT_RET(__wt_config_initn(session, &parser, config, config_len));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
-		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+		if (k.type != WT_CONFIG_ITEM_STRING &&
+		    k.type != WT_CONFIG_ITEM_ID)
 			WT_RET_MSG(session, EINVAL,
 			    "Invalid configuration key found: '%.*s'",
 			    (int)k.len, k.str);
@@ -271,8 +272,8 @@ config_check(WT_SESSION_IMPL *session,
 			    (int)k.len, k.str);
 
 		if (strcmp(checks[i].type, "boolean") == 0) {
-			badtype = (v.type != ITEM_BOOL &&
-			    (v.type != ITEM_NUM ||
+			badtype = (v.type != WT_CONFIG_ITEM_BOOL &&
+			    (v.type != WT_CONFIG_ITEM_NUM ||
 			    (v.val != 0 && v.val != 1)));
 		} else if (strcmp(checks[i].type, "category") == 0) {
 			/* Deal with categories of the form: XXX=(XXX=blah). */
@@ -286,9 +287,10 @@ config_check(WT_SESSION_IMPL *session,
 		} else if (strcmp(checks[i].type, "format") == 0) {
 			badtype = 0;
 		} else if (strcmp(checks[i].type, "int") == 0) {
-			badtype = (v.type != ITEM_NUM);
+			badtype = (v.type != WT_CONFIG_ITEM_NUM);
 		} else if (strcmp(checks[i].type, "list") == 0) {
-			badtype = (v.len > 0 && v.type != ITEM_STRUCT);
+			badtype = (v.len > 0 &&
+			    v.type != WT_CONFIG_ITEM_STRUCT);
 		} else if (strcmp(checks[i].type, "string") == 0) {
 			badtype = 0;
 		} else
@@ -326,7 +328,7 @@ config_check(WT_SESSION_IMPL *session,
 					WT_RET_MSG(session, EINVAL,
 					    "Key '%.*s' requires a value",
 					    (int)k.len, k.str);
-				if (v.type == ITEM_STRUCT) {
+				if (v.type == WT_CONFIG_ITEM_STRUCT) {
 					/*
 					 * Handle the 'verbose' case of a list
 					 * containing restricted choices.
