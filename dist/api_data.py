@@ -506,13 +506,17 @@ methods = {
 'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([
-	Config('entry', 'wiredtiger_extension_init', r'''
-		the entry point of the extension, called when the extension
-		is loaded.  The signature of the entry point is
+	Config('load', 'wiredtiger_extension_load', r'''
+		an entry point of the extension, called when the extension
+		is loaded.  The signature of the function is
 		<code>entry(WT_CONNECTION *, WT_CONFIG_ARG *config)</code>'''),
 	Config('prefix', '', r'''
 		a prefix for all names registered by this extension (e.g., to
 		make namespaces distinct or during upgrades'''),
+	Config('unload', 'wiredtiger_extension_unload', r'''
+		an entry point of the extension, called when the extension
+		is unloaded.  The signature of the function is
+		<code>entry(WT_CONNECTION *)</code>'''),
 ]),
 
 'connection.open_session' : Method(session_config),

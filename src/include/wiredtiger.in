@@ -1157,13 +1157,17 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
 	 * @configstart{connection.load_extension, see dist/api_data.py}
-	 * @config{entry, the entry point of the extension\, called when the
-	 * extension is loaded.  The signature of the entry point is
+	 * @config{load, an entry point of the extension\, called when the
+	 * extension is loaded.  The signature of the function is
 	 * <code>entry(WT_CONNECTION *\, WT_CONFIG_ARG *config)</code>., a
-	 * string; default \c wiredtiger_extension_init.}
+	 * string; default \c wiredtiger_extension_load.}
 	 * @config{prefix, a prefix for all names registered by this extension
 	 * (e.g.\, to make namespaces distinct or during upgrades., a string;
 	 * default empty.}
+	 * @config{unload, an entry point of the extension\, called when the
+	 * extension is unloaded.  The signature of the function is
+	 * <code>entry(WT_CONNECTION *)</code>., a string; default \c
+	 * wiredtiger_extension_unload.}
 	 * @configend
 	 * @errors
 	 */
@@ -2118,14 +2122,20 @@ struct __wt_config_item {
 };
 #endif /* SWIG */
 
-/*! Entry point to an extension, implemented by loadable modules.
+/*! Entry point when loading an extension, implemented by loadable modules.
  *
  * @param connection the connection handle
- * @param config the config string passed to WT_CONNECTION::load_extension
+ * @param config the config information passed to WT_CONNECTION::load_extension
  * @errors
  */
-extern int wiredtiger_extension_init(
+extern int wiredtiger_extension_load(
     WT_CONNECTION *connection, WT_CONFIG_ARG *config);
+/*! Entry point when unloading an extension, implemented by loadable modules.
+ *
+ * @param connection the connection handle
+ * @errors
+ */
+extern int wiredtiger_extension_unload(WT_CONNECTION *connection);
 
 /*! @} */
 

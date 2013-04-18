@@ -44,7 +44,7 @@ __conn_load_extension(
 	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
-	int (*entry)(WT_CONNECTION *, WT_CONFIG_ARG *);
+	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
 	const char *entry_name;
 
 	dlh = NULL;
@@ -53,7 +53,7 @@ __conn_load_extension(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
-	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "load", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
 
 	/*
@@ -62,22 +62,26 @@ __conn_load_extension(
 	 * count, and closing it simply decrements the ref count, and the last
 	 * close discards the reference entirely -- in other words, we do not
 	 * check to see if we've already opened this shared library.
+	 *
+	 * Fill in the extension structure and call the load function.
 	 */
 	WT_ERR(__wt_dlopen(session, path, &dlh));
-	WT_ERR(__wt_dlsym(session, dlh, entry_name, &entry));
+	WT_ERR(__wt_dlsym(session, dlh, entry_name, 1, &load));
+	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
-	/* Fill in the extension structure and call the entry function. */
-	WT_ERR(entry(wt_conn, (WT_CONFIG_ARG *)cfg));
+	/* Remember the unload function for when we close. */
+	WT_ERR(__wt_config_gets(session, cfg, "unload", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
+	WT_ERR(__wt_dlsym(session, dlh, entry_name, 0, &dlh->unload));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->dlhqh, dlh, q);
 	__wt_spin_unlock(session, &conn->api_lock);
+	dlh = NULL;
 
-	if (0) {
-err:		if (dlh != NULL)
-			WT_TRET(__wt_dlclose(session, dlh));
-	}
+err:	if (dlh != NULL)
+		WT_TRET(__wt_dlclose(session, dlh));
 	__wt_free(session, entry_name);
 
 	API_END_NOTFOUND_MAP(session, ret);

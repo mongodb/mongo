@@ -18,15 +18,22 @@ WT_EXTENSION_API::.
 
 <ul>
 <li>
-The function called when loading an extension's signature has changed
+The configuration string for specifying a non-standard load entry point has
+been changed from \c entry to \c load, and the default entry point name has
+been changed from \c wiredtiger_extension_init to \c wiredtiger_extension_load.
+Applications may require modifications.
+
+<li>
+The signature of the function called when loading an extension has changed
 from <code>(WT_SESSION *session, WT_EXTENSION_API *api)</code> to
-<code>(WT_CONNECTION *connection)</code>, and the
-WT_CONNECTION::get_extension_api added to support retrieval of the
-extension API.  Applications may require modifications.
+<code>(WT_CONNECTION *connection)</code>.   As no WT_EXTENSION_API
+handle reference is passed to the function, the
+WT_CONNECTION::get_extension_api has been added to support retrieval of
+the extension API.  Applications may require modifications.
 
 <li>
 The type of all configuration arguments to extension methods has changed
-from \c "const char *" to \c "void *", and the WT_EXTENSION::config
+from \c "const char *" to \c "WT_CONFIG_ARG *", and the WT_EXTENSION::config
 method added to support configuration parsing; applications may require
 modifications.
 
@@ -43,6 +50,7 @@ the WT_EXTENSION_API method handle; applications may require modifications.
 <li>
 The WT_SESSION::msg_printf method was replaced by WT_EXTENSION_API::msg_printf;
 applications may require modifications.
+
 </ul>
 </dd>
 

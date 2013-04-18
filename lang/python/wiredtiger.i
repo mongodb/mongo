@@ -433,7 +433,8 @@ typedef int int_void;
 %ignore wiredtiger_struct_unpack;
 %ignore wiredtiger_struct_unpackv;
 
-%ignore wiredtiger_extension_init;
+%ignore wiredtiger_extension_load;
+%ignore wiredtiger_extension_unload;
 
 /* Convert 'int *' to output args for wiredtiger_version */
 %apply int *OUTPUT { int * };

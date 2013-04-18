@@ -67,7 +67,7 @@ static int bz_workfactor = 0;
 static int bz_small = 0;
 
 int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+wiredtiger_extension_load(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	(void)config;				/* Unused parameters */
 
