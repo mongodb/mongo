@@ -2214,6 +2214,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="geo\shapes.cpp" />
+    <ClCompile Include="index\2d_access_method.cpp" />
+    <ClCompile Include="index\2d_index_cursor.cpp" />
     <ClCompile Include="index\btree_access_method.cpp" />
     <ClCompile Include="index\btree_index_cursor.cpp" />
     <ClCompile Include="index\btree_interface.cpp" />
@@ -2692,6 +2694,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="geo\shapes.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
+    <ClInclude Include="index\2d_access_method.h" />
+    <ClInclude Include="index\2d_common.h" />
+    <ClInclude Include="index\2d_index_cursor.h" />
     <ClInclude Include="index\btree_access_method.h" />
     <ClInclude Include="index\btree_access_method_internal.h" />
     <ClInclude Include="index\btree_index_cursor.h" />

@@ -1919,6 +1919,12 @@
     <ClCompile Include="..\s\range_deleter_test.cpp">
       <Filter>s</Filter>
     </ClCompile>
+    <ClCompile Include="index\2d_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\2d_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4060,6 +4066,15 @@
     </ClInclude>
     <ClInclude Include="..\s\range_deleter_stats.h">
       <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="index\2d_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\2d_common.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\2d_index_cursor.h">
+      <Filter>db\index</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
