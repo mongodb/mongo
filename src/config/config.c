@@ -343,7 +343,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	WT_CONFIG_ITEM *out = key;
 	int utf8_remain = 0;
 	static const WT_CONFIG_ITEM true_value = {
-		"", 0, 1, ITEM_BOOL
+		"", 0, 1, WT_CONFIG_ITEM_BOOL
 	};
 
 	key->len = 0;
@@ -370,7 +370,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 		case A_UP:
 			if (conf->top == -1)
 				conf->top = 1;
-			PUSH(0, ITEM_STRUCT);
+			PUSH(0, WT_CONFIG_ITEM_STRUCT);
 			++conf->depth;
 			break;
 
@@ -404,7 +404,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_QUP:
-			PUSH(1, ITEM_STRING);
+			PUSH(1, WT_CONFIG_ITEM_STRING);
 			conf->go = gostring;
 			break;
 
@@ -417,12 +417,12 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_BARE:
-			PUSH(0, ITEM_ID);
+			PUSH(0, WT_CONFIG_ITEM_ID);
 			conf->go = gobare;
 			break;
 
 		case A_NUMBARE:
-			PUSH(0, ITEM_NUM);
+			PUSH(0, WT_CONFIG_ITEM_NUM);
 			conf->go = gobare;
 			break;
 
@@ -497,15 +497,15 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 	if (value->len == 0)
 		return (0);
 
-	if (value->type == ITEM_ID) {
+	if (value->type == WT_CONFIG_ITEM_ID) {
 		if (strncasecmp(value->str, "true", value->len) == 0) {
-			value->type = ITEM_BOOL;
+			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 1;
 		} else if (strncasecmp(value->str, "false", value->len) == 0) {
-			value->type = ITEM_BOOL;
+			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 0;
 		}
-	} else if (value->type == ITEM_NUM) {
+	} else if (value->type == WT_CONFIG_ITEM_NUM) {
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
 
@@ -542,7 +542,7 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				 * might be okay, the required type will be
 				 * checked by __wt_config_check.
 				 */
-				value->type = ITEM_ID;
+				value->type = WT_CONFIG_ITEM_ID;
 				break;
 			}
 
@@ -552,7 +552,7 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		 * aren't well-formed integers: if an integer is expected, that
 		 * will be caught by __wt_config_check.
 		 */
-		if (value->type == ITEM_NUM && errno == ERANGE)
+		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
 			goto range;
 	}
 
@@ -588,7 +588,8 @@ __config_getraw(
 
 	found = 0;
 	while ((ret = __config_next(cparser, &k, &v)) == 0) {
-		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+		if (k.type != WT_CONFIG_ITEM_STRING &&
+		    k.type != WT_CONFIG_ITEM_ID)
 			continue;
 		if (k.len == key->len &&
 		    strncasecmp(key->str, k.str, k.len) == 0) {
@@ -646,64 +647,10 @@ int
 __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM key_item = { key, strlen(key), 0, ITEM_STRING };
+	WT_CONFIG_ITEM key_item =
+	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	return (__wt_config_get(session, cfg, &key_item, value));
-}
-
-/*
- * __wt_ext_get_config --
- *	Given a NULL-terminated list of configuration strings, find the final
- *	value for a given string key (external API version).
- */
-int
-__wt_ext_get_config(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session, const char *key, WT_CONFIG_ARG *cfg_arg,
-    WT_CONFIG_ITEM *cval)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
-	const char **cfg;
-
-	conn = (WT_CONNECTION_IMPL *)wt_api;
-	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
-		session = conn->default_session;
-
-	cfg = (const char **)cfg_arg;
-	WT_RET(__wt_config_gets(session, cfg, key, cval));
-
-	/* Prepare for sequential traversal if it's a list. */
-	if (cval->type == ITEM_STRUCT) {
-		WT_RET(__wt_config_subinit(session, &conn->ext_conf, cval));
-		conn->ext_conf_set = 1;
-	} else
-		conn->ext_conf_set = 0;
-
-	return (0);
-}
-
-/*
- * __wt_ext_get_config_next --
- *	Return the next entry from a configuration string that contains a list
- * (external API only).
- */
-int
-__wt_ext_get_config_next(
-    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ITEM *cval)
-{
-	WT_CONFIG_ITEM v;
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
-
-	conn = (WT_CONNECTION_IMPL *)wt_api;
-	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
-		session = conn->default_session;
-
-	if (!conn->ext_conf_set)
-		WT_RET_MSG(session,
-		    EINVAL, "no configuration list available to step through");
-
-	return (__wt_config_next(&conn->ext_conf, cval, &v));
 }
 
 /*
@@ -729,7 +676,8 @@ __wt_config_getones(WT_SESSION_IMPL *session,
     const char *config, const char *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG cparser;
-	WT_CONFIG_ITEM key_item = { key, strlen(key), 0, ITEM_STRING };
+	WT_CONFIG_ITEM key_item =
+	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	WT_RET(__wt_config_init(session, &cparser, config));
 	return (__config_getraw(&cparser, &key_item, value, 1));
@@ -746,7 +694,7 @@ __wt_config_gets_defno(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
 	static const WT_CONFIG_ITEM false_value = {
-		"", 0, 0, ITEM_NUM
+		"", 0, 0, WT_CONFIG_ITEM_NUM
 	};
 
 	/*

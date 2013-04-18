@@ -24,6 +24,7 @@ BBBBBBBBBBBBBBBBBB
 BDB
 BDB's
 BIGENDIAN
+BOOL
 BSR
 BTREE
 BUF
@@ -184,6 +185,7 @@ SQL
 SSD
 SSq
 STAILQ
+STRUCT
 SYS
 Sevii
 SiH
@@ -646,6 +648,7 @@ rx
 sHQ
 savepoints
 sb
+scanp
 schemas
 schematab
 scr

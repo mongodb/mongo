@@ -471,14 +471,6 @@ extern int __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_ext_get_config(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session,
-    const char *key,
-    WT_CONFIG_ARG *cfg_arg,
-    WT_CONFIG_ITEM *cval);
-extern int __wt_ext_get_config_next( WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session,
-    WT_CONFIG_ITEM *cval);
 extern  int __wt_config_getone(WT_SESSION_IMPL *session,
     const char *config,
     WT_CONFIG_ITEM *key,
@@ -518,6 +510,22 @@ extern int __wt_config_concat( WT_SESSION_IMPL *session,
     const char **config_ret);
 extern int __wt_conn_config_init(WT_SESSION_IMPL *session);
 extern void __wt_conn_config_discard(WT_SESSION_IMPL *session);
+extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    WT_CONFIG_ARG *cfg_arg,
+    const char *key,
+    WT_CONFIG_ITEM *cval);
+extern int __wt_ext_config_scan_begin( WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *str,
+    size_t len,
+    WT_CONFIG_SCAN **scanp);
+extern int __wt_ext_config_scan_end(WT_EXTENSION_API *wt_api,
+    WT_CONFIG_SCAN *scan);
+extern int __wt_ext_config_scan_next( WT_EXTENSION_API *wt_api,
+    WT_CONFIG_SCAN *scan,
+    WT_CONFIG_ITEM *key,
+    WT_CONFIG_ITEM *value);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,

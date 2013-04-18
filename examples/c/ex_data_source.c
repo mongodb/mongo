@@ -155,8 +155,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the boolean type configuration string
 	 * "overwrite".
 	 */
-	if ((ret = wt_api->get_config(
-	    wt_api, session, "overwrite", config, &v)) != 0) {
+	if ((ret = wt_api->config_get(
+	    wt_api, session, config, "overwrite", &v)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
 		    "overwrite configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
@@ -176,8 +176,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the integer type configuration string
 	 * "page_size".
 	 */
-	if ((ret = wt_api->get_config(
-	    wt_api, session, "page_size", config, &v)) != 0) {
+	if ((ret = wt_api->config_get(
+	    wt_api, session, config, "page_size", &v)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
 		    "page_size configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
@@ -189,7 +189,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	{
-	/*! [WT_EXTENSION get_config] */
+	/*! [WT_EXTENSION config_get] */
 	WT_CONFIG_ITEM v;
 	const char *my_data_source_key;
 
@@ -197,8 +197,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Retrieve the value of the string type configuration string
 	 * "key_format".
 	 */
-	if ((ret = wt_api->get_config(
-	    wt_api, session, "key_format", config, &v)) != 0) {
+	if ((ret = wt_api->config_get(
+	    wt_api, session, config, "key_format", &v)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
 		    "key_format configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
@@ -212,20 +212,21 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		my_data_source_key = "recno";
 	else
 		my_data_source_key = "bytestring";
-	/*! [WT_EXTENSION get_config] */
+	/*! [WT_EXTENSION config_get] */
 
 	(void)my_data_source_key;
 	}
 
 	{
-	/*! [WT_EXTENSION get_config_next] */
-	WT_CONFIG_ITEM v;
+	/*! [WT_EXTENSION config scan] */
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
 
 	/*
 	 * Retrieve the value of the list type configuration string "paths".
 	 */
-	if ((ret = wt_api->get_config(
-	    wt_api, session, "paths", config, &v)) != 0) {
+	if ((ret = wt_api->config_get(
+	    wt_api, session, config, "paths", &v)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
 		    "paths configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
@@ -234,9 +235,11 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	/*
 	 * Step through the list of entries.
 	 */
-	while ((ret = wt_api->get_config_next(wt_api, session, &v)) == 0)
-		printf("%.*s\n", (int)v.len, v.str);
-	/*! [WT_EXTENSION get_config_next] */
+	ret = wt_api->config_scan_begin(wt_api, session, v.str, v.len, &scan);
+	while ((ret = wt_api->config_scan_next(wt_api, scan, &k, &v)) == 0)
+		printf("%.*s\n", (int)k.len, k.str);
+	ret = wt_api->config_scan_end(wt_api, scan);
+	/*! [WT_EXTENSION config scan] */
 	}
 
 	/*! [WT_DATA_SOURCE error message] */

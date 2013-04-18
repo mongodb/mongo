@@ -25,8 +25,10 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.msg_printf = __wt_ext_msg_printf;
 	conn->extension_api.scr_alloc = __wt_ext_scr_alloc;
 	conn->extension_api.scr_free = __wt_ext_scr_free;
-	conn->extension_api.get_config = __wt_ext_get_config;
-	conn->extension_api.get_config_next = __wt_ext_get_config_next;
+	conn->extension_api.config_get = __wt_ext_config_get;
+	conn->extension_api.config_scan_begin = __wt_ext_config_scan_begin;
+	conn->extension_api.config_scan_end = __wt_ext_config_scan_end;
+	conn->extension_api.config_scan_next = __wt_ext_config_scan_next;
 
 	return (&conn->extension_api);
 }

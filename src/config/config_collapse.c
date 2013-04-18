@@ -26,16 +26,17 @@ __wt_config_collapse(
 
 	WT_ERR(__wt_config_init(session, &cparser, cfg[0]));
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
-		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+		if (k.type != WT_CONFIG_ITEM_STRING &&
+		    k.type != WT_CONFIG_ITEM_ID)
 			WT_ERR_MSG(session, EINVAL,
 			    "Invalid configuration key found: '%s'\n", k.str);
 		WT_ERR(__wt_config_get(session, cfg, &k, &v));
 		/* Include the quotes around string keys/values. */
-		if (k.type == ITEM_STRING) {
+		if (k.type == WT_CONFIG_ITEM_STRING) {
 			--k.str;
 			k.len += 2;
 		}
-		if (v.type == ITEM_STRING) {
+		if (v.type == WT_CONFIG_ITEM_STRING) {
 			--v.str;
 			v.len += 2;
 		}
