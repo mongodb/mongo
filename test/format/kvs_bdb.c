@@ -569,8 +569,8 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 }
 
 static int
-kvs_create(
-    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
+kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
 {
 	DB *db;
 	DBTYPE type;
@@ -613,8 +613,8 @@ kvs_create(
 }
 
 static int
-kvs_drop(
-    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
+kvs_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
 {
 	DB *db;
 	int ret, tret;
@@ -641,8 +641,8 @@ kvs_drop(
 }
 
 static int
-kvs_open_cursor(WT_DATA_SOURCE *dsrc,
-    WT_SESSION *session, const char *uri, void *config, WT_CURSOR **new_cursor)
+kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
 {
 	CURSOR_SOURCE *cursor;
 	DATA_SOURCE *data;
@@ -726,8 +726,8 @@ err:		free(cursor);
 }
 
 static int
-kvs_rename(WT_DATA_SOURCE *dsrc,
-    WT_SESSION *session, const char *uri, const char *newname, void *config)
+kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, const char *newname, WT_CONFIG_ARG *config)
 {
 	DB *db;
 	int ret, tret;
@@ -754,8 +754,8 @@ kvs_rename(WT_DATA_SOURCE *dsrc,
 }
 
 static int
-kvs_truncate(
-    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
+kvs_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
 {
 	DB *db;
 	int ret, tret;
@@ -787,8 +787,8 @@ kvs_truncate(
 }
 
 static int
-kvs_verify(
-    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
+kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
 {
 	DB *db;
 	int ret, tret;

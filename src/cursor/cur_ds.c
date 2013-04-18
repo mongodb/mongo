@@ -326,7 +326,8 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
-	WT_ERR(dsrc->open_cursor(dsrc, &session->iface, uri, dscfg, &dsc));
+	WT_ERR(dsrc->open_cursor(dsrc,
+	    &session->iface, uri, (WT_CONFIG_ARG *)dscfg, &dsc));
 	memset(&dsc->q, 0, sizeof(dsc->q));
 	dsc->recno = 0;
 	memset(dsc->raw_recno_buf, 0, sizeof(dsc->raw_recno_buf));

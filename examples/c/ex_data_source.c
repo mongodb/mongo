@@ -47,8 +47,8 @@ my_data_source_init(WT_CONNECTION *conn)
 
 /*! [WT_DATA_SOURCE create] */
 static int
-my_create(
-    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
+my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
 /*! [WT_DATA_SOURCE create] */
 {
 	/* Unused parameters */
@@ -92,7 +92,7 @@ my_create(
 /*! [WT_DATA_SOURCE compact] */
 static int
 my_compact(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, void *config)
+    const char *uri, WT_CONFIG_ARG *config)
 /*! [WT_DATA_SOURCE compact] */
 {
 	/* Unused parameters */
@@ -107,7 +107,7 @@ my_compact(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE drop] */
 static int
 my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, void *config)
+    const char *uri, WT_CONFIG_ARG *config)
 /*! [WT_DATA_SOURCE drop] */
 {
 	/* Unused parameters */
@@ -134,7 +134,7 @@ data_source_error(int v)
 /*! [WT_DATA_SOURCE open_cursor] */
 static int
 my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, void *config, WT_CURSOR **new_cursor)
+    const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
 /*! [WT_DATA_SOURCE open_cursor] */
 {
 	int ret;
@@ -257,7 +257,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE rename] */
 static int
 my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, const char *newname, void *config)
+    const char *uri, const char *newname, WT_CONFIG_ARG *config)
 /*! [WT_DATA_SOURCE rename] */
 {
 	/* Unused parameters */
@@ -273,7 +273,7 @@ my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE salvage] */
 static int
 my_salvage(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, void *config)
+    const char *uri, WT_CONFIG_ARG *config)
 /*! [WT_DATA_SOURCE salvage] */
 {
 	/* Unused parameters */
@@ -287,8 +287,8 @@ my_salvage(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 /*! [WT_DATA_SOURCE truncate] */
 static int
-my_truncate(
-    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
+my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
 /*! [WT_DATA_SOURCE truncate] */
 {
 	/* Unused parameters */
@@ -302,8 +302,8 @@ my_truncate(
 
 /*! [WT_DATA_SOURCE verify] */
 static int
-my_verify(
-    WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, void *config)
+my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
 /*! [WT_DATA_SOURCE verify] */
 {
 	/* Unused parameters */

@@ -68,11 +68,14 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0) {
 		wt_session = (WT_SESSION *)session;
 		if (func == __wt_compact && dsrc->compact != NULL)
-			WT_ERR(dsrc->compact(dsrc, wt_session, uri, cfg));
+			WT_ERR(dsrc->compact(
+			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (func == __wt_salvage && dsrc->salvage != NULL)
-			WT_ERR(dsrc->salvage(dsrc, wt_session, uri, cfg));
+			WT_ERR(dsrc->salvage(
+			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (func == __wt_verify && dsrc->verify != NULL)
-			WT_ERR(dsrc->verify(dsrc, wt_session, uri, cfg));
+			WT_ERR(dsrc->verify(
+			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else
 			WT_ERR(__wt_object_unsupported(session, uri));
 	} else

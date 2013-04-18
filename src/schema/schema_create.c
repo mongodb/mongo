@@ -485,7 +485,8 @@ __create_data_source(WT_SESSION_IMPL *session,
 	if ((ret = __wt_metadata_insert(session, uri, fileconf)) == 0) {
 		cfg[0] = fileconf;
 		cfg[1] = NULL;
-		WT_ERR(dsrc->create(dsrc, &session->iface, uri, cfg));
+		WT_ERR(dsrc->create(
+		    dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg));
 	} else if (ret == WT_DUPLICATE_KEY)
 		ret = EEXIST;
 

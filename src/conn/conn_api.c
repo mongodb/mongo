@@ -44,7 +44,7 @@ __conn_load_extension(
 	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
-	int (*entry)(WT_CONNECTION *, void *);
+	int (*entry)(WT_CONNECTION *, WT_CONFIG_ARG *);
 	const char *entry_name;
 
 	dlh = NULL;
@@ -67,7 +67,7 @@ __conn_load_extension(
 	WT_ERR(__wt_dlsym(session, dlh, entry_name, &entry));
 
 	/* Fill in the extension structure and call the entry function. */
-	WT_ERR(entry(wt_conn, cfg));
+	WT_ERR(entry(wt_conn, (WT_CONFIG_ARG *)cfg));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);

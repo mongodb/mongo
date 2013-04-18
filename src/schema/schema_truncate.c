@@ -106,7 +106,8 @@ __wt_schema_truncate(
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
 		ret = dsrc->truncate == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    dsrc->truncate(dsrc, &session->iface, uri, cfg);
+		    dsrc->truncate(
+			dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

@@ -101,15 +101,15 @@ struct __wt_extension_api {
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
 	 * @param key configuration key string
-	 * @param config the configuration information passed to a
-	 * WT_DATA_SOURCE:: method
+	 * @param config the configuration information passed to an application
+	 * callback
 	 * @param value the returned value
 	 * @errors
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION get_config
 	 */
 	int (*get_config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
-	    const char *key, void *config, WT_CONFIG_ITEM *value);
+	    const char *key, WT_CONFIG_ARG *config, WT_CONFIG_ITEM *value);
 
 	/*! Return the list entries of a configuration string value.
 	 * This method steps through the entries found in the last returned

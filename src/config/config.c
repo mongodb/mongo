@@ -658,15 +658,18 @@ __wt_config_gets(WT_SESSION_IMPL *session,
  */
 int
 __wt_ext_get_config(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session, const char *key, void *cfg, WT_CONFIG_ITEM *cval)
+    WT_SESSION *wt_session, const char *key, WT_CONFIG_ARG *cfg_arg,
+    WT_CONFIG_ITEM *cval)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
+	const char **cfg;
 
 	conn = (WT_CONNECTION_IMPL *)wt_api;
 	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
 		session = conn->default_session;
 
+	cfg = (const char **)cfg_arg;
 	WT_RET(__wt_config_gets(session, cfg, key, cval));
 
 	/* Prepare for sequential traversal if it's a list. */

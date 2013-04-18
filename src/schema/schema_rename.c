@@ -252,7 +252,8 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
 		ret = dsrc->rename == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    dsrc->rename(dsrc, &session->iface, uri, newuri, cfg);
+		    dsrc->rename(dsrc, &session->iface,
+			uri, newuri, (WT_CONFIG_ARG *)cfg);
 
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;
