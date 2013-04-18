@@ -25,7 +25,7 @@ namespace mongo {
 
     class IndexCursor;
     class IndexDescriptor;
-    class TwoDIndexingParams;
+    struct TwoDIndexingParams;
 
     namespace twod_internal {
         class GeoPoint;
