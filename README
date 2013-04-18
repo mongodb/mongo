@@ -2,20 +2,31 @@ MongoDB README
 
 Welcome to MongoDB!
 
+
+
 COMPONENTS
 
   mongod - The database process.
   mongos - Sharding controller.
   mongo  - The database shell (uses interactive javascript).
 
+
 UTILITIES
 
-  mongodump         - MongoDB dump tool - for backups, snapshots, etc..
+
+
+  mongodump         - MongoDB dump tool - for backups, snapshots, etc.
+
   mongorestore      - MongoDB restore a dump
+
   mongoexport       - Export a single collection to test (JSON, CSV)
+
   mongoimport       - Import from JSON or CSV
+
   mongofiles        - Utility for putting and getting files from MongoDB GridFS
+
   mongostat         - Show performance statistics
+
 
 BUILDING
       
@@ -57,7 +68,7 @@ MAIL LISTS AND IRC
 
 LICENSE
 
-  Most MongoDB source files are made available under the terms of the
+  Most MongoDB source files (src/mongo folder and below) are made available under the terms of the
   GNU Affero General Public License (AGPL).  See individual files for
   details.
 
