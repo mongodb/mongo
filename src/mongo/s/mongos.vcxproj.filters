@@ -1638,6 +1638,12 @@
     <ClCompile Include="..\platform\random_test.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="range_arithmetic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="range_arithmetic_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3230,6 +3236,9 @@
     </ClInclude>
     <ClInclude Include="..\platform\compiler_gcc.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="range_arithmetic.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

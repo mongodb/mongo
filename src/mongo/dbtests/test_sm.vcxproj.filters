@@ -1868,6 +1868,18 @@
     <ClInclude Include="..\db\repl\is_master.h">
       <Filter>db\repl</Filter>
     </ClInclude>
+    <ClInclude Include="..\s\range_arithmetic.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\range_deleter.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\range_deleter_mock_env.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\range_deleter_stats.h">
+      <Filter>s</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3608,6 +3620,27 @@
     </ClCompile>
     <ClCompile Include="..\db\index\haystack_access_method.cpp">
       <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_arithmetic.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_arithmetic_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_deleter.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_deleter_mock_env.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_deleter_stat_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_deleter_stats.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_deleter_test.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
