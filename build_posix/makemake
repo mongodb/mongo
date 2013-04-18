@@ -6,25 +6,19 @@
 # (in release trees, some of the subdirs might be excluded).
 (sed -n '1,/BEGIN SUBDIRS/p' Make.base
 
-SUBDIRS=.
+echo "SUBDIRS = ."
 sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | (while read dir cond ; do
 	test -d ../$dir || continue
 	if test -n "$cond" ; then
-		cat <<EOF
+		cat <<END_CONDITIONAL
 if ${cond}
-  ${cond}_BUILD = $dir
+    SUBDIRS += $dir
 endif
-EOF
-		SUBDIRS="$SUBDIRS \\
-	\$(${cond}_BUILD)"
+END_CONDITIONAL
 	else
-		SUBDIRS="$SUBDIRS \\
-	$dir"
+		echo "SUBDIRS += $dir"
 	fi
-done
-
-echo
-echo "SUBDIRS = $SUBDIRS")
+done)
 
 # Write the rest of Make.base
 sed -n '/END SUBDIRS/,$p' Make.base
