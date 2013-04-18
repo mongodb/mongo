@@ -184,13 +184,13 @@ namespace {
         env->addCursorId(ns, 50);
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(bind(&RangeDeleter::deleteNow,
-                                                         &deleter,
-                                                         ns,
-                                                         BSON("x" << 0),
-                                                         BSON("x" << 10),
-                                                         true,
-                                                         &errMsg));
+        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
+                                                                &deleter,
+                                                                ns,
+                                                                BSON("x" << 0),
+                                                                BSON("x" << 10),
+                                                                true,
+                                                                &errMsg));
 
         env->waitForNthGetCursor(1u);
 
@@ -225,13 +225,13 @@ namespace {
         env->pauseDeletes();
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(bind(&RangeDeleter::deleteNow,
-                                                         &deleter,
-                                                         ns,
-                                                         BSON("x" << 0),
-                                                         BSON("x" << 10),
-                                                         true,
-                                                         &errMsg));
+        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
+                                                                &deleter,
+                                                                ns,
+                                                                BSON("x" << 0),
+                                                                BSON("x" << 10),
+                                                                true,
+                                                                &errMsg));
 
         env->waitForNthDelete(1u);
 

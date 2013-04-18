@@ -123,13 +123,13 @@ namespace {
         env->addCursorId(ns, 345);
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(bind(&RangeDeleter::deleteNow,
-                                                         &deleter,
-                                                         ns,
-                                                         BSON("x" << 0),
-                                                         BSON("x" << 10),
-                                                         true,
-                                                         &errMsg));
+        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
+                                                                &deleter,
+                                                                ns,
+                                                                BSON("x" << 0),
+                                                                BSON("x" << 10),
+                                                                true,
+                                                                &errMsg));
 
         env->waitForNthGetCursor(1u);
 
@@ -167,13 +167,13 @@ namespace {
         env->addCursorId(ns, 345);
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(bind(&RangeDeleter::deleteNow,
-                                                         &deleter,
-                                                         ns,
-                                                         BSON("x" << 0),
-                                                         BSON("x" << 10),
-                                                         true,
-                                                         &errMsg));
+        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
+                                                                &deleter,
+                                                                ns,
+                                                                BSON("x" << 0),
+                                                                BSON("x" << 10),
+                                                                true,
+                                                                &errMsg));
 
         env->waitForNthGetCursor(1u);
 
@@ -380,13 +380,13 @@ namespace {
         env->pauseDeletes();
 
         string delErrMsg;
-        boost::thread deleterThread = boost::thread(bind(&RangeDeleter::deleteNow,
-                                                         &deleter,
-                                                         ns,
-                                                         BSON("x" << 64),
-                                                         BSON("x" << 70),
-                                                         true,
-                                                         &delErrMsg));
+        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
+                                                                &deleter,
+                                                                ns,
+                                                                BSON("x" << 64),
+                                                                BSON("x" << 70),
+                                                                true,
+                                                                &delErrMsg));
 
         env->waitForNthDelete(1u);
 

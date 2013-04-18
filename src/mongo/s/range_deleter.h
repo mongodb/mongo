@@ -30,7 +30,7 @@
 
 namespace mongo {
 
-    class RangeDeleterEnv;
+    struct RangeDeleterEnv;
     class RangeDeleterStats;
 
     /**
