@@ -113,6 +113,7 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
 	    -e 's/(void) /(void)/' \
 	    -e '/for /!s/;;$/;/' \
+	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
 	    -e 's/(unsigned)/(u_int)/' \
 	    -e 's/^#define /#define	/' \
 	    -e 's/sizeof(WT_PAGE_DISK)/WT_PAGE_DISK_SIZE/g' >$t
