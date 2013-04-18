@@ -64,8 +64,7 @@ namespace mongo {
 
     protected:
         // Friends who need getKeys.
-        // TODO: uncomment when builder is in.
-        // template <class K> friend class BtreeBasedIndexBuilder;
+        friend class BtreeBasedBuilder;
 
         // See below for body.
         class BtreeBasedPrivateUpdateData;

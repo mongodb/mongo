@@ -27,7 +27,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dur_commitjob.h"
-#include "mongo/db/index_insertion_continuation.h"
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
@@ -1699,52 +1698,6 @@ namespace mongo {
 
     /** @thisLoc disk location of *this */
     template< class V >
-    void BtreeBucket<V>::insertStepOne(DiskLoc thisLoc, 
-                             IndexInsertionContinuationImpl<V>& c,
-                             bool dupsAllowed) const {
-        dassert( c.key.dataSize() <= this->KeyMax );
-        verify( c.key.dataSize() > 0 );
-
-        int pos;
-        bool found = find(c.idx, c.key, c.recordLoc, c.order, pos, !dupsAllowed);
-
-        if ( found ) {
-            const _KeyNode& kn = k(pos);
-            if ( kn.isUnused() ) {
-                LOG(4) << "btree _insert: reusing unused key" << endl;
-                c.b = this;
-                c.pos = pos;
-                c.op = IndexInsertionContinuation::SetUsed;
-                return;
-            }
-
-            DEV {
-                log() << "_insert(): key already exists in index (ok for background:true)\n";
-                log() << "  " << c.idx.indexNamespace() << " thisLoc:" << thisLoc.toString() << '\n';
-                log() << "  " << c.key.toString() << '\n';
-                log() << "  " << "recordLoc:" << c.recordLoc.toString() << " pos:" << pos << endl;
-                log() << "  old l r: " << this->childForPos(pos).toString() << ' ' << this->childForPos(pos+1).toString() << endl;
-            }
-            alreadyInIndex();
-        }
-
-        Loc ch = this->childForPos(pos);
-        DiskLoc child = ch;
-
-        if ( child.isNull() ) {
-            // A this->new key will be inserted at the same tree height as an adjacent existing key.
-            c.bLoc = thisLoc;
-            c.b = this;
-            c.pos = pos;
-            c.op = IndexInsertionContinuation::InsertHere;
-            return;
-        }
-
-        child.btree<V>()->insertStepOne(child, c, dupsAllowed);
-    }
-
-    /** @thisLoc disk location of *this */
-    template< class V >
     int BtreeBucket<V>::_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                              const Key& key, const Ordering &order, bool dupsAllowed,
                              const DiskLoc lChild, const DiskLoc rChild, IndexDetails& idx) const {
@@ -1816,18 +1769,6 @@ namespace mongo {
                 _log() << " UNUSED";
         }
         _log() << "\n" << indent << "  " << hex << this->nextChild.getOfs() << dec << endl;
-    }
-
-    template< class V >
-    void BtreeBucket<V>::twoStepInsert(DiskLoc thisLoc, IndexInsertionContinuationImpl<V> &c,
-                                       bool dupsAllowed) const
-    {
-
-        if ( c.key.dataSize() > this->KeyMax ) {
-            problem() << "ERROR: key too large len:" << c.key.dataSize() << " max:" << this->KeyMax << ' ' << c.key.dataSize() << ' ' << c.idx.indexNamespace() << endl;
-            return; // op=Nothing
-        }
-        insertStepOne(thisLoc, c, dupsAllowed);
     }
 
     /** todo: meaning of return code unclear clean up */
@@ -1976,7 +1917,4 @@ namespace mongo {
             }
         }
     } btunittest;
-
-
-    IndexInsertionContinuation::~IndexInsertionContinuation() {}
 }

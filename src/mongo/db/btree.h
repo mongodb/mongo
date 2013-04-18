@@ -588,9 +588,6 @@ namespace mongo {
     };
 
     class IndexDetails;
-    class IndexInsertionContinuation;
-    template< class V>
-    struct IndexInsertionContinuationImpl;
 
     /**
      * This class adds functionality for manipulating buckets that are assembled
@@ -623,7 +620,6 @@ namespace mongo {
     template< class V >
     class BtreeBucket : public BucketBasics<V> {
         friend class BtreeCursor;
-        friend struct IndexInsertionContinuationImpl<V>;
     public:
         // make compiler happy:
         typedef typename V::Key Key;
@@ -699,11 +695,6 @@ namespace mongo {
         int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                       const BSONObj& key, const Ordering &order, bool dupsAllowed,
                       IndexDetails& idx, bool toplevel = true) const;
-
-        /** does the insert in two steps - can then use an upgradable lock for step 1, which 
-            is the part which may have page faults.  also that step is most of the computational work.
-        */
-        void twoStepInsert(DiskLoc thisLoc, IndexInsertionContinuationImpl<V> &c, bool dupsAllowed) const;
 
         /**
          * Preconditions:
@@ -956,9 +947,6 @@ namespace mongo {
         int _insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                     const Key& key, const Ordering &order, bool dupsAllowed,
                     const DiskLoc lChild, const DiskLoc rChild, IndexDetails &idx) const;
-
-        void insertStepOne(
-                DiskLoc thisLoc, IndexInsertionContinuationImpl<V>& c, bool dupsAllowed) const;
 
         bool find(const IndexDetails& idx, const Key& key, const DiskLoc &recordLoc, const Ordering &order, int& pos, bool assertIfDup) const;        
         static bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) ;

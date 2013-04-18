@@ -33,7 +33,6 @@
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/sort_phase_one.h"
 
 namespace mongo {
 
@@ -98,7 +97,7 @@ namespace mongo {
     Cloner::Cloner() { }
 
     struct Cloner::Fun {
-        Fun() : lastLog(0), _sortersForIndex(NULL) { }
+        Fun() : lastLog(0) { }
         time_t lastLog;
         void operator()( DBClientCursorBatchIterator &i ) {
             Lock::GlobalWrite lk;
@@ -148,18 +147,8 @@ namespace mongo {
                 }
 
                 try {
-                    // add keys for presorting
                     DiskLoc loc = theDataFileMgr.insertWithObjMod(to_collection, js);
                     loc.assertOk();
-                    if (_sortersForIndex != NULL) {
-                        // add key to SortersForNS
-                        for (SortersForIndex::iterator iSorter = _sortersForIndex->begin();
-                             iSorter != _sortersForIndex->end();
-                             ++iSorter) {
-                            iSorter->second.preSortPhase.addKeys(iSorter->second.spec, js,
-                                                                 loc, false);
-                        }
-                    }
                     if ( logForRepl )
                         logOp("i", to_collection, js);
 
@@ -186,7 +175,6 @@ namespace mongo {
         Client::Context *context;
         bool _mayYield;
         bool _mayBeInterrupted;
-        SortersForIndex *_sortersForIndex;  // sorters that build index keys during query
     };
 
     /* copy the specified collection
@@ -210,12 +198,6 @@ namespace mongo {
         f._mayYield = mayYield;
         f._mayBeInterrupted = mayBeInterrupted;
 
-        if (!isindex) {
-            SortersForNS::iterator it = _sortersForNS.find(to_collection);
-            if (it != _sortersForNS.end())
-                f._sortersForIndex = &it->second;
-        }
-
         int options = QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 );
         {
             f.context = cc().getContext();
@@ -232,14 +214,6 @@ namespace mongo {
                 BSONObj js = *i;
                 scoped_lock precalcLock(theDataFileMgr._precalcedMutex);
                 try {
-                    // set the 'precalculated' index data and add the index
-                    SortersForNS::iterator sortIter = _sortersForNS.find(js["ns"].String());
-                    if (sortIter != _sortersForNS.end()) {
-                        SortersForIndex::iterator it = sortIter->second.find(js["name"].String());
-                        if (it != sortIter->second.end()) {
-                            theDataFileMgr.setPrecalced(&it->second.preSortPhase);
-                        }
-                    }
                     theDataFileMgr.insertWithObjMod(to_collection, js);
                     theDataFileMgr.setPrecalced(NULL);
 
@@ -395,34 +369,6 @@ namespace mongo {
             mayInterrupt( opts.mayBeInterrupted );
             dbtempreleaseif r( opts.mayYield );
 
-#if 0
-            // fetch index info
-            auto_ptr<DBClientCursor> cur = _conn->query(idxns.c_str(), BSONObj(), 0, 0, 0,
-                                                       opts.slaveOk ? QueryOption_SlaveOk : 0 );
-            if (!validateQueryResults(cur, errCode, errmsg)) {
-                errmsg = "index query on ns " + ns + " failed: " + errmsg;
-                return false;
-            }
-            while(cur->more()) {
-                BSONObj idxEntry = cur->next();
-                massert(16536, "sync source has invalid index data",
-                               idxEntry.hasField("key") &&
-                               idxEntry.hasField("ns") &&
-                               idxEntry.hasField("name"));
-
-                // validate index version (similar to fixIndexVersion())
-                SortPhaseOne initialSort;
-                IndexInterface* interface = &IndexInterface::defaultVersion();
-
-                // initialize sorter for this index
-                PreSortDetails details;
-                details.preSortPhase.sorter.reset(
-                            new BSONObjExternalSorter(*interface,idxEntry["key"].Obj().copy()));
-                details.spec = IndexSpec(idxEntry["key"].Obj().copy(), idxEntry.copy());
-                _sortersForNS[idxEntry["ns"].String()].insert(make_pair(idxEntry["name"].String(),
-                                                                        details));
-            }
-#endif
             // just using exhaust for collection copying right now
             
             // todo: if snapshot (bool param to this func) is true, we need to snapshot this query?

@@ -21,6 +21,7 @@
 #include "mongo/db/btree.h"
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/btree_based_builder.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/sort_phase_one.h"
@@ -91,7 +92,8 @@ namespace IndexUpdateTests {
                                                              nDocs,
                                                              nDocs));
             // Add keys to phaseOne.
-            addKeysToPhaseOne( _ns, id, BSON( "a" << 1 ), &phaseOne, nDocs, pm.get(), true );
+            BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns, id, BSON( "a" << 1 ), &phaseOne, nDocs, pm.get(), true,
+                                                 nsdetails(_ns)->idxNo(id) );
             // Keys for all documents were added to phaseOne.
             ASSERT_EQUALS( static_cast<uint64_t>( nDocs ), phaseOne.n );
         }
@@ -121,26 +123,27 @@ namespace IndexUpdateTests {
             cc().curop()->kill();
             if ( _mayInterrupt ) {
                 // Add keys to phaseOne.
-                ASSERT_THROWS( addKeysToPhaseOne( _ns,
+                ASSERT_THROWS( BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns,
                                                   id,
                                                   BSON( "a" << 1 ),
                                                   &phaseOne,
                                                   nDocs,
                                                   pm.get(),
-                                                  _mayInterrupt ),
+                                                  _mayInterrupt,
+                                                  nsdetails(_ns)->idxNo(id) ),
                                UserException );
                 // Not all keys were added to phaseOne due to the interrupt.
                 ASSERT( static_cast<uint64_t>( nDocs ) > phaseOne.n );
             }
             else {
                 // Add keys to phaseOne.
-                addKeysToPhaseOne( _ns,
+                BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns,
                                    id,
                                    BSON( "a" << 1 ),
                                    &phaseOne,
                                    nDocs,
                                    pm.get(),
-                                   _mayInterrupt );
+                                   _mayInterrupt, nsdetails(_ns)->idxNo(id) );
                 // All keys were added to phaseOne despite to the kill request, because
                 // mayInterrupt == false.
                 ASSERT_EQUALS( static_cast<uint64_t>( nDocs ), phaseOne.n );
@@ -304,7 +307,7 @@ namespace IndexUpdateTests {
             // Check the expected number of dups.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 * 3 ), dups.size() );
             // Drop the dups.
-            doDropDups( _ns, nsdetails( _ns ), dups, true );
+            BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, true );
             // Check that the expected number of documents remain.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
         }
@@ -341,14 +344,14 @@ namespace IndexUpdateTests {
             cc().curop()->kill();
             if ( _mayInterrupt ) {
                 // doDropDups() aborts.
-                ASSERT_THROWS( doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt ),
+                ASSERT_THROWS( BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt ),
                                UserException );
                 // Not all dups are dropped.
                 ASSERT( static_cast<uint32_t>( nDocs / 4 ) < _client.count( _ns ) );
             }
             else {
                 // doDropDups() succeeds.
-                doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt );
+                BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt );
                 // The expected number of documents were dropped.
                 ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
             }

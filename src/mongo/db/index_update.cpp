@@ -22,13 +22,13 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index.h"
+#include "mongo/db/index/btree_based_builder.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/sort_phase_one.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/startup_test.h"
 
@@ -119,192 +119,6 @@ namespace mongo {
     //
     // Bulk index building
     //
-
-    void addKeysToPhaseOne( const char* ns,
-                            const IndexDetails& idx,
-                            const BSONObj& order,
-                            SortPhaseOne* phaseOne,
-                            int64_t nrecords,
-                            ProgressMeter* progressMeter,
-                            bool mayInterrupt ) {
-        shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
-        phaseOne->sorter.reset( new BSONObjExternalSorter( idx.idxInterface(), order ) );
-        phaseOne->sorter->hintNumObjects( nrecords );
-        const IndexSpec& spec = idx.getSpec();
-        while ( cursor->ok() ) {
-            RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
-            BSONObj o = cursor->current();
-            DiskLoc loc = cursor->currLoc();
-            phaseOne->addKeys( spec, o, loc, mayInterrupt );
-            cursor->advance();
-            progressMeter->hit();
-            if ( logLevel > 1 && phaseOne->n % 10000 == 0 ) {
-                printMemInfo( "\t iterating objects" );
-            }
-        }
-    }
-
-    template< class V >
-    void buildBottomUpPhases2And3( bool dupsAllowed,
-                                   IndexDetails& idx,
-                                   BSONObjExternalSorter& sorter,
-                                   bool dropDups,
-                                   set<DiskLoc>& dupsToDrop,
-                                   CurOp* op,
-                                   SortPhaseOne* phase1,
-                                   ProgressMeterHolder& pm,
-                                   Timer& t,
-                                   bool mayInterrupt ) {
-        BtreeBuilder<V> btBuilder(dupsAllowed, idx);
-        BSONObj keyLast;
-        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-        // verifies that pm and op refer to the same ProgressMeter
-        verify(pm == op->setMessage("index: (2/3) btree bottom up",
-                                    "Index: (2/3) BTree Bottom Up Progress",
-                                    phase1->nkeys,
-                                    10));
-        while( i->more() ) {
-            RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
-            BSONObjExternalSorter::Data d = i->next();
-
-            try {
-                if ( !dupsAllowed && dropDups ) {
-                    LastError::Disabled led( lastError.get() );
-                    btBuilder.addKey(d.first, d.second);
-                }
-                else {
-                    btBuilder.addKey(d.first, d.second);                    
-                }
-            }
-            catch( AssertionException& e ) {
-                if ( dupsAllowed ) {
-                    // unknown exception??
-                    throw;
-                }
-
-                if( e.interrupted() ) {
-                    killCurrentOp.checkForInterrupt();
-                }
-
-                if ( ! dropDups )
-                    throw;
-
-                /* we could queue these on disk, but normally there are very few dups, so instead we
-                    keep in ram and have a limit.
-                */
-                dupsToDrop.insert(d.second);
-                uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
-            }
-            pm.hit();
-        }
-        pm.finished();
-        op->setMessage("index: (3/3) btree-middle", "Index: (3/3) BTree Middle Progress");
-        LOG(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
-        btBuilder.commit( mayInterrupt );
-        if ( btBuilder.getn() != phase1->nkeys && ! dropDups ) {
-            warning() << "not all entries were added to the index, probably some keys were too large" << endl;
-        }
-    }
-
-    void doDropDups( const char* ns,
-                     NamespaceDetails* d,
-                     const set<DiskLoc>& dupsToDrop,
-                     bool mayInterrupt ) {
-        for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
-            RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
-            theDataFileMgr.deleteRecord( d,
-                                         ns,
-                                         i->rec(),
-                                         *i,
-                                         false /* cappedOk */,
-                                         true /* noWarn */,
-                                         isMaster( ns ) /* logOp */ );
-            getDur().commitIfNeeded();
-        }
-    }
-
-    // throws DBException
-    uint64_t fastBuildIndex(const char* ns,
-                            NamespaceDetails* d,
-                            IndexDetails& idx,
-                            bool mayInterrupt) {
-        CurOp * op = cc().curop();
-
-        Timer t;
-
-        tlog(1) << "fastBuildIndex " << ns << ' ' << idx.info.obj().toString() << endl;
-
-        bool dupsAllowed = !idx.unique() || ignoreUniqueIndex(idx);
-        bool dropDups = idx.dropDups() || inDBRepair;
-        BSONObj order = idx.keyPattern();
-
-        getDur().writingDiskLoc(idx.head).Null();
-
-        if ( logLevel > 1 ) printMemInfo( "before index start" );
-
-        /* get and sort all the keys ----- */
-        ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
-                                              "Index: (1/3) External Sort Progress",
-                                              d->stats.nrecords,
-                                              10));
-        SortPhaseOne _ours;
-        SortPhaseOne *phase1 = theDataFileMgr.getPrecalced();
-        if( phase1 == 0 ) {
-            phase1 = &_ours;
-            addKeysToPhaseOne( ns, idx, order, phase1, d->stats.nrecords, pm.get(), mayInterrupt );
-        }
-        pm.finished();
-
-        BSONObjExternalSorter& sorter = *(phase1->sorter);
-        // Ensure the index and external sorter have a consistent index interface (and sort order).
-        fassert( 16408, &idx.idxInterface() == &sorter.getIndexInterface() );
-
-        if( phase1->multi ) {
-            int idxNo = IndexBuildsInProgress::get(ns, idx.info.obj()["name"].valuestr());
-            d->setIndexIsMultikey(ns, idxNo);
-        }
-
-        if ( logLevel > 1 ) printMemInfo( "before final sort" );
-        phase1->sorter->sort( mayInterrupt );
-        if ( logLevel > 1 ) printMemInfo( "after final sort" );
-
-        LOG(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
-
-        set<DiskLoc> dupsToDrop;
-
-        /* build index --- */
-        if( idx.version() == 0 )
-            buildBottomUpPhases2And3<V0>(dupsAllowed,
-                                         idx,
-                                         sorter,
-                                         dropDups,
-                                         dupsToDrop,
-                                         op,
-                                         phase1,
-                                         pm,
-                                         t,
-                                         mayInterrupt);
-        else if( idx.version() == 1 ) 
-            buildBottomUpPhases2And3<V1>(dupsAllowed,
-                                         idx,
-                                         sorter,
-                                         dropDups,
-                                         dupsToDrop,
-                                         op,
-                                         phase1,
-                                         pm,
-                                         t,
-                                         mayInterrupt);
-        else
-            verify(false);
-
-        if( dropDups ) 
-            log() << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
-
-        doDropDups(ns, d, dupsToDrop, mayInterrupt);
-
-        return phase1->n;
-    }
 
     class BackgroundIndexBuildJob : public BackgroundOperation {
 
@@ -467,11 +281,9 @@ namespace mongo {
 
         verify( Lock::isWriteLocked(ns) );
 
-        // Build index spec here in case the collection is empty and the index details are invalid
-        idx.getSpec();
-
         if( inDBRepair || !background ) {
-            n = fastBuildIndex(ns.c_str(), d, idx, mayInterrupt);
+            int idxNo = IndexBuildsInProgress::get(ns.c_str(), idx.info.obj()["name"].valuestr());
+            n = BtreeBasedBuilder::fastBuildIndex(ns.c_str(), d, idx, mayInterrupt, idxNo);
             verify( !idx.head.isNull() );
         }
         else {
@@ -592,41 +404,6 @@ namespace mongo {
             }
         }
         return true;
-    }
-
-    /**
-     * DEPRECATED -- only used by prefetch.cpp
-     *  step one of adding keys to index idxNo for a new record
-     */
-    void fetchIndexInserters(BSONObjSet & /*out*/keys,
-                             IndexInterface::IndexInserter &inserter,
-                             NamespaceDetails *d,
-                             int idxNo,
-                             const BSONObj& obj,
-                             DiskLoc recordLoc,
-                             const bool allowDups) {
-        IndexDetails &idx = d->idx(idxNo);
-        idx.getKeysFromObject(obj, keys);
-        if( keys.empty() )
-            return;
-        bool dupsAllowed = !idx.unique() || allowDups;
-        Ordering ordering = Ordering::make(idx.keyPattern());
-        
-        try {
-            // we can't do the two step method with multi keys as insertion of one key changes the indexes 
-            // structure.  however we can do the first key of the set so we go ahead and do that FWIW
-            inserter.addInsertionContinuation(
-                    idx.idxInterface().beginInsertIntoIndex(
-                            idxNo, idx, recordLoc, *keys.begin(), ordering, dupsAllowed));
-        }
-        catch (AssertionException& e) {
-            if( e.getCode() == 10287 && idxNo >= d->nIndexes ) {
-                DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
-            }
-            else {
-                throw;
-            }
-        }
     }
 
     class IndexUpdateTest : public StartupTest {

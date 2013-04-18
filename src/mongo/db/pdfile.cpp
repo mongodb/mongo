@@ -1337,15 +1337,15 @@ namespace mongo {
                 IndexDetails& idx = d->idx(idxNo);
                 if (ignoreUniqueIndex(idx))
                     continue;
-                BSONObjSet keys;
-                idx.getKeysFromObject(obj, keys);
-                BSONObj order = idx.keyPattern();
-                IndexInterface& ii = idx.idxInterface();
-                for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                    // WARNING: findSingle may not be compound index safe.  this may need to change.  see notes in 
-                    // findSingle code.
-                    uassert( 12582, "duplicate key insert for unique index of capped collection",
-                             ii.findSingle(idx, idx.head, *i ).isNull() );
+                auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, idxNo));
+                auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+                InsertDeleteOptions options;
+                options.logIfError = false;
+                options.dupsAllowed = false;
+                UpdateTicket ticket;
+                Status ret = iam->validateUpdate(BSONObj(), obj, DiskLoc(), options, &ticket);
+                if (ret != Status::OK()) {
+                    uasserted(12582, "duplicate key insert for unique index of capped collection");
                 }
             }
         }

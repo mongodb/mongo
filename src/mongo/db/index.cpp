@@ -38,26 +38,9 @@
 
 namespace mongo {
 
-    IndexInterface::IndexInserter::IndexInserter() {}
-    IndexInterface::IndexInserter::~IndexInserter() {
-        for (size_t i = 0; i < _continuations.size(); ++i)
-            delete _continuations[i];
-    }
-
-    void IndexInterface::IndexInserter::addInsertionContinuation(IndexInsertionContinuation *c) {
-        _continuations.push_back(c);
-    }
-
-    void IndexInterface::IndexInserter::finishAllInsertions() {
-        for (size_t i = 0; i < _continuations.size(); ++i) {
-            _continuations[i]->doIndexInsertionWrites();
-        }
-    }
-
     IndexInterface& IndexInterface::defaultVersion() {
         return *IndexDetails::iis[ DefaultIndexVersionNumber ];
     }
-
 
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
@@ -66,20 +49,6 @@ namespace mongo {
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
 
     public:
-        IndexInsertionContinuation *beginInsertIntoIndex(
-                int idxNo, IndexDetails &_idx,
-                DiskLoc _recordLoc, const BSONObj &_key,
-                const Ordering& _order, bool dupsAllowed) {
-
-            IndexInsertionContinuationImpl<V> *continuation = new IndexInsertionContinuationImpl<V>(
-                    _idx.head, _recordLoc, _key, _order, _idx);
-            ScopeGuard allocGuard = MakeGuard(boost::checked_delete<IndexInsertionContinuation>,
-                                              continuation);
-            _idx.head.btree<V>()->twoStepInsert(_idx.head, *continuation, dupsAllowed);
-            allocGuard.Dismiss();
-            return continuation;
-        }
-
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -226,28 +195,6 @@ namespace mongo {
         }
         catch ( DBException &e ) {
             log() << "exception in kill_idx: " << e << ", ns: " << ns << endl;
-        }
-    }
-
-    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const {
-        getSpec().getKeys( obj, keys );
-    }
-
-    void setDifference(BSONObjSet &l, BSONObjSet &r, vector<BSONObj*> &diff) {
-        // l and r must use the same ordering spec.
-        verify( l.key_comp().order() == r.key_comp().order() );
-        BSONObjSet::iterator i = l.begin();
-        BSONObjSet::iterator j = r.begin();
-        while ( 1 ) {
-            if ( i == l.end() )
-                break;
-            while ( j != r.end() && j->woCompare( *i ) < 0 )
-                j++;
-            if ( j == r.end() || i->woCompare(*j) != 0  ) {
-                const BSONObj *jo = &*i;
-                diff.push_back( (BSONObj *) jo );
-            }
-            i++;
         }
     }
 

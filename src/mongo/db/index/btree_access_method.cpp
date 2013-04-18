@@ -22,6 +22,7 @@
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/btree_interface.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pdfile_private.h"
 
@@ -169,8 +170,11 @@ namespace mongo {
         setDifference(data->oldKeys, data->newKeys, &data->removed);
         setDifference(data->newKeys, data->oldKeys, &data->added);
 
-        // Check for dups.
-        if (!data->added.empty() && _descriptor->unique() && !options.dupsAllowed) {
+        bool checkForDups = !data->added.empty()
+            && (KeyPattern::isIdKeyPattern(_descriptor->keyPattern()) || _descriptor->unique())
+            && !options.dupsAllowed;
+
+        if (checkForDups) {
             for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
                 if (_interface->wouldCreateDup(_descriptor->getOnDisk(), _descriptor->getHead(),
                                                **i, _ordering, record)) {
