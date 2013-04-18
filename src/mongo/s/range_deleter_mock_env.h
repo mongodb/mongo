@@ -29,6 +29,7 @@ namespace mongo {
         std::string ns;
         BSONObj min;
         BSONObj max;
+        BSONObj shardKeyPattern;
     };
 
     /**
@@ -114,6 +115,7 @@ namespace mongo {
         bool deleteRange(const StringData& ns,
                          const BSONObj& min,
                          const BSONObj& max,
+                         const BSONObj& shardKeyPattern,
                          bool secondaryThrottle,
                          string* errMsg);
 

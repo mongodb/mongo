@@ -794,8 +794,12 @@ namespace mongo {
         }
     }
 
-    void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ) {
-        migrateFromStatus.logOp( opstr , ns , obj , patt );
+    void logOpForSharding( const char * opstr,
+                           const char * ns,
+                           const BSONObj& obj,
+                           BSONObj * patt,
+                           const BSONObj* fullObj ) {
+        migrateFromStatus.logOp( opstr , ns , obj , patt /*, fullObj TODO */ );
     }
 
     void aboutToDeleteForSharding( const Database* db, const NamespaceDetails* nsd, const DiskLoc& dl ) {

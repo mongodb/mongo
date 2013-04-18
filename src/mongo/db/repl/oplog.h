@@ -48,10 +48,15 @@ namespace mongo {
         "n" no-op
         "db" declares presence of a database (ns is set to the db name + '.')
 
+       For 'u' records, 'obj' captures the mutation made to the object but not
+       the object itself. In that case, we provide also 'fullObj' which is the
+       image of the object _after_ the mutation logged here was applied.
+
        See _logOp() in oplog.cpp for more details.
     */
-    void logOp( const char *opstr, const char *ns, const BSONObj& obj, 
-                BSONObj *patt = 0, bool *b = 0, bool fromMigrate = false );
+    void logOp( const char *opstr, const char *ns, const BSONObj& obj,
+                BSONObj *patt = NULL, bool *b = NULL, bool fromMigrate = false,
+                const BSONObj* fullObj = NULL );
 
     // Log an empty no-op operation to the local oplog
     void logKeepalive();

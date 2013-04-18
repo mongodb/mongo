@@ -120,6 +120,7 @@ namespace mongo {
         bool queueDelete(const std::string& ns,
                          const BSONObj& min,
                          const BSONObj& max,
+                         const BSONObj& shardKeyPattern,
                          bool secondaryThrottle,
                          Notification* notifyDone,
                          std::string* errMsg);
@@ -134,6 +135,7 @@ namespace mongo {
         bool deleteNow(const std::string& ns,
                        const BSONObj& min,
                        const BSONObj& max,
+                       const BSONObj& shardKeyPattern,
                        bool secondaryThrottle,
                        std::string* errMsg);
 
@@ -271,6 +273,7 @@ namespace mongo {
         virtual bool deleteRange(const StringData& ns,
                                  const BSONObj& inclusiveLower,
                                  const BSONObj& exclusiveUpper,
+                                 const BSONObj& shardKeyPattern,
                                  bool secondaryThrottle,
                                  std::string* errMsg) = 0;
 

@@ -91,6 +91,7 @@ namespace mongo {
     bool RangeDeleterMockEnv::deleteRange(const StringData& ns,
                                           const BSONObj& min,
                                           const BSONObj& max,
+                                          const BSONObj& shardKeyPattern,
                                           bool secondaryThrottle,
                                           string* errMsg) {
 
@@ -117,6 +118,7 @@ namespace mongo {
             entry.ns = ns.toString();
             entry.min = min.getOwned();
             entry.max = max.getOwned();
+            entry.shardKeyPattern = shardKeyPattern.getOwned();
 
             _deleteList.push_back(entry);
         }
