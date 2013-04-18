@@ -38,6 +38,9 @@ namespace {
     using mongo::RangeDeleterMockEnv;
     using mongo::RangeDeleterStats;
 
+    // Capped sleep interval is 640 mSec, Nyquist frequency is 1280 mSec => round up to 2 sec.
+    const int MAX_IMMEDIATE_DELETE_WAIT_SECS = 2;
+
     // Should not be able to queue deletes if deleter workers were not started.
     TEST(QueueDelete, CantAfterStop) {
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
@@ -133,6 +136,8 @@ namespace {
 
         env->waitForNthGetCursor(1u);
 
+        // Note: immediate deletes has no pending state, it goes directly to inProgress
+        // even while waiting for cursors.
         const BSONObj stats(deleter.getStats()->toBSON());
         int inProgCount = 0;
         ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
@@ -145,7 +150,8 @@ namespace {
         env->addCursorId(ns, 200);
         env->removeCursorId(ns, 345);
 
-        ASSERT_TRUE(deleterThread.timed_join(boost::posix_time::seconds(1)));
+        ASSERT_TRUE(deleterThread.timed_join(
+                boost::posix_time::seconds(MAX_IMMEDIATE_DELETE_WAIT_SECS)));
 
         ASSERT_TRUE(env->deleteOccured());
         const DeletedRange deletedChunk(env->getLastDelete());
@@ -177,6 +183,8 @@ namespace {
 
         env->waitForNthGetCursor(1u);
 
+        // Note: immediate deletes has no pending state, it goes directly to inProgress
+        // even while waiting for cursors.
         const BSONObj stats(deleter.getStats()->toBSON());
         int inProgCount = 0;
         ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
@@ -187,7 +195,9 @@ namespace {
 
         deleter.stopWorkers();
 
-        ASSERT_TRUE(deleterThread.timed_join(boost::posix_time::seconds(1)));
+        ASSERT_TRUE(deleterThread.timed_join(
+                boost::posix_time::seconds(MAX_IMMEDIATE_DELETE_WAIT_SECS)));
+
         ASSERT_FALSE(env->deleteOccured());
     }
 
@@ -211,7 +221,7 @@ namespace {
         ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 10), BSON("x" << 20), true,
                                         &notifyDone1, NULL /* don't care errMsg */));
 
-        env->waitForNthDelete(1u);
+        env->waitForNthPausedDelete(1u);
 
         // Make sure that the delete is already in progress before proceeding.
         const BSONObj stats(deleter.getStats()->toBSON());
@@ -388,7 +398,7 @@ namespace {
                                                                 true,
                                                                 &delErrMsg));
 
-        env->waitForNthDelete(1u);
+        env->waitForNthPausedDelete(1u);
 
         string blErrMsg;
         ASSERT_FALSE(deleter.addToBlackList(ns, BSON("x" << 10), BSON("x" << 90), &blErrMsg));

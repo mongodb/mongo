@@ -38,9 +38,9 @@ namespace mongo {
         _cursorMapMutex("cursorMap"),
         _pauseDeleteMutex("pauseDelete"),
         _pauseDelete(false),
+        _pausedCount(0),
         _envStatMutex("envStat"),
-        _getCursorsCallCount(0),
-        _deleteCallCount(0) {
+        _getCursorsCallCount(0) {
     }
 
     void RangeDeleterMockEnv::addCursorId(const StringData& ns, CursorId id) {
@@ -71,10 +71,10 @@ namespace mongo {
         }
     }
 
-    void RangeDeleterMockEnv::waitForNthDelete(uint64_t nthCall) {
-        scoped_lock sl(_envStatMutex);
-        while (_deleteCallCount < nthCall) {
-            _deleteCallCountUpdatedCV.wait(sl.boost());
+    void RangeDeleterMockEnv::waitForNthPausedDelete(uint64_t nthPause) {
+        scoped_lock sl(_pauseDeleteMutex);
+        while(_pausedCount < nthPause) {
+            _pausedDeleteChangeCV.wait(sl.boost());
         }
     }
 
@@ -93,15 +93,15 @@ namespace mongo {
                                           const BSONObj& max,
                                           bool secondaryThrottle,
                                           string* errMsg) {
-        {
-            scoped_lock sl(_envStatMutex);
-            _deleteCallCount++;
-            _deleteCallCountUpdatedCV.notify_one();
-        }
 
         {
             scoped_lock sl(_pauseDeleteMutex);
             bool wasInitiallyPaused = _pauseDelete;
+
+            if (_pauseDelete) {
+                _pausedCount++;
+                _pausedDeleteChangeCV.notify_one();
+            }
 
             while (_pauseDelete) {
                 _pausedCV.wait(sl.boost());
@@ -126,15 +126,15 @@ namespace mongo {
 
     void RangeDeleterMockEnv::getCursorIds(const StringData& ns, set<CursorId>* in) {
         {
-            scoped_lock sl(_envStatMutex);
-            _getCursorsCallCount++;
-            _cursorsCallCountUpdatedCV.notify_one();
-        }
-
-        {
             scoped_lock sl(_cursorMapMutex);
             const set<CursorId>& _cursors = _cursorMap[ns.toString()];
             std::copy(_cursors.begin(), _cursors.end(), inserter(*in, in->begin()));
+        }
+
+        {
+            scoped_lock sl(_envStatMutex);
+            _getCursorsCallCount++;
+            _cursorsCallCountUpdatedCV.notify_one();
         }
     }
 }

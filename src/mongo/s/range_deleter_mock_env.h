@@ -76,16 +76,16 @@ namespace mongo {
         void resumeOneDelete();
 
         /**
-         * Blocks until the getCursor method was called at least the specified number
-         * of times for the entire lifetime of this deleter.
+         * Blocks until the getCursor method was called and terminated at least the
+         * specified number of times for the entire lifetime of this deleter.
          */
         void waitForNthGetCursor(uint64_t nthCall);
 
         /**
-         * Blocks until the deleteRange method was called at least the specified number
-         * of times for the entire lifetime of this deleter.
+         * Blocks until the deleteRange method was called and at the same time paused
+         * at least the specified number of times for the entire lifetime of this deleter.
          */
-        void waitForNthDelete(uint64_t nthCall);
+        void waitForNthPausedDelete(uint64_t nthPause);
 
         //
         // Environment introspection methods.
@@ -134,20 +134,22 @@ namespace mongo {
         mutex _cursorMapMutex;
         std::map<std::string, std::set<CursorId> > _cursorMap;
 
-        // Protects _pauseDelete & _stickyPause
+        // Protects _pauseDelete & _pausedCount
         mutex _pauseDeleteMutex;
         boost::condition _pausedCV;
         bool _pauseDelete;
+
+        // Number of times a delete gets paused.
+        uint64_t _pausedCount;
+        // _pausedCount < nthPause (used by waitForNthPausedDelete)
+        boost::condition _pausedDeleteChangeCV;
 
         // Protects all variables below this line.
         mutex _envStatMutex;
 
         // Keeps track of the number of times getCursorIds was called.
         uint64_t _getCursorsCallCount;
+        // _getCursorsCallCount < nthCall (used by waitForNthGetCursor)
         boost::condition _cursorsCallCountUpdatedCV;
-
-        // Keeps track of the number of times deleteRange was called.
-        uint64_t _deleteCallCount;
-        boost::condition _deleteCallCountUpdatedCV;
     };
 }

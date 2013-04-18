@@ -114,7 +114,7 @@ namespace {
                                         &deleteDone, &errMsg));
         ASSERT_TRUE(errMsg.empty());
 
-        env->waitForNthDelete(1u);
+        env->waitForNthPausedDelete(1u);
 
         const BSONObj stats(deleter.getStats()->toBSON());
 
@@ -201,6 +201,8 @@ namespace {
                                          &totalCount, NULL /* don't care errMsg */));
         ASSERT_EQUALS(1, totalCount);
 
+        // Note: immediate deletes has no pending state, it goes directly to inProgress
+        // even while waiting for cursors.
         int pendingCount = 0;
         ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::PendingDeletesField,
                                          &pendingCount, NULL /* don't care errMsg */));
@@ -233,7 +235,7 @@ namespace {
                                                                 true,
                                                                 &errMsg));
 
-        env->waitForNthDelete(1u);
+        env->waitForNthPausedDelete(1u);
 
         const BSONObj stats(deleter.getStats()->toBSON());
 
