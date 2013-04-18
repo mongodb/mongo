@@ -802,10 +802,15 @@ namespace mongo {
         migrateFromStatus.logOp( opstr , ns , obj , patt /*, fullObj TODO */ );
     }
 
-    void aboutToDeleteForSharding( const Database* db, const NamespaceDetails* nsd, const DiskLoc& dl ) {
-        if ( nsd->isCapped() )
-            return;
-        migrateFromStatus.aboutToDelete( db , dl );
+    void aboutToDeleteForSharding( const StringData& ns,
+                                   const Database* db,
+                                   const NamespaceDetails* nsd,
+                                   const DiskLoc& dl )
+    {
+        // Note: namespace is currently unused since we only have a single migration per host,
+        // but will be needed for parallel migrations.
+        if ( nsd->isCapped() ) return;
+        migrateFromStatus.aboutToDelete( db, dl );
     }
 
     class TransferModsCommand : public ChunkCommandHelper {

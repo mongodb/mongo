@@ -265,6 +265,6 @@ namespace mongo {
                            BSONObj * patt,
                            const BSONObj* fullObj );
 
-    void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl );
+    void aboutToDeleteForSharding( const StringData& ns, const Database* db , const DiskLoc& dl );
 
 }
