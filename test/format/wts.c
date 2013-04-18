@@ -318,7 +318,8 @@ wts_verify(const char *tag)
 	if (g.logging != 0)
 		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== verify start ===============");
-	if ((ret = session->verify(session, g.uri, NULL)) != 0)
+	ret = session->verify(session, g.uri, NULL);
+	if (ret != 0 && ret != EOPNOTSUPP)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if (g.logging != 0)
 		(void)wt_api->msg_printf(wt_api, session,
