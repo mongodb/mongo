@@ -103,7 +103,7 @@ wts_open(void)
 #if 0
 		wiredtiger_kvs_stec_init(conn);
 #else
-		die(ret, "kvsstec not loaded");
+		die(ENOTSUP, "kvsstec not loaded");
 #endif
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
