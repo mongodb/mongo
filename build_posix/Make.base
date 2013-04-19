@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I build_posix/aclocal
 
-# BEGIN SUBDIRS, maintained by makemake and subdirs.list
+# BEGIN SUBDIRS, maintained by makemake and Make.subdirs
 # END SUBDIRS
 
 lib_LTLIBRARIES = libwiredtiger.la
