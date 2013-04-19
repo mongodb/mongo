@@ -978,6 +978,20 @@ namespace {
 
     TEST(Document, EndElement) {
         mmb::Document doc;
+        mmb::Element end = doc.end();
+        ASSERT_FALSE(end.ok());
+        mmb::Element missing = doc.root().leftChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().leftSibling();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightSibling();
+        ASSERT_EQUALS(end, missing);
+    }
+
+    TEST(Document, ConstEndElement) {
+        const mmb::Document doc;
         mmb::ConstElement end = doc.end();
         ASSERT_FALSE(end.ok());
         mmb::ConstElement missing = doc.root().leftChild();

@@ -1963,8 +1963,12 @@ namespace mutablebson {
         }
     }
 
+    Element Document::end() {
+        return Element(this, kInvalidRepIdx);
+    }
+
     ConstElement Document::end() const {
-        return ConstElement(Element(const_cast<Document*>(this), kInvalidRepIdx));
+        return const_cast<Document*>(this)->end();
     }
 
     inline Document::Impl& Document::getImpl() {
