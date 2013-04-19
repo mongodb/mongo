@@ -339,6 +339,11 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_auto_throttle", &cval));
+	if (cval.val)
+		F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);
+	else
+		F_CLR(lsm_tree, WT_LSM_TREE_THROTTLE);
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom", &cval));
 	FLD_SET(lsm_tree->bloom,
 	    (cval.val == 0 ? WT_LSM_BLOOM_OFF : WT_LSM_BLOOM_MERGED));
@@ -560,7 +565,7 @@ __wt_lsm_tree_switch(
 	    in_memory < lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
 	    ++in_memory, --cp)
 		;
-	if (in_memory <= 2)
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 2)
 		lsm_tree->throttle_sleep = 0;
 	else if (in_memory == lsm_tree->nchunks ||
 	    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {

@@ -94,6 +94,9 @@ format_meta = column_meta + [
 ]
 
 lsm_config = [
+	Config('lsm_auto_throttle', 'true', r'''
+		Throttle inserts into LSM trees if flushing to disk isn't keeping up''',
+		type='boolean'),
 	Config('lsm_bloom', 'true', r'''
 		create bloom filters on LSM tree chunks as they are merged''',
 		type='boolean'),

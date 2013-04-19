@@ -695,6 +695,8 @@ struct __wt_session {
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
 	 * 1MB.}
+	 * @config{lsm_auto_throttle, Throttle inserts into LSM trees if
+	 * flushing to disk isn't keeping up., a boolean flag; default \c true.}
 	 * @config{lsm_bloom, create bloom filters on LSM tree chunks as they
 	 * are merged., a boolean flag; default \c true.}
 	 * @config{lsm_bloom_bit_count, the number of bits used per item for LSM

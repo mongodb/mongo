@@ -244,12 +244,12 @@ __wt_confdfl_session_create =
 	"colgroups=,collator=,columns=,dictionary=0,exclusive=0,format=btree,"
 	"huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,key_gap=10"
-	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
-	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
-	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"lsm_merge_threads=1,memory_page_max=5MB,os_cache_dirty_max=0,"
-	"os_cache_max=0,prefix_compression=,source=,split_pct=75,type=file,"
-	"value_format=u";
+	",leaf_item_max=0,leaf_page_max=1MB,lsm_auto_throttle=,lsm_bloom=,"
+	"lsm_bloom_bit_count=8,lsm_bloom_config=,lsm_bloom_hash_count=4,"
+	"lsm_bloom_newest=0,lsm_bloom_oldest=0,lsm_chunk_size=2MB,"
+	"lsm_merge_max=15,lsm_merge_threads=1,memory_page_max=5MB,"
+	"os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,source=,"
+	"split_pct=75,type=file,value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
@@ -274,6 +274,7 @@ __wt_confchk_session_create[] = {
 	{ "key_gap", "int", "min=0", NULL},
 	{ "leaf_item_max", "int", "min=0", NULL},
 	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL},
+	{ "lsm_auto_throttle", "boolean", NULL, NULL},
 	{ "lsm_bloom", "boolean", NULL, NULL},
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000", NULL},
 	{ "lsm_bloom_config", "string", NULL, NULL},

@@ -112,7 +112,8 @@ struct __wt_lsm_tree {
 #define	WT_LSM_TREE_LOCKED	0x01
 #define	WT_LSM_TREE_NEED_SWITCH	0x02
 #define	WT_LSM_TREE_OPEN	0x04
-#define	WT_LSM_TREE_WORKING	0x08
+#define	WT_LSM_TREE_THROTTLE	0x08
+#define	WT_LSM_TREE_WORKING	0x10
 	uint32_t flags;
 };
 
