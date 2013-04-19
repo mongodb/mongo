@@ -69,8 +69,7 @@ config_setup(void)
 	if (!config_find_is_perm("file_type", strlen("file_type")))
 		switch (MMRAND(0, 2)) {
 		case 0:
-			if (!DATASOURCE("lsm") &&
-			    !DATASOURCE("kvsbdb") && !DATASOURCE("kvsstec")) {
+			if (!DATASOURCE("lsm")) {
 				config_single("file_type=fix", 0);
 				break;
 			}
@@ -91,12 +90,6 @@ config_setup(void)
 	 * If data_source and file_type were both "permanent", we may still
 	 * have a mismatch.
 	 */
-	if (DATASOURCE("kvsbdb") && DATASOURCE("kvsstec") && g.type == FIX) {
-		fprintf(stderr,
-	    "%s: kvs data_source not compatible with fix file_type\n",
-		    g.progname);
-		exit(EXIT_FAILURE);
-	}
 	if (DATASOURCE("lsm") && g.type != ROW) {
 		fprintf(stderr,
 	    "%s: lsm data_source is only compatible with row file_type\n",
