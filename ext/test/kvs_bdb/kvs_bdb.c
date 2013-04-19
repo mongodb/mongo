@@ -173,19 +173,6 @@ copyin_key(WT_CURSOR *wt_cursor)
 }
 
 static inline void
-copyin_value(WT_CURSOR *wt_cursor)
-{
-	CURSOR_SOURCE *cursor;
-	DBT *value;
-
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	value = &cursor->value;
-
-	value->data = (char *)wt_cursor->value.data;
-	value->size = wt_cursor->value.size;
-}
-
-static inline void
 copyout_key(WT_CURSOR *wt_cursor)
 {
 	CURSOR_SOURCE *cursor;
@@ -200,6 +187,19 @@ copyout_key(WT_CURSOR *wt_cursor)
 		wt_cursor->key.data = key->data;
 		wt_cursor->key.size = key->size;
 	}
+}
+
+static inline void
+copyin_value(WT_CURSOR *wt_cursor)
+{
+	CURSOR_SOURCE *cursor;
+	DBT *value;
+
+	cursor = (CURSOR_SOURCE *)wt_cursor;
+	value = &cursor->value;
+
+	value->data = (char *)wt_cursor->value.data;
+	value->size = wt_cursor->value.size;
 }
 
 static inline void
@@ -668,6 +668,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
+
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "overwrite", &v)) != 0) {
 		ESET(session, ret,
@@ -675,6 +676,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
+
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "key_format", &v)) != 0) {
 		ESET(session, ret,
