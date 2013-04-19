@@ -34,6 +34,15 @@
 #include "mongo/util/concurrency/mutexdebugger.h"
 #endif
 
+// Macro to get line as a string constant
+#define MONGO_STRINGIFY(X) #X
+// Double-expansion trick to get preproc to actually substitute __LINE__
+#define _MONGO_LINE_STRING(LINE) MONGO_STRINGIFY( LINE )
+#define MONGO_LINE_STRING _MONGO_LINE_STRING( __LINE__ )
+
+// Mutex names should be as <file>::<line> string
+#define MONGO_FILE_LINE __FILE__ "::" MONGO_LINE_STRING
+
 namespace mongo {
 
     inline boost::xtime incxtimemillis( long long s ) {
