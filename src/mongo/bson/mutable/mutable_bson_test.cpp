@@ -1069,5 +1069,24 @@ namespace {
         ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
     }
 
+    TEST(Document, SetValueBSONElementFieldNameHandling) {
+        static const char inJson[] = "{ a : 4 }";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        static const char inJson2[] = "{ b : 5 }";
+        mongo::BSONObj inObj2 = mongo::fromjson(inJson2);
+        mongo::BSONObjIterator iterator = inObj2.begin();
+
+        ASSERT_TRUE(iterator.more());
+        const mongo::BSONElement b = iterator.next();
+
+        mmb::Element a = doc.root().leftChild();
+        a.setValueBSONElement(b);
+
+        static const char outJson[] = "{ a : 5 }";
+        ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    }
+
 } // namespace
 

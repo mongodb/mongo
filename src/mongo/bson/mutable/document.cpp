@@ -1471,7 +1471,11 @@ namespace mutablebson {
 
     Status Element::setValueBSONElement(const BSONElement& value) {
         verify(ok());
-        Element newValue = getDocument().makeElement(value);
+        Document::Impl& impl = getDocument().getImpl();
+        const ElementRep& thisRep = impl.getElementRep(_repIdx);
+        Element newValue = getDocument().makeElementWithNewFieldName(
+            impl.getFieldName(thisRep),
+            value);
         return setValue(&newValue);
     }
 
