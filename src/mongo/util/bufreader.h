@@ -18,6 +18,11 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     /** helper to read and parse a block of memory
