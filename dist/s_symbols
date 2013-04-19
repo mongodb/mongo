@@ -36,6 +36,12 @@ egrep -v '^__wt') |
 sort |
 uniq -u > $t
 
-test -s $t && cat $t
+test -s $t && {
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	echo 'unexpected external symbols in the WiredTiger library'
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	cat $t
+	exit 1
+}
 
 exit 0
