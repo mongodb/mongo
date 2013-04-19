@@ -105,14 +105,8 @@ AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 AC_SUBST(AM_CFLAGS)
 
 # test/format requires an installed Berkeley DB release tree.
-bdbdir="/usr/local/BerkeleyDB.5.3"
-if ! test -d $bdbdir ; then
-	bdbdir="/usr/local/BerkeleyDB.5.1"
-fi
-if ! test -d $bdbdir ; then
-	bdbdir="/usr/local/BerkeleyDB.4.8"
-fi
-if ! test -d $bdbdir ; then
+bdbdir=`ls -d "$ac_pwd/db" /usr/local/BerkeleyDB* 2>/dev/null | head -1`
+if ! test -d "$bdbdir" ; then
 	bdbdir="NO_BERKELEY_DB_INSTALLATION_FOUND"
 fi
 AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $bdbdir])
