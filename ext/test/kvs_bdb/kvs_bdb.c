@@ -575,7 +575,6 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	DB *db;
 	DBTYPE type;
 	WT_CONFIG_ITEM v;
-	uint32_t flags;
 	int ret, tret;
 	const char *name;
 
@@ -600,12 +599,10 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		    "kvs_create: unsupported value format %.*s",
 		    (int)v.len, v.str);
 
-	flags = DB_CREATE;
-
 	ret = 0;			/* Create the Berkeley DB table */
 	if ((tret = db_create(&db, dbenv, 0)) != 0)
 		ERET(session, WT_ERROR, "db_create: %s", db_strerror(tret));
-	if ((tret = db->open(db, NULL, name, NULL, type, flags, 0)) != 0)
+	if ((tret = db->open(db, NULL, name, NULL, type, DB_CREATE, 0)) != 0)
 		ESET(session, WT_ERROR, "Db.open: %s", uri, db_strerror(tret));
 	if ((tret = db->close(db, 0)) != 0)
 		ESET(session, WT_ERROR, "Db.close", db_strerror(tret));
