@@ -443,56 +443,112 @@ public:
         boost::scoped_array<char> buffer(new char[BUF_SIZE+2]);
         char* line = buffer.get();
 
-        while ( _jsonArray || in->rdstate() == 0 ) {
-            try {
-                BSONObj o;
-                if (_jsonArray) {
-                    int bytesProcessed = 0;
-                    if (line == buffer.get()) { // Only read on first pass - the whole array must be on one line.
-                        bytesProcessed = getLine(in, line);
+        if (_jsonArray) {
+            while ( _jsonArray || in->rdstate() == 0 ) {
+                try {
+                    BSONObj o;
+                    if (_jsonArray) {
+                        int bytesProcessed = 0;
+                        if (line == buffer.get()) { // Only read on first pass - the whole array must be on one line.
+                            bytesProcessed = getLine(in, line);
+                            line += bytesProcessed;
+                            len += bytesProcessed;
+                        }
+                        if ((bytesProcessed = parseJSONArray(line, o)) < 0) {
+                            len += bytesProcessed;
+                            break;
+                        }
+                        len += bytesProcessed;
                         line += bytesProcessed;
-                        len += bytesProcessed;
                     }
-                    if ((bytesProcessed = parseJSONArray(line, o)) < 0) {
-                        len += bytesProcessed;
+                    else {
+                        if (!parseRow(in, o, len)) {
+                            continue;
+                        }
+                    }
+
+                    if ( _headerLine ) {
+                        _headerLine = false;
+                    }
+                    else if (_doimport) {
+                        importDocument(ns, o);
+
+                        if (num < 10) {
+                            // we absolutely want to check the first and last op of the batch. we do
+                            // a few more as that won't be too time expensive.
+                            checkLastError();
+                            lastNumChecked = num;
+                        }
+                    }
+
+                    num++;
+                }
+                catch ( std::exception& e ) {
+                    log() << "exception:" << e.what() << endl;
+                    log() << line << endl;
+                    errors++;
+
+                    if (hasParam("stopOnError") || _jsonArray)
                         break;
-                    }
-                    len += bytesProcessed;
-                    line += bytesProcessed;
-                }
-                else {
-                    if (!parseRow(in, o, len)) {
-                        continue;
-                    }
                 }
 
-                if ( _headerLine ) {
-                    _headerLine = false;
+                if ( pm.hit( len + 1 ) ) {
+                    log() << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
                 }
-                else if (_doimport) {
-                    importDocument(ns, o);
-
-                    if (num < 10) {
-                        // we absolutely want to check the first and last op of the batch. we do 
-                        // a few more as that won't be too time expensive.
-                        checkLastError();
-                        lastNumChecked = num;
-                    }
-                }
-
-                num++;
             }
-            catch ( std::exception& e ) {
-                log() << "exception:" << e.what() << endl;
-                log() << line << endl;
-                errors++;
+        }
+        else {
+            while ( _jsonArray || in->rdstate() == 0 ) {
+                try {
+                    BSONObj o;
+                    if (_jsonArray) {
+                        int bytesProcessed = 0;
+                        if (line == buffer.get()) { // Only read on first pass - the whole array must be on one line.
+                            bytesProcessed = getLine(in, line);
+                            line += bytesProcessed;
+                            len += bytesProcessed;
+                        }
+                        if ((bytesProcessed = parseJSONArray(line, o)) < 0) {
+                            len += bytesProcessed;
+                            break;
+                        }
+                        len += bytesProcessed;
+                        line += bytesProcessed;
+                    }
+                    else {
+                        if (!parseRow(in, o, len)) {
+                            continue;
+                        }
+                    }
 
-                if (hasParam("stopOnError") || _jsonArray)
-                    break;
-            }
+                    if ( _headerLine ) {
+                        _headerLine = false;
+                    }
+                    else if (_doimport) {
+                        importDocument(ns, o);
 
-            if ( pm.hit( len + 1 ) ) {
-                log() << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
+                        if (num < 10) {
+                            // we absolutely want to check the first and last op of the batch. we do
+                            // a few more as that won't be too time expensive.
+                            checkLastError();
+                            lastNumChecked = num;
+                        }
+                    }
+
+                    num++;
+                }
+                catch ( std::exception& e ) {
+                    log() << "exception:" << e.what() << endl;
+                    log() << line << endl;
+                    errors++;
+
+                    if (hasParam("stopOnError") || _jsonArray)
+                        break;
+                }
+
+                if ( pm.hit( len + 1 ) ) {
+                    log() << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
+                }
             }
         }
 
