@@ -62,3 +62,34 @@ wiredtiger_struct_unpack(WT_SESSION *wt_session,
 
 	return (ret);
 }
+
+/*
+ * wiredtiger_pack_uint_raw --
+ *	Pack a 8B value into a buffer, returning the length.
+ */
+int
+wiredtiger_pack_uint_raw(void *buffer, uint64_t u, size_t *sizep)
+{
+	WT_DECL_RET;
+	uint8_t *p;
+
+	p = buffer;
+	if ((ret = __wt_vpack_uint(&p, (size_t)0, u)) != 0)
+		return (ret);
+
+	*sizep = WT_PTRDIFF(p, buffer);
+	return (0);
+}
+
+/*
+ * wiredtiger_unpack_uint_raw --
+ *	Unpack a buffer into an 8B value.
+ */
+int
+wiredtiger_unpack_uint_raw(const void *buffer, uint64_t *up)
+{
+	const uint8_t *p;
+
+	p = buffer;
+	return (__wt_vunpack_uint(&p, (size_t)0, up));
+}
