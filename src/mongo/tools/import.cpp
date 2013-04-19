@@ -444,33 +444,25 @@ public:
         char* line = buffer.get();
 
         if (_jsonArray) {
-            while ( _jsonArray || in->rdstate() == 0 ) {
+            while (true) {
                 try {
                     BSONObj o;
-                    if (_jsonArray) {
-                        int bytesProcessed = 0;
-                        if (line == buffer.get()) { // Only read on first pass - the whole array must be on one line.
-                            bytesProcessed = getLine(in, line);
-                            line += bytesProcessed;
-                            len += bytesProcessed;
-                        }
-                        if ((bytesProcessed = parseJSONArray(line, o)) < 0) {
-                            len += bytesProcessed;
-                            break;
-                        }
-                        len += bytesProcessed;
-                        line += bytesProcessed;
-                    }
-                    else {
-                        if (!parseRow(in, o, len)) {
-                            continue;
-                        }
-                    }
 
-                    if ( _headerLine ) {
-                        _headerLine = false;
+                    int bytesProcessed = 0;
+                    if (line == buffer.get()) { // Only read on first pass - the whole array must be on one line.
+                        bytesProcessed = getLine(in, line);
+                        line += bytesProcessed;
+                        len += bytesProcessed;
                     }
-                    else if (_doimport) {
+                    if ((bytesProcessed = parseJSONArray(line, o)) < 0) {
+                        len += bytesProcessed;
+                        break;
+                    }
+                    len += bytesProcessed;
+                    line += bytesProcessed;
+
+                    // Import documents
+                    if (_doimport) {
                         importDocument(ns, o);
 
                         if (num < 10) {
@@ -488,8 +480,9 @@ public:
                     log() << line << endl;
                     errors++;
 
-                    if (hasParam("stopOnError") || _jsonArray)
-                        break;
+                    // Since we only support JSON arrays all on one line, we might as well stop now
+                    // because we can't read any more documents
+                    break;
                 }
 
                 if ( pm.hit( len + 1 ) ) {
@@ -498,27 +491,12 @@ public:
             }
         }
         else {
-            while ( _jsonArray || in->rdstate() == 0 ) {
+            while (in->rdstate() == 0) {
                 try {
                     BSONObj o;
-                    if (_jsonArray) {
-                        int bytesProcessed = 0;
-                        if (line == buffer.get()) { // Only read on first pass - the whole array must be on one line.
-                            bytesProcessed = getLine(in, line);
-                            line += bytesProcessed;
-                            len += bytesProcessed;
-                        }
-                        if ((bytesProcessed = parseJSONArray(line, o)) < 0) {
-                            len += bytesProcessed;
-                            break;
-                        }
-                        len += bytesProcessed;
-                        line += bytesProcessed;
-                    }
-                    else {
-                        if (!parseRow(in, o, len)) {
-                            continue;
-                        }
+
+                    if (!parseRow(in, o, len)) {
+                        continue;
                     }
 
                     if ( _headerLine ) {
@@ -542,7 +520,7 @@ public:
                     log() << line << endl;
                     errors++;
 
-                    if (hasParam("stopOnError") || _jsonArray)
+                    if (hasParam("stopOnError"))
                         break;
                 }
 
