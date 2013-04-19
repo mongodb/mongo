@@ -112,6 +112,14 @@ fi
 AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $bdbdir])
 AC_SUBST(BERKELEY_DB_PATH, [$bdbdir])
 
+# test/format optionally supports the STEC KVS library.
+stec_kvs_dir=`ls -d "$ac_pwd/stec_kvs" 2>/dev/null | head -1`
+if ! test -d "$stec_kvs_dir" ; then
+	stec_kvs_dir="NO_STEC_KVS_INSTALLATION_FOUND"
+fi
+AM_CONDITIONAL([HAVE_STEC_KVS], [test -d $stec_kvs_dir])
+AC_SUBST(STEC_KVS_PATH, [$stec_kvs_dir])
+
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then
 	AC_MSG_WARN(

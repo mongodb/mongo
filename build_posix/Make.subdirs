@@ -13,6 +13,7 @@ ext/compressors/bzip2 BZIP2
 ext/compressors/nop
 ext/compressors/snappy SNAPPY
 ext/test/kvs_bdb HAVE_BERKELEY_DB
+ext/test/kvs_stec HAVE_STEC_KVS
 lang/java JAVA
 lang/python PYTHON
 test/bloom

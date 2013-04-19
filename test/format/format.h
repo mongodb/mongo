@@ -49,14 +49,19 @@
 extern WT_EXTENSION_API *wt_api;
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
+
 #define	BZIP_PATH							\
 	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 #define	SNAPPY_PATH							\
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
+
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
+#define	KVS_STEC_PATH							\
+	EXTPATH "test/kvs_stec/.libs/libwiredtiger_kvs_stec.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
@@ -194,6 +199,3 @@ void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
-
-void	 wiredtiger_kvs_stec_close(WT_CONNECTION *);
-void	 wiredtiger_kvs_stec_init(WT_CONNECTION *);

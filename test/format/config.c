@@ -126,6 +126,12 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
+	/* KVS requires shared libraries. */
+	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
+		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
+	if (DATASOURCE("kvsstec") && access(KVS_STEC_PATH, R_OK) != 0)
+		die(errno, "kvsstec shared library: %s", KVS_STEC_PATH);
+
 	/* KVS doesn't support user-specified collations. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
 		g.c_reverse = 0;
