@@ -1155,17 +1155,18 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
 	 * @configstart{connection.load_extension, see dist/api_data.py}
-	 * @config{load, an entry point of the extension\, called when the
-	 * extension is loaded.  The signature of the function is
-	 * <code>entry(WT_CONNECTION *\, WT_CONFIG_ARG *config)</code>., a
-	 * string; default \c wiredtiger_extension_load.}
+	 * @config{entry, the entry point of the extension\, called to
+	 * initialize the extension when it is loaded.  The signature of the
+	 * function must match ::wiredtiger_extension_init., a string; default
+	 * \c wiredtiger_extension_init.}
 	 * @config{prefix, a prefix for all names registered by this extension
 	 * (e.g.\, to make namespaces distinct or during upgrades., a string;
 	 * default empty.}
-	 * @config{unload, an entry point of the extension\, called when the
-	 * extension is unloaded.  The signature of the function is
-	 * <code>entry(WT_CONNECTION *)</code>., a string; default \c
-	 * wiredtiger_extension_unload.}
+	 * @config{terminate, a optional function in the extension that is
+	 * called before the extension is unloaded during WT_CONNECTION::close.
+	 * The signature of the function must match
+	 * ::wiredtiger_extension_terminate., a string; default \c
+	 * wiredtiger_extension_terminate.}
 	 * @configend
 	 * @errors
 	 */
@@ -2071,7 +2072,8 @@ struct __wt_data_source {
  * @snippet ex_all.c WT_EXTRACTOR register
  */
 struct __wt_extractor {
-	/*! Callback to extract a value for an index or column group.
+	/*!
+	 * Callback to extract a value for an index or column group.
 	 *
 	 * @errors
 	 *
@@ -2082,20 +2084,24 @@ struct __wt_extractor {
 	    WT_ITEM *result);
 };
 
-/*! Entry point when loading an extension, implemented by loadable modules.
+/*!
+ * Entry point to an extension, called when the extension is loaded.
  *
  * @param connection the connection handle
  * @param config the config information passed to WT_CONNECTION::load_extension
  * @errors
  */
-extern int wiredtiger_extension_load(
+extern int wiredtiger_extension_init(
     WT_CONNECTION *connection, WT_CONFIG_ARG *config);
-/*! Entry point when unloading an extension, implemented by loadable modules.
+
+/*!
+ * Optional cleanup function for an extension, called during
+ * WT_CONNECTION::close.
  *
  * @param connection the connection handle
  * @errors
  */
-extern int wiredtiger_extension_unload(WT_CONNECTION *connection);
+extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 
 /*! @} */
 

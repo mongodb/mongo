@@ -11,5 +11,5 @@ struct __wt_dlh {
 	void	*handle;			/* Handle returned by dlopen. */
 	char	*name;
 
-	int (*unload)(WT_CONNECTION *);		/* Unload entry point */
+	int (*terminate)(WT_CONNECTION *);	/* Terminate function. */
 };

@@ -55,7 +55,7 @@ __conn_load_extension(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
-	WT_ERR(__wt_config_gets(session, cfg, "load", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
 
 	/*
@@ -72,9 +72,9 @@ __conn_load_extension(
 	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
 	/* Remember the unload function for when we close. */
-	WT_ERR(__wt_config_gets(session, cfg, "unload", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "terminate", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
-	WT_ERR(__wt_dlsym(session, dlh, entry_name, 0, &dlh->unload));
+	WT_ERR(__wt_dlsym(session, dlh, entry_name, 0, &dlh->terminate));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);

@@ -10,21 +10,15 @@ been removed, and all configuration strings are now case-dependent.
 Applications may require modifications to resolve run-time errors.
 </dd>
 
-<dt>Loading extensions and WT_EXTENSION_API::</dt>
+<dt>Loading extensions and WT_EXTENSION_API</dt>
 <dd>
 The following changes are only applicable to applications loading
 extensions and/or using the WiredTiger extension functions described in
-WT_EXTENSION_API::.
+WT_EXTENSION_API.
 
 <ul>
 <li>
-The configuration string for specifying a non-standard load entry point has
-been changed from \c entry to \c load, and the default entry point name has
-been changed from \c wiredtiger_extension_init to \c wiredtiger_extension_load.
-Applications may require modifications.
-
-<li>
-The signature of the function called when loading an extension has changed
+The signature of ::wiredtiger_extension_init has changed
 from <code>(WT_SESSION *session, WT_EXTENSION_API *api)</code> to
 <code>(WT_CONNECTION *connection)</code>.   As no WT_EXTENSION_API
 handle reference is passed to the function, the
@@ -44,17 +38,17 @@ applications should instead use the method handles referenced by the
 WT_EXTENSION_API handle to call extension functions.
 
 <li>
-The extension API methods have all changed to require an additional parameter,
-the WT_EXTENSION_API method handle; applications may require modifications.
+The extension API methods have all changed to require an additional
+parameter, the WT_EXTENSION_API method handle; applications may require
+modifications.
 
 <li>
 The WT_SESSION::msg_printf method was replaced by WT_EXTENSION_API::msg_printf;
 applications may require modifications.
-
 </ul>
 </dd>
 
-<dt>WT_DATA_SOURCE::</dt>
+<dt>WT_DATA_SOURCE</dt>
 <dd>
 The following changes are only applicable to applications providing new
 implementations of the WiredTiger WT_DATA_SOURCE class.

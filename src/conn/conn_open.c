@@ -116,8 +116,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
 		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
 
-		if (dlh->unload != NULL)
-			WT_TRET(dlh->unload(wt_conn));
+		if (dlh->terminate != NULL)
+			WT_TRET(dlh->terminate(wt_conn));
 		WT_TRET(__wt_dlclose(session, dlh));
 	}
 

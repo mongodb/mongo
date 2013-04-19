@@ -816,7 +816,7 @@ kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 }
 
 int
-wiredtiger_extension_load(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
+wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 {
 	int ret;
 
@@ -854,7 +854,7 @@ wiredtiger_extension_load(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 }
 
 int
-wiredtiger_extension_unload(WT_CONNECTION *conn)
+wiredtiger_extension_terminate(WT_CONNECTION *conn)
 {
 	int ret;
 
