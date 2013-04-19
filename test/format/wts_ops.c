@@ -407,6 +407,17 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "read_row: read row %" PRIu64, keyno);
+	/*
+	 * In fixed length stores, zero values at the end of the key space are
+	 * returned as not found.  Treat this the same as a zero value in the
+	 * key space, to match BDB's behavior.
+	 */
+	if (ret == WT_NOTFOUND && g.type == FIX) {
+		bitfield = 0;
+		value.data = &bitfield;
+		value.size = 1;
+		ret = 0;
+	}
 
 	if (!SINGLETHREADED)
 		return;
@@ -415,18 +426,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	memset(&bdb_value, 0, sizeof(bdb_value));
 	bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound);
 
-	/*
-	 * Check for not-found status.
-	 *
-	 * In fixed length stores, zero values at the end of the key space
-	 * are treated as not found.  Treat this the same as a zero value
-	 * in the key space, to match BDB's behavior.
-	 */
-	if (g.type == FIX && ret == WT_NOTFOUND) {
-		bitfield = 0;
-		ret = 0;
-	}
-
+	/* Check for not-found status. */
 	if (notfound_chk("read_row", ret, notfound, keyno))
 		return;
 
