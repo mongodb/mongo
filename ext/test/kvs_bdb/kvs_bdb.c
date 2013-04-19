@@ -91,6 +91,7 @@ struct __cursor_source {
 	db_recno_t recno;
 
 	int	 config_append;			/* config "append" */
+	int	 config_bitfield;		/* config "value_format=#t" */
 	int	 config_overwrite;		/* config "overwrite" */
 	int	 config_recno;			/* config "key_format=r" */
 };
@@ -520,6 +521,16 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 	key = &cursor->key;
 	value = &cursor->value;
 
+	/*
+	 * WiredTiger's "remove" of a bitfield is really an update with a value
+	 * of a single byte of zero.
+	 */
+	if (cursor->config_bitfield) {
+		wt_cursor->value.size = 1;
+		wt_cursor->value.data = "\0";
+		return (kvs_cursor_update(wt_cursor));
+	}
+
 	if ((ret = copyin_key(wt_cursor)) != 0)
 		return (ret);
 
@@ -590,14 +601,6 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		ERET(session, ret,
 		    "key_format configuration: %s", wiredtiger_strerror(ret));
 	type = v.len == 1 && v.str[0] == 'r' ? DB_RECNO : DB_BTREE;
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "value_format", &v)) != 0)
-		ERET(session, ret,
-		    "value_format configuration: %s", wiredtiger_strerror(ret));
-	if (v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't')
-		ERET(session, EINVAL,
-		    "kvs_create: unsupported value format %.*s",
-		    (int)v.len, v.str);
 
 	ret = 0;			/* Create the Berkeley DB table */
 	if ((tret = db_create(&db, dbenv, 0)) != 0)
@@ -679,6 +682,15 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		goto err;
 	}
 	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
+
+	if ((ret = wt_ext->config_get(
+	    wt_ext, session, config, "value_format", &v)) != 0) {
+		ESET(session, ret,
+		    "value_format configuration: %s", wiredtiger_strerror(ret));
+		goto err;
+	}
+	cursor->config_bitfield =
+	    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
 	lock();
 	locked = 1;
