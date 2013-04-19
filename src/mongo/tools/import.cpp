@@ -43,7 +43,6 @@ class Import : public Tool {
     bool _headerLine;
     bool _upsert;
     bool _doimport;
-    bool _jsonArray;
     vector<string> _upsertFields;
     static const int BUF_SIZE;
 
@@ -109,23 +108,17 @@ class Import : public Tool {
      * increment buf by this amount.
      */
     int getLine(istream* in, char* buf) {
-        if (_jsonArray) {
-            in->read(buf, BUF_SIZE);
-            uassert(13295, "JSONArray file too large", (in->rdstate() & ios_base::eofbit));
-            buf[ in->gcount() ] = '\0';
+        in->getline( buf , BUF_SIZE );
+        if ((in->rdstate() & ios_base::eofbit) && (in->rdstate() & ios_base::failbit)) {
+            // this is the last line, and it's empty (not even a newline)
+            buf[0] = '\0';
+            return 0;
         }
-        else {
-            in->getline( buf , BUF_SIZE );
-            if ((in->rdstate() & ios_base::eofbit) && (in->rdstate() & ios_base::failbit)) {
-                // this is the last line, and it's empty (not even a newline)
-                buf[0] = '\0';
-                return 0;
-            }
 
-            uassert(16329, str::stream() << "read error, or input line too long (max length: "
-                    << BUF_SIZE << ")", !(in->rdstate() & ios_base::failbit));
-            LOG(1) << "got line:" << buf << endl;
-        }
+        uassert(16329, str::stream() << "read error, or input line too long (max length: "
+                << BUF_SIZE << ")", !(in->rdstate() & ios_base::failbit));
+        LOG(1) << "got line:" << buf << endl;
+
         uassert( 10263 ,  "unknown error reading file" ,
                  (!(in->rdstate() & ios_base::badbit)) &&
                  (!(in->rdstate() & ios_base::failbit) || (in->rdstate() & ios_base::eofbit)) );
@@ -141,27 +134,44 @@ class Import : public Tool {
     }
 
     /*
-     * Parses a BSON object out of a JSON array.
-     * Returns number of bytes processed on success and -1 on failure.
+     * description:
+     *     given a pointer into a JSON array, returns the next valid JSON object
+     * args:
+     *     buf - pointer into the JSON array
+     *     o - BSONObj to fill
+     *     numBytesRead - return parameter for how far we read
+     * return:
+     *     true if an object was successfully parsed
+     *     false if there is no object left to parse
+     * throws:
+     *     exception on parsing error
      */
-    int parseJSONArray(char* buf, BSONObj& o) {
-        int len = 0;
-        while (buf[0] != '{' && buf[0] != '\0') {
-            len++;
+    bool parseJSONArray(char* buf, BSONObj* o, int* numBytesRead) {
+
+        // Skip extra characters since fromjson must be passed a character buffer that starts with a
+        // valid JSON object, and does not accept JSON arrays.
+        // (NOTE: this doesn't catch all invalid JSON arrays, but does fail on invalid characters)
+        *numBytesRead = 0;
+        while (buf[0] == '[' ||
+               buf[0] == ']' ||
+               buf[0] == ',' ||
+               isspace(buf[0])) {
+            (*numBytesRead)++;
             buf++;
         }
+
         if (buf[0] == '\0')
-            return -1;
+            return false;
 
-        int jslen;
         try {
-            o = fromjson(buf, &jslen);
+            int len = 0;
+            *o = fromjson(buf, &len);
+            (*numBytesRead) += len;
         } catch ( MsgAssertionException& e ) {
-            uasserted(13293, string("BSON representation of supplied JSON array is too large: ") + e.what());
+            uasserted(13293, string("Invalid JSON passed to mongoimport: ") + e.what());
         }
-        len += jslen;
 
-        return len;
+        return true;
     }
 
     /*
@@ -218,7 +228,7 @@ class Import : public Tool {
                     line += num;
                     numBytesRead += num;
 
-                    uassert (15854, "CSV file ends while inside quoted field", line[0] != '\0');
+                    uassert(15854, "CSV file ends while inside quoted field", line[0] != '\0');
                     numBytesRead += strlen( line );
                 } else {
                     break;
@@ -286,7 +296,6 @@ public:
         _headerLine = false;
         _upsert = false;
         _doimport = true;
-        _jsonArray = false;
     }
     ;
     virtual void printExtraHelp( ostream & out ) {
@@ -427,9 +436,6 @@ public:
             }
         }
 
-        if (_type == JSON && hasParam("jsonArray")) {
-            _jsonArray = true;
-        }
 
         time_t start = time(0);
         LOG(1) << "filesize: " << fileSize << endl;
@@ -439,27 +445,39 @@ public:
         int errors = 0;
         lastErrorFailures = 0;
         int len = 0;
-        // buffer and line are only used when parsing a jsonArray
-        boost::scoped_array<char> buffer(new char[BUF_SIZE+2]);
-        char* line = buffer.get();
 
-        if (_jsonArray) {
+        // We have to handle jsonArrays differently since we can't read line by line
+        if (_type == JSON && hasParam("jsonArray")) {
+
+            // We cycle through these buffers in order to continuously read from the stream
+            boost::scoped_array<char> buffer1(new char[BUF_SIZE]);
+            boost::scoped_array<char> buffer2(new char[BUF_SIZE]);
+            char* current_buffer = buffer1.get();
+            char* next_buffer = buffer2.get();
+            char* temp_buffer;
+
+            // buffer_base_offset is the offset into the stream where our buffer starts, while
+            // input_stream_offset is the total number of bytes read from the stream
+            uint64_t buffer_base_offset = 0;
+            uint64_t input_stream_offset = 0;
+
+            // Fill our buffer
+            // NOTE: istream::get automatically appends '\0' at the end of what it reads
+            in->get(current_buffer, BUF_SIZE, '\0');
+            uassert(16808, str::stream() << "read error: " << strerror(errno), !in->fail());
+
+            // Record how far we read into the stream.
+            input_stream_offset += in->gcount();
+
             while (true) {
                 try {
+
                     BSONObj o;
 
-                    int bytesProcessed = 0;
-                    if (line == buffer.get()) { // Only read on first pass - the whole array must be on one line.
-                        bytesProcessed = getLine(in, line);
-                        line += bytesProcessed;
-                        len += bytesProcessed;
-                    }
-                    if ((bytesProcessed = parseJSONArray(line, o)) < 0) {
-                        len += bytesProcessed;
+                    // Try to parse (parseJSONArray)
+                    if (!parseJSONArray(current_buffer, &o, &len)) {
                         break;
                     }
-                    len += bytesProcessed;
-                    line += bytesProcessed;
 
                     // Import documents
                     if (_doimport) {
@@ -473,11 +491,34 @@ public:
                         }
                     }
 
+                    // Copy over the part of buffer that was not parsed
+                    strcpy(next_buffer, current_buffer + len);
+
+                    // Advance our buffer base past what we've already parsed
+                    buffer_base_offset += len;
+
+                    // Fill up the end of our next buffer only if there is something in the stream
+                    if (!in->eof()) {
+                        // NOTE: istream::get automatically appends '\0' at the end of what it reads
+                        in->get(next_buffer + (input_stream_offset - buffer_base_offset),
+                                BUF_SIZE - (input_stream_offset - buffer_base_offset), '\0');
+                        uassert(16809, str::stream() << "read error: "
+                                                     << strerror(errno), !in->fail());
+
+                        // Record how far we read into the stream.
+                        input_stream_offset += in->gcount();
+                    }
+
+                    // Swap buffer pointers
+                    temp_buffer = current_buffer;
+                    current_buffer = next_buffer;
+                    next_buffer = temp_buffer;
+
                     num++;
                 }
-                catch ( std::exception& e ) {
-                    log() << "exception:" << e.what() << endl;
-                    log() << line << endl;
+                catch ( const std::exception& e ) {
+                    log() << "exception: " << e.what()
+                          << ", current buffer: " << current_buffer << endl;
                     errors++;
 
                     // Since we only support JSON arrays all on one line, we might as well stop now
@@ -515,9 +556,8 @@ public:
 
                     num++;
                 }
-                catch ( std::exception& e ) {
+                catch ( const std::exception& e ) {
                     log() << "exception:" << e.what() << endl;
-                    log() << line << endl;
                     errors++;
 
                     if (hasParam("stopOnError"))
