@@ -195,7 +195,5 @@ void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
 
-void	 wiredtiger_kvs_bdb_close(WT_CONNECTION *);
-void	 wiredtiger_kvs_bdb_init(WT_CONNECTION *);
 void	 wiredtiger_kvs_stec_close(WT_CONNECTION *);
 void	 wiredtiger_kvs_stec_init(WT_CONNECTION *);
