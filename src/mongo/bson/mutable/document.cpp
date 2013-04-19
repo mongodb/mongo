@@ -1586,6 +1586,37 @@ namespace mutablebson {
         return Status::OK();
     }
 
+
+    namespace {
+
+        // A helper for Element::writeElement below. For cases where we are building inside an
+        // array, we want to ignore field names. So the specialization for BSONArrayBuilder ignores
+        // the third parameter.
+        template<typename Builder>
+        struct SubBuilder;
+
+        template<>
+        struct SubBuilder<BSONObjBuilder> {
+            SubBuilder(BSONObjBuilder* builder, BSONType type, const StringData& fieldName)
+                : buffer(
+                    (type == mongo::Array) ?
+                    builder->subarrayStart(fieldName) :
+                    builder->subobjStart(fieldName)) {}
+            BufBuilder& buffer;
+        };
+
+        template<>
+        struct SubBuilder<BSONArrayBuilder> {
+            SubBuilder(BSONArrayBuilder* builder, BSONType type, const StringData&)
+                : buffer(
+                    (type == mongo::Array) ?
+                    builder->subarrayStart() :
+                    builder->subobjStart()) {}
+            BufBuilder& buffer;
+        };
+
+    } // namespace
+
     template<typename Builder>
     void Element::writeElement(Builder* builder) const {
         // No need to verify(ok()) since we are only called from methods that have done so.
@@ -1598,12 +1629,13 @@ namespace mutablebson {
             builder->append(impl.getSerializedElement(thisRep));
         } else {
             const BSONType type = impl.getType(thisRep);
+            SubBuilder<Builder> subBuilder(builder, type, impl.getFieldName(thisRep));
             if (type == mongo::Array) {
-                BSONArrayBuilder child_builder(builder->subarrayStart(impl.getFieldName(thisRep)));
+                BSONArrayBuilder child_builder(subBuilder.buffer);
                 writeChildren(&child_builder);
                 child_builder.doneFast();
             } else if (type == mongo::Object) {
-                BSONObjBuilder child_builder(builder->subobjStart(impl.getFieldName(thisRep)));
+                BSONObjBuilder child_builder(subBuilder.buffer);
                 writeChildren(&child_builder);
                 child_builder.doneFast();
             } else {

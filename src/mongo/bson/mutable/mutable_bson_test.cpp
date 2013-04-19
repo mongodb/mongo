@@ -1028,5 +1028,32 @@ namespace {
         ASSERT_FALSE(doc.root().leftChild() == doc.root().rightChild());
     }
 
+    TEST(Document, ArraySerialization) {
+
+        static const char inJson[] =
+            "{ "
+            " 'a' : { 'b' : [ 'c', 'd' ] } "
+            "}";
+
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        mmb::Element root = doc.root();
+        mmb::Element a = root.leftChild();
+        mmb::Element b = a.leftChild();
+        mmb::Element new_array = doc.makeElementArray("XXX");
+        mmb::Element e = doc.makeElementString("e", "e");
+        new_array.pushBack(e);
+        b.pushBack(new_array);
+
+        static const char outJson[] =
+            "{ "
+            " 'a' : { 'b' : [ 'c', 'd', [ 'e' ] ] } "
+            "}";
+
+        const mongo::BSONObj outObj = doc.getObject();
+        ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    }
+
 } // namespace
 
