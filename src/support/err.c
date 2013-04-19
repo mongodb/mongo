@@ -250,38 +250,33 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 }
 
 /*
- * __wt_verrx --
- *	Interface to support the extension API.
+ * __wt_ext_err_printf --
+ *	Extension API call to print to the error stream.
  */
 int
-__wt_verrx(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
-{
-	return (__eventv(session, 0, 0, NULL, 0, fmt, ap));
-}
-/*
- * __wt_msg --
- * 	Informational message.
- */
-int
-__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+__wt_ext_err_printf(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	va_start(ap, fmt);
-	ret = __wt_vmsg(session, fmt, ap);
-	va_end(ap);
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
+	va_start(ap, fmt);
+	ret = __eventv(session, 0, 0, NULL, 0, fmt, ap);
+	va_end(ap);
 	return (ret);
 }
 
 /*
- * __wt_vmsg --
+ * info_msg --
  * 	Informational message.
  */
-int
-__wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
+static int
+info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
 
@@ -296,6 +291,46 @@ __wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	handler = session->event_handler;
 	return (handler->handle_message(handler, s));
+}
+
+/*
+ * __wt_msg --
+ * 	Informational message.
+ */
+int
+__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	WT_DECL_RET;
+	va_list ap;
+
+	va_start(ap, fmt);
+	ret = info_msg(session, fmt, ap);
+	va_end(ap);
+
+	return (ret);
+}
+
+/*
+ * __wt_ext_msg_printf --
+ *	Extension API call to print to the message stream.
+ */
+int
+__wt_ext_msg_printf(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	va_list ap;
+
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
+
+	va_start(ap, fmt);
+	ret = info_msg(session, fmt, ap);
+	va_end(ap);
+	return (ret);
 }
 
 /*
@@ -397,6 +432,17 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 
 	__wt_abort(session);			/* Drop core if testing. */
 	/* NOTREACHED */
+}
+
+/*
+ * __wt_object_unsupported --
+ *	Print a standard error message for an object that doesn't support a
+ * particular operation.
+ */
+int
+__wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri)
+{
+	WT_RET_MSG(session, ENOTSUP, "unsupported object operation: %s", uri);
 }
 
 /*

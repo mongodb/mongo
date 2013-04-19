@@ -257,16 +257,16 @@ err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
  * the cache should not be excessively churned.
  */
 static int
-__lsm_bloom_create(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
+__lsm_bloom_create(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src;
 	WT_DECL_RET;
 	WT_ITEM buf, key;
 	WT_SESSION *wt_session;
-	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor, "raw");
 	uint64_t insert_count;
+	const char *cfg[3];
 
 	/*
 	 * Normally, the Bloom URI is populated when the chunk struct is
@@ -293,7 +293,10 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	    lsm_tree->bloom_config, chunk->count,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
-	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &src));
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[1] = "raw";
+	cfg[2] = NULL;
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &src));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
@@ -332,9 +335,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	const char *drop_cfg[] = API_CONF_DEFAULTS(session, drop, NULL);
 	u_int i;
 	int locked, progress;
+	const char *drop_cfg[] =
+	    { WT_CONFIG_BASE(session, session_drop), NULL };
 
 	locked = progress = 0;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {

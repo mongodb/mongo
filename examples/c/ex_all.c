@@ -45,7 +45,6 @@
 
 int add_collator(WT_CONNECTION *conn);
 int add_compressor(WT_CONNECTION *conn);
-int add_data_source(WT_CONNECTION *conn);
 int add_extractor(WT_CONNECTION *conn);
 int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
@@ -535,11 +534,6 @@ session_ops(WT_SESSION *session)
 	ret = session->compact(session, "table:mytable", NULL);
 	/*! [Compact a table] */
 
-	/*! [Print to the message stream] */
-	ret = session->msg_printf(
-	    session, "process ID %" PRIuMAX, (uintmax_t)getpid());
-	/*! [Print to the message stream] */
-
 	/*! [Rename a table] */
 	ret = session->rename(session, "table:old", "table:new", NULL);
 	/*! [Rename a table] */
@@ -648,106 +642,6 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	/* Re-configure a session for snapshot isolation. */
 	ret = session->reconfigure(session, "isolation=snapshot");
 	/*! [session isolation re-configuration] */
-
-	return (ret);
-}
-
-/*! [WT_DATA_SOURCE create] */
-static int
-my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, int exclusive, const char *config)
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)name;
-	(void)exclusive;
-	(void)config;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE create] */
-
-/*! [WT_DATA_SOURCE drop] */
-static int
-my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)name;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE drop] */
-
-/*! [WT_DATA_SOURCE open_cursor] */
-static int
-my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *obj, WT_CURSOR *owner, const char *cfg[],
-    WT_CURSOR **new_cursor)
-{
-	/* Unused parameters */
-	(void)dsrc;
-
-	(void)session;
-	(void)obj;
-	(void)owner;
-	(void)cfg;
-	(void)new_cursor;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE open_cursor] */
-
-/*! [WT_DATA_SOURCE rename] */
-static int
-my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *oldname, const char *newname, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)oldname;
-	(void)newname;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE rename] */
-
-/*! [WT_DATA_SOURCE truncate] */
-static int
-my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)name;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE truncate] */
-
-int
-add_data_source(WT_CONNECTION *conn)
-{
-	int ret;
-
-	/*! [WT_DATA_SOURCE register] */
-	static WT_DATA_SOURCE my_dsrc = {
-		my_create,
-		my_drop,
-		my_open_cursor,
-		my_rename,
-		my_truncate
-	};
-	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
-	/*! [WT_DATA_SOURCE register] */
 
 	return (ret);
 }
@@ -941,7 +835,6 @@ connection_ops(WT_CONNECTION *conn)
 #endif
 
 	add_collator(conn);
-	add_data_source(conn);
 	add_extractor(conn);
 
 	/*! [Reconfigure a connection] */
@@ -966,6 +859,25 @@ connection_ops(WT_CONNECTION *conn)
 
 	session_ops(session);
 	}
+
+	/*! [Configure method configuration] */
+	/*
+	 * Applications opening a cursor for the data-source object "my_data"
+	 * have an additional configuration option "entries", which is an
+	 * integer type, defaults to 5, and must be an integer between 1 and 10.
+	 */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor",
+	    "my_data:", "entries=5", "int", "min=1,max=10");
+
+	/*
+	 * Applications opening a cursor for the data-source object "my_data"
+	 * have an additional configuration option "devices", which is a list
+	 * of strings.
+	 */
+	ret = conn->configure_method(conn,
+	    "session.open_cursor", "my_data:", "devices", "list", NULL);
+	/*! [Configure method configuration] */
 
 	/*! [Close a connection] */
 	ret = conn->close(conn, NULL);

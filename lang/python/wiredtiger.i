@@ -412,16 +412,19 @@ typedef int int_void;
 %immutable __wt_session::connection;
 
 %ignore __wt_buf;
+%ignore __wt_config_item;
+%ignore __wt_event_handler;
+%ignore __wt_extractor;
+%ignore __wt_item;
+
 %ignore __wt_collator;
 %ignore __wt_connection::add_collator;
 %ignore __wt_compressor;
 %ignore __wt_connection::add_compressor;
 %ignore __wt_data_source;
 %ignore __wt_connection::add_data_source;
-%ignore __wt_event_handler;
-%ignore __wt_extractor;
 %ignore __wt_connection::add_extractor;
-%ignore __wt_item;
+%ignore __wt_connection::get_extension_api;
 
 %ignore wiredtiger_struct_pack;
 %ignore wiredtiger_struct_packv;
@@ -431,6 +434,7 @@ typedef int int_void;
 %ignore wiredtiger_struct_unpackv;
 
 %ignore wiredtiger_extension_init;
+%ignore wiredtiger_extension_terminate;
 
 /* Convert 'int *' to output args for wiredtiger_version */
 %apply int *OUTPUT { int * };

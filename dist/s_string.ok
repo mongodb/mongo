@@ -9,6 +9,7 @@ ADDR
 AJZ
 API
 APIs
+ARG
 ARGS
 Addr
 Alakuijala
@@ -23,6 +24,7 @@ BBBBBBBBBBBBBBBBBB
 BDB
 BDB's
 BIGENDIAN
+BOOL
 BSR
 BTREE
 BUF
@@ -59,6 +61,8 @@ DESC
 DHANDLE
 DSRC
 DUPLICATEV
+DbCursor
+DbEnv
 Decrement
 EB
 EBUSY
@@ -68,6 +72,7 @@ EMail
 ENOENT
 ENOMEM
 ENOTSUP
+ENV
 EOF
 ETIME
 ETIMEDOUT
@@ -105,6 +110,7 @@ JSON
 Jyrki
 KEYFIRST
 KV
+KVS
 Kanowski's
 Kounavis
 LF
@@ -159,6 +165,7 @@ Pre
 Qsort
 RCS
 READONLY
+RECNO
 REF's
 REQ
 RET
@@ -178,6 +185,7 @@ SQL
 SSD
 SSq
 STAILQ
+STRUCT
 SYS
 Sevii
 SiH
@@ -185,6 +193,7 @@ Skiplist
 Solaris
 Split's
 StoreLoad
+Strsep
 Subtree
 Subtrees
 TAILQ
@@ -220,6 +229,7 @@ WiredTigerCheckpoint
 WiredTigerHome
 WiredTigerStat
 WithSeeds
+Wmissing
 Wuninitialized
 XP
 __wt_epoch
@@ -238,6 +248,7 @@ allocsize
 ao
 ap
 api
+apip
 arg
 argc
 args
@@ -267,8 +278,10 @@ btmem
 btree
 btrees
 buf
+bufs
 builtin
 bytelock
+bytestring
 bzCompressEnd
 bzCompressInit
 bzDecompress
@@ -309,6 +322,7 @@ conf
 config
 conn
 connectionp
+const
 cp
 crc
 cref
@@ -352,6 +366,7 @@ dll
 dlopen
 dlsym
 dmsg
+ds
 dsk
 dsrc
 dst
@@ -402,6 +417,7 @@ fixup
 flcs
 fmt
 fnv
+foc
 fopen
 fp
 fprintf
@@ -473,6 +489,9 @@ keycmp
 keyname
 keyv
 kv
+kvs
+kvsbdb
+kvsstec
 ld
 len
 lenp
@@ -521,6 +540,7 @@ minorp
 minprefix
 mkdir
 mmap
+mnt
 msg
 msgv
 mtx
@@ -540,6 +560,7 @@ nclr
 negint
 newbar
 newname
+newuri
 nextprev
 nfilename
 nhex
@@ -627,6 +648,7 @@ rx
 sHQ
 savepoints
 sb
+scanp
 schemas
 schematab
 scr
@@ -661,6 +683,7 @@ stdarg
 stderr
 stdin
 stdout
+stec
 str
 strcmp
 strdup
@@ -669,6 +692,8 @@ strftime
 stringin
 strncpy
 strndup
+strsep
+strtoll
 strtouq
 struct
 structs

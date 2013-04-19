@@ -28,6 +28,7 @@
 #include "format.h"
 
 GLOBAL g;
+WT_EXTENSION_API *wt_api;
 
 static void onint(int);
 static void startup(void);
@@ -52,13 +53,6 @@ main(int argc, char *argv[])
 
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
-
-	/* Create the run directory and change to it. */
-	if (access(RUNDIR, X_OK) != 0 && mkdir(RUNDIR, 0777)) {
-		fprintf(stderr,
-		    "%s: mkdir: %s %s\n", g.progname, RUNDIR, strerror(errno));
-		return (EXIT_FAILURE);
-	}
 
 	/* Set values from the command line. */
 	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
@@ -206,8 +200,16 @@ startup(void)
 		g.rand_log = NULL;
 	}
 
+	/* Create RUNDIR if it doesn't yet exist. */
+	if (access(RUNDIR, X_OK) != 0 && mkdir(RUNDIR, 0777) != 0)
+		die(errno, "mkdir: %s", RUNDIR);
+
 	/* Remove the run's files except for rand. */
 	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
+
+	/* Create the data-source directory. */
+	if (mkdir(RUNDIR_KVS, 0777) != 0)
+		die(errno, "mkdir: %s", RUNDIR_KVS);
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0) {

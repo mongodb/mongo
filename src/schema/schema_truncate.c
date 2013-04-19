@@ -99,10 +99,15 @@ __wt_schema_truncate(
 
 	if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __truncate_file(session, uri);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_lsm_tree_truncate(session, uri, cfg);
 	else if (WT_PREFIX_SKIP(tablename, "table:"))
 		ret = __truncate_table(session, tablename);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->truncate(dsrc, &session->iface, uri, cfg);
+		ret = dsrc->truncate == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    dsrc->truncate(
+			dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

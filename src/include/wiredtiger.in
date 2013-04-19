@@ -403,6 +403,9 @@ struct __wt_cursor {
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
+	/* Data source cursors have underlying application-owned cursors. */
+	WT_CURSOR *data_source;
+
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_DUMP_HEX	0x0002
 #define	WT_CURSTD_DUMP_PRINT	0x0004
@@ -798,13 +801,13 @@ struct __wt_session {
 	 * @snippet ex_all.c Rename a table
 	 *
 	 * @param session the session handle
-	 * @param oldname the current URI of the object, such as \c "table:old"
-	 * @param newname the new name of the object, such as \c "table:new"
+	 * @param uri the current URI of the object, such as \c "table:old"
+	 * @param newuri the new URI of the object, such as \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(rename)(WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *config);
+	    const char *uri, const char *newuri, const char *config);
 
 	/*! Salvage a file or table
 	 *
@@ -999,21 +1002,6 @@ struct __wt_session {
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
 
 	/*! @} */
-	/*! @name Debugging
-	 * @{
-	 */
-
-	/*! Send a string to the message handler for debugging.
-	 *
-	 * @snippet ex_all.c Print to the message stream
-	 *
-	 * @param session the session handle
-	 * @param fmt a printf-like format specification
-	 * @errors
-	 */
-	int __F(msg_printf)(WT_SESSION *session, const char *fmt, ...);
-
-	/*! @} */
 };
 
 /*!
@@ -1103,6 +1091,25 @@ struct __wt_connection {
 	 */
 	const char *__F(get_home)(WT_CONNECTION *connection);
 
+	/*! Add configuration options for a method.  See
+	 * @ref custom_ds_config_add for more information.
+	 *
+	 * @snippet ex_all.c Configure method configuration
+	 *
+	 * @param connection the connection handle
+	 * @param method the name of the method
+	 * @param uri the object type or NULL for all object types
+	 * @param config the additional configuration's name and default value
+	 * @param type the additional configuration's type (must be one of
+	 * \c "boolean"\, \c "int", \c "list" or \c "string")
+	 * @param check the additional configuration check string, or NULL if
+	 * none
+	 * @errors
+	 */
+	int __F(configure_method)(WT_CONNECTION *connection,
+	    const char *method, const char *uri,
+	    const char *config, const char *type, const char *check);
+
 	/*! Return if opening this handle created the database.
 	 *
 	 * @snippet ex_all.c Check if the database is newly created
@@ -1148,23 +1155,31 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
 	 * @configstart{connection.load_extension, see dist/api_data.py}
-	 * @config{entry, the entry point of the extension., a string; default
+	 * @config{entry, the entry point of the extension\, called to
+	 * initialize the extension when it is loaded.  The signature of the
+	 * function must match ::wiredtiger_extension_init., a string; default
 	 * \c wiredtiger_extension_init.}
 	 * @config{prefix, a prefix for all names registered by this extension
 	 * (e.g.\, to make namespaces distinct or during upgrades., a string;
 	 * default empty.}
+	 * @config{terminate, a optional function in the extension that is
+	 * called before the extension is unloaded during WT_CONNECTION::close.
+	 * The signature of the function must match
+	 * ::wiredtiger_extension_terminate., a string; default \c
+	 * wiredtiger_extension_terminate.}
 	 * @configend
 	 * @errors
 	 */
 	int __F(load_extension)(WT_CONNECTION *connection,
 	    const char *path, const char *config);
 
-	/*! Add a custom data source. @notyet{custom data sources}
+	/*! Add a custom data source.  See @ref custom_data_sources for more
+	 * information.
 	 *
 	 * The application must first implement the WT_DATA_SOURCE interface
 	 * and then register the implementation with WiredTiger:
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE register
+	 * @snippet ex_data_source.c WT_DATA_SOURCE register
 	 *
 	 * @param connection the connection handle
 	 * @param prefix the URI prefix for this data source, e.g., "file:"
@@ -1227,6 +1242,15 @@ struct __wt_connection {
 	 */
 	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
 	    WT_EXTRACTOR *extractor, const char *config);
+
+	/*! Return a reference to the WiredTiger extension functions.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API declaration
+	 *
+	 * @param wt_conn the WT_CONNECTION handle
+	 * @returns a reference to a WT_EXTENSION_API structure.
+	 */
+	WT_EXTENSION_API *__F(get_extension_api)(WT_CONNECTION *wt_conn);
 	/*! @} */
 };
 
@@ -1659,9 +1683,9 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * return.
  */
 #define	WT_ERROR	-31802
-/*! Cursor item not found.
- * This error indicates a cursor operation did not find a record to return.
- * This includes search and other operations where no record matched the
+/*! Item not found.
+ * This error indicates an operation did not find a value to return.  This
+ * includes cursor search and other operations where no record matched the
  * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
  */
 #define	WT_NOTFOUND	-31803
@@ -1687,6 +1711,13 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * behavior of WiredTiger.
  * @{
  */
+
+/*******************************************
+ * Forward structure declarations for the extension API
+ *******************************************/
+struct __wt_config_arg;	    typedef struct __wt_config_arg WT_CONFIG_ARG;
+struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
+struct __wt_config_scan;    typedef struct __wt_config_scan WT_CONFIG_SCAN;
 
 /*!
  * The interface implemented by applications to provide custom ordering of
@@ -1962,7 +1993,7 @@ struct __wt_compressor {
  * Applications can extend WiredTiger by providing new implementations of the
  * WT_DATA_SOURCE class.  Each data source supports a different URI scheme for
  * data sources to WT_SESSION::create, WT_SESSION::open_cursor and related
- * methods.
+ * methods.  See @ref custom_data_sources for more information.
  *
  * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_DATA_SOURCE
  * interface from multiple threads concurrently.  It is the responsibility of
@@ -1971,44 +2002,64 @@ struct __wt_compressor {
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_data_source.
  *
- * @snippet ex_all.c WT_DATA_SOURCE register
+ * @snippet ex_data_source.c WT_DATA_SOURCE register
  */
 struct __wt_data_source {
 	/*! Callback to create a new object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE create
+	 * @snippet ex_data_source.c WT_DATA_SOURCE create
 	 */
 	int (*create)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, int exclusive, const char *config);
+	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*! Callback to compact an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE compact
+	 */
+	int (*compact)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ARG *config);
 
 	/*! Callback to drop an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE drop
+	 * @snippet ex_data_source.c WT_DATA_SOURCE drop
 	 */
 	int (*drop)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *cfg[]);
+	    const char *uri, WT_CONFIG_ARG *config);
 
 	/*! Callback to initialize a cursor.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE open_cursor
+	 * @snippet ex_data_source.c WT_DATA_SOURCE open_cursor
 	 */
 	int (*open_cursor)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *uri, WT_CURSOR *owner, const char *cfg[],
-	    WT_CURSOR **new_cursor);
+	    const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor);
 
 	/*! Callback to rename an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE rename
+	 * @snippet ex_data_source.c WT_DATA_SOURCE rename
 	 */
 	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *cfg[]);
+	    const char *uri, const char *newuri, WT_CONFIG_ARG *config);
+
+	/*! Callback to salvage an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE salvage
+	 */
+	int (*salvage)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ARG *config);
 
 	/*! Callback to truncate an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE truncate
+	 * @snippet ex_data_source.c WT_DATA_SOURCE truncate
 	 */
 	int (*truncate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *cfg[]);
+	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*! Callback to verify an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE verify
+	 */
+	int (*verify)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ARG *config);
 };
 
 /*!
@@ -2021,7 +2072,8 @@ struct __wt_data_source {
  * @snippet ex_all.c WT_EXTRACTOR register
  */
 struct __wt_extractor {
-	/*! Callback to extract a value for an index or column group.
+	/*!
+	 * Callback to extract a value for an index or column group.
 	 *
 	 * @errors
 	 *
@@ -2032,15 +2084,24 @@ struct __wt_extractor {
 	    WT_ITEM *result);
 };
 
-/*! Entry point to an extension, implemented by loadable modules.
+/*!
+ * Entry point to an extension, called when the extension is loaded.
  *
- * @param session the session handle
- * @param api entry points for WiredTiger functions exported to extensions
- * @param config the config string passed to WT_CONNECTION::load_extension
+ * @param connection the connection handle
+ * @param config the config information passed to WT_CONNECTION::load_extension
  * @errors
  */
-extern int wiredtiger_extension_init(WT_SESSION *session,
-    WT_EXTENSION_API *api, const char *config);
+extern int wiredtiger_extension_init(
+    WT_CONNECTION *connection, WT_CONFIG_ARG *config);
+
+/*!
+ * Optional cleanup function for an extension, called during
+ * WT_CONNECTION::close.
+ *
+ * @param connection the connection handle
+ * @errors
+ */
+extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 
 /*! @} */
 

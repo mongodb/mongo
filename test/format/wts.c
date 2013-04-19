@@ -75,10 +75,9 @@ wts_open(void)
 	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,cache_size=%" PRIu32 "MB,"
+	    "create,sync=false,cache_size=%" PRIu32 "MB,"
 	    "error_prefix=\"%s\","
-	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s,"
-	    "sync=false,",
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
 	    g.c_cache,
 	    g.progname,
 	    REVERSE_PATH,
@@ -87,6 +86,7 @@ wts_open(void)
 	    (access(RAW_PATH, R_OK) == 0 &&
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    access(KVS_BDB_PATH, R_OK) == 0 ? KVS_BDB_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
@@ -94,6 +94,16 @@ wts_open(void)
 	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open");
 	g.wts_conn = conn;
+						/* Load extension functions. */
+	wt_api = conn->get_extension_api(conn);
+
+	/* Open any underlying key/value store data-source. */
+	if (DATASOURCE("kvsstec"))
+#if 0
+		wiredtiger_kvs_stec_init(conn);
+#else
+		die(ENOTSUP, "kvsstec not loaded");
+#endif
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
@@ -200,6 +210,11 @@ wts_open(void)
 	/* Configure Btree split page percentage. */
 	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
+	/* Configure KVS devices. */
+	if (DATASOURCE("kvsstec"))
+		p += snprintf(
+		    p, (size_t)(end - p), ",kvs_devices=[RUNDIR/KVS]");
+
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
 
@@ -215,6 +230,12 @@ wts_close()
 
 	conn = g.wts_conn;
 
+	if (DATASOURCE("kvsstec"))
+#if 0
+		wiredtiger_kvs_stec_close(conn);
+#else
+		die(ENOTSUP, "kvsstec not loaded");
+#endif
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
 }
@@ -225,11 +246,16 @@ wts_dump(const char *tag, int dump_bdb)
 	int offset, ret;
 	char cmd[256];
 
+	/* Data-sources that don't support dump comparisons. */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
+		return;
+
 	track("dump files and compare", 0ULL, NULL);
+
 	offset = snprintf(cmd, sizeof(cmd), "sh s_dumpcmp");
 	if (dump_bdb)
 		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -b");
+		    sizeof(cmd) - (size_t)offset, " -b %s", BERKELEY_DB_PATH);
 	if (g.type == FIX || g.type == VAR)
 		offset += snprintf(cmd + offset,
 		    sizeof(cmd) - (size_t)offset, " -c");
@@ -248,8 +274,11 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	conn = g.wts_conn;
+	/* Data-sources that don't support salvage. */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
+		return;
 
+	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
 
 	/*
@@ -278,19 +307,22 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
-	conn = g.wts_conn;
+	/* Data-sources that don't support dump comparisons. */
+	if (DATASOURCE("kvsstec"))
+		return;
 
+	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if (g.logging != 0)
-		(void)session->msg_printf(session,
+		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== verify start ===============");
 	if ((ret = session->verify(session, g.uri, NULL)) != 0)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if (g.logging != 0)
-		(void)session->msg_printf(session,
+		(void)wt_api->msg_printf(wt_api, session,
 		    "=============== verify stop ===============");
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
@@ -312,9 +344,13 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	track("stat", 0ULL, NULL);
+	/* Data-sources that don't support statistics. */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
+		return;
 
 	conn = g.wts_conn;
+	track("stat", 0ULL, NULL);
+
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 

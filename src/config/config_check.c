@@ -7,76 +7,300 @@
 
 #include "wt_internal.h"
 
+static int config_check(
+    WT_SESSION_IMPL *, const WT_CONFIG_CHECK *, const char *, size_t);
+
+/*
+ * __wt_conn_foc_add --
+ *	Add a new entry into the connection's free-on-close list.
+ */
+static int
+__wt_conn_foc_add(WT_SESSION_IMPL *session, ...)
+{
+	WT_CONNECTION_IMPL *conn;
+	va_list ap;
+	size_t cnt;
+	void *p;
+
+	conn = S2C(session);
+
+	/*
+	 * Instead of using locks to protect configuration information, assume
+	 * we can atomically update a pointer to a chunk of memory, and because
+	 * a pointer is never partially written, readers will correctly see the
+	 * original or new versions of the memory.  Readers might be using the
+	 * old version as it's being updated, though, which means we cannot free
+	 * the old chunk of memory until all possible readers have finished.
+	 * Currently, that's on connection close: in other words, we can use
+	 * this because it's small amounts of memory, and we really, really do
+	 * not want to acquire locks every time we access configuration strings,
+	 * since that's done on every API call.
+	 *
+	 * Our caller is expected to be holding any locks we need.
+	 */
+	/* Count the slots. */
+	va_start(ap, session);
+	for (cnt = 0; va_arg(ap, void *) != NULL; ++cnt)
+		;
+	va_end(ap);
+
+	if (conn->foc_cnt + cnt >= conn->foc_size) {
+		WT_RET(__wt_realloc(session, NULL,
+		    (conn->foc_size + cnt + 20) * sizeof(void *), &conn->foc));
+		conn->foc_size += cnt + 20;
+	}
+	va_start(ap, session);
+	while ((p = va_arg(ap, void *)) != NULL)
+		conn->foc[conn->foc_cnt++] = p;
+	va_end(ap);
+	return (0);
+}
+
+/*
+ * __wt_conn_foc_discard --
+ *	Discard any memory the connection accumulated.
+ */
+void
+__wt_conn_foc_discard(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	size_t i;
+
+	conn = S2C(session);
+
+	/*
+	 * If we have a list of chunks to free, run through the list, then
+	 * free the list itself.
+	 */
+	for (i = 0; i < conn->foc_cnt; ++i)
+		__wt_free(session, conn->foc[i]);
+	__wt_free(session, conn->foc);
+}
+
+/*
+ * __wt_configure_method --
+ *	WT_CONNECTION.configure_method.
+ */
+int
+__wt_configure_method(WT_SESSION_IMPL *session,
+    const char *method, const char *uri,
+    const char *config, const char *type, const char *check)
+{
+	const WT_CONFIG_CHECK *cp;
+	WT_CONFIG_CHECK *checks, *newcheck;
+	const WT_CONFIG_ENTRY **epp;
+	WT_CONFIG_ENTRY *entry;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	size_t cnt;
+	char *newcheck_name, *p;
+
+	/*
+	 * !!!
+	 * We ignore the specified uri, that is, all new configuration options
+	 * will be valid for all data sources.   That's shouldn't be too bad
+	 * as the worst that can happen is an application might specify some
+	 * configuration option and not get an error -- the option should be
+	 * ignored by the underlying implementation since it's unexpected, so
+	 * there shouldn't be any real problems.  Eventually I expect we will
+	 * get the whole data-source thing sorted, at which time there may be
+	 * configuration arrays for each data source, and that's when the uri
+	 * will matter.
+	 */
+	WT_UNUSED(uri);
+
+	conn = S2C(session);
+	checks = newcheck = NULL;
+	entry = NULL;
+	newcheck_name = NULL;
+
+	/* Argument checking; we only support a limited number of types. */
+	if (config == NULL)
+		WT_RET_MSG(session, EINVAL, "no configuration specified");
+	if (type == NULL)
+		WT_RET_MSG(session, EINVAL, "no configuration type specified");
+	if (strcmp(type, "boolean") != 0 && strcmp(type, "int") != 0 &&
+	    strcmp(type, "list") != 0 && strcmp(type, "string") != 0)
+		WT_RET_MSG(session, EINVAL,
+		    "type must be one of \"boolean\", \"int\", \"list\" or "
+		    "\"string\"");
+
+	/* Find a match for the method name. */
+	for (epp = conn->config_entries; (*epp)->method != NULL; ++epp)
+		if (strcmp((*epp)->method, method) == 0)
+			break;
+	if ((*epp)->method == NULL)
+		WT_RET_MSG(session,
+		    WT_NOTFOUND, "no method matching %s found", method);
+
+	/*
+	 * Technically possible for threads to race, lock the connection while
+	 * adding the new configuration information.  We're holding the lock
+	 * for an extended period of time, but configuration changes should be
+	 * rare and only happen during startup.
+	 */
+	__wt_spin_lock(session, &conn->api_lock);
+
+	/*
+	 * Allocate new configuration entry and fill it in.
+	 *
+	 * The new base value is the previous base value, a separator and the
+	 * new configuration string.
+	 */
+	WT_ERR(__wt_calloc_def(session, 1, &entry));
+	entry->method = (*epp)->method;
+	WT_ERR(__wt_calloc_def(session,
+	    strlen((*epp)->base) + strlen(",") + strlen(config) + 1, &p));
+	(void)strcpy(p, (*epp)->base);
+	(void)strcat(p, ",");
+	(void)strcat(p, config);
+	entry->base = p;
+
+	/*
+	 * Build a new checks entry name field.  There may be a default value
+	 * in the config argument we're passed , we don't want that as part of
+	 * the checks entry name field.
+	 */
+	WT_ERR(__wt_strdup(session, config, &newcheck_name));
+	if ((p = strchr(newcheck_name, '=')) != NULL)
+		*p = '\0';
+
+	/*
+	 * Build a new checks array.  The new configuration name may replace
+	 * an existing check with new information, in that case skip the old
+	 * version.
+	 */
+	for (cnt = 0, cp = (*epp)->checks; cp->name != NULL; ++cp)
+		++cnt;
+	WT_ERR(__wt_calloc_def(session, cnt + 2, &checks));
+	for (cnt = 0, cp = (*epp)->checks; cp->name != NULL; ++cp)
+		if (strcmp(newcheck_name, cp->name) != 0)
+			checks[cnt++] = *cp;
+	newcheck = &checks[cnt];
+
+	newcheck->name = newcheck_name;
+	WT_ERR(__wt_strdup(session, type, &newcheck->type));
+	if (check != NULL)
+		WT_ERR(__wt_strdup(session, check, &newcheck->checks));
+
+	entry->checks = checks;
+
+	/* Confirm the configuration string passes the new set of checks. */
+	WT_ERR(config_check(session, entry->checks, config, 0));
+
+	/*
+	 * The next time this configuration is updated, we don't want to figure
+	 * out which of these pieces of memory were allocated and will need to
+	 * be free'd on close, add them to the list now.
+	 */
+	WT_ERR(__wt_conn_foc_add(session,
+	    entry, entry->base,
+	    checks, newcheck->name, newcheck->type, newcheck->checks, NULL));
+
+	*epp = entry;
+
+	if (0) {
+err:		if (entry != NULL) {
+			__wt_free(session, entry->base);
+			__wt_free(session, entry);
+		}
+		__wt_free(session, checks);
+		if (newcheck != NULL) {
+			__wt_free(session, newcheck->type);
+			__wt_free(session, newcheck->checks);
+		}
+		__wt_free(session, newcheck_name);
+	}
+
+	__wt_spin_unlock(session, &conn->api_lock);
+	return (ret);
+}
+
 /*
  * __wt_config_check--
- *	Check that all keys in an application-supplied config string match
- *	what is specified in the check string.
- *	The final parameter is optional, and allows for passing in strings
- *	that are not NULL terminated.
- *
- * All check strings are generated by dist/config.py from the constraints given
- * in dist/api_data.py
+ *	Check the keys in an application-supplied config string match what is
+ * specified in an array of check strings.
  */
 int
 __wt_config_check(WT_SESSION_IMPL *session,
-    WT_CONFIG_CHECK checks[], const char *config, size_t config_len)
+    const WT_CONFIG_ENTRY *entry, const char *config, size_t config_len)
+{
+	/*
+	 * Callers don't check, it's a fast call without a configuration or
+	 * check array.
+	 */
+	return (config == NULL || entry->checks == NULL ?
+	    0 : config_check(session, entry->checks, config, config_len));
+}
+
+/*
+ * config_check --
+ *	Check the keys in an application-supplied config string match what is
+ * specified in an array of check strings.
+ */
+static int
+config_check(WT_SESSION_IMPL *session,
+    const WT_CONFIG_CHECK *checks, const char *config, size_t config_len)
 {
 	WT_CONFIG parser, cparser, sparser;
 	WT_CONFIG_ITEM k, v, ck, cv, dummy;
 	WT_DECL_RET;
 	int badtype, found, i;
 
-	/* It is always okay to pass NULL. */
-	if (config == NULL)
-		return (0);
-
+	/*
+	 * The config_len parameter is optional, and allows passing in strings
+	 * that are not nul-terminated.
+	 */
 	if (config_len == 0)
 		WT_RET(__wt_config_init(session, &parser, config));
 	else
 		WT_RET(__wt_config_initn(session, &parser, config, config_len));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
-		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+		if (k.type != WT_CONFIG_ITEM_STRING &&
+		    k.type != WT_CONFIG_ITEM_ID)
 			WT_RET_MSG(session, EINVAL,
 			    "Invalid configuration key found: '%.*s'",
 			    (int)k.len, k.str);
 
-		/* The config check array is sorted, so exit on first found */
-		for (i = 0, found = 0; checks[i].name != NULL; i++) {
-			if (WT_STRING_CASE_MATCH(
-			    checks[i].name, k.str, k.len)) {
-				found = 1;
+		/* Search for a matching entry. */
+		for (i = 0; checks[i].name != NULL; i++)
+			if (WT_STRING_MATCH(checks[i].name, k.str, k.len))
 				break;
-			}
-		}
-
-		if (!found)
+		if (checks[i].name == NULL)
 			WT_RET_MSG(session, EINVAL,
-			    "Unknown configuration key found: '%.*s'",
+			    "unknown configuration key: '%.*s'",
 			    (int)k.len, k.str);
 
-		if (strcmp(checks[i].type, "int") == 0)
-			badtype = (v.type != ITEM_NUM);
-		else if (strcmp(checks[i].type, "boolean") == 0)
-			badtype = (v.type != ITEM_BOOL &&
-			    (v.type != ITEM_NUM ||
+		if (strcmp(checks[i].type, "boolean") == 0) {
+			badtype = (v.type != WT_CONFIG_ITEM_BOOL &&
+			    (v.type != WT_CONFIG_ITEM_NUM ||
 			    (v.val != 0 && v.val != 1)));
-		else if (strcmp(checks[i].type, "list") == 0)
-			badtype = (v.len > 0 && v.type != ITEM_STRUCT);
-		else if (strcmp(checks[i].type, "category") == 0) {
+		} else if (strcmp(checks[i].type, "category") == 0) {
 			/* Deal with categories of the form: XXX=(XXX=blah). */
-			ret = __wt_config_check(session,
+			ret = config_check(session,
 			    checks[i].subconfigs,
 			    k.str + strlen(checks[i].name) + 1, v.len);
 			if (ret != EINVAL)
 				badtype = 0;
 			else
 				badtype = 1;
-		} else
+		} else if (strcmp(checks[i].type, "format") == 0) {
 			badtype = 0;
+		} else if (strcmp(checks[i].type, "int") == 0) {
+			badtype = (v.type != WT_CONFIG_ITEM_NUM);
+		} else if (strcmp(checks[i].type, "list") == 0) {
+			badtype = (v.len > 0 &&
+			    v.type != WT_CONFIG_ITEM_STRUCT);
+		} else if (strcmp(checks[i].type, "string") == 0) {
+			badtype = 0;
+		} else
+			WT_RET_MSG(session, EINVAL,
+			    "unknown configuration type: '%s'",
+			    checks[i].type);
 
 		if (badtype)
 			WT_RET_MSG(session, EINVAL,
-			    "Invalid value type for key '%.*s': expected a %s",
+			    "Invalid value for key '%.*s': expected a %s",
 			    (int)k.len, k.str, checks[i].type);
 
 		if (checks[i].checks == NULL)
@@ -104,7 +328,7 @@ __wt_config_check(WT_SESSION_IMPL *session,
 					WT_RET_MSG(session, EINVAL,
 					    "Key '%.*s' requires a value",
 					    (int)k.len, k.str);
-				if (v.type == ITEM_STRUCT) {
+				if (v.type == WT_CONFIG_ITEM_STRUCT) {
 					/*
 					 * Handle the 'verbose' case of a list
 					 * containing restricted choices.

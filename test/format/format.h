@@ -41,10 +41,12 @@
 #include <unistd.h>
 
 #ifdef BDB
-#include "build_unix/db.h"
-#else
-#include <wiredtiger.h>
+#include <db.h>
 #endif
+#include <wiredtiger.h>
+
+#include <wiredtiger_ext.h>
+extern WT_EXTENSION_API *wt_api;
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
 #define	BZIP_PATH							\
@@ -53,6 +55,8 @@
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
+#define	KVS_BDB_PATH							\
+	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
@@ -65,8 +69,10 @@
 
 #define	WT_NAME	"wt"				/* Object name */
 
-#define	RUNDIR	"RUNDIR"			/* Run home */
+#define	RUNDIR		"RUNDIR"		/* Run home */
+#define	RUNDIR_KVS	"RUNDIR/KVS"		/* Run home for data-source */
 
+#define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 #define	SINGLETHREADED	(g.c_threads == 1)
 
 typedef struct {
@@ -188,3 +194,8 @@ void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
+
+void	 wiredtiger_kvs_bdb_close(WT_CONNECTION *);
+void	 wiredtiger_kvs_bdb_init(WT_CONNECTION *);
+void	 wiredtiger_kvs_stec_close(WT_CONNECTION *);
+void	 wiredtiger_kvs_stec_init(WT_CONNECTION *);

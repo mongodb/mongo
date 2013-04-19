@@ -37,14 +37,18 @@ err:		__wt_free(session, dlh->name);
  *	Lookup a symbol in a dynamic library.
  */
 int
-__wt_dlsym(
-    WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, void *sym_ret)
+__wt_dlsym(WT_SESSION_IMPL *session,
+    WT_DLH *dlh, const char *name, int fail, void *sym_ret)
 {
 	void *sym;
 
-	if ((sym = dlsym(dlh->handle, name)) == NULL)
-		WT_RET_MSG(session, __wt_errno(),
-		    "dlsym(%s in %s): %s", name, dlh->name, dlerror());
+	*(void **)sym_ret = NULL;
+	if ((sym = dlsym(dlh->handle, name)) == NULL) {
+		if (fail)
+			WT_RET_MSG(session, __wt_errno(),
+			    "dlsym(%s in %s): %s", name, dlh->name, dlerror());
+		return (0);
+	}
 
 	*(void **)sym_ret = sym;
 	return (0);

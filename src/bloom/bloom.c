@@ -118,13 +118,15 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
 	WT_DECL_RET;
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
+	const char *cfg[3];
 	uint64_t size;
 
 	WT_RET(__bloom_init(session, uri, NULL, &bloom));
 
 	/* Find the largest key, to get the size of the filter. */
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	cfg[1] = bloom->config;
+	cfg[2] = NULL;
 	c = NULL;
 	WT_ERR(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 

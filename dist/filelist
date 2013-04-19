@@ -52,6 +52,7 @@ src/config/config_check.c
 src/config/config_collapse.c
 src/config/config_concat.c
 src/config/config_def.c
+src/config/config_ext.c
 src/conn/conn_api.c
 src/conn/conn_dhandle.c
 src/conn/conn_cache.c
@@ -63,6 +64,7 @@ src/conn/conn_stat.c
 src/cursor/cur_backup.c
 src/cursor/cur_bulk.c
 src/cursor/cur_config.c
+src/cursor/cur_ds.c
 src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_index.c
@@ -72,7 +74,6 @@ src/cursor/cur_table.c
 src/log/log.c
 src/log/log_desc.c
 src/lsm/lsm_cursor.c
-src/lsm/lsm_dsrc.c
 src/lsm/lsm_merge.c
 src/lsm/lsm_meta.c
 src/lsm/lsm_stat.c

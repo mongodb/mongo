@@ -20,11 +20,11 @@ errors = [
 	Error('WT_ERROR', 'non-specific WiredTiger error', '''
 		This error is returned when an error is not covered by a
 		specific error return.'''),
-	Error('WT_NOTFOUND', 'cursor item not found', '''
-		This error indicates a cursor operation did not find a
-		record to return.  This includes search and other
-		operations where no record matched the cursor's search
-		key such as WT_CURSOR::update or WT_CURSOR::remove.'''),
+	Error('WT_NOTFOUND', 'item not found', '''
+		This error indicates an operation did not find a value to
+		return.  This includes cursor search and other operations
+		where no record matched the cursor's search key such as
+		WT_CURSOR::update or WT_CURSOR::remove.'''),
 	Error('WT_PANIC', 'WiredTiger library panic', '''
 		This error indicates an underlying problem that requires the
 		application exit and restart.'''),
@@ -507,10 +507,16 @@ methods = {
 
 'connection.load_extension' : Method([
 	Config('entry', 'wiredtiger_extension_init', r'''
-		the entry point of the extension'''),
+		the entry point of the extension, called to initialize the extension
+		when it is loaded.  The signature of the function must match
+		::wiredtiger_extension_init'''),
 	Config('prefix', '', r'''
 		a prefix for all names registered by this extension (e.g., to
 		make namespaces distinct or during upgrades'''),
+	Config('terminate', 'wiredtiger_extension_terminate', r'''
+		a optional function in the extension that is called before the
+		extension is unloaded during WT_CONNECTION::close.  The signature of
+		the function must match ::wiredtiger_extension_terminate'''),
 ]),
 
 'connection.open_session' : Method(session_config),

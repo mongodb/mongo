@@ -761,7 +761,9 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 %ignore wiredtiger_version;
 
+%ignore __wt_connection::get_extension_api;
 %ignore wiredtiger_extension_init;
+%ignore wiredtiger_extension_terminate;
 
 %ignore wiredtiger_open;
 %javamethodmodifiers wiredtiger_open_wrap "
