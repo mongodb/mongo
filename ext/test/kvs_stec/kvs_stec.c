@@ -1016,17 +1016,6 @@ kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 }
 
 static int
-kvs_truncate(WT_DATA_SOURCE *dsrc,
-    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
-{
-	(void)dsrc;				/* Unused parameters */
-	(void)uri;
-	(void)config;
-
-	ERET(session, ENOTSUP, "truncate: %s", strerror(ENOTSUP));
-}
-
-static int
 kvs_verify(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
@@ -1061,7 +1050,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	data_source.open_cursor = kvs_open_cursor;
 	data_source.rename = kvs_rename;
 	data_source.salvage = NULL;		/* No salvage */
-	data_source.truncate = kvs_truncate;
+	data_source.truncate = NULL;		/* No truncate */
 	data_source.verify = kvs_verify;
 	if ((ret = connection->add_data_source(
 	    connection, "kvsstec:", &data_source, NULL)) != 0)
