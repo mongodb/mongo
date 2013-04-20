@@ -101,7 +101,7 @@ static pthread_rwlock_t rwlock;			/* Object list lock */
  * os_errno --
  *	Limit our use of errno so it's easy to remove.
  */
-static inline int
+static int
 os_errno()
 {
 	return (errno);
