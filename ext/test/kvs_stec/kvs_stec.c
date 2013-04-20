@@ -37,6 +37,9 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
+#undef	INLINE
+#define	INLINE	inline				/* Turn off inline */
+
 /*
  * Macros to output an error message and set or return an error.
  * Requires local variables:
@@ -139,7 +142,7 @@ lock_destroy(WT_SESSION *session)
  * lock --
  *	Acquire an object's lock.
  */
-static inline int
+static INLINE int
 lock(WT_SESSION *session)
 {
 	int ret;
@@ -153,7 +156,7 @@ lock(WT_SESSION *session)
  * unlock --
  *	Release an object's lock.
  */
-static inline int
+static INLINE int
 unlock(WT_SESSION *session)
 {
 	int ret;
@@ -163,14 +166,20 @@ unlock(WT_SESSION *session)
 	return (0);
 }
 
-static inline int
-copyin_key(WT_CURSOR *wt_cursor, struct kvs_record *r)
+/*
+ * copyin_key --
+ *	Connect a WT_CURSOR key to a struct kvs_record key.
+ */
+static INLINE int
+copyin_key(WT_CURSOR *wt_cursor)
 {
+	struct kvs_record *r;
 	CURSOR *cursor;
 	size_t size;
 	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	r = &cursor->record;
 	ret = 0;
 
 	/*
@@ -189,13 +198,19 @@ copyin_key(WT_CURSOR *wt_cursor, struct kvs_record *r)
 	return (0);
 }
 
-static inline int
-copyout_key(WT_CURSOR *wt_cursor, struct kvs_record *r)
+/*
+ * copyout_key --
+ *	Connect a struct kvs_record key to a WT_CURSOR key.
+ */
+static INLINE int
+copyout_key(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
+	struct kvs_record *r;
 	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	r = &cursor->record;
 	ret = 0;
 
 	if (cursor->config_recno) {
@@ -209,9 +224,19 @@ copyout_key(WT_CURSOR *wt_cursor, struct kvs_record *r)
 	return (0);
 }
 
-static inline int
-copyin_val(WT_CURSOR *wt_cursor, struct kvs_record *r)
+/*
+ * copyin_val --
+ *	Connect a WT_CURSOR value to a struct kvs_record value .
+ */
+static INLINE int
+copyin_val(WT_CURSOR *wt_cursor)
 {
+	struct kvs_record *r;
+	CURSOR *cursor;
+
+	cursor = (CURSOR *)wt_cursor;
+	r = &cursor->record;
+
 	/*
 	 * XXX
 	 * The underlying KVS library data fields aren't const.
@@ -221,11 +246,46 @@ copyin_val(WT_CURSOR *wt_cursor, struct kvs_record *r)
 	return (0);
 }
 
-static inline int
-copyout_val(WT_CURSOR *wt_cursor, struct kvs_record *r)
+/*
+ * copyout_val --
+ *	Connect a struct kvs_record value to a WT_CURSOR value.
+ */
+static INLINE int
+copyout_val(WT_CURSOR *wt_cursor)
 {
+	struct kvs_record *r;
+	CURSOR *cursor;
+
+	cursor = (CURSOR *)wt_cursor;
+	r = &cursor->record;
+
 	wt_cursor->value.data = r->val;
 	wt_cursor->value.size = (uint32_t)r->val_len;
+	return (0);
+}
+
+/*
+ * copy_key --
+ *	Copy the key for methods where the underlying KVS call returns a key.
+ */
+static INLINE int
+copy_key(WT_CURSOR *wt_cursor)
+{
+	struct kvs_record *r;
+	CURSOR *cursor;
+	WT_SESSION *session;
+
+	cursor = (CURSOR *)wt_cursor;
+	session = cursor->session;
+	r = &cursor->record;
+
+	if (cursor->key == r->key)
+		return (0);
+	if (r->key_len > sizeof(cursor->key))
+		ERET(session, ERANGE,
+		    "key too large, maximum is % PRIuMAX", sizeof(cursor->key));
+	memcpy(cursor->key, r->key, r->key_len);
+	r->key = cursor->key;
 	return (0);
 }
 
@@ -233,7 +293,7 @@ copyout_val(WT_CURSOR *wt_cursor, struct kvs_record *r)
  * record_val_grow --
  *	Grow the records value buffer on demand.
  */
-static inline int
+static INLINE int
 record_val_grow(CURSOR *cursor)
 {
 	char *p;
@@ -253,7 +313,7 @@ record_val_grow(CURSOR *cursor)
  * kvs_call --
  *	Call a KVS function.
  */
-static inline int
+static INLINE int
 kvs_call(WT_CURSOR *wt_cursor, const char *fname,
     int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
 {
@@ -293,42 +353,50 @@ kvs_call(WT_CURSOR *wt_cursor, const char *fname,
 	return (0);
 }
 
+/*
+ * kvs_cursor_next --
+ *	WT_CURSOR::next method.
+ */
 static int
 kvs_cursor_next(WT_CURSOR *wt_cursor)
 {
-	CURSOR *cursor;
 	int ret;
 
-	cursor = (CURSOR *)wt_cursor;
-	ret = 0;
-
+	if ((ret = copy_key(wt_cursor)) != 0)
+		return (ret);
 	if ((ret = kvs_call(wt_cursor, "kvs_next", kvs_next)) != 0)
 		return (ret);
-	if ((ret = copyout_key(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyout_key(wt_cursor)) != 0)
 		return (ret);
-	if ((ret = copyout_val(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyout_val(wt_cursor)) != 0)
 		return (ret);
 	return (0);
 }
 
+/*
+ * kvs_cursor_prev --
+ *	WT_CURSOR::prev method.
+ */
 static int
 kvs_cursor_prev(WT_CURSOR *wt_cursor)
 {
-	CURSOR *cursor;
 	int ret;
 
-	cursor = (CURSOR *)wt_cursor;
-	ret = 0;
-
+	if ((ret = copy_key(wt_cursor)) != 0)
+		return (ret);
 	if ((ret = kvs_call(wt_cursor, "kvs_prev", kvs_prev)) != 0)
 		return (ret);
-	if ((ret = copyout_key(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyout_key(wt_cursor)) != 0)
 		return (ret);
-	if ((ret = copyout_val(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyout_val(wt_cursor)) != 0)
 		return (ret);
 	return (0);
 }
 
+/*
+ * kvs_cursor_reset --
+ *	WT_CURSOR::reset method.
+ */
 static int
 kvs_cursor_reset(WT_CURSOR *wt_cursor)
 {
@@ -344,32 +412,62 @@ kvs_cursor_reset(WT_CURSOR *wt_cursor)
 	return (0);
 }
 
+/*
+ * kvs_cursor_search --
+ *	WT_CURSOR::search method.
+ */
 static int
 kvs_cursor_search(WT_CURSOR *wt_cursor)
 {
-	CURSOR *cursor;
 	int ret;
 
-	cursor = (CURSOR *)wt_cursor;
-	ret = 0;
-
-	if ((ret = copyin_key(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyin_key(wt_cursor)) != 0)
 		return (ret);
 	if ((ret = kvs_call(wt_cursor, "kvs_get", kvs_get)) != 0)
 		return (ret);
-	if ((ret = copyout_val(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyout_val(wt_cursor)) != 0)
 		return (ret);
 	return (0);
 }
 
+/*
+ * kvs_cursor_search_near --
+ *	WT_CURSOR::search_near method.
+ */
 static int
 kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 {
-	(void)wt_cursor;			/* Unused parameters */
-	(void)exact;
-	return (WT_ERROR);
+	int ret;
+
+	/* Search for an exact match. */
+	if ((ret = kvs_cursor_search(wt_cursor)) == 0) {
+		*exact = 0;
+		return (0);
+	}
+	if (ret != WT_NOTFOUND)
+		return (ret);
+
+	/* Search for a key that's larger. */
+	if ((ret = kvs_cursor_next(wt_cursor)) == 0) {
+		*exact = 1;
+		return (0);
+	}
+	if (ret != WT_NOTFOUND)
+		return (ret);
+
+	/* Search for a key that's smaller. */
+	if ((ret = kvs_cursor_prev(wt_cursor)) == 0) {
+		*exact = -1;
+		return (0);
+	}
+
+	return (ret);
 }
 
+/*
+ * kvs_cursor_insert --
+ *	WT_CURSOR::insert method.
+ */
 static int
 kvs_cursor_insert(WT_CURSOR *wt_cursor)
 {
@@ -386,9 +484,9 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	    kvs_keygen(cursor->data_source->kvs, &wt_cursor->recno)) != 0)
 		ESET(session, WT_ERROR, "kvs_keygen: %s", kvs_strerror(ret));
 
-	if ((ret = copyin_key(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyin_key(wt_cursor)) != 0)
 		return (ret);
-	if ((ret = copyin_val(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyin_val(wt_cursor)) != 0)
 		return (ret);
 	if (cursor->config_overwrite) {
 		if ((ret = kvs_set(
@@ -407,6 +505,10 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	return (ret);
 }
 
+/*
+ * kvs_cursor_update --
+ *	WT_CURSOR::update method.
+ */
 static int
 kvs_cursor_update(WT_CURSOR *wt_cursor)
 {
@@ -417,15 +519,19 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
 
-	if ((ret = copyin_key(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyin_key(wt_cursor)) != 0)
 		return (ret);
-	if ((ret = copyin_val(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyin_val(wt_cursor)) != 0)
 		return (ret);
 	if ((ret = kvs_set(cursor->data_source->kvs, &cursor->record)) != 0)
 		ERET(session, WT_ERROR, "kvs_set: %s", kvs_strerror(ret));
 	return (0);
 }
 
+/*
+ * kvs_cursor_remove --
+ *	WT_CURSOR::remove method.
+ */
 static int
 kvs_cursor_remove(WT_CURSOR *wt_cursor)
 {
@@ -447,7 +553,7 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 		return (kvs_cursor_update(wt_cursor));
 	}
 
-	if ((ret = copyin_key(wt_cursor, &cursor->record)) != 0)
+	if ((ret = copyin_key(wt_cursor)) != 0)
 		return (ret);
 	if ((ret = kvs_del(cursor->data_source->kvs, &cursor->record)) == 0)
 		return (0);
@@ -456,6 +562,10 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 	ERET(session, WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
 }
 
+/*
+ * kvs_cursor_close --
+ *	WT_CURSOR::close method.
+ */
 static int
 kvs_cursor_close(WT_CURSOR *wt_cursor)
 {
@@ -738,6 +848,10 @@ drop_data_source(WT_SESSION *session, const char *uri)
 	return (ret);
 }
 
+/*
+ * kvs_create --
+ *	WT_SESSION::create method.
+ */
 static int
 kvs_create(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
@@ -797,6 +911,10 @@ err:	free(emsg);
 	return (ret);
 }
 
+/*
+ * kvs_drop --
+ *	WT_SESSION::drop method.
+ */
 static int
 kvs_drop(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
@@ -896,6 +1014,10 @@ err:	if (locked)
 	return (ret);
 }
 
+/*
+ * kvs_open_cursor --
+ *	WT_SESSION::open_cursor method.
+ */
 static int
 kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
@@ -1003,6 +1125,10 @@ err:	if (cursor != NULL) {
 	return (ret);
 }
 
+/*
+ * kvs_rename --
+ *	WT_SESSION::rename method.
+ */
 static int
 kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, const char *newname, WT_CONFIG_ARG *config)
@@ -1015,6 +1141,10 @@ kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (drop_data_source(session, uri));
 }
 
+/*
+ * kvs_verify --
+ *	WT_SESSION::verify method.
+ */
 static int
 kvs_verify(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
