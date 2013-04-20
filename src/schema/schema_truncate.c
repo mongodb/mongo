@@ -90,7 +90,7 @@ static int
 __truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 	const char *cfg[2];
 
 	/* Open a cursor and traverse the object, removing every entry. */
