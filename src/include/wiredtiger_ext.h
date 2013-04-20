@@ -79,6 +79,18 @@ struct __wt_extension_api {
 	    WT_EXTENSION_API *, WT_SESSION *session, const char *fmt, ...);
 
 	/*!
+	 * Return information about an error as a string; the strerror method
+	 * is a superset of the ISO C99/POSIX 1003.1-2001 function strerror.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API strerror
+	 *
+	 * @param err a return value from a WiredTiger, C library or POSIX
+	 * function
+	 * @returns a string representation of the error
+	 */
+	const char *(*strerror)(int err);
+
+	/*!
 	 * Allocate short-term use scratch memory.
 	 *
 	 * @param wt_api the extension handle

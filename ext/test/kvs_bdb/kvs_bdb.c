@@ -599,7 +599,7 @@ kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "key_format", &v)) != 0)
 		ERET(session, ret,
-		    "key_format configuration: %s", wiredtiger_strerror(ret));
+		    "key_format configuration: %s", wt_ext->strerror(ret));
 	type = v.len == 1 && v.str[0] == 'r' ? DB_RECNO : DB_BTREE;
 
 	ret = 0;			/* Create the Berkeley DB table */
@@ -664,7 +664,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "append", &v)) != 0) {
 		ESET(session, ret,
-		    "append configuration: %s", wiredtiger_strerror(ret));
+		    "append configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
@@ -672,7 +672,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "overwrite", &v)) != 0) {
 		ESET(session, ret,
-		    "overwrite configuration: %s", wiredtiger_strerror(ret));
+		    "overwrite configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
@@ -680,7 +680,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "key_format", &v)) != 0) {
 		ESET(session, ret,
-		    "key_format configuration: %s", wiredtiger_strerror(ret));
+		    "key_format configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
@@ -688,7 +688,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "value_format", &v)) != 0) {
 		ESET(session, ret,
-		    "value_format configuration: %s", wiredtiger_strerror(ret));
+		    "value_format configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_bitfield =
