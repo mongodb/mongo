@@ -3,8 +3,7 @@ AM_CPPFLAGS = -I$(top_builddir) \
 
 noinst_LTLIBRARIES = libwiredtiger_kvs_bdb.la
 libwiredtiger_kvs_bdb_la_SOURCES = kvs_bdb.c
-libwiredtiger_kvs_bdb_la_LIBADD = \
-    $(top_builddir)/libwiredtiger.la -L$(BERKELEY_DB_PATH)/lib -ldb
+libwiredtiger_kvs_bdb_la_LIBADD = -L$(BERKELEY_DB_PATH)/lib -ldb
 
 # libtool hack: noinst_LTLIBRARIES turns off building shared libraries as well
 # as installation, it will only build static libraries.  As far as I can tell,

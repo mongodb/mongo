@@ -381,8 +381,7 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	/* Allocate a new record for append operations. */
 	if (cursor->config_append && (ret =
 	    kvs_keygen(cursor->data_source->kvs, &wt_cursor->recno)) != 0)
-		ESET(session, WT_ERROR,
-		    "kvs_keygen: %s", kvs_strerror(ret));
+		ESET(session, WT_ERROR, "kvs_keygen: %s", kvs_strerror(ret));
 
 	if ((ret = copyin_key(wt_cursor, &cursor->record)) != 0)
 		return (ret);
@@ -531,8 +530,7 @@ kvs_config_add(WT_CONNECTION *conn)
 			ERET(NULL, ret,
 			    "WT_CONNECTION.configure_method: session.create: "
 			    "{%s, %s, %s}",
-			    p->name, p->type, p->checks,
-			    wiredtiger_strerror(ret));
+			    p->name, p->type, p->checks, wt_ext->strerror(ret));
 	return (0);
 }
 
@@ -558,7 +556,7 @@ kvs_config_devices(WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
 	    wt_ext, session, orig->str, orig->len, &scan)) != 0) {
 		ESET(session, ret,
 		    "WT_EXTENSION_API::config_scan_begin: %s",
-		    wiredtiger_strerror(ret));
+		    wt_ext->strerror(ret));
 		return (ret);
 	}
 
@@ -584,13 +582,13 @@ kvs_config_devices(WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
 	if (ret != WT_NOTFOUND) {
 		ESET(session, ret,
 		    "WT_EXTENSION_API::config_scan_next: %s",
-		    wiredtiger_strerror(ret));
+		    wt_ext->strerror(ret));
 		return (ret);
 	}
 	if ((ret = wt_ext->config_scan_end(wt_ext, scan)) != 0) {
 		ESET(session, ret,
 		    "WT_EXTENSION_API::config_scan_end: %s",
-		    wiredtiger_strerror(ret));
+		    wt_ext->strerror(ret));
 		return (ret);
 	}
 
@@ -630,7 +628,7 @@ kvs_config_read(WT_SESSION *session, WT_CONFIG_ARG *config,
 		    wt_ext->config_get(wt_ext, session, config, name, &v)) != 0)
 			ERET(session, ret,
 			    "WT_EXTENSION_API.config: %s: %s",
-			    name, wiredtiger_strerror(ret));
+			    name, wt_ext->strerror(ret));
 
 		if (strcmp(name, "kvs_devices") == 0) {
 			if ((ret =
@@ -929,7 +927,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "append", &v)) != 0) {
 		ESET(session, ret,
-		    "append configuration: %s", wiredtiger_strerror(ret));
+		    "append configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
@@ -937,7 +935,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "overwrite", &v)) != 0) {
 		ESET(session, ret,
-		    "overwrite configuration: %s", wiredtiger_strerror(ret));
+		    "overwrite configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
@@ -945,7 +943,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "key_format", &v)) != 0) {
 		ESET(session, ret,
-		    "key_format configuration: %s", wiredtiger_strerror(ret));
+		    "key_format configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
@@ -953,7 +951,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "value_format", &v)) != 0) {
 		ESET(session, ret,
-		    "value_format configuration: %s", wiredtiger_strerror(ret));
+		    "value_format configuration: %s", wt_ext->strerror(ret));
 		goto err;
 	}
 	cursor->config_bitfield =
@@ -1060,8 +1058,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	if ((ret = connection->add_data_source(
 	    connection, "kvsstec:", &data_source, NULL)) != 0)
 		ERET(NULL, ret,
-		    "WT_CONNECTION.add_data_source: %s",
-		    wiredtiger_strerror(ret));
+		    "WT_CONNECTION.add_data_source: %s", wt_ext->strerror(ret));
 
 	/* Add the KVS-specific configuration options. */
 	if ((ret = kvs_config_add(connection)) != 0)
