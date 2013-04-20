@@ -35,7 +35,7 @@ namespace mongo {
     class NamespaceDetails;
     class ProgressMeter;
     class ProgressMeterHolder;
-    class SortPhaseOne;
+    struct SortPhaseOne;
 
     class BtreeBasedBuilder {
     public:
