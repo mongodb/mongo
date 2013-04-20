@@ -1050,7 +1050,6 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	(void)config;				/* Unused parameters */
 
 	ret = 0;
-
 						/* Acquire the extension API. */
 	wt_ext = connection->get_extension_api(connection);
 
