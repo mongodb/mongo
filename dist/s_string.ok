@@ -323,6 +323,8 @@ config
 conn
 connectionp
 const
+copyin
+copyout
 cp
 crc
 cref
