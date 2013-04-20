@@ -25,7 +25,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -56,6 +55,7 @@
 	if (ret == 0)							\
 		ret = v;						\
 } while (0)
+#undef	ETRET
 #define	ETRET(a) do {							\
 	int __ret;							\
 	if ((__ret = (a)) != 0 &&					\
@@ -63,7 +63,6 @@
 	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
 		ret = __ret;						\
 } while (0)
-#define	DECL_RET	int ret = 0
 
 typedef struct __data_source {
 	kvs_t *kvs;				/* Underlying KVS store */
@@ -71,8 +70,6 @@ typedef struct __data_source {
 	char  *uri;				/* Object URI */
 
 	u_int	open_cursors;			/* Object's cursor count */
-
-	uint64_t last_recno;			/* Object's last record */
 
 	struct __data_source *next;		/* List of objects */
 } DATA_SOURCE;
@@ -117,7 +114,7 @@ os_errno()
 static int
 lock_init(WT_SESSION *session)
 {
-	DECL_RET;
+	int ret;
 
 	if ((ret = pthread_rwlock_init(&rwlock, NULL)) != 0)
 		ERET(session, WT_PANIC, "lock init: %s", strerror(ret));
@@ -131,7 +128,7 @@ lock_init(WT_SESSION *session)
 static int
 lock_destroy(WT_SESSION *session)
 {
-	DECL_RET;
+	int ret;
 
 	if ((ret = pthread_rwlock_destroy(&rwlock)) != 0)
 		ERET(session, WT_PANIC, "lock destroy: %s", strerror(ret));
@@ -145,7 +142,7 @@ lock_destroy(WT_SESSION *session)
 static inline int
 lock(WT_SESSION *session)
 {
-	DECL_RET;
+	int ret;
 
 	if ((ret = pthread_rwlock_trywrlock(&rwlock)) != 0)
 		ERET(session, WT_PANIC, "lock: %s", strerror(ret));
@@ -159,7 +156,7 @@ lock(WT_SESSION *session)
 static inline int
 unlock(WT_SESSION *session)
 {
-	DECL_RET;
+	int ret;
 
 	if ((ret = pthread_rwlock_unlock(&rwlock)) != 0)
 		ERET(session, WT_PANIC, "unlock: %s", strerror(ret));
@@ -170,10 +167,11 @@ static inline int
 copyin_key(WT_CURSOR *wt_cursor, struct kvs_record *r)
 {
 	CURSOR *cursor;
-	DECL_RET;
 	size_t size;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	ret = 0;
 
 	/*
 	 * XXX
@@ -195,9 +193,10 @@ static inline int
 copyout_key(WT_CURSOR *wt_cursor, struct kvs_record *r)
 {
 	CURSOR *cursor;
-	DECL_RET;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	ret = 0;
 
 	if (cursor->config_recno) {
 		if ((ret =
@@ -259,11 +258,12 @@ kvs_call(WT_CURSOR *wt_cursor, const char *fname,
     int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
 {
 	CURSOR *cursor;
-	DECL_RET;
 	WT_SESSION *session;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
+	ret = 0;
 
 	/* Set up the return buffer. */
 	cursor->record.val = cursor->val;
@@ -297,9 +297,10 @@ static int
 kvs_cursor_next(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
-	DECL_RET;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	ret = 0;
 
 	if ((ret = kvs_call(wt_cursor, "kvs_next", kvs_next)) != 0)
 		return (ret);
@@ -314,9 +315,10 @@ static int
 kvs_cursor_prev(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
-	DECL_RET;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	ret = 0;
 
 	if ((ret = kvs_call(wt_cursor, "kvs_prev", kvs_prev)) != 0)
 		return (ret);
@@ -346,9 +348,10 @@ static int
 kvs_cursor_search(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
-	DECL_RET;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	ret = 0;
 
 	if ((ret = copyin_key(wt_cursor, &cursor->record)) != 0)
 		return (ret);
@@ -371,8 +374,8 @@ static int
 kvs_cursor_insert(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
-	DECL_RET;
 	WT_SESSION *session;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
@@ -408,8 +411,8 @@ static int
 kvs_cursor_update(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
-	DECL_RET;
 	WT_SESSION *session;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
@@ -427,11 +430,12 @@ static int
 kvs_cursor_remove(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
-	DECL_RET;
 	WT_SESSION *session;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
+	ret = 0;
 
 	/*
 	 * WiredTiger's "remove" of a bitfield is really an update with a value
@@ -456,11 +460,12 @@ static int
 kvs_cursor_close(WT_CURSOR *wt_cursor)
 {
 	CURSOR *cursor;
-	DECL_RET;
 	WT_SESSION *session;
+	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
+	ret = 0;
 
 	if ((ret = lock(session)) != 0)
 		goto err;
@@ -515,8 +520,10 @@ static const KVS_OPTIONS kvs_options[] = {
 static int
 kvs_config_add(WT_CONNECTION *conn)
 {
-	DECL_RET;
 	const KVS_OPTIONS *p;
+	int ret;
+
+	ret = 0;
 
 	/*
 	 * KVS options are currently only allowed on session.create, which means
@@ -541,11 +548,11 @@ kvs_config_add(WT_CONNECTION *conn)
 static int
 kvs_config_devices(WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
 {
-	DECL_RET;
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
 	size_t len;
 	u_int cnt, slots;
+	int ret;
 	char **argv, **p;
 
 	ret = 0;
@@ -563,13 +570,13 @@ kvs_config_devices(WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
 	for (cnt = slots = 0; (ret = wt_ext->
 	    config_scan_next(wt_ext, scan, &k, &v)) == 0; ++cnt) {
 		if (cnt + 1 >= slots) {		/* NULL-terminate the array */
-			len = slots + 3 * sizeof(*argv);
+			len = slots + 20 * sizeof(*argv);
 			if ((p = realloc(argv, len)) == NULL) {
 				ret = os_errno();
 				goto err;
 			}
 			argv = p;
-			slots += 3;
+			slots += 20;
 		}
 		len = k.len + 1;
 		if ((argv[cnt] = (char *)calloc(len, sizeof(**argv))) == NULL) {
@@ -611,13 +618,15 @@ static int
 kvs_config_read(WT_SESSION *session, WT_CONFIG_ARG *config,
     char ***devices, struct kvs_config *kvs_config, int *flagsp)
 {
-	DECL_RET;
 	const KVS_OPTIONS *p;
 	WT_CONFIG_ITEM v;
+	int ret;
 	char *t, name[128];
 
-	*flagsp = 0;				/* Clear */
+	*flagsp = 0;				/* Clear return values */
 	memset(kvs_config, 0, sizeof(*kvs_config));
+
+	ret = 0;
 
 	for (p = kvs_options; p->name != NULL; ++p) {
 		/* Truncate the name, discarding the trailing value. */
@@ -699,9 +708,7 @@ static int
 drop_data_source(WT_SESSION *session, const char *uri)
 {
 	DATA_SOURCE *p, **ref;
-	DECL_RET;
-
-	ret = 0;
+	int ret;
 
 	if ((ret = lock(session)) != 0)
 		return (ret);
@@ -895,13 +902,13 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 {
 	CURSOR *cursor;
 	DATA_SOURCE *p;
-	DECL_RET;
 	WT_CONFIG_ITEM v;
+	int ret;
 
 	(void)dsrc;				/* Unused parameters */
 
-	ret = 0;
 	cursor = NULL;
+	ret = 0;
 
 	/* Allocate and initialize a cursor. */
 	if ((cursor = (CURSOR *)calloc(1, sizeof(CURSOR))) == NULL)
@@ -1038,9 +1045,11 @@ int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	static WT_DATA_SOURCE data_source;	/* Enclosing data source */
-	DECL_RET;
+	int ret;
 
 	(void)config;				/* Unused parameters */
+
+	ret = 0;
 
 						/* Acquire the extension API. */
 	wt_ext = connection->get_extension_api(connection);
@@ -1078,8 +1087,7 @@ int
 wiredtiger_extension_terminate(WT_CONNECTION *connection)
 {
 	DATA_SOURCE *p;
-	DECL_RET;
-	int tret;
+	int ret, tret;
 
 	(void)connection;			/* Unused parameters */
 
