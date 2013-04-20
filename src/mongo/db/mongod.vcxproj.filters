@@ -1925,6 +1925,9 @@
     <ClCompile Include="index\2d_index_cursor.cpp">
       <Filter>db\index</Filter>
     </ClCompile>
+    <ClCompile Include="index\btree_based_builder.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -2340,9 +2343,6 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="index.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="index_insertion_continuation.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="indexkey.h">
@@ -4076,6 +4076,13 @@
     <ClInclude Include="index\2d_index_cursor.h">
       <Filter>db\index</Filter>
     </ClInclude>
+    <ClInclude Include="index\btree_based_builder.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\sequence_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\server.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">

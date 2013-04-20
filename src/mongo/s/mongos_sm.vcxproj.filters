@@ -2382,6 +2382,10 @@
     <ClInclude Include="range_arithmetic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\sequence_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\server.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">

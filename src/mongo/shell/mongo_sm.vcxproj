@@ -1363,6 +1363,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\moveablebuffer.h" />
     <ClInclude Include="..\util\net\ssl_manager.h" />
     <ClInclude Include="..\util\safe_num.h" />
+    <ClInclude Include="..\util\sequence_util.h" />
     <ClInclude Include="..\util\string_map.h" />
     <ClInclude Include="..\util\string_map_internal.h" />
     <ClInclude Include="..\util\string_writer.h" />

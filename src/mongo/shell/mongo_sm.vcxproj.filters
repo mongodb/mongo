@@ -1468,6 +1468,9 @@
     <ClInclude Include="..\db\repl\is_master.h">
       <Filter>db\repl</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\sequence_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\db\db.rc">

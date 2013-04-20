@@ -2217,6 +2217,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="index\2d_access_method.cpp" />
     <ClCompile Include="index\2d_index_cursor.cpp" />
     <ClCompile Include="index\btree_access_method.cpp" />
+    <ClCompile Include="index\btree_based_builder.cpp" />
     <ClCompile Include="index\btree_index_cursor.cpp" />
     <ClCompile Include="index\btree_interface.cpp" />
     <ClCompile Include="index\btree_key_generator.cpp" />
@@ -2565,6 +2566,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="..\server.h" />
     <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\collection_manager.h" />
     <ClInclude Include="..\s\config.h" />
@@ -2619,6 +2621,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\progress_meter.h" />
     <ClInclude Include="..\util\safe_num.h" />
     <ClInclude Include="..\util\scopeguard.h" />
+    <ClInclude Include="..\util\sequence_util.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\stacktrace.h" />
     <ClInclude Include="..\util\stack_introspect.h" />
@@ -2699,6 +2702,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index\2d_index_cursor.h" />
     <ClInclude Include="index\btree_access_method.h" />
     <ClInclude Include="index\btree_access_method_internal.h" />
+    <ClInclude Include="index\btree_based_builder.h" />
     <ClInclude Include="index\btree_index_cursor.h" />
     <ClInclude Include="index\btree_interface.h" />
     <ClInclude Include="index\btree_key_generator.h" />
@@ -2718,7 +2722,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index\s2_near_cursor.h" />
     <ClInclude Include="index\s2_simple_cursor.h" />
     <ClInclude Include="index_builder.h" />
-    <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="index_rebuilder.h" />
     <ClInclude Include="index_set.h" />
     <ClInclude Include="index_update.h" />

@@ -664,6 +664,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\index\2d_index_cursor.h" />
     <ClInclude Include="..\db\index\btree_access_method.h" />
     <ClInclude Include="..\db\index\btree_access_method_internal.h" />
+    <ClInclude Include="..\db\index\btree_based_builder.h" />
     <ClInclude Include="..\db\index\btree_index_cursor.h" />
     <ClInclude Include="..\db\index\btree_interface.h" />
     <ClInclude Include="..\db\index\btree_key_generator.h" />
@@ -683,7 +684,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\index\s2_near_cursor.h" />
     <ClInclude Include="..\db\index\s2_simple_cursor.h" />
     <ClInclude Include="..\db\index_builder.h" />
-    <ClInclude Include="..\db\index_insertion_continuation.h" />
     <ClInclude Include="..\db\index_rebuilder.h" />
     <ClInclude Include="..\db\index_set.h" />
     <ClInclude Include="..\db\index_update.h" />
@@ -715,6 +715,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\pagefault.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcrecpp.h" />
     <ClInclude Include="..\db\parsed_query.h" />
+    <ClInclude Include="..\db\pdfile_private.h" />
+    <ClInclude Include="..\db\pdfile_version.h" />
     <ClInclude Include="..\db\pipeline\accumulator.h" />
     <ClInclude Include="..\db\pipeline\builder.h" />
     <ClInclude Include="..\db\pipeline\document.h" />
@@ -729,11 +731,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\pipeline\value.h" />
     <ClInclude Include="..\db\pipeline\value_internal.h" />
     <ClInclude Include="..\db\prefetch.h" />
+    <ClInclude Include="..\db\projection.h" />
+    <ClInclude Include="..\db\queryoptimizercursor.h" />
+    <ClInclude Include="..\db\querypattern.h" />
+    <ClInclude Include="..\db\queryutil-inl.h" />
+    <ClInclude Include="..\db\queryutil.h" />
     <ClInclude Include="..\db\query_optimizer.h" />
     <ClInclude Include="..\db\query_optimizer_internal.h" />
     <ClInclude Include="..\db\query_plan.h" />
     <ClInclude Include="..\db\query_plan_selection_policy.h" />
     <ClInclude Include="..\db\query_plan_summary.h" />
+    <ClInclude Include="..\db\record.h" />
     <ClInclude Include="..\db\repl\bgsync.h" />
     <ClInclude Include="..\db\repl\connections.h" />
     <ClInclude Include="..\db\repl\finding_start_cursor.h" />
@@ -754,13 +762,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\repl\rs_sync.h" />
     <ClInclude Include="..\db\repl\sync.h" />
     <ClInclude Include="..\db\repl\write_concern.h" />
+    <ClInclude Include="..\db\restapi.h" />
     <ClInclude Include="..\db\server_parameters.h" />
     <ClInclude Include="..\db\server_parameters_inline.h" />
+    <ClInclude Include="..\db\sort_phase_one.h" />
     <ClInclude Include="..\db\stats\counters.h" />
     <ClInclude Include="..\db\stats\fine_clock.h" />
     <ClInclude Include="..\db\stats\snapshots.h" />
     <ClInclude Include="..\db\stats\timer_stats.h" />
     <ClInclude Include="..\db\stats\top.h" />
+    <ClInclude Include="..\db\taskqueue.h" />
+    <ClInclude Include="..\db\ttl.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_gcc.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -963,6 +975,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\safe_num.h" />
     <ClInclude Include="..\util\scopeguard.h" />
+    <ClInclude Include="..\util\sequence_util.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\stacktrace.h" />
@@ -2579,6 +2592,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\index\2d_access_method.cpp" />
     <ClCompile Include="..\db\index\2d_index_cursor.cpp" />
     <ClCompile Include="..\db\index\btree_access_method.cpp" />
+    <ClCompile Include="..\db\index\btree_based_builder.cpp" />
     <ClCompile Include="..\db\index\btree_index_cursor.cpp" />
     <ClCompile Include="..\db\index\btree_interface.cpp" />
     <ClCompile Include="..\db\index\btree_key_generator.cpp" />
