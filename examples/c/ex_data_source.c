@@ -72,6 +72,14 @@ my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	{
+	int ret = 0;
+	/*! [WT_EXTENSION_API strerror] */
+	(void)wt_api->err_printf(wt_api,
+	    session, "WiredTiger error return: %s", wt_api->strerror(ret));
+	/*! [WT_EXTENSION_API strerror] */
+	}
+
+	{
 	/*! [WT_EXTENSION_API scr_alloc] */
 	void *buffer;
 	if ((buffer = wt_api->scr_alloc(wt_api, session, 512)) == NULL) {
