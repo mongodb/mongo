@@ -283,7 +283,8 @@ copy_key(WT_CURSOR *wt_cursor)
 		return (0);
 	if (r->key_len > sizeof(cursor->key))
 		ERET(session, ERANGE,
-		    "key too large, maximum is % PRIuMAX", sizeof(cursor->key));
+		    "key too large, maximum is %" PRIuMAX,
+		    (uintmax_t)sizeof(cursor->key));
 	memcpy(cursor->key, r->key, r->key_len);
 	r->key = cursor->key;
 	return (0);
