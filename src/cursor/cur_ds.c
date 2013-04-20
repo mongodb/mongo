@@ -315,12 +315,14 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	 * data-source.
 	 */
 	cfgp = dscfg;
-	if (cfg[0] != NULL)
+	if (cfg[0] != NULL) {
 		*cfgp++ = cfg[0];
-	if (cfg[1] != NULL)
-		*cfgp++ = cfg[1];
-	if (cfg[2] != NULL)
-		*cfgp++ = cfg[2];
+		if (cfg[1] != NULL) {
+			*cfgp++ = cfg[1];
+			if (cfg[2] != NULL)
+				*cfgp++ = cfg[2];
+		}
+	}
 	*cfgp++ = metaconf;
 	*cfgp = NULL;
 
