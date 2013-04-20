@@ -38,10 +38,9 @@ extern "C" {
  *
  * @snippet ex_data_source.c WT_EXTENSION_API declaration
  *
- * The following code is from the sample compression module, where the
- * extension functions are configured  in the extension's entry point:
+ * The following code is from the sample compression module, where compression
+ * extension functions are configured in the extension's entry point:
  *
- * @snippet nop_compress.c WT_EXTENSION_API declaration
  * @snippet nop_compress.c WT_EXTENSION_API initialization
  */
 struct __wt_extension_api {

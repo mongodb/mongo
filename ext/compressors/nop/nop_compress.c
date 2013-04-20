@@ -28,11 +28,9 @@
 #include <string.h>
 
 #include <wiredtiger.h>
-/*! [WT_EXTENSION_API declaration] */
 #include <wiredtiger_ext.h>
 
 static WT_EXTENSION_API *wt_api;
-/*! [WT_EXTENSION_API declaration] */
 
 static int
 nop_compress(WT_COMPRESSOR *, WT_SESSION *,
