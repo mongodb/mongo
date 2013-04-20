@@ -326,14 +326,14 @@ kvs_call(WT_CURSOR *wt_cursor, const char *fname,
 	session = cursor->session;
 	ret = 0;
 
-	/* Set up the return buffer. */
-	cursor->record.val = cursor->val;
-
 	/*
 	 * Call the underlying function; we have to loop because the value
 	 * buffer may need to be grown to accommodate the returned value.
 	 */
 	for (;;) {
+		/* Set up the return buffer. */
+		cursor->record.val = cursor->val;
+
 		if ((ret = f(cursor->data_source->kvs, &cursor->record,
 		    (unsigned long)0, (unsigned long)cursor->val_len)) != 0) {
 			if (ret == KVS_E_KEY_NOT_FOUND)
