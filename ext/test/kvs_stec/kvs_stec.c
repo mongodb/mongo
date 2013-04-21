@@ -323,38 +323,54 @@ kvs_call(WT_CURSOR *wt_cursor, const char *fname,
 {
 	CURSOR *cursor;
 	WT_SESSION *session;
+	kvs_t kvs;
 	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
+	kvs = cursor->data_source->kvs;
 	ret = 0;
 
+	cursor->record.val = cursor->val;
+
+restart:
+	if ((ret = f(kvs, &cursor->record,
+	    (unsigned long)0, (unsigned long)cursor->val_len)) != 0) {
+		if (ret == KVS_E_KEY_NOT_FOUND)
+			return (WT_NOTFOUND);
+		ERET(session, WT_ERROR, "%s: %s", fname, kvs_strerror(ret));
+	}
+
 	/*
-	 * Call the underlying function; we have to loop because the value
-	 * buffer may need to be grown to accommodate the returned value.
+	 * If the returned length is larger than our passed-in length, we didn't
+	 * get the complete value.  Grow the buffer and use kvs_get to complete
+	 * the retrieval (kvs_get because the call succeeded and the key was
+	 * copied out, so calling kvs_next/kvs_prev again would skip key/value
+	 * pairs).
+	 *
+	 * We have to loop, another thread of control might change the length of
+	 * the value, requiring we grow our buffer multiple times.
+	 *
+	 * We have to potentially restart the entire call in case the underlying
+	 * key/value disappears.
 	 */
 	for (;;) {
-		/* Set up the return buffer. */
-		cursor->record.val = cursor->val;
-
-		if ((ret = f(cursor->data_source->kvs, &cursor->record,
-		    (unsigned long)0, (unsigned long)cursor->val_len)) != 0) {
-			if (ret == KVS_E_KEY_NOT_FOUND)
-				return (WT_NOTFOUND);
-			ERET(session,
-			    WT_ERROR, "%s: %s", fname, kvs_strerror(ret));
-		}
-
-		/*
-		 * If the returned length is larger than our passed-in length,
-		 * nothing came back because the buffer is too small, grow it.
-		 */
 		if (cursor->val_len >= cursor->record.val_len)
-			break;
+			return (0);
+
 		if ((ret = record_val_grow(cursor)) != 0)
 			return (ret);
+		cursor->record.val = cursor->val;
+
+		if ((ret = kvs_get(kvs, &cursor->record,
+		    (unsigned long)0, (unsigned long)cursor->val_len)) != 0) {
+			if (ret == KVS_E_KEY_NOT_FOUND)
+				goto restart;
+			ERET(session,
+			    WT_ERROR, "kvs_get: %s", kvs_strerror(ret));
+		}
 	}
-	return (0);
+	/* NOTREACHED */
 }
 
 /*
