@@ -522,7 +522,7 @@ kvs_recno_alloc(WT_CURSOR *wt_cursor)
 	}
 
 	wt_cursor->recno = ++cursor->data_source->append_recno;
-		
+
 err:	ETRET(unlock(session, &cursor->data_source->lock));
 	return (ret);
 }
