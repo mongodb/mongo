@@ -68,7 +68,7 @@
 } while (0)
 
 typedef struct __data_source {
-	kvs_t *kvs;				/* Underlying KVS store */
+	kvs_t kvs;				/* Underlying KVS store */
 
 	char  *uri;				/* Object URI */
 
@@ -858,7 +858,7 @@ kvs_create(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	struct kvs_config kvs_config;
-	kvs_t *kvs;
+	kvs_t kvs;
 	int flags, ret;
 	char **devices, *emsg;
 
