@@ -443,6 +443,15 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 {
 	int ret;
 
+	/*
+	 * XXX
+	 * I'm not confident this is sufficient: if there are multiple threads
+	 * of control, it's possible for the search for an exact match to fail,
+	 * another thread of control to insert (and commit) an exact match, and
+	 * then it's possible we'll return the wrong value.  This needs to be
+	 * revisited once the transactional code is in place.
+	 */
+
 	/* Search for an exact match. */
 	if ((ret = kvs_cursor_search(wt_cursor)) == 0) {
 		*exact = 0;
@@ -489,8 +498,18 @@ kvs_recno_alloc(WT_CURSOR *wt_cursor)
 		return (ret);
 
 	/*
-	 * If already know the current maximum record number, simply return the
-	 * next one.
+	 * If not yet tracking the maximum record number, read the last record
+	 * from the object and figure it out.
+	 *
+	 * XXX
+	 * There is still a race here.  If another thread of control performs a
+	 * WT_CURSOR::insert of an explicit record number (that is, the other
+	 * cursor isn't configured for "append"), we could race.  If we figure
+	 * out the last record in the data-source is 37, then the other thread
+	 * explicitly writes record 37, things will go badly.  I don't want to
+	 * lock the data-source on every update, so I'm leaving this until we
+	 * write the transactional code, because that's going to change all of
+	 * the locking in here.
 	 */
 	if (cursor->data_source->append_recno == 0) {
 		if ((ret = kvs_last(cursor->data_source->kvs,
