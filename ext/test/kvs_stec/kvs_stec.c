@@ -294,26 +294,6 @@ copy_key(WT_CURSOR *wt_cursor)
 }
 
 /*
- * record_val_grow --
- *	Grow the records value buffer on demand.
- */
-static INLINE int
-record_val_grow(CURSOR *cursor)
-{
-	char *p;
-
-	/*
-	 * If the returned length is larger than our passed-in length, nothing
-	 * came back because the buffer is too small, grow it.
-	 */
-	if ((p = realloc(cursor->val, cursor->record.val_len + 32)) == NULL)
-		return (os_errno());
-	cursor->val = p;
-	cursor->val_len = cursor->record.val_len + 32;
-	return (0);
-}
-
-/*
  * kvs_call --
  *	Call a KVS function.
  */
@@ -325,6 +305,7 @@ kvs_call(WT_CURSOR *wt_cursor, const char *fname,
 	WT_SESSION *session;
 	kvs_t kvs;
 	int ret;
+	char *p;
 
 	cursor = (CURSOR *)wt_cursor;
 	session = cursor->session;
@@ -358,9 +339,12 @@ restart:
 		if (cursor->val_len >= cursor->record.val_len)
 			return (0);
 
-		if ((ret = record_val_grow(cursor)) != 0)
-			return (ret);
-		cursor->record.val = cursor->val;
+		/* Grow the value buffer. */
+		if ((p = realloc(
+		    cursor->val, cursor->record.val_len + 32)) == NULL)
+			return (os_errno());
+		cursor->val = cursor->record.val = p;
+		cursor->val_len = cursor->record.val_len + 32;
 
 		if ((ret = kvs_get(kvs, &cursor->record,
 		    (unsigned long)0, (unsigned long)cursor->val_len)) != 0) {
