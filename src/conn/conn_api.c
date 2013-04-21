@@ -48,16 +48,16 @@ __conn_load_extension(
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
-	const char *entry_name;
+	const char *init_name, *terminate_name;
 
 	dlh = NULL;
-	entry_name = NULL;
+	init_name = terminate_name = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
 	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
 
 	/*
 	 * This assumes the underlying shared libraries are reference counted,
@@ -69,13 +69,13 @@ __conn_load_extension(
 	 * Fill in the extension structure and call the load function.
 	 */
 	WT_ERR(__wt_dlopen(session, path, &dlh));
-	WT_ERR(__wt_dlsym(session, dlh, entry_name, 1, &load));
+	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
 	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
 	/* Remember the unload function for when we close. */
 	WT_ERR(__wt_config_gets(session, cfg, "terminate", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &entry_name));
-	WT_ERR(__wt_dlsym(session, dlh, entry_name, 0, &dlh->terminate));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &terminate_name));
+	WT_ERR(__wt_dlsym(session, dlh, terminate_name, 0, &dlh->terminate));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);
@@ -85,7 +85,8 @@ __conn_load_extension(
 
 err:	if (dlh != NULL)
 		WT_TRET(__wt_dlclose(session, dlh));
-	__wt_free(session, entry_name);
+	__wt_free(session, init_name);
+	__wt_free(session, terminate_name);
 
 	API_END_NOTFOUND_MAP(session, ret);
 }
