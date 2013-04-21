@@ -142,15 +142,15 @@ lock_destroy(WT_SESSION *session, pthread_rwlock_t *lockp)
 }
 
 /*
- * lock --
- *	Acquire an object's lock.
+ * writelock --
+ *	Acquire a write lock.
  */
 static INLINE int
-lock(WT_SESSION *session, pthread_rwlock_t *lockp)
+writelock(WT_SESSION *session, pthread_rwlock_t *lockp)
 {
 	int ret;
 
-	if ((ret = pthread_rwlock_trywrlock(lockp)) != 0)
+	if ((ret = pthread_rwlock_wrlock(lockp)) != 0)
 		ERET(session, WT_PANIC, "lock: %s", strerror(ret));
 	return (ret);
 }
@@ -494,7 +494,7 @@ kvs_recno_alloc(WT_CURSOR *wt_cursor)
 	r = &cursor->record;
 
 	/* Lock the data-source. */
-	if ((ret = lock(session, &cursor->data_source->lock)) != 0)
+	if ((ret = writelock(session, &cursor->data_source->lock)) != 0)
 		return (ret);
 
 	/*
@@ -602,7 +602,7 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 	 * that updates IFF the record exists, in which case that call should
 	 * replace this locked get/set pair.
 	 */
-	if ((ret = lock(session, &cursor->data_source->lock)) != 0)
+	if ((ret = writelock(session, &cursor->data_source->lock)) != 0)
 		return (ret);
 	if ((ret = kvs_call(wt_cursor, "kvs_get", kvs_get)) != 0)
 		goto err;
@@ -664,7 +664,7 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 	session = cursor->session;
 	ret = 0;
 
-	if ((ret = lock(session, &global_lock)) != 0)
+	if ((ret = writelock(session, &global_lock)) != 0)
 		goto err;
 	--cursor->data_source->open_cursors;
 	if ((ret = unlock(session, &global_lock)) != 0)
@@ -907,7 +907,7 @@ drop_data_source(WT_SESSION *session, const char *uri)
 	DATA_SOURCE *p, **ref;
 	int ret;
 
-	if ((ret = lock(session, &global_lock)) != 0)
+	if ((ret = writelock(session, &global_lock)) != 0)
 		return (ret);
 
 	/* Search our list of objects for a match. */
@@ -1067,7 +1067,7 @@ open_data_source(WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 	 * kvs_open isn't re-entrant: lock things down while we make sure we
 	 * don't have more than a single handle at a time.
 	 */
-	if ((ret = lock(session, &global_lock)) != 0)
+	if ((ret = writelock(session, &global_lock)) != 0)
 		goto err;
 	locked = 1;
 
@@ -1186,7 +1186,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * open cursors to pin it, and release the lock.
 	 */
 	for (;;) {
-		if ((ret = lock(session, &global_lock)) != 0)
+		if ((ret = writelock(session, &global_lock)) != 0)
 			goto err;
 		for (p = data_source_head; p != NULL; p = p->next)
 			if (strcmp(p->uri, uri) == 0) {
@@ -1304,7 +1304,7 @@ wiredtiger_extension_terminate(WT_CONNECTION *connection)
 
 	(void)connection;			/* Unused parameters */
 
-	ret = lock(NULL, &global_lock);
+	ret = writelock(NULL, &global_lock);
 
 	/* Start a flush on any open objects. */
 	for (p = data_source_head; p != NULL; p = p->next)
