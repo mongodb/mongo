@@ -681,7 +681,7 @@ static const KVS_OPTIONS kvs_options[] = {
 	{ "kvs_reclaim_threshold=60",	"int", "min=1,max=80" },
 
 	/*
-	 * KVS_O_XXX flag configuration
+	 * KVS_O_FLAG flag configuration
 	 */
 	{ "kvs_open_o_debug=0",		"boolean", NULL },
 	{ "kvs_open_o_reclaim=0",	"boolean", NULL },
