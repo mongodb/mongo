@@ -577,6 +577,11 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 	 * WT_CURSOR::update (update the record if it does exist, fail if it
 	 * does not exist), doesn't map directly to a KVS call.  To match the
 	 * semantic, lock the data-source across a get/update pair.
+	 *
+	 * XXX
+	 * Tony Givargis: future versions of KVS will have a kvs_replace call
+	 * that updates IFF the record exists, in which case that call should
+	 * replace this locked get/set pair.
 	 */
 	if ((ret = lock(session, &cursor->data_source->lock)) != 0)
 		return (ret);
