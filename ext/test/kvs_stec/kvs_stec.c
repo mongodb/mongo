@@ -561,18 +561,17 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	if (cursor->config_overwrite) {
 		if ((ret = kvs_set(
 		    cursor->data_source->kvs, &cursor->record)) != 0)
-			ESET(session, WT_ERROR,
+			ERET(session, WT_ERROR,
 			    "kvs_set: %s", kvs_strerror(ret));
 	} else
 		if ((ret = kvs_add(
 		    cursor->data_source->kvs, &cursor->record)) != 0) {
 			if (ret == KVS_E_KEY_EXISTS)
-				ret = WT_DUPLICATE_KEY;
-			else
-				ESET(session, WT_ERROR,
-				    "kvs_add: %s", kvs_strerror(ret));
+				return (WT_DUPLICATE_KEY);
+			ERET(session, WT_ERROR,
+			    "kvs_add: %s", kvs_strerror(ret));
 		}
-	return (ret);
+	return (0);
 }
 
 /*
@@ -591,28 +590,17 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
 
 	if ((ret = copyin_key(wt_cursor)) != 0)
 		return (ret);
+	if ((ret = copyin_val(wt_cursor)) != 0)
+		return (ret);
 
 	/*
 	 * WT_CURSOR::update (update the record if it does exist, fail if it
-	 * does not exist), doesn't map directly to a KVS call.  To match the
-	 * semantic, lock the data-source across a get/update pair.
-	 *
-	 * XXX
-	 * Tony Givargis: future versions of KVS will have a kvs_replace call
-	 * that updates IFF the record exists, in which case that call should
-	 * replace this locked get/set pair.
+	 * does not exist), maps to kvs_replace.
 	 */
-	if ((ret = writelock(session, &cursor->data_source->lock)) != 0)
-		return (ret);
-	if ((ret = kvs_call(wt_cursor, "kvs_get", kvs_get)) != 0)
-		goto err;
-	if ((ret = copyin_val(wt_cursor)) != 0)
-		goto err;
-	if ((ret = kvs_set(cursor->data_source->kvs, &cursor->record)) != 0)
-		ESET(session, WT_ERROR, "kvs_set: %s", kvs_strerror(ret));
+	if ((ret = kvs_replace(cursor->data_source->kvs, &cursor->record)) != 0)
+		ERET(session, WT_ERROR, "kvs_replace: %s", kvs_strerror(ret));
 
-err:	ETRET(unlock(session, &cursor->data_source->lock));
-	return (ret);
+	return (0);
 }
 
 /*
