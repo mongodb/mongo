@@ -30,7 +30,7 @@ wt_SOURCES =\
 	src/utilities/util_verify.c \
 	src/utilities/util_write.c
 
-include_HEADERS= wiredtiger.h
+include_HEADERS= wiredtiger.h src/include/wiredtiger_ext.h
 AM_CPPFLAGS = -I$(srcdir)/src/include
 
 pkgconfigdir = $(libdir)/pkgconfig
