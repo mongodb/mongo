@@ -466,6 +466,16 @@ namespace mongo {
 
                 // todo: lots of overhead in context, this can be faster
                 Client::Context c(d.ns);
+
+                // Add the doc to our rollback file
+                BSONObj obj;
+                bool found = Helpers::findOne(d.ns, pattern, obj, false);
+                if ( found ) {
+                    rs->goingToDelete( obj );
+                } else {
+                    error() << "rollback cannot find object by id" << endl;
+                }
+
                 if( i->second.isEmpty() ) {
                     // wasn't on the primary; delete.
                     /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
