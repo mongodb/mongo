@@ -22,16 +22,20 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/index/2d_index_cursor.h"
+#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/s2_near_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/geo/2d.h"
-#include "mongo/db/geo/s2common.h"
-#include "mongo/db/geo/s2index.h"
-#include "mongo/db/geo/s2nearcursor.h"
 
 namespace mongo {
+
     GeoNearArguments::GeoNearArguments(const BSONObj &cmdObj) {
         const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
         if (cmdObj[limitName].isNumber()) {
@@ -110,7 +114,7 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                return run2DGeoNear(d->idx(idxs[0]), cmdObj, commonArgs, errmsg, result);
+                return twod_internal::TwoDGeoNearRunner::run2DGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
             }
 
             d->findIndexByType("2dsphere", idxs);
@@ -121,12 +125,101 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                return run2DSphereGeoNear(d->idx(idxs[0]), cmdObj, commonArgs, errmsg, result);
+                return run2DSphereGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
             }
 
             errmsg = "no geo indices for geoNear";
             return false;
         }
+
     private:
+
+        static bool run2DSphereGeoNear(NamespaceDetails* nsDetails, int idxNo, BSONObj& cmdObj,
+                                       const GeoNearArguments &parsedArgs, string& errmsg,
+                                       BSONObjBuilder& result) {
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsDetails, idxNo));
+            auto_ptr<S2AccessMethod> sam(new S2AccessMethod(descriptor.get()));
+            const S2IndexingParams& params = sam->getParams();
+            auto_ptr<S2NearIndexCursor> nic(new S2NearIndexCursor(descriptor.get(), params));
+
+            vector<string> geoFieldNames;
+            BSONObjIterator i(descriptor->keyPattern());
+            while (i.more()) {
+                BSONElement e = i.next();
+                if (e.type() == String && S2IndexingParams::SPHERE_2D_NAME == e.valuestr()) {
+                    geoFieldNames.push_back(e.fieldName());
+                }
+            }
+
+            // NOTE(hk): If we add a new argument to geoNear, we could have a
+            // 2dsphere index with multiple indexed geo fields, and the geoNear
+            // could pick the one to run over.  Right now, we just require one.
+            uassert(16552, "geoNear requires exactly one indexed geo field", 1 == geoFieldNames.size());
+            NearQuery nearQuery(geoFieldNames[0]);
+            uassert(16679, "Invalid geometry given as arguments to geoNear: " + cmdObj.toString(),
+                    nearQuery.parseFromGeoNear(cmdObj, params.radius));
+            uassert(16683, "geoNear on 2dsphere index requires spherical",
+                    parsedArgs.isSpherical);
+
+            // NOTE(hk): For a speedup, we could look through the query to see if
+            // we've geo-indexed any of the fields in it.
+            vector<GeoQuery> regions;
+
+            nic->seek(parsedArgs.query, nearQuery, regions);
+
+            // We do pass in the query above, but it's just so we can possibly use it in our index
+            // scan.  We have to do our own matching.
+            auto_ptr<Matcher> matcher(new Matcher(parsedArgs.query));
+
+            double totalDistance = 0;
+            BSONObjBuilder resultBuilder(result.subarrayStart("results"));
+            double farthestDist = 0;
+
+            int results;
+            for (results = 0; results < parsedArgs.numWanted && !nic->isEOF(); ++results) {
+                BSONObj currObj = nic->getValue().obj();
+                if (!matcher->matches(currObj)) {
+                    --results;
+                    nic->next();
+                    continue;
+                }
+
+                double dist = nic->currentDistance();
+                // If we got the distance in radians, output it in radians too.
+                if (nearQuery.fromRadians) { dist /= params.radius; }
+                dist *= parsedArgs.distanceMultiplier;
+                totalDistance += dist;
+                if (dist > farthestDist) { farthestDist = dist; }
+
+                BSONObjBuilder oneResultBuilder(
+                    resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
+                oneResultBuilder.append("dis", dist);
+                if (parsedArgs.includeLocs) {
+                    BSONElementSet geoFieldElements;
+                    currObj.getFieldsDotted(geoFieldNames[0], geoFieldElements, false);
+                    for (BSONElementSet::iterator oi = geoFieldElements.begin();
+                            oi != geoFieldElements.end(); ++oi) {
+                        if (oi->isABSONObj()) {
+                            oneResultBuilder.appendAs(*oi, "loc");
+                        }
+                    }
+                }
+
+                oneResultBuilder.append("obj", currObj);
+                oneResultBuilder.done();
+                nic->next();
+            }
+
+            resultBuilder.done();
+
+            BSONObjBuilder stats(result.subobjStart("stats"));
+            stats.append("time", cc().curop()->elapsedMillis());
+            stats.appendNumber("nscanned", nic->nscanned());
+            stats.append("avgDistance", totalDistance / results);
+            stats.append("maxDistance", farthestDist);
+            stats.done();
+
+            return true;
+        }
     } geo2dFindNearCmd;
 }  // namespace mongo

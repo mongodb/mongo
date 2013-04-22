@@ -92,58 +92,12 @@ namespace mongo {
         }
     }
 
-    shared_ptr<Cursor> HashedIndexType::newCursor( const BSONObj& query ,
-            const BSONObj& order , int numWanted ) const {
-
-        //Use FieldRangeSet to parse the query into a vector of intervals
-        //These should be point-intervals if this cursor is ever used
-        //So the FieldInterval vector will be, e.g. <[1,1], [3,3], [6,6]>
-        FieldRangeSet frs( "" , query , true, true );
-        const vector<FieldInterval>& intervals = frs.range( _hashedField.c_str() ).intervals();
-
-        //Force a match of the query against the actual document by giving
-        //the cursor a matcher with an empty indexKeyPattern.  This ensures the
-        //index is not used as a covered index.
-        //NOTE: this forcing is necessary due to potential hash collisions
-        const shared_ptr< CoveredIndexMatcher > forceDocMatcher(
-                new CoveredIndexMatcher( query , BSONObj() ) );
-
-        //Construct a new query based on the hashes of the previous point-intervals
-        //e.g. {a : {$in : [ hash(1) , hash(3) , hash(6) ]}}
-        BSONObjBuilder newQueryBuilder;
-        BSONObjBuilder inObj( newQueryBuilder.subobjStart( _hashedField ) );
-        BSONArrayBuilder inArray( inObj.subarrayStart("$in") );
-        vector<FieldInterval>::const_iterator i;
-        for( i = intervals.begin(); i != intervals.end(); ++i ){
-            if ( ! i->equality() ){
-                const shared_ptr< BtreeCursor > exhaustiveCursor(
-                        BtreeCursor::make( nsdetails( _spec->getDetails()->parentNS()),
-                                           *( _spec->getDetails() ),
-                                           BSON( "" << MINKEY ) ,
-                                           BSON( "" << MAXKEY ) ,
-                                           true ,
-                                           1 ) );
-                exhaustiveCursor->setMatcher( forceDocMatcher );
-                return exhaustiveCursor;
-            }
-            inArray.append( makeSingleKey( i->_lower._bound , _seed , _hashVersion ) );
-        }
-        inArray.done();
-        inObj.done();
-        BSONObj newQuery = newQueryBuilder.obj();
-
-        //Use the point-intervals of the new query to create a Btree cursor
-        FieldRangeSet newfrs( "" , newQuery , true, true );
-        shared_ptr<FieldRangeVector> newVector(
-                new FieldRangeVector( newfrs , *_spec , 1 ) );
-
-        const shared_ptr< BtreeCursor > cursor(
-                BtreeCursor::make( nsdetails( _spec->getDetails()->parentNS()),
-                        *( _spec->getDetails() ), newVector, 0, 1 ) );
-        cursor->setMatcher( forceDocMatcher );
-        return cursor;
+    shared_ptr<Cursor> HashedIndexType::newCursor(const BSONObj& query, const BSONObj& order,
+                                                  int numWanted) const {
+        shared_ptr<Cursor> c;
+        verify(0);
+        return c;
     }
-
 
     /* This class registers HASHED_INDEX_NAME in a global map of special index types
      * Using this pattern, any index with the pattern, {fieldname : HASHED_INDEX_NAME}

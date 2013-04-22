@@ -37,6 +37,9 @@ namespace mongo {
         virtual Status newCursor(IndexCursor** out);
 
     private:
+        friend class Geo2dFindNearCmd;
+        const S2IndexingParams& getParams() const { return _params; }
+
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         // getKeys calls the helper methods below.

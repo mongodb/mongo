@@ -28,9 +28,17 @@
 namespace mongo {
 
     class TwoDAccessMethod;
+    class GeoNearArguments;
 
     namespace twod_internal {
         class GeoCursorBase;
+
+        class TwoDGeoNearRunner {
+        public:
+            static bool run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
+                                     const GeoNearArguments &parsedArgs, string& errmsg,
+                                     BSONObjBuilder& result);
+        };
     }
 
     class TwoDIndexCursor : public IndexCursor {

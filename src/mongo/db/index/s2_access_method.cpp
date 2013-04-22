@@ -45,6 +45,9 @@ namespace mongo {
 
     const string S2IndexingParams::SPHERE_2D_NAME = "2dsphere";
 
+    // Thanks, Wikipedia.
+    const double S2IndexingParams::kRadiusOfEarthInMeters = (6378.1 * 1000);
+
     static int configValueWithDefault(IndexDescriptor *desc, const string& name, int def) {
         BSONElement e = desc->getInfoElement(name);
         if (e.isNumber()) { return e.numberInt(); }

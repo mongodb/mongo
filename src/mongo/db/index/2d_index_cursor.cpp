@@ -17,10 +17,13 @@
 #include "mongo/db/index/2d_index_cursor.h"
 
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_interface.h"
+#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/core.h"
+#include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/pdfile.h"
@@ -1762,6 +1765,72 @@ namespace mongo {
         GeoHash _start;
         shared_ptr<GeoHashConverter> _converter;
     };
+
+    bool TwoDGeoNearRunner::run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
+                             const GeoNearArguments &parsedArgs, string& errmsg,
+                             BSONObjBuilder& result) {
+
+        auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsd, idxNo));
+        auto_ptr<TwoDAccessMethod> sam(new TwoDAccessMethod(descriptor.get()));
+        const TwoDIndexingParams& params = sam->getParams();
+
+        uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
+        const Point n(cmdObj["near"]);
+        result.append("near", params.geoHashConverter->hash(cmdObj["near"]).toString());
+
+        double maxDistance = numeric_limits<double>::max();
+        if (cmdObj["maxDistance"].isNumber())
+            maxDistance = cmdObj["maxDistance"].number();
+
+        GeoDistType type = parsedArgs.isSpherical ? GEO_SPHERE : GEO_PLANE;
+
+        GeoSearch gs(sam.get(), n, parsedArgs.numWanted, parsedArgs.query, maxDistance, type,
+                     parsedArgs.uniqueDocs, true);
+
+        if (cmdObj["start"].type() == String) {
+            GeoHash start ((string) cmdObj["start"].valuestr());
+            gs._start = start;
+        }
+
+        gs.exec();
+
+        double totalDistance = 0;
+
+        BSONObjBuilder arr(result.subarrayStart("results"));
+        int x = 0;
+        for (GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++) {
+
+            const GeoPoint& p = *i;
+            double dis = parsedArgs.distanceMultiplier * p.distance();
+            totalDistance += dis;
+
+            BSONObjBuilder bb(arr.subobjStart(BSONObjBuilder::numStr(x++)));
+            bb.append("dis", dis);
+            if (parsedArgs.includeLocs) {
+                if(p._pt.couldBeArray()) bb.append("loc", BSONArray(p._pt));
+                else bb.append("loc", p._pt);
+            }
+            bb.append("obj", p._o);
+            bb.done();
+
+            if (arr.len() > BSONObjMaxUserSize) {
+                warning() << "Too many results to fit in single document. Truncating..." << endl;
+                break;
+            }
+        }
+        arr.done();
+
+        BSONObjBuilder stats(result.subobjStart("stats"));
+        stats.append("time", cc().curop()->elapsedMillis());
+        stats.appendNumber("btreelocs", gs._nscanned);
+        stats.appendNumber("nscanned", gs._lookedAt);
+        stats.appendNumber("objectsLoaded", gs._objectsLoaded);
+        stats.append("avgDistance", totalDistance / x);
+        stats.append("maxDistance", gs.farthest());
+        stats.done();
+
+        return true;
+    }
 
     }  // namespace twod_internal
 

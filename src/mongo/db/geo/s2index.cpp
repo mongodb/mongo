@@ -24,9 +24,7 @@
 #include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/geoquery.h"
-#include "mongo/db/geo/s2common.h"
-#include "mongo/db/geo/s2cursor.h"
-#include "mongo/db/geo/s2nearcursor.h"
+#include "mongo/db/index/s2_common.h"
 #include "third_party/s2/s2.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2polygon.h"
@@ -143,64 +141,9 @@ namespace mongo {
         // Entry point for a search.
         virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
                                              int numWanted) const {
-            vector<GeoQuery> regions;
-            bool isNearQuery = false;
-            NearQuery nearQuery;
-
-            // Go through the fields that we index, and for each geo one, make
-            // a GeoQuery object for the S2*Cursor class to do intersection
-            // testing/cover generating with.
-            for (size_t i = 0; i < _fields.size(); ++i) {
-                const IndexedField &field = _fields[i];
-                if (IndexedField::GEO != field.type) { continue; }
-
-                BSONElement e = query.getFieldDotted(field.name);
-                if (e.eoo()) { continue; }
-                if (!e.isABSONObj()) { continue; }
-                BSONObj obj = e.Obj();
-
-                if (nearQuery.parseFrom(obj, _params.radius)) {
-                    uassert(16685, "Only one $near clause allowed: " + query.toString(),
-                            !isNearQuery);
-                    isNearQuery = true;
-                    nearQuery.field = field.name;
-                    continue;
-                }
-
-                GeoQuery geoQueryField(field.name);
-                if (!geoQueryField.parseFrom(obj)) {
-                    uasserted(16535, "can't parse query (2dsphere): " + obj.toString());
-                }
-                uassert(16684, "Geometry unsupported: " + obj.toString(),
-                        geoQueryField.hasS2Region());
-                regions.push_back(geoQueryField);
-            }
-
-            // Remove all the indexed geo regions from the query.  The s2*cursor will
-            // instead create a covering for that key to speed up the search.
-            //
-            // One thing to note is that we create coverings for indexed geo keys during
-            // a near search to speed it up further.
-            BSONObjBuilder geoFieldsToNuke;
-            if (isNearQuery) {
-                geoFieldsToNuke.append(nearQuery.field, "");
-            }
-            for (size_t i = 0; i < regions.size(); ++i) {
-                geoFieldsToNuke.append(regions[i].getField(), "");
-            }
-
-            // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
-            BSONObj filteredQuery = query.filterFieldsUndotted(geoFieldsToNuke.obj(), false);
-
-            if (isNearQuery) {
-                S2NearCursor *cursor = new S2NearCursor(keyPattern(), getDetails(), filteredQuery,
-                    nearQuery, regions, _params);
-                return shared_ptr<Cursor>(cursor);
-            } else {
-                S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), filteredQuery, regions, 
-                                                _params);
-                return shared_ptr<Cursor>(cursor);
-            }
+            shared_ptr<Cursor> c;
+            verify(0);
+            return c;
         }
 
         virtual IndexSuitability suitability(const FieldRangeSet& queryConstraints,
@@ -376,73 +319,4 @@ namespace mongo {
         }
     } S2IndexPluginS2D;
 
-    bool run2DSphereGeoNear(const IndexDetails &id, BSONObj& cmdObj,
-                            const GeoNearArguments &parsedArgs, string& errmsg,
-                            BSONObjBuilder& result) {
-        S2IndexType *idxType = static_cast<S2IndexType*>(id.getSpec().getType());
-        verify(&id == idxType->getDetails());
-
-        vector<string> geoFieldNames;
-        idxType->getGeoFieldNames(&geoFieldNames);
-
-        // NOTE(hk): If we add a new argument to geoNear, we could have a
-        // 2dsphere index with multiple indexed geo fields, and the geoNear
-        // could pick the one to run over.  Right now, we just require one.
-        uassert(16552, "geoNear requires exactly one indexed geo field", 1 == geoFieldNames.size());
-        NearQuery nearQuery(geoFieldNames[0]);
-        uassert(16679, "Invalid geometry given as arguments to geoNear: " + cmdObj.toString(),
-                nearQuery.parseFromGeoNear(cmdObj, idxType->getParams().radius));
-        uassert(16683, "geoNear on 2dsphere index requires spherical",
-                parsedArgs.isSpherical);
-
-        // NOTE(hk): For a speedup, we could look through the query to see if
-        // we've geo-indexed any of the fields in it.
-        vector<GeoQuery> regions;
-
-        scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(),
-            idxType->getDetails(), parsedArgs.query, nearQuery, regions, idxType->getParams()));
-
-        double totalDistance = 0;
-        BSONObjBuilder resultBuilder(result.subarrayStart("results"));
-        double farthestDist = 0;
-
-        int results;
-        for (results = 0; results < parsedArgs.numWanted && cursor->ok(); ++results) {
-            double dist = cursor->currentDistance();
-            // If we got the distance in radians, output it in radians too.
-            if (nearQuery.fromRadians) { dist /= idxType->getParams().radius; }
-            dist *= parsedArgs.distanceMultiplier;
-            totalDistance += dist;
-            if (dist > farthestDist) { farthestDist = dist; }
-
-            BSONObjBuilder oneResultBuilder(
-                resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
-            oneResultBuilder.append("dis", dist);
-            if (parsedArgs.includeLocs) {
-                BSONElementSet geoFieldElements;
-                cursor->current().getFieldsDotted(geoFieldNames[0], geoFieldElements, false);
-                for (BSONElementSet::iterator oi = geoFieldElements.begin();
-                        oi != geoFieldElements.end(); ++oi) {
-                    if (oi->isABSONObj()) {
-                        oneResultBuilder.appendAs(*oi, "loc");
-                    }
-                }
-            }
-
-            oneResultBuilder.append("obj", cursor->current());
-            oneResultBuilder.done();
-            cursor->advance();
-        }
-
-        resultBuilder.done();
-
-        BSONObjBuilder stats(result.subobjStart("stats"));
-        stats.append("time", cc().curop()->elapsedMillis());
-        stats.appendNumber("nscanned", cursor->nscanned());
-        stats.append("avgDistance", totalDistance / results);
-        stats.append("maxDistance", farthestDist);
-        stats.done();
-
-        return true;
-    }
 }  // namespace mongo

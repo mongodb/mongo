@@ -18,8 +18,6 @@
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {
-    // Thanks, Wikipedia.
-    const double S2IndexingParams::kRadiusOfEarthInMeters = (6378.1 * 1000);
 
     static string myitoa(int d) {
         stringstream ss;

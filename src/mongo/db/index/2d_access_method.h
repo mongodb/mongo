@@ -36,6 +36,7 @@ namespace mongo {
         class GeoCircleBrowse;
         class GeoBoxBrowse;
         class GeoPolygonBrowse;
+        class TwoDGeoNearRunner;
     }
 
     class TwoDAccessMethod : public BtreeBasedAccessMethod {
@@ -59,6 +60,7 @@ namespace mongo {
         friend class twod_internal::GeoCircleBrowse;
         friend class twod_internal::GeoBoxBrowse;
         friend class twod_internal::GeoPolygonBrowse;
+        friend class twod_internal::TwoDGeoNearRunner;
 
         BtreeInterface* getInterface() { return _interface; }
         IndexDescriptor* getDescriptor() { return _descriptor; }
