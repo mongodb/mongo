@@ -4,7 +4,6 @@ AM_CPPFLAGS = -I$(top_builddir) \
 noinst_LTLIBRARIES = libwiredtiger_kvs_stec.la
 libwiredtiger_kvs_stec_la_SOURCES = kvs_stec.c
 libwiredtiger_kvs_stec_la_LIBADD = \
-    $(top_builddir)/libwiredtiger.la \
     -L$(STEC_KVS_PATH)/lib -lkvs -L$(BERKELEY_DB_PATH)/lib -ldb
 
 # libtool hack: noinst_LTLIBRARIES turns off building shared libraries as well
