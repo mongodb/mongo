@@ -178,10 +178,12 @@ copyin_key(WT_CURSOR *wt_cursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
+	WT_SESSION *session;
 	size_t size;
 	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	session = cursor->session;
 	r = &cursor->record;
 	ret = 0;
 
@@ -190,10 +192,12 @@ copyin_key(WT_CURSOR *wt_cursor)
 	 * The underlying KVS library data fields aren't const.
 	 */
 	if (cursor->config_recno) {
-		if ((ret = wiredtiger_pack_uint_raw(
-		    r->key, wt_cursor->recno, &size)) != 0)
+		if ((ret = wt_ext->struct_size(wt_ext, session,
+		    &size, "r", wt_cursor->recno)) != 0 ||
+		    (ret = wt_ext->struct_pack(wt_ext, session,
+		    r->key, sizeof(r->key), "r", wt_cursor->recno)) != 0)
 			return (ret);
-		r->key_len = (unsigned long)size;
+		r->key_len = size;
 	} else {
 		r->key = (char *)wt_cursor->key.data;
 		r->key_len = (unsigned long)wt_cursor->key.size;
@@ -208,17 +212,19 @@ copyin_key(WT_CURSOR *wt_cursor)
 static INLINE int
 copyout_key(WT_CURSOR *wt_cursor)
 {
-	CURSOR *cursor;
 	struct kvs_record *r;
+	CURSOR *cursor;
+	WT_SESSION *session;
 	int ret;
 
 	cursor = (CURSOR *)wt_cursor;
+	session = cursor->session;
 	r = &cursor->record;
 	ret = 0;
 
 	if (cursor->config_recno) {
-		if ((ret =
-		    wiredtiger_unpack_uint_raw(r->key, &wt_cursor->recno)) != 0)
+		if ((ret = wt_ext->struct_unpack(wt_ext, session,
+		    r->key, sizeof(r->key), "r", &wt_cursor->recno)) != 0)
 			return (ret);
 	} else {
 		wt_cursor->key.data = r->key;
@@ -516,8 +522,9 @@ kvs_recno_alloc(WT_CURSOR *wt_cursor)
 		    &cursor->record, (unsigned long)0, (unsigned long)0)) != 0)
 			goto err;
 
-		if ((ret = wiredtiger_unpack_uint_raw(
-		    r->key, &cursor->data_source->append_recno)) != 0)
+		if ((ret = wt_ext->struct_unpack(wt_ext, session,
+		    r->key, sizeof(r->key),
+		    "r", &cursor->data_source->append_recno)) != 0)
 			goto err;
 	}
 

@@ -1684,26 +1684,6 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
  */
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 
-/*!
- * Pack an unsigned integer into a buffer; the buffer must be at least 9
- * bytes in length.
- *
- * @param buffer the buffer
- * @param u an unsigned integer to pack
- * @param[out] sizep the returned length
- * @errors
- */
-int wiredtiger_pack_uint_raw(void *buffer, uint64_t u, size_t *sizep);
-
-/*!
- * Unpack an unsigned integer from a buffer.
- *
- * @param buffer the buffer
- * @param[out] up the returned unsigned integer
- * @errors
- */
-int wiredtiger_unpack_uint_raw(const void *buffer, uint64_t *up);
-
 #endif /* !defined(SWIG) */
 /*!
  * @}
