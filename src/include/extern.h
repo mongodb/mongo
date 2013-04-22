@@ -882,29 +882,15 @@ extern int __wt_struct_check(WT_SESSION_IMPL *session,
     size_t len,
     int *fixedp,
     uint32_t *fixed_lenp);
-extern int __wt_struct_sizev( WT_SESSION_IMPL *session,
-    size_t *sizep,
-    const char *fmt,
-    va_list ap);
 extern int __wt_struct_size(WT_SESSION_IMPL *session,
     size_t *sizep,
     const char *fmt,
     ...);
-extern int __wt_struct_packv(WT_SESSION_IMPL *session,
-    void *buffer,
-    size_t size,
-    const char *fmt,
-    va_list ap);
 extern int __wt_struct_pack(WT_SESSION_IMPL *session,
     void *buffer,
     size_t size,
     const char *fmt,
     ...);
-extern int __wt_struct_unpackv(WT_SESSION_IMPL *session,
-    const void *buffer,
-    size_t size,
-    const char *fmt,
-    va_list ap);
 extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     const void *buffer,
     size_t size,
