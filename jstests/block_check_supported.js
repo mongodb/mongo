@@ -27,6 +27,7 @@ var doTest = function () {
     print('Testing workingSet and indexCounters portions of serverStatus');
     var hostInfo = db.hostInfo();
     var isXP = (hostInfo.os.name == 'Windows XP') ? true : false;
+    var isEmpty = (hostInfo.os.name == '') ? true : false;
 
     // Check that the serverStatus command returns something for these sub-documents
     //
@@ -55,6 +56,23 @@ var doTest = function () {
                   ' did not return the expected value');
         expectedResult = { note: 'not supported on this platform' };
         print('Testing db.serverStatus().indexCounters on Windows XP -- expecting ' +
+              tojsononeline(expectedResult));
+        assert.eq(expectedResult, indexCounters_1,
+                  'Test FAILED: db.serverStatus().indexCounters' +
+                  ' did not return the expected value');
+    }
+    else if (isEmpty) {
+        // Until SERVER-9325 is fixed, Solaris/SmartOS will also be missing this data; make sure
+        // that we don't get bogus data back
+        //
+        expectedResult = { info: 'not supported' };
+        print('Testing db.serverStatus({workingSet:1}).workingSet on "" (Solaris?) -- expecting ' +
+              tojsononeline(expectedResult));
+        assert.eq(expectedResult, workingSet_1,
+                  'Test FAILED: db.serverStatus({workingSet:1}).workingSet' +
+                  ' did not return the expected value');
+        expectedResult = { note: 'not supported on this platform' };
+        print('Testing db.serverStatus().indexCounters on "" (Solaris?) -- expecting ' +
               tojsononeline(expectedResult));
         assert.eq(expectedResult, indexCounters_1,
                   'Test FAILED: db.serverStatus().indexCounters' +
