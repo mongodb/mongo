@@ -101,7 +101,7 @@ namespace {
     }
 
     void SaslClientSession::setParameter(Parameter id, const StringData& value) {
-        fassert(16805, id >= 0 && id < numParameters);
+        fassert(16807, id >= 0 && id < numParameters);
         DataBuffer& buffer = _parameters[id];
         if (id == parameterPassword) {
             // The parameterPassword is stored as a sasl_secret_t inside its DataBuffer, while other
