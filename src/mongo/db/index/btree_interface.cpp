@@ -153,11 +153,14 @@ namespace mongo {
                                     DiskLoc* recordOut) const {
             verify(!bucket.isNull());
             const BtreeBucket<Version> *b = bucket.btree<Version>();
+
             int n = b->getN();
-            if (n == b->INVALID_N_SENTINEL) {
-                throw UserException(deletedBucketCode, "keyAt bucket deleted");
+
+            // If n is 0xffff the bucket was deleted.
+            if (keyOffset < 0 || keyOffset >= n || n == 0xffff || !b->isUsed(keyOffset)) {
+                return;
             }
-            dassert( n >= 0 && n < 10000 );
+
             if (keyOffset >= n) {
                 *keyOut = BSONObj();
                 *recordOut = DiskLoc();
