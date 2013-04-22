@@ -357,9 +357,6 @@ namespace mongo {
                         d->paddingFits();
                     }
                     else {
-                        if ( rs )
-                            rs->goingToDelete( onDisk );
-
                         BSONObj newObj = mss->createNewFromMods();
                         checkTooLarge(newObj);
                         DiskLoc newLoc = theDataFileMgr.updateRecord(ns,
