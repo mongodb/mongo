@@ -16,11 +16,13 @@ extern "C" {
 
 #if !defined(SWIG)
 
-/*! @addtogroup wt_ext
+/*!
+ * @addtogroup wt_ext
  * @{
  */
 
-/*! Table of WiredTiger extension methods.
+/*!
+ * Table of WiredTiger extension methods.
  *
  * This structure is used to provide a set of WiredTiger methods to extension
  * modules without needing to link the modules with the WiredTiger library.
@@ -175,6 +177,48 @@ struct __wt_extension_api {
 	 */
 	int (*config_scan_next)(WT_EXTENSION_API *wt_api,
 	    WT_CONFIG_SCAN *scan, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
+
+	/*!
+	 * Pack a structure into a buffer.
+	 * See ::wiredtiger_struct_pack for details.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @param buffer a pointer to a packed byte array
+	 * @param size the number of valid bytes in the buffer
+	 * @param format the data format, see @ref packing
+	 * @errors
+	 */
+	int (*struct_pack)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    void *buffer, size_t size, const char *format, ...);
+
+	/*!
+	 * Calculate the size required to pack a structure.
+	 * See ::wiredtiger_struct_size for details.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @param sizep a location where the number of bytes needed for the
+	 * matching call to WT_EXTENSION_API::struct_pack is returned
+	 * @param format the data format, see @ref packing
+	 * @errors
+	 */
+	int (*struct_size)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    size_t *sizep, const char *format, ...);
+
+	/*!
+	 * Unpack a structure from a buffer.
+	 * See ::wiredtiger_struct_unpack for details.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @param buffer a pointer to a packed byte array
+	 * @param size the number of valid bytes in the buffer
+	 * @param format the data format, see @ref packing
+	 * @errors
+	 */
+	int (*struct_unpack)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    const void *buffer, size_t size, const char *format, ...);
 };
 
 /*!

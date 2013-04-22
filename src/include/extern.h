@@ -877,34 +877,37 @@ extern int __wt_thread_create(WT_SESSION_IMPL *session,
 extern int __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid);
 extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern void __wt_yield(void);
+extern int __wt_ext_struct_pack(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    void *buffer,
+    size_t size,
+    const char *fmt,
+    ...);
+extern int __wt_ext_struct_size(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    size_t *sizep,
+    const char *fmt,
+    ...);
+extern int __wt_ext_struct_unpack(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const void *buffer,
+    size_t size,
+    const char *fmt,
+    ...);
 extern int __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt,
     size_t len,
     int *fixedp,
     uint32_t *fixed_lenp);
-extern int __wt_struct_sizev( WT_SESSION_IMPL *session,
-    size_t *sizep,
-    const char *fmt,
-    va_list ap);
 extern int __wt_struct_size(WT_SESSION_IMPL *session,
     size_t *sizep,
     const char *fmt,
     ...);
-extern int __wt_struct_packv(WT_SESSION_IMPL *session,
-    void *buffer,
-    size_t size,
-    const char *fmt,
-    va_list ap);
 extern int __wt_struct_pack(WT_SESSION_IMPL *session,
     void *buffer,
     size_t size,
     const char *fmt,
     ...);
-extern int __wt_struct_unpackv(WT_SESSION_IMPL *session,
-    const void *buffer,
-    size_t size,
-    const char *fmt,
-    va_list ap);
 extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     const void *buffer,
     size_t size,
