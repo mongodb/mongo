@@ -231,6 +231,14 @@ namespace mongo {
                 }
 
                 while ( 1 ) {
+
+                    if ( !_isMaster() ) {
+                        // this should be in the while loop in case we step down
+                        errmsg = "not master";
+                        result.append( "wnote", "no longer primary" );
+                        return false;
+                    }
+
                     // check this first for w=0 or w=1
                     if ( opReplicatedEnough( op, e ) ) {
                         break;
