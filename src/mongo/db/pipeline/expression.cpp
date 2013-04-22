@@ -2379,27 +2379,35 @@ namespace mongo {
 
         Value ExpressionSplit::evaluate(const Document& pDocument) const {
             checkArgCount(2);
-            Value pString1(vpOperand[0]->evaluate(pDocument));
-            Value pString2(vpOperand[1]->evaluate(pDocument));
+            Value string1 = vpOperand[0]->evaluate(pDocument);
+            Value string2 = vpOperand[1]->evaluate(pDocument);
 
 
-            string toSplit = pString1.coerceToString();
-            string pattern = pString2.coerceToString();
+            string toSplit = string1.coerceToString();
+            string pattern = string2.coerceToString();
 
 
             string::size_type length = pattern.length();
             string::size_type limit = toSplit.length();
             vector<Value> result;
 
-            if ( pattern != "" ){
+            if ( pattern != "" && limit >= length ){
 				size_t current;
 				string::size_type next = -1;
 				do{
 					current = next + length;
-					next = toSplit.find_first_of(pattern, current);
-					result.push_back(Value::createString(toSplit.substr( current, next - current )));
+					next = toSplit.find(pattern, current);
+					Value toPush = Value::createString(toSplit.substr( current, next - current + length ));
+					if ( toPush.coerceToString() != "" ){
+						result.push_back(toPush);
+					}
 				}while ( next != string::npos);
             } else {
+            	result.push_back(Value::createString(toSplit));
+            }
+
+            //case the pattern is not found we return an array with the original value.
+            if ( result.size() == 0 ){
             	result.push_back(Value::createString(toSplit));
             }
 
