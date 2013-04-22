@@ -99,6 +99,7 @@ namespace mongo {
                 
                 _currentlyUpdatingCache = true;
                 for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
+                    Client::GodScope gs;
                     db.update( NS , i->first , i->second , true );
                 }
                 _currentlyUpdatingCache = false;
