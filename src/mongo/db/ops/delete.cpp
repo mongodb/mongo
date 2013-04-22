@@ -129,9 +129,6 @@ namespace mongo {
                 }
             }
 
-            if ( rs )
-                rs->goingToDelete( rloc.obj() /*cc->c->current()*/ );
-
             theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
             nDeleted++;
             if ( foundAllResults ) {
