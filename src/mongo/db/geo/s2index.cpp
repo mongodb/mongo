@@ -138,50 +138,6 @@ namespace mongo {
             }
         }
 
-        // Entry point for a search.
-        virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
-                                             int numWanted) const {
-            shared_ptr<Cursor> c;
-            verify(0);
-            return c;
-        }
-
-        virtual IndexSuitability suitability(const FieldRangeSet& queryConstraints,
-                                             const BSONObj& order) const {
-            BSONObj query = queryConstraints.originalQuery();
-
-            for (size_t i = 0; i < _fields.size(); ++i) {
-                const IndexedField &field = _fields[i];
-                if (IndexedField::GEO != field.type) { continue; }
-
-                BSONElement e = query.getFieldDotted(field.name);
-                // Some locations are given to us as arrays.  Sigh.
-                if (Array == e.type()) { return HELPFUL; }
-                if (Object != e.type()) { continue; }
-                // getGtLtOp is horribly misnamed and really means get the operation.
-                switch (e.embeddedObject().firstElement().getGtLtOp()) {
-                    case BSONObj::opNEAR:
-                        return OPTIMAL;
-                    case BSONObj::opWITHIN: {
-                        BSONElement elt = e.embeddedObject().firstElement();
-                        if (Object != elt.type()) { continue; }
-                        const char* fname = elt.embeddedObject().firstElement().fieldName();
-                        if (mongoutils::str::equals("$geometry", fname)
-                            || mongoutils::str::equals("$centerSphere", fname)) {
-                            return OPTIMAL;
-                        } else {
-                            return USELESS;
-                        }
-                    }
-                    case BSONObj::opGEO_INTERSECTS:
-                        return OPTIMAL;
-                    default:
-                        return USELESS;
-                }
-            }
-            return USELESS;
-        }
-
         const IndexDetails* getDetails() const { return _spec->getDetails(); }
 
         // These are used by the geoNear command.  geoNear constructs its own cursor.

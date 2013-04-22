@@ -18,6 +18,7 @@
 
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/cmdline.h"
+#include "mongo/db/index_selection.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/emulated_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -115,8 +116,8 @@ namespace mongo {
 
         // If the parsing or index indicates this is a special query, don't continue the processing
         if (!_special.empty() ||
-            ( _index->getSpec().getType() &&
-             _index->getSpec().getType()->suitability( _frs, _order ) != USELESS ) ) {
+            ( _index->getSpec().getType() && (USELESS !=
+                IndexSelection::isSuitableFor(_index->getSpec().keyPattern, _frs, _order)))) {
 
             _type  = _index->getSpec().getType();
             if (_special.empty()) _special = _index->getSpec().getType()->getPlugin()->getName();

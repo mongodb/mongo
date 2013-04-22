@@ -17,7 +17,6 @@
 #include "mongo/db/index/2d_index_cursor.h"
 
 #include "mongo/db/btreecursor.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_interface.h"
 #include "mongo/db/index/catalog_hack.h"
@@ -1821,7 +1820,6 @@ namespace mongo {
         arr.done();
 
         BSONObjBuilder stats(result.subobjStart("stats"));
-        stats.append("time", cc().curop()->elapsedMillis());
         stats.appendNumber("btreelocs", gs._nscanned);
         stats.appendNumber("nscanned", gs._lookedAt);
         stats.appendNumber("objectsLoaded", gs._objectsLoaded);

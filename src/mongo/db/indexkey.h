@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-#include "diskloc.h"
-#include "jsobj.h"
 #include <map>
+
+#include "mongo/db/diskloc.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
@@ -57,16 +58,6 @@ namespace mongo {
          */
         virtual BSONElement missingField() const;
 
-        /* Full semantics of numWanted:
-         * numWanted == 0 : Return any number of results, but try to return in batches of 101.
-         * numWanted == 1 : Return exactly one result.
-         * numWanted  > 1 : Return any number of results, but try to return in batches of numWanted.
-         *
-         * In practice, your cursor can ignore numWanted, as enforcement of limits is done
-         * by the caller.
-         */
-        virtual shared_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const = 0;
-
         /** optional op : changes query to match what's in the index */
         virtual BSONObj fixKey( const BSONObj& in ) { return in; }
 
@@ -77,16 +68,6 @@ namespace mongo {
         const IndexPlugin * getPlugin() const { return _plugin; }
 
         const BSONObj& keyPattern() const;
-
-        /* Determines the suitability level of this index for answering a given query. The query is
-         * represented as a set of constraints given by a FieldRangeSet, and a desired ordering of
-         * the output.
-         *
-         * Note: it is the responsibility of the caller to pass in the correct FieldRangeSet, which
-         * may depend upon whether this is a single or multi-key index at the time of calling.
-         */
-        virtual IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
-                                              const BSONObj& order ) const;
 
         virtual bool scanAndOrderRequired( const BSONObj& query , const BSONObj& order ) const ;
 
@@ -149,9 +130,9 @@ namespace mongo {
          */
         static bool existedBefore24(const string& name) {
             return name.empty()
-                || name == "2d"
-                || name == "geoHaystack"
-                || name == "hashed"
+                || name == IndexNames::GEO_2D
+                || name == IndexNames::GEO_HAYSTACK
+                || name == IndexNames::HASHED
                 ;
         }
 
@@ -224,9 +205,6 @@ namespace mongo {
             return _details;
         }
 
-        IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
-                                      const BSONObj& order ) const ;
-
         bool isSparse() const { return _sparse; }
 
         string toString() const;
@@ -235,9 +213,6 @@ namespace mongo {
 
         int indexVersion() const;
         
-        IndexSuitability _suitability( const FieldRangeSet& queryConstraints ,
-                                       const BSONObj& order ) const ;
-
         BSONSizeTracker _sizeTracker;
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;

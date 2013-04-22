@@ -20,6 +20,7 @@
 #include <set>
 
 #include "mongo/db/cursor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_cursor.h"
@@ -27,10 +28,6 @@
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
-
-    static const string SPHERE_2D_NAME = "2dsphere";
-    static const string HASH_NAME = "hashed";
-    static const string GEO_2D_NAME = "2d";
 
     /**
      * This class is a crutch to help migrate from the old everything-is-a-Cursor world to the new
@@ -43,6 +40,14 @@ namespace mongo {
          * Create a new EmulatedCursor.
          * Takes ownership of the provided indexAccessMethod indexCursor.
          * Takes ownership of the IndexDescriptor inside the indexAccessMethod.
+         *
+         * Full semantics of numWanted:
+         * numWanted == 0 : Return any number of results, but try to return in batches of 101.
+         * numWanted == 1 : Return exactly one result.
+         * numWanted  > 1 : Return any number of results, but try to return in batches of numWanted.
+         *
+         * In practice, your cursor can ignore numWanted, as enforcement of limits is done
+         * by the caller.
          */
         static EmulatedCursor* make(IndexDescriptor* descriptor,
                                     IndexAccessMethod* indexAccessMethod,
@@ -147,13 +152,13 @@ namespace mongo {
             options.numWanted = numWanted;
             cursor->setOptions(options);
 
-            if (HASH_NAME == _pluginName) {
+            if (IndexNames::HASHED == _pluginName) {
                 _supportYields = true;
                 _supportGetMore = true;
                 _modifiedKeys = true;
                 _shouldGetSetDup = false;
                 _autoDedup = true;
-            } else if (SPHERE_2D_NAME == _pluginName) {
+            } else if (IndexNames::GEO_2DSPHERE == _pluginName) {
                 _supportYields = true;
                 _supportGetMore = true;
                 _modifiedKeys = true;
@@ -161,7 +166,7 @@ namespace mongo {
                 // to not de-dup themselves.
                 _shouldGetSetDup = true;
                 _autoDedup = false;
-            } else if (GEO_2D_NAME == _pluginName) {
+            } else if (IndexNames::GEO_2D == _pluginName) {
                 _supportYields = false;
                 _supportGetMore = true;
                 _modifiedKeys = true;
@@ -190,7 +195,7 @@ namespace mongo {
                 _nscanned = 0;
             }
 
-            if (HASH_NAME == _pluginName) {
+            if (IndexNames::HASHED == _pluginName) {
                 // Quoted from hashindex.cpp:
                 // Force a match of the query against the actual document by giving
                 // the cursor a matcher with an empty indexKeyPattern.  This ensures the
@@ -198,7 +203,7 @@ namespace mongo {
                 // NOTE: this forcing is necessary due to potential hash collisions
                 _matcher = shared_ptr<CoveredIndexMatcher>(
                     new CoveredIndexMatcher(query, BSONObj()));
-            } else if (SPHERE_2D_NAME == _pluginName) {
+            } else if (IndexNames::GEO_2DSPHERE == _pluginName) {
                 // Technically, the non-geo indexed fields are in the key, though perhaps not in the
                 // exact format the matcher expects (arrays).  So, we match against all non-geo
                 // fields.  This could possibly be relaxed in some fashion in the future?  Requires
@@ -208,7 +213,7 @@ namespace mongo {
 
                 while (keyIt.more()) {
                     BSONElement e = keyIt.next();
-                    if (e.type() == String && SPHERE_2D_NAME == e.valuestr()) {
+                    if (e.type() == String && IndexNames::GEO_2DSPHERE == e.valuestr()) {
                         fieldsToNuke.append(e.fieldName(), "");
                     }
                 }
@@ -217,7 +222,7 @@ namespace mongo {
 
                 _matcher = shared_ptr<CoveredIndexMatcher>(
                     new CoveredIndexMatcher(filteredQuery, _keyPattern));
-            } else if (GEO_2D_NAME == _pluginName) {
+            } else if (IndexNames::GEO_2D == _pluginName) {
                 // No-op matcher.
                 _matcher = shared_ptr<CoveredIndexMatcher>(
                     new CoveredIndexMatcher(BSONObj(), BSONObj()));
@@ -225,7 +230,7 @@ namespace mongo {
         }
 
         void checkMultiKeyProperties() {
-            if (GEO_2D_NAME != _pluginName) {
+            if (IndexNames::GEO_2D != _pluginName) {
                 _isMultiKey = _shouldGetSetDup = _descriptor->isMultikey();
             }
         }

@@ -20,6 +20,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index/s2_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "third_party/s2/s2.h"
@@ -42,8 +43,6 @@ namespace {
 }  // namespace
 
 namespace mongo {
-
-    const string S2IndexingParams::SPHERE_2D_NAME = "2dsphere";
 
     // Thanks, Wikipedia.
     const double S2IndexingParams::kRadiusOfEarthInMeters = (6378.1 * 1000);
@@ -78,7 +77,7 @@ namespace mongo {
         BSONObjIterator i(descriptor->keyPattern());
         while (i.more()) {
             BSONElement e = i.next();
-            if (e.type() == String && S2IndexingParams::SPHERE_2D_NAME == e.valuestr()) {
+            if (e.type() == String && IndexNames::GEO_2DSPHERE == e.valuestr()) {
                 ++geoFields;
             }
         }
@@ -105,7 +104,7 @@ namespace mongo {
             obj.getFieldsDotted(e.fieldName(), fieldElements, false);
 
             BSONObjSet keysForThisField;
-            if (S2IndexingParams::SPHERE_2D_NAME == e.valuestr()) {
+            if (IndexNames::GEO_2DSPHERE == e.valuestr()) {
                 getGeoKeys(fieldElements, &keysForThisField);
             } else {
                 getLiteralKeys(fieldElements, &keysForThisField);

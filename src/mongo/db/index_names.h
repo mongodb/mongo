@@ -17,16 +17,23 @@
 #pragma once
 
 #include <string>
-#include <vector>
-
-#include "mongo/db/geo/hash.h"
 
 namespace mongo {
 
-    struct TwoDIndexingParams {
-        string geo;
-        vector<pair<string, int> > other;
-        shared_ptr<GeoHashConverter> geoHashConverter;
+    using std::string;
+
+    /**
+     * We use the string representation of index names all over the place, so we declare them all
+     * once here.
+     */
+    class IndexNames {
+    public:
+        static const string GEO_2D;
+        static const string GEO_HAYSTACK;
+        static const string GEO_2DSPHERE;
+        static const string TEXT;
+        static const string TEXT_INTERNAL;
+        static const string HASHED;
     };
 
 }  // namespace mongo

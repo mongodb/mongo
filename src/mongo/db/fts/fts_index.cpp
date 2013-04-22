@@ -48,14 +48,6 @@ namespace mongo {
             FTSIndexFormat::getKeys( _ftsSpec, obj, &keys );
         }
 
-        shared_ptr<Cursor> FTSIndex::newCursor( const BSONObj& query,
-                                                const BSONObj& order,
-                                                int numWanted ) const {
-            shared_ptr<Cursor> c;
-            verify(0);
-            return c;
-        }
-
 
         FTSIndexPlugin::FTSIndexPlugin() : IndexPlugin( INDEX_NAME ) {}
 

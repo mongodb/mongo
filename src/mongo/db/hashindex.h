@@ -64,21 +64,6 @@ namespace mongo {
         HashedIndexType( const IndexPlugin* plugin , const IndexSpec* spec );
         virtual ~HashedIndexType();
 
-        /* This index is only considered "HELPFUL" for a query
-         * if it's the union of at least one equality constraint on the
-         * hashed field.  Otherwise it's considered USELESS.
-         * Example queries (supposing the indexKey is {a : "hashed"}):
-         *   {a : 3}  HELPFUL
-         *   {a : 3 , b : 3} HELPFUL
-         *   {a : {$in : [3,4]}} HELPFUL
-         *   {a : {$gte : 3, $lte : 3}} HELPFUL
-         *   {} USELESS
-         *   {b : 3} USELESS
-         *   {a : {$gt : 3}} USELESS
-         */
-        IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
-                                      const BSONObj& order ) const;
-
         /* The input is "obj" which should have a field corresponding to the hashedfield.
          * The output is a BSONObj with a single BSONElement whose value is the hash
          * Eg if this is an index on "a" we have
@@ -92,13 +77,6 @@ namespace mongo {
         /* A field missing from a document is represented by the hash value of a null BSONElement.
          */
         BSONElement missingField() const { return _missingKey.firstElement(); }
-
-        /* The newCursor method works for suitable queries by generating a BtreeCursor
-         * using the hash of point-intervals parsed by FieldRangeSet.
-         * For unsuitable queries it just instantiates a btree cursor over the whole tree
-         */
-        shared_ptr<Cursor> newCursor( const BSONObj& query ,
-                const BSONObj& order , int numWanted ) const;
 
         /* Takes a BSONElement, seed and hashVersion, and outputs the
          * 64-bit hash used for this index

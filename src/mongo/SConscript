@@ -238,6 +238,7 @@ env.StaticLibrary("coredb", [
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",
+        "db/index_names.cpp",
         "db/keypattern.cpp",
         "db/matcher.cpp",
         "db/pipeline/accumulator.cpp",
@@ -287,6 +288,7 @@ env.StaticLibrary("coredb", [
 coreServerFiles = [ "db/client_basic.cpp",
                     "util/net/miniwebserver.cpp",
                     "db/indexkey.cpp",
+                    "db/index_selection.cpp",
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
                     ]

@@ -25,6 +25,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/keypattern.h"
 
 namespace mongo {
@@ -41,17 +42,17 @@ namespace mongo {
 
         static BtreeBasedAccessMethod* getBtreeBasedIndex(IndexDescriptor* desc) {
             string type = KeyPattern::findPluginName(desc->keyPattern());
-            if ("hashed" == type) {
+            if (IndexNames::HASHED == type) {
                 return new HashAccessMethod(desc);
-            } else if ("2dsphere" == type) {
+            } else if (IndexNames::GEO_2DSPHERE == type) {
                 return new S2AccessMethod(desc);
-            } else if ("text" == type || "_fts" == type) {
+            } else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
                 return new FTSAccessMethod(desc);
-            } else if ("geoHaystack" == type) {
+            } else if (IndexNames::GEO_HAYSTACK == type) {
                 return new HaystackAccessMethod(desc);
             } else if ("" == type) {
                 return new BtreeAccessMethod(desc);
-            } else if ("2d" == type) {
+            } else if (IndexNames::GEO_2D == type) {
                 return new TwoDAccessMethod(desc);
             } else {
                 cout << "Can't find index for keypattern " << desc->keyPattern() << endl;
@@ -62,17 +63,17 @@ namespace mongo {
 
         static IndexAccessMethod* getIndex(IndexDescriptor* desc) {
             string type = KeyPattern::findPluginName(desc->keyPattern());
-            if ("hashed" == type) {
+            if (IndexNames::HASHED == type) {
                 return new HashAccessMethod(desc);
-            } else if ("2dsphere" == type) {
+            } else if (IndexNames::GEO_2DSPHERE == type) {
                 return new S2AccessMethod(desc);
-            } else if ("text" == type || "_fts" == type) {
+            } else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
                 return new FTSAccessMethod(desc);
-            } else if ("geoHaystack" == type) {
+            } else if (IndexNames::GEO_HAYSTACK == type) {
                 return new HaystackAccessMethod(desc);
             } else if ("" == type) {
                 return new BtreeAccessMethod(desc);
-            } else if ("2d" == type) {
+            } else if (IndexNames::GEO_2D == type) {
                 return new TwoDAccessMethod(desc);
             } else {
                 cout << "Can't find index for keypattern " << desc->keyPattern() << endl;

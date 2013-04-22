@@ -214,55 +214,6 @@ namespace mongo {
 
         const IndexDetails* getDetails() const { return _spec->getDetails(); }
 
-        virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
-                                             int numWanted) const {
-            shared_ptr<Cursor> c;
-            verify(0);
-            return c;
-        }
-
-        virtual IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
-                                              const BSONObj& order ) const {
-            BSONObj query = queryConstraints.originalQuery();
-
-            BSONElement e = query.getFieldDotted(_geo.c_str());
-            switch (e.type()) {
-            case Object: {
-                BSONObj sub = e.embeddedObject();
-                switch (sub.firstElement().getGtLtOp()) {
-                case BSONObj::opNEAR:
-                    return OPTIMAL;
-                case BSONObj::opWITHIN: {
-                    // Don't return optimal if it's $within: {$geometry: ... }
-                    // because we will error out in that case, but the matcher
-                    // or 2dsphere index may handle it.
-                    BSONElement elt = sub.firstElement();
-                    if (Object == elt.type()) {
-                        BSONObjIterator it(elt.embeddedObject());
-                        while (it.more()) {
-                            BSONElement elt = it.next();
-                            if (mongoutils::str::equals("$geometry", elt.fieldName())) {
-                                return USELESS;
-                            }
-                        }
-                    }
-                    return OPTIMAL;
-                }
-                default:
-                    // We can try to match if there's no other indexing defined,
-                    // this is assumed a point
-                    return HELPFUL;
-                }
-            }
-            case Array:
-                // We can try to match if there's no other indexing defined,
-                // this is assumed a point
-                return HELPFUL;
-            default:
-                return USELESS;
-            }
-        }
-
         const GeoHashConverter& getConverter() const { return *_geoHashConverter; }
 
         // XXX: make private with a getter

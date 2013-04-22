@@ -14,19 +14,13 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
-
-#include <string>
-#include <vector>
-
-#include "mongo/db/geo/hash.h"
+#include "mongo/db/index_names.h"
 
 namespace mongo {
-
-    struct TwoDIndexingParams {
-        string geo;
-        vector<pair<string, int> > other;
-        shared_ptr<GeoHashConverter> geoHashConverter;
-    };
-
+    const string IndexNames::GEO_2D = "2d";
+    const string IndexNames::GEO_HAYSTACK = "geoHaystack";
+    const string IndexNames::GEO_2DSPHERE = "2dsphere";
+    const string IndexNames::TEXT = "text";
+    const string IndexNames::TEXT_INTERNAL = "_fts";
+    const string IndexNames::HASHED = "hashed";
 }  // namespace mongo

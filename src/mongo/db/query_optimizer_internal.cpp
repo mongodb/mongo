@@ -20,6 +20,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/db.h"
+#include "mongo/db/index_selection.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/query_plan_selection_policy.h"
@@ -544,7 +545,8 @@ namespace mongo {
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
                 if (special.has(spec.getTypeName()) &&
-                    spec.suitability( _qps.frsp().frsForIndex(d, j), _qps.order() ) != USELESS ) {
+                    (USELESS != IndexSelection::isSuitableFor(spec.keyPattern,
+                        _qps.frsp().frsForIndex(d, j), _qps.order()))) {
                     uassert( 16330, "'special' query operator not allowed", _allowSpecial );
                     _qps.setSinglePlan( newPlan( d, j, BSONObj(), BSONObj(), spec.getTypeName()));
                     return true;
@@ -1554,9 +1556,8 @@ namespace mongo {
             // No matches are possible in the index so the index may be useful.
             return true;   
         }
-
-        return d->idx( idxNo ).getSpec().suitability( frsp.frsForIndex( d , idxNo ) , order )
-               != USELESS;
+        return USELESS != IndexSelection::isSuitableFor(keyPattern, frsp.frsForIndex( d , idxNo ) ,
+                                           order );
     }
     
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair& frsp,

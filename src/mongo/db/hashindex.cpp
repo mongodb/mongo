@@ -69,13 +69,6 @@ namespace mongo {
 
     HashedIndexType::~HashedIndexType() { }
 
-    IndexSuitability HashedIndexType::suitability( const FieldRangeSet& queryConstraints ,
-                                                   const BSONObj& order ) const {
-        if ( queryConstraints.isPointIntervalSet( _hashedField ) )
-            return HELPFUL;
-        return USELESS;
-    }
-
     void HashedIndexType::getKeys( const BSONObj &obj, BSONObjSet &keys ) const {
         string hashedFieldCopy = string( _hashedField );
         const char* hashedFieldCopyPtr = hashedFieldCopy.c_str();
@@ -90,13 +83,6 @@ namespace mongo {
         else if (! _isSparse ) {
             keys.insert( _missingKey.copy() );
         }
-    }
-
-    shared_ptr<Cursor> HashedIndexType::newCursor(const BSONObj& query, const BSONObj& order,
-                                                  int numWanted) const {
-        shared_ptr<Cursor> c;
-        verify(0);
-        return c;
     }
 
     /* This class registers HASHED_INDEX_NAME in a global map of special index types

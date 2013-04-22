@@ -23,6 +23,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_index_cursor.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -106,7 +107,7 @@ namespace mongo {
 
             vector<int> idxs;
 
-            d->findIndexByType("2d", idxs);
+            d->findIndexByType(IndexNames::GEO_2D, idxs);
             if (idxs.size() > 1) {
                 errmsg = "more than one 2d index, not sure which to run geoNear on";
                 return false;
@@ -114,10 +115,14 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                return twod_internal::TwoDGeoNearRunner::run2DGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
+                twod_internal::TwoDGeoNearRunner::run2DGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
+                BSONObjBuilder stats(result.subobjStart("stats"));
+                stats.append("time", cc().curop()->elapsedMillis());
+                stats.done();
+                return true;
             }
 
-            d->findIndexByType("2dsphere", idxs);
+            d->findIndexByType(IndexNames::GEO_2DSPHERE, idxs);
             if (idxs.size() > 1) {
                 errmsg = "more than one 2dsphere index, not sure which to run geoNear on";
                 return false;
@@ -125,7 +130,11 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                return run2DSphereGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
+                run2DSphereGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
+                BSONObjBuilder stats(result.subobjStart("stats"));
+                stats.append("time", cc().curop()->elapsedMillis());
+                stats.done();
+                return true;
             }
 
             errmsg = "no geo indices for geoNear";
@@ -146,7 +155,7 @@ namespace mongo {
             BSONObjIterator i(descriptor->keyPattern());
             while (i.more()) {
                 BSONElement e = i.next();
-                if (e.type() == String && S2IndexingParams::SPHERE_2D_NAME == e.valuestr()) {
+                if (e.type() == String && IndexNames::GEO_2DSPHERE == e.valuestr()) {
                     geoFieldNames.push_back(e.fieldName());
                 }
             }
@@ -213,7 +222,6 @@ namespace mongo {
             resultBuilder.done();
 
             BSONObjBuilder stats(result.subobjStart("stats"));
-            stats.append("time", cc().curop()->elapsedMillis());
             stats.appendNumber("nscanned", nic->nscanned());
             stats.append("avgDistance", totalDistance / results);
             stats.append("maxDistance", farthestDist);

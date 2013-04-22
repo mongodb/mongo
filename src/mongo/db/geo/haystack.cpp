@@ -176,14 +176,6 @@ namespace mongo {
             }
         }
 
-        // XXX: Who could call this and how do they know not to actually do so?
-        shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
-                                     int numWanted) const {
-            shared_ptr<Cursor> c;
-            verify(0);
-            return c;
-        }
-
         void searchCommand(NamespaceDetails* nsd,
                             const BSONObj& n /*near*/, double maxDistance, const BSONObj& search,
                             BSONObjBuilder& result, unsigned limit) {

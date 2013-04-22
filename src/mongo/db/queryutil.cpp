@@ -16,6 +16,7 @@
 #include "pch.h"
 
 #include "mongo/db/queryutil.h"
+#include "mongo/db/index_names.h"
 
 #include "pdfile.h"
 #include "../util/startup_test.h"
@@ -438,15 +439,15 @@ namespace mongo {
             break;
         }
         case BSONObj::opWITHIN:
-            _special.add("2d", SpecialIndices::NO_INDEX_REQUIRED);
-            _special.add("2dsphere", SpecialIndices::NO_INDEX_REQUIRED);
+            _special.add(IndexNames::GEO_2D, SpecialIndices::NO_INDEX_REQUIRED);
+            _special.add(IndexNames::GEO_2DSPHERE, SpecialIndices::NO_INDEX_REQUIRED);
             break;
         case BSONObj::opNEAR:
-            _special.add("2d", SpecialIndices::INDEX_REQUIRED);
-            _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
+            _special.add(IndexNames::GEO_2D, SpecialIndices::INDEX_REQUIRED);
+            _special.add(IndexNames::GEO_2DSPHERE, SpecialIndices::INDEX_REQUIRED);
             break;
         case BSONObj::opGEO_INTERSECTS:
-            _special.add("2dsphere", SpecialIndices::NO_INDEX_REQUIRED);
+            _special.add(IndexNames::GEO_2DSPHERE, SpecialIndices::NO_INDEX_REQUIRED);
             break;
         case BSONObj::opEXISTS: {
             if ( !existsSpec ) {

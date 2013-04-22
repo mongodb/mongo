@@ -469,41 +469,6 @@ namespace mongo {
         }
     }
 
-
-    IndexSuitability IndexSpec::suitability( const FieldRangeSet& queryConstraints ,
-                                             const BSONObj& order ) const {
-        if ( _indexType.get() )
-            return _indexType->suitability( queryConstraints , order );
-        return _suitability( queryConstraints , order );
-    }
-
-    IndexSuitability IndexSpec::_suitability( const FieldRangeSet& queryConstraints ,
-                                              const BSONObj& order ) const {
-        // This is a quick first pass to determine the suitability of the index.  It produces some
-        // false positives (returns HELPFUL for some indexes which are not particularly). When we
-        // return HELPFUL a more precise determination of utility is done by the query optimizer.
-
-        // check whether any field in the index is constrained at all by the query
-        BSONForEach( elt, keyPattern ){
-            const FieldRange& frange = queryConstraints.range( elt.fieldName() );
-            if( ! frange.universal() )
-                return HELPFUL;
-        }
-        // or whether any field in the desired sort order is in the index
-        set<string> orderFields;
-        order.getFieldNames( orderFields );
-        BSONForEach( k, keyPattern ) {
-            if ( orderFields.find( k.fieldName() ) != orderFields.end() )
-                return HELPFUL;
-        }
-        return USELESS;
-    }
-
-    IndexSuitability IndexType::suitability( const FieldRangeSet& queryConstraints ,
-                                             const BSONObj& order ) const {
-        return _spec->_suitability( queryConstraints , order );
-    }
-    
     int IndexSpec::indexVersion() const {
         if ( !info.hasField( "v" ) ) {
             return DefaultIndexVersionNumber;

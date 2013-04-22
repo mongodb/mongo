@@ -40,11 +40,6 @@ namespace mongo {
 
             void getKeys( const BSONObj& obj, BSONObjSet& keys) const;
 
-            /* newCursor is pure Virtual in IndexType so it has to be redefined in FTSIndex */
-            shared_ptr<Cursor> newCursor( const BSONObj& query,
-                                          const BSONObj& order,
-                                          int numWanted ) const;
-
             const FTSSpec& getFtsSpec() const { return _ftsSpec; }
 
         private:
