@@ -59,8 +59,8 @@ extern WT_EXTENSION_API *wt_api;
 
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
-#define	KVS_STEC_PATH							\
-	EXTPATH "test/kvs_stec/.libs/libwiredtiger_kvs_stec.so"
+#define	MEMRATA_PATH							\
+	EXTPATH "test/memrata/.libs/libwiredtiger_memrata.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"

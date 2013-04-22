@@ -89,7 +89,7 @@ wts_open(void)
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(KVS_BDB_PATH, R_OK) == 0 ? KVS_BDB_PATH : "",
-	    access(KVS_STEC_PATH, R_OK) == 0 ? KVS_STEC_PATH : "",
+	    access(MEMRATA_PATH, R_OK) == 0 ? MEMRATA_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
@@ -206,7 +206,7 @@ wts_open(void)
 	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
 	/* Configure KVS devices. */
-	if (DATASOURCE("kvsstec"))
+	if (DATASOURCE("memrata"))
 		p += snprintf(
 		    p, (size_t)(end - p), ",kvs_devices=[RUNDIR/KVS]");
 
@@ -236,7 +236,7 @@ wts_dump(const char *tag, int dump_bdb)
 	char cmd[256];
 
 	/* Data-sources that don't support dump comparisons. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		return;
 
 	track("dump files and compare", 0ULL, NULL);
@@ -264,7 +264,7 @@ wts_salvage(void)
 	int ret;
 
 	/* Data-sources that don't support salvage. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;
@@ -297,7 +297,7 @@ wts_verify(const char *tag)
 	int ret;
 
 	/* Data-sources that don't support dump comparisons. */
-	if (DATASOURCE("kvsstec"))
+	if (DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;
@@ -334,7 +334,7 @@ wts_stats(void)
 	int ret;
 
 	/* Data-sources that don't support statistics. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;

@@ -48,13 +48,13 @@
 #undef	ERET
 #define	ERET(session, v, ...) do {					\
 	(void)wt_ext->err_printf(					\
-	    wt_ext, session, "kvs_stec: " __VA_ARGS__);			\
+	    wt_ext, session, "memrata: " __VA_ARGS__);			\
 	return (v);							\
 } while (0)
 #undef	ESET
 #define	ESET(session, v, ...) do {					\
 	(void)wt_ext->err_printf(					\
-	    wt_ext, session, "kvs_stec: " __VA_ARGS__);			\
+	    wt_ext, session, "memrata: " __VA_ARGS__);			\
 	if (ret == 0)							\
 		ret = v;						\
 } while (0)
@@ -724,7 +724,7 @@ kvs_config_add(WT_CONNECTION *conn)
 	 */
 	for (p = kvs_options; p->name != NULL; ++p)
 		if ((ret = conn->configure_method(conn,
-		    "session.create", "kvsstec:",
+		    "session.create", "memrata:",
 		    p->name, p->type, p->checks)) != 0)
 			ERET(NULL, ret,
 			    "WT_CONNECTION.configure_method: session.create: "
@@ -1273,7 +1273,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	data_source.truncate = NULL;		/* No truncate */
 	data_source.verify = kvs_verify;
 	if ((ret = connection->add_data_source(
-	    connection, "kvsstec:", &data_source, NULL)) != 0)
+	    connection, "memrata:", &data_source, NULL)) != 0)
 		ERET(NULL, ret,
 		    "WT_CONNECTION.add_data_source: %s", wt_ext->strerror(ret));
 

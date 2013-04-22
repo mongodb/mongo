@@ -496,7 +496,6 @@ keyv
 kv
 kvs
 kvsbdb
-kvsstec
 ld
 len
 lenp
@@ -535,6 +534,7 @@ membar
 memcpy
 memfree
 memmove
+memrata
 memsize
 mergeable
 metaconf
@@ -688,7 +688,6 @@ stdarg
 stderr
 stdin
 stdout
-stec
 str
 strcmp
 strdup
