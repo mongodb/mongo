@@ -1282,4 +1282,3 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 	fflush(stdout);
 }
 #endif
-
