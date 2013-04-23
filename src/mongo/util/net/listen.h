@@ -21,6 +21,11 @@
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/net/sock.h"
 
+// For Mach monotonic counters (need for return type of helper function)
+#if defined(__MACH__)
+    #include <mach/mach_time.h>
+#endif
+
 namespace mongo {
 
     const int DEFAULT_MAX_CONN = 20000;
@@ -44,9 +49,9 @@ namespace mongo {
         const int _port;
 
         /**
-         * @return a rough estimate of elapsed time since the server started
+         * @return elapsed time since the server started, in milliseconds
          */
-        long long getMyElapsedTimeMillis() const { return _elapsedTime; }
+        long long getMyElapsedTimeMillis() const { return getMillis() - startMillis; }
 
         void setAsTimeTracker() {
             _timeTracker = this;
@@ -64,11 +69,16 @@ namespace mongo {
             return 0;
         }
 
+        /**
+         * @start the elapsed time counter
+         */
+        void startElapsedTimeCounter() { startMillis = getMillis(); }
+
     private:
         string _name;
         string _ip;
         bool _logConnect;
-        long long _elapsedTime;
+        long long startMillis;
         
 #ifdef MONGO_SSL
         SSLManager* _ssl;
@@ -84,6 +94,18 @@ namespace mongo {
         static const Listener* _timeTracker;
         
         virtual bool useUnixSockets() const { return false; }
+
+        #if defined(_WIN32)
+        static long long getWinPerformanceFrequency();
+        static void winPerformanceCounterToMillis(long long *t);
+        #endif
+
+        #if defined(__MACH__)
+        static mach_timebase_info_data_t getMachTimeInfo();
+        static void machAbsToMillis(long long *t);
+        #endif
+
+        static long long getMillis();
 
     public:
         /** the "next" connection number.  every connection to this process has a unique number */

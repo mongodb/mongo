@@ -39,6 +39,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <time.h>
 #ifdef __openbsd__
 # include <sys/uio.h>
 #endif
@@ -49,6 +50,23 @@
 #undef errno
 #define errno WSAGetLastError()
 
+#endif
+
+// Make sure our Linux has the timer we need
+#if defined(__linux__)
+    #ifndef CLOCK_MONOTONIC_COARSE
+        #error "Your ancient kernel doesn't support CLOCK_MONOTONIC_COARSE: upgrade to v2.6.31 or newer"
+    #endif
+#endif
+
+// For absolute_time monotonic counters
+#if defined(__MACH__)
+    #include <mach/mach_time.h>
+#endif
+
+// For monotonic performance counters
+#if defined(_WIN32)
+    #include <windows.h>
 #endif
 
 namespace mongo {
@@ -97,7 +115,7 @@ namespace mongo {
     }
     
     Listener::Listener(const string& name, const string &ip, int port, bool logConnect ) 
-        : _port(port), _name(name), _ip(ip), _logConnect(logConnect), _elapsedTime(0) { 
+        : _port(port), _name(name), _ip(ip), _logConnect(logConnect) {
 #ifdef MONGO_SSL
         _ssl = getSSLManager();
 #endif
@@ -203,7 +221,7 @@ namespace mongo {
         _logListen(_port, false);
 #endif
 
-        struct timeval maxSelectTime;
+        this->startElapsedTimeCounter();
         while ( ! inShutdown() ) {
             fd_set fds[1];
             FD_ZERO(fds);
@@ -212,16 +230,9 @@ namespace mongo {
                 FD_SET(*it, fds);
             }
 
-            maxSelectTime.tv_sec = 0;
-            maxSelectTime.tv_usec = 10000;
-            const int ret = select(maxfd+1, fds, NULL, NULL, &maxSelectTime);
+            const int ret = select(maxfd+1, fds, NULL, NULL, NULL);
 
             if (ret == 0) {
-#if defined(__linux__)
-                _elapsedTime += ( 10000 - maxSelectTime.tv_usec ) / 1000;
-#else
-                _elapsedTime += 10;
-#endif
                 continue;
             }
 
@@ -237,12 +248,6 @@ namespace mongo {
                     log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
                 return;
             }
-
-#if defined(__linux__)
-            _elapsedTime += max(ret, (int)(( 10000 - maxSelectTime.tv_usec ) / 1000));
-#else
-            _elapsedTime += ret; // assume 1ms to grab connection. very rough
-#endif
 
             for (vector<SOCKET>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
                 if (! (FD_ISSET(*it, fds)))
@@ -555,6 +560,55 @@ namespace mongo {
         globalTicketHolder.resize( want );
     }
 
+    #if defined(_WIN32)
+    long long Listener::getWinPerformanceFrequency() {
+        long long counter_freq = -1;
+        QueryPerformanceFrequency(&counter_freq);
+        return counter_freq;
+    }
+
+    void Listener::winPerformanceCounterToMillis(long long *t) {
+        static long long counter_freq = getWinPerformanceFrequency();
+        *t /= counter_freq / 1000;
+    }
+    #endif
+
+    #if defined(__MACH__)
+    mach_timebase_info_data_t Listener::getMachTimeInfo() {
+        mach_timebase_info_data_t x;
+        mach_timebase_info(&x);
+        return x;
+    }
+
+    void Listener::machAbsToMillis(long long *t) {
+        static mach_timebase_info_data_t conv = getMachTimeInfo();
+        *t *= conv.numer;
+        *t /= conv.denom;
+        *t /= 1000000;
+    }
+    #endif
+
+    long long Listener::getMillis() {
+        long long now = -1;
+
+        #if defined(__linux__)
+            struct timespec n;
+            clock_gettime(CLOCK_MONOTONIC_COARSE, &n);
+            now = n.tv_sec * 1000 + n.tv_nsec / 1000000;
+        #elif defined(_WIN32)
+            QueryPerformanceCounter(&now);
+            winPerformanceCounterToMillis(&now);
+        #elif defined(__MACH__)
+            now = mach_absolute_time();
+            machAbsToMillis(&now);
+        #elif defined(__sunos__)
+            now = gethrtime() / 1000000;
+        #else
+            #error "Don't know how to get monotonic time on this platform!"
+        #endif
+
+        return now;
+    }
 
     TicketHolder Listener::globalTicketHolder(DEFAULT_MAX_CONN);
     AtomicInt64 Listener::globalConnectionNumber;
