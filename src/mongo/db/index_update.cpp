@@ -141,7 +141,6 @@ namespace mongo {
 
             std::string idxName = idx.indexName();
             int idxNo = IndexBuildsInProgress::get(ns, idxName);
-            massert(16574, "Couldn't find index being built", idxNo != -1);
 
             // After this yields in the loop, idx may point at a different index (if indexes get
             // flipped, see insert_makeIndex) or even an empty IndexDetails, so nothing below should
@@ -187,8 +186,6 @@ namespace mongo {
                         idxNo = IndexBuildsInProgress::get(ns, idxName);
                         // This index must still be around, because this is thread that would clean
                         // it up
-                        massert(16575, "cannot find index build anymore", idxNo != -1);
-
                         numDropped++;
                     }
                     else {
@@ -206,8 +203,6 @@ namespace mongo {
 
                     // Recalculate idxNo if we yielded
                     idxNo = IndexBuildsInProgress::get(ns, idxName);
-                    // Someone may have interrupted the index build
-                    massert(16576, "cannot find index build anymore", idxNo != -1);
                 }
                 else {
                     idxNo = -1;

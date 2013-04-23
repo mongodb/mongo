@@ -546,7 +546,7 @@ namespace IndexUpdateTests {
             nsdetails(_ns)->indexBuildsInProgress--;
 
             ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
-            ASSERT_EQUALS(-1, IndexBuildsInProgress::get(_ns, "d_1"));
+            ASSERT_THROWS(IndexBuildsInProgress::get(_ns, "d_1"), MsgAssertionException);
 
             offset = IndexBuildsInProgress::get(_ns, "a_1");
             IndexBuildsInProgress::remove(_ns, offset);

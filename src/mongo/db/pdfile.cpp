@@ -1500,7 +1500,6 @@ namespace mongo {
             // Recompute index numbers
             tableToIndex = nsdetails(tabletoidxns);
             idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
-            verify(idxNo > -1);
 
             // Make sure the newly created index is relocated to nIndexes, if it isn't already there
             if (idxNo != tableToIndex->nIndexes) {
@@ -1570,8 +1569,7 @@ namespace mongo {
                 return i;
             }
         }
-
-        return -1;
+        msgasserted(16574, "could not find index being built");
     }
 
     void IndexBuildsInProgress::remove(const char* ns, int offset) {
