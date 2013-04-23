@@ -1767,7 +1767,7 @@ namespace mongo {
 
     bool TwoDGeoNearRunner::run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
                              const GeoNearArguments &parsedArgs, string& errmsg,
-                             BSONObjBuilder& result) {
+                             BSONObjBuilder& result, unordered_map<string, double>* stats) {
 
         auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsd, idxNo));
         auto_ptr<TwoDAccessMethod> sam(new TwoDAccessMethod(descriptor.get()));
@@ -1819,13 +1819,11 @@ namespace mongo {
         }
         arr.done();
 
-        BSONObjBuilder stats(result.subobjStart("stats"));
-        stats.appendNumber("btreelocs", gs._nscanned);
-        stats.appendNumber("nscanned", gs._lookedAt);
-        stats.appendNumber("objectsLoaded", gs._objectsLoaded);
-        stats.append("avgDistance", totalDistance / x);
-        stats.append("maxDistance", gs.farthest());
-        stats.done();
+        (*stats)["btreelocs"] = gs._nscanned;
+        (*stats)["nscanned"] = gs._lookedAt;
+        (*stats)["objectsLoaded"] = gs._objectsLoaded;
+        (*stats)["avgDistance"] = totalDistance / x;
+        (*stats)["maxDistance"] = gs.farthest();
 
         return true;
     }

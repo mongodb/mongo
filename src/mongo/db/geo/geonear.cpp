@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
@@ -113,10 +114,17 @@ namespace mongo {
                 return false;
             }
 
+            unordered_map<string, double> statsMap;
+
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                twod_internal::TwoDGeoNearRunner::run2DGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
+                twod_internal::TwoDGeoNearRunner::run2DGeoNear(d, idxs[0], cmdObj, commonArgs,
+                                                               errmsg, result, &statsMap);
                 BSONObjBuilder stats(result.subobjStart("stats"));
+                for (unordered_map<string, double>::const_iterator it = statsMap.begin();
+                     it != statsMap.end(); ++it) {
+                    stats.append(it->first, it->second);
+                }
                 stats.append("time", cc().curop()->elapsedMillis());
                 stats.done();
                 return true;
@@ -131,9 +139,6 @@ namespace mongo {
             if (1 == idxs.size()) {
                 result.append("ns", ns);
                 run2DSphereGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
-                BSONObjBuilder stats(result.subobjStart("stats"));
-                stats.append("time", cc().curop()->elapsedMillis());
-                stats.done();
                 return true;
             }
 
@@ -225,6 +230,7 @@ namespace mongo {
             stats.appendNumber("nscanned", nic->nscanned());
             stats.append("avgDistance", totalDistance / results);
             stats.append("maxDistance", farthestDist);
+            stats.append("time", cc().curop()->elapsedMillis());
             stats.done();
 
             return true;

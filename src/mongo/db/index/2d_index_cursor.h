@@ -24,6 +24,7 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
         public:
             static bool run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
                                      const GeoNearArguments &parsedArgs, string& errmsg,
-                                     BSONObjBuilder& result);
+                                     BSONObjBuilder& result, unordered_map<string, double>* stats);
         };
     }
 
