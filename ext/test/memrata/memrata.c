@@ -1259,8 +1259,14 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	(void)config;				/* Unused parameters */
 
 	ret = 0;
-						/* Acquire the extension API. */
+						/* Acquire the extension API */
 	wt_ext = connection->get_extension_api(connection);
+
+						/* Check the library version */
+#if KVS_VERSION_MAJOR != 2 || KVS_VERSION_MINOR != 6
+	ERET(NULL, EINVAL,
+	    "interface code only supports KVS library version 2.6");
+#endif
 
 	/* Initialize the WT_DATA_SOURCE structure. */
 	memset(&data_source, 0, sizeof(data_source));
