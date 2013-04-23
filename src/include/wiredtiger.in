@@ -2124,40 +2124,60 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_CACHE_WRITE			26
 /*! pthread mutex condition wait calls */
 #define	WT_STAT_CONN_COND_WAIT				27
+/*! cursor creation */
+#define	WT_STAT_CONN_CURSOR_CREATE			28
+/*! Btree cursor insert calls */
+#define	WT_STAT_CONN_CURSOR_INSERT			29
+/*! Btree cursor next calls */
+#define	WT_STAT_CONN_CURSOR_NEXT			30
+/*! Btree cursor prev calls */
+#define	WT_STAT_CONN_CURSOR_PREV			31
+/*! Btree cursor remove calls */
+#define	WT_STAT_CONN_CURSOR_REMOVE			32
+/*! Btree cursor reset calls */
+#define	WT_STAT_CONN_CURSOR_RESET			33
+/*! Btree cursor search calls */
+#define	WT_STAT_CONN_CURSOR_SEARCH			34
+/*! Btree cursor search near calls */
+#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			35
+/*! Btree cursor update calls */
+#define	WT_STAT_CONN_CURSOR_UPDATE			36
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				28
+#define	WT_STAT_CONN_FILE_OPEN				37
+/*! rows merged in an LSM tree */
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			38
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			29
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			39
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			30
+#define	WT_STAT_CONN_MEMORY_FREE			40
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			31
+#define	WT_STAT_CONN_MEMORY_GROW			41
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				32
+#define	WT_STAT_CONN_READ_IO				42
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				33
+#define	WT_STAT_CONN_REC_PAGES				43
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			34
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			44
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			35
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			45
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			36
+#define	WT_STAT_CONN_RWLOCK_READ			46
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			37
+#define	WT_STAT_CONN_RWLOCK_WRITE			47
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			38
+#define	WT_STAT_CONN_TXN_ANCIENT			48
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				39
+#define	WT_STAT_CONN_TXN_BEGIN				49
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			40
+#define	WT_STAT_CONN_TXN_CHECKPOINT			50
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				41
+#define	WT_STAT_CONN_TXN_COMMIT				51
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			42
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			52
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			43
+#define	WT_STAT_CONN_TXN_ROLLBACK			53
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				44
+#define	WT_STAT_CONN_WRITE_IO				54
 
 /*!
  * @}

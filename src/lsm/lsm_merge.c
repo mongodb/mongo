@@ -251,10 +251,12 @@ __wt_lsm_merge(
 		if (create_bloom)
 			WT_ERR(__wt_bloom_insert(bloom, &key));
 	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+	WT_CSTAT_INCRV(session, lsm_rows_merged, insert_count);
 	WT_VERBOSE_ERR(session, lsm,
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
 	    record_count, insert_count);
-	WT_ERR_NOTFOUND_OK(ret);
 
 	/* We've successfully created the new chunk.  Now install it. */
 	WT_TRET(src->close(src));
