@@ -1101,5 +1101,12 @@ namespace {
         ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
     }
 
+    TEST(Document, CreateElementWithEmptyFieldName) {
+        mmb::Document doc;
+        mmb::Element noname = doc.makeElementObject(mongo::StringData());
+        ASSERT_TRUE(noname.ok());
+        ASSERT_EQUALS(mongo::StringData(), noname.getFieldName());
+    }
+
 } // namespace
 

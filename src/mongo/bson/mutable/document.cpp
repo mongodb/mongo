@@ -802,10 +802,11 @@ namespace mutablebson {
         // field name.
         int32_t insertFieldName(const StringData& fieldName) {
             const uint32_t id = _fieldNames.size();
-            _fieldNames.insert(
-                _fieldNames.end(),
-                &fieldName.rawData()[0],
-                &fieldName.rawData()[fieldName.size()]);
+            if (!fieldName.empty())
+                _fieldNames.insert(
+                    _fieldNames.end(),
+                    fieldName.rawData(),
+                    fieldName.rawData() + fieldName.size());
             _fieldNames.push_back('\0');
             if (debug) {
                 // Force names to new addresses to catch invalidation errors.
