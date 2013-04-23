@@ -35,9 +35,6 @@ namespace mongo {
        If 'client' is not specified, the current client is used.
     */
     inline bool _isMaster() {
-        if ( cc().isGod() )
-            return true;
-
         if( replSet ) {
             if( theReplSet )
                 return theReplSet->isPrimary();
@@ -54,6 +51,10 @@ namespace mongo {
             // if running with --master --slave, allow.
             return true;
         }
+
+        //TODO: Investigate if this is needed/used, see SERVER-9188
+        if ( cc().isGod() )
+            return true;
 
         return false;
     }
