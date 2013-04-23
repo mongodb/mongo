@@ -158,7 +158,7 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 
 	/*
 	 * Build a new checks entry name field.  There may be a default value
-	 * in the config argument we're passed , we don't want that as part of
+	 * in the config argument we're passed, we don't want that as part of
 	 * the checks entry name field.
 	 */
 	WT_ERR(__wt_strdup(session, config, &newcheck_name));

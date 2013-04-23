@@ -94,8 +94,10 @@ Fsync
 GCC
 GIDs
 Geoff
+Givargis
 IEC
 IEEE
+IFF
 IKEY
 IMPL
 IMPL's
@@ -323,6 +325,8 @@ config
 conn
 connectionp
 const
+copyin
+copyout
 cp
 crc
 cref
@@ -486,12 +490,12 @@ ispo
 kb
 kcell
 keycmp
+keygen
 keyname
 keyv
 kv
 kvs
 kvsbdb
-kvsstec
 ld
 len
 lenp
@@ -530,6 +534,7 @@ membar
 memcpy
 memfree
 memmove
+memrata
 memsize
 mergeable
 metaconf
@@ -683,7 +688,6 @@ stdarg
 stderr
 stdin
 stdout
-stec
 str
 strcmp
 strdup

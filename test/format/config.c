@@ -126,8 +126,14 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
+	/* KVS requires shared libraries. */
+	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
+		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
+	if (DATASOURCE("memrata") && access(MEMRATA_PATH, R_OK) != 0)
+		die(errno, "memrata shared library: %s", MEMRATA_PATH);
+
 	/* KVS doesn't support user-specified collations. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("kvsstec"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		g.c_reverse = 0;
 
 	config_compression();
@@ -347,8 +353,8 @@ config_single(const char *s, int perm)
 		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
 		    strncmp("file", ep, strlen("file")) != 0 &&
 		    strncmp("kvsbdb", ep, strlen("kvsbdb")) != 0 &&
-		    strncmp("kvsstec", ep, strlen("kvsstec")) != 0 &&
 		    strncmp("lsm", ep, strlen("lsm")) != 0 &&
+		    strncmp("memrata", ep, strlen("memrata")) != 0 &&
 		    strncmp("table", ep, strlen("table")) != 0) {
 			    fprintf(stderr,
 				"Invalid data source option: %s\n", ep);

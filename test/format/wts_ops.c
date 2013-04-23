@@ -218,7 +218,7 @@ ops(void *arg)
 		}
 		/* kvs doesn't support compaction. */
 		if (cnt == compact_op &&
-		    !DATASOURCE("kvsbdb") && !DATASOURCE("kvsstec") &&
+		    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata") &&
 		    (ret = session->compact(session, g.uri, NULL)) != 0)
 			die(ret, "session.compact");
 

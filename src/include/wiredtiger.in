@@ -1685,7 +1685,6 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 
 #endif /* !defined(SWIG) */
-
 /*!
  * @}
  */

@@ -39,9 +39,9 @@
 static WT_EXTENSION_API *wt_api;
 
 static void
-my_data_source_init(WT_CONNECTION *conn)
+my_data_source_init(WT_CONNECTION *connection)
 {
-	wt_api = conn->get_extension_api(conn);
+	wt_api = connection->get_extension_api(connection);
 }
 /*! [WT_EXTENSION_API declaration] */
 

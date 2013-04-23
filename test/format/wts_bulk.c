@@ -52,7 +52,7 @@ wts_load(void)
 	 * the order of insertion will not match the collation order.
 	 */
 	is_bulk = !g.c_reverse &&
-	    !DATASOURCE("kvsbdb") && !DATASOURCE("kvsstec");
+	    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata");
 	if ((ret = session->open_cursor(
 	    session, g.uri, NULL, is_bulk ? "bulk" : NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");

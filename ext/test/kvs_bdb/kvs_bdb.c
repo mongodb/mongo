@@ -96,13 +96,33 @@ struct __cursor_source {
 	int	 config_recno;			/* config "key_format=r" */
 };
 
-static void
-lock(void)
+static int
+lock_init(void)
 {
-	(void)pthread_rwlock_trywrlock(&ds.rwlock);
+	int ret;
+
+	if ((ret = pthread_rwlock_init(&ds.rwlock, NULL)) != 0)
+		ERET(NULL, WT_PANIC, "lock init: %s", strerror(ret));
+	return (ret);
 }
 
-static void
+static int
+lock_destroy(void)
+{
+	int ret;
+
+	if ((ret = pthread_rwlock_destroy(&ds.rwlock)) != 0)
+		ERET(NULL, WT_PANIC, "lock destroy: %s", strerror(ret));
+	return (ret);
+}
+
+static inline void
+writelock(void)
+{
+	(void)pthread_rwlock_wrlock(&ds.rwlock);
+}
+
+static inline void
 unlock(void)
 {
 	(void)pthread_rwlock_unlock(&ds.rwlock);
@@ -114,7 +134,7 @@ single_thread(WT_DATA_SOURCE *dsrc)
 	DATA_SOURCE *data;
 
 	data = (DATA_SOURCE *)dsrc;
-	lock();
+	writelock();
 	if (data->open_cursors != 0) {
 		unlock();
 		return (EBUSY);
@@ -173,19 +193,6 @@ copyin_key(WT_CURSOR *wt_cursor)
 }
 
 static inline void
-copyin_value(WT_CURSOR *wt_cursor)
-{
-	CURSOR_SOURCE *cursor;
-	DBT *value;
-
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	value = &cursor->value;
-
-	value->data = (char *)wt_cursor->value.data;
-	value->size = wt_cursor->value.size;
-}
-
-static inline void
 copyout_key(WT_CURSOR *wt_cursor)
 {
 	CURSOR_SOURCE *cursor;
@@ -200,6 +207,19 @@ copyout_key(WT_CURSOR *wt_cursor)
 		wt_cursor->key.data = key->data;
 		wt_cursor->key.size = key->size;
 	}
+}
+
+static inline void
+copyin_value(WT_CURSOR *wt_cursor)
+{
+	CURSOR_SOURCE *cursor;
+	DBT *value;
+
+	cursor = (CURSOR_SOURCE *)wt_cursor;
+	value = &cursor->value;
+
+	value->data = (char *)wt_cursor->value.data;
+	value->size = wt_cursor->value.size;
 }
 
 static inline void
@@ -572,7 +592,7 @@ kvs_cursor_close(WT_CURSOR *wt_cursor)
 		ERET(session, WT_ERROR, "Db.close: %s", db_strerror(tret));
 	free(wt_cursor);
 
-	lock();
+	writelock();
 	--data->open_cursors;
 	unlock();
 
@@ -668,6 +688,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
+
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "overwrite", &v)) != 0) {
 		ESET(session, ret,
@@ -675,6 +696,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
+
 	if ((ret = wt_ext->config_get(
 	    wt_ext, session, config, "key_format", &v)) != 0) {
 		ESET(session, ret,
@@ -692,7 +714,7 @@ kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	cursor->config_bitfield =
 	    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
-	lock();
+	writelock();
 	locked = 1;
 				/* Open the Berkeley DB cursor */
 	if ((tret = db_create(&cursor->db, dbenv, 0)) != 0) {
@@ -836,8 +858,8 @@ wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 
 	memset(&ds, 0, sizeof(ds));
 
-	if ((ret = pthread_rwlock_init(&ds.rwlock, NULL)) != 0)
-		ERET(NULL, WT_PANIC, "lock init: %s", strerror(ret));
+	if ((ret = lock_init()) != 0)
+		return (ret);
 
 	if ((ret = db_env_create(&dbenv, 0)) != 0)
 		ERET(NULL, WT_ERROR, "db_env_create: %s", db_strerror(ret));
@@ -869,8 +891,7 @@ wiredtiger_extension_terminate(WT_CONNECTION *conn)
 
 	(void)conn;				/* Unused parameters */
 
-	 if ((ret = pthread_rwlock_destroy(&ds.rwlock)) != 0)
-		ERET(NULL, WT_PANIC, "lock destroy: %s", strerror(ret));
+	ret = lock_destroy();
 
 	if (dbenv != NULL && (ret = dbenv->close(dbenv, 0)) != 0)
 		ERET(NULL, WT_ERROR, "DbEnv.close: %s", db_strerror(ret));

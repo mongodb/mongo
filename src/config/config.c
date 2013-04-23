@@ -708,7 +708,7 @@ __wt_config_gets_defno(WT_SESSION_IMPL *session,
 	 * strings like "next_random".
 	 */
 	*value = false_value;
-	if (cfg == NULL || cfg[1] == NULL)
+	if (cfg == NULL || cfg[0] == NULL || cfg[1] == NULL)
 		return (0);
 	else if (cfg[2] == NULL)
 		WT_RET_NOTFOUND_OK(
