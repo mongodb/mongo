@@ -2316,7 +2316,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BLOCK_MAJOR			6
 /*! minor version number */
 #define	WT_STAT_DSRC_BLOCK_MINOR			7
-/*! block manager size */
+/*! block manager file size in bytes */
 #define	WT_STAT_DSRC_BLOCK_SIZE				8
 /*! bloom filters in the LSM tree */
 #define	WT_STAT_DSRC_BLOOM_COUNT			9

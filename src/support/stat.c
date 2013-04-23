@@ -15,7 +15,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->block_magic.desc = "file magic number";
 	stats->block_major.desc = "file major version number";
 	stats->block_minor.desc = "minor version number";
-	stats->block_size.desc = "block manager size";
+	stats->block_size.desc = "block manager file size in bytes";
 	stats->bloom_count.desc = "bloom filters in the LSM tree";
 	stats->bloom_false_positive.desc = "bloom filter false positives";
 	stats->bloom_hit.desc = "bloom filter hits";
