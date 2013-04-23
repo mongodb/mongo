@@ -35,8 +35,35 @@
 #include "mongo/db/namespace-inl.h"
 #include "mongo/util/file.h"
 
+#if MONGO_USE_NEW_SORTER
 namespace mongo {
 
+    BSONObjExternalSorter::BSONObjExternalSorter(const ExternalSortComparison* comp,
+                                                 long maxFileSize)
+        : _mayInterrupt(boost::make_shared<bool>(false))
+    {
+        SortOptions opts;
+        opts.maxMemoryUsageBytes = maxFileSize;
+        opts.extSortAllowed = true;
+
+        Comparator compForSorter (comp, _mayInterrupt);
+        _sorter.reset(new Sorter<BSONObj, DiskLoc, Comparator>(opts, compForSorter));
+    }
+
+    int BSONObjExternalSorter::Comparator::operator() (const Data& l, const Data& r) const {
+        RARELY if (*_mayInterrupt) {
+            killCurrentOp.checkForInterrupt(!*_mayInterrupt);
+        }
+        return _comp->compare(l, r);
+    }
+}
+
+#include "mongo/db/sorter/sorter.cpp"
+MONGO_CREATE_SORTER(mongo::BSONObj, mongo::DiskLoc, mongo::BSONObjExternalSorter::Comparator);
+
+#else
+
+namespace mongo {
     HLMutex BSONObjExternalSorter::_extSortMutex("s");
     bool BSONObjExternalSorter::extSortMayInterrupt( false );
     unsigned long long BSONObjExternalSorter::_compares = 0;
@@ -346,3 +373,4 @@ namespace mongo {
         return ExternalSortDatum( BSONObj(h), l );
     }
 }
+#endif

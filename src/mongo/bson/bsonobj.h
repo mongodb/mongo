@@ -28,6 +28,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/bufreader.h"
 
 namespace mongo {
 
@@ -506,6 +507,19 @@ namespace mongo {
             _holder = rRHS._holder;
         }
         return *this;
+    }
+
+    /// members for Sorter
+    struct SorterDeserializeSettings {}; // unused
+    void serializeForSorter(BufBuilder& buf) const { buf.appendBuf(objdata(), objsize()); }
+    static BSONObj deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+        const int size = buf.peek<int>();
+        const void* ptr = buf.skip(size);
+        return BSONObj(static_cast<const char*>(ptr));
+    }
+    int memUsageForSorter() const {
+        // TODO consider ownedness?
+        return sizeof(BSONObj) + objsize();
     }
 
     private:

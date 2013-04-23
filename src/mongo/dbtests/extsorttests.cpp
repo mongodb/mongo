@@ -354,12 +354,13 @@ namespace ExtSortTests {
             cc().curop()->kill();
             if ( _mayInterrupt && !isSolaris() ) { // This interrupt is unsupported on solaris.
                 // The sort is aborted due to the kill request.
-                ASSERT_THROWS( sorter.sort( _mayInterrupt ), UserException );
-                // TODO Check that an iterator cannot be retrieved because the keys are unsorted (Not
-                // currently implemented.)
-                if ( 0 ) {
-                    ASSERT_THROWS( sorter.iterator(), UserException );
-                }
+                ASSERT_THROWS( {
+                    sorter.sort( _mayInterrupt );
+                    auto_ptr<BSONObjExternalSorter::Iterator> iter = sorter.iterator();
+                    while (iter->more()) {
+                        iter->next();
+                    }
+                }, UserException );
             }
             else {
                 // Sort the keys.
