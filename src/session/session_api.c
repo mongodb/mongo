@@ -604,7 +604,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	 * thread.  Check if the cache is full: if we have to block for
 	 * eviction, this is the best time to do it.
 	 */
-	WT_ERR(__wt_cache_full_check(session));
+	WT_ERR(__wt_cache_full_check(session, 1));
 
 	ret = __wt_txn_begin(session, cfg);
 

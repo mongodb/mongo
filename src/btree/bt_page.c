@@ -41,7 +41,7 @@ __wt_page_in_func(
 			 *
 			 * First make sure there is space in the cache.
 			 */
-			WT_RET(__wt_cache_full_check(session));
+			WT_RET(__wt_cache_full_check(session, 0));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
 		case WT_REF_EVICT_FORCE:
