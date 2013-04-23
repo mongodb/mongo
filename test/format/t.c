@@ -165,8 +165,10 @@ main(int argc, char *argv[])
 		wts_close();			/* Close */
 
 		/* Overwrite the progress line with a completion line. */
-		printf("\r%78s\r%4d: %s %s\n",
-		    " ", g.run_cnt, g.c_file_type, g.c_data_source);
+		if (g.track)
+			printf("\r%78s\r", " ");
+		printf("%4d: %s %s\n",
+		    g.run_cnt, g.c_file_type, g.c_data_source);
 	}
 
 	/* Flush/close any logging information. */
