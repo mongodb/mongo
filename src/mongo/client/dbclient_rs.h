@@ -166,7 +166,7 @@ namespace mongo {
          * Selects the right node given the nodes to pick from and the preference. This
          * will also attempt to refresh the local view of the replica set configuration
          * if the primary node needs to be returned but is not currently available (except
-         * for ReadPrefrence_Nearest).
+         * for ReadPreference_Nearest).
          *
          * @param preference the read mode to use.
          * @param tags the tags used for filtering nodes.

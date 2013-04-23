@@ -79,7 +79,7 @@
 #                                           libm with IEEE as the 
 #                                           default standard
 # 
-# NOTE: if scalb's second arguement is an int, then one must
+# NOTE: if scalb's second argument is an int, then one must
 # define _SCALB_INT in CFLAGS. The default prototype of scalb
 # is double scalb(double, double)
 #

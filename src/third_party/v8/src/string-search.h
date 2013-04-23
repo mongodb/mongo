@@ -306,7 +306,7 @@ int StringSearch<PatternChar, SubjectChar>::BoyerMooreSearch(
   // Only preprocess at most kBMMaxShift last characters of pattern.
   int start = search->start_;
 
-  int* bad_char_occurence = search->bad_char_table();
+  int* bad_char_occurrence = search->bad_char_table();
   int* good_suffix_shift = search->good_suffix_shift_table();
 
   PatternChar last_char = pattern[pattern_length - 1];
@@ -317,7 +317,7 @@ int StringSearch<PatternChar, SubjectChar>::BoyerMooreSearch(
     int c;
     while (last_char != (c = subject[index + j])) {
       int shift =
-          j - CharOccurrence(bad_char_occurence, c);
+          j - CharOccurrence(bad_char_occurrence, c);
       index += shift;
       if (index > subject_length - pattern_length) {
         return -1;
@@ -330,12 +330,12 @@ int StringSearch<PatternChar, SubjectChar>::BoyerMooreSearch(
       // we have matched more than our tables allow us to be smart about.
       // Fall back on BMH shift.
       index += pattern_length - 1
-          - CharOccurrence(bad_char_occurence,
+          - CharOccurrence(bad_char_occurrence,
                            static_cast<SubjectChar>(last_char));
     } else {
       int gs_shift = good_suffix_shift[j + 1];
       int bc_occ =
-          CharOccurrence(bad_char_occurence, c);
+          CharOccurrence(bad_char_occurrence, c);
       int shift = j - bc_occ;
       if (gs_shift > shift) {
         shift = gs_shift;

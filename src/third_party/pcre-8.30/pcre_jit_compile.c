@@ -188,7 +188,7 @@ typedef int (SLJIT_CALL *jit_function)(jit_arguments *args);
 
 /* The following structure is the key data type for the recursive
 code generator. It is allocated by compile_hotpath, and contains
-the aguments for compile_fallbackpath. Must be the first member
+the arguments for compile_fallbackpath. Must be the first member
 of its descendants. */
 typedef struct fallback_common {
   /* Concatenation stack. */

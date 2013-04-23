@@ -286,7 +286,7 @@ static int CalculateReserveForVector(const string& full, const char* delim) {
         ++p;
       } else {
         while (++p != end && *p != c) {
-          // Skip to the next occurence of the delimiter.
+          // Skip to the next occurrence of the delimiter.
         }
         ++count;
       }
@@ -322,7 +322,7 @@ void SplitStringToIteratorUsing(const StringType& full,
       } else {
         const char* start = p;
         while (++p != end && *p != c) {
-          // Skip to the next occurence of the delimiter.
+          // Skip to the next occurrence of the delimiter.
         }
         *result++ = StringType(start, p - start);
       }

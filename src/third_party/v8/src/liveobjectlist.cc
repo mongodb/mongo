@@ -1042,7 +1042,7 @@ void LiveObjectList::NullifyMostRecent(HeapObject* obj) {
       // "nullified" (its lowest bit will be cleared to make it look like an
       // SMI), it would/should show up before the equivalent dups that have not
       // yet been "nullified".  Hence, we should be searching backwards for the
-      // first occurence of a matching object and nullify that instance.  This
+      // first occurrence of a matching object and nullify that instance.  This
       // will ensure that we preserve the expected sorting order.
       for (i--; i > 0; i--) {
         Element* element = &lol->elements_[i];

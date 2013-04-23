@@ -86,7 +86,7 @@ namespace boost {
 
         //! Find first algorithm ( case insensitive )
         /*!
-            Search for the first occurence of the substring in the input. 
+            Search for the first occurrence of the substring in the input. 
             Searching is case insensitive.
             
             \param Input A string which will be searched.
