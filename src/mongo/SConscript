@@ -111,6 +111,35 @@ env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
                 LIBDEPS=['bson','index_set'])
 
 
+
+env.StaticLibrary('expressions',
+                  ['db/matcher/expression.cpp',
+                   'db/matcher/expression_array.cpp',
+                   'db/matcher/expression_internal.cpp',
+                   'db/matcher/expression_leaf.cpp',
+                   'db/matcher/expression_tree.cpp',
+                   'db/matcher/expression_parser.cpp',
+                   'db/matcher/expression_parser_tree.cpp'],
+                  LIBDEPS=['bson',
+                           '$BUILD_DIR/mongo/db/common',
+                           '$BUILD_DIR/third_party/pcrecpp'
+                           ] )
+
+env.CppUnitTest('expression_test',
+                ['db/matcher/expression_test.cpp',
+                 'db/matcher/expression_leaf_test.cpp',
+                 'db/matcher/expression_tree_test.cpp',
+                 'db/matcher/expression_array_test.cpp'],
+                LIBDEPS=['expressions'] )
+
+env.CppUnitTest('expression_parser_test',
+                ['db/matcher/expression_parser_test.cpp',
+                 'db/matcher/expression_parser_array_test.cpp',
+                 'db/matcher/expression_parser_tree_test.cpp',
+                 'db/matcher/expression_parser_leaf_test.cpp'],
+                LIBDEPS=['expressions'] )
+
+
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 
 env.CppUnitTest('descriptive_stats_test',
