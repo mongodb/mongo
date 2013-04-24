@@ -1471,6 +1471,9 @@
     <ClInclude Include="..\util\sequence_util.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\base\status_with.h">
+      <Filter>base</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\db\db.rc">

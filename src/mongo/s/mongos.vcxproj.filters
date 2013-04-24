@@ -864,13 +864,7 @@
     <ClCompile Include="..\db\geo\s2common.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\geo\s2cursor.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\geo\s2index.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2nearcursor.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
     <ClCompile Include="..\util\exception_filter_win32.cpp">
@@ -1644,6 +1638,15 @@
     <ClCompile Include="range_arithmetic_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\index_names.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_selection.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_set.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -2226,12 +2229,6 @@
     <ClInclude Include="..\db\geo\s2common.h">
       <Filter>db\geo</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\geo\s2cursor.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\s2nearcursor.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\exception_filter_win32.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -2293,9 +2290,6 @@
       <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\db\geo\geoparser.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\s2index.h">
       <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\third_party\s2\hash.h">
@@ -3244,6 +3238,21 @@
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\server.h" />
+    <ClInclude Include="..\base\status_with.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_names.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_selection.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_set.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\base\error_codes.err">

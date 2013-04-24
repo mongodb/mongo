@@ -2369,43 +2369,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
     </ClCompile>
-    <ClCompile Include="..\db\geo\s2cursor.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-    </ClCompile>
     <ClCompile Include="..\db\geo\s2index.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2nearcursor.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
@@ -2425,6 +2389,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="..\db\geo\shapes.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
+    <ClCompile Include="..\db\index_names.cpp" />
+    <ClCompile Include="..\db\index_selection.cpp" />
+    <ClCompile Include="..\db\index_set.cpp" />
     <ClCompile Include="..\db\initialize_server_global_state.cpp" />
     <ClCompile Include="..\db\keypattern.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_geo_near.cpp" />
@@ -3098,6 +3065,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\base\owned_pointer_vector.h" />
     <ClInclude Include="..\base\parse_number.h" />
     <ClInclude Include="..\base\status.h" />
+    <ClInclude Include="..\base\status_with.h" />
     <ClInclude Include="..\base\string_data-inl.h" />
     <ClInclude Include="..\bson\bson-inl.h" />
     <ClInclude Include="..\bson\bson.h" />
@@ -3175,11 +3143,12 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\geo\geoquery.h" />
     <ClInclude Include="..\db\geo\hash.h" />
     <ClInclude Include="..\db\geo\s2common.h" />
-    <ClInclude Include="..\db\geo\s2cursor.h" />
-    <ClInclude Include="..\db\geo\s2index.h" />
-    <ClInclude Include="..\db\geo\s2nearcursor.h" />
     <ClInclude Include="..\db\geo\shapes.h" />
     <ClInclude Include="..\db\hasher.h" />
+    <ClInclude Include="..\db\index.h" />
+    <ClInclude Include="..\db\index_names.h" />
+    <ClInclude Include="..\db\index_selection.h" />
+    <ClInclude Include="..\db\index_set.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />
     <ClInclude Include="..\db\keypattern.h" />
     <ClInclude Include="..\db\pipeline\document_internal.h" />

@@ -605,6 +605,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\base\owned_pointer_vector.h" />
     <ClInclude Include="..\base\parse_number.h" />
     <ClInclude Include="..\base\status.h" />
+    <ClInclude Include="..\base\status_with.h" />
     <ClInclude Include="..\base\string_data-inl.h" />
     <ClInclude Include="..\bson\bson-inl.h" />
     <ClInclude Include="..\bson\bson.h" />
@@ -707,9 +708,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\geo\geoquery.h" />
     <ClInclude Include="..\db\geo\hash.h" />
     <ClInclude Include="..\db\geo\s2common.h" />
-    <ClInclude Include="..\db\geo\s2cursor.h" />
-    <ClInclude Include="..\db\geo\s2index.h" />
-    <ClInclude Include="..\db\geo\s2nearcursor.h" />
     <ClInclude Include="..\db\geo\shapes.h" />
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\hashindex.h" />
@@ -740,7 +738,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\index\s2_near_cursor.h" />
     <ClInclude Include="..\db\index\s2_simple_cursor.h" />
     <ClInclude Include="..\db\index_builder.h" />
+    <ClInclude Include="..\db\index_names.h" />
     <ClInclude Include="..\db\index_rebuilder.h" />
+    <ClInclude Include="..\db\index_selection.h" />
     <ClInclude Include="..\db\index_set.h" />
     <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />
@@ -754,6 +754,12 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\kill_current_op.h" />
     <ClInclude Include="..\db\lockstat.h" />
     <ClInclude Include="..\db\lockstate.h" />
+    <ClInclude Include="..\db\matcher\expression.h" />
+    <ClInclude Include="..\db\matcher\expression_array.h" />
+    <ClInclude Include="..\db\matcher\expression_internal.h" />
+    <ClInclude Include="..\db\matcher\expression_leaf.h" />
+    <ClInclude Include="..\db\matcher\expression_parser.h" />
+    <ClInclude Include="..\db\matcher\expression_tree.h" />
     <ClInclude Include="..\db\memconcept.h" />
     <ClInclude Include="..\db\module.h" />
     <ClInclude Include="..\db\mongommf.h" />
@@ -2847,27 +2853,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
     </ClCompile>
-    <ClCompile Include="..\db\geo\s2cursor.cpp">
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-    </ClCompile>
     <ClCompile Include="..\db\geo\s2index.cpp">
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2nearcursor.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
@@ -2896,7 +2882,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\index\s2_near_cursor.cpp" />
     <ClCompile Include="..\db\index\s2_simple_cursor.cpp" />
     <ClCompile Include="..\db\index_builder.cpp" />
+    <ClCompile Include="..\db\index_names.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
+    <ClCompile Include="..\db\index_selection.cpp" />
     <ClCompile Include="..\db\index_set.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\interrupt_status_mongod.cpp" />
@@ -2906,6 +2894,102 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\kill_current_op.cpp" />
     <ClCompile Include="..\db\lockstat.cpp" />
     <ClCompile Include="..\db\lockstate.cpp" />
+    <ClCompile Include="..\db\matcher\expression.cpp">
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)expression1</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)expression1</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">$(IntDir)expression1</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">$(IntDir)expression1</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)expression1</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)expression1</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">$(IntDir)expression1</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">$(IntDir)expression1</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_array.cpp" />
+    <ClCompile Include="..\db\matcher\expression_array_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_internal.cpp" />
+    <ClCompile Include="..\db\matcher\expression_leaf.cpp" />
+    <ClCompile Include="..\db\matcher\expression_leaf_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser.cpp" />
+    <ClCompile Include="..\db\matcher\expression_parser_array_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_leaf_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_tree.cpp" />
+    <ClCompile Include="..\db\matcher\expression_parser_tree_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_tree.cpp" />
+    <ClCompile Include="..\db\matcher\expression_tree_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\db\mongommf.cpp" />
     <ClCompile Include="..\db\namespace_details.cpp" />
     <ClCompile Include="..\db\ops\count.cpp" />

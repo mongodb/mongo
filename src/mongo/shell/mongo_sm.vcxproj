@@ -1253,6 +1253,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\base\owned_pointer_vector.h" />
     <ClInclude Include="..\base\parse_number.h" />
     <ClInclude Include="..\base\status.h" />
+    <ClInclude Include="..\base\status_with.h" />
     <ClInclude Include="..\base\string_data-inl.h" />
     <ClInclude Include="..\bson\bson.h" />
     <ClInclude Include="..\bson\bson_builder_base.h" />
