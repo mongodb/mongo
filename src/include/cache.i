@@ -62,7 +62,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 	 * busier.
 	 */
 	for (wake = 0;; wake = (wake + 1) % 1000) {
-		WT_RET(__wt_eviction_check(session, &lockout, wake));
+		WT_RET(__wt_eviction_check(session, &lockout, wake == 0));
 		if (!lockout || F_ISSET(session,
 		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 			return (0);
@@ -70,16 +70,15 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 		    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
 			return (0);
 		ret = __wt_evict_lru_page(session, 1);
-		if (ret == 0 || ret == EBUSY) {
-			if (onepass)
-				return (0);
-		} else if (ret == WT_NOTFOUND)
+		if (ret == 0 && onepass)
+			return (0);
+		else if (ret == WT_NOTFOUND)
 			/*
 			 * The eviction queue was empty - give the server time
 			 * to re-populate before trying again.
 			 */
 			__wt_sleep(0, 10);
-		else
+		else if (ret != 0 && ret != EBUSY)
 			/*
 			 * We've dealt with expected returns - we came across
 			 * a real error.
