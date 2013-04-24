@@ -101,8 +101,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	__wt_free(session, session->excl);
 
 	/* Destroy the thread's mutex. */
-	if (session->cond != NULL)
-		WT_TRET(__wt_cond_destroy(session, session->cond));
+	WT_TRET(__wt_cond_destroy(session, &session->cond));
 
 	/* The API lock protects opening and closing of sessions. */
 	__wt_spin_lock(session, &conn->api_lock);
@@ -197,6 +196,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_clsm_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
@@ -204,8 +205,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->open_cursor(dsrc, &session->iface,
-		    uri, owner, cfg, cursorp);
+		ret = dsrc->open_cursor == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    __wt_curds_create(session, uri, cfg, dsrc, cursorp);
 
 	return (ret);
 }
@@ -252,13 +254,14 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  * which only wants to dump the schema information needed for load.
  */
 int
-__wt_session_create_strip(
-    WT_SESSION *session, const char *v1, const char *v2, const char **value_ret)
+__wt_session_create_strip(WT_SESSION *wt_session,
+    const char *v1, const char *v2, const char **value_ret)
 {
-	WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
-	const char *cfg[] = { __wt_confdfl_session_create, v1, v2, NULL };
+	WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
+	const char *cfg[] =
+	    { WT_CONFIG_BASE(session, session_create), v1, v2, NULL };
 
-	return (__wt_config_collapse(session_impl, cfg, value_ret));
+	return (__wt_config_collapse(session, cfg, value_ret));
 }
 
 /*
@@ -289,7 +292,7 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  */
 static int
 __session_rename(WT_SESSION *wt_session,
-    const char *uri, const char *newname, const char *config)
+    const char *uri, const char *newuri, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -298,7 +301,7 @@ __session_rename(WT_SESSION *wt_session,
 	SESSION_API_CALL(session, rename, config, cfg);
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_rename(session, uri, newname, cfg));
+	    ret = __wt_schema_rename(session, uri, newuri, cfg));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -471,7 +474,7 @@ __session_truncate(WT_SESSION *wt_session,
 		goto done;
 	}
 
-	/* Truncate is only supported for file and table objects. */
+	/* Cursor truncate is only supported for file and table objects. */
 	cursor = start == NULL ? stop : start;
 	if (!WT_PREFIX_MATCH(cursor->uri, "file:") &&
 	    !WT_PREFIX_MATCH(cursor->uri, "table:"))
@@ -600,7 +603,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	 * thread.  Check if the cache is full: if we have to block for
 	 * eviction, this is the best time to do it.
 	 */
-	WT_ERR(__wt_cache_full_check(session));
+	WT_ERR(__wt_cache_full_check(session, 1));
 
 	ret = __wt_txn_begin(session, cfg);
 
@@ -712,23 +715,6 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
- * __session_msg_printf --
- *	WT_SESSION->msg_printf method.
- */
-static int
-__session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
-{
-	WT_DECL_RET;
-	va_list ap;
-
-	va_start(ap, fmt);
-	ret = __wt_vmsg((WT_SESSION_IMPL *)wt_session, fmt, ap);
-	va_end(ap);
-
-	return (ret);
-}
-
-/*
  * __wt_open_session --
  *	Allocate a session handle.  The internal parameter is used for sessions
  *	opened by WiredTiger for its own use.
@@ -738,7 +724,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
     WT_EVENT_HANDLER *event_handler, const char *config,
     WT_SESSION_IMPL **sessionp)
 {
-	static WT_SESSION stds = {
+	static const WT_SESSION stds = {
 		NULL,
 		__session_close,
 		__session_reconfigure,
@@ -754,8 +740,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_begin_transaction,
 		__session_commit_transaction,
 		__session_rollback_transaction,
-		__session_checkpoint,
-		__session_msg_printf
+		__session_checkpoint
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;

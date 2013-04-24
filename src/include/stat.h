@@ -195,7 +195,17 @@ struct __wt_connection_stats {
 	WT_STATS cache_read;
 	WT_STATS cache_write;
 	WT_STATS cond_wait;
+	WT_STATS cursor_create;
+	WT_STATS cursor_insert;
+	WT_STATS cursor_next;
+	WT_STATS cursor_prev;
+	WT_STATS cursor_remove;
+	WT_STATS cursor_reset;
+	WT_STATS cursor_search;
+	WT_STATS cursor_search_near;
+	WT_STATS cursor_update;
 	WT_STATS file_open;
+	WT_STATS lsm_rows_merged;
 	WT_STATS memory_allocation;
 	WT_STATS memory_free;
 	WT_STATS memory_grow;

@@ -72,15 +72,12 @@ __wt_lsm_merge(
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
-	WT_LSM_CHUNK *chunk;
-	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "bulk,raw");
-	const char *rand_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,next_random");
+	WT_LSM_CHUNK *chunk, *youngest;
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count, r;
 	u_int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
 	int create_bloom;
+	const char *cfg[3];
 
 	src = dest = NULL;
 	bloom = NULL;
@@ -130,18 +127,15 @@ __wt_lsm_merge(
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
+		youngest = lsm_tree->chunk[end_chunk];
 		nchunks = (end_chunk - start_chunk) + 1;
 
 		/* If the chunk is already involved in a merge, stop. */
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
 			break;
 
-		/*
-		 * Only merge across more than 2 generations if there are no
-		 * new chunks being created.
-		 */
-		if (stalls < 50 && chunk->generation >=
-		    lsm_tree->chunk[end_chunk]->generation + 2)
+		/* Don't merge across more than 2 generations. */
+		if (chunk->generation >= youngest->generation + 2)
 			break;
 
 		/*
@@ -152,13 +146,13 @@ __wt_lsm_merge(
 			break;
 
 		/*
-		 * Never do big merges in the first thread if there are
-		 * multiple threads.  If there is a single thread, wait for 10
-		 * seconds looking for small merges before trying a big one.
+		 * Never merges across generations in the first thread if there
+		 * are multiple threads.  If there is a single thread, wait for
+		 * 30 seconds looking for small merges before trying a big one.
 		 */
 		if (id == 0 && nchunks > 0 &&
-		    chunk->count > lsm_tree->chunk[end_chunk]->count * 2 &&
-		    (lsm_tree->merge_threads > 1 || stalls < 10))
+		    chunk->generation > youngest->generation &&
+		    (lsm_tree->merge_threads > 1 || stalls < 30))
 			break;
 
 		F_SET(chunk, WT_LSM_CHUNK_MERGING);
@@ -166,17 +160,17 @@ __wt_lsm_merge(
 		--start_chunk;
 
 		if (nchunks == max_chunks) {
-			F_CLR(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_MERGING);
-			record_count -= lsm_tree->chunk[end_chunk--]->count;
+			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
+			record_count -= youngest->count;
+			--end_chunk;
 		}
 	}
 
 	nchunks = (end_chunk - start_chunk) + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
-	/* Don't do small merges unless we have waited for 2s. */
-	if (nchunks <= 1 ||
-	    (id == 0 && stalls < 2 && nchunks < max_chunks / 2)) {
+	/* Don't do small merges. */
+	if (nchunks <= 1 || (id == 0 && nchunks < max_chunks / 2)) {
 		for (i = 0; i < nchunks; i++)
 			F_CLR(lsm_tree->chunk[start_chunk + i],
 			    WT_LSM_CHUNK_MERGING);
@@ -235,7 +229,13 @@ __wt_lsm_merge(
 		    lsm_tree->bloom_hash_count, &bloom));
 	}
 
-	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &dest));
+	/* Discard pages we read as soon as we're done with them. */
+	F_SET(session, WT_SESSION_NO_CACHE);
+
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[1] = "bulk,raw";
+	cfg[2] = NULL;
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % 1000 &&
@@ -251,15 +251,18 @@ __wt_lsm_merge(
 		if (create_bloom)
 			WT_ERR(__wt_bloom_insert(bloom, &key));
 	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+	WT_CSTAT_INCRV(session, lsm_rows_merged, insert_count);
 	WT_VERBOSE_ERR(session, lsm,
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
 	    record_count, insert_count);
-	WT_ERR_NOTFOUND_OK(ret);
 
 	/* We've successfully created the new chunk.  Now install it. */
 	WT_TRET(src->close(src));
 	WT_TRET(dest->close(dest));
 	src = dest = NULL;
+
 	if (create_bloom) {
 		WT_TRET(__wt_bloom_finalize(bloom));
 
@@ -275,6 +278,7 @@ __wt_lsm_merge(
 		WT_TRET(__wt_bloom_close(bloom));
 		bloom = NULL;
 	}
+	F_CLR(session, WT_SESSION_NO_CACHE);
 	WT_ERR(ret);
 
 	/*
@@ -283,8 +287,9 @@ __wt_lsm_merge(
 	 * enough internal pages in cache so that application threads don't
 	 * stall and block each other reading them in.
 	 */
-	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, rand_cfg, &dest));
-	for (r = 0; ret == 0 && r < 1 + (insert_count >> 20); r++)
+	cfg[1] = "checkpoint=WiredTigerCheckpoint,next_random";
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
+	for (r = 0; ret == 0 && r < 100 + (insert_count >> 16); r++)
 		WT_TRET(dest->next(dest));
 	WT_TRET(dest->close(dest));
 	dest = NULL;
@@ -342,6 +347,7 @@ err:	if (src != NULL)
 		else
 			WT_VERBOSE_TRET(session, lsm,
 			    "Merge failed with %s", wiredtiger_strerror(ret));
+		F_CLR(session, WT_SESSION_NO_CACHE);
 	}
 	return (ret);
 }

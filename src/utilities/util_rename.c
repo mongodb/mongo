@@ -14,7 +14,7 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
 	int ch;
-	char *uri, *newname;
+	char *uri, *newuri;
 
 	uri = NULL;
 	while ((ch = util_getopt(argc, argv, "")) != EOF)
@@ -32,11 +32,11 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
 	if ((uri = util_name(*argv,
 	    "table", UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 		return (1);
-	newname = argv[1];
+	newuri = argv[1];
 
-	if ((ret = session->rename(session, uri, newname, NULL)) != 0) {
+	if ((ret = session->rename(session, uri, newuri, NULL)) != 0) {
 		fprintf(stderr, "%s: rename %s to %s: %s\n",
-		    progname, uri, newname, wiredtiger_strerror(ret));
+		    progname, uri, newuri, wiredtiger_strerror(ret));
 		goto err;
 	}
 
@@ -55,7 +55,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "rename uri newname\n",
+	    "rename uri newuri\n",
 	    progname, usage_prefix);
 	return (1);
 }

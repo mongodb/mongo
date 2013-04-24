@@ -87,6 +87,8 @@ __rename_tree(WT_SESSION_IMPL *session,
 	int is_colgroup;
 
 	olduri = table->name;
+	value = NULL;
+
 	newname = newuri;
 	(void)WT_PREFIX_SKIP(newname, "table:");
 
@@ -222,11 +224,18 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 {
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	const char *oldname, *newname;
+	const char *p, *t;
 
 	/* Disallow renames to/from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
 	WT_RET(__wt_schema_name_check(session, newuri));
+
+	/* The target type must match the source type. */
+	for (p = uri, t = newuri; *p == *t && *p != ':'; ++p, ++t)
+		;
+	if (*p != ':' || *t != ':')
+		WT_RET_MSG(session, EINVAL,
+		    "rename target type must match URI: %s to %s", uri, newuri);
 
 	/*
 	 * We track rename operations, if we fail in the middle, we want to
@@ -234,22 +243,17 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_meta_track_on(session));
 
-	oldname = uri;
-	newname = newuri;
-	if (WT_PREFIX_SKIP(oldname, "file:")) {
-		if (!WT_PREFIX_SKIP(newname, "file:"))
-			WT_RET_MSG(session, EINVAL,
-			    "rename target type must match URI: %s to %s",
-			    uri, newuri);
+	if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __rename_file(session, uri, newuri);
-	} else if (WT_PREFIX_SKIP(oldname, "table:")) {
-		if (!WT_PREFIX_SKIP(newname, "table:"))
-			WT_RET_MSG(session, EINVAL,
-			    "rename target type must match URI: %s to %s",
-			    uri, newuri);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_lsm_tree_rename(session, uri, newuri, cfg);
+	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __rename_table(session, uri, newuri, cfg);
-	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->rename(dsrc, &session->iface, uri, newuri, cfg);
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->rename == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    dsrc->rename(dsrc, &session->iface,
+			uri, newuri, (WT_CONFIG_ARG *)cfg);
 
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;

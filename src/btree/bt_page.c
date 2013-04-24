@@ -30,9 +30,9 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int busy;
+	int busy, oldgen;
 
-	for (;;) {
+	for (oldgen = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
@@ -41,8 +41,9 @@ __wt_page_in_func(
 			 *
 			 * First make sure there is space in the cache.
 			 */
-			WT_RET(__wt_cache_full_check(session));
+			WT_RET(__wt_cache_full_check(session, 0));
 			WT_RET(__wt_cache_read(session, parent, ref));
+			oldgen = F_ISSET(session, WT_SESSION_NO_CACHE) ? 1 : 0;
 			continue;
 		case WT_REF_EVICT_FORCE:
 		case WT_REF_LOCKED:
@@ -83,8 +84,7 @@ __wt_page_in_func(
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
 				page->read_gen = WT_READ_GEN_OLDEST;
-				WT_RET(__wt_hazard_clear(session, page));
-				WT_RET(__wt_evict_server_wake(session));
+				WT_RET(__wt_page_release(session, page));
 				break;
 			}
 
@@ -102,6 +102,14 @@ __wt_page_in_func(
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
 				    __wt_cache_read_gen_set(session);
+
+			/*
+			 * If we read the page and we are configured to not
+			 * trash the cache, set the oldest read generation so
+			 * the page is forcibly evicted as soon as possible.
+			 */
+			if (oldgen && page->read_gen == WT_READ_GEN_NOTSET)
+				page->read_gen = WT_READ_GEN_OLDEST;
 
 			return (0);
 		WT_ILLEGAL_VALUE(session);

@@ -341,8 +341,7 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
 		conn->stat_tid_set = 0;
 	}
-	if (conn->stat_cond != NULL)
-		WT_TRET(__wt_cond_destroy(session, conn->stat_cond));
+	WT_TRET(__wt_cond_destroy(session, &conn->stat_cond));
 
 	if ((p = conn->stat_sources) != NULL) {
 		for (; *p != NULL; ++p)

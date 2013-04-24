@@ -144,8 +144,7 @@ __wt_checkpoint_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_thread_join(session, conn->ckpt_tid));
 		conn->ckpt_tid_set = 0;
 	}
-	if (conn->ckpt_cond != NULL)
-		WT_TRET(__wt_cond_destroy(session, conn->ckpt_cond));
+	WT_TRET(__wt_cond_destroy(session, &conn->ckpt_cond));
 
 	__wt_free(session, conn->ckpt_config);
 

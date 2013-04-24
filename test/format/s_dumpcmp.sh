@@ -3,17 +3,16 @@
 trap 'exit 1' 1 2
 
 top=../..
-bdb=$top/db/build_unix
 
 colflag=0
-dump_bdb=0
+bdbdir=""
 wt_name="file:wt"
 while :
 	do case "$1" in
-	# -b means we need to dump the BDB database
+	# -b means we need to dump the Berkeley DB database
 	-b)
-		dump_bdb=1;
-		shift ;;
+		bdbdir="$2";
+		shift ; shift ;;
 	# -c means it was a column-store.
 	-c)
 		colflag=1
@@ -56,12 +55,12 @@ config='extensions=['$ext']'
 $top/wt -h RUNDIR -C "$config" dump $wt_name |
     sed -e '1,/^Data$/d' > RUNDIR/wt_dump
 
-if test $dump_bdb -ne 1; then
+if test "X$bdbdir" = "X"; then
 	exit 0
 fi
 
 if test $colflag -eq 0; then
-	$bdb/db_dump -p RUNDIR/bdb |
+	$bdbdir/bin/db_dump -p RUNDIR/bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e '/DATA=END/d' \
 		-e 's/^ //' > RUNDIR/bdb_dump
@@ -69,7 +68,7 @@ else
 	# Format stores record numbers in Berkeley DB as string keys,
 	# it's simpler that way.  Convert record numbers from strings
 	# to numbers.
-	$bdb/db_dump -p RUNDIR/bdb |
+	$bdbdir/bin/db_dump -p RUNDIR/bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e '/DATA=END/d' \
 		-e 's/^ //' |

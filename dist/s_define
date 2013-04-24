@@ -13,9 +13,11 @@ l="$l `echo ../src/include/*.i ../src/utilities/*.c `"
 sed -e '/^$/d' -e '/^#/d' < s_define.list
 
 # Get the list of #defines.
+# Ignore the list of configuration objects
 # Ignore the list of statistic "keys" generated for applications.
 search=`cat ../src/include/*.[hi] ../src/include/*.in |
-    sed -e '/Statistics section: BEGIN/,/Statistics section: END/d' |
+    sed -e '/configuration section: BEGIN/,/configuration section: END/d' \
+        -e '/Statistics section: BEGIN/,/Statistics section: END/d' |
     egrep '^#define' |
     sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
     sort -u`

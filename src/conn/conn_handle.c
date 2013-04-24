@@ -27,6 +27,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */
 
+	/* Configuration. */
+	WT_RET(__wt_conn_config_init(session));
+
 	/* Statistics. */
 	__wt_stat_init_connection_stats(&conn->stats);
 
@@ -80,6 +83,11 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_lock(session, &__wt_process.spinlock);
 	TAILQ_REMOVE(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(session, &__wt_process.spinlock);
+
+	/* Configuration */
+	__wt_conn_config_discard(session);		/* configuration */
+
+	__wt_conn_foc_discard(session);			/* free-on-close */
 
 	__wt_spin_destroy(session, &conn->api_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);

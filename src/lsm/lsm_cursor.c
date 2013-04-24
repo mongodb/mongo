@@ -115,16 +115,17 @@ __clsm_open_cursors(
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,raw");
-	const char *merge_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,raw");
+	const char *ckpt_cfg[3];
 	u_int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsm_tree = clsm->lsm_tree;
 	c = &clsm->iface;
 	chunk = NULL;
+
+	ckpt_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	ckpt_cfg[1] = "checkpoint=WiredTigerCheckpoint,raw";
+	ckpt_cfg[2] = NULL;
 
 	if (!update)
 		F_SET(clsm, WT_CLSM_OPEN_READ);
@@ -185,8 +186,7 @@ __clsm_open_cursors(
 		chunk = lsm_tree->chunk[i + start_chunk];
 		ret = __wt_open_cursor(session,
 		    chunk->uri, &clsm->iface,
-		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL :
-		    (F_ISSET(clsm, WT_CLSM_MERGE) ? merge_cfg : ckpt_cfg), cp);
+		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL : ckpt_cfg, cp);
 
 		/*
 		 * XXX kludge: we may have an empty chunk where no checkpoint
@@ -774,10 +774,10 @@ static inline int
 __clsm_put(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
 {
-	WT_DATA_HANDLE *saved_dhandle;
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
+	int ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 
@@ -808,7 +808,9 @@ __clsm_put(
 	 * The count is in a shared structure, but it's only approximate, so
 	 * don't worry about protecting access.
 	 */
-	++clsm->primary_chunk->count;
+	if (++clsm->primary_chunk->count % 100 == 0 &&
+	    lsm_tree->throttle_sleep > 0)
+		__wt_sleep(0, lsm_tree->throttle_sleep);
 
 	/*
 	 * Set the position for future scans.  If we were already positioned in
@@ -822,37 +824,37 @@ __clsm_put(
 	 * In LSM there are multiple btrees active at one time. The tree
 	 * switch code needs to use btree API methods, and it wants to
 	 * operate on the btree for the primary chunk. Set that up now.
+	 *
+	 * If the tree is locked, attempting to switch will block.  Set a flag
+	 * so the worker thread will switch when it gets a chance to avoid
+	 * introducing high latency into application threads.  Don't do this
+	 * indefinitely: if a chunk grows 50% larger than the configured
+	 * size, block until it can be switched.
 	 */
-	saved_dhandle = session->dhandle;
-	WT_SET_BTREE_IN_SESSION(session, ((WT_CURSOR_BTREE *)primary)->btree);
-	if (__wt_btree_size_overflow(session, lsm_tree->chunk_size)) {
-		/*
-		 * Take the LSM lock first: we can't acquire it while
-		 * holding the schema lock, or we will deadlock.
-		 */
-		WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
-		/* Make sure we don't race. */
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+		    ovfl = __wt_btree_size_overflow(
+		    session, lsm_tree->chunk_size));
+
+		if (ovfl && F_ISSET(lsm_tree, WT_LSM_TREE_LOCKED)) {
+			F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+			ovfl = 0;
+		}
+	} else
+		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+		    ovfl = __wt_btree_size_overflow(
+		    session, 3 * lsm_tree->chunk_size / 2));
+
+	if (ovfl) {
+		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_lsm_tree_switch(session, lsm_tree));
-
-		/*
-		 * Clear the "cache resident" flag so the primary can be
-		 * evicted and eventually closed.  Make sure we succeeded
-		 * in switching: if something went wrong, we should keep
-		 * trying to switch.
-		 */
-		if (ret == 0) {
-			WT_SET_BTREE_IN_SESSION(session,
-			    ((WT_CURSOR_BTREE *)primary)->btree);
-			__wt_btree_evictable(session, 1);
-		}
-
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+		WT_RET(ret);
 	}
-err:	session->dhandle = saved_dhandle;
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -964,7 +966,7 @@ err:	API_END(session);
  */
 int
 __wt_clsm_open(WT_SESSION_IMPL *session,
-    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
 	    NULL,			/* get-key */
@@ -1016,7 +1018,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	clsm->dsk_gen = 0;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
 	/*
 	 * LSM cursors default to overwrite: if no setting was supplied, turn

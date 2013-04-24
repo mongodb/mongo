@@ -23,6 +23,11 @@ search=`sed \
 echo "$search"
 fgrep -who "$search" $l) | sort | uniq -u > $t
 
-test -s $t && cat $t
-
+test -s $t && {
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	echo 'unused statistics fields'
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	cat $t
+	exit 1
+}
 exit 0

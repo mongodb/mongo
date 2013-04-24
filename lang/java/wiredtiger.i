@@ -753,15 +753,14 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %ignore __wt_session::msg_printf;
 
 %ignore wiredtiger_struct_pack;
-%ignore wiredtiger_struct_packv;
 %ignore wiredtiger_struct_size;
-%ignore wiredtiger_struct_sizev;
 %ignore wiredtiger_struct_unpack;
-%ignore wiredtiger_struct_unpackv;
 
 %ignore wiredtiger_version;
 
+%ignore __wt_connection::get_extension_api;
 %ignore wiredtiger_extension_init;
+%ignore wiredtiger_extension_terminate;
 
 %ignore wiredtiger_open;
 %javamethodmodifiers wiredtiger_open_wrap "

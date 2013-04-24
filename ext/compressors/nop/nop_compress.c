@@ -30,7 +30,7 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-WT_EXTENSION_API *wt_api;
+static WT_EXTENSION_API *wt_api;
 
 static int
 nop_compress(WT_COMPRESSOR *, WT_SESSION *,
@@ -42,21 +42,20 @@ nop_decompress(WT_COMPRESSOR *, WT_SESSION *,
 static WT_COMPRESSOR nop_compressor = {
     nop_compress, NULL, nop_decompress, NULL };
 
-#define	__UNUSED(v)	((void)(v))
-
+/*! [WT_EXTENSION_API initialization] */
 int
-wiredtiger_extension_init(
-    WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	WT_CONNECTION *conn;
+	(void)config;				/* Unused parameters */
 
-	__UNUSED(config);
+						/* Find the extension API */
+	wt_api = connection->get_extension_api(connection);
 
-	wt_api = api;
-	conn = session->connection;
-
-	return (conn->add_compressor(conn, "nop", &nop_compressor, NULL));
+						/* Load the compressor */
+	return (connection->add_compressor(
+	    connection, "nop", &nop_compressor, NULL));
 }
+/*! [WT_EXTENSION_API initialization] */
 
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 static int
@@ -65,8 +64,8 @@ nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp, int *compression_failed)
 {
-	__UNUSED(compressor);
-	__UNUSED(session);
+	(void)compressor;				/* Unused */
+	(void)session;
 
 	*compression_failed = 0;
 	if (dst_len < src_len) {
@@ -86,9 +85,9 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
-	__UNUSED(compressor);
-	__UNUSED(session);
-	__UNUSED(src_len);
+	(void)compressor;				/* Unused */
+	(void)session;
+	(void)src_len;
 
 	/*
 	 * The destination length is the number of uncompressed bytes we're

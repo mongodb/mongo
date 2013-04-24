@@ -143,14 +143,18 @@ err:	if (locked)
  *	Destroy a condition variable.
  */
 int
-__wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
+__wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
 {
+	WT_CONDVAR *cond;
 	WT_DECL_RET;
+
+	cond = *condp;
+	if (cond == NULL)
+		return (0);
 
 	ret = pthread_cond_destroy(&cond->cond);
 	WT_TRET(pthread_mutex_destroy(&cond->mtx));
-
-	__wt_free(session, cond);
+	__wt_free(session, *condp);
 
 	return ((ret == 0) ? 0 : WT_ERROR);
 
@@ -265,6 +269,8 @@ __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 	WT_RWLOCK *rwlock;
 
 	rwlock = *rwlockp;		/* Clear our caller's reference. */
+	if (rwlock == NULL)
+		return (0);
 	*rwlockp = NULL;
 
 	WT_VERBOSE_RET(session, mutex,

@@ -85,7 +85,7 @@ int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -153,10 +153,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
-	saved_dhandle = session->dhandle;
-	session->dhandle = dhandle;
-	ret = __wt_checkpoint(session, cfg);
-	session->dhandle = saved_dhandle;
+	WT_WITH_DHANDLE(session, dhandle,
+	    ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
 

@@ -42,9 +42,12 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 /*
  * __wt_cache_full_check --
  *	Wait for there to be space in the cache before a read or update.
+ *	If one pass is true we are trying to catch a pathological case where
+ *	the application can't make progress because the cache is too full.
+ *	Freeing a single page is enough in that case.
  */
 static inline int
-__wt_cache_full_check(WT_SESSION_IMPL *session)
+__wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -54,21 +57,33 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 
 	/*
 	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full), or every hundred times after that.  Otherwise,
+	 * cache is too full), or every thousand times after that.  Otherwise,
 	 * we are just wasting effort and making a busy condition variable
 	 * busier.
 	 */
-	for (wake = 0;; wake = (wake + 1) % 100) {
-		WT_RET(__wt_eviction_check(session, &lockout, wake == 0));
+	for (wake = 0;; wake = (wake + 1) % 1000) {
+		WT_RET(__wt_eviction_check(session, &lockout, wake));
 		if (!lockout || F_ISSET(session,
 		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 			return (0);
 		if (btree != NULL &&
 		    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
 			return (0);
-		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
-			__wt_yield();
+		ret = __wt_evict_lru_page(session, 1);
+		if (ret == 0 || ret == EBUSY) {
+			if (onepass)
+				return (0);
+		} else if (ret == WT_NOTFOUND)
+			/*
+			 * The eviction queue was empty - give the server time
+			 * to re-populate before trying again.
+			 */
+			__wt_sleep(0, 10);
 		else
-			WT_RET_NOTFOUND_OK(ret);
+			/*
+			 * We've dealt with expected returns - we came across
+			 * a real error.
+			 */
+			return (ret);
 	}
 }

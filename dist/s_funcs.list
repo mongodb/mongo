@@ -5,6 +5,7 @@ __bit_nclr
 __wt_bloom_drop
 __wt_bloom_get
 __wt_btree_lex_compare
+__wt_cache_dump
 __wt_config_getone
 __wt_debug_addr
 __wt_debug_offset
@@ -19,11 +20,11 @@ wiredtiger_pack_int
 wiredtiger_pack_item
 wiredtiger_pack_str
 wiredtiger_pack_uint
+wiredtiger_struct_pack
+wiredtiger_struct_size
+wiredtiger_struct_unpack
 wiredtiger_unpack_int
 wiredtiger_unpack_item
 wiredtiger_unpack_start
 wiredtiger_unpack_str
 wiredtiger_unpack_uint
-wiredtiger_struct_pack
-wiredtiger_struct_size
-wiredtiger_struct_unpack

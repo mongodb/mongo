@@ -228,7 +228,6 @@ __wt_curfile_truncate(
     WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
 {
 	WT_CURSOR_BTREE *cursor;
-	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 
 	/*
@@ -238,11 +237,9 @@ __wt_curfile_truncate(
 	 * do any of the other "standard" cursor API setup.
 	 */
 	cursor = (WT_CURSOR_BTREE *)(start == NULL ? stop : start);
-	saved_dhandle = session->dhandle;
-	WT_SET_BTREE_IN_SESSION(session, cursor->btree);
-	ret = __wt_btcur_truncate(
-	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop);
-	session->dhandle = saved_dhandle;
+	WT_WITH_BTREE(session, cursor->btree,
+	    ret = __wt_btcur_truncate(
+	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
 
 	return (ret);
 }
@@ -336,6 +333,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
+	WT_CSTAT_INCR(session, cursor_create);
 	WT_DSTAT_INCR(session, cursor_create);
 
 	if (0) {
@@ -361,8 +359,9 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	flags = 0;
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	if (cval.type == ITEM_BOOL ||
-	    (cval.type == ITEM_NUM && (cval.val == 0 || cval.val == 1))) {
+	if (cval.type == WT_CONFIG_ITEM_BOOL ||
+	    (cval.type == WT_CONFIG_ITEM_NUM &&
+	    (cval.val == 0 || cval.val == 1))) {
 		bitmap = 0;
 		bulk = (cval.val != 0);
 	} else if (WT_STRING_MATCH("bitmap", cval.str, cval.len))

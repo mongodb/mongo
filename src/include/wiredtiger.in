@@ -58,7 +58,8 @@ extern "C" {
 %}
 #endif
 
-/*! @defgroup wt WiredTiger API
+/*!
+ * @defgroup wt WiredTiger API
  * The functions, handles and methods applications use to access and manage
  * data with WiredTiger.
  *
@@ -171,10 +172,12 @@ struct __wt_cursor {
 	 */
 	const char *value_format;
 
-	/*! @name Data access
+	/*!
+	 * @name Data access
 	 * @{
 	 */
-	/*! Get the key for the current record.
+	/*!
+	 * Get the key for the current record.
 	 *
 	 * @snippet ex_all.c Get the cursor's string key
 	 *
@@ -187,7 +190,8 @@ struct __wt_cursor {
 	 */
 	int __F(get_key)(WT_CURSOR *cursor, ...);
 
-	/*! Get the value for the current record.
+	/*!
+	 * Get the value for the current record.
 	 *
 	 * @snippet ex_all.c Get the cursor's string value
 	 *
@@ -200,7 +204,8 @@ struct __wt_cursor {
 	 */
 	int __F(get_value)(WT_CURSOR *cursor, ...);
 
-	/*! Set the key for the next operation.
+	/*!
+	 * Set the key for the next operation.
 	 *
 	 * @snippet ex_all.c Set the cursor's string key
 	 *
@@ -215,7 +220,8 @@ struct __wt_cursor {
 	 */
 	void __F(set_key)(WT_CURSOR *cursor, ...);
 
-	/*! Set the value for the next operation.
+	/*!
+	 * Set the value for the next operation.
 	 *
 	 * @snippet ex_all.c Set the cursor's string value
 	 *
@@ -231,10 +237,12 @@ struct __wt_cursor {
 	void __F(set_value)(WT_CURSOR *cursor, ...);
 	/*! @} */
 
-	/*! @name Cursor positioning
+	/*!
+	 * @name Cursor positioning
 	 * @{
 	 */
-	/*! Return the ordering relationship between two cursors: both cursors
+	/*!
+	 * Return the ordering relationship between two cursors: both cursors
 	 * must have the same data source and have valid keys.
 	 *
 	 * @snippet ex_all.c Cursor comparison
@@ -250,7 +258,8 @@ struct __wt_cursor {
 	 */
 	int __F(compare)(WT_CURSOR *cursor, WT_CURSOR *other, int *comparep);
 
-	/*! Return the next record.
+	/*!
+	 * Return the next record.
 	 *
 	 * @snippet ex_all.c Return the next record
 	 *
@@ -259,7 +268,8 @@ struct __wt_cursor {
 	 */
 	int __F(next)(WT_CURSOR *cursor);
 
-	/*! Return the previous record.
+	/*!
+	 * Return the previous record.
 	 *
 	 * @snippet ex_all.c Return the previous record
 	 *
@@ -268,7 +278,8 @@ struct __wt_cursor {
 	 */
 	int __F(prev)(WT_CURSOR *cursor);
 
-	/*! Reset the position of the cursor.  Any resources held by the cursor
+	/*!
+	 * Reset the position of the cursor.  Any resources held by the cursor
 	 * are released, and the cursor's key and position are no longer valid.
 	 * A subsequent iteration with WT_CURSOR::next will move to the first
 	 * record, or with WT_CURSOR::prev will move to the last record.
@@ -280,7 +291,8 @@ struct __wt_cursor {
 	 */
 	int __F(reset)(WT_CURSOR *cursor);
 
-	/*! Move to the record matching the key. The key must first be set.
+	/*!
+	 * Move to the record matching the key. The key must first be set.
 	 *
 	 * @snippet ex_all.c Search for an exact match
 	 *
@@ -289,7 +301,8 @@ struct __wt_cursor {
 	 */
 	int __F(search)(WT_CURSOR *cursor);
 
-	/*! Move to the record matching the key if it exists, or a record that
+	/*!
+	 * Move to the record matching the key if it exists, or a record that
 	 * would be adjacent.  Either the smallest record larger than the key
 	 * or the largest record smaller than the key (in other words, a
 	 * logically adjacent key).  The key must first be set.
@@ -309,10 +322,12 @@ struct __wt_cursor {
 	int __F(search_near)(WT_CURSOR *cursor, int *exactp);
 	/*! @} */
 
-	/*! @name Data modification
+	/*!
+	 * @name Data modification
 	 * @{
 	 */
-	/*! Insert a record, and optionally overwrite an existing record.
+	/*!
+	 * Insert a record, and optionally overwrite an existing record.
 	 * If the cursor was not configured with "append" or "overwrite", both
 	 * the key and value must be set and the record must not already exist;
 	 * the record will be inserted.
@@ -341,7 +356,8 @@ struct __wt_cursor {
 	 */
 	int __F(insert)(WT_CURSOR *cursor);
 
-	/*! Update a record.  Both key and value must be set, the key must
+	/*!
+	 * Update a record.  Both key and value must be set, the key must
 	 * exist, and the value of the key's record will be updated.
 	 *
 	 * @snippet ex_all.c Update an existing record
@@ -353,7 +369,8 @@ struct __wt_cursor {
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
-	/*! Remove a record.  The key must be set, and the key's record will be
+	/*!
+	 * Remove a record.  The key must be set, and the key's record will be
 	 * removed.
 	 *
 	 * Removing a record in a fixed-length bit field column-store
@@ -370,7 +387,8 @@ struct __wt_cursor {
 	int __F(remove)(WT_CURSOR *cursor);
 	/*! @} */
 
-	/*! Close the cursor.
+	/*!
+	 * Close the cursor.
 	 *
 	 * This releases the resources associated with the cursor handle.
 	 * Cursors are closed implicitly by ending the enclosing connection or
@@ -403,6 +421,9 @@ struct __wt_cursor {
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
+	/* Data source cursors have underlying application-owned cursors. */
+	WT_CURSOR *data_source;
+
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_DUMP_HEX	0x0002
 #define	WT_CURSTD_DUMP_PRINT	0x0004
@@ -430,7 +451,8 @@ struct __wt_session {
 	/*! The connection for this session. */
 	WT_CONNECTION *connection;
 
-	/*! Close the session handle.
+	/*!
+	 * Close the session handle.
 	 *
 	 * This will release the resources associated with the session handle,
 	 * including rolling back any active transactions and closing any
@@ -444,7 +466,8 @@ struct __wt_session {
 	 */
 	int __F(close)(WT_SESSION *session, const char *config);
 
-	/*! Reconfigure a session handle.
+	/*!
+	 * Reconfigure a session handle.
 	 *
 	 * @snippet ex_all.c Reconfigure a session
 	 *
@@ -463,11 +486,13 @@ struct __wt_session {
 	 */
 	int __F(reconfigure)(WT_SESSION *session, const char *config);
 
-	/*! @name Cursor handles
+	/*!
+	 * @name Cursor handles
 	 * @{
 	 */
 
-	/*! Open a new cursor on a data source or duplicate an existing cursor.
+	/*!
+	 * Open a new cursor on a data source or duplicate an existing cursor.
 	 *
 	 * @snippet ex_all.c Open a cursor
 	 *
@@ -589,10 +614,12 @@ struct __wt_session {
 	    const char *config, WT_CURSOR **cursorp);
 	/*! @} */
 
-	/*! @name Table operations
+	/*!
+	 * @name Table operations
 	 * @{
 	 */
-	/*! Create a table, column group, index or file.
+	/*!
+	 * Create a table, column group, index or file.
 	 *
 	 * @snippet ex_all.c Create a table
 	 *
@@ -695,6 +722,8 @@ struct __wt_session {
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
 	 * 1MB.}
+	 * @config{lsm_auto_throttle, Throttle inserts into LSM trees if
+	 * flushing to disk isn't keeping up., a boolean flag; default \c true.}
 	 * @config{lsm_bloom, create bloom filters on LSM tree chunks as they
 	 * are merged., a boolean flag; default \c true.}
 	 * @config{lsm_bloom_bit_count, the number of bits used per item for LSM
@@ -761,7 +790,8 @@ struct __wt_session {
 	int __F(create)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Compact an object.
+	/*!
+	 * Compact an object.
 	 *
 	 * @snippet ex_all.c Compact a table
 	 *
@@ -778,7 +808,8 @@ struct __wt_session {
 	int __F(compact)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Drop (delete) an object.
+	/*!
+	 * Drop (delete) an object.
 	 *
 	 * @snippet ex_all.c Drop a table
 	 *
@@ -787,26 +818,30 @@ struct __wt_session {
 	 * @configstart{session.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist., a
 	 * boolean flag; default \c false.}
+	 * @config{remove_files, should the underlying files be removed?., a
+	 * boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Rename an object.
+	/*!
+	 * Rename an object.
 	 *
 	 * @snippet ex_all.c Rename a table
 	 *
 	 * @param session the session handle
-	 * @param oldname the current URI of the object, such as \c "table:old"
-	 * @param newname the new name of the object, such as \c "table:new"
+	 * @param uri the current URI of the object, such as \c "table:old"
+	 * @param newuri the new URI of the object, such as \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(rename)(WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *config);
+	    const char *uri, const char *newuri, const char *config);
 
-	/*! Salvage a file or table
+	/*!
+	 * Salvage a file or table
 	 *
 	 * Salvage rebuilds the file, or files of which a table is comprised,
 	 * discarding any corrupted file blocks.
@@ -833,7 +868,8 @@ struct __wt_session {
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Truncate a file, table or cursor range.
+	/*!
+	 * Truncate a file, table or cursor range.
 	 *
 	 * Truncate a file or table.
 	 * @snippet ex_all.c Truncate a table
@@ -860,7 +896,8 @@ struct __wt_session {
 	    const char *name,
 	    WT_CURSOR *start, WT_CURSOR *stop, const char *config);
 
-	/*! Upgrade a file or table.
+	/*!
+	 * Upgrade a file or table.
 	 *
 	 * Upgrade upgrades a file or table, if upgrade is required.
 	 *
@@ -874,7 +911,8 @@ struct __wt_session {
 	int __F(upgrade)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Verify a file or table.
+	/*!
+	 * Verify a file or table.
 	 *
 	 * Verify reports if a file, or the files of which a table is
 	 * comprised, have been corrupted.  The WT_SESSION::salvage method
@@ -901,10 +939,12 @@ struct __wt_session {
 	    const char *name, const char *config);
 	/*! @} */
 
-	/*! @name Transactions
+	/*!
+	 * @name Transactions
 	 * @{
 	 */
-	/*! Start a transaction in this session.
+	/*!
+	 * Start a transaction in this session.
 	 *
 	 * The transaction remains active until ended by
 	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction.
@@ -939,7 +979,8 @@ struct __wt_session {
 	 */
 	int __F(begin_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Commit the current transaction.
+	/*!
+	 * Commit the current transaction.
 	 *
 	 * A transaction must be in progress when this method is called.
 	 *
@@ -956,7 +997,8 @@ struct __wt_session {
 	 */
 	int __F(commit_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Roll back the current transaction.
+	/*!
+	 * Roll back the current transaction.
 	 *
 	 * A transaction must be in progress when this method is called.
 	 *
@@ -970,7 +1012,8 @@ struct __wt_session {
 	 */
 	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Write a transactionally consistent snapshot of a database or set of
+	/*!
+	 * Write a transactionally consistent snapshot of a database or set of
 	 * objects.  The checkpoint includes all transactions committed before
 	 * the checkpoint starts.  Additionally, checkpoints may optionally be
 	 * discarded.
@@ -999,21 +1042,6 @@ struct __wt_session {
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
 
 	/*! @} */
-	/*! @name Debugging
-	 * @{
-	 */
-
-	/*! Send a string to the message handler for debugging.
-	 *
-	 * @snippet ex_all.c Print to the message stream
-	 *
-	 * @param session the session handle
-	 * @param fmt a printf-like format specification
-	 * @errors
-	 */
-	int __F(msg_printf)(WT_SESSION *session, const char *fmt, ...);
-
-	/*! @} */
 };
 
 /*!
@@ -1030,7 +1058,8 @@ struct __wt_session {
  * see @ref threads for more information.
  */
 struct __wt_connection {
-	/*! Close a connection.
+	/*!
+	 * Close a connection.
 	 *
 	 * Any open sessions will be closed.
 	 *
@@ -1042,7 +1071,8 @@ struct __wt_connection {
 	 */
 	int __F(close)(WT_CONNECTION *connection, const char *config);
 
-	/*! Reconfigure a connection handle.
+	/*!
+	 * Reconfigure a connection handle.
 	 *
 	 * @snippet ex_all.c Reconfigure a connection
 	 *
@@ -1094,7 +1124,8 @@ struct __wt_connection {
 	 */
 	int __F(reconfigure)(WT_CONNECTION *connection, const char *config);
 
-	/*! The home directory of the connection.
+	/*!
+	 * The home directory of the connection.
 	 *
 	 * @snippet ex_all.c Get the database home directory
 	 *
@@ -1103,7 +1134,28 @@ struct __wt_connection {
 	 */
 	const char *__F(get_home)(WT_CONNECTION *connection);
 
-	/*! Return if opening this handle created the database.
+	/*!
+	 * Add configuration options for a method.  See
+	 * @ref custom_ds_config_add for more information.
+	 *
+	 * @snippet ex_all.c Configure method configuration
+	 *
+	 * @param connection the connection handle
+	 * @param method the name of the method
+	 * @param uri the object type or NULL for all object types
+	 * @param config the additional configuration's name and default value
+	 * @param type the additional configuration's type (must be one of
+	 * \c "boolean"\, \c "int", \c "list" or \c "string")
+	 * @param check the additional configuration check string, or NULL if
+	 * none
+	 * @errors
+	 */
+	int __F(configure_method)(WT_CONNECTION *connection,
+	    const char *method, const char *uri,
+	    const char *config, const char *type, const char *check);
+
+	/*!
+	 * Return if opening this handle created the database.
 	 *
 	 * @snippet ex_all.c Check if the database is newly created
 	 *
@@ -1114,10 +1166,12 @@ struct __wt_connection {
 	 */
 	int __F(is_new)(WT_CONNECTION *connection);
 
-	/*! @name Session handles
+	/*!
+	 * @name Session handles
 	 * @{
 	 */
-	/*! Open a session.
+	/*!
+	 * Open a session.
 	 *
 	 * @snippet ex_all.c Open a session
 	 *
@@ -1138,33 +1192,44 @@ struct __wt_connection {
 	    WT_SESSION **sessionp);
 	/*! @} */
 
-	/*! @name Extensions
+	/*!
+	 * @name Extensions
 	 * @{
 	 */
-	/*! Load an extension.
+	/*!
+	 * Load an extension.
 	 *
 	 * @snippet ex_all.c Load an extension
 	 *
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
 	 * @configstart{connection.load_extension, see dist/api_data.py}
-	 * @config{entry, the entry point of the extension., a string; default
+	 * @config{entry, the entry point of the extension\, called to
+	 * initialize the extension when it is loaded.  The signature of the
+	 * function must match ::wiredtiger_extension_init., a string; default
 	 * \c wiredtiger_extension_init.}
 	 * @config{prefix, a prefix for all names registered by this extension
 	 * (e.g.\, to make namespaces distinct or during upgrades., a string;
 	 * default empty.}
+	 * @config{terminate, a optional function in the extension that is
+	 * called before the extension is unloaded during WT_CONNECTION::close.
+	 * The signature of the function must match
+	 * ::wiredtiger_extension_terminate., a string; default \c
+	 * wiredtiger_extension_terminate.}
 	 * @configend
 	 * @errors
 	 */
 	int __F(load_extension)(WT_CONNECTION *connection,
 	    const char *path, const char *config);
 
-	/*! Add a custom data source. @notyet{custom data sources}
+	/*!
+	 * Add a custom data source.  See @ref custom_data_sources for more
+	 * information.
 	 *
 	 * The application must first implement the WT_DATA_SOURCE interface
 	 * and then register the implementation with WiredTiger:
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE register
+	 * @snippet ex_data_source.c WT_DATA_SOURCE register
 	 *
 	 * @param connection the connection handle
 	 * @param prefix the URI prefix for this data source, e.g., "file:"
@@ -1176,7 +1241,8 @@ struct __wt_connection {
 	int __F(add_data_source)(WT_CONNECTION *connection, const char *prefix,
 	    WT_DATA_SOURCE *data_source, const char *config);
 
-	/*! Add a custom collation function.
+	/*!
+	 * Add a custom collation function.
 	 *
 	 * The application must first implement the WT_COLLATOR interface and
 	 * then register the implementation with WiredTiger:
@@ -1193,7 +1259,8 @@ struct __wt_connection {
 	int __F(add_collator)(WT_CONNECTION *connection,
 	    const char *name, WT_COLLATOR *collator, const char *config);
 
-	/*! Add a compression function.
+	/*!
+	 * Add a compression function.
 	 *
 	 * The application must first implement the WT_COMPRESSOR interface
 	 * and then register the implementation with WiredTiger:
@@ -1210,7 +1277,8 @@ struct __wt_connection {
 	int __F(add_compressor)(WT_CONNECTION *connection,
 	    const char *name, WT_COMPRESSOR *compressor, const char *config);
 
-	/*! Add a custom extractor for index keys or column groups.
+	/*!
+	 * Add a custom extractor for index keys or column groups.
 	 * @notyet{custom extractors}
 	 *
 	 * The application must first implement the WT_EXTRACTOR interface and
@@ -1227,10 +1295,21 @@ struct __wt_connection {
 	 */
 	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
 	    WT_EXTRACTOR *extractor, const char *config);
+
+	/*!
+	 * Return a reference to the WiredTiger extension functions.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API declaration
+	 *
+	 * @param wt_conn the WT_CONNECTION handle
+	 * @returns a reference to a WT_EXTENSION_API structure.
+	 */
+	WT_EXTENSION_API *__F(get_extension_api)(WT_CONNECTION *wt_conn);
 	/*! @} */
 };
 
-/*! Open a connection to a database.
+/*!
+ * Open a connection to a database.
  *
  * @snippet ex_all.c Open a connection
  *
@@ -1329,7 +1408,7 @@ struct __wt_connection {
  * \c "%b %d %H:%M:%S".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
  * between each write of the log records; setting this value configures \c
- * statistics and statistics logging., an integer between 5 and 100000; default
+ * statistics and statistics logging., an integer between 1 and 100000; default
  * \c 0.}
  * @config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
@@ -1359,7 +1438,8 @@ int wiredtiger_open(const char *home,
     WT_EVENT_HANDLER *errhandler, const char *config,
     WT_CONNECTION **connectionp);
 
-/*! Return information about an error as a string; wiredtiger_strerror is a
+/*!
+ * Return information about an error as a string; wiredtiger_strerror is a
  * superset of the ISO C99/POSIX 1003.1-2001 function strerror.
  *
  * @snippet ex_all.c Display an error
@@ -1417,10 +1497,13 @@ struct __wt_event_handler {
 	    const char *operation, uint64_t progress);
 };
 
-/*! @name Data packing and unpacking
+/*!
+ * @name Data packing and unpacking
  * @{
  */
-/*! Pack a structure into a buffer.
+
+/*!
+ * Pack a structure into a buffer.
  *
  * See @ref packing for a description of the permitted format strings.
  *
@@ -1428,8 +1511,8 @@ struct __wt_event_handler {
  *
  * For example, the string <code>"iSh"</code> will pack a 32-bit integer
  * followed by a NUL-terminated string, followed by a 16-bit integer.  The
- * default, big-endian encoding will be used, with no alignment.  This could
- * be used in C as follows:
+ * default, big-endian encoding will be used, with no alignment.  This could be
+ * used in C as follows:
  *
  * @snippet ex_all.c Pack fields into a buffer
  *
@@ -1443,10 +1526,11 @@ struct __wt_event_handler {
  * @param format the data format, see @ref packing
  * @errors
  */
-int wiredtiger_struct_pack(
-    WT_SESSION *session, void *buffer, size_t size, const char *format, ...);
+int wiredtiger_struct_pack(WT_SESSION *session,
+    void *buffer, size_t size, const char *format, ...);
 
-/*! Calculate the size required to pack a structure.
+/*!
+ * Calculate the size required to pack a structure.
  *
  * Note that for variable-sized fields including variable-sized strings and
  * integers, the calculated sized merely reflects the expected sizes specified
@@ -1460,12 +1544,14 @@ int wiredtiger_struct_pack(
  * @param format the data format, see @ref packing
  * @errors
  */
-int wiredtiger_struct_size(
-    WT_SESSION *session, size_t *sizep, const char *format, ...);
+int wiredtiger_struct_size(WT_SESSION *session,
+    size_t *sizep, const char *format, ...);
 
-/*! Unpack a structure from a buffer.
+/*!
+ * Unpack a structure from a buffer.
  *
- * Reverse of ::wiredtiger_struct_pack: gets values out of a packed byte string.
+ * Reverse of ::wiredtiger_struct_pack: gets values out of a
+ * packed byte string.
  *
  * @snippet ex_all.c Unpack fields from a buffer
  *
@@ -1603,12 +1689,12 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 
 #endif /* !defined(SWIG) */
-
 /*!
  * @}
  */
 
-/*! Get version information.
+/*!
+ * Get version information.
  *
  * @snippet ex_all.c Get the WiredTiger library version #1
  * @snippet ex_all.c Get the WiredTiger library version #2
@@ -1641,31 +1727,36 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * DO NOT EDIT: automatically built by dist/api_err.py.
  * Error return section: BEGIN
  */
-/*! Conflict between concurrent operations.
+/*!
+ * Conflict between concurrent operations.
  * This error is generated when an operation cannot be completed due to a
  * conflict with concurrent operations.  The operation may be retried; if a
  * transaction is in progress, it should be rolled back and the operation
  * retried in a new transaction.
  */
 #define	WT_DEADLOCK	-31800
-/*! Attempt to insert an existing key.
+/*!
+ * Attempt to insert an existing key.
  * This error is generated when the application attempts to insert a record with
  * the same key as an existing record without the 'overwrite' configuration to
  * WT_SESSION::open_cursor.
  */
 #define	WT_DUPLICATE_KEY	-31801
-/*! Non-specific WiredTiger error.
+/*!
+ * Non-specific WiredTiger error.
  * This error is returned when an error is not covered by a specific error
  * return.
  */
 #define	WT_ERROR	-31802
-/*! Cursor item not found.
- * This error indicates a cursor operation did not find a record to return.
- * This includes search and other operations where no record matched the
+/*!
+ * Item not found.
+ * This error indicates an operation did not find a value to return.  This
+ * includes cursor search and other operations where no record matched the
  * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
  */
 #define	WT_NOTFOUND	-31803
-/*! WiredTiger library panic.
+/*!
+ * WiredTiger library panic.
  * This error indicates an underlying problem that requires the application exit
  * and restart.
  */
@@ -1682,11 +1773,19 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 
 /*! @} */
 
-/*! @defgroup wt_ext WiredTiger Extension API
+/*!
+ * @defgroup wt_ext WiredTiger Extension API
  * The functions and interfaces applications use to customize and extend the
  * behavior of WiredTiger.
  * @{
  */
+
+/*******************************************
+ * Forward structure declarations for the extension API
+ *******************************************/
+struct __wt_config_arg;	    typedef struct __wt_config_arg WT_CONFIG_ARG;
+struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
+struct __wt_config_scan;    typedef struct __wt_config_scan WT_CONFIG_SCAN;
 
 /*!
  * The interface implemented by applications to provide custom ordering of
@@ -1700,7 +1799,8 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * @snippet ex_extending.c add collator prefix10
  */
 struct __wt_collator {
-	/*! Callback to compare keys.
+	/*!
+	 * Callback to compare keys.
 	 *
 	 * @param[out] cmp set to -1 if <code>key1 < key2</code>,
 	 * 	0 if <code>key1 == key2</code>,
@@ -1733,7 +1833,8 @@ struct __wt_collator {
  * @snippet ex_all.c WT_COMPRESSOR register
  */
 struct __wt_compressor {
-	/*! Callback to compress a chunk of data.
+	/*!
+	 * Callback to compress a chunk of data.
 	 *
 	 * WT_COMPRESSOR::compress takes a source buffer and a destination
 	 * buffer, by default of the same size.  If the callback can compress
@@ -1768,7 +1869,8 @@ struct __wt_compressor {
 	    uint8_t *dst, size_t dst_len,
 	    size_t *result_lenp, int *compression_failed);
 
-	/*! Callback to compress a list of byte strings.
+	/*!
+	 * Callback to compress a list of byte strings.
 	 *
 	 * WT_COMPRESSOR::compress_raw gives applications fine-grained control
 	 * over disk block size when writing row-store or variable-length
@@ -1879,7 +1981,8 @@ struct __wt_compressor {
 	    int final,
 	    size_t *result_lenp, uint32_t *result_slotsp);
 
-	/*! Callback to decompress a chunk of data.
+	/*!
+	 * Callback to decompress a chunk of data.
 	 *
 	 * WT_COMPRESSOR::decompress takes a source buffer and a destination
 	 * buffer.  The contents are switched from \c compress: the
@@ -1918,7 +2021,8 @@ struct __wt_compressor {
 	    uint8_t *dst, size_t dst_len,
 	    size_t *result_lenp);
 
-	/*! Callback to size a destination buffer for compression
+	/*!
+	 * Callback to size a destination buffer for compression
 	 *
 	 * WT_COMPRESSOR::pre_size is an optional callback that, given the
 	 * source buffer and size, produces the size of the destination buffer
@@ -1962,7 +2066,7 @@ struct __wt_compressor {
  * Applications can extend WiredTiger by providing new implementations of the
  * WT_DATA_SOURCE class.  Each data source supports a different URI scheme for
  * data sources to WT_SESSION::create, WT_SESSION::open_cursor and related
- * methods.
+ * methods.  See @ref custom_data_sources for more information.
  *
  * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_DATA_SOURCE
  * interface from multiple threads concurrently.  It is the responsibility of
@@ -1971,44 +2075,72 @@ struct __wt_compressor {
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_data_source.
  *
- * @snippet ex_all.c WT_DATA_SOURCE register
+ * @snippet ex_data_source.c WT_DATA_SOURCE register
  */
 struct __wt_data_source {
-	/*! Callback to create a new object.
+	/*!
+	 * Callback to create a new object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE create
+	 * @snippet ex_data_source.c WT_DATA_SOURCE create
 	 */
 	int (*create)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, int exclusive, const char *config);
+	    const char *uri, WT_CONFIG_ARG *config);
 
-	/*! Callback to drop an object.
+	/*!
+	 * Callback to compact an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE drop
+	 * @snippet ex_data_source.c WT_DATA_SOURCE compact
+	 */
+	int (*compact)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*!
+	 * Callback to drop an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE drop
 	 */
 	int (*drop)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *cfg[]);
+	    const char *uri, WT_CONFIG_ARG *config);
 
-	/*! Callback to initialize a cursor.
+	/*!
+	 * Callback to initialize a cursor.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE open_cursor
+	 * @snippet ex_data_source.c WT_DATA_SOURCE open_cursor
 	 */
 	int (*open_cursor)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *uri, WT_CURSOR *owner, const char *cfg[],
-	    WT_CURSOR **new_cursor);
+	    const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor);
 
-	/*! Callback to rename an object.
+	/*!
+	 * Callback to rename an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE rename
+	 * @snippet ex_data_source.c WT_DATA_SOURCE rename
 	 */
 	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *cfg[]);
+	    const char *uri, const char *newuri, WT_CONFIG_ARG *config);
 
-	/*! Callback to truncate an object.
+	/*!
+	 * Callback to salvage an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE truncate
+	 * @snippet ex_data_source.c WT_DATA_SOURCE salvage
+	 */
+	int (*salvage)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*!
+	 * Callback to truncate an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE truncate
 	 */
 	int (*truncate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *cfg[]);
+	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*!
+	 * Callback to verify an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE verify
+	 */
+	int (*verify)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ARG *config);
 };
 
 /*!
@@ -2021,7 +2153,8 @@ struct __wt_data_source {
  * @snippet ex_all.c WT_EXTRACTOR register
  */
 struct __wt_extractor {
-	/*! Callback to extract a value for an index or column group.
+	/*!
+	 * Callback to extract a value for an index or column group.
 	 *
 	 * @errors
 	 *
@@ -2032,22 +2165,32 @@ struct __wt_extractor {
 	    WT_ITEM *result);
 };
 
-/*! Entry point to an extension, implemented by loadable modules.
+/*!
+ * Entry point to an extension, called when the extension is loaded.
  *
- * @param session the session handle
- * @param api entry points for WiredTiger functions exported to extensions
- * @param config the config string passed to WT_CONNECTION::load_extension
+ * @param connection the connection handle
+ * @param config the config information passed to WT_CONNECTION::load_extension
  * @errors
  */
-extern int wiredtiger_extension_init(WT_SESSION *session,
-    WT_EXTENSION_API *api, const char *config);
+extern int wiredtiger_extension_init(
+    WT_CONNECTION *connection, WT_CONFIG_ARG *config);
+
+/*!
+ * Optional cleanup function for an extension, called during
+ * WT_CONNECTION::close.
+ *
+ * @param connection the connection handle
+ * @errors
+ */
+extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 
 /*! @} */
 
 /*******************************************
  * Statistic reference.
  *******************************************/
-/*! @addtogroup wt
+/*!
+ * @addtogroup wt
  * @{
  */
 /*
@@ -2120,40 +2263,60 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_CACHE_WRITE			26
 /*! pthread mutex condition wait calls */
 #define	WT_STAT_CONN_COND_WAIT				27
+/*! cursor creation */
+#define	WT_STAT_CONN_CURSOR_CREATE			28
+/*! Btree cursor insert calls */
+#define	WT_STAT_CONN_CURSOR_INSERT			29
+/*! Btree cursor next calls */
+#define	WT_STAT_CONN_CURSOR_NEXT			30
+/*! Btree cursor prev calls */
+#define	WT_STAT_CONN_CURSOR_PREV			31
+/*! Btree cursor remove calls */
+#define	WT_STAT_CONN_CURSOR_REMOVE			32
+/*! Btree cursor reset calls */
+#define	WT_STAT_CONN_CURSOR_RESET			33
+/*! Btree cursor search calls */
+#define	WT_STAT_CONN_CURSOR_SEARCH			34
+/*! Btree cursor search near calls */
+#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			35
+/*! Btree cursor update calls */
+#define	WT_STAT_CONN_CURSOR_UPDATE			36
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				28
+#define	WT_STAT_CONN_FILE_OPEN				37
+/*! rows merged in an LSM tree */
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			38
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			29
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			39
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			30
+#define	WT_STAT_CONN_MEMORY_FREE			40
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			31
+#define	WT_STAT_CONN_MEMORY_GROW			41
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				32
+#define	WT_STAT_CONN_READ_IO				42
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				33
+#define	WT_STAT_CONN_REC_PAGES				43
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			34
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			44
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			35
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			45
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			36
+#define	WT_STAT_CONN_RWLOCK_READ			46
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			37
+#define	WT_STAT_CONN_RWLOCK_WRITE			47
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			38
+#define	WT_STAT_CONN_TXN_ANCIENT			48
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				39
+#define	WT_STAT_CONN_TXN_BEGIN				49
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			40
+#define	WT_STAT_CONN_TXN_CHECKPOINT			50
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				41
+#define	WT_STAT_CONN_TXN_COMMIT				51
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			42
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			52
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			43
+#define	WT_STAT_CONN_TXN_ROLLBACK			53
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				44
+#define	WT_STAT_CONN_WRITE_IO				54
 
 /*!
  * @}
@@ -2177,7 +2340,7 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_BLOCK_MAJOR			6
 /*! minor version number */
 #define	WT_STAT_DSRC_BLOCK_MINOR			7
-/*! block manager size */
+/*! block manager file size in bytes */
 #define	WT_STAT_DSRC_BLOCK_SIZE				8
 /*! bloom filters in the LSM tree */
 #define	WT_STAT_DSRC_BLOOM_COUNT			9

@@ -9,6 +9,7 @@ ADDR
 AJZ
 API
 APIs
+ARG
 ARGS
 Addr
 Alakuijala
@@ -23,6 +24,7 @@ BBBBBBBBBBBBBBBBBB
 BDB
 BDB's
 BIGENDIAN
+BOOL
 BSR
 BTREE
 BUF
@@ -59,6 +61,8 @@ DESC
 DHANDLE
 DSRC
 DUPLICATEV
+DbCursor
+DbEnv
 Decrement
 EB
 EBUSY
@@ -68,6 +72,7 @@ EMail
 ENOENT
 ENOMEM
 ENOTSUP
+ENV
 EOF
 ETIME
 ETIMEDOUT
@@ -89,8 +94,10 @@ Fsync
 GCC
 GIDs
 Geoff
+Givargis
 IEC
 IEEE
+IFF
 IKEY
 IMPL
 IMPL's
@@ -105,6 +112,7 @@ JSON
 Jyrki
 KEYFIRST
 KV
+KVS
 Kanowski's
 Kounavis
 LF
@@ -159,6 +167,7 @@ Pre
 Qsort
 RCS
 READONLY
+RECNO
 REF's
 REQ
 RET
@@ -178,6 +187,7 @@ SQL
 SSD
 SSq
 STAILQ
+STRUCT
 SYS
 Sevii
 SiH
@@ -185,6 +195,7 @@ Skiplist
 Solaris
 Split's
 StoreLoad
+Strsep
 Subtree
 Subtrees
 TAILQ
@@ -220,6 +231,7 @@ WiredTigerCheckpoint
 WiredTigerHome
 WiredTigerStat
 WithSeeds
+Wmissing
 Wuninitialized
 XP
 __wt_epoch
@@ -238,6 +250,7 @@ allocsize
 ao
 ap
 api
+apip
 arg
 argc
 args
@@ -267,8 +280,10 @@ btmem
 btree
 btrees
 buf
+bufs
 builtin
 bytelock
+bytestring
 bzCompressEnd
 bzCompressInit
 bzDecompress
@@ -309,6 +324,9 @@ conf
 config
 conn
 connectionp
+const
+copyin
+copyout
 cp
 crc
 cref
@@ -352,6 +370,7 @@ dll
 dlopen
 dlsym
 dmsg
+ds
 dsk
 dsrc
 dst
@@ -402,6 +421,7 @@ fixup
 flcs
 fmt
 fnv
+foc
 fopen
 fp
 fprintf
@@ -470,9 +490,12 @@ ispo
 kb
 kcell
 keycmp
+keygen
 keyname
 keyv
 kv
+kvs
+kvsbdb
 ld
 len
 lenp
@@ -497,6 +520,7 @@ lsm
 lsn
 lu
 lzo
+madvise
 majorp
 malloc
 maxintlitem
@@ -511,6 +535,7 @@ membar
 memcpy
 memfree
 memmove
+memrata
 memsize
 mergeable
 metaconf
@@ -521,6 +546,7 @@ minorp
 minprefix
 mkdir
 mmap
+mnt
 msg
 msgv
 mtx
@@ -540,6 +566,7 @@ nclr
 negint
 newbar
 newname
+newuri
 nextprev
 nfilename
 nhex
@@ -578,6 +605,7 @@ poptable
 posint
 posix
 pre
+preload
 prepended
 presize
 printf
@@ -609,6 +637,7 @@ recno
 recnos
 req
 rescan
+resize
 resizing
 resultp
 ret
@@ -626,6 +655,7 @@ rx
 sHQ
 savepoints
 sb
+scanp
 schemas
 schematab
 scr
@@ -668,6 +698,8 @@ strftime
 stringin
 strncpy
 strndup
+strsep
+strtoll
 strtouq
 struct
 structs

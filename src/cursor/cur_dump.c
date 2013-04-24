@@ -283,7 +283,7 @@ err:	API_END(session);
 }
 
 /*
- * __wt_curdump_init --
+ * __wt_curdump_create --
  *	initialize a dump cursor.
  */
 int
@@ -307,9 +307,10 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	WT_CURSOR *cursor;
 	WT_CURSOR_DUMP *cdump;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
+	const char *cfg[2];
 
 	session = (WT_SESSION_IMPL *)child->session;
+
 	WT_RET(__wt_calloc_def(session, 1, &cdump));
 	cursor = &cdump->iface;
 	*cursor = iface;
@@ -325,6 +326,9 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_DUMP, iface) == 0);
+
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[1] = NULL;
 	WT_RET(__wt_cursor_init(cursor, NULL, owner, cfg, cursorp));
 
 	return (0);

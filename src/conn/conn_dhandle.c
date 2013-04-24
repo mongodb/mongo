@@ -257,7 +257,8 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 	 * it, after the copy, we don't want to free it.
 	 */
 	WT_ERR(__wt_calloc_def(session, 3, &dhandle->cfg));
-	WT_ERR(__wt_strdup(session, __wt_confdfl_file_meta, &dhandle->cfg[0]));
+	WT_ERR(__wt_strdup(
+	    session, WT_CONFIG_BASE(session, file_meta), &dhandle->cfg[0]));
 	dhandle->cfg[1] = metaconf;
 	metaconf = NULL;
 	return (0);
@@ -369,11 +370,10 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	saved_dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
@@ -387,11 +387,11 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 			 * handle locking here, or pulling every tree into this
 			 * session's handle cache.
 			 */
-			session->dhandle = dhandle;
-			WT_ERR(func(session, cfg));
+			WT_WITH_DHANDLE(session, dhandle,
+			    ret = func(session, cfg));
+			WT_RET(ret);
 		}
 
-err:	session->dhandle = saved_dhandle;
 	return (ret);
 }
 

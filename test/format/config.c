@@ -66,29 +66,31 @@ config_setup(void)
 			break;
 		}
 
-	if (!config_find_is_perm("file_type", strlen("file_type"))) {
-		if (strcmp(g.c_data_source, "lsm") == 0)
-			config_single("file_type=row", 0);
-		else
-			switch (MMRAND(0, 2)) {
-			case 0:
+	if (!config_find_is_perm("file_type", strlen("file_type")))
+		switch (MMRAND(0, 2)) {
+		case 0:
+			if (!DATASOURCE("lsm")) {
 				config_single("file_type=fix", 0);
 				break;
-			case 1:
+			}
+			/* FALLTHROUGH */
+		case 1:
+			if (!DATASOURCE("lsm")) {
 				config_single("file_type=var", 0);
 				break;
-			case 2:
-				config_single("file_type=row", 0);
-				break;
 			}
-	}
+			/* FALLTHROUGH */
+		case 2:
+			config_single("file_type=row", 0);
+			break;
+		}
 	g.type = config_translate(g.c_file_type);
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still
 	 * have a mismatch.
 	 */
-	if (g.type != ROW && strcmp(g.c_data_source, "lsm") == 0) {
+	if (DATASOURCE("lsm") && g.type != ROW) {
 		fprintf(stderr,
 	    "%s: lsm data_source is only compatible with row file_type\n",
 		    g.progname);
@@ -123,6 +125,16 @@ config_setup(void)
 		else
 			*cp->v = CONF_RAND(cp);
 	}
+
+	/* KVS requires shared libraries. */
+	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
+		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
+	if (DATASOURCE("memrata") && access(MEMRATA_PATH, R_OK) != 0)
+		die(errno, "memrata shared library: %s", MEMRATA_PATH);
+
+	/* KVS doesn't support user-specified collations. */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+		g.c_reverse = 0;
 
 	config_compression();
 
@@ -340,8 +352,10 @@ config_single(const char *s, int perm)
 	if (cp->flags & C_STRING) {
 		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
 		    strncmp("file", ep, strlen("file")) != 0 &&
-		    strncmp("table", ep, strlen("table")) != 0 &&
-		    strncmp("lsm", ep, strlen("lsm")) != 0) {
+		    strncmp("kvsbdb", ep, strlen("kvsbdb")) != 0 &&
+		    strncmp("lsm", ep, strlen("lsm")) != 0 &&
+		    strncmp("memrata", ep, strlen("memrata")) != 0 &&
+		    strncmp("table", ep, strlen("table")) != 0) {
 			    fprintf(stderr,
 				"Invalid data source option: %s\n", ep);
 			    exit(EXIT_FAILURE);

@@ -18,6 +18,15 @@
 #define	WT_SET_BTREE_IN_SESSION(s, b)	((s)->dhandle = b->dhandle)
 #define	WT_CLEAR_BTREE_IN_SESSION(s)	((s)->dhandle = NULL)
 
+#define	WT_WITH_DHANDLE(s, d, e)	do {				\
+	WT_DATA_HANDLE *old_dhandle = (s)->dhandle;			\
+	(s)->dhandle = (d);						\
+	e;								\
+	(s)->dhandle = old_dhandle;					\
+} while (0)
+
+#define	WT_WITH_BTREE(s, b, e)	WT_WITH_DHANDLE(s, (b)->dhandle, e)
+
 /*
  * WT_DATA_HANDLE --
  *	A handle for a generic named data source.

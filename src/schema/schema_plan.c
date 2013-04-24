@@ -171,20 +171,17 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
-	WT_DATA_HANDLE *saved_dhandle;
-	WT_DECL_RET;
 	u_int cg, col, current_cg, current_col, i, start_cg, start_col;
 	int have_it;
 	char coltype, current_coltype;
 
-	saved_dhandle = session->dhandle;
 	start_cg = start_col = UINT_MAX;	/* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
-	WT_ERR(__wt_config_initn(session, &conf, columns, len));
+	WT_RET(__wt_config_initn(session, &conf, columns, len));
 	if (value_only)
 		for (i = 0; i < table->nkey_columns; i++)
-			WT_ERR(__wt_config_next(&conf, &k, &v));
+			WT_RET(__wt_config_next(&conf, &k, &v));
 
 	current_cg = cg = 0;
 	current_col = col = INT_MAX;
@@ -206,7 +203,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			    current_coltype != coltype) {
 				WT_ASSERT(session, !value_only ||
 				    coltype == WT_PROJ_VALUE);
-				WT_ERR(__wt_buf_catfmt(
+				WT_RET(__wt_buf_catfmt(
 				    session, plan, "%d%c", cg, coltype));
 
 				/*
@@ -220,9 +217,9 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			/* Now move to the column we want. */
 			if (current_col < col) {
 				if (col - current_col > 1)
-					WT_ERR(__wt_buf_catfmt(session,
+					WT_RET(__wt_buf_catfmt(session,
 					    plan, "%d", col - current_col));
-				WT_ERR(__wt_buf_catfmt(session,
+				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_SKIP));
 			}
 			/*
@@ -232,14 +229,14 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			 * a "reuse" operation to avoid making another copy.
 			 */
 			if (!have_it) {
-				WT_ERR(__wt_buf_catfmt(session,
+				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_NEXT));
 
 				start_cg = cg;
 				start_col = col;
 				have_it = 1;
 			} else
-				WT_ERR(__wt_buf_catfmt(session,
+				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_REUSE));
 			current_col = col + 1;
 		}
@@ -247,10 +244,9 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 	/* Special case empty plans. */
 	if (i == 0 && plan->size == 0)
-		WT_ERR(__wt_buf_set(session, plan, "", 1));
+		WT_RET(__wt_buf_set(session, plan, "", 1));
 
-err:	session->dhandle = saved_dhandle;
-	return (ret);
+	return (0);
 }
 
 static int

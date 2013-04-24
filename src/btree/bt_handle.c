@@ -11,6 +11,7 @@ static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
+static int __btree_warm_cache(WT_SESSION_IMPL *);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
@@ -106,6 +107,9 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 			WT_ERR(__wt_btree_tree_open(
 			    session, root_addr, root_addr_size));
 
+			/* Warm the cache, if possible. */
+			WT_ERR(__btree_warm_cache(session));
+
 			/* Get the last record number in a column-store file. */
 			if (btree->type != BTREE_ROW)
 				WT_ERR(__btree_get_last_recno(session));
@@ -154,8 +158,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
-	if (btree->val_ovfl_lock != NULL)
-		WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
+	WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
 
 	btree->bulk_load_ok = 0;
 
@@ -484,6 +487,42 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 		F_CLR(S2BT(session), WT_BTREE_NO_EVICTION);
 	else
 		F_SET(S2BT(session), WT_BTREE_NO_EVICTION);
+}
+
+/*
+ * __btree_warm_cache --
+ *	Pre-load internal pages from a checkpoint.
+ */
+static int
+__btree_warm_cache(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_BM *bm;
+	WT_PAGE *page;
+
+	btree = S2BT(session);
+	bm = btree->bm;
+
+	if (bm->map == NULL)
+		return (0);
+
+	/*
+	 * If the file is memory mapped, find the first leaf page.  Assuming
+	 * the file was created with a bulk load, the internal pages will be at
+	 * the end of the file, starting with the parent of the left-most
+	 * child, ending with the root.
+	 */
+	page = NULL;
+	WT_RET(__wt_tree_walk(session, &page, 0));
+	if (page == NULL)
+		return (WT_NOTFOUND);
+
+	if (page->parent->dsk < btree->root_page->dsk)
+		WT_RET(__wt_mmap_preload(
+		    session, page->parent->dsk,
+		    WT_PTRDIFF(btree->root_page->dsk, page->parent->dsk)));
+
+	return (__wt_page_release(session, page));
 }
 
 /*

@@ -23,6 +23,7 @@ __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
 	size_t size;
 
 	buf = &session->logrec_buf;
+	size = 0;
 
 	va_start(ap, recdesc);
 	ret = __log_record_size(session, &size, recdesc, ap);

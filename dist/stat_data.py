@@ -66,8 +66,7 @@ connection_stats = [
 	    'cache: internal page merge operations completed'),
 	Stat('cache_eviction_merge_fail',
 	    'cache: internal page merge attempts that could not complete'),
-	Stat('cache_eviction_merge_levels',
-	    'cache: internal levels merged'),
+	Stat('cache_eviction_merge_levels', 'cache: internal levels merged'),
 	Stat('cache_eviction_slow',
 	    'cache: eviction server unable to reach eviction goal'),
 	Stat('cache_eviction_walk', 'cache: pages walked for eviction'),
@@ -94,6 +93,24 @@ connection_stats = [
 	Stat('txn_commit', 'transactions committed'),
 	Stat('txn_fail_cache', 'transaction failures due to cache overflow'),
 	Stat('txn_rollback', 'transactions rolled-back'),
+
+	##########################################
+	# LSM statistics
+	##########################################
+	Stat('lsm_rows_merged', 'rows merged in an LSM tree'),
+
+	##########################################
+	# Total Btree cursor operations
+	##########################################
+	Stat('cursor_create', 'cursor creation'),
+	Stat('cursor_insert', 'Btree cursor insert calls'),
+	Stat('cursor_next', 'Btree cursor next calls'),
+	Stat('cursor_prev', 'Btree cursor prev calls'),
+	Stat('cursor_remove', 'Btree cursor remove calls'),
+	Stat('cursor_reset', 'Btree cursor reset calls'),
+	Stat('cursor_search', 'Btree cursor search calls'),
+	Stat('cursor_search_near', 'Btree cursor search near calls'),
+	Stat('cursor_update', 'Btree cursor update calls'),
 ]
 
 connection_stats = sorted(connection_stats, key=attrgetter('name'))
@@ -103,7 +120,12 @@ connection_stats = sorted(connection_stats, key=attrgetter('name'))
 ##########################################
 dsrc_stats = [
 	##########################################
-	# Operations
+	# Session operations
+	##########################################
+	Stat('session_compact', 'object compaction'),
+
+	##########################################
+	# Cursor operations
 	##########################################
 	Stat('cursor_create', 'cursor creation'),
 	Stat('cursor_insert', 'cursor insert calls'),
@@ -119,7 +141,6 @@ dsrc_stats = [
 	Stat('cursor_search_near', 'cursor search near calls'),
 	Stat('cursor_update', 'cursor update calls'),
 	Stat('cursor_update_bytes', 'cursor-update value bytes updated'),
-	Stat('session_compact', 'object compaction'),
 
 	##########################################
 	# Btree statistics
@@ -169,7 +190,7 @@ dsrc_stats = [
 	Stat('block_magic', 'file magic number'),
 	Stat('block_major', 'file major version number'),
 	Stat('block_minor', 'minor version number'),
-	Stat('block_size', 'block manager size'),
+	Stat('block_size', 'block manager file size in bytes'),
 
 	##########################################
 	# Cache and eviction statistics
@@ -190,8 +211,7 @@ dsrc_stats = [
 	    'cache: internal page merge operations completed'),
 	Stat('cache_eviction_merge_fail',
 	    'cache: internal page merge attempts that could not complete'),
-	Stat('cache_eviction_merge_levels',
-	    'cache: internal levels merged'),
+	Stat('cache_eviction_merge_levels', 'cache: internal levels merged'),
 	Stat('cache_overflow_value', 'overflow values cached in memory'),
 	Stat('cache_read', 'pages read into cache'),
 	Stat('cache_read_overflow', 'overflow pages read into cache'),
