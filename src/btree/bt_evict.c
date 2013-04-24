@@ -17,17 +17,6 @@ static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, int);
 static int  __evict_worker(WT_SESSION_IMPL *);
 
 /*
- * Tuning constants: I hesitate to call this tuning, but we want to review some
- * number of pages from each file's in-memory tree for each page we evict.
- */
-#define	WT_EVICT_INT_SKEW  (1<<12)	/* Prefer leaf pages over internal
-					   pages by this many increments of the
-					   read generation. */
-#define	WT_EVICT_WALK_PER_FILE	10	/* Pages to visit per file */
-#define	WT_EVICT_WALK_BASE     100	/* Pages tracked across file visits */
-#define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
-
-/*
  * __evict_read_gen --
  *	Get the adjusted read generation for an eviction entry.
  */
@@ -289,9 +278,6 @@ __wt_cache_evict_server(void *arg)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	cache->evict_entries = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-	WT_ERR(__wt_calloc_def(session, cache->evict_entries, &cache->evict));
-
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
@@ -325,8 +311,6 @@ __wt_cache_evict_server(void *arg)
 			    cache->bytes_dirty, cache->pages_dirty);
 	} else
 err:		WT_PANIC_ERR(session, ret, "eviction server error");
-
-	__wt_free(session, cache->evict);
 
 	/* Close the eviction session and free its hazard array. */
 	(void)session->iface.close(&session->iface, NULL);

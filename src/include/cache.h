@@ -6,6 +6,17 @@
  */
 
 /*
+ * Tuning constants: I hesitate to call this tuning, but we want to review some
+ * number of pages from each file's in-memory tree for each page we evict.
+ */
+#define	WT_EVICT_INT_SKEW  (1<<12)	/* Prefer leaf pages over internal
+					   pages by this many increments of the
+					   read generation. */
+#define	WT_EVICT_WALK_PER_FILE	10	/* Pages to visit per file */
+#define	WT_EVICT_WALK_BASE     100	/* Pages tracked across file visits */
+#define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
+
+/*
  * WT_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.
  */
