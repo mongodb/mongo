@@ -114,7 +114,6 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;
-	WT_STATS cache_eviction_force;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
 	WT_STATS cache_eviction_merge;
@@ -182,7 +181,6 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;
-	WT_STATS cache_eviction_force;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
 	WT_STATS cache_eviction_merge;

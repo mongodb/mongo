@@ -327,7 +327,6 @@ __rec_review(WT_SESSION_IMPL *session,
 				    ref, ref->page, exclusive, merge, 0));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
-			case WT_REF_EVICT_FORCE:	/* Forced evict */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 				return (EBUSY);
