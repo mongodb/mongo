@@ -1006,11 +1006,17 @@ def doConfigure(myenv):
         # Clang likes to warn about unused private fields, but some of our third_party
         # libraries have such things.
         AddToCCFLAGSIfSupported(myenv, '-Wno-unused-private-field')
+
         # Clang warns about struct/class tag mismatch, but most people think that that is not
         # really an issue, see
         # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. We disable the
         # warning so it doesn't become an error.
         AddToCCFLAGSIfSupported(myenv, '-Wno-mismatched-tags')
+
+        # Prevents warning about using deprecated features (such as auto_ptr in c++11)
+        # Using -Wno-error=deprecated-declarations does not seem to work on some compilers,
+        # including at least g++-4.6.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-deprecated-declarations")
 
     if has_option('c++11'):
         # The Microsoft compiler does not need a switch to enable C++11. Again we should be
@@ -1090,10 +1096,6 @@ def doConfigure(myenv):
     # glibc's memcmp is faster than gcc's
     if linux:
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
-
-    if using_gcc() or using_clang():
-        # If possible, don't make deprecated declarations errors.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-error=deprecated-declarations")
 
     conf = Configure(myenv)
 
