@@ -30,7 +30,7 @@ namespace mongo {
 
     string pathToString( const FieldRef& path, int32_t size ) {
         string res;
-        if ( (size_t)size > path.numParts() ) {
+        if ( (size_t)size >= path.numParts() ) {
             return res;
         }
 
