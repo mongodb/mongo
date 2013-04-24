@@ -80,10 +80,6 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	/* Use a common routine for run-time configuration options. */
 	WT_RET(__wt_cache_config(conn, cfg));
 
-	/* Allocate the LRU eviction queue. */
-	cache->evict_entries = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-	WT_ERR(__wt_calloc_def(session, cache->evict_entries, &cache->evict));
-
 	/* Add the configured cache to the cache pool. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		WT_RET(__wt_conn_cache_pool_open(session));
@@ -100,6 +96,10 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	    "cache eviction server", 0, &cache->evict_cond));
 	__wt_spin_init(session, &cache->evict_lock);
 	__wt_spin_init(session, &cache->evict_walk_lock);
+
+	/* Allocate the LRU eviction queue. */
+	cache->evict_entries = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
+	WT_ERR(__wt_calloc_def(session, cache->evict_entries, &cache->evict));
 
 	/*
 	 * We get/set some values in the cache statistics (rather than have
