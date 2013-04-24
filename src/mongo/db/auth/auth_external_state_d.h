@@ -36,6 +36,10 @@ namespace mongo {
 
         virtual void startRequest();
 
+        virtual void onAddAuthorizedPrincipal(Principal*);
+
+        virtual void onLogoutDatabase(const std::string&);
+
     protected:
         virtual bool _findUser(const string& usersNamespace,
                                const BSONObj& query,

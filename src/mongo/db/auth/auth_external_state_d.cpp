@@ -24,6 +24,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
@@ -47,6 +48,18 @@ namespace mongo {
 
     bool AuthExternalStateMongod::shouldIgnoreAuthChecks() const {
         return cc().isGod() || AuthExternalStateServerCommon::shouldIgnoreAuthChecks();
+    }
+
+    void AuthExternalStateMongod::onAddAuthorizedPrincipal(Principal*) {
+        // invalidate all thread-local JS scopes due to new user authentication
+        if (globalScriptEngine)
+            globalScriptEngine->threadDone();
+    }
+
+    void AuthExternalStateMongod::onLogoutDatabase(const std::string&) {
+        // invalidate all thread-local JS scopes due to logout
+        if (globalScriptEngine)
+            globalScriptEngine->threadDone();
     }
 
 } // namespace mongo

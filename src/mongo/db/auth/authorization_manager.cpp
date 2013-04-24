@@ -405,6 +405,7 @@ namespace {
         const std::string dbname = principal->getName().getDB().toString();
         _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());
         principal->markDatabaseAsProbed(dbname);
+        _externalState->onAddAuthorizedPrincipal(principal);
     }
 
     void AuthorizationManager::_acquirePrivilegesForPrincipalFromDatabase(
@@ -431,6 +432,7 @@ namespace {
             return;
         _acquiredPrivileges.revokePrivilegesFromPrincipal(principal->getName());
         _authenticatedPrincipals.removeByDBName(dbname);
+        _externalState->onLogoutDatabase(dbname);
     }
 
     PrincipalSet::NameIterator AuthorizationManager::getAuthenticatedPrincipalNames() {

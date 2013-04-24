@@ -29,6 +29,10 @@ namespace mongo {
     AuthExternalStateMongos::AuthExternalStateMongos() {}
     AuthExternalStateMongos::~AuthExternalStateMongos() {}
 
+    void AuthExternalStateMongos::onAddAuthorizedPrincipal(Principal*) { }
+
+    void AuthExternalStateMongos::onLogoutDatabase(const std::string&) { }
+
     void AuthExternalStateMongos::startRequest() {
         _checkShouldAllowLocalhost();
     }
