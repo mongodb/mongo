@@ -49,7 +49,9 @@ namespace mongo {
     class Status {
     public:
         // Short-hand for returning an OK status.
-        static Status OK() { return Status(getOKInfo()); }
+        static Status OK() {
+            return Status();
+        }
 
         /**
          * Builds an error status given the error code, a textual description of what
@@ -82,11 +84,25 @@ namespace mongo {
         // accessors
         //
 
-        bool isOK() const { return code() == ErrorCodes::OK; }
-        ErrorCodes::Error code() const { return _error->code; }
-        const char* codeString() const { return ErrorCodes::errorString(_error->code); }
-        const std::string& reason() const { return _error->reason; }
-        int location() const { return _error->location; }
+        bool isOK() const {
+            return code() == ErrorCodes::OK;
+        }
+
+        ErrorCodes::Error code() const {
+            return _error ? _error->code : ErrorCodes::OK;
+        }
+
+        const char* codeString() const {
+            return ErrorCodes::errorString(code());
+        }
+
+        std::string reason() const {
+            return _error ? _error->reason : std::string();
+        }
+
+        int location() const {
+            return _error ? _error->location : 0;
+        }
 
         std::string toString() const;
 
@@ -94,21 +110,24 @@ namespace mongo {
         // Below interface used for testing code only.
         //
 
-        int refCount() const { return _error->refs.load(); }
+        AtomicUInt32::WordType refCount() const {
+            return _error ? _error->refs.load() : 0;
+        }
 
     private:
+        Status();
+
         struct ErrorInfo {
-            AtomicUInt32 refs;       // reference counter
-            ErrorCodes::Error code;  // error code
-            std::string reason;      // description of error cause
-            int location;            // unique location of the triggering line in the code
+            AtomicUInt32 refs;             // reference counter
+            const ErrorCodes::Error code;  // error code
+            const std::string reason;      // description of error cause
+            const int location;            // unique location of the triggering line in the code
 
-            ErrorInfo(ErrorCodes::Error aCode, const std::string& aReason, int aLocation);
+            static ErrorInfo* create(ErrorCodes::Error code,
+                                     const StringData& reason, int location);
+
+            ErrorInfo(ErrorCodes::Error code, const StringData& reason, int location);
         };
-
-        static ErrorInfo *getOKInfo();
-
-        explicit Status(ErrorInfo *info);
 
         ErrorInfo* _error;
 
@@ -121,11 +140,11 @@ namespace mongo {
         static void unref(ErrorInfo* error);
     };
 
-    static inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
+    inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
         return rhs == lhs;
     }
 
-    static inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
+    inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
         return rhs != lhs;
     }
 
@@ -137,3 +156,6 @@ namespace mongo {
     std::ostream& operator<<(std::ostream& os, ErrorCodes::Error);
 
 }  // namespace mongo
+
+#include "mongo/base/status-inl.h"
+
