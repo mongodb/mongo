@@ -1240,8 +1240,9 @@ kvs_session_truncate(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	DATA_SOURCE *p;
-	WT_CURSOR *wt_cursor;
 	int ret, tret;
+
+	(void)dsrc;				/* Unused parameters */
 
 	/*
 	 * Truncate should work even if the object is not yet opened: if we
