@@ -208,7 +208,7 @@ wts_open(void)
 	/* Configure KVS devices. */
 	if (DATASOURCE("memrata"))
 		p += snprintf(
-		    p, (size_t)(end - p), ",kvs_devices=[RUNDIR/KVS]");
+		    p, (size_t)(end - p), ",kvs_devices=[\"/dev/loop0\"]");
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
