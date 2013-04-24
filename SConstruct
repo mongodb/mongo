@@ -989,7 +989,10 @@ def doConfigure(myenv):
     def AddToCXXFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C++', '.cpp', flag, CXXFLAGS=[flag])
 
-    if using_clang():
+    if using_gcc() or using_clang():
+        # This warning was added in g++-4.8.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-local-typedefs')
+
         # Clang likes to warn about unused functions, which seems a tad aggressive and breaks
         # -Werror, which we want to be able to use.
         AddToCCFLAGSIfSupported(myenv, '-Wno-unused-function')
