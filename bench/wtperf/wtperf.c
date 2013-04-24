@@ -552,7 +552,7 @@ stat_worker(void *arg)
 
 		/* Report data source stats. */
 		if ((ret = session->open_cursor(session, stat_uri,
-		    NULL, NULL, &cursor)) != 0) {
+		    NULL, "statistics_fast", &cursor)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "open_cursor failed for data source statistics");
 			goto err;
