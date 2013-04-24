@@ -340,8 +340,6 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	WT_CSTAT_INCR(session, file_open);
-
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
 
