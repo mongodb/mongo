@@ -13,7 +13,7 @@
 					   pages by this many increments of the
 					   read generation. */
 #define	WT_EVICT_WALK_PER_FILE	10	/* Pages to visit per file */
-#define	WT_EVICT_WALK_BASE     100	/* Pages tracked across file visits */
+#define	WT_EVICT_WALK_BASE     300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
 
 /*
@@ -66,8 +66,9 @@ struct __wt_cache {
 	 */
 	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
-	uint32_t evict_entries;		/* LRU list eviction slots */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
+	uint32_t evict_entries;		/* LRU highest eviction slot in use */
+	uint32_t evict_slots;		/* LRU list eviction slots */
 	u_int    evict_file_next;	/* LRU: next file to search */
 	uint32_t force_entries;		/* Forced eviction page count */
 
