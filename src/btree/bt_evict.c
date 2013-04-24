@@ -826,6 +826,12 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 	__wt_spin_unlock(session, &cache->evict_lock);
 
 	/*
+	 * Signal any application threads waiting for the eviction queue to
+	 * have candidates.
+	 */
+	(void)__wt_cond_signal(session, cache->evict_waiter_cond);
+
+	/*
 	 * Reconcile and discard some pages: EBUSY is returned if a page fails
 	 * eviction because it's unavailable, continue in that case.
 	 */

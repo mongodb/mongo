@@ -74,10 +74,11 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 			return (0);
 		else if (ret == WT_NOTFOUND)
 			/*
-			 * The eviction queue was empty - give the server time
-			 * to re-populate before trying again.
+			 * The eviction queue was empty - wait for it to
+			 * re-populate before trying again.
 			 */
-			__wt_sleep(0, 10);
+			WT_RET(__wt_cond_wait(session,
+			    S2C(session)->cache->evict_waiter_cond, 10000));
 		else if (ret != 0 && ret != EBUSY)
 			/*
 			 * We've dealt with expected returns - we came across
