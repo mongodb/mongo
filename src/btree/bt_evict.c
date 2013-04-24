@@ -829,7 +829,7 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 	 * Signal any application threads waiting for the eviction queue to
 	 * have candidates.
 	 */
-	(void)__wt_cond_signal(session, cache->evict_waiter_cond);
+	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 
 	/*
 	 * Reconcile and discard some pages: EBUSY is returned if a page fails

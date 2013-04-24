@@ -128,14 +128,14 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 
 	if (!cond->signalled) {
 		cond->signalled = 1;
-		WT_ERR(pthread_cond_signal(&cond->cond));
+		WT_ERR(pthread_cond_broadcast(&cond->cond));
 	}
 
 err:	if (locked)
 		WT_TRET(pthread_mutex_unlock(&cond->mtx));
 	if (ret == 0)
 		return (0);
-	WT_RET_MSG(session, ret, "pthread_cond_signal");
+	WT_RET_MSG(session, ret, "pthread_cond_broadcast");
 }
 
 /*
