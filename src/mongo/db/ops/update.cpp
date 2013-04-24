@@ -26,6 +26,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
+#include "mongo/db/query_runner.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/record.h"
 #include "mongo/db/repl/oplog.h"
@@ -73,7 +74,7 @@ namespace mongo {
         {
             IndexDetails& i = d->idx(idIdxNo);
             BSONObj key = i.getKeyFromQuery( patternOrig );
-            loc = i.idxInterface().findSingle(i, i.head, key);
+            loc = QueryRunner::fastFindSingle(i, key);
             if( loc.isNull() ) {
                 // no upsert support in _updateById yet, so we are done.
                 return UpdateResult( 0 , 0 , 0 , BSONObj() );

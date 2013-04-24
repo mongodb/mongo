@@ -62,6 +62,8 @@ namespace mongo {
 
         virtual Status touch(const BSONObj& obj);
 
+        virtual Status validate(int64_t* numKeys);
+
     protected:
         // Friends who need getKeys.
         friend class BtreeBasedBuilder;

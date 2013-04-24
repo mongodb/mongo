@@ -244,7 +244,7 @@ namespace mongo {
 
             prep(ns.c_str(), d);
             try {
-                idx.head.writing() = idx.idxInterface().addBucket(idx);
+                idx.head.writing() = BtreeBasedBuilder::makeEmptyIndex(idx);
                 n = addExistingToIndex(ns.c_str(), d, idx);
                 // idx may point at an invalid index entry at this point
             }

@@ -29,6 +29,36 @@
 
 namespace mongo {
 
+    const int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
+
+    class ExternalSortComparisonV0 : public ExternalSortComparison {
+    public:
+        ExternalSortComparisonV0(const BSONObj& ordering) : _ordering(Ordering::make(ordering)) { }
+        virtual ~ExternalSortComparisonV0() { }
+
+        virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const {
+            int x = oldCompare(l.first, r.first, _ordering);
+            if (x) { return x; }
+            return l.second.compare(r.second);
+        }
+    private:
+        const Ordering _ordering;
+    };
+
+    class ExternalSortComparisonV1 : public ExternalSortComparison {
+    public:
+        ExternalSortComparisonV1(const BSONObj& ordering) : _ordering(Ordering::make(ordering)) { }
+        virtual ~ExternalSortComparisonV1() { }
+
+        virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const {
+            int x = l.first.woCompare(r.first, _ordering, /*considerfieldname*/false);
+            if (x) { return x; }
+            return l.second.compare(r.second);
+        }
+    private:
+        const Ordering _ordering;
+    };
+
     template< class V >
     void buildBottomUpPhases2And3( bool dupsAllowed,
                                    IndexDetails& idx,
@@ -50,7 +80,7 @@ namespace mongo {
                                     10));
         while( i->more() ) {
             RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
-            BSONObjExternalSorter::Data d = i->next();
+            ExternalSortDatum d = i->next();
 
             try {
                 if ( !dupsAllowed && dropDups ) {
@@ -87,7 +117,26 @@ namespace mongo {
         LOG(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
         btBuilder.commit( mayInterrupt );
         if ( btBuilder.getn() != phase1->nkeys && ! dropDups ) {
-            warning() << "not all entries were added to the index, probably some keys were too large" << endl;
+            warning() << "not all entries were added to the index, probably some "
+                         "keys were too large" << endl;
+        }
+    }
+
+    DiskLoc BtreeBasedBuilder::makeEmptyIndex(const IndexDetails& idx) {
+        if (0 == idx.version()) {
+            return BtreeBucket<V0>::addBucket(idx);
+        } else {
+            return BtreeBucket<V1>::addBucket(idx);
+        }
+    }
+
+    ExternalSortComparison* BtreeBasedBuilder::getComparison(int version,
+                                                             const BSONObj& keyPattern) {
+        if (0 == version) {
+            return new ExternalSortComparisonV0(keyPattern);
+        } else {
+            verify(1 == version);
+            return new ExternalSortComparisonV1(keyPattern);
         }
     }
 
@@ -99,7 +148,8 @@ namespace mongo {
                            ProgressMeter* progressMeter,
                            bool mayInterrupt, int idxNo) {
         shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
-        phaseOne->sorter.reset( new BSONObjExternalSorter( idx.idxInterface(), order ) );
+        phaseOne->sortCmp.reset(getComparison(idx.version(), idx.keyPattern()));
+        phaseOne->sorter.reset(new BSONObjExternalSorter(phaseOne->sortCmp.get()));
         phaseOne->sorter->hintNumObjects( nrecords );
         auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(d, idxNo));
         auto_ptr<BtreeBasedAccessMethod> iam(CatalogHack::getBtreeBasedIndex(desc.get()));
@@ -146,8 +196,6 @@ namespace mongo {
         pm.finished();
 
         BSONObjExternalSorter& sorter = *(phase1.sorter);
-        // Ensure the index and external sorter have a consistent index interface (and sort order).
-        fassert( 16408, &idx.idxInterface() == &sorter.getIndexInterface() );
 
         if( phase1.multi ) {
             d->setIndexIsMultikey(ns, idxNo);
@@ -157,7 +205,8 @@ namespace mongo {
         phase1.sorter->sort( mayInterrupt );
         if ( logLevel > 1 ) printMemInfo( "after final sort" );
 
-        LOG(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
+        LOG(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles()
+                                     << " files " << " in " << t.seconds() << " secs" << endl;
 
         set<DiskLoc> dupsToDrop;
 

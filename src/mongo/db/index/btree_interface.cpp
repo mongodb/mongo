@@ -182,6 +182,10 @@ namespace mongo {
                                 const char* caller) const {
             return thisLoc.btree<Version>()->advance(thisLoc, keyOfs, direction, caller);
         }
+
+        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj& keyPattern) {
+            return thisLoc.btree<Version>()->fullValidate(thisLoc, keyPattern);
+        }
     };
 
     BtreeInterfaceImpl<V0> interface_v0;

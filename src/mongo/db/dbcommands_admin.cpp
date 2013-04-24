@@ -39,6 +39,9 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop-inl.h"
+#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace-inl.h"
@@ -497,8 +500,11 @@ namespace mongo {
                     while( i.more() ) {
                         IndexDetails& id = i.next();
                         log() << "validating index " << idxn << ": " << id.indexNamespace() << endl;
-                        long long keys = id.idxInterface().fullValidate(id.head, id.keyPattern());
-                        indexes.appendNumber(id.indexNamespace(), keys);
+                        auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, idxn));
+                        auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+                        int64_t keys;
+                        iam->validate(&keys);
+                        indexes.appendNumber(id.indexNamespace(), static_cast<long long>(keys));
                         idxn++;
                     }
                     result.append("keysPerIndex", indexes.done());

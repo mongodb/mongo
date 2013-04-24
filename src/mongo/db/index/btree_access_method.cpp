@@ -155,6 +155,11 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {
+        *numKeys = _interface->fullValidate(_descriptor->getHead(), _descriptor->keyPattern());
+        return Status::OK();
+    }
+
     Status BtreeBasedAccessMethod::validateUpdate(
         const BSONObj &from, const BSONObj &to, const DiskLoc &record,
         const InsertDeleteOptions &options, UpdateTicket* status) {

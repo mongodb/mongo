@@ -33,6 +33,7 @@ namespace IndexUpdateTests {
 
     static const char* const _ns = "unittests.indexupdate";
     DBDirectClient _client;
+    ExternalSortComparison* _aFirstSort = BtreeBasedBuilder::getComparison(0, BSON("a" << 1));
 
     /**
      * Test fixture for a write locked test using collection _ns.  Includes functionality to
@@ -160,8 +161,7 @@ namespace IndexUpdateTests {
             IndexDetails& id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            phaseOne.sorter.reset( new BSONObjExternalSorter( id.idxInterface(),
-                                                              BSON( "a" << 1 ) ) );
+            phaseOne.sorter.reset( new BSONObjExternalSorter(_aFirstSort));
             // Add index keys to the phaseOne.
             int32_t nKeys = 130;
             for( int32_t i = 0; i < nKeys; ++i ) {
@@ -221,8 +221,7 @@ namespace IndexUpdateTests {
             IndexDetails& id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            phaseOne.sorter.reset( new BSONObjExternalSorter( id.idxInterface(),
-                                                              BSON( "a" << 1 ) ) );
+            phaseOne.sorter.reset(new BSONObjExternalSorter(_aFirstSort));
             // It's necessary to index sufficient keys that a RARELY condition will be triggered,
             // but few enough keys that the btree builder will not create an internal node and check
             // for an interrupt internally (which would cause this test to pass spuriously).

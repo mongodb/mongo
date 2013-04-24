@@ -28,6 +28,8 @@ namespace mongo {
             multi = false;
         }
         shared_ptr<BSONObjExternalSorter> sorter;
+        shared_ptr<ExternalSortComparison> sortCmp;
+
         unsigned long long n; // # of records
         unsigned long long nkeys;
         bool multi; // multikey index
