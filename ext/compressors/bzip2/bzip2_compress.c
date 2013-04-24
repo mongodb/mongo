@@ -33,7 +33,7 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-WT_EXTENSION_API *wt_api;
+static WT_EXTENSION_API *wt_api;
 
 static int
 bzip2_compress(WT_COMPRESSOR *, WT_SESSION *,
@@ -51,8 +51,6 @@ bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, u_int,
 static WT_COMPRESSOR bzip2_compressor = {
     bzip2_compress, NULL, bzip2_decompress, NULL };
 
-#define	__UNUSED(v)	((void)(v))
-
 /* between 0-4: set the amount of verbosity to stderr */
 static int bz_verbosity = 0;
 
@@ -69,21 +67,21 @@ static int bz_workfactor = 0;
 static int bz_small = 0;
 
 int
-wiredtiger_extension_init(
-    WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	WT_CONNECTION *conn;
+	(void)config;				/* Unused parameters */
 
-	__UNUSED(config);
+						/* Find the extension API */
+	wt_api = connection->get_extension_api(connection);
 
-	wt_api = api;
-	conn = session->connection;
-
+						/* Load the compressor */
 #ifdef WIREDTIGER_TEST_COMPRESS_RAW
 	bzip2_compressor.compress_raw = bzip2_compress_raw;
-	return (conn->add_compressor(conn, "raw", &bzip2_compressor, NULL));
+	return (connection->add_compressor(
+	    connection, "raw", &bzip2_compressor, NULL));
 #else
-	return (conn->add_compressor(conn, "bzip2", &bzip2_compressor, NULL));
+	return (connection->add_compressor(
+	    connection, "bzip2", &bzip2_compressor, NULL));
 #endif
 }
 
@@ -130,7 +128,7 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 		break;
 	}
 
-	(void)wiredtiger_err_printf(
+	(void)wt_api->err_printf(wt_api,
 	    session, "bzip2 error: %s: %s: %d", call, msg, bzret);
 	return (WT_ERROR);
 }
@@ -138,13 +136,13 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 static void *
 bzalloc(void *cookie, int number, int size)
 {
-	return (wiredtiger_scr_alloc(cookie, (size_t)(number * size)));
+	return (wt_api->scr_alloc(wt_api, cookie, (size_t)(number * size)));
 }
 
 static void
 bzfree(void *cookie, void *p)
 {
-	wiredtiger_scr_free(cookie, p);
+	wt_api->scr_free(wt_api, cookie, p);
 }
 
 static int
@@ -156,7 +154,7 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	bz_stream bz;
 	int ret;
 
-	__UNUSED(compressor);
+	(void)compressor;				/* Unused */
 
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;
@@ -217,10 +215,10 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	uint32_t take, twenty_pct;
 	int compression_failed, ret;
 
-	__UNUSED(page_max);
-	__UNUSED(split_pct);
-	__UNUSED(extra);
-	__UNUSED(final);
+	(void)page_max;					/* Unused */
+	(void)split_pct;
+	(void)extra;
+	(void)final;
 
 	/*
 	 * This function is used by the test/format utility to test the
@@ -286,7 +284,7 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	bz_stream bz;
 	int ret, tret;
 
-	__UNUSED(compressor);
+	(void)compressor;				/* Unused */
 
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;

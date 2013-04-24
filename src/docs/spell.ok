@@ -57,6 +57,7 @@ bindir
 bitstring
 bool
 boolean
+booleans
 br
 btree
 builtin
@@ -103,6 +104,8 @@ dl
 dlp
 dontlock
 dp
+ds
+dsrc
 dsync
 dt
 dumpfile
@@ -160,6 +163,7 @@ keyexist
 keyfmt
 keyname
 keyvalue
+kvs
 lastname
 len
 li

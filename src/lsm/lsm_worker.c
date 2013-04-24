@@ -317,16 +317,15 @@ err:	__wt_free(session, cookie.chunk_array);
  *	checkpointed but not yet been merged.
  */
 static int
-__lsm_bloom_create(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
+__lsm_bloom_create(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src;
 	WT_DECL_RET;
 	WT_ITEM buf, key;
 	WT_SESSION *wt_session;
-	const char *cur_cfg[] = API_CONF_DEFAULTS(
-	    session, open_cursor, "checkpoint=WiredTigerCheckpoint,raw");
+	const char *cur_cfg[3];
 	uint64_t insert_count;
 	int exist;
 
@@ -357,6 +356,9 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	    lsm_tree->bloom_config, chunk->count,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
+	cur_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cur_cfg[1] = "raw";
+	cur_cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &src));
 
 	F_SET(session, WT_SESSION_NO_CACHE);
@@ -422,8 +424,9 @@ static int
 __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 {
 	WT_DECL_RET;
-	const char *drop_cfg[] =
-	    API_CONF_DEFAULTS(session, drop, "remove_files=false");
+	const char *drop_cfg[] = {
+	    WT_CONFIG_BASE(session, session_drop), "remove_files=false", NULL
+	};
 
 	/*
 	 * We need to grab the schema lock to drop the file, so first try to
@@ -467,7 +470,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * that update.
 	 */
 	WT_CLEAR(cookie);
-	WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 1));
+	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 1));
 	for (i = 0, progress = 0; i < cookie.nchunks; i++) {
 		if ((chunk = cookie.chunk_array[i]) == NULL)
 			continue;

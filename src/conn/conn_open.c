@@ -72,11 +72,13 @@ err:	WT_TRET(__wt_connection_close(conn));
 int
 __wt_connection_close(WT_CONNECTION_IMPL *conn)
 {
+	WT_CONNECTION *wt_conn;
 	WT_SESSION_IMPL *session;
 	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_FH *fh;
 
+	wt_conn = (WT_CONNECTION *)conn;
 	session = conn->default_session;
 
 	/*
@@ -110,9 +112,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Discard transaction state. */
 	__wt_txn_global_destroy(conn);
 
-	/* Close extensions. */
+	/* Close extensions, first calling any unload entry point. */
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
 		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
+
+		if (dlh->terminate != NULL)
+			WT_TRET(dlh->terminate(wt_conn));
 		WT_TRET(__wt_dlclose(session, dlh));
 	}
 

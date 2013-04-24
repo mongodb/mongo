@@ -83,7 +83,7 @@ static CONFIG c[] = {
 	  0, C_IGNORE|C_STRING, 1, 5, NULL, &g.c_compression },
 
 	{ "data_source",
-	  "type of data source to create (file | table | lsm)",
+	  "type of data source to create (file | kvs | lsm | table)",
 	  0, C_IGNORE | C_STRING, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",

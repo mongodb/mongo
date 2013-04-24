@@ -10,4 +10,6 @@ struct __wt_dlh {
 
 	void	*handle;			/* Handle returned by dlopen. */
 	char	*name;
+
+	int (*terminate)(WT_CONNECTION *);	/* Terminate function. */
 };

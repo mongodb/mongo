@@ -208,7 +208,7 @@ __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
  *	ANSI free function.
  */
 void
-__wt_free_int(WT_SESSION_IMPL *session, void *p_arg)
+__wt_free_int(WT_SESSION_IMPL *session, const void *p_arg)
 {
 	void *p;
 

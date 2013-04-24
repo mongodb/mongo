@@ -114,13 +114,16 @@ __bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
 {
 	WT_CURSOR *c;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] = API_CONF_DEFAULTS(
-	    session, open_cursor, "checkpoint=WiredTigerCheckpoint");
+	const char *cfg[3];
 
 	if ((c = bloom->c) != NULL)
 		return (0);
 
 	session = bloom->session;
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[1] = bloom->config;
+	cfg[2] = NULL;
+	c = NULL;
 	WT_RET(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 
 	/* XXX Layering violation: bump the cache priority for Bloom filters. */
@@ -149,6 +152,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	WT_ERR(__bloom_open_cursor(bloom, owner));
 	c = bloom->c;
 
+	/* Find the largest key, to get the size of the filter. */
 	WT_ERR(c->prev(c));
 	WT_ERR(c->get_key(c, &size));
 	WT_ERR(c->reset(c));

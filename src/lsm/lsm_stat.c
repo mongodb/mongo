@@ -20,14 +20,15 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_DSRC_STATS *stats;
 	WT_LSM_CHUNK *chunk;
-	const char *cfg[] = API_CONF_DEFAULTS(
-	    session, open_cursor, "statistics_fast=on");
-	const char *disk_cfg[] = API_CONF_DEFAULTS(session,
-	    open_cursor, "checkpoint=WiredTigerCheckpoint,statistics_fast=on");
-	const char *desc, *pvalue;
 	uint64_t value;
 	u_int i;
 	int locked, stat_key;
+	const char *cfg[] = { WT_CONFIG_BASE(
+	    session, session_open_cursor), "statistics_fast=on", NULL };
+	const char *disk_cfg[] =
+	   { WT_CONFIG_BASE(session, session_open_cursor),
+	   "checkpoint=WiredTigerCheckpoint,statistics_fast=on", NULL };
+	const char *desc, *pvalue;
 
 	WT_UNUSED(flags);
 	locked = 0;

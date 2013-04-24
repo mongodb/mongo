@@ -415,33 +415,36 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_scr_alloc_ext --
+ * __wt_ext_scr_alloc --
  *	Allocate a scratch buffer, and return the memory reference.
  */
 void *
-__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size)
+__wt_ext_scr_alloc(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, size_t size)
 {
 	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
 
-	session = (WT_SESSION_IMPL *)wt_session;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
 	return (__wt_scr_alloc(
 	    session, (uint32_t)size, &buf) == 0 ? buf->mem : NULL);
 }
 
 /*
- * __wt_scr_free_ext --
+ * __wt_ext_scr_free --
  *	Free a scratch buffer based on the memory reference.
  */
 void
-__wt_scr_free_ext(WT_SESSION *wt_session, void *p)
+__wt_ext_scr_free(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, void *p)
 {
 	WT_ITEM **bufp;
 	WT_SESSION_IMPL *session;
 	u_int i;
 
-	session = (WT_SESSION_IMPL *)wt_session;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
 	for (i = 0,
 	    bufp = session->scratch; i < session->scratch_alloc; ++i, ++bufp)

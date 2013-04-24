@@ -46,7 +46,7 @@ def plot(title, entries, num):
     print 'building ' + title
 
     # Write the raw data into a file for processing.
-    of = open("reports/report." + num + ".raw", "w")
+    of = open("reports/raw/report." + num + ".raw", "w")
     for entry in sorted(entries):
         of.write(" ".join(entry) + "\n")
     of.close()
@@ -66,7 +66,7 @@ def plot(title, entries, num):
     of.write("set ylabel \"Value\"\n")
     of.write("set yrange [0:]\n")
     of.write("set output 'reports/report." + num + ".png'\n")
-    of.write("plot \"reports/report." + num + ".raw\" using 1:4 notitle\n")
+    of.write("plot \"reports/raw/report." + num + ".raw\" using 1:4 notitle\n")
     of.close()
 
     # Run gnuplot.
@@ -78,6 +78,7 @@ def plot(title, entries, num):
 # Remove and re-create the reports folder.
 shutil.rmtree("reports", True)
 os.mkdir("reports")
+os.mkdir("reports/raw")
 
 # Read the input into a dictionary of lists.
 if sys.argv[1:] == []:

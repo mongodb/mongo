@@ -86,6 +86,15 @@ struct __wt_connection_impl {
 
 	int connection_initialized;	/* Connection is initialized */
 
+	WT_EXTENSION_API extension_api;	/* Extension API */
+
+					/* Configuration */
+	const WT_CONFIG_ENTRY **config_entries;
+
+	void  **foc;			/* Free-on-close array */
+	size_t  foc_cnt;		/* Array entries */
+	size_t  foc_size;		/* Array size */
+
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	pthread_t cache_evict_tid;	/* Eviction server thread ID */

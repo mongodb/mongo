@@ -115,8 +115,21 @@ AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 
 AC_SUBST(AM_CFLAGS)
 
-# Is there a link to a BDB tree that we can use for test/format?
-AM_CONDITIONAL([HAVE_BDB], [test -d ../test/format && test -e db])
+# test/format requires an installed Berkeley DB release tree.
+bdbdir=`ls -d "$ac_pwd/db" /usr/local/BerkeleyDB* 2>/dev/null | head -1`
+if ! test -d "$bdbdir" ; then
+	bdbdir="NO_BERKELEY_DB_LIBRARY_FOUND"
+fi
+AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $bdbdir])
+AC_SUBST(BERKELEY_DB_PATH, [$bdbdir])
+
+# test/format optionally supports the MEMRATA KVS library.
+memrata_dir=`ls -d "$ac_pwd/memrata" 2>/dev/null | head -1`
+if ! test -d "$memrata_dir" ; then
+	memrata_dir="NO_MEMRATA_LIBRARY_FOUND"
+fi
+AM_CONDITIONAL([HAVE_MEMRATA], [test -d $memrata_dir])
+AC_SUBST(MEMRATA_PATH, [$memrata_dir])
 
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then

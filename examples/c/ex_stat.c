@@ -169,8 +169,9 @@ print_derived_stats(WT_SESSION *session)
 
 	ret = get_stat(cursor, WT_STAT_DSRC_CACHE_BYTES_WRITE, &fs_writes);
 
-	printf("Write amplification is %.2lf\n",
-	    (double)fs_writes / (app_insert + app_remove + app_update));
+	if (app_insert + app_remove + app_update != 0)
+		printf("Write amplification is %.2lf\n",
+		    (double)fs_writes / (app_insert + app_remove + app_update));
 	/*! [statistics calculate write amplification] */
 	}
 
@@ -187,7 +188,7 @@ main(void)
 	WT_SESSION *session;
 	int ret;
 
-	ret = wiredtiger_open(home, NULL, "create", &conn);
+	ret = wiredtiger_open(home, NULL, "create,statistics", &conn);
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(
 	    session, "table:access", "key_format=S,value_format=S");

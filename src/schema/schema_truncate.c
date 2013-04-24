@@ -83,6 +83,29 @@ err:	__wt_scr_free(&namebuf);
 }
 
 /*
+ * __truncate_dsrc --
+ *	WT_SESSION::truncate for a data-source without a truncate operation.
+ */
+static int
+__truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	const char *cfg[2];
+
+	/* Open a cursor and traverse the object, removing every entry. */
+	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[1] = NULL;
+	WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
+	while ((ret = cursor->next(cursor)) == 0)
+		WT_ERR(cursor->remove(cursor));
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	WT_TRET(cursor->close(cursor));
+	return (0);
+}
+
+/*
  * __wt_schema_truncate --
  *	WT_SESSION::truncate.
  */
@@ -99,10 +122,15 @@ __wt_schema_truncate(
 
 	if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __truncate_file(session, uri);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_lsm_tree_truncate(session, uri, cfg);
 	else if (WT_PREFIX_SKIP(tablename, "table:"))
 		ret = __truncate_table(session, tablename);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->truncate(dsrc, &session->iface, uri, cfg);
+		ret = dsrc->truncate == NULL ?
+		    __truncate_dsrc(session, uri) :
+		    dsrc->truncate(
+			dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

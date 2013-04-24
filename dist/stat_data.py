@@ -190,7 +190,7 @@ dsrc_stats = [
 	Stat('block_magic', 'file magic number'),
 	Stat('block_major', 'file major version number'),
 	Stat('block_minor', 'minor version number'),
-	Stat('block_size', 'block manager size'),
+	Stat('block_size', 'block manager file size in bytes'),
 
 	##########################################
 	# Cache and eviction statistics
