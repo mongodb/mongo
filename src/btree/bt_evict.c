@@ -561,6 +561,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	__wt_spin_lock(session, &cache->evict_lock);
 	F_SET(btree, WT_BTREE_NO_EVICTION);
 
+	/* Clear any existing LRU eviction walk, we're discarding the tree. */
+	__wt_evict_clear_tree_walk(session, NULL);
+
 	/*
 	 * The eviction candidate list might reference pages we are about to
 	 * discard; clear it.
@@ -574,9 +577,6 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 */
 	while (btree->lru_count > 0)
 		__wt_yield();
-
-	/* Clear any existing LRU eviction walk, we're discarding the tree. */
-	__wt_evict_clear_tree_walk(session, NULL);
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
