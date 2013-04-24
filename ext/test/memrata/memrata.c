@@ -1245,7 +1245,7 @@ kvs_session_truncate(WT_DATA_SOURCE *dsrc,
 
 	/*
 	 * Truncate should work even if the object is not yet opened: if we
-	 * don't find it, open it.   We loop because we could theoretically 
+	 * don't find it, open it.   We loop because we could theoretically
 	 * race with other threads creating/deleting the object.
 	 */
 	for (;;) {
