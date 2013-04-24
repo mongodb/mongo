@@ -934,11 +934,11 @@ drop_data_source(WT_SESSION *session, const char *uri)
 }
 
 /*
- * kvs_create --
+ * kvs_session_create --
  *	WT_SESSION::create method.
  */
 static int
-kvs_create(WT_DATA_SOURCE *dsrc,
+kvs_session_create(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	struct kvs_config kvs_config;
@@ -997,11 +997,11 @@ err:	free(emsg);
 }
 
 /*
- * kvs_drop --
+ * kvs_session_drop --
  *	WT_SESSION::drop method.
  */
 static int
-kvs_drop(WT_DATA_SOURCE *dsrc,
+kvs_session_drop(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	(void)dsrc;				/* Unused parameters */
@@ -1105,11 +1105,11 @@ err:	if (locked)
 }
 
 /*
- * kvs_open_cursor --
+ * kvs_session_open_cursor --
  *	WT_SESSION::open_cursor method.
  */
 static int
-kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+kvs_session_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
 {
 	CURSOR *cursor;
@@ -1216,11 +1216,11 @@ err:	if (cursor != NULL) {
 }
 
 /*
- * kvs_rename --
+ * kvs_session_rename --
  *	WT_SESSION::rename method.
  */
 static int
-kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+kvs_session_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, const char *newname, WT_CONFIG_ARG *config)
 {
 	(void)dsrc;				/* Unused parameters */
@@ -1232,11 +1232,58 @@ kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 }
 
 /*
- * kvs_verify --
+ * kvs_session_truncate --
+ *	WT_SESSION::truncate method.
+ */
+static int
+kvs_session_truncate(WT_DATA_SOURCE *dsrc,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
+{
+	DATA_SOURCE *p;
+	WT_CURSOR *wt_cursor;
+	int ret, tret;
+
+	/*
+	 * Truncate should work even if the object is not yet opened: if we
+	 * don't find it, open it.   We loop because we could theoretically 
+	 * race with other threads creating/deleting the object.
+	 */
+	for (;;) {
+		if ((ret = writelock(session, &global_lock)) != 0)
+			return (ret);
+
+		/* Search our list of objects for a match. */
+		for (p = data_source_head; p != NULL; p = p->next)
+			if (strcmp(p->uri, uri) == 0)
+				break;
+
+		/* If we don't find the object, open it. */
+		if (p == NULL) {
+			if ((ret = unlock(session, &global_lock)) != 0)
+				return (ret);
+			if ((ret = open_data_source(session, uri, config)) != 0)
+				return (ret);
+			continue;
+		}
+		if (p->open_cursors == 0) {
+			if ((tret = kvs_truncate(p->kvs)) != 0)
+				ESET(NULL, WT_ERROR,
+				    "kvs_truncate: %s: %s",
+				    p->uri, kvs_strerror(tret));
+		} else
+			ret = EBUSY;
+		ETRET(unlock(session, &global_lock));
+		return (ret);
+	}
+	/* NOTREACHED */
+}
+
+/*
+ * kvs_session_verify --
  *	WT_SESSION::verify method.
  */
 static int
-kvs_verify(WT_DATA_SOURCE *dsrc,
+kvs_session_verify(WT_DATA_SOURCE *dsrc,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	(void)dsrc;				/* Unused parameters */
@@ -1263,22 +1310,22 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wt_ext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if KVS_VERSION_MAJOR != 2 || KVS_VERSION_MINOR != 6
+#if KVS_VERSION_MAJOR != 2 || KVS_VERSION_MINOR != 8
 	ERET(NULL, EINVAL,
-	    "interface code only supports KVS library version %d.%d",
+	    "unsupported KVS library version %d.%d",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
 #endif
 
 	/* Initialize the WT_DATA_SOURCE structure. */
 	memset(&data_source, 0, sizeof(data_source));
-	data_source.create = kvs_create;
+	data_source.create = kvs_session_create;
 	data_source.compact = NULL;		/* No compaction */
-	data_source.drop = kvs_drop;
-	data_source.open_cursor = kvs_open_cursor;
-	data_source.rename = kvs_rename;
+	data_source.drop = kvs_session_drop;
+	data_source.open_cursor = kvs_session_open_cursor;
+	data_source.rename = kvs_session_rename;
 	data_source.salvage = NULL;		/* No salvage */
-	data_source.truncate = NULL;		/* No truncate */
-	data_source.verify = kvs_verify;
+	data_source.truncate = kvs_session_truncate;
+	data_source.verify = kvs_session_verify;
 	if ((ret = connection->add_data_source(
 	    connection, "memrata:", &data_source, NULL)) != 0)
 		ERET(NULL, ret,
