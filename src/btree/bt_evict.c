@@ -1228,7 +1228,6 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
 	WT_PAGE *page;
 	uint64_t file_bytes, file_dirty, file_pages, total_bytes;
 
@@ -1249,8 +1248,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		file_bytes = file_dirty = file_pages = 0;
 		page = NULL;
 		session->dhandle = dhandle;
-		while ((ret =
-		    __wt_tree_walk(session, &page, WT_TREE_CACHE)) == 0 &&
+		while (__wt_tree_walk(session, &page, WT_TREE_CACHE) == 0 &&
 		    page != NULL) {
 			++file_pages;
 			file_bytes += page->memory_footprint;
