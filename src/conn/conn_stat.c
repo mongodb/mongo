@@ -69,9 +69,20 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		WT_RET(__wt_calloc_def(session, cnt + 1, &conn->stat_sources));
 		WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 		for (cnt = 0;
-		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
+		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt) {
+			/*
+			 * XXX
+			 * Only allow "file:" for now, other data sources have
+			 * not been converted to use DHANDLEs so we don't have
+			 * an easy way to get to the lists of open objects.
+			 */
+			if (!WT_PREFIX_MATCH(k.str, "file:"))
+				WT_RET_MSG(session, EINVAL,
+				    "statistics_log sources configuration only "
+				    "supports objects of type \"file:\"");
 			WT_RET(__wt_strndup(session,
 			    k.str, k.len, &conn->stat_sources[cnt]));
+		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
 
