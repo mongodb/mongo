@@ -484,24 +484,22 @@ private:
     }
 
     void createCollectionWithOptions(BSONObj cmdObj) {
-        if (!cmdObj.hasField("create") || cmdObj["create"].String() != _curcoll) {
-            BSONObjBuilder bo;
-            if (!cmdObj.hasField("create")) {
+        BSONObjBuilder bo;
+        if (!cmdObj.hasField("create")) {
+            bo.append("create", _curcoll);
+        }
+
+        BSONObjIterator i(cmdObj);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if (strcmp(e.fieldName(), "create") == 0) {
                 bo.append("create", _curcoll);
             }
-
-            BSONObjIterator i(cmdObj);
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                if (strcmp(e.fieldName(), "create") == 0) {
-                    bo.append("create", _curcoll);
-                }
-                else {
-                    bo.append(e);
-                }
+            else {
+                bo.append(e);
             }
-            cmdObj = bo.obj();
         }
+        cmdObj = bo.obj();
 
         BSONObj fields = BSON("options" << 1);
         scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces", Query(BSON("name" << _curns)), 0, 0, &fields));
