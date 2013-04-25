@@ -73,8 +73,8 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 			/*
 			 * XXX
 			 * Only allow "file:" for now, other data sources have
-			 * not been converted to use DHANDLEs so we don't have
-			 * an easy way to get to the lists of open objects.
+			 * not been converted to use data handles so we don't
+			 * have an easy way to get to the lists of open objects.
 			 */
 			if (!WT_PREFIX_MATCH(k.str, "file:"))
 				WT_RET_MSG(session, EINVAL,
