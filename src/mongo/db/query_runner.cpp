@@ -18,6 +18,7 @@
 #include "mongo/db/btree.h"
 #include "mongo/db/index.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
