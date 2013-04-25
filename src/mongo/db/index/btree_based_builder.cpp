@@ -29,7 +29,7 @@
 
 namespace mongo {
 
-    const int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
 
     class ExternalSortComparisonV0 : public ExternalSortComparison {
     public:
