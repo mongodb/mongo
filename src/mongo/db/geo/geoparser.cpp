@@ -123,6 +123,16 @@ namespace mongo {
         *out = coordsToPoint(coords);
     }
 
+    void eraseDuplicatePoints(vector<S2Point>* vertices) {
+        for (size_t i = 1; i < vertices->size(); ++i) {
+            if ((*vertices)[i - 1] == (*vertices)[i]) {
+                vertices->erase(vertices->begin() + i);
+                // We could have > 2 adjacent identical vertices, and must examine i again.
+                --i;
+            }
+        }
+    }
+
     bool GeoParser::isGeoJSONLineString(const BSONObj& obj) {
         BSONElement type = obj.getFieldDotted(GEOJSON_TYPE);
         if (type.eoo() || (String != type.type())) { return false; }
@@ -141,12 +151,14 @@ namespace mongo {
         if (!isArrayOfCoordinates(coordinateArray)) { return false; }
         vector<S2Point> vertices;
         parsePoints(obj.getFieldDotted(GEOJSON_COORDINATES).Array(), &vertices);
+        eraseDuplicatePoints(&vertices);
         return S2Polyline::IsValid(vertices);
     }
 
     void GeoParser::parseGeoJSONLineString(const BSONObj& obj, S2Polyline* out) {
         vector<S2Point> vertices;
         parsePoints(obj.getFieldDotted(GEOJSON_COORDINATES).Array(), &vertices);
+        eraseDuplicatePoints(&vertices);
         out->Init(vertices);
     }
 
