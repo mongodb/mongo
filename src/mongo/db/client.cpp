@@ -121,14 +121,35 @@ namespace mongo {
         }
 #endif
         verify( currentClient.get() == 0 );
-        Client *c = new Client(desc, mp);
+
+        string fullDesc = desc;
+        if ( str::equals( "conn" , desc ) && mp != NULL )
+            fullDesc = str::stream() << desc << mp->connectionId();
+
+        setThreadName( fullDesc.c_str() );
+
+        // Create the client obj, attach to thread
+        Client *c = new Client( fullDesc, mp );
         currentClient.reset(c);
         mongo::lastError.initThread();
         c->setAuthorizationManager(new AuthorizationManager(new AuthExternalStateMongod()));
         return *c;
     }
 
-    Client::Client(const char *desc, AbstractMessagingPort *p) :
+    /* resets the client for the current thread */
+    void Client::resetThread( const StringData& origThreadName ) {
+        verify( currentClient.get() != 0 );
+
+        // Detach all client info from thread
+        mongo::lastError.reset(NULL);
+        currentClient.get()->shutdown();
+        currentClient.reset(NULL);
+
+        setThreadName( origThreadName.rawData() );
+    }
+
+
+    Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
         _context(0),
         _shutdown(false),
@@ -139,10 +160,6 @@ namespace mongo {
         _hasWrittenThisPass = false;
         _pageFaultRetryableSection = 0;
         _connectionId = p ? p->connectionId() : 0;
-        
-        if ( str::equals( "conn" , desc ) && _connectionId > 0 )
-            _desc = str::stream() << desc << _connectionId;
-        setThreadName(_desc.c_str());
         _curOp = new CurOp( this );
 #ifndef _WIN32
         stringstream temp;
