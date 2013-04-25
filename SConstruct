@@ -14,6 +14,7 @@
 # several, subordinate SConscript files, which describe specific build rules.
 
 import buildscripts
+import copy
 import datetime
 import imp
 import os
@@ -960,12 +961,27 @@ def doConfigure(myenv):
             context.Result(ret)
             return ret
 
-        cloned = env.Clone()
-        cloned.Append(**mutation)
-
         if using_msvc():
             print("AddFlagIfSupported is not currently supported with MSVC")
             Exit(1)
+
+        test_mutation = mutation
+        if using_gcc():
+            test_mutation = copy.deepcopy(mutation)
+            # GCC helpfully doesn't issue a diagnostic on unkown flags of the form -Wno-xxx
+            # unless other diagnostics are triggered. That makes it tough to check for support
+            # for -Wno-xxx. To work around, if we see that we are testing for a flag of the
+            # form -Wno-xxx (but not -Wno-error=xxx), we also add -Wxxx to the flags. GCC does
+            # warn on unknown -Wxxx style flags, so this lets us probe for availablity of
+            # -Wno-xxx.
+            for kw in test_mutation.keys():
+                test_flags = test_mutation[kw]
+                for test_flag in test_flags:
+                    if test_flag.startswith("-Wno-") and not test_flag.startswith("-Wno-error="):
+                        test_flags.append(re.sub("^-Wno-", "-W", test_flag))
+
+        cloned = env.Clone()
+        cloned.Append(**test_mutation)
 
         # For GCC, we don't need anything since bad flags are already errors, but
         # adding -Werror won't hurt. For clang, bad flags are only warnings, so we need -Werror
