@@ -806,7 +806,7 @@ def doConfigure(myenv):
     # TODO: Currently, we have some flags already injected. Eventually, this should test the
     # bare compilers, and we should re-check at the very end that TryCompile and TryLink still
     # work with the flags we have selected.
-    conf = Configure(myenv, clean=False, help=False)
+    conf = Configure(myenv, help=False)
 
     if 'CheckCXX' in dir( conf ):
         if not conf.CheckCXX():
@@ -861,7 +861,7 @@ def doConfigure(myenv):
         context.Result(result)
         return result
 
-    conf = Configure(myenv, clean=False, help=False, custom_tests = {
+    conf = Configure(myenv, help=False, custom_tests = {
         'CheckForToolchain' : CheckForToolchain,
     })
 
@@ -923,7 +923,7 @@ def doConfigure(myenv):
                     context.Result(result)
                     return result
 
-                conf = Configure(myenv, clean=False, help=False, custom_tests = {
+                conf = Configure(myenv, help=False, custom_tests = {
                     'CheckFor64Bit' : CheckFor64Bit
                 })
                 if conf.CheckFor64Bit():
@@ -971,7 +971,7 @@ def doConfigure(myenv):
         # adding -Werror won't hurt. For clang, bad flags are only warnings, so we need -Werror
         # to make them real errors.
         cloned.Append(CCFLAGS=['-Werror'])
-        conf = Configure(cloned, clean=False, help=False, custom_tests = {
+        conf = Configure(cloned, help=False, custom_tests = {
                 'CheckFlag' : lambda(ctx) : CheckFlagTest(ctx, tool, extension, flag)
         })
         available = conf.CheckFlag()
