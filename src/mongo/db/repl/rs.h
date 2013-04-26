@@ -149,6 +149,7 @@ namespace mongo {
         void percolate(const BSONObj& rid, const OpTime& last);
         void associateSlave(const BSONObj& rid, const int memberId);
         void updateSlave(const mongo::OID& id, const OpTime& last);
+        void clearCache();
     };
 
     class Consensus {
@@ -489,6 +490,9 @@ namespace mongo {
          * have called it again, passing in false.
          */
         bool setMaintenanceMode(const bool inc);
+
+        // Records a new slave's id in the GhostSlave map, at handshake time.
+        void registerSlave(const BSONObj& rid, const int memberId);
     private:
         Member* head() const { return _members.head(); }
     public:
