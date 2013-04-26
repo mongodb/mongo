@@ -104,6 +104,9 @@
     <Filter Include="JavaScript source files\Included in shell only">
       <UniqueIdentifier>{283d932c-5594-47a6-9b1b-8f5af53c0337}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party\MurmurHash3">
+      <UniqueIdentifier>{4da66dbf-2329-43ac-9c04-a7e3088bbaa7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\scripting\engine.cpp">
@@ -628,6 +631,9 @@
     </ClCompile>
     <ClCompile Include="..\platform\random_test.cpp">
       <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
+      <Filter>third_party\MurmurHash3</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1473,6 +1479,9 @@
     </ClInclude>
     <ClInclude Include="..\base\status_with.h">
       <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
+      <Filter>third_party\MurmurHash3</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

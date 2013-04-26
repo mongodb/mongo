@@ -747,6 +747,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\query_plan.h" />
     <ClInclude Include="..\db\query_plan_selection_policy.h" />
     <ClInclude Include="..\db\query_plan_summary.h" />
+    <ClInclude Include="..\db\query_runner.h" />
     <ClInclude Include="..\db\record.h" />
     <ClInclude Include="..\db\repl\bgsync.h" />
     <ClInclude Include="..\db\repl\connections.h" />
@@ -2752,6 +2753,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\query_optimizer_internal.cpp" />
     <ClCompile Include="..\db\query_plan.cpp" />
     <ClCompile Include="..\db\query_plan_selection_policy.cpp" />
+    <ClCompile Include="..\db\query_runner.cpp" />
     <ClCompile Include="..\db\record.cpp" />
     <ClCompile Include="..\db\repl\bgsync.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />

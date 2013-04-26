@@ -1637,6 +1637,9 @@
     <ClCompile Include="matcher\expression_tree_test.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
+    <ClCompile Include="query_runner.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3329,6 +3332,9 @@
     </ClInclude>
     <ClInclude Include="matcher\expression_tree.h">
       <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="query_runner.h">
+      <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
