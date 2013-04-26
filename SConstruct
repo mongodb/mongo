@@ -170,6 +170,8 @@ add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
 
 add_option( "cxx", "compiler to use" , 1 , True )
 add_option( "cc", "compiler to use for c" , 1 , True )
+add_option( "cc-use-shell-environment", "use $CC from shell for C compiler" , 0 , False )
+add_option( "cxx-use-shell-environment", "use $CXX from shell for C++ compiler" , 0 , False )
 add_option( "ld", "linker to use" , 1 , True )
 add_option( "c++11", "enable c++11 support (experimental)", 0, True )
 
@@ -367,6 +369,19 @@ if os.sys.platform == 'win32':
     env['OS_FAMILY'] = 'win'
 else:
     env['OS_FAMILY'] = 'posix'
+
+if has_option( "cc-use-shell-environment" ) and has_option( "cc" ):
+    print("Cannot specify both --cc-use-shell-environment and --cc")
+    Exit(1)
+elif has_option( "cxx-use-shell-environment" ) and has_option( "cxx" ):
+    print("Cannot specify both --cxx-use-shell-environment and --cxx")
+    Exit(1)
+
+if has_option( "cxx-use-shell-environment" ):
+    env["CXX"] = os.getenv("CXX");
+    env["CC"] = env["CXX"]
+if has_option( "cc-use-shell-environment" ):
+    env["CC"] = os.getenv("CC");
 
 if has_option( "cxx" ):
     env["CC"] = get_option( "cxx" )
