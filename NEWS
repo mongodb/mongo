@@ -1,3 +1,35 @@
+WiredTiger release 1.5.3, 2013-04-26
+------------------------------------
+
+This release contains some major new features along with numerous bug fixes
+and performance improvements. The significant changes are highlighted
+below:
+
+* Enhance the extension data source API to facilitate implementation of new
+  data stores in WiredTiger.
+
+* Add support for the STEC / Memrata KVS data source.
+
+* Add a Berkeley DB data source via the WiredTiger extension API.
+
+* Various enhancements to cache eviction management. Mostly to avoid stalls in
+  application threads.
+
+* Fixes to shared cache pool implementation, so resources are more
+  aggressively reallocated.
+
+* Add new statistics.
+
+* Implement automatic insert throttling in LSM - enabled by default.
+
+* Configuration strings are now case sensitive.
+
+* Enhance LSM merge algorithms to be more efficient as trees grow very large.
+
+See the upgrade documentation for details of API changes that may require
+altering existing applications.
+
+
 WiredTiger release 1.5.2, 2013-03-28
 ------------------------------------
 
