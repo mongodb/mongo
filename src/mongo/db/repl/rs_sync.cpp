@@ -784,6 +784,11 @@ namespace replset {
         }
     }
 
+    void GhostSync::clearCache() {
+        rwlock lk(_lock, true);
+        _ghostCache.clear();
+    }
+
     void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
         const OID rid = id["_id"].OID();
         rwlock lk( _lock , true );
