@@ -74,7 +74,7 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
  *	Close all of the btree cursors currently open.
  */
 static int
-__clsm_close_cursors(WT_CURSOR_LSM *clsm)
+__clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
@@ -89,14 +89,17 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 		clsm->primary_chunk = NULL;
 	}
 
-	WT_FORALL_CURSORS(clsm, c, i) {
-		clsm->cursors[i] = NULL;
-		WT_RET(c->close(c));
-		if ((bloom = clsm->blooms[i]) != NULL) {
-			clsm->blooms[i] = NULL;
-			WT_RET(__wt_bloom_close(bloom));
+	if (skip_chunks < clsm->nchunks)
+		WT_FORALL_CURSORS(clsm, c, i) {
+			clsm->cursors[i] = NULL;
+			WT_RET(c->close(c));
+			if ((bloom = clsm->blooms[i]) != NULL) {
+				clsm->blooms[i] = NULL;
+				WT_RET(__wt_bloom_close(bloom));
+			}
+			if (i == skip_chunks)
+				break;
 		}
-	}
 
 	clsm->current = NULL;
 	return (0);
@@ -115,13 +118,15 @@ __clsm_open_cursors(
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	const char *ckpt_cfg[3];
-	u_int i, nchunks;
+	const char *checkpoint, *ckpt_cfg[3];
+	size_t alloc;
+	u_int i, nchunks, skip_chunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsm_tree = clsm->lsm_tree;
 	c = &clsm->iface;
 	chunk = NULL;
+	skip_chunks = 0;
 
 	ckpt_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	ckpt_cfg[1] = "checkpoint=WiredTigerCheckpoint,raw";
@@ -140,9 +145,41 @@ __clsm_open_cursors(
 	}
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
-	WT_RET(__clsm_close_cursors(clsm));
-
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+
+	if (!F_ISSET(clsm, WT_CLSM_MERGE)) {
+		/* Calculate how many cursors are open in unchanged chunks. */
+		for (cp = clsm->cursors;
+		    skip_chunks < clsm->nchunks &&
+		    skip_chunks < lsm_tree->nchunks;
+		    cp++, skip_chunks++) {
+			chunk = lsm_tree->chunk[skip_chunks];
+			/* Easy case: the URIs don't match. */
+			if (*cp == NULL || strcmp((*cp)->uri, chunk->uri) != 0)
+				break;
+
+			/* Make sure the checkpoint config matches. */
+			checkpoint = ((WT_CURSOR_BTREE *)*cp)->
+			    btree->dhandle->checkpoint;
+			if (checkpoint == NULL &&
+			    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+				break;
+
+			/* Make sure the Bloom config matches. */
+			if (clsm->blooms[skip_chunks] == NULL &&
+			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+				break;
+		}
+
+		/* Spurious generation bump? */
+		if (skip_chunks == clsm->nchunks &&
+		    clsm->nchunks == lsm_tree->nchunks) {
+			clsm->dsk_gen = lsm_tree->dsk_gen;
+			goto err;
+		}
+		WT_RET(__clsm_close_cursors(clsm, skip_chunks));
+	}
+
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
 	/* Merge cursors have already figured out how many chunks they need. */
@@ -168,14 +205,18 @@ __clsm_open_cursors(
 		nchunks = lsm_tree->nchunks;
 
 	if (clsm->cursors == NULL || nchunks > clsm->nchunks) {
-		WT_ERR(__wt_realloc(session, NULL,
+		alloc = skip_chunks * sizeof(WT_BLOOM *);
+		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
 		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
-		WT_ERR(__wt_realloc(session, NULL,
+		alloc = skip_chunks * sizeof(WT_CURSOR *);
+		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
 		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
 	}
 	clsm->nchunks = nchunks;
 
-	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
+	for (i = skip_chunks, cp = clsm->cursors + i;
+	    i != clsm->nchunks;
+	    i++, cp++) {
 		if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && i < clsm->nchunks - 1)
 			continue;
 
@@ -947,7 +988,7 @@ __clsm_close(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
-	WT_TRET(__clsm_close_cursors(clsm));
+	WT_TRET(__clsm_close_cursors(clsm, 0));
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */
