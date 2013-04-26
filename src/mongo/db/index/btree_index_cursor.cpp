@@ -57,6 +57,8 @@ namespace mongo {
     }
 
     Status BtreeIndexCursor::seek(const BSONObj& position) {
+        _keyOffset = 0;
+
         // Unused out parameter.
         bool found;
 
@@ -76,12 +78,13 @@ namespace mongo {
     }
 
     Status BtreeIndexCursor::seek(const vector<const BSONElement*>& position,
-            const vector<bool>& inclusive) {
+                                  const vector<bool>& inclusive) {
         pair<DiskLoc, int> ignored;
 
         // Bucket is modified by customLocate.  Seeks start @ the root, so we set _bucket to the
         // root here.
         _bucket = _descriptor->getHead();
+        _keyOffset = 0;
 
         _interface->customLocate(
                 _bucket,

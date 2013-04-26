@@ -1850,6 +1850,22 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
+        /**
+         * This test, and every other test that assumes that you get documents back in the order you
+         * inserted them in, is unreliable.
+         *
+         * Documents in an index are ordered by (extracted keypattern fields in doc, diskloc).  We
+         * use the diskloc to break ties.  In this test, all the "extracted keypattern fields in
+         * doc" values are the same, so the documents are in fact ordered in the Btree by their
+         * diskloc.
+         *
+         * This test expects to retrieve docs in the order in which it inserts them.  To get the
+         * docs back in the order you insert them in, DiskLoc_of_insert_N < DiskLoc_of_insert_N+1
+         * must always hold.  This just happens to be true "by default" (when you run ./test) but
+         * it's not true in general.  So, this test (and other similar tests) will fail if you run a
+         * subset of the dbtests, or really anything that modifies the free list such that the
+         * DiskLocs are not strictly sequential.
+         */
         class TakeoverUpdateBase : public Base {
         public:
             TakeoverUpdateBase() :
