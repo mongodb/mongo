@@ -720,7 +720,6 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 void show_help_text(po::options_description options) {
-    show_warnings();
     cout << options << endl;
 };
 
