@@ -590,9 +590,9 @@ __wt_lsm_tree_switch(
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
-	++lsm_tree->dsk_gen;
-	F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
+	F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+	++lsm_tree->dsk_gen;
 
 err:	/* TODO: mark lsm_tree bad on error(?) */
 	return (ret);

@@ -282,8 +282,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			++j;
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-			++lsm_tree->dsk_gen;
 			ret = __wt_lsm_meta_write(session, lsm_tree);
+			++lsm_tree->dsk_gen;
 			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 			if (ret != 0) {
@@ -382,8 +382,8 @@ __lsm_bloom_create(
 
 	/* Ensure the bloom filter is in the metadata. */
 	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
-	++lsm_tree->dsk_gen;
 	ret = __wt_lsm_meta_write(session, lsm_tree);
+	++lsm_tree->dsk_gen;
 	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (ret != 0)
