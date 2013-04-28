@@ -474,7 +474,7 @@ namespace mongo {
 
     string ChunkInfo::toString() const {
         ostringstream os;
-        os << "lastmod: " << lastmod.toString() << " min: " << min << " max: " << endl;
+        os << "lastmod: " << lastmod.toString() << " min: " << min << " max: " << max << endl;
         return os.str();
     }
     // ** end temporary **
