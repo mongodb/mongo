@@ -731,6 +731,10 @@ namespace mongo {
                 queryResponseBuilder->noteYield();
             }
             
+            if ( pq.isExplain() == (char)2 ) {
+                break;
+            }
+            
             if ( pq.getMaxScan() && cursor->nscanned() > pq.getMaxScan() ) {
                 break;
             }
@@ -974,7 +978,7 @@ namespace mongo {
             return "";
         }
 
-        bool explain = pq.isExplain();
+        char explain = pq.isExplain();
         BSONObj order = pq.getOrder();
         BSONObj query = pq.getFilter();
 
