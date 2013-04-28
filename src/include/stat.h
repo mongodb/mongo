@@ -7,13 +7,31 @@
 
 struct __wt_stats {
 	const char	*desc;				/* text description */
+
+	/*
+	 * The underlying statistics values and operations come in two forms,
+	 * one with atomic updates (used if we care enough about the value to
+	 * avoid races), and standard where races are acceptable.  The atomic
+	 * updates are restricted to 4B values, other values can be up to 8B.
+	 * For simplicity, assume the 8B value can be treated as a two-element
+	 * 4B array, where array element 0 holds the 8B value's low-order bits.
+	 */
 	uint64_t	 v;				/* 64-bit value */
 };
 
 #define	WT_STAT(stats, fld)						\
-	(stats)->fld.v
+	((stats)->fld.v)
+#define	WT_STAT_32V(stats, fld)						\
+	(((uint32_t *)&(stats)->fld.v)[0])
+
+#define	WT_STAT_ATOMIC_DECR(stats, fld) do {				\
+	(void)WT_ATOMIC_SUB(WT_STAT_32V(stats, fld), 1);		\
+} while (0)
 #define	WT_STAT_DECR(stats, fld) do {					\
 	--(stats)->fld.v;						\
+} while (0)
+#define	WT_STAT_ATOMIC_INCR(stats, fld) do {				\
+	(void)WT_ATOMIC_ADD(WT_STAT_32V(stats, fld), 1);		\
 } while (0)
 #define	WT_STAT_INCR(stats, fld) do {					\
 	++(stats)->fld.v;						\
@@ -29,9 +47,17 @@ struct __wt_stats {
 } while (0)
 
 /* Connection statistics. */
+#define	WT_CSTAT_ATOMIC_DECR(session, fld) do {				\
+	if (S2C(session)->statistics)					\
+		WT_STAT_ATOMIC_DECR(&S2C(session)->stats, fld);		\
+} while (0)
 #define	WT_CSTAT_DECR(session, fld) do {				\
 	if (S2C(session)->statistics)					\
 		WT_STAT_DECR(&S2C(session)->stats, fld);		\
+} while (0)
+#define	WT_CSTAT_ATOMIC_INCR(session, fld) do {				\
+	if (S2C(session)->statistics)					\
+		WT_STAT_ATOMIC_INCR(&S2C(session)->stats, fld);		\
 } while (0)
 #define	WT_CSTAT_INCR(session, fld) do {				\
 	if (S2C(session)->statistics)					\
@@ -46,21 +72,27 @@ struct __wt_stats {
 		WT_STAT_SET(&S2C(session)->stats, fld, v);		\
 } while (0)
 
-/* Data-source statistics. */
+/*
+ * Data-source statistics.
+ *
+ * XXX
+ * We shouldn't have to check if the data-source handle is NULL, but it's
+ * useful until everything is converted to using data-source handles.
+ */
 #define	WT_DSTAT_DECR(session, fld) do {				\
-	if (S2C(session)->statistics)					\
+	if (session->dhandle != NULL && S2C(session)->statistics)	\
 		WT_STAT_DECR(&(session)->dhandle->stats, fld);		\
 } while (0)
 #define	WT_DSTAT_INCR(session, fld) do {				\
-	if (S2C(session)->statistics)					\
+	if (session->dhandle != NULL && S2C(session)->statistics)	\
 		WT_STAT_INCR(&session->dhandle->stats, fld);		\
 } while (0)
 #define	WT_DSTAT_INCRV(session, fld, v) do {				\
-	if (S2C(session)->statistics)					\
+	if (session->dhandle != NULL && S2C(session)->statistics)	\
 		WT_STAT_INCRV(&session->dhandle->stats, fld, v);	\
 } while (0)
 #define	WT_DSTAT_SET(session, fld, v) do {				\
-	if (S2C(session)->statistics)					\
+	if (session->dhandle != NULL && S2C(session)->statistics)	\
 		WT_STAT_SET(&session->dhandle->stats, fld, v);		\
 } while (0)
 
@@ -159,6 +191,7 @@ struct __wt_dsrc_stats {
 	WT_STATS rec_split_leaf;
 	WT_STATS rec_split_max;
 	WT_STATS session_compact;
+	WT_STATS session_cursor_open;
 	WT_STATS txn_update_conflict;
 	WT_STATS txn_write_conflict;
 };
@@ -215,6 +248,7 @@ struct __wt_connection_stats {
 	WT_STATS rec_skipped_update;
 	WT_STATS rwlock_read;
 	WT_STATS rwlock_write;
+	WT_STATS session_cursor_open;
 	WT_STATS txn_ancient;
 	WT_STATS txn_begin;
 	WT_STATS txn_checkpoint;
