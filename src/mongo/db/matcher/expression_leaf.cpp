@@ -27,7 +27,7 @@
 
 namespace mongo {
 
-    bool LeafExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool LeafMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
         //log() << "e doc: " << doc << " path: " << _path << std::endl;
 
         FieldRef path;
@@ -75,7 +75,7 @@ namespace mongo {
 
     // -------------
 
-    Status ComparisonExpression::init( const StringData& path, Type type, const BSONElement& rhs ) {
+    Status ComparisonMatchExpression::init( const StringData& path, Type type, const BSONElement& rhs ) {
         _path = path;
         _type = type;
         _rhs = rhs;
@@ -89,8 +89,8 @@ namespace mongo {
     }
 
 
-    bool ComparisonExpression::matchesSingleElement( const BSONElement& e ) const {
-        //log() << "\t ComparisonExpression e: " << e << " _rhs: " << _rhs << std::endl;
+    bool ComparisonMatchExpression::matchesSingleElement( const BSONElement& e ) const {
+        //log() << "\t ComparisonMatchExpression e: " << e << " _rhs: " << _rhs << std::endl;
 
         if ( e.canonicalType() != _rhs.canonicalType() ) {
             // some special cases
@@ -126,13 +126,13 @@ namespace mongo {
         throw 1;
     }
 
-    bool ComparisonExpression::_invertForNE( bool normal ) const {
+    bool ComparisonMatchExpression::_invertForNE( bool normal ) const {
         if ( _type == NE )
             return !normal;
         return normal;
     }
 
-    void ComparisonExpression::debugString( StringBuilder& debug, int level ) const {
+    void ComparisonMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " ";
         switch ( _type ) {
@@ -166,14 +166,14 @@ namespace mongo {
         return options;
     }
 
-    Status RegexExpression::init( const StringData& path, const BSONElement& e ) {
+    Status RegexMatchExpression::init( const StringData& path, const BSONElement& e ) {
         if ( e.type() != RegEx )
             return Status( ErrorCodes::BadValue, "regex not a regex" );
         return init( path, e.regex(), e.regexFlags() );
     }
 
 
-    Status RegexExpression::init( const StringData& path, const StringData& regex, const StringData& options ) {
+    Status RegexMatchExpression::init( const StringData& path, const StringData& regex, const StringData& options ) {
         _path = path;
 
         if ( regex.size() > MaxPatternSize ) {
@@ -186,8 +186,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool RegexExpression::matchesSingleElement( const BSONElement& e ) const {
-        //log() << "RegexExpression::matchesSingleElement _regex: " << _regex << " e: " << e << std::endl;
+    bool RegexMatchExpression::matchesSingleElement( const BSONElement& e ) const {
+        //log() << "RegexMatchExpression::matchesSingleElement _regex: " << _regex << " e: " << e << std::endl;
         switch (e.type()) {
         case String:
         case Symbol:
@@ -202,14 +202,14 @@ namespace mongo {
         }
     }
 
-    void RegexExpression::debugString( StringBuilder& debug, int level ) const {
+    void RegexMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " regex /" << _regex << "/" << _flags << "\n";
     }
 
     // ---------
 
-    Status ModExpression::init( const StringData& path, int divisor, int remainder ) {
+    Status ModMatchExpression::init( const StringData& path, int divisor, int remainder ) {
         _path = path;
         if ( divisor == 0 )
             return Status( ErrorCodes::BadValue, "divisor cannot be 0" );
@@ -218,13 +218,13 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool ModExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool ModMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         if ( !e.isNumber() )
             return false;
         return e.numberLong() % _divisor == _remainder;
     }
 
-    void ModExpression::debugString( StringBuilder& debug, int level ) const {
+    void ModMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " mod " << _divisor << " % x == "  << _remainder << "\n";
     }
@@ -232,41 +232,41 @@ namespace mongo {
 
     // ------------------
 
-    Status ExistsExpression::init( const StringData& path, bool exists ) {
+    Status ExistsMatchExpression::init( const StringData& path, bool exists ) {
         _path = path;
         _exists = exists;
         return Status::OK();
     }
 
-    bool ExistsExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool ExistsMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         if ( e.eoo() ) {
             return !_exists;
         }
         return _exists;
     }
 
-    void ExistsExpression::debugString( StringBuilder& debug, int level ) const {
+    void ExistsMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " exists: " << _exists << "\n";
     }
 
     // ----
 
-    Status TypeExpression::init( const StringData& path, int type ) {
+    Status TypeMatchExpression::init( const StringData& path, int type ) {
         _path = path;
         _type = type;
         return Status::OK();
     }
 
-    bool TypeExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool TypeMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         return e.type() == _type;
     }
 
-    bool TypeExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool TypeMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
         return _matches( _path, doc, details );
     }
 
-    bool TypeExpression::_matches( const StringData& path, const BSONObj& doc, MatchDetails* details ) const {
+    bool TypeMatchExpression::_matches( const StringData& path, const BSONObj& doc, MatchDetails* details ) const {
 
         FieldRef pathRef;
         pathRef.parse(path);
@@ -305,7 +305,7 @@ namespace mongo {
         return false;
     }
 
-    void TypeExpression::debugString( StringBuilder& debug, int level ) const {
+    void TypeMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " type: " << _type << "\n";
     }
@@ -340,20 +340,20 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ArrayFilterEntries::addRegex( RegexExpression* expr ) {
+    Status ArrayFilterEntries::addRegex( RegexMatchExpression* expr ) {
         _regexes.push_back( expr );
         return Status::OK();
     }
 
     // -----------
 
-    void InExpression::init( const StringData& path ) {
+    void InMatchExpression::init( const StringData& path ) {
         _path = path;
         _allHaveToMatch = false;
     }
 
 
-    bool InExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool InMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         if ( _arrayEntries.hasNull() && e.eoo() )
             return true;
 
@@ -368,7 +368,7 @@ namespace mongo {
         return false;
     }
 
-    void InExpression::debugString( StringBuilder& debug, int level ) const {
+    void InMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " $in: TODO\n";
     }
@@ -376,18 +376,18 @@ namespace mongo {
 
     // ----------
 
-    void NinExpression::init( const StringData& path ) {
+    void NinMatchExpression::init( const StringData& path ) {
         _path = path;
         _allHaveToMatch = true;
     }
 
 
-    bool NinExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool NinMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         return !_in.matchesSingleElement( e );
     }
 
 
-    void NinExpression::debugString( StringBuilder& debug, int level ) const {
+    void NinMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " $nin: TODO\n";
     }

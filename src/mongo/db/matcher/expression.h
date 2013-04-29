@@ -25,14 +25,14 @@
 
 namespace mongo {
 
-    class TreeExpression;
+    class TreeMatchExpression;
 
-    class Expression {
-        MONGO_DISALLOW_COPYING( Expression );
+    class MatchExpression {
+        MONGO_DISALLOW_COPYING( MatchExpression );
 
     public:
-        Expression(){}
-        virtual ~Expression(){}
+        MatchExpression(){}
+        virtual ~MatchExpression(){}
 
         /**
          * determins if the doc matches the expression

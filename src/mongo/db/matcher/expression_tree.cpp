@@ -25,26 +25,26 @@
 
 namespace mongo {
 
-    ListOfExpression::~ListOfExpression() {
+    ListOfMatchExpression::~ListOfMatchExpression() {
         for ( unsigned i = 0; i < _expressions.size(); i++ )
             delete _expressions[i];
         _expressions.clear();
     }
 
-    void ListOfExpression::add( Expression* e ) {
+    void ListOfMatchExpression::add( MatchExpression* e ) {
         verify( e );
         _expressions.push_back( e );
     }
 
 
-    void ListOfExpression::_debugList( StringBuilder& debug, int level ) const {
+    void ListOfMatchExpression::_debugList( StringBuilder& debug, int level ) const {
         for ( unsigned i = 0; i < _expressions.size(); i++ )
             _expressions[i]->debugString( debug, level + 1 );
     }
 
     // -----
 
-    bool AndExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool AndMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
         for ( size_t i = 0; i < size(); i++ ) {
             if ( !get(i)->matches( doc, details ) ) {
                 if ( details )
@@ -55,7 +55,7 @@ namespace mongo {
         return true;
     }
 
-    bool AndExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool AndMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         for ( size_t i = 0; i < size(); i++ ) {
             if ( !get(i)->matchesSingleElement( e ) ) {
                 return false;
@@ -65,7 +65,7 @@ namespace mongo {
     }
 
 
-    void AndExpression::debugString( StringBuilder& debug, int level ) const {
+    void AndMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << "$and\n";
         _debugList( debug, level );
@@ -73,7 +73,7 @@ namespace mongo {
 
     // -----
 
-    bool OrExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool OrMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
         for ( size_t i = 0; i < size(); i++ ) {
             if ( get(i)->matches( doc, NULL ) ) {
                 return true;
@@ -82,7 +82,7 @@ namespace mongo {
         return false;
     }
 
-    bool OrExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool OrMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         for ( size_t i = 0; i < size(); i++ ) {
             if ( get(i)->matchesSingleElement( e ) ) {
                 return true;
@@ -92,7 +92,7 @@ namespace mongo {
     }
 
 
-    void OrExpression::debugString( StringBuilder& debug, int level ) const {
+    void OrMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << "$or\n";
         _debugList( debug, level );
@@ -100,7 +100,7 @@ namespace mongo {
 
     // ----
 
-    bool NorExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool NorMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
         for ( size_t i = 0; i < size(); i++ ) {
             if ( get(i)->matches( doc, NULL ) ) {
                 return false;
@@ -109,7 +109,7 @@ namespace mongo {
         return true;
     }
 
-    bool NorExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool NorMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         for ( size_t i = 0; i < size(); i++ ) {
             if ( get(i)->matchesSingleElement( e ) ) {
                 return false;
@@ -118,7 +118,7 @@ namespace mongo {
         return true;
     }
 
-    void NorExpression::debugString( StringBuilder& debug, int level ) const {
+    void NorMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << "$nor\n";
         _debugList( debug, level );
@@ -126,7 +126,7 @@ namespace mongo {
 
     // -------
 
-    void NotExpression::debugString( StringBuilder& debug, int level ) const {
+    void NotMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << "$not\n";
         _exp->debugString( debug, level + 1 );

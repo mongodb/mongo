@@ -31,25 +31,25 @@
 
 namespace mongo {
 
-    StatusWithExpression ExpressionParser::_parseComparison( const char* name,
-                                                                ComparisonExpression::Type cmp,
+    StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
+                                                                ComparisonMatchExpression::Type cmp,
                                                                 const BSONElement& e ) {
-        std::auto_ptr<ComparisonExpression> temp( new ComparisonExpression() );
+        std::auto_ptr<ComparisonMatchExpression> temp( new ComparisonMatchExpression() );
 
         Status s = temp->init( name, cmp, e );
         if ( !s.isOK() )
-            return StatusWithExpression(s);
+            return StatusWithMatchExpression(s);
 
-        return StatusWithExpression( temp.release() );
+        return StatusWithMatchExpression( temp.release() );
     }
 
-    StatusWithExpression ExpressionParser::_parseSubField( const char* name,
+    StatusWithMatchExpression MatchExpressionParser::_parseSubField( const char* name,
                                                            const BSONElement& e ) {
 
         // TODO: these should move to getGtLtOp, or its replacement
 
         if ( mongoutils::str::equals( "$eq", e.fieldName() ) )
-            return _parseComparison( name, ComparisonExpression::EQ, e );
+            return _parseComparison( name, ComparisonMatchExpression::EQ, e );
 
         if ( mongoutils::str::equals( "$not", e.fieldName() ) ) {
             return _parseNot( name, e );
@@ -59,42 +59,42 @@ namespace mongo {
         int x = e.getGtLtOp(-1);
         switch ( x ) {
         case -1:
-            return StatusWithExpression( ErrorCodes::BadValue,
+            return StatusWithMatchExpression( ErrorCodes::BadValue,
                                          mongoutils::str::stream() << "unknown operator: "
                                          << e.fieldName() );
         case BSONObj::LT:
-            return _parseComparison( name, ComparisonExpression::LT, e );
+            return _parseComparison( name, ComparisonMatchExpression::LT, e );
         case BSONObj::LTE:
-            return _parseComparison( name, ComparisonExpression::LTE, e );
+            return _parseComparison( name, ComparisonMatchExpression::LTE, e );
         case BSONObj::GT:
-            return _parseComparison( name, ComparisonExpression::GT, e );
+            return _parseComparison( name, ComparisonMatchExpression::GT, e );
         case BSONObj::GTE:
-            return _parseComparison( name, ComparisonExpression::GTE, e );
+            return _parseComparison( name, ComparisonMatchExpression::GTE, e );
         case BSONObj::NE:
-            return _parseComparison( name, ComparisonExpression::NE, e );
+            return _parseComparison( name, ComparisonMatchExpression::NE, e );
         case BSONObj::Equality:
-            return _parseComparison( name, ComparisonExpression::EQ, e );
+            return _parseComparison( name, ComparisonMatchExpression::EQ, e );
 
         case BSONObj::opIN: {
             if ( e.type() != Array )
-                return StatusWithExpression( ErrorCodes::BadValue, "$in needs an array" );
-            std::auto_ptr<InExpression> temp( new InExpression() );
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "$in needs an array" );
+            std::auto_ptr<InMatchExpression> temp( new InMatchExpression() );
             temp->init( name );
             Status s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), e.Obj() );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
-            return StatusWithExpression( temp.release() );
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( temp.release() );
         }
 
         case BSONObj::NIN: {
             if ( e.type() != Array )
-                return StatusWithExpression( ErrorCodes::BadValue, "$nin needs an array" );
-            std::auto_ptr<NinExpression> temp( new NinExpression() );
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "$nin needs an array" );
+            std::auto_ptr<NinMatchExpression> temp( new NinMatchExpression() );
             temp->init( name );
             Status s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), e.Obj() );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
-            return StatusWithExpression( temp.release() );
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( temp.release() );
         }
 
         case BSONObj::opSIZE: {
@@ -117,37 +117,37 @@ namespace mongo {
                 }
             }
             else {
-                return StatusWithExpression( ErrorCodes::BadValue, "$size needs a number" );
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "$size needs a number" );
             }
 
-            std::auto_ptr<SizeExpression> temp( new SizeExpression() );
+            std::auto_ptr<SizeMatchExpression> temp( new SizeMatchExpression() );
             Status s = temp->init( name, size );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
-            return StatusWithExpression( temp.release() );
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( temp.release() );
         }
 
         case BSONObj::opEXISTS: {
             if ( e.eoo() )
-                return StatusWithExpression( ErrorCodes::BadValue, "$exists can't be eoo" );
-            std::auto_ptr<ExistsExpression> temp( new ExistsExpression() );
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "$exists can't be eoo" );
+            std::auto_ptr<ExistsMatchExpression> temp( new ExistsMatchExpression() );
             Status s = temp->init( name, e.trueValue() );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
-            return StatusWithExpression( temp.release() );
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( temp.release() );
         }
 
         case BSONObj::opTYPE: {
             if ( !e.isNumber() )
-                return StatusWithExpression( ErrorCodes::BadValue, "$type has to be a number" );
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "$type has to be a number" );
             int type = e.numberInt();
             if ( e.type() != NumberInt && type != e.number() )
                 type = -1;
-            std::auto_ptr<TypeExpression> temp( new TypeExpression() );
+            std::auto_ptr<TypeMatchExpression> temp( new TypeMatchExpression() );
             Status s = temp->init( name, type );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
-            return StatusWithExpression( temp.release() );
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( temp.release() );
         }
 
 
@@ -155,7 +155,7 @@ namespace mongo {
             return _parseMOD( name, e );
 
         case BSONObj::opOPTIONS:
-            return StatusWithExpression( ErrorCodes::BadValue, "$options has to be after a $regex" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "$options has to be after a $regex" );
 
         case BSONObj::opELEM_MATCH:
             return _parseElemMatch( name, e );
@@ -164,14 +164,14 @@ namespace mongo {
             return _parseAll( name, e );
 
         default:
-            return StatusWithExpression( ErrorCodes::BadValue, "not done" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "not done" );
         }
 
     }
 
-    StatusWithExpression ExpressionParser::parse( const BSONObj& obj ) {
+    StatusWithMatchExpression MatchExpressionParser::parse( const BSONObj& obj ) {
 
-        std::auto_ptr<AndExpression> root( new AndExpression() );
+        std::auto_ptr<AndMatchExpression> root( new AndMatchExpression() );
 
         BSONObjIterator i( obj );
         while ( i.more() ){
@@ -183,36 +183,36 @@ namespace mongo {
                 // TODO: optimize if block?
                 if ( mongoutils::str::equals( "or", rest ) ) {
                     if ( e.type() != Array )
-                        return StatusWithExpression( ErrorCodes::BadValue,
+                        return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "$or needs an array" );
-                    std::auto_ptr<OrExpression> temp( new OrExpression() );
+                    std::auto_ptr<OrMatchExpression> temp( new OrMatchExpression() );
                     Status s = _parseTreeList( e.Obj(), temp.get() );
                     if ( !s.isOK() )
-                        return StatusWithExpression( s );
+                        return StatusWithMatchExpression( s );
                     root->add( temp.release() );
                 }
                 else if ( mongoutils::str::equals( "and", rest ) ) {
                     if ( e.type() != Array )
-                        return StatusWithExpression( ErrorCodes::BadValue,
+                        return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "and needs an array" );
-                    std::auto_ptr<AndExpression> temp( new AndExpression() );
+                    std::auto_ptr<AndMatchExpression> temp( new AndMatchExpression() );
                     Status s = _parseTreeList( e.Obj(), temp.get() );
                     if ( !s.isOK() )
-                        return StatusWithExpression( s );
+                        return StatusWithMatchExpression( s );
                     root->add( temp.release() );
                 }
                 else if ( mongoutils::str::equals( "nor", rest ) ) {
                     if ( e.type() != Array )
-                        return StatusWithExpression( ErrorCodes::BadValue,
+                        return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "and needs an array" );
-                    std::auto_ptr<NorExpression> temp( new NorExpression() );
+                    std::auto_ptr<NorMatchExpression> temp( new NorMatchExpression() );
                     Status s = _parseTreeList( e.Obj(), temp.get() );
                     if ( !s.isOK() )
-                        return StatusWithExpression( s );
+                        return StatusWithMatchExpression( s );
                     root->add( temp.release() );
                 }
                 else {
-                    return StatusWithExpression( ErrorCodes::BadValue,
+                    return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  mongoutils::str::stream()
                                                  << "unkown operator: "
                                                  << e.fieldName() );
@@ -224,32 +224,32 @@ namespace mongo {
             if ( e.type() == Object && e.Obj().firstElement().fieldName()[0] == '$' ) {
                 Status s = _parseSub( e.fieldName(), e.Obj(), root.get() );
                 if ( !s.isOK() )
-                    return StatusWithExpression( s );
+                    return StatusWithMatchExpression( s );
                 continue;
             }
 
             if ( e.type() == RegEx ) {
-                StatusWithExpression result = _parseRegexElement( e.fieldName(), e );
+                StatusWithMatchExpression result = _parseRegexElement( e.fieldName(), e );
                 if ( !result.isOK() )
                     return result;
                 root->add( result.getValue() );
                 continue;
             }
 
-            std::auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
-            Status s = eq->init( e.fieldName(), ComparisonExpression::EQ, e );
+            std::auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
+            Status s = eq->init( e.fieldName(), ComparisonMatchExpression::EQ, e );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
+                return StatusWithMatchExpression( s );
 
             root->add( eq.release() );
         }
 
-        return StatusWithExpression( root.release() );
+        return StatusWithMatchExpression( root.release() );
     }
 
-    Status ExpressionParser::_parseSub( const char* name,
+    Status MatchExpressionParser::_parseSub( const char* name,
                                         const BSONObj& sub,
-                                        AndExpression* root ) {
+                                        AndMatchExpression* root ) {
 
         bool first = true;
 
@@ -262,14 +262,14 @@ namespace mongo {
                 if ( !first )
                     return Status( ErrorCodes::BadValue, "$regex has to be first" );
 
-                StatusWithExpression s = _parseRegexDocument( name, sub );
+                StatusWithMatchExpression s = _parseRegexDocument( name, sub );
                 if ( !s.isOK() )
                     return s.getStatus();
                 root->add( s.getValue() );
                 return Status::OK();
             }
 
-            StatusWithExpression s = _parseSubField( name, deep );
+            StatusWithMatchExpression s = _parseSubField( name, deep );
             if ( !s.isOK() )
                 return s.getStatus();
 
@@ -281,49 +281,49 @@ namespace mongo {
 
 
 
-    StatusWithExpression ExpressionParser::_parseMOD( const char* name,
+    StatusWithMatchExpression MatchExpressionParser::_parseMOD( const char* name,
                                                       const BSONElement& e ) {
 
         if ( e.type() != Array )
-            return StatusWithExpression( ErrorCodes::BadValue, "malformed mod, needs to be an array" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "malformed mod, needs to be an array" );
 
         BSONObjIterator i( e.Obj() );
 
         if ( !i.more() )
-            return StatusWithExpression( ErrorCodes::BadValue, "malformed mod, not enough elements" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "malformed mod, not enough elements" );
         BSONElement d = i.next();
         if ( !d.isNumber() )
-            return StatusWithExpression( ErrorCodes::BadValue, "malformed mod, divisor not a number" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "malformed mod, divisor not a number" );
 
         if ( !i.more() )
-            return StatusWithExpression( ErrorCodes::BadValue, "malformed mod, not enough elements" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "malformed mod, not enough elements" );
         BSONElement r = i.next();
         if ( !d.isNumber() )
-            return StatusWithExpression( ErrorCodes::BadValue, "malformed mod, remainder not a number" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "malformed mod, remainder not a number" );
 
         if ( i.more() )
-            return StatusWithExpression( ErrorCodes::BadValue, "malformed mod, too many elements" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "malformed mod, too many elements" );
 
-        std::auto_ptr<ModExpression> temp( new ModExpression() );
+        std::auto_ptr<ModMatchExpression> temp( new ModMatchExpression() );
         Status s = temp->init( name, d.numberInt(), r.numberInt() );
         if ( !s.isOK() )
-            return StatusWithExpression( s );
-        return StatusWithExpression( temp.release() );
+            return StatusWithMatchExpression( s );
+        return StatusWithMatchExpression( temp.release() );
     }
 
-    StatusWithExpression ExpressionParser::_parseRegexElement( const char* name,
+    StatusWithMatchExpression MatchExpressionParser::_parseRegexElement( const char* name,
                                                                const BSONElement& e ) {
         if ( e.type() != RegEx )
-            return StatusWithExpression( ErrorCodes::BadValue, "not a regex" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "not a regex" );
 
-        std::auto_ptr<RegexExpression> temp( new RegexExpression() );
+        std::auto_ptr<RegexMatchExpression> temp( new RegexMatchExpression() );
         Status s = temp->init( name, e.regex(), e.regexFlags() );
         if ( !s.isOK() )
-            return StatusWithExpression( s );
-        return StatusWithExpression( temp.release() );
+            return StatusWithMatchExpression( s );
+        return StatusWithMatchExpression( temp.release() );
     }
 
-    StatusWithExpression ExpressionParser::_parseRegexDocument( const char* name,
+    StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument( const char* name,
                                                                 const BSONObj& doc ) {
         string regex;
         string regexOptions;
@@ -334,33 +334,33 @@ namespace mongo {
             switch ( e.getGtLtOp() ) {
             case BSONObj::opREGEX:
                 if ( e.type() != String )
-                    return StatusWithExpression( ErrorCodes::BadValue,
+                    return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  "$regex has to be a string" );
                 regex = e.String();
                 break;
             case BSONObj::opOPTIONS:
                 if ( e.type() != String )
-                    return StatusWithExpression( ErrorCodes::BadValue,
+                    return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  "$options has to be a string" );
                 regexOptions = e.String();
                 break;
             default:
-                return StatusWithExpression( ErrorCodes::BadValue,
+                return StatusWithMatchExpression( ErrorCodes::BadValue,
                                              mongoutils::str::stream()
                                              << "bad $regex doc option: " << e.fieldName() );
             }
 
         }
 
-        std::auto_ptr<RegexExpression> temp( new RegexExpression() );
+        std::auto_ptr<RegexMatchExpression> temp( new RegexMatchExpression() );
         Status s = temp->init( name, regex, regexOptions );
         if ( !s.isOK() )
-            return StatusWithExpression( s );
-        return StatusWithExpression( temp.release() );
+            return StatusWithMatchExpression( s );
+        return StatusWithMatchExpression( temp.release() );
 
     }
 
-    Status ExpressionParser::_parseArrayFilterEntries( ArrayFilterEntries* entries,
+    Status MatchExpressionParser::_parseArrayFilterEntries( ArrayFilterEntries* entries,
                                                        const BSONObj& theArray ) {
 
 
@@ -369,7 +369,7 @@ namespace mongo {
             BSONElement e = i.next();
 
             if ( e.type() == RegEx ) {
-                std::auto_ptr<RegexExpression> r( new RegexExpression() );
+                std::auto_ptr<RegexMatchExpression> r( new RegexMatchExpression() );
                 Status s = r->init( "", e );
                 if ( !s.isOK() )
                     return s;
@@ -387,51 +387,51 @@ namespace mongo {
 
     }
 
-    StatusWithExpression ExpressionParser::_parseElemMatch( const char* name,
+    StatusWithMatchExpression MatchExpressionParser::_parseElemMatch( const char* name,
                                                             const BSONElement& e ) {
         if ( e.type() != Object )
-            return StatusWithExpression( ErrorCodes::BadValue, "$elemMatch needs an Object" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "$elemMatch needs an Object" );
 
         BSONObj obj = e.Obj();
         if ( obj.firstElement().fieldName()[0] == '$' ) {
             // value case
 
-            AndExpression theAnd;
+            AndMatchExpression theAnd;
             Status s = _parseSub( "", obj, &theAnd );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
+                return StatusWithMatchExpression( s );
 
-            std::auto_ptr<ElemMatchValueExpression> temp( new ElemMatchValueExpression() );
+            std::auto_ptr<ElemMatchValueMatchExpression> temp( new ElemMatchValueMatchExpression() );
             s = temp->init( name );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
+                return StatusWithMatchExpression( s );
 
             for ( size_t i = 0; i < theAnd.size(); i++ ) {
                 temp->add( theAnd.get( i ) );
             }
             theAnd.clearAndRelease();
 
-            return StatusWithExpression( temp.release() );
+            return StatusWithMatchExpression( temp.release() );
         }
 
         // object case
 
-        StatusWithExpression sub = parse( obj );
+        StatusWithMatchExpression sub = parse( obj );
         if ( !sub.isOK() )
             return sub;
 
-        std::auto_ptr<ElemMatchObjectExpression> temp( new ElemMatchObjectExpression() );
+        std::auto_ptr<ElemMatchObjectMatchExpression> temp( new ElemMatchObjectMatchExpression() );
         Status status = temp->init( name, sub.getValue() );
         if ( !status.isOK() )
-            return StatusWithExpression( status );
+            return StatusWithMatchExpression( status );
 
-        return StatusWithExpression( temp.release() );
+        return StatusWithMatchExpression( temp.release() );
     }
 
-    StatusWithExpression ExpressionParser::_parseAll( const char* name,
+    StatusWithMatchExpression MatchExpressionParser::_parseAll( const char* name,
                                                       const BSONElement& e ) {
         if ( e.type() != Array )
-            return StatusWithExpression( ErrorCodes::BadValue, "$all needs an array" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "$all needs an array" );
 
         BSONObj arr = e.Obj();
         if ( arr.firstElement().type() == Object &&
@@ -442,7 +442,7 @@ namespace mongo {
             std::auto_ptr<AllElemMatchOp> temp( new AllElemMatchOp() );
             Status s = temp->init( name );
             if ( !s.isOK() )
-                return StatusWithExpression( s );
+                return StatusWithMatchExpression( s );
 
             BSONObjIterator i( arr );
             while ( i.more() ) {
@@ -450,7 +450,7 @@ namespace mongo {
 
                 if ( hopefullyElemMatchElemennt.type() != Object ) {
                     // $all : [ { $elemMatch : ... }, 5 ]
-                    return StatusWithExpression( ErrorCodes::BadValue,
+                    return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  "$all/$elemMatch has to be consistent" );
                 }
 
@@ -458,29 +458,29 @@ namespace mongo {
                 if ( !mongoutils::str::equals( "$elemMatch",
                                                hopefullyElemMatchObj.firstElement().fieldName() ) ) {
                     // $all : [ { $elemMatch : ... }, { x : 5 } ]
-                    return StatusWithExpression( ErrorCodes::BadValue,
+                    return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  "$all/$elemMatch has to be consistent" );
                 }
 
-                StatusWithExpression inner = _parseElemMatch( "", hopefullyElemMatchObj.firstElement() );
+                StatusWithMatchExpression inner = _parseElemMatch( "", hopefullyElemMatchObj.firstElement() );
                 if ( !inner.isOK() )
                     return inner;
-                temp->add( static_cast<ArrayMatchingExpression*>( inner.getValue() ) );
+                temp->add( static_cast<ArrayMatchingMatchExpression*>( inner.getValue() ) );
             }
 
-            return StatusWithExpression( temp.release() );
+            return StatusWithMatchExpression( temp.release() );
         }
 
-        std::auto_ptr<AllExpression> temp( new AllExpression() );
+        std::auto_ptr<AllMatchExpression> temp( new AllMatchExpression() );
         Status s = temp->init( name );
         if ( !s.isOK() )
-            return StatusWithExpression( s );
+            return StatusWithMatchExpression( s );
 
         s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), arr );
         if ( !s.isOK() )
-            return StatusWithExpression( s );
+            return StatusWithMatchExpression( s );
 
-        return StatusWithExpression( temp.release() );
+        return StatusWithMatchExpression( temp.release() );
     }
 
 

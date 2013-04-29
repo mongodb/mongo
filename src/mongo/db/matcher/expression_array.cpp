@@ -28,12 +28,12 @@ namespace mongo {
 
     // ----------
 
-    Status AllExpression::init( const StringData& path ) {
+    Status AllMatchExpression::init( const StringData& path ) {
         _path = path;
         return Status::OK();
     }
 
-    bool AllExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool AllMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
         FieldRef path;
         path.parse(_path);
 
@@ -61,7 +61,7 @@ namespace mongo {
         return _match( all );
     }
 
-    bool AllExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool AllMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         if ( _arrayEntries.size() == 0 )
             return false;
 
@@ -84,7 +84,7 @@ namespace mongo {
         return _match( all );
     }
 
-    bool AllExpression::_match( const BSONElementSet& all ) const {
+    bool AllMatchExpression::_match( const BSONElementSet& all ) const {
 
         if ( all.size() == 0 )
             return _arrayEntries.singleNull();
@@ -114,14 +114,14 @@ namespace mongo {
         return true;
     }
 
-    void AllExpression::debugString( StringBuilder& debug, int level ) const {
+    void AllMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " $all TODO\n";
     }
 
     // -------
 
-    bool ArrayMatchingExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool ArrayMatchingMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
 
         FieldRef path;
         path.parse(_path);
@@ -163,7 +163,7 @@ namespace mongo {
         return false;
     }
 
-    bool ArrayMatchingExpression::matchesSingleElement( const BSONElement& e ) const {
+    bool ArrayMatchingMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         if ( e.type() != Array )
             return false;
         return matchesArray( e.Obj(), NULL );
@@ -172,7 +172,7 @@ namespace mongo {
 
     // -------
 
-    Status ElemMatchObjectExpression::init( const StringData& path, const Expression* sub ) {
+    Status ElemMatchObjectMatchExpression::init( const StringData& path, const MatchExpression* sub ) {
         _path = path;
         _sub.reset( sub );
         return Status::OK();
@@ -180,7 +180,7 @@ namespace mongo {
 
 
 
-    bool ElemMatchObjectExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
+    bool ElemMatchObjectMatchExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
         BSONObjIterator i( anArray );
         while ( i.more() ) {
             BSONElement inner = i.next();
@@ -196,7 +196,7 @@ namespace mongo {
         return false;
     }
 
-    void ElemMatchObjectExpression::debugString( StringBuilder& debug, int level ) const {
+    void ElemMatchObjectMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " $elemMatch\n";
         _sub->debugString( debug, level + 1 );
@@ -205,30 +205,30 @@ namespace mongo {
 
     // -------
 
-    ElemMatchValueExpression::~ElemMatchValueExpression() {
+    ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
         for ( unsigned i = 0; i < _subs.size(); i++ )
             delete _subs[i];
         _subs.clear();
     }
 
-    Status ElemMatchValueExpression::init( const StringData& path, const Expression* sub ) {
+    Status ElemMatchValueMatchExpression::init( const StringData& path, const MatchExpression* sub ) {
         init( path );
         add( sub );
         return Status::OK();
     }
 
-    Status ElemMatchValueExpression::init( const StringData& path ) {
+    Status ElemMatchValueMatchExpression::init( const StringData& path ) {
         _path = path;
         return Status::OK();
     }
 
 
-    void ElemMatchValueExpression::add( const Expression* sub ) {
+    void ElemMatchValueMatchExpression::add( const MatchExpression* sub ) {
         verify( sub );
         _subs.push_back( sub );
     }
 
-    bool ElemMatchValueExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
+    bool ElemMatchValueMatchExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
         BSONObjIterator i( anArray );
         while ( i.more() ) {
             BSONElement inner = i.next();
@@ -243,7 +243,7 @@ namespace mongo {
         return false;
     }
 
-    bool ElemMatchValueExpression::_arrayElementMatchesAll( const BSONElement& e ) const {
+    bool ElemMatchValueMatchExpression::_arrayElementMatchesAll( const BSONElement& e ) const {
         for ( unsigned i = 0; i < _subs.size(); i++ ) {
             if ( !_subs[i]->matchesSingleElement( e ) )
                 return false;
@@ -251,7 +251,7 @@ namespace mongo {
         return true;
     }
 
-    void ElemMatchValueExpression::debugString( StringBuilder& debug, int level ) const {
+    void ElemMatchValueMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " $elemMatch\n";
         for ( unsigned i = 0; i < _subs.size(); i++ ) {
@@ -273,7 +273,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void AllElemMatchOp::add( const ArrayMatchingExpression* expr ) {
+    void AllElemMatchOp::add( const ArrayMatchingMatchExpression* expr ) {
         verify( expr );
         _list.push_back( expr );
     }
@@ -322,19 +322,19 @@ namespace mongo {
 
     // ---------
 
-    Status SizeExpression::init( const StringData& path, int size ) {
+    Status SizeMatchExpression::init( const StringData& path, int size ) {
         _path = path;
         _size = size;
         return Status::OK();
     }
 
-    bool SizeExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
+    bool SizeMatchExpression::matchesArray( const BSONObj& anArray, MatchDetails* details ) const {
         if ( _size < 0 )
             return false;
         return anArray.nFields() == _size;
     }
 
-    void SizeExpression::debugString( StringBuilder& debug, int level ) const {
+    void SizeMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " $size : " << _size << "\n";
     }

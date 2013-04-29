@@ -30,7 +30,7 @@
 
 namespace mongo {
 
-    Status ExpressionParser::_parseTreeList( const BSONObj& arr, ListOfExpression* out ) {
+    Status MatchExpressionParser::_parseTreeList( const BSONObj& arr, ListOfMatchExpression* out ) {
         BSONObjIterator i( arr );
         while ( i.more() ) {
             BSONElement e = i.next();
@@ -39,7 +39,7 @@ namespace mongo {
                 return Status( ErrorCodes::BadValue,
                                "$or/$and/$nor entries need to be full objects" );
 
-            StatusWithExpression sub = parse( e.Obj() );
+            StatusWithMatchExpression sub = parse( e.Obj() );
             if ( !sub.isOK() )
                 return sub.getStatus();
 
@@ -48,33 +48,33 @@ namespace mongo {
         return Status::OK();
     }
 
-    StatusWithExpression ExpressionParser::_parseNot( const char* name,
+    StatusWithMatchExpression MatchExpressionParser::_parseNot( const char* name,
                                                       const BSONElement& e ) {
         if ( e.type() == RegEx ) {
-            StatusWithExpression s = _parseRegexElement( name, e );
+            StatusWithMatchExpression s = _parseRegexElement( name, e );
             if ( !s.isOK() )
                 return s;
-            std::auto_ptr<NotExpression> n( new NotExpression() );
+            std::auto_ptr<NotMatchExpression> n( new NotMatchExpression() );
             Status s2 = n->init( s.getValue() );
             if ( !s2.isOK() )
-                return StatusWithExpression( s2 );
-            return StatusWithExpression( n.release() );
+                return StatusWithMatchExpression( s2 );
+            return StatusWithMatchExpression( n.release() );
         }
 
         if ( e.type() != Object )
-            return StatusWithExpression( ErrorCodes::BadValue, "$not needs a regex or a document" );
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "$not needs a regex or a document" );
 
-        std::auto_ptr<AndExpression> theAnd( new AndExpression() );
+        std::auto_ptr<AndMatchExpression> theAnd( new AndMatchExpression() );
         Status s = _parseSub( name, e.Obj(), theAnd.get() );
         if ( !s.isOK() )
-            return StatusWithExpression( s );
+            return StatusWithMatchExpression( s );
 
-        std::auto_ptr<NotExpression> theNot( new NotExpression() );
+        std::auto_ptr<NotMatchExpression> theNot( new NotMatchExpression() );
         s = theNot->init( theAnd.release() );
         if ( !s.isOK() )
-            return StatusWithExpression( s );
+            return StatusWithMatchExpression( s );
 
-        return StatusWithExpression( theNot.release() );
+        return StatusWithMatchExpression( theNot.release() );
     }
 
 }

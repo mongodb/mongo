@@ -37,7 +37,7 @@ namespace mongo {
 
     private:
         const BSONObj& _pattern; // this is owned by who created us
-        boost::scoped_ptr<Expression> _expression;
+        boost::scoped_ptr<MatchExpression> _expression;
     };
 
 }

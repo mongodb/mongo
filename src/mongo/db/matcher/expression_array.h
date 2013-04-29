@@ -28,7 +28,7 @@
 
 namespace mongo {
     /**
-     * this SHOULD extend from ArrayMatchingExpression
+     * this SHOULD extend from ArrayMatchingMatchExpression
      * the only reason it can't is
 
      > db.foo.insert( { x : 5 } )
@@ -40,7 +40,7 @@ namespace mongo {
      * the { x : 5}  doc should NOT match
      *
      */
-    class AllExpression : public Expression {
+    class AllMatchExpression : public MatchExpression {
     public:
         Status init( const StringData& path );
         ArrayFilterEntries* getArrayFilterEntries() { return &_arrayEntries; }
@@ -58,9 +58,9 @@ namespace mongo {
     };
 
 
-    class ArrayMatchingExpression : public Expression {
+    class ArrayMatchingMatchExpression : public MatchExpression {
     public:
-        virtual ~ArrayMatchingExpression(){}
+        virtual ~ArrayMatchingMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details ) const;
 
@@ -76,24 +76,24 @@ namespace mongo {
     };
 
 
-    class ElemMatchObjectExpression : public ArrayMatchingExpression {
+    class ElemMatchObjectMatchExpression : public ArrayMatchingMatchExpression {
     public:
-        Status init( const StringData& path, const Expression* sub );
+        Status init( const StringData& path, const MatchExpression* sub );
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
     private:
-        boost::scoped_ptr<const Expression> _sub;
+        boost::scoped_ptr<const MatchExpression> _sub;
     };
 
-    class ElemMatchValueExpression : public ArrayMatchingExpression {
+    class ElemMatchValueMatchExpression : public ArrayMatchingMatchExpression {
     public:
-        virtual ~ElemMatchValueExpression();
+        virtual ~ElemMatchValueMatchExpression();
 
         Status init( const StringData& path );
-        Status init( const StringData& path, const Expression* sub );
-        void add( const Expression* sub );
+        Status init( const StringData& path, const MatchExpression* sub );
+        void add( const MatchExpression* sub );
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
 
@@ -101,19 +101,19 @@ namespace mongo {
     private:
         bool _arrayElementMatchesAll( const BSONElement& e ) const;
 
-        std::vector< const Expression* > _subs;
+        std::vector< const MatchExpression* > _subs;
     };
 
 
     /**
-     * i'm suprised this isn't a regular AllExpression
+     * i'm suprised this isn't a regular AllMatchExpression
      */
-    class AllElemMatchOp : public Expression {
+    class AllElemMatchOp : public MatchExpression {
     public:
         virtual ~AllElemMatchOp();
 
         Status init( const StringData& path );
-        void add( const ArrayMatchingExpression* expr );
+        void add( const ArrayMatchingMatchExpression* expr );
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details ) const;
 
@@ -127,10 +127,10 @@ namespace mongo {
         bool _allMatch( const BSONObj& anArray ) const;
 
         StringData _path;
-        std::vector< const ArrayMatchingExpression* > _list;
+        std::vector< const ArrayMatchingMatchExpression* > _list;
     };
 
-    class SizeExpression : public ArrayMatchingExpression {
+    class SizeMatchExpression : public ArrayMatchingMatchExpression {
     public:
         Status init( const StringData& path, int size );
 

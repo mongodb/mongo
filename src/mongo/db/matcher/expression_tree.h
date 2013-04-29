@@ -28,14 +28,14 @@
  */
 namespace mongo {
 
-    class ListOfExpression : public Expression {
+    class ListOfMatchExpression : public MatchExpression {
     public:
-        virtual ~ListOfExpression();
+        virtual ~ListOfMatchExpression();
 
         /**
          * @param e - I take ownership
          */
-        void add( Expression* e );
+        void add( MatchExpression* e );
 
         /**
          * clears all the thingsd we own, and does NOT delete
@@ -44,18 +44,18 @@ namespace mongo {
         void clearAndRelease() { _expressions.clear(); }
 
         size_t size() const { return _expressions.size(); }
-        Expression* get( size_t i ) const { return _expressions[i]; }
+        MatchExpression* get( size_t i ) const { return _expressions[i]; }
 
     protected:
         void _debugList( StringBuilder& debug, int level ) const;
 
     private:
-        std::vector< Expression* > _expressions;
+        std::vector< MatchExpression* > _expressions;
     };
 
-    class AndExpression : public ListOfExpression {
+    class AndMatchExpression : public ListOfMatchExpression {
     public:
-        virtual ~AndExpression(){}
+        virtual ~AndMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
@@ -63,9 +63,9 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
     };
 
-    class OrExpression : public ListOfExpression {
+    class OrMatchExpression : public ListOfMatchExpression {
     public:
-        virtual ~OrExpression(){}
+        virtual ~OrMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
@@ -73,9 +73,9 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
     };
 
-    class NorExpression : public ListOfExpression {
+    class NorMatchExpression : public ListOfMatchExpression {
     public:
-        virtual ~NorExpression(){}
+        virtual ~NorMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
@@ -83,12 +83,12 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
     };
 
-    class NotExpression : public Expression {
+    class NotMatchExpression : public MatchExpression {
     public:
         /**
          * @param exp - I own it, and will delete
          */
-        virtual Status init( Expression* exp ) {
+        virtual Status init( MatchExpression* exp ) {
             _exp.reset( exp );
             return Status::OK();
         }
@@ -103,7 +103,7 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
     private:
-        boost::scoped_ptr<Expression> _exp;
+        boost::scoped_ptr<MatchExpression> _exp;
     };
 
 }

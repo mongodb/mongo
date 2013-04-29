@@ -26,11 +26,11 @@
 
 namespace mongo {
 
-    typedef StatusWith<Expression*> StatusWithExpression;
+    typedef StatusWith<MatchExpression*> StatusWithMatchExpression;
 
-    class ExpressionParser {
+    class MatchExpressionParser {
     public:
-        static StatusWithExpression parse( const BSONObj& obj );
+        static StatusWithMatchExpression parse( const BSONObj& obj );
 
     private:
 
@@ -41,27 +41,27 @@ namespace mongo {
          */
         static Status _parseSub( const char* name,
                                  const BSONObj& obj,
-                                 AndExpression* root );
+                                 AndMatchExpression* root );
 
         /**
          * parses a single field in a sub expression
          * if the query is { x : { $gt : 5, $lt : 8 } }
          * e is $gt : 5
          */
-        static StatusWithExpression _parseSubField( const char* name,
+        static StatusWithMatchExpression _parseSubField( const char* name,
                                                     const BSONElement& e );
 
-        static StatusWithExpression _parseComparison( const char* name,
-                                                      ComparisonExpression::Type cmp,
+        static StatusWithMatchExpression _parseComparison( const char* name,
+                                                      ComparisonMatchExpression::Type cmp,
                                                       const BSONElement& e );
 
-        static StatusWithExpression _parseMOD( const char* name,
+        static StatusWithMatchExpression _parseMOD( const char* name,
                                                const BSONElement& e );
 
-        static StatusWithExpression _parseRegexElement( const char* name,
+        static StatusWithMatchExpression _parseRegexElement( const char* name,
                                                         const BSONElement& e );
 
-        static StatusWithExpression _parseRegexDocument( const char* name,
+        static StatusWithMatchExpression _parseRegexDocument( const char* name,
                                                          const BSONObj& doc );
 
 
@@ -70,17 +70,17 @@ namespace mongo {
 
         // arrays
 
-        static StatusWithExpression _parseElemMatch( const char* name,
+        static StatusWithMatchExpression _parseElemMatch( const char* name,
                                                      const BSONElement& e );
 
-        static StatusWithExpression _parseAll( const char* name,
+        static StatusWithMatchExpression _parseAll( const char* name,
                                                const BSONElement& e );
 
         // tree
 
-        static Status _parseTreeList( const BSONObj& arr, ListOfExpression* out );
+        static Status _parseTreeList( const BSONObj& arr, ListOfMatchExpression* out );
 
-        static StatusWithExpression _parseNot( const char* name, const BSONElement& e );
+        static StatusWithMatchExpression _parseNot( const char* name, const BSONElement& e );
 
     };
 

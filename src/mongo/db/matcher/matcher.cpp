@@ -27,7 +27,7 @@ namespace mongo {
     Matcher2::Matcher2( const BSONObj& pattern )
         : _pattern( pattern ) {
 
-        StatusWithExpression result = ExpressionParser::parse( pattern );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( pattern );
         uassert( 16810,
                  mongoutils::str::stream() << "bad query: " << result.toString(),
                  result.isOK() );

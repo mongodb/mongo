@@ -27,10 +27,10 @@
 
 namespace mongo {
 
-    TEST( ExpressionParserTreeTest, OR1 ) {
+    TEST( MatchExpressionParserTreeTest, OR1 ) {
         BSONObj query = BSON( "$or" << BSON_ARRAY( BSON( "x" << 1 ) <<
                                                    BSON( "y" << 2 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -39,11 +39,11 @@ namespace mongo {
         ASSERT( !result.getValue()->matches( BSON( "y" << 1 ) ) );
     }
 
-    TEST( ExpressionParserTreeTest, OREmbedded ) {
+    TEST( MatchExpressionParserTreeTest, OREmbedded ) {
         BSONObj query1 = BSON( "$or" << BSON_ARRAY( BSON( "x" << 1 ) <<
                                                     BSON( "y" << 2 ) ) );
         BSONObj query2 = BSON( "$or" << BSON_ARRAY( query1 ) );
-        StatusWithExpression result = ExpressionParser::parse( query2 );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query2 );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -53,10 +53,10 @@ namespace mongo {
     }
 
 
-    TEST( ExpressionParserTreeTest, AND1 ) {
+    TEST( MatchExpressionParserTreeTest, AND1 ) {
         BSONObj query = BSON( "$and" << BSON_ARRAY( BSON( "x" << 1 ) <<
                                                     BSON( "y" << 2 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -67,10 +67,10 @@ namespace mongo {
         ASSERT( !result.getValue()->matches( BSON( "x" << 2 << "y" << 2 ) ) );
     }
 
-    TEST( ExpressionParserTreeTest, NOREmbedded ) {
+    TEST( MatchExpressionParserTreeTest, NOREmbedded ) {
         BSONObj query = BSON( "$nor" << BSON_ARRAY( BSON( "x" << 1 ) <<
                                                     BSON( "y" << 2 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -79,20 +79,20 @@ namespace mongo {
         ASSERT( result.getValue()->matches( BSON( "y" << 1 ) ) );
     }
 
-    TEST( ExpressionParserTreeTest, NOT1 ) {
+    TEST( MatchExpressionParserTreeTest, NOT1 ) {
         BSONObj query = BSON( "x" << BSON( "$not" << BSON( "$gt" << 5 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
         ASSERT( !result.getValue()->matches( BSON( "x" << 8 ) ) );
     }
 
-    TEST( ExpressionParserLeafTest, NotRegex1 ) {
+    TEST( MatchExpressionParserLeafTest, NotRegex1 ) {
         BSONObjBuilder b;
         b.appendRegex( "$not", "abc", "i" );
         BSONObj query = BSON( "x" << b.obj() );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << "abc" ) ) );

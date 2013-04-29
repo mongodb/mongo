@@ -25,13 +25,13 @@
 
 namespace mongo {
 
-    string Expression::toString() const {
+    string MatchExpression::toString() const {
         StringBuilder buf;
         debugString( buf, 0 );
         return buf.str();
     }
 
-    void Expression::_debugAddSpace( StringBuilder& debug, int level ) const {
+    void MatchExpression::_debugAddSpace( StringBuilder& debug, int level ) const {
         for ( int i = 0; i < level; i++ )
             debug << "    ";
     }

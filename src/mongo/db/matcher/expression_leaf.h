@@ -28,13 +28,13 @@
 
 namespace mongo {
 
-    class LeafExpression : public Expression {
+    class LeafMatchExpression : public MatchExpression {
     public:
-        LeafExpression() {
+        LeafMatchExpression() {
             _allHaveToMatch = false;
         }
 
-        virtual ~LeafExpression(){}
+        virtual ~LeafMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
 
@@ -46,13 +46,13 @@ namespace mongo {
 
     // -----
 
-    class ComparisonExpression : public LeafExpression {
+    class ComparisonMatchExpression : public LeafMatchExpression {
     public:
         enum Type { LTE, LT, EQ, GT, GTE, NE };
 
         Status init( const StringData& path, Type type, const BSONElement& rhs );
 
-        virtual ~ComparisonExpression(){}
+        virtual ~ComparisonMatchExpression(){}
 
         virtual Type getType() const { return _type; }
 
@@ -67,7 +67,7 @@ namespace mongo {
         BSONElement _rhs;
     };
 
-    class RegexExpression : public LeafExpression {
+    class RegexMatchExpression : public LeafMatchExpression {
     public:
         /**
          * Maximum pattern size which pcre v8.3 can do matches correctly with
@@ -88,7 +88,7 @@ namespace mongo {
         boost::scoped_ptr<pcrecpp::RE> _re;
     };
 
-    class ModExpression : public LeafExpression {
+    class ModMatchExpression : public LeafMatchExpression {
     public:
         Status init( const StringData& path, int divisor, int remainder );
 
@@ -100,7 +100,7 @@ namespace mongo {
         int _remainder;
     };
 
-    class ExistsExpression : public LeafExpression {
+    class ExistsMatchExpression : public LeafMatchExpression {
     public:
         Status init( const StringData& path, bool exists );
 
@@ -111,7 +111,7 @@ namespace mongo {
         bool _exists;
     };
 
-    class TypeExpression : public Expression {
+    class TypeMatchExpression : public MatchExpression {
     public:
         Status init( const StringData& path, int type );
 
@@ -140,13 +140,13 @@ namespace mongo {
         ~ArrayFilterEntries();
 
         Status addEquality( const BSONElement& e );
-        Status addRegex( RegexExpression* expr );
+        Status addRegex( RegexMatchExpression* expr );
 
         const BSONElementSet& equalities() const { return _equalities; }
         bool contains( const BSONElement& elem ) const { return _equalities.count(elem) > 0; }
 
         size_t numRegexes() const { return _regexes.size(); }
-        RegexExpression* regex( int idx ) const { return _regexes[idx]; }
+        RegexMatchExpression* regex( int idx ) const { return _regexes[idx]; }
 
         bool hasNull() const { return _hasNull; }
         bool singleNull() const { return size() == 1 && _hasNull; }
@@ -155,14 +155,14 @@ namespace mongo {
     private:
         bool _hasNull; // if _equalities has a jstNULL element in it
         BSONElementSet _equalities;
-        std::vector<RegexExpression*> _regexes;
+        std::vector<RegexMatchExpression*> _regexes;
     };
 
 
     /**
      * query operator: $in
      */
-    class InExpression : public LeafExpression {
+    class InMatchExpression : public LeafMatchExpression {
     public:
         void init( const StringData& path );
         ArrayFilterEntries* getArrayFilterEntries() { return &_arrayEntries; }
@@ -174,7 +174,7 @@ namespace mongo {
         ArrayFilterEntries _arrayEntries;
     };
 
-    class NinExpression : public LeafExpression {
+    class NinMatchExpression : public LeafMatchExpression {
     public:
         void init( const StringData& path );
         ArrayFilterEntries* getArrayFilterEntries() { return _in.getArrayFilterEntries(); }
@@ -183,7 +183,7 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level ) const;
     private:
-        InExpression _in;
+        InMatchExpression _in;
     };
 
 

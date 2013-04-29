@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** Unit tests for MatchExpression operator implementations in match_operators.{h,cpp}. */
+/** Unit tests for MatchMatchExpression operator implementations in match_operators.{h,cpp}. */
 
 #include "mongo/unittest/unittest.h"
 
@@ -26,21 +26,21 @@
 
 namespace mongo {
 
-    TEST( NotExpression, MatchesScalar ) {
+    TEST( NotMatchExpression, MatchesScalar ) {
         BSONObj baseOperand = BSON( "$lt" << 5 );
-        auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
-        ASSERT( lt->init( "a", ComparisonExpression::LT, baseOperand[ "$lt" ] ).isOK() );
-        NotExpression notOp;
+        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
+        ASSERT( lt->init( "a", ComparisonMatchExpression::LT, baseOperand[ "$lt" ] ).isOK() );
+        NotMatchExpression notOp;
         ASSERT( notOp.init( lt.release() ).isOK() );
         ASSERT( notOp.matches( BSON( "a" << 6 ), NULL ) );
         ASSERT( !notOp.matches( BSON( "a" << 4 ), NULL ) );
     }
 
-    TEST( NotExpression, MatchesArray ) {
+    TEST( NotMatchExpression, MatchesArray ) {
         BSONObj baseOperand = BSON( "$lt" << 5 );
-        auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
-        ASSERT( lt->init( "a", ComparisonExpression::LT, baseOperand[ "$lt" ] ).isOK() );
-        NotExpression notOp;
+        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
+        ASSERT( lt->init( "a", ComparisonMatchExpression::LT, baseOperand[ "$lt" ] ).isOK() );
+        NotMatchExpression notOp;
         ASSERT( notOp.init( lt.release() ).isOK() );
         ASSERT( notOp.matches( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
         ASSERT( !notOp.matches( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
@@ -48,11 +48,11 @@ namespace mongo {
         ASSERT( !notOp.matches( BSON( "a" << BSON_ARRAY( 4 << 5 << 6 ) ), NULL ) );
     }
 
-    TEST( NotExpression, ElemMatchKey ) {
+    TEST( NotMatchExpression, ElemMatchKey ) {
         BSONObj baseOperand = BSON( "$lt" << 5 );
-        auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
-        ASSERT( lt->init( "a", ComparisonExpression::LT, baseOperand[ "$lt" ] ).isOK() );
-        NotExpression notOp;
+        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
+        ASSERT( lt->init( "a", ComparisonMatchExpression::LT, baseOperand[ "$lt" ] ).isOK() );
+        NotMatchExpression notOp;
         ASSERT( notOp.init( lt.release() ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
@@ -65,15 +65,15 @@ namespace mongo {
         ASSERT( !details.hasElemMatchKey() );
     }
     /*
-      TEST( NotExpression, MatchesIndexKey ) {
+      TEST( NotMatchExpression, MatchesIndexKey ) {
       BSONObj baseOperand = BSON( "$lt" << 5 );
-      auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
+      auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
       ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
-      NotExpression notOp;
+      NotMatchExpression notOp;
       ASSERT( notOp.init( lt.release() ).isOK() );
       IndexSpec indexSpec( BSON( "a" << 1 ) );
       BSONObj indexKey = BSON( "" << "7" );
-      ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+      ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
       notOp.matchesIndexKey( indexKey, indexSpec ) );
       }
     */
@@ -83,20 +83,20 @@ namespace mongo {
         BSONObj baseOperand = BSON( "$lt" << 5 );
         BSONObj match = BSON( "a" << 4 );
         BSONObj notMatch = BSON( "a" << 5 );
-        auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
         ASSERT( lt->init( "", baseOperand[ "$lt" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( lt.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( lt.release() );
         AndOp andOp;
-        ASSERT( andOp.init( &subExpressions ).isOK() );
+        ASSERT( andOp.init( &subMatchExpressions ).isOK() );
         ASSERT( andOp.matchesSingleElement( match[ "a" ] ) );
         ASSERT( !andOp.matchesSingleElement( notMatch[ "a" ] ) );
     }
     */
 
     TEST( AndOp, NoClauses ) {
-        AndExpression andExpression;
-        ASSERT( andExpression.matches( BSONObj(), NULL ) );
+        AndMatchExpression andMatchExpression;
+        ASSERT( andMatchExpression.matches( BSONObj(), NULL ) );
     }
 
     TEST( AndOp, MatchesElementThreeClauses ) {
@@ -107,14 +107,14 @@ namespace mongo {
         BSONObj notMatch2 = BSON( "a" << "a1" );
         BSONObj notMatch3 = BSON( "a" << "r" );
 
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
-        ASSERT( sub1->init( "a", ComparisonExpression::LT, baseOperand1[ "$lt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
-        ASSERT( sub2->init( "a", ComparisonExpression::GT, baseOperand2[ "$gt" ] ).isOK() );
-        auto_ptr<RegexExpression> sub3( new RegexExpression() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
+        ASSERT( sub1->init( "a", ComparisonMatchExpression::LT, baseOperand1[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
+        ASSERT( sub2->init( "a", ComparisonMatchExpression::GT, baseOperand2[ "$gt" ] ).isOK() );
+        auto_ptr<RegexMatchExpression> sub3( new RegexMatchExpression() );
         ASSERT( sub3->init( "a", "1", "" ).isOK() );
 
-        AndExpression andOp;
+        AndMatchExpression andOp;
         andOp.add( sub1.release() );
         andOp.add( sub2.release() );
         andOp.add( sub3.release() );
@@ -127,10 +127,10 @@ namespace mongo {
 
     TEST( AndOp, MatchesSingleClause ) {
         BSONObj baseOperand = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonExpression> ne( new ComparisonExpression() );
-        ASSERT( ne->init( "a", ComparisonExpression::NE, baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> ne( new ComparisonMatchExpression() );
+        ASSERT( ne->init( "a", ComparisonMatchExpression::NE, baseOperand[ "$ne" ] ).isOK() );
 
-        AndExpression andOp;
+        AndMatchExpression andOp;
         andOp.add( ne.release() );
 
         ASSERT( andOp.matches( BSON( "a" << 4 ), NULL ) );
@@ -144,16 +144,16 @@ namespace mongo {
         BSONObj baseOperand2 = BSON( "$lt" << 10 );
         BSONObj baseOperand3 = BSON( "$lt" << 100 );
 
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
-        ASSERT( sub1->init( "a", ComparisonExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
+        ASSERT( sub1->init( "a", ComparisonMatchExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
 
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
-        ASSERT( sub2->init( "a", ComparisonExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
+        ASSERT( sub2->init( "a", ComparisonMatchExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
 
-        auto_ptr<ComparisonExpression> sub3( new ComparisonExpression() );
-        ASSERT( sub3->init( "b", ComparisonExpression::LT, baseOperand3[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub3( new ComparisonMatchExpression() );
+        ASSERT( sub3->init( "b", ComparisonMatchExpression::LT, baseOperand3[ "$lt" ] ).isOK() );
 
-        AndExpression andOp;
+        AndMatchExpression andOp;
         andOp.add( sub1.release() );
         andOp.add( sub2.release() );
         andOp.add( sub3.release() );
@@ -169,13 +169,13 @@ namespace mongo {
         BSONObj baseOperand1 = BSON( "a" << 1 );
         BSONObj baseOperand2 = BSON( "b" << 2 );
 
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
-        ASSERT( sub1->init( "a", ComparisonExpression::EQ, baseOperand1[ "a" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
+        ASSERT( sub1->init( "a", ComparisonMatchExpression::EQ, baseOperand1[ "a" ] ).isOK() );
 
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
-        ASSERT( sub2->init( "b", ComparisonExpression::EQ, baseOperand2[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
+        ASSERT( sub2->init( "b", ComparisonMatchExpression::EQ, baseOperand2[ "b" ] ).isOK() );
 
-        AndExpression andOp;
+        AndMatchExpression andOp;
         andOp.add( sub1.release() );
         andOp.add( sub2.release() );
 
@@ -196,21 +196,21 @@ namespace mongo {
     TEST( AndOp, MatchesIndexKeyWithoutUnknown ) {
         BSONObj baseOperand1 = BSON( "$gt" << 1 );
         BSONObj baseOperand2 = BSON( "$lt" << 5 );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
         ASSERT( sub1->init( "a", baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
         ASSERT( sub2->init( "a", baseOperand2[ "$lt" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( sub1.release() );
-        subExpressions.mutableVector().push_back( sub2.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( sub1.release() );
+        subMatchExpressions.mutableVector().push_back( sub2.release() );
         AndOp andOp;
-        ASSERT( andOp.init( &subExpressions ).isOK() );
+        ASSERT( andOp.init( &subMatchExpressions ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
-        ASSERT( MatchExpression::PartialMatchResult_True ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_True ==
                 andOp.matchesIndexKey( BSON( "" << 3 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_False ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_False ==
                 andOp.matchesIndexKey( BSON( "" << 0 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_False ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_False ==
                 andOp.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
     }
 
@@ -219,24 +219,24 @@ namespace mongo {
         BSONObj baseOperand2 = BSON( "$lt" << 5 );
         // This part will return PartialMatchResult_Unknown.
         BSONObj baseOperand3 = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
         ASSERT( sub1->init( "a", baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
         ASSERT( sub2->init( "a", baseOperand2[ "$lt" ] ).isOK() );
         auto_ptr<NeOp> sub3( new NeOp() );
         ASSERT( sub3->init( "a", baseOperand3[ "$ne" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( sub1.release() );
-        subExpressions.mutableVector().push_back( sub2.release() );
-        subExpressions.mutableVector().push_back( sub3.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( sub1.release() );
+        subMatchExpressions.mutableVector().push_back( sub2.release() );
+        subMatchExpressions.mutableVector().push_back( sub3.release() );
         AndOp andOp;
-        ASSERT( andOp.init( &subExpressions ).isOK() );
+        ASSERT( andOp.init( &subMatchExpressions ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
-        ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
                 andOp.matchesIndexKey( BSON( "" << 3 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_False ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_False ==
                 andOp.matchesIndexKey( BSON( "" << 0 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_False ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_False ==
                 andOp.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
     }
     */
@@ -246,19 +246,19 @@ namespace mongo {
         BSONObj baseOperand = BSON( "$lt" << 5 );
         BSONObj match = BSON( "a" << 4 );
         BSONObj notMatch = BSON( "a" << 5 );
-        auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
         ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( lt.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( lt.release() );
         OrOp orOp;
-        ASSERT( orOp.init( &subExpressions ).isOK() );
+        ASSERT( orOp.init( &subMatchExpressions ).isOK() );
         ASSERT( orOp.matchesSingleElement( match[ "a" ] ) );
         ASSERT( !orOp.matchesSingleElement( notMatch[ "a" ] ) );
     }
     */
 
     TEST( OrOp, NoClauses ) {
-        OrExpression orOp;
+        OrMatchExpression orOp;
         ASSERT( !orOp.matches( BSONObj(), NULL ) );
     }
     /*
@@ -270,18 +270,18 @@ namespace mongo {
         BSONObj match2 = BSON( "a" << 11 );
         BSONObj match3 = BSON( "a" << 5 );
         BSONObj notMatch = BSON( "a" << "6" );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
         ASSERT( sub1->init( "a", baseOperand1[ "$lt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
         ASSERT( sub2->init( "a", baseOperand2[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub3( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub3( new ComparisonMatchExpression() );
         ASSERT( sub3->init( "a", baseOperand3[ "a" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( sub1.release() );
-        subExpressions.mutableVector().push_back( sub2.release() );
-        subExpressions.mutableVector().push_back( sub3.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( sub1.release() );
+        subMatchExpressions.mutableVector().push_back( sub2.release() );
+        subMatchExpressions.mutableVector().push_back( sub3.release() );
         OrOp orOp;
-        ASSERT( orOp.init( &subExpressions ).isOK() );
+        ASSERT( orOp.init( &subMatchExpressions ).isOK() );
         ASSERT( orOp.matchesSingleElement( match1[ "a" ] ) );
         ASSERT( orOp.matchesSingleElement( match2[ "a" ] ) );
         ASSERT( orOp.matchesSingleElement( match3[ "a" ] ) );
@@ -290,10 +290,10 @@ namespace mongo {
     */
     TEST( OrOp, MatchesSingleClause ) {
         BSONObj baseOperand = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonExpression> ne( new ComparisonExpression() );
-        ASSERT( ne->init( "a", ComparisonExpression::NE, baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> ne( new ComparisonMatchExpression() );
+        ASSERT( ne->init( "a", ComparisonMatchExpression::NE, baseOperand[ "$ne" ] ).isOK() );
 
-        OrExpression orOp;
+        OrMatchExpression orOp;
         orOp.add( ne.release() );
 
         ASSERT( orOp.matches( BSON( "a" << 4 ), NULL ) );
@@ -306,14 +306,14 @@ namespace mongo {
         BSONObj baseOperand1 = BSON( "$gt" << 10 );
         BSONObj baseOperand2 = BSON( "$lt" << 0 );
         BSONObj baseOperand3 = BSON( "b" << 100 );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
-        ASSERT( sub1->init( "a", ComparisonExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
-        ASSERT( sub2->init( "a", ComparisonExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub3( new ComparisonExpression() );
-        ASSERT( sub3->init( "b", ComparisonExpression::EQ, baseOperand3[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
+        ASSERT( sub1->init( "a", ComparisonMatchExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
+        ASSERT( sub2->init( "a", ComparisonMatchExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub3( new ComparisonMatchExpression() );
+        ASSERT( sub3->init( "b", ComparisonMatchExpression::EQ, baseOperand3[ "b" ] ).isOK() );
 
-        OrExpression orOp;
+        OrMatchExpression orOp;
         orOp.add( sub1.release() );
         orOp.add( sub2.release() );
         orOp.add( sub3.release() );
@@ -330,12 +330,12 @@ namespace mongo {
     TEST( OrOp, ElemMatchKey ) {
         BSONObj baseOperand1 = BSON( "a" << 1 );
         BSONObj baseOperand2 = BSON( "b" << 2 );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
-        ASSERT( sub1->init( "a", ComparisonExpression::EQ, baseOperand1[ "a" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
-        ASSERT( sub2->init( "b", ComparisonExpression::EQ, baseOperand2[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
+        ASSERT( sub1->init( "a", ComparisonMatchExpression::EQ, baseOperand1[ "a" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
+        ASSERT( sub2->init( "b", ComparisonMatchExpression::EQ, baseOperand2[ "b" ] ).isOK() );
 
-        OrExpression orOp;
+        OrMatchExpression orOp;
         orOp.add( sub1.release() );
         orOp.add( sub2.release() );
 
@@ -356,21 +356,21 @@ namespace mongo {
     TEST( OrOp, MatchesIndexKeyWithoutUnknown ) {
         BSONObj baseOperand1 = BSON( "$gt" << 5 );
         BSONObj baseOperand2 = BSON( "$lt" << 1 );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
         ASSERT( sub1->init( "a", baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
         ASSERT( sub2->init( "a", baseOperand2[ "$lt" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( sub1.release() );
-        subExpressions.mutableVector().push_back( sub2.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( sub1.release() );
+        subMatchExpressions.mutableVector().push_back( sub2.release() );
         OrOp orOp;
-        ASSERT( orOp.init( &subExpressions ).isOK() );
+        ASSERT( orOp.init( &subMatchExpressions ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
-        ASSERT( MatchExpression::PartialMatchResult_False ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_False ==
                 orOp.matchesIndexKey( BSON( "" << 3 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_True ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_True ==
                 orOp.matchesIndexKey( BSON( "" << 0 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_True ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_True ==
                 orOp.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
     }
     
@@ -379,24 +379,24 @@ namespace mongo {
         BSONObj baseOperand2 = BSON( "$lt" << 1 );
         // This part will return PartialMatchResult_Unknown.
         BSONObj baseOperand3 = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
         ASSERT( sub1->init( "a", baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
         ASSERT( sub2->init( "a", baseOperand2[ "$lt" ] ).isOK() );
         auto_ptr<NeOp> sub3( new NeOp() );
         ASSERT( sub3->init( "a", baseOperand3[ "$ne" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( sub1.release() );
-        subExpressions.mutableVector().push_back( sub2.release() );
-        subExpressions.mutableVector().push_back( sub3.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( sub1.release() );
+        subMatchExpressions.mutableVector().push_back( sub2.release() );
+        subMatchExpressions.mutableVector().push_back( sub3.release() );
         OrOp orOp;
-        ASSERT( orOp.init( &subExpressions ).isOK() );
+        ASSERT( orOp.init( &subMatchExpressions ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
-        ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
                 orOp.matchesIndexKey( BSON( "" << 3 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_True ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_True ==
                 orOp.matchesIndexKey( BSON( "" << 0 ), indexSpec ) );
-        ASSERT( MatchExpression::PartialMatchResult_True ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_True ==
                 orOp.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
     }
     */
@@ -406,19 +406,19 @@ namespace mongo {
         BSONObj baseOperand = BSON( "$lt" << 5 );
         BSONObj match = BSON( "a" << 5 );
         BSONObj notMatch = BSON( "a" << 4 );
-        auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
         ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( lt.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( lt.release() );
         NorOp norOp;
-        ASSERT( norOp.init( &subExpressions ).isOK() );
+        ASSERT( norOp.init( &subMatchExpressions ).isOK() );
         ASSERT( norOp.matchesSingleElement( match[ "a" ] ) );
         ASSERT( !norOp.matchesSingleElement( notMatch[ "a" ] ) );
     }
     */
 
     TEST( NorOp, NoClauses ) {
-        NorExpression norOp;
+        NorMatchExpression norOp;
         ASSERT( norOp.matches( BSONObj(), NULL ) );
     }
     /*
@@ -430,18 +430,18 @@ namespace mongo {
         BSONObj notMatch2 = BSON( "a" << 11 );
         BSONObj notMatch3 = BSON( "a" << 5 );
         BSONObj match = BSON( "a" << "6" );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
         ASSERT( sub1->init( "a", baseOperand1[ "$lt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
         ASSERT( sub2->init( "a", baseOperand2[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub3( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> sub3( new ComparisonMatchExpression() );
         ASSERT( sub3->init( "a", baseOperand3[ "a" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( sub1.release() );
-        subExpressions.mutableVector().push_back( sub2.release() );
-        subExpressions.mutableVector().push_back( sub3.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( sub1.release() );
+        subMatchExpressions.mutableVector().push_back( sub2.release() );
+        subMatchExpressions.mutableVector().push_back( sub3.release() );
         NorOp norOp;
-        ASSERT( norOp.init( &subExpressions ).isOK() );
+        ASSERT( norOp.init( &subMatchExpressions ).isOK() );
         ASSERT( !norOp.matchesSingleElement( notMatch1[ "a" ] ) );
         ASSERT( !norOp.matchesSingleElement( notMatch2[ "a" ] ) );
         ASSERT( !norOp.matchesSingleElement( notMatch3[ "a" ] ) );
@@ -451,10 +451,10 @@ namespace mongo {
 
     TEST( NorOp, MatchesSingleClause ) {
         BSONObj baseOperand = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonExpression> ne( new ComparisonExpression() );
-        ASSERT( ne->init( "a", ComparisonExpression::NE, baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> ne( new ComparisonMatchExpression() );
+        ASSERT( ne->init( "a", ComparisonMatchExpression::NE, baseOperand[ "$ne" ] ).isOK() );
 
-        NorExpression norOp;
+        NorMatchExpression norOp;
         norOp.add( ne.release() );
 
         ASSERT( !norOp.matches( BSON( "a" << 4 ), NULL ) );
@@ -468,14 +468,14 @@ namespace mongo {
         BSONObj baseOperand2 = BSON( "$lt" << 0 );
         BSONObj baseOperand3 = BSON( "b" << 100 );
 
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
-        ASSERT( sub1->init( "a", ComparisonExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
-        ASSERT( sub2->init( "a", ComparisonExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub3( new ComparisonExpression() );
-        ASSERT( sub3->init( "b", ComparisonExpression::EQ, baseOperand3[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
+        ASSERT( sub1->init( "a", ComparisonMatchExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
+        ASSERT( sub2->init( "a", ComparisonMatchExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub3( new ComparisonMatchExpression() );
+        ASSERT( sub3->init( "b", ComparisonMatchExpression::EQ, baseOperand3[ "b" ] ).isOK() );
 
-        NorExpression norOp;
+        NorMatchExpression norOp;
         norOp.add( sub1.release() );
         norOp.add( sub2.release() );
         norOp.add( sub3.release() );
@@ -492,12 +492,12 @@ namespace mongo {
     TEST( NorOp, ElemMatchKey ) {
         BSONObj baseOperand1 = BSON( "a" << 1 );
         BSONObj baseOperand2 = BSON( "b" << 2 );
-        auto_ptr<ComparisonExpression> sub1( new ComparisonExpression() );
-        ASSERT( sub1->init( "a", ComparisonExpression::EQ, baseOperand1[ "a" ] ).isOK() );
-        auto_ptr<ComparisonExpression> sub2( new ComparisonExpression() );
-        ASSERT( sub2->init( "b", ComparisonExpression::EQ, baseOperand2[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub1( new ComparisonMatchExpression() );
+        ASSERT( sub1->init( "a", ComparisonMatchExpression::EQ, baseOperand1[ "a" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> sub2( new ComparisonMatchExpression() );
+        ASSERT( sub2->init( "b", ComparisonMatchExpression::EQ, baseOperand2[ "b" ] ).isOK() );
 
-        NorExpression norOp;
+        NorMatchExpression norOp;
         norOp.add( sub1.release() );
         norOp.add( sub2.release() );
 
@@ -517,15 +517,15 @@ namespace mongo {
     /**
     TEST( NorOp, MatchesIndexKey ) {
         BSONObj baseOperand = BSON( "a" << 5 );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
         ASSERT( eq->init( "a", baseOperand[ "a" ] ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( eq.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( eq.release() );
         NorOp norOp;
-        ASSERT( norOp.init( &subExpressions ).isOK() );
+        ASSERT( norOp.init( &subMatchExpressions ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
         BSONObj indexKey = BSON( "" << "7" );
-        ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
                 norOp.matchesIndexKey( indexKey, indexSpec ) );
     }
     */

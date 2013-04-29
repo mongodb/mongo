@@ -27,18 +27,18 @@
 
 namespace mongo {
 
-    TEST( ExpressionParserTest, SimpleEQ1 ) {
+    TEST( MatchExpressionParserTest, SimpleEQ1 ) {
         BSONObj query = BSON( "x" << 2 );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
         ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
     }
 
-    TEST( ExpressionParserTest, Multiple1 ) {
+    TEST( MatchExpressionParserTest, Multiple1 ) {
         BSONObj query = BSON( "x" << 5 << "y" << BSON( "$gt" << 5 << "$lt" << 8 ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( result.getValue()->matches( BSON( "x" << 5 << "y" << 7 ) ) );

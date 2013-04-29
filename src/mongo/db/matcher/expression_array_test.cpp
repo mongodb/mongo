@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** Unit tests for MatchExpression operator implementations in match_operators.{h,cpp}. */
+/** Unit tests for MatchMatchExpression operator implementations in match_operators.{h,cpp}. */
 
 #include "mongo/unittest/unittest.h"
 
@@ -26,11 +26,11 @@
 
 namespace mongo {
 
-    TEST( AllExpression, MatchesElementSingle ) {
+    TEST( AllMatchExpression, MatchesElementSingle ) {
         BSONObj operand = BSON_ARRAY( 1 << 1 );
         BSONObj match = BSON( "a" << 1 );
         BSONObj notMatch = BSON( "a" << 2 );
-        AllExpression all;
+        AllMatchExpression all;
         all.getArrayFilterEntries()->addEquality( operand[0] );
         all.getArrayFilterEntries()->addEquality( operand[1] );
 
@@ -38,19 +38,19 @@ namespace mongo {
         ASSERT( !all.matchesSingleElement( notMatch[ "a" ] ) );
     }
 
-    TEST( AllExpression, MatchesEmpty ) {
+    TEST( AllMatchExpression, MatchesEmpty ) {
 
         BSONObj notMatch = BSON( "a" << 2 );
-        AllExpression all;
+        AllMatchExpression all;
 
         ASSERT( !all.matchesSingleElement( notMatch[ "a" ] ) );
         ASSERT( !all.matches( BSON( "a" << 1 ), NULL ) );
         ASSERT( !all.matches( BSONObj(), NULL ) );
     }
 
-    TEST( AllExpression, MatchesElementMultiple ) {
+    TEST( AllMatchExpression, MatchesElementMultiple ) {
         BSONObj operand = BSON_ARRAY( 1 << "r" );
-        AllExpression all;
+        AllMatchExpression all;
         all.getArrayFilterEntries()->addEquality( operand[0] );
         all.getArrayFilterEntries()->addEquality( operand[1] );
 
@@ -63,9 +63,9 @@ namespace mongo {
         ASSERT( !all.matchesSingleElement( notMatchArray[ "a" ] ) );
     }
 
-    TEST( AllExpression, MatchesScalar ) {
+    TEST( AllMatchExpression, MatchesScalar ) {
         BSONObj operand = BSON_ARRAY( 5 );
-        AllExpression all;
+        AllMatchExpression all;
         all.init( "a" );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
@@ -73,9 +73,9 @@ namespace mongo {
         ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
     }
 
-    TEST( AllExpression, MatchesArrayValue ) {
+    TEST( AllMatchExpression, MatchesArrayValue ) {
         BSONObj operand = BSON_ARRAY( 5 );
-        AllExpression all;
+        AllMatchExpression all;
         all.init( "a" );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
@@ -84,9 +84,9 @@ namespace mongo {
         ASSERT( !all.matches( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
     }
 
-    TEST( AllExpression, MatchesNonArrayMultiValues ) {
+    TEST( AllMatchExpression, MatchesNonArrayMultiValues ) {
         BSONObj operand = BSON_ARRAY( 5 << 6 );
-        AllExpression all;
+        AllMatchExpression all;
         all.init( "a.b" );
         all.getArrayFilterEntries()->addEquality( operand[0] );
         all.getArrayFilterEntries()->addEquality( operand[1] );
@@ -100,9 +100,9 @@ namespace mongo {
                               NULL ) );
     }
 
-    TEST( AllExpression, MatchesArrayAndNonArrayMultiValues ) {
+    TEST( AllMatchExpression, MatchesArrayAndNonArrayMultiValues ) {
         BSONObj operand = BSON_ARRAY( 1 << 2 << 3 << 4 );
-        AllExpression all;
+        AllMatchExpression all;
         all.init( "a.b" );
         all.getArrayFilterEntries()->addEquality( operand[0] );
         all.getArrayFilterEntries()->addEquality( operand[1] );
@@ -116,12 +116,12 @@ namespace mongo {
                              NULL ) );
     }
 
-    TEST( AllExpression, MatchesNull ) {
+    TEST( AllMatchExpression, MatchesNull ) {
         BSONObjBuilder allArray;
         allArray.appendNull( "0" );
         BSONObj operand = allArray.obj();
 
-        AllExpression all;
+        AllMatchExpression all;
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
@@ -130,9 +130,9 @@ namespace mongo {
         ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
     }
 
-    TEST( AllExpression, MatchesFullArray ) {
+    TEST( AllMatchExpression, MatchesFullArray ) {
         BSONObj operand = BSON_ARRAY( BSON_ARRAY( 1 << 2 ) << 1 );
-        AllExpression all;
+        AllMatchExpression all;
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
         all.getArrayFilterEntries()->addEquality( operand[1] );
@@ -144,9 +144,9 @@ namespace mongo {
         ASSERT( !all.matches( BSON( "a" << 1 ), NULL ) );
     }
 
-    TEST( AllExpression, ElemMatchKey ) {
+    TEST( AllMatchExpression, ElemMatchKey ) {
         BSONObj operand = BSON_ARRAY( 5 );
-        AllExpression all;
+        AllMatchExpression all;
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
@@ -161,9 +161,9 @@ namespace mongo {
         ASSERT( !details.hasElemMatchKey() );
     }
 
-    TEST( AllExpression, MatchesMinKey ) {
+    TEST( AllMatchExpression, MatchesMinKey ) {
         BSONObj operand = BSON_ARRAY( MinKey );
-        AllExpression all;
+        AllMatchExpression all;
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
@@ -172,9 +172,9 @@ namespace mongo {
         ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
     }
 
-    TEST( AllExpression, MatchesMaxKey ) {
+    TEST( AllMatchExpression, MatchesMaxKey ) {
         BSONObj operand = BSON_ARRAY( MaxKey );
-        AllExpression all;
+        AllMatchExpression all;
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
@@ -184,42 +184,42 @@ namespace mongo {
     }
 
     /**
-    TEST( AllExpression, MatchesIndexKey ) {
+    TEST( AllMatchExpression, MatchesIndexKey ) {
         BSONObj operand = BSON( "$all" << BSON_ARRAY( 5 ) );
-        AllExpression all;
+        AllMatchExpression all;
         ASSERT( all.init( "a", operand[ "$all" ] ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
         BSONObj indexKey = BSON( "" << "7" );
-        ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
                 all.matchesIndexKey( indexKey, indexSpec ) );
     }
     */
 
-    TEST( ElemMatchObjectExpression, MatchesElementSingle ) {
+    TEST( ElemMatchObjectMatchExpression, MatchesElementSingle ) {
         BSONObj baseOperand = BSON( "b" << 5 );
         BSONObj match = BSON( "a" << BSON_ARRAY( BSON( "b" << 5.0 ) ) );
         BSONObj notMatch = BSON( "a" << BSON_ARRAY( BSON( "b" << 6 ) ) );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
-        ASSERT( eq->init( "b", ComparisonExpression::EQ, baseOperand[ "b" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
+        ASSERT( eq->init( "b", ComparisonMatchExpression::EQ, baseOperand[ "b" ] ).isOK() );
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
         ASSERT( !op.matchesSingleElement( notMatch[ "a" ] ) );
     }
 
-    TEST( ElemMatchObjectExpression, MatchesElementArray ) {
+    TEST( ElemMatchObjectMatchExpression, MatchesElementArray ) {
         BSONObj baseOperand = BSON( "1" << 5 );
         BSONObj match = BSON( "a" << BSON_ARRAY( BSON_ARRAY( 's' << 5.0 ) ) );
         BSONObj notMatch = BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 << 6 ) ) );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
-        ASSERT( eq->init( "1", ComparisonExpression::EQ, baseOperand[ "1" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
+        ASSERT( eq->init( "1", ComparisonMatchExpression::EQ, baseOperand[ "1" ] ).isOK() );
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
         ASSERT( !op.matchesSingleElement( notMatch[ "a" ] ) );
     }
 
-    TEST( ElemMatchObjectExpression, MatchesElementMultiple ) {
+    TEST( ElemMatchObjectMatchExpression, MatchesElementMultiple ) {
         BSONObj baseOperand1 = BSON( "b" << 5 );
         BSONObj baseOperand2 = BSON( "b" << 6 );
         BSONObj baseOperand3 = BSON( "c" << 7 );
@@ -228,19 +228,19 @@ namespace mongo {
         BSONObj notMatch3 = BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 5 << 6 ) ) ) );
         BSONObj match =
             BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 5 << 6 ) << "c" << 7 ) ) );
-        auto_ptr<ComparisonExpression> eq1( new ComparisonExpression() );
-        ASSERT( eq1->init( "b", ComparisonExpression::EQ, baseOperand1[ "b" ] ).isOK() );
-        auto_ptr<ComparisonExpression> eq2( new ComparisonExpression() );
-        ASSERT( eq2->init( "b", ComparisonExpression::EQ, baseOperand2[ "b" ] ).isOK() );
-        auto_ptr<ComparisonExpression> eq3( new ComparisonExpression() );
-        ASSERT( eq3->init( "c", ComparisonExpression::EQ, baseOperand3[ "c" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq1( new ComparisonMatchExpression() );
+        ASSERT( eq1->init( "b", ComparisonMatchExpression::EQ, baseOperand1[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq2( new ComparisonMatchExpression() );
+        ASSERT( eq2->init( "b", ComparisonMatchExpression::EQ, baseOperand2[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq3( new ComparisonMatchExpression() );
+        ASSERT( eq3->init( "c", ComparisonMatchExpression::EQ, baseOperand3[ "c" ] ).isOK() );
 
-        auto_ptr<AndExpression> andOp( new AndExpression() );
+        auto_ptr<AndMatchExpression> andOp( new AndMatchExpression() );
         andOp->add( eq1.release() );
         andOp->add( eq2.release() );
         andOp->add( eq3.release() );
 
-        ElemMatchObjectExpression op;
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", andOp.release() ).isOK() );
         ASSERT( !op.matchesSingleElement( notMatch1[ "a" ] ) );
         ASSERT( !op.matchesSingleElement( notMatch2[ "a" ] ) );
@@ -248,11 +248,11 @@ namespace mongo {
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
     }
 
-    TEST( ElemMatchObjectExpression, MatchesNonArray ) {
+    TEST( ElemMatchObjectMatchExpression, MatchesNonArray ) {
         BSONObj baseOperand = BSON( "b" << 5 );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
-        ASSERT( eq->init( "b", ComparisonExpression::EQ, baseOperand[ "b" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
+        ASSERT( eq->init( "b", ComparisonMatchExpression::EQ, baseOperand[ "b" ] ).isOK() );
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         // Directly nested objects are not matched with $elemMatch.  An intervening array is
         // required.
@@ -261,11 +261,11 @@ namespace mongo {
         ASSERT( !op.matches( BSON( "a" << 4 ), NULL ) );
     }
 
-    TEST( ElemMatchObjectExpression, MatchesArrayObject ) {
+    TEST( ElemMatchObjectMatchExpression, MatchesArrayObject ) {
         BSONObj baseOperand = BSON( "b" << 5 );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
-        ASSERT( eq->init( "b", ComparisonExpression::EQ, baseOperand[ "b" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
+        ASSERT( eq->init( "b", ComparisonMatchExpression::EQ, baseOperand[ "b" ] ).isOK() );
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << 5 ) ) ), NULL ) );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( 4 << BSON( "b" << 5 ) ) ), NULL ) );
@@ -274,11 +274,11 @@ namespace mongo {
                             NULL ) );
     }
 
-    TEST( ElemMatchObjectExpression, MatchesMultipleNamedValues ) {
+    TEST( ElemMatchObjectMatchExpression, MatchesMultipleNamedValues ) {
         BSONObj baseOperand = BSON( "c" << 5 );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
-        ASSERT( eq->init( "c", ComparisonExpression::EQ, baseOperand[ "c" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
+        ASSERT( eq->init( "c", ComparisonMatchExpression::EQ, baseOperand[ "c" ] ).isOK() );
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a.b", eq.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" <<
                                   BSON_ARRAY( BSON( "b" <<
@@ -295,11 +295,11 @@ namespace mongo {
                             NULL ) );
     }
 
-    TEST( ElemMatchObjectExpression, ElemMatchKey ) {
+    TEST( ElemMatchObjectMatchExpression, ElemMatchKey ) {
         BSONObj baseOperand = BSON( "c" << 6 );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
-        ASSERT( eq->init( "c", ComparisonExpression::EQ, baseOperand[ "c" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
+        ASSERT( eq->init( "c", ComparisonMatchExpression::EQ, baseOperand[ "c" ] ).isOK() );
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a.b", eq.release() ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
@@ -325,43 +325,43 @@ namespace mongo {
     }
 
     /**
-    TEST( ElemMatchObjectExpression, MatchesIndexKey ) {
+    TEST( ElemMatchObjectMatchExpression, MatchesIndexKey ) {
         BSONObj baseOperand = BSON( "b" << 5 );
-        auto_ptr<ComparisonExpression> eq( new ComparisonExpression() );
+        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
         ASSERT( eq->init( "b", baseOperand[ "b" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         IndexSpec indexSpec( BSON( "a.b" << 1 ) );
         BSONObj indexKey = BSON( "" << "5" );
-        ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
                 op.matchesIndexKey( indexKey, indexSpec ) );
     }
     */
 
-    TEST( ElemMatchValueExpression, MatchesElementSingle ) {
+    TEST( ElemMatchValueMatchExpression, MatchesElementSingle ) {
         BSONObj baseOperand = BSON( "$gt" << 5 );
         BSONObj match = BSON( "a" << BSON_ARRAY( 6 ) );
         BSONObj notMatch = BSON( "a" << BSON_ARRAY( 4 ) );
-        auto_ptr<ComparisonExpression> gt( new ComparisonExpression() );
-        ASSERT( gt->init( "", ComparisonExpression::GT, baseOperand[ "$gt" ] ).isOK() );
-        ElemMatchValueExpression op;
+        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
+        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a", gt.release() ).isOK() );
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
         ASSERT( !op.matchesSingleElement( notMatch[ "a" ] ) );
     }
 
-    TEST( ElemMatchValueExpression, MatchesElementMultiple ) {
+    TEST( ElemMatchValueMatchExpression, MatchesElementMultiple ) {
         BSONObj baseOperand1 = BSON( "$gt" << 1 );
         BSONObj baseOperand2 = BSON( "$lt" << 10 );
         BSONObj notMatch1 = BSON( "a" << BSON_ARRAY( 0 << 1 ) );
         BSONObj notMatch2 = BSON( "a" << BSON_ARRAY( 10 << 11 ) );
         BSONObj match = BSON( "a" << BSON_ARRAY( 0 << 5 << 11 ) );
-        auto_ptr<ComparisonExpression> gt( new ComparisonExpression() );
-        ASSERT( gt->init( "", ComparisonExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonExpression> lt( new ComparisonExpression() );
-        ASSERT( lt->init( "", ComparisonExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
+        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
+        ASSERT( lt->init( "", ComparisonMatchExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
 
-        ElemMatchValueExpression op;
+        ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a" ).isOK() );
         op.add( gt.release() );
         op.add( lt.release() );
@@ -371,11 +371,11 @@ namespace mongo {
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
     }
 
-    TEST( ElemMatchValueExpression, MatchesNonArray ) {
+    TEST( ElemMatchValueMatchExpression, MatchesNonArray ) {
         BSONObj baseOperand = BSON( "$gt" << 5 );
-        auto_ptr<ComparisonExpression> gt( new ComparisonExpression() );
-        ASSERT( gt->init( "", ComparisonExpression::GT, baseOperand[ "$gt" ] ).isOK() );
-        ElemMatchObjectExpression op;
+        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
+        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", gt.release() ).isOK() );
         // Directly nested objects are not matched with $elemMatch.  An intervening array is
         // required.
@@ -383,22 +383,22 @@ namespace mongo {
         ASSERT( !op.matches( BSON( "a" << BSON( "0" << 6 ) ), NULL ) );
     }
 
-    TEST( ElemMatchValueExpression, MatchesArrayScalar ) {
+    TEST( ElemMatchValueMatchExpression, MatchesArrayScalar ) {
         BSONObj baseOperand = BSON( "$gt" << 5 );
-        auto_ptr<ComparisonExpression> gt( new ComparisonExpression() );
-        ASSERT( gt->init( "", ComparisonExpression::GT, baseOperand[ "$gt" ] ).isOK() );
-        ElemMatchValueExpression op;
+        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
+        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a", gt.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSONObj() << 7 ) ), NULL ) );
     }
 
-    TEST( ElemMatchValueExpression, MatchesMultipleNamedValues ) {
+    TEST( ElemMatchValueMatchExpression, MatchesMultipleNamedValues ) {
         BSONObj baseOperand = BSON( "$gt" << 5 );
-        auto_ptr<ComparisonExpression> gt( new ComparisonExpression() );
-        ASSERT( gt->init( "", ComparisonExpression::GT, baseOperand[ "$gt" ] ).isOK() );
-        ElemMatchValueExpression op;
+        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
+        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a.b", gt.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 6 ) ) ) ), NULL ) );
         ASSERT( op.matches( BSON( "a" <<
@@ -407,11 +407,11 @@ namespace mongo {
                             NULL ) );
     }
 
-    TEST( ElemMatchValueExpression, ElemMatchKey ) {
+    TEST( ElemMatchValueMatchExpression, ElemMatchKey ) {
         BSONObj baseOperand = BSON( "$gt" << 6 );
-        auto_ptr<ComparisonExpression> gt( new ComparisonExpression() );
-        ASSERT( gt->init( "", ComparisonExpression::GT, baseOperand[ "$gt" ] ).isOK() );
-        ElemMatchValueExpression op;
+        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
+        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a.b", gt.release() ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
@@ -435,15 +435,15 @@ namespace mongo {
     }
 
     /**
-    TEST( ElemMatchValueExpression, MatchesIndexKey ) {
+    TEST( ElemMatchValueMatchExpression, MatchesIndexKey ) {
         BSONObj baseOperand = BSON( "$lt" << 5 );
-        auto_ptr<LtOp> lt( new ComparisonExpression() );
+        auto_ptr<LtOp> lt( new ComparisonMatchExpression() );
         ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
-        ElemMatchValueExpression op;
+        ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a", lt.release() ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
         BSONObj indexKey = BSON( "" << "3" );
-        ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
                 op.matchesIndexKey( indexKey, indexSpec ) );
     }
     */
@@ -452,35 +452,35 @@ namespace mongo {
 
 
         BSONObj baseOperanda1 = BSON( "a" << 1 );
-        auto_ptr<ComparisonExpression> eqa1( new ComparisonExpression() );
-        ASSERT( eqa1->init( "a", ComparisonExpression::EQ, baseOperanda1[ "a" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqa1( new ComparisonMatchExpression() );
+        ASSERT( eqa1->init( "a", ComparisonMatchExpression::EQ, baseOperanda1[ "a" ] ).isOK() );
 
         BSONObj baseOperandb1 = BSON( "b" << 1 );
-        auto_ptr<ComparisonExpression> eqb1( new ComparisonExpression() );
-        ASSERT( eqb1->init( "b", ComparisonExpression::EQ, baseOperandb1[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqb1( new ComparisonMatchExpression() );
+        ASSERT( eqb1->init( "b", ComparisonMatchExpression::EQ, baseOperandb1[ "b" ] ).isOK() );
 
-        auto_ptr<AndExpression> and1( new AndExpression() );
+        auto_ptr<AndMatchExpression> and1( new AndMatchExpression() );
         and1->add( eqa1.release() );
         and1->add( eqb1.release() );
         // and1 = { a : 1, b : 1 }
 
-        auto_ptr<ElemMatchObjectExpression> elemMatch1( new ElemMatchObjectExpression() );
+        auto_ptr<ElemMatchObjectMatchExpression> elemMatch1( new ElemMatchObjectMatchExpression() );
         elemMatch1->init( "x", and1.release() );
         // elemMatch1 = { x : { $elemMatch : { a : 1, b : 1 } } }
 
         BSONObj baseOperanda2 = BSON( "a" << 2 );
-        auto_ptr<ComparisonExpression> eqa2( new ComparisonExpression() );
-        ASSERT( eqa2->init( "a", ComparisonExpression::EQ, baseOperanda2[ "a" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqa2( new ComparisonMatchExpression() );
+        ASSERT( eqa2->init( "a", ComparisonMatchExpression::EQ, baseOperanda2[ "a" ] ).isOK() );
 
         BSONObj baseOperandb2 = BSON( "b" << 2 );
-        auto_ptr<ComparisonExpression> eqb2( new ComparisonExpression() );
-        ASSERT( eqb2->init( "b", ComparisonExpression::EQ, baseOperandb2[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqb2( new ComparisonMatchExpression() );
+        ASSERT( eqb2->init( "b", ComparisonMatchExpression::EQ, baseOperandb2[ "b" ] ).isOK() );
 
-        auto_ptr<AndExpression> and2( new AndExpression() );
+        auto_ptr<AndMatchExpression> and2( new AndMatchExpression() );
         and2->add( eqa2.release() );
         and2->add( eqb2.release() );
 
-        auto_ptr<ElemMatchObjectExpression> elemMatch2( new ElemMatchObjectExpression() );
+        auto_ptr<ElemMatchObjectMatchExpression> elemMatch2( new ElemMatchObjectMatchExpression() );
         elemMatch2->init( "x", and2.release() );
         // elemMatch2 = { x : { $elemMatch : { a : 2, b : 2 } } }
 
@@ -510,27 +510,27 @@ namespace mongo {
 
     TEST( AllElemMatchOp, Matches ) {
         BSONObj baseOperandgt1 = BSON( "$gt" << 1 );
-        auto_ptr<ComparisonExpression> gt1( new ComparisonExpression() );
-        ASSERT( gt1->init( "", ComparisonExpression::GT, baseOperandgt1[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt1( new ComparisonMatchExpression() );
+        ASSERT( gt1->init( "", ComparisonMatchExpression::GT, baseOperandgt1[ "$gt" ] ).isOK() );
 
         BSONObj baseOperandlt1 = BSON( "$lt" << 10 );
-        auto_ptr<ComparisonExpression> lt1( new ComparisonExpression() );
-        ASSERT( lt1->init( "", ComparisonExpression::LT, baseOperandlt1[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> lt1( new ComparisonMatchExpression() );
+        ASSERT( lt1->init( "", ComparisonMatchExpression::LT, baseOperandlt1[ "$lt" ] ).isOK() );
 
-        auto_ptr<ElemMatchValueExpression> elemMatch1( new ElemMatchValueExpression() );
+        auto_ptr<ElemMatchValueMatchExpression> elemMatch1( new ElemMatchValueMatchExpression() );
         elemMatch1->init( "x" );
         elemMatch1->add( gt1.release() );
         elemMatch1->add( lt1.release() );
 
         BSONObj baseOperandgt2 = BSON( "$gt" << 101 );
-        auto_ptr<ComparisonExpression> gt2( new ComparisonExpression() );
-        ASSERT( gt2->init( "", ComparisonExpression::GT, baseOperandgt2[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt2( new ComparisonMatchExpression() );
+        ASSERT( gt2->init( "", ComparisonMatchExpression::GT, baseOperandgt2[ "$gt" ] ).isOK() );
 
         BSONObj baseOperandlt2 = BSON( "$lt" << 110 );
-        auto_ptr<ComparisonExpression> lt2( new ComparisonExpression() );
-        ASSERT( lt2->init( "", ComparisonExpression::LT, baseOperandlt2[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> lt2( new ComparisonMatchExpression() );
+        ASSERT( lt2->init( "", ComparisonMatchExpression::LT, baseOperandlt2[ "$lt" ] ).isOK() );
 
-        auto_ptr<ElemMatchValueExpression> elemMatch2( new ElemMatchValueExpression() );
+        auto_ptr<ElemMatchValueMatchExpression> elemMatch2( new ElemMatchValueMatchExpression() );
         elemMatch2->init( "x" );
         elemMatch2->add( gt2.release() );
         elemMatch2->add( lt2.release() );
@@ -560,44 +560,44 @@ namespace mongo {
     /**
     TEST( AllElemMatchOp, MatchesIndexKey ) {
         BSONObj baseOperand = BSON( "$lt" << 5 );
-        auto_ptr<LtOp> lt( new ComparisonExpression() );
+        auto_ptr<LtOp> lt( new ComparisonMatchExpression() );
         ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
-        auto_ptr<ElemMatchValueExpression> elemMatchValueOp( new ElemMatchValueExpression() );
+        auto_ptr<ElemMatchValueMatchExpression> elemMatchValueOp( new ElemMatchValueMatchExpression() );
         ASSERT( elemMatchValueOp->init( "a", lt.release() ).isOK() );
-        OwnedPointerVector<MatchExpression> subExpressions;
-        subExpressions.mutableVector().push_back( elemMatchValueOp.release() );
+        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
+        subMatchExpressions.mutableVector().push_back( elemMatchValueOp.release() );
         AllElemMatchOp allElemMatchOp;
-        ASSERT( allElemMatchOp.init( &subExpressions ).isOK() );
+        ASSERT( allElemMatchOp.init( &subMatchExpressions ).isOK() );
         IndexSpec indexSpec( BSON( "a" << 1 ) );
         BSONObj indexKey = BSON( "" << "3" );
-        ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
                 allElemMatchOp.matchesIndexKey( indexKey, indexSpec ) );
     }
     */
 
-    TEST( SizeExpression, MatchesElement ) {
+    TEST( SizeMatchExpression, MatchesElement ) {
         BSONObj match = BSON( "a" << BSON_ARRAY( 5 << 6 ) );
         BSONObj notMatch = BSON( "a" << BSON_ARRAY( 5 ) );
-        SizeExpression size;
+        SizeMatchExpression size;
         ASSERT( size.init( "", 2 ).isOK() );
         ASSERT( size.matchesSingleElement( match.firstElement() ) );
         ASSERT( !size.matchesSingleElement( notMatch.firstElement() ) );
     }
 
-    TEST( SizeExpression, MatchesNonArray ) {
+    TEST( SizeMatchExpression, MatchesNonArray ) {
         // Non arrays do not match.
         BSONObj stringValue = BSON( "a" << "z" );
         BSONObj numberValue = BSON( "a" << 0 );
         BSONObj arrayValue = BSON( "a" << BSONArray() );
-        SizeExpression size;
+        SizeMatchExpression size;
         ASSERT( size.init( "", 0 ).isOK() );
         ASSERT( !size.matchesSingleElement( stringValue.firstElement() ) );
         ASSERT( !size.matchesSingleElement( numberValue.firstElement() ) );
         ASSERT( size.matchesSingleElement( arrayValue.firstElement() ) );
     }
 
-    TEST( SizeExpression, MatchesArray ) {
-        SizeExpression size;
+    TEST( SizeMatchExpression, MatchesArray ) {
+        SizeMatchExpression size;
         ASSERT( size.init( "a", 2 ).isOK() );
         ASSERT( size.matches( BSON( "a" << BSON_ARRAY( 4 << 5.5 ) ), NULL ) );
         // Arrays are not unwound to look for matching subarrays.
@@ -605,16 +605,16 @@ namespace mongo {
                                NULL ) );
     }
 
-    TEST( SizeExpression, MatchesNestedArray ) {
-        SizeExpression size;
+    TEST( SizeMatchExpression, MatchesNestedArray ) {
+        SizeMatchExpression size;
         ASSERT( size.init( "a.2", 2 ).isOK() );
         // A numerically referenced nested array is matched.
         ASSERT( size.matches( BSON( "a" << BSON_ARRAY( 4 << 5.5 << BSON_ARRAY( 1 << 2 ) ) ),
                               NULL ) );
     }
 
-    TEST( SizeExpression, ElemMatchKey ) {
-        SizeExpression size;
+    TEST( SizeMatchExpression, ElemMatchKey ) {
+        SizeMatchExpression size;
         ASSERT( size.init( "a.b", 3 ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
@@ -631,13 +631,13 @@ namespace mongo {
     }
 
     /**
-       TEST( SizeExpression, MatchesIndexKey ) {
+       TEST( SizeMatchExpression, MatchesIndexKey ) {
        BSONObj operand = BSON( "$size" << 4 );
-       SizeExpression size;
+       SizeMatchExpression size;
        ASSERT( size.init( "a", operand[ "$size" ] ).isOK() );
        IndexSpec indexSpec( BSON( "a" << 1 ) );
        BSONObj indexKey = BSON( "" << 1 );
-       ASSERT( MatchExpression::PartialMatchResult_Unknown ==
+       ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
        size.matchesIndexKey( indexKey, indexSpec ) );
        }
     */

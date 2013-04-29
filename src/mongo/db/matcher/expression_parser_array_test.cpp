@@ -27,9 +27,9 @@
 
 namespace mongo {
 
-    TEST( ExpressionParserArrayTest, Size1 ) {
+    TEST( MatchExpressionParserArrayTest, Size1 ) {
         BSONObj query = BSON( "x" << BSON( "$size" << 2 ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -38,9 +38,9 @@ namespace mongo {
         ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
     }
 
-    TEST( ExpressionParserArrayTest, SizeAsString ) {
+    TEST( MatchExpressionParserArrayTest, SizeAsString ) {
         BSONObj query = BSON( "x" << BSON( "$size" << "a" ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -49,9 +49,9 @@ namespace mongo {
         ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
     }
 
-    TEST( ExpressionParserArrayTest, SizeWithDouble ) {
+    TEST( MatchExpressionParserArrayTest, SizeWithDouble ) {
         BSONObj query = BSON( "x" << BSON( "$size" << 2.5 ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -61,17 +61,17 @@ namespace mongo {
         ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
     }
 
-    TEST( ExpressionParserArrayTest, SizeBad ) {
+    TEST( MatchExpressionParserArrayTest, SizeBad ) {
         BSONObj query = BSON( "x" << BSON( "$size" << BSONNULL ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
     }
 
     // ---------
 
-    TEST( ExpressionParserArrayTest, ElemMatchArr1 ) {
+    TEST( MatchExpressionParserArrayTest, ElemMatchArr1 ) {
         BSONObj query = BSON( "x" << BSON( "$elemMatch" << BSON( "x" << 1 << "y" << 2 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -82,9 +82,9 @@ namespace mongo {
 
     }
 
-    TEST( ExpressionParserArrayTest, ElemMatchVal1 ) {
+    TEST( MatchExpressionParserArrayTest, ElemMatchVal1 ) {
         BSONObj query = BSON( "x" << BSON( "$elemMatch" << BSON( "$gt" << 5 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -92,9 +92,9 @@ namespace mongo {
         ASSERT( result.getValue()->matches( BSON( "x" << BSON_ARRAY( 6 ) ) ) );
     }
 
-    TEST( ExpressionParserArrayTest, All1 ) {
+    TEST( MatchExpressionParserArrayTest, All1 ) {
         BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( 1 << 2 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -105,13 +105,13 @@ namespace mongo {
         ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 2 << 3 ) ) ) );
     }
 
-    TEST( ExpressionParserArrayTest, AllBadArg ) {
+    TEST( MatchExpressionParserArrayTest, AllBadArg ) {
         BSONObj query = BSON( "x" << BSON( "$all" << 1 ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
     }
 
-    TEST( ExpressionParserArrayTest, AllBadRegexArg ) {
+    TEST( MatchExpressionParserArrayTest, AllBadRegexArg ) {
         string tooLargePattern( 50 * 1000, 'z' );
         BSONObjBuilder allArray;
         allArray.appendRegex( "0", tooLargePattern, "" );
@@ -120,12 +120,12 @@ namespace mongo {
 
         BSONObj query = BSON( "x" << operand.obj() );
 
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
     }
 
 
-    TEST( ExpressionParserArrayTest, AllRegex1 ) {
+    TEST( MatchExpressionParserArrayTest, AllRegex1 ) {
         BSONObjBuilder allArray;
         allArray.appendRegex( "0", "^a", "" );
         allArray.appendRegex( "1", "B", "i" );
@@ -133,7 +133,7 @@ namespace mongo {
         all.appendArray( "$all", allArray.obj() );
         BSONObj query = BSON( "a" << all.obj() );
 
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         BSONObj notMatchFirst = BSON( "a" << "ax" );
@@ -145,7 +145,7 @@ namespace mongo {
         ASSERT( result.getValue()->matchesSingleElement( matchesBoth[ "a" ] ) );
     }
 
-    TEST( ExpressionParserArrayTest, AllRegex2 ) {
+    TEST( MatchExpressionParserArrayTest, AllRegex2 ) {
         BSONObjBuilder allArray;
         allArray.appendRegex( "0", "^a", "" );
         allArray.append( "1", "abc" );
@@ -153,7 +153,7 @@ namespace mongo {
         all.appendArray( "$all", allArray.obj() );
         BSONObj query = BSON( "a" << all.obj() );
 
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         BSONObj notMatchFirst = BSON( "a" << "ax" );
@@ -163,10 +163,10 @@ namespace mongo {
         ASSERT( result.getValue()->matchesSingleElement( matchesBoth[ "a" ] ) );
     }
 
-    TEST( ExpressionParserArrayTest, AllElemMatch1 ) {
+    TEST( MatchExpressionParserArrayTest, AllElemMatch1 ) {
         BSONObj internal = BSON( "x" << 1 << "y" << 2 );
         BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( BSON( "$elemMatch" << internal ) ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
         ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
@@ -177,15 +177,15 @@ namespace mongo {
 
     }
 
-    TEST( ExpressionParserArrayTest, AllElemMatchBad ) {
+    TEST( MatchExpressionParserArrayTest, AllElemMatchBad ) {
         BSONObj internal = BSON( "x" << 1 << "y" << 2 );
 
         BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( BSON( "$elemMatch" << internal ) << 5 ) ) );
-        StatusWithExpression result = ExpressionParser::parse( query );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
 
         query = BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 << BSON( "$elemMatch" << internal ) ) ) );
-        result = ExpressionParser::parse( query );
+        result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
     }
 
