@@ -275,13 +275,15 @@ namespace MatcherTests {
                 ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
             }
         };
-        
+
     } // namespace Covered
-    
+
+
+    template< typename M >
     class TimingBase {
     public:
-        long time( const BSONObj& patt , const BSONObj& obj ) {
-            Matcher m( patt );
+        long dotime( const BSONObj& patt , const BSONObj& obj ) {
+            M m( patt );
             Timer t;
             for ( int i=0; i<10000; i++ ) {
                 ASSERT( m.matches( obj ) );
@@ -290,13 +292,18 @@ namespace MatcherTests {
         }
     };
 
-    class AllTiming : public TimingBase {
+    template< typename M >
+    class AllTiming : public TimingBase<M> {
     public:
         void run() {
-            long normal = time( BSON( "x" << 5 ) , BSON( "x" << 5 ) );
-            long all = time( BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 ) ) ) , BSON( "x" << 5 ) );
+            long normal = TimingBase<M>::dotime( BSON( "x" << 5 ),
+                                                 BSON( "x" << 5 ) );
 
-            cout << "normal: " << normal << " all: " << all << endl;
+            long all = TimingBase<M>::dotime( BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 ) ) ),
+                                              BSON( "x" << 5 ) );
+
+            cout << "AllTiming " << demangleName(typeid(M))
+                 << " normal: " << normal << " all: " << all << endl;
         }
     };
 
@@ -424,7 +431,7 @@ namespace MatcherTests {
             add<Covered::ElemMatchKeyUnindexed>();
             add<Covered::ElemMatchKeyIndexed>();
             add<Covered::ElemMatchKeyIndexedSingleKey>();
-            add<AllTiming>();
+            ADD_BOTH(AllTiming);
             add<Visit>();
             add<WithinBox>();
             add<WithinCenter>();
