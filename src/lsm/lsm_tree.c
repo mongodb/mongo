@@ -565,7 +565,7 @@ __wt_lsm_tree_switch(
 	    in_memory < lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
 	    ++in_memory, --cp)
 		;
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 2)
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->throttle_sleep = 0;
 	else if (in_memory == lsm_tree->nchunks ||
 	    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {

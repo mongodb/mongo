@@ -866,25 +866,32 @@ __clsm_put(
 	 * switch code needs to use btree API methods, and it wants to
 	 * operate on the btree for the primary chunk. Set that up now.
 	 *
-	 * If the tree is locked, attempting to switch will block.  Set a flag
-	 * so the worker thread will switch when it gets a chance to avoid
-	 * introducing high latency into application threads.  Don't do this
-	 * indefinitely: if a chunk grows 50% larger than the configured
-	 * size, block until it can be switched.
+	 * If the primary chunk has grown too large, set a flag so the worker
+	 * thread will switch when it gets a chance to avoid introducing high
+	 * latency into application threads.  Don't do this indefinitely: if a
+	 * chunk grows twice as large as the configured size, block until it
+	 * can be switched.
 	 */
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
 		    ovfl = __wt_btree_size_overflow(
 		    session, lsm_tree->chunk_size));
 
-		if (ovfl && F_ISSET(lsm_tree, WT_LSM_TREE_LOCKED)) {
-			F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+		if (ovfl) {
+			/*
+			 * Check that we are up-to-date: don't switch if the
+			 * tree has changed in the meantime.
+			 */
+			WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+			if (clsm->dsk_gen == lsm_tree->dsk_gen)
+				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+			WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 			ovfl = 0;
 		}
 	} else
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
 		    ovfl = __wt_btree_size_overflow(
-		    session, 3 * lsm_tree->chunk_size / 2));
+		    session, 2 * lsm_tree->chunk_size));
 
 	if (ovfl) {
 		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
