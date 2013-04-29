@@ -100,6 +100,11 @@ connection_stats = [
 	Stat('lsm_rows_merged', 'rows merged in an LSM tree'),
 
 	##########################################
+	# Session operations
+	##########################################
+	Stat('session_cursor_open', 'open cursor count', perm=1),
+
+	##########################################
 	# Total Btree cursor operations
 	##########################################
 	Stat('cursor_create', 'cursor creation'),
@@ -123,6 +128,7 @@ dsrc_stats = [
 	# Session operations
 	##########################################
 	Stat('session_compact', 'object compaction'),
+	Stat('session_cursor_open', 'open cursor count', perm=1),
 
 	##########################################
 	# Cursor operations
