@@ -259,6 +259,15 @@ namespace mongo {
         result = ExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
 
+        // has to be in the other order
+        query = BSON( "x" << BSON( "$options" << "i" << "$regex" << "abc" ) );
+        result = ExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
+        query = BSON( "x" << BSON( "$gt" << "i" << "$regex" << "abc" ) );
+        result = ExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
     }
 
     TEST( ExpressionParserLeafTest, ExistsYes1 ) {

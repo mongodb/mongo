@@ -272,7 +272,9 @@ namespace mongo {
             StatusWithExpression s = _parseSubField( name, deep );
             if ( !s.isOK() )
                 return s.getStatus();
+
             root->add( s.getValue() );
+            first = false;
         }
         return Status::OK();
     }
