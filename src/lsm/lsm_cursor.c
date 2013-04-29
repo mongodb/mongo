@@ -901,7 +901,7 @@ __clsm_put(
 			WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 			if (need_signal)
 				WT_RET(__wt_cond_signal(
-				    session, lsm_tree->ckpt_cond));
+				    session, lsm_tree->work_cond));
 			ovfl = 0;
 		}
 	} else
