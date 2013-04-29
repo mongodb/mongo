@@ -230,25 +230,6 @@ namespace mongo {
         }
     }
 
-    MatchDetails::MatchDetails() :
-    _elemMatchKeyRequested() {
-        resetOutput();
-    }
-    
-    void MatchDetails::resetOutput() {
-        _loadedRecord = false;
-        _elemMatchKeyFound = false;
-        _elemMatchKey = "";
-    }
-    
-    string MatchDetails::toString() const {
-        stringstream ss;
-        ss << "loadedRecord: " << _loadedRecord << " ";
-        ss << "elemMatchKeyRequested: " << _elemMatchKeyRequested << " ";
-        ss << "elemMatchKey: " << ( _elemMatchKeyFound ? _elemMatchKey : "NONE" ) << " ";
-        return ss.str();
-    }
-    
     void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot) {
 
         RegexMatcher rm;

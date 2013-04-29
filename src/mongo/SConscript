@@ -119,7 +119,8 @@ env.StaticLibrary('expressions',
                    'db/matcher/expression_leaf.cpp',
                    'db/matcher/expression_tree.cpp',
                    'db/matcher/expression_parser.cpp',
-                   'db/matcher/expression_parser_tree.cpp'],
+                   'db/matcher/expression_parser_tree.cpp',
+                   'db/matcher/match_details.cpp'],
                   LIBDEPS=['bson',
                            '$BUILD_DIR/mongo/db/common',
                            '$BUILD_DIR/third_party/pcrecpp'
@@ -312,6 +313,7 @@ env.StaticLibrary("coredb", [
                            'server_parameters',
                            'geoparser',
                            'geoquery',
+                           'expressions',
                            '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",

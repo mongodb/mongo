@@ -22,7 +22,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/matcher/expression_internal.h"
 #include "mongo/util/log.h"
 
@@ -177,7 +176,7 @@ namespace mongo {
     Status RegexExpression::init( const StringData& path, const StringData& regex, const StringData& options ) {
         _path = path;
 
-        if ( regex.size() > RegexMatcher::MaxPatternSize ) {
+        if ( regex.size() > MaxPatternSize ) {
             return Status( ErrorCodes::BadValue, "Regular expression is too long" );
         }
 

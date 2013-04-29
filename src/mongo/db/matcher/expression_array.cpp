@@ -20,7 +20,6 @@
 
 #include "mongo/bson/bsonobjiterator.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/matcher/expression_internal.h"
 #include "mongo/util/log.h"
 

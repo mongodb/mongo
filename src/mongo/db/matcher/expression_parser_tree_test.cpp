@@ -24,7 +24,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 

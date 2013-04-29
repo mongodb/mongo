@@ -21,11 +21,11 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
 
     class TreeExpression;
-    class MatchDetails;
 
     class Expression {
         MONGO_DISALLOW_COPYING( Expression );

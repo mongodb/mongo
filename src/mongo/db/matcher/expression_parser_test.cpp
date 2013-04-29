@@ -20,29 +20,12 @@
 
 #include "mongo/db/matcher/expression_parser.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 
 namespace mongo {
-
-    /// HACK HACK HACK
-
-    MatchDetails::MatchDetails() :
-        _elemMatchKeyRequested() {
-        resetOutput();
-    }
-    void MatchDetails::resetOutput() {
-        _loadedRecord = false;
-        _elemMatchKeyFound = false;
-        _elemMatchKey = "";
-    }
-
-    // ----------------------------
 
     TEST( ExpressionParserTest, SimpleEQ1 ) {
         BSONObj query = BSON( "x" << 2 );

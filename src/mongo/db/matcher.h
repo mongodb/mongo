@@ -23,6 +23,7 @@
 #include "jsobj.h"
 #include "pcrecpp.h"
 #include "mongo/db/geo/geoquery.h"
+#include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
 
@@ -123,39 +124,6 @@ namespace mongo {
     class Where; // used for $where javascript eval
     class DiskLoc;
 
-    /** Reports information about a match request. */
-    class MatchDetails {
-    public:
-        MatchDetails();
-        void resetOutput();
-        string toString() const;
-
-        /** Request that an elemMatchKey be recorded. */
-        void requestElemMatchKey() { _elemMatchKeyRequested = true; }
-        
-        bool needRecord() const { return _elemMatchKeyRequested; }
-        
-        bool hasLoadedRecord() const { return _loadedRecord; }
-        bool hasElemMatchKey() const { return _elemMatchKeyFound; }
-        string elemMatchKey() const {
-            verify( hasElemMatchKey() );
-            return _elemMatchKey;
-        }
-
-        void setLoadedRecord( bool loadedRecord ) { _loadedRecord = loadedRecord; }
-        void setElemMatchKey( const string &elemMatchKey ) {
-            if ( _elemMatchKeyRequested ) {
-                _elemMatchKeyFound = true;
-                _elemMatchKey = elemMatchKey;
-            }
-        }
-        
-    private:
-        bool _loadedRecord;
-        bool _elemMatchKeyRequested;
-        bool _elemMatchKeyFound;
-        string _elemMatchKey;
-    };
 
     /* Match BSON objects against a query pattern.
 

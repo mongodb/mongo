@@ -24,26 +24,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 
 namespace mongo {
-
-    /// HACK HACK HACK
-
-    MatchDetails::MatchDetails() :
-        _elemMatchKeyRequested() {
-        resetOutput();
-    }
-    void MatchDetails::resetOutput() {
-        _loadedRecord = false;
-        _elemMatchKeyFound = false;
-        _elemMatchKey = "";
-    }
-
-
-    // ----------------------
 
     TEST( ExpressionTest, Parse1 ) {
         //TreeExpression* e = NULL;
