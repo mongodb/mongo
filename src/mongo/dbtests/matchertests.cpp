@@ -57,36 +57,40 @@ namespace MatcherTests {
         }
     };
 
+    template <typename M>
     class DoubleEqual {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":5}" );
-            Matcher m( query );
+            M m( query );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
         }
     };
 
+    template <typename M>
     class MixedNumericEqual {
     public:
         void run() {
             BSONObjBuilder query;
             query.append( "a", 5 );
-            Matcher m( query.done() );
+            M m( query.done() );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
         }
     };
 
+    template <typename M>
     class MixedNumericGt {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":{\"$gt\":4}}" );
-            Matcher m( query );
+            M m( query );
             BSONObjBuilder b;
             b.append( "a", 5 );
             ASSERT( m.matches( b.done() ) );
         }
     };
 
+    template <typename M>
     class MixedNumericIN {
     public:
         void run() {
@@ -94,7 +98,7 @@ namespace MatcherTests {
             ASSERT_EQUALS( 4 , query["a"].embeddedObject()["$in"].embeddedObject()["0"].number() );
             ASSERT_EQUALS( NumberInt , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
 
-            Matcher m( query );
+            M m( query );
 
             {
                 BSONObjBuilder b;
@@ -118,19 +122,21 @@ namespace MatcherTests {
         }
     };
 
+    template <typename M>
     class MixedNumericEmbedded {
     public:
         void run() {
-            Matcher m( BSON( "a" << BSON( "x" << 1 ) ) );
+            M m( BSON( "a" << BSON( "x" << 1 ) ) );
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1 ) ) ) );
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1.0 ) ) ) );
         }
     };
 
+    template <typename M>
     class Size {
     public:
         void run() {
-            Matcher m( fromjson( "{a:{$size:4}}" ) );
+            M m( fromjson( "{a:{$size:4}}" ) );
             ASSERT( m.matches( fromjson( "{a:[1,2,3,4]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3,'a','b']}" ) ) );
@@ -177,10 +183,11 @@ namespace MatcherTests {
     };
 
     /** Test that MatchDetails::elemMatchKey() is set correctly after a match. */
+    template <typename M>
     class ElemMatchKey {
     public:
         void run() {
-            Matcher matcher( BSON( "a.b" << 1 ) );
+            M matcher( BSON( "a.b" << 1 ) );
             MatchDetails details;
             details.requestElemMatchKey();
             ASSERT( !details.hasElemMatchKey() );
@@ -407,13 +414,13 @@ namespace MatcherTests {
 
         void setupTests() {
             ADD_BOTH(Basic);
-            add<DoubleEqual>();
-            add<MixedNumericEqual>();
-            add<MixedNumericGt>();
-            add<MixedNumericIN>();
-            add<Size>();
-            add<MixedNumericEmbedded>();
-            add<ElemMatchKey>();
+            ADD_BOTH(DoubleEqual);
+            ADD_BOTH(MixedNumericEqual);
+            ADD_BOTH(MixedNumericGt);
+            ADD_BOTH(MixedNumericIN);
+            ADD_BOTH(Size);
+            ADD_BOTH(MixedNumericEmbedded);
+            ADD_BOTH(ElemMatchKey);
             add<Covered::ElemMatchKeyUnindexed>();
             add<Covered::ElemMatchKeyIndexed>();
             add<Covered::ElemMatchKeyIndexedSingleKey>();
