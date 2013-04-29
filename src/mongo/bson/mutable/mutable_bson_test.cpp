@@ -1042,6 +1042,19 @@ namespace {
         ASSERT_FALSE(doc.root().leftChild() == doc.root().rightChild());
     }
 
+    TEST(Document, AddChildToEmptyOpaqueSubobject) {
+        mongo::BSONObj inObj = mongo::fromjson("{a: {}}");
+        mmb::Document doc(inObj);
+
+        mmb::Element elem = doc.root()["a"];
+        ASSERT_TRUE(elem.ok());
+
+        mmb::Element newElem = doc.makeElementInt("0", 1);
+        ASSERT_TRUE(newElem.ok());
+
+        ASSERT_OK(elem.pushBack(newElem));
+    }
+
     TEST(Document, ArraySerialization) {
 
         static const char inJson[] =
