@@ -28,6 +28,20 @@ namespace mongo {
         return BSONElementHasher::hash64(e, seed);
     }
 
+    BSONObj HashAccessMethod::getMissingField(const IndexDetails& details) {
+        BSONObj infoObj = details.info.obj();
+        int hashVersion = infoObj["hashVersion"].numberInt();
+        HashSeed seed = infoObj["seed"].numberInt();
+
+        // Explicit null valued fields and missing fields are both represented in hashed indexes
+        // using the hash value of the null BSONElement.  This is partly for historical reasons
+        // (hash of null was used in the initial release of hashed indexes and changing would alter
+        // the data format).  Additionally, in certain places the hashed index code and the index
+        // bound calculation code assume null and missing are indexed identically.
+        BSONObj nullObj = BSON("" << BSONNULL);
+        return BSON("" << makeSingleKey(nullObj.firstElement(), seed, hashVersion));
+    }
+
     HashAccessMethod::HashAccessMethod(IndexDescriptor* descriptor)
         : BtreeBasedAccessMethod(descriptor) {
 
@@ -56,11 +70,6 @@ namespace mongo {
                 firstElt.str().compare(HASHED_INDEX_TYPE_IDENTIFIER) == 0);
         _hashedField = firstElt.fieldName();
 
-        // Explicit null valued fields and missing fields are both represented in hashed indexes
-        // using the hash value of the null BSONElement.  This is partly for historical reasons
-        // (hash of null was used in the initial release of hashed indexes and changing would alter
-        // the data format).  Additionally, in certain places the hashed index code and the index
-        // bound calculation code assume null and missing are indexed identically.
         BSONObj nullObj = BSON("" << BSONNULL);
         _missingKey = BSON("" << makeSingleKey(nullObj.firstElement(), _seed, _hashVersion));
     }

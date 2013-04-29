@@ -32,7 +32,6 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
-    void __forceLinkGeoPlugin();
     shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query,
                                                const BSONObj &order = BSONObj(),
                                                const QueryPlanSelectionPolicy &planPolicy =
@@ -4826,7 +4825,6 @@ namespace QueryOptimizerCursorTests {
         All() : Suite( "queryoptimizercursor" ) {}
         
         void setupTests() {
-            __forceLinkGeoPlugin();
             add<CachedMatchCounter::Count>();
             add<CachedMatchCounter::Accumulate>();
             add<CachedMatchCounter::Dedup>();

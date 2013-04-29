@@ -117,7 +117,7 @@ namespace mongo {
         S2IndexingParams _params;
 
         // We also pass this to the FieldRangeVector ctor.
-        IndexSpec _specForFRV;
+        BSONObj _specForFRV;
 
         // Geo-related variables.
         // What's the max distance (arc length) we're willing to look for results?

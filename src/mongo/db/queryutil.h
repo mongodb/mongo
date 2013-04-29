@@ -17,9 +17,10 @@
 
 #include "jsobj.h"
 #include "indexkey.h"
+#include "mongo/db/index/btree_key_generator.h"
 
 namespace mongo {
-    
+
     //maximum number of intervals produced by $in queries.
     static const unsigned MAX_IN_COMBINATIONS = 4000000;
 
@@ -433,7 +434,7 @@ namespace mongo {
          * @param indexSpec The index spec (key pattern and info)
          * @param direction The direction of index traversal
          */
-        FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction );
+        FieldRangeVector( const FieldRangeSet &frs, BSONObj keyPattern, int direction );
 
         /**
          * Methods for identifying compound start and end btree bounds describing this field range
@@ -499,8 +500,6 @@ namespace mongo {
         /** @return a client readable representation of 'this' */
         BSONObj obj() const;
         
-        const IndexSpec& getSpec(){ return _indexSpec; }
-
         /**
          * @return true iff the provided document matches valid ranges on all
          * of this FieldRangeVector's fields, which is the case iff this document
@@ -541,11 +540,15 @@ namespace mongo {
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
         vector<FieldRange> _ranges;
-        const IndexSpec _indexSpec;
+        BSONObj _keyPattern;
         int _direction;
         vector<BSONObj> _queries; // make sure mem owned
         bool _hasAllIndexedRanges;
         friend class FieldRangeVectorIterator;
+
+        vector<const char*> _fieldNames;
+        vector<BSONElement> _fixed;
+        scoped_ptr<BtreeKeyGenerator> _keyGenerator;
     };
     
     /**

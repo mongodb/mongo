@@ -1059,7 +1059,6 @@ namespace {
         All() : Suite( "queryoptimizer" ) {}
 
         void setupTests() {
-            __forceLinkGeoPlugin();
             add<QueryPlanTests::ToString>();
             add<QueryPlanTests::NoIndex>();
             add<QueryPlanTests::SimpleOrder>();

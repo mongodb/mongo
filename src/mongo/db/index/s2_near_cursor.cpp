@@ -53,8 +53,7 @@ namespace mongo {
             BSONElement e = specIt.next();
             specBuilder.append(e.fieldName(), 1);
         }
-        BSONObj spec = specBuilder.obj();
-        _specForFRV = IndexSpec(spec);
+        _specForFRV = specBuilder.obj();
 
         specIt = BSONObjIterator(_descriptor->keyPattern());
         while (specIt.more()) {

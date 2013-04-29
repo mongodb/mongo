@@ -43,6 +43,10 @@ namespace mongo {
             return Status::OK();
         }
 
+        // Our missing field is different than the default missing field, this needs to be
+        // exposed in s/d_split.cpp.  That's the only thing that calls this.
+        static BSONObj getMissingField(const IndexDetails& details);
+
         /**
          * Hashing function used by both this class and the cursors we create.
          */
@@ -60,9 +64,6 @@ namespace mongo {
         // _hashVersion defaults to zero.
         int _hashVersion;
 
-        // What key do we insert when the field is missing?
-        // TODO: fix migration code to do the right thing.
-        // TODO: see http://codereview.10gen.com/9497028/patch/3001/4007
         BSONObj _missingKey;
     };
 

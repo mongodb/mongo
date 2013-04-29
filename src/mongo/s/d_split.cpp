@@ -31,6 +31,7 @@
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk.h" // for static genID only
@@ -134,7 +135,14 @@ namespace mongo {
             // this index.
             // NOTE A local copy of 'missingField' is made because IndexSpec objects may be
             // invalidated during a db lock yield.
-            BSONObj missingFieldObj = idx->getSpec().missingField().wrap();
+            BSONObj missingFieldObj;
+            if (IndexNames::HASHED == KeyPattern::findPluginName(kp.toBSON())) {
+                missingFieldObj = HashAccessMethod::getMissingField(*idx);
+            } else {
+                BSONObjBuilder b;
+                b.appendNull("");
+                missingFieldObj = b.obj();
+            }
             BSONElement missingField = missingFieldObj.firstElement();
             
             // for now, the only check is that all shard keys are filled

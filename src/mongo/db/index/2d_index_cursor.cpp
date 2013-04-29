@@ -322,7 +322,7 @@ namespace mongo {
 
         scoped_ptr<BtreeCursor> _cursor;
         scoped_ptr<FieldRangeSet> _frs;
-        scoped_ptr<IndexSpec> _spec;
+        BSONObj _keyPattern;
 
         BSONObj key() { return _cursor->currKey(); }
 
@@ -390,11 +390,11 @@ namespace mongo {
             }
             BSONObj iSpec = bob.obj();
 
-            min._spec.reset(new IndexSpec(iSpec));
-            max._spec.reset(new IndexSpec(iSpec));
+            min._keyPattern = iSpec;
+            max._keyPattern = iSpec;
 
-            shared_ptr<FieldRangeVector> frvMin(new FieldRangeVector(*min._frs, *min._spec, -1));
-            shared_ptr<FieldRangeVector> frvMax(new FieldRangeVector(*max._frs, *max._spec, 1));
+            shared_ptr<FieldRangeVector> frvMin(new FieldRangeVector(*min._frs, min._keyPattern, -1));
+            shared_ptr<FieldRangeVector> frvMax(new FieldRangeVector(*max._frs, max._keyPattern, 1));
 
             min._cursor.reset(BtreeCursor::make(nsdetails(descriptor->parentNS()),
                                                 descriptor->getOnDisk(), frvMin, 0, -1));

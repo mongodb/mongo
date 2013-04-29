@@ -32,12 +32,11 @@ namespace mongo {
 
     class KeyType : boost::noncopyable {
     public:
-        IndexSpec _spec;
+        BSONObj _keyPattern;
         FieldRangeVector _keyCutter;
     public:
-        KeyType(const BSONObj &pattern, const FieldRangeSet &frs):
-        _spec(pattern, BSONObj(), IndexSpec::NoPlugins),
-        _keyCutter(frs, _spec, 1) {
+        KeyType(const BSONObj &pattern, const FieldRangeSet &frs)
+            : _keyPattern(pattern), _keyCutter(frs, pattern, 1) {
             verify(!pattern.isEmpty());
         }
 

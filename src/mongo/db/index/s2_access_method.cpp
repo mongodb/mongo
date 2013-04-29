@@ -110,7 +110,7 @@ namespace mongo {
                 getLiteralKeys(fieldElements, &keysForThisField);
             }
 
-            // We expect there to be _spec->_missingField() present in the keys if data is
+            // We expect there to be the missing field element present in the keys if data is
             // missing.  So, this should be non-empty.
             verify(!keysForThisField.empty());
 

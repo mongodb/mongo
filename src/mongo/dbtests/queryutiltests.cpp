@@ -1760,7 +1760,7 @@ namespace QueryUtilTests {
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
                 FieldRangeSet fieldRangeSet( "", obj, true, true );
-                IndexSpec indexSpec( BSON( "a" << 1 ) );
+                BSONObj indexSpec( BSON( "a" << 1 ) );
                 FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
                 fieldRangeVector.toString(); // Just test that we don't crash.
             }
@@ -1799,7 +1799,7 @@ namespace QueryUtilTests {
         private:
             bool rangesRepresented( const BSONObj& index, bool singleKey, const BSONObj& query ) {
                 FieldRangeSet fieldRangeSet( "", query, singleKey, true );
-                IndexSpec indexSpec( index );
+                BSONObj indexSpec( index );
                 FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
                 return fieldRangeVector.hasAllIndexedRanges();
             }
@@ -1811,12 +1811,12 @@ namespace QueryUtilTests {
             void run() {
                 // Equality on a single field is a single interval.
                 FieldRangeVector frv1( FieldRangeSet( "dummy", BSON( "a" << 5 ), true, true ),
-                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       ( BSON( "a" << 1 ) ),
                                        1 );
                 ASSERT( frv1.isSingleInterval() );
                 // Single interval on a single field is a single interval.
                 FieldRangeVector frv2( FieldRangeSet( "dummy", BSON( "a" << GT << 5 ), true, true ),
-                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       ( BSON( "a" << 1 ) ),
                                        1 );
                 ASSERT( frv2.isSingleInterval() );
                 // Multiple intervals on a single field is not a single interval.
@@ -1824,7 +1824,7 @@ namespace QueryUtilTests {
                                                       fromjson( "{a:{$in:[4,5]}}" ),
                                                       true,
                                                       true ),
-                                      IndexSpec( BSON( "a" << 1 ) ),
+                                      ( BSON( "a" << 1 ) ),
                                       1 );
                 ASSERT( !frv3.isSingleInterval() );
 
@@ -1833,7 +1833,7 @@ namespace QueryUtilTests {
                                                       BSON( "a" << 5 << "b" << 6 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT( frv4.isSingleInterval() );
                 // Equality on first field and single interval on second field is a compound
@@ -1842,7 +1842,7 @@ namespace QueryUtilTests {
                                                       BSON( "a" << 5 << "b" << GT << 6 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT( frv5.isSingleInterval() );
                 // Single interval on first field and single interval on second field is not a
@@ -1851,7 +1851,7 @@ namespace QueryUtilTests {
                                                       BSON( "a" << LT << 5 << "b" << GT << 6 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT( !frv6.isSingleInterval() );
                 // Multiple intervals on two fields is not a compound single interval.
@@ -1859,7 +1859,7 @@ namespace QueryUtilTests {
                                                       fromjson( "{a:{$in:[4,5]},b:{$in:[7,8]}}" ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT( !frv7.isSingleInterval() );
 
@@ -1868,7 +1868,7 @@ namespace QueryUtilTests {
                                                       BSON( "a" << 5 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT( frv8.isSingleInterval() );
                 // With missing second field is still a single compound interval.
@@ -1876,7 +1876,7 @@ namespace QueryUtilTests {
                                                       BSON( "b" << 5 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT( !frv9.isSingleInterval() );
 
@@ -1886,7 +1886,7 @@ namespace QueryUtilTests {
                                                        fromjson( "{a:5,b:6,c:{$gt:7}}" ),
                                                        true,
                                                        true ),
-                                        IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                        ( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
                                         1 );
                 ASSERT( frv10.isSingleInterval() );
 
@@ -1895,7 +1895,7 @@ namespace QueryUtilTests {
                                                        fromjson( "{a:5,b:{$gt:7}}" ),
                                                        true,
                                                        true ),
-                                        IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                        ( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
                                         1 );
                 ASSERT( frv11.isSingleInterval() );
                 // Equality, then single interval, then missing, then missing is a compound single
@@ -1904,7 +1904,7 @@ namespace QueryUtilTests {
                                                        fromjson( "{a:5,b:{$gt:7}}" ),
                                                        true,
                                                        true ),
-                                        IndexSpec( BSON( "a" << 1 <<
+                                        ( BSON( "a" << 1 <<
                                                          "b" << 1 <<
                                                          "c" << 1 <<
                                                          "d" << 1 ) ),
@@ -1916,7 +1916,7 @@ namespace QueryUtilTests {
                                                        fromjson( "{a:5,b:{$gt:7}}" ),
                                                        true,
                                                        true ),
-                                        IndexSpec( BSON( "a" << 1 <<
+                                        ( BSON( "a" << 1 <<
                                                          "b" << 1 <<
                                                          "c" << 1 <<
                                                          "d" << -1 ) ),
@@ -1928,7 +1928,7 @@ namespace QueryUtilTests {
                                                        fromjson( "{a:5,b:{$gt:7},d:{$gt:1}}" ),
                                                        true,
                                                        true ),
-                                        IndexSpec( BSON( "a" << 1 <<
+                                        ( BSON( "a" << 1 <<
                                                          "b" << 1 <<
                                                          "c" << 1 <<
                                                          "d" << 1 ) ),
@@ -1943,7 +1943,7 @@ namespace QueryUtilTests {
             void run() {
                 // Equality on a single field.
                 FieldRangeVector frv1( FieldRangeSet( "dummy", BSON( "a" << 5 ), true, true ),
-                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       ( BSON( "a" << 1 ) ),
                                        1 );
                 ASSERT_EQUALS( BSON( "" << 5 ), frv1.startKey() );
                 ASSERT( frv1.startKeyInclusive() );
@@ -1951,7 +1951,7 @@ namespace QueryUtilTests {
                 ASSERT( frv1.endKeyInclusive() );
                 // Single interval on a single field.
                 FieldRangeVector frv2( FieldRangeSet( "dummy", BSON( "a" << GT << 5 ), true, true ),
-                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       ( BSON( "a" << 1 ) ),
                                        1 );
                 ASSERT_EQUALS( BSON( "" << 5 ), frv2.startKey() );
                 ASSERT( !frv2.startKeyInclusive() );
@@ -1963,7 +1963,7 @@ namespace QueryUtilTests {
                                                       BSON( "a" << 5 << "b" << 6 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT_EQUALS( BSON( "" << 5 << "" << 6 ), frv3.startKey() );
                 ASSERT( frv3.startKeyInclusive() );
@@ -1974,7 +1974,7 @@ namespace QueryUtilTests {
                                                       BSON( "a" << 5 << "b" << LT << 6 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT_EQUALS( BSON( "" << 5 << "" << -numeric_limits<double>::max() ),
                                frv4.startKey() );
@@ -1988,7 +1988,7 @@ namespace QueryUtilTests {
                                                       BSON( "a" << 5 ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 ) ),
                                        1 );
                 ASSERT_EQUALS( BSON( "" << 5 << "" << MINKEY ), frv5.startKey() );
                 ASSERT( frv5.startKeyInclusive() );
@@ -1999,7 +1999,7 @@ namespace QueryUtilTests {
                                                       fromjson( "{a:5,b:{$gt:7}}" ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                       ( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
                                        1 );
                 ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY ), frv6.startKey() );
                 ASSERT( !frv6.startKeyInclusive() );
@@ -2013,7 +2013,7 @@ namespace QueryUtilTests {
                                                       fromjson( "{a:5,b:{$gt:7}}" ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 <<
+                                       ( BSON( "a" << 1 <<
                                                         "b" << 1 <<
                                                         "c" << 1 <<
                                                         "d" << 1 ) ),
@@ -2034,7 +2034,7 @@ namespace QueryUtilTests {
                                                       fromjson( "{a:5,b:{$gt:7,$lt:10}}" ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 <<
+                                       ( BSON( "a" << 1 <<
                                                         "b" << 1 <<
                                                         "c" << 1 <<
                                                         "d" << -1 ) ),
@@ -2051,7 +2051,7 @@ namespace QueryUtilTests {
                                                       fromjson( "{a:5,b:{$gt:7,$lt:10}}" ),
                                                       true,
                                                       true ),
-                                       IndexSpec( BSON( "a" << 1 <<
+                                       ( BSON( "a" << 1 <<
                                                         "b" << 1 <<
                                                         "c" << 1 <<
                                                         "d" << -1 ) ),
@@ -2075,8 +2075,7 @@ namespace QueryUtilTests {
             virtual ~Base() {}
             void run() {
                 FieldRangeSet fieldRangeSet( "", query(), true, true );
-                IndexSpec indexSpec( index(), BSONObj() );
-                FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
+                FieldRangeVector fieldRangeVector( fieldRangeSet, index(), 1 );
                 _iterator.reset( new FieldRangeVectorIterator( fieldRangeVector,
                                                               singleIntervalLimit() ) );
                 _iterator->advance( fieldRangeVector.startKey() );

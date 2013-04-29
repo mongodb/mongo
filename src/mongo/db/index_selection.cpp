@@ -16,6 +16,7 @@
 
 #include "mongo/db/index_selection.h"
 
+#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
@@ -27,68 +28,10 @@ namespace mongo {
                                                    const FieldRangeSet& queryConstraints,
                                                    const BSONObj& order) {
 
-        string type = KeyPattern::findPluginName(keyPattern);
+        string type = CatalogHack::findPluginName(keyPattern);
         BSONObj query = queryConstraints.originalQuery();
 
-        if (IndexNames::HASHED == type) {
-            /* This index is only considered "HELPFUL" for a query
-             * if it's the union of at least one equality constraint on the
-             * hashed field.  Otherwise it's considered USELESS.
-             * Example queries (supposing the indexKey is {a : "hashed"}):
-             *   {a : 3}  HELPFUL
-             *   {a : 3 , b : 3} HELPFUL
-             *   {a : {$in : [3,4]}} HELPFUL
-             *   {a : {$gte : 3, $lte : 3}} HELPFUL
-             *   {} USELESS
-             *   {b : 3} USELESS
-             *   {a : {$gt : 3}} USELESS
-             */
-            BSONElement firstElt = keyPattern.firstElement();
-            if (queryConstraints.isPointIntervalSet(firstElt.fieldName())) {
-                return HELPFUL;
-            } else {
-                return USELESS;
-            }
-        } else if (IndexNames::GEO_2DSPHERE == type) {
-            BSONObjIterator i(keyPattern);
-            while (i.more()) {
-                BSONElement ie = i.next();
-
-                if (ie.type() != String || IndexNames::GEO_2DSPHERE != ie.valuestr()) {
-                    continue;
-                }
-
-                BSONElement e = query.getFieldDotted(ie.fieldName());
-                // Some locations are given to us as arrays.  Sigh.
-                if (Array == e.type()) { return HELPFUL; }
-                if (Object != e.type()) { continue; }
-                // getGtLtOp is horribly misnamed and really means get the operation.
-                switch (e.embeddedObject().firstElement().getGtLtOp()) {
-                    case BSONObj::opNEAR:
-                        return OPTIMAL;
-                    case BSONObj::opWITHIN: {
-                        BSONElement elt = e.embeddedObject().firstElement();
-                        if (Object != elt.type()) { continue; }
-                        const char* fname = elt.embeddedObject().firstElement().fieldName();
-                        if (mongoutils::str::equals("$geometry", fname)
-                            || mongoutils::str::equals("$centerSphere", fname)) {
-                            return OPTIMAL;
-                        } else {
-                            return USELESS;
-                        }
-                    }
-                    case BSONObj::opGEO_INTERSECTS:
-                        return OPTIMAL;
-                    default:
-                        return USELESS;
-                }
-            }
-            return USELESS;
-        } else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
-            return USELESS;
-        } else if (IndexNames::GEO_HAYSTACK == type) {
-            return USELESS;
-        } else if ("" == type) {
+        if ("" == type) {
             // This is a quick first pass to determine the suitability of the index.  It produces
             // some false positives (returns HELPFUL for some indexes which are not particularly).
             // When we return HELPFUL a more precise determination of utility is done by the query
@@ -160,6 +103,64 @@ namespace mongo {
             default:
                 return USELESS;
             }
+        } else if (IndexNames::HASHED == type) {
+            /* This index is only considered "HELPFUL" for a query
+             * if it's the union of at least one equality constraint on the
+             * hashed field.  Otherwise it's considered USELESS.
+             * Example queries (supposing the indexKey is {a : "hashed"}):
+             *   {a : 3}  HELPFUL
+             *   {a : 3 , b : 3} HELPFUL
+             *   {a : {$in : [3,4]}} HELPFUL
+             *   {a : {$gte : 3, $lte : 3}} HELPFUL
+             *   {} USELESS
+             *   {b : 3} USELESS
+             *   {a : {$gt : 3}} USELESS
+             */
+            BSONElement firstElt = keyPattern.firstElement();
+            if (queryConstraints.isPointIntervalSet(firstElt.fieldName())) {
+                return HELPFUL;
+            } else {
+                return USELESS;
+            }
+        } else if (IndexNames::GEO_2DSPHERE == type) {
+            BSONObjIterator i(keyPattern);
+            while (i.more()) {
+                BSONElement ie = i.next();
+
+                if (ie.type() != String || IndexNames::GEO_2DSPHERE != ie.valuestr()) {
+                    continue;
+                }
+
+                BSONElement e = query.getFieldDotted(ie.fieldName());
+                // Some locations are given to us as arrays.  Sigh.
+                if (Array == e.type()) { return HELPFUL; }
+                if (Object != e.type()) { continue; }
+                // getGtLtOp is horribly misnamed and really means get the operation.
+                switch (e.embeddedObject().firstElement().getGtLtOp()) {
+                    case BSONObj::opNEAR:
+                        return OPTIMAL;
+                    case BSONObj::opWITHIN: {
+                        BSONElement elt = e.embeddedObject().firstElement();
+                        if (Object != elt.type()) { continue; }
+                        const char* fname = elt.embeddedObject().firstElement().fieldName();
+                        if (mongoutils::str::equals("$geometry", fname)
+                            || mongoutils::str::equals("$centerSphere", fname)) {
+                            return OPTIMAL;
+                        } else {
+                            return USELESS;
+                        }
+                    }
+                    case BSONObj::opGEO_INTERSECTS:
+                        return OPTIMAL;
+                    default:
+                        return USELESS;
+                }
+            }
+            return USELESS;
+        } else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
+            return USELESS;
+        } else if (IndexNames::GEO_HAYSTACK == type) {
+            return USELESS;
         } else {
             cout << "Can't find index for keypattern " << keyPattern << endl;
             verify(0);

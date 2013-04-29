@@ -88,7 +88,6 @@ namespace mongo {
         _endKeyInclusive(),
         _utility( Helpful ),
         _special( special ),
-        _type( 0 ),
         _startOrEndSpec() {
     }
     
@@ -112,24 +111,24 @@ namespace mongo {
             return;
         }
 
+        _descriptor.reset(CatalogHack::getDescriptor(_d, _idxNo));
         _index = &_d->idx(_idxNo);
 
         // If the parsing or index indicates this is a special query, don't continue the processing
         if (!_special.empty() ||
-            ( _index->getSpec().getType() && (USELESS !=
-                IndexSelection::isSuitableFor(_index->getSpec().keyPattern, _frs, _order)))) {
+            ( ("" != CatalogHack::findPluginName(_descriptor->keyPattern())) && (USELESS !=
+                IndexSelection::isSuitableFor(_descriptor->keyPattern(), _frs, _order)))) {
 
-            _type  = _index->getSpec().getType();
-            if (_special.empty()) _special = _index->getSpec().getType()->getPlugin()->getName();
+            _specialIndexName = CatalogHack::findPluginName(_descriptor->keyPattern());
+            if (_special.empty()) _special = _specialIndexName;
 
-            massert( 13040 , (string)"no type for special: " + _special , _type );
+            massert( 13040 , (string)"no type for special: " + _special , "" != _specialIndexName);
             // hopefully safe to use original query in these contexts;
             // don't think we can mix special with $or clause separation yet
-            _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , _order );
+            _scanAndOrderRequired = !_order.isEmpty();
             return;
         }
 
-        const IndexSpec &idxSpec = _index->getSpec();
         BSONObjIterator o( _order );
         BSONObjIterator k( idxKey );
         if ( !o.moreWithEOO() )
@@ -192,7 +191,7 @@ doneCheckOrder:
         if ( !_scanAndOrderRequired &&
                 ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
             _utility = Optimal;
-        _frv.reset( new FieldRangeVector( _frs, idxSpec, _direction ) );
+        _frv.reset( new FieldRangeVector( _frs, _descriptor->keyPattern(), _direction ) );
 
         if ( // If all field range constraints are on indexed fields and ...
              _utility == Optimal &&
@@ -208,7 +207,7 @@ doneCheckOrder:
 
         if ( originalFrsp ) {
             _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ),
-                                                      idxSpec,
+                                                      _descriptor->keyPattern(),
                                                       _direction ) );
         }
         else {
@@ -231,7 +230,7 @@ doneCheckOrder:
             _utility = Unhelpful;
         }
             
-        if ( idxSpec.isSparse() && hasPossibleExistsFalsePredicate() ) {
+        if ( _descriptor->isSparse() && hasPossibleExistsFalsePredicate() ) {
             _utility = Disallowed;
         }
 
@@ -244,7 +243,7 @@ doneCheckOrder:
     shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc& startLoc,
                                              bool requestIntervalCursor ) const {
 
-        if ( _type ) {
+        if ("" != _specialIndexName) {
             // hopefully safe to use original query in these contexts - don't think we can mix type
             // with $or clause separation yet
             int numWanted = 0;
@@ -253,6 +252,7 @@ doneCheckOrder:
                 numWanted = _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
             }
 
+            // Why do we get new objects here?  Because EmulatedCursor takes ownership of them.
             IndexDescriptor* descriptor = CatalogHack::getDescriptor(_d, _idxNo);
             IndexAccessMethod* iam = CatalogHack::getIndex(descriptor);
             return shared_ptr<Cursor>(EmulatedCursor::make(descriptor, iam, _originalQuery,
@@ -284,7 +284,7 @@ doneCheckOrder:
                                                           _direction >= 0 ? 1 : -1 ) );
         }
 
-        if ( _index->getSpec().getType() ) {
+        if ( !_index->getSpec().getTypeName().empty()) { //_index->getSpec().getType() ) {
             return shared_ptr<Cursor>( BtreeCursor::make( _d,
                                                           *_index,
                                                           _frv->startKey(),

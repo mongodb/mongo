@@ -23,9 +23,9 @@
 
 #include "../db/db.h"
 #include "../db/json.h"
-#include "mongo/db/hashindex.h"
 #include "mongo/db/index_selection.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/queryutil.h"
 
 #include "dbtests.h"
@@ -955,11 +955,11 @@ namespace NamespaceTests {
         class IndexedQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ) );
                 FieldRangeSet frs( "n/a", BSON( "a" << 2 ), true , true );
                 // Checking a return value of HELPFUL instead of OPTIMAL is descriptive rather than
                 // normative.  See SERVER-4485.
-                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSONObj() ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -967,9 +967,9 @@ namespace NamespaceTests {
         class NoIndexedQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ) );
                 FieldRangeSet frs( "n/a", BSON( "b" << 2 ), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -977,9 +977,9 @@ namespace NamespaceTests {
         class ChildOfIndexQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSON( "a.b" << 2 ), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -987,9 +987,9 @@ namespace NamespaceTests {
         class ParentOfIndexQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a.b" << 1 ));
                 FieldRangeSet frs( "n/a", BSON( "a" << 2 ), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -1000,9 +1000,9 @@ namespace NamespaceTests {
         class ObjectMatchCompletingIndexField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a.b" << 1 ));
                 FieldRangeSet frs( "n/a", BSON( "a" << BSON( "b" << 2 ) ), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -1010,9 +1010,9 @@ namespace NamespaceTests {
         class IndexedOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSON( "a" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -1020,9 +1020,9 @@ namespace NamespaceTests {
         class IndexedReverseOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << -1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << -1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSON( "a" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -1033,9 +1033,9 @@ namespace NamespaceTests {
         class NonPrefixIndexedOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSON( "b" << 1 << "a" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSON( "b" << 1 << "a" << 1 ) ) );
             }
         };
 
@@ -1043,9 +1043,9 @@ namespace NamespaceTests {
         class NoIndexedOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSON( "b" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSON( "b" << 1 ) ) );
             }
         };
         
@@ -1053,9 +1053,9 @@ namespace NamespaceTests {
         class ChildOfIndexOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSON( "a.b" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSON( "a.b" << 1 ) ) );
             }
         };
         
@@ -1063,9 +1063,9 @@ namespace NamespaceTests {
         class ParentOfIndexOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a.b" << 1 ) );
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs, BSON( "a" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -1073,13 +1073,13 @@ namespace NamespaceTests {
         class NumericFieldSuitability {
         public:
             void run() {
-                IndexSpec spec( BSON( "1" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "1" << 1 ));
                 FieldRangeSet frs1( "n/a", BSON( "1" << 2 ), true , true );
-                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec.keyPattern, frs1, BSONObj() ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs1, BSONObj() ) );
                 FieldRangeSet frs2( "n/a", BSON( "01" << 3), true , true );
-                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec.keyPattern, frs2, BSON( "01" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs2, BSON( "01" << 1 ) ) );
                 FieldRangeSet frs3( "n/a", BSONObj() , true , true );
-                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec.keyPattern, frs3, BSON( "1" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs3, BSON( "1" << 1 ) ) );
             }
         };
 
@@ -1471,63 +1471,6 @@ namespace NamespaceTests {
         // GeoHaystack does not implement its own suitability().  See SERVER-8645.
          
     } // namespace IndexSpecSuitability
-
-    namespace IndexSpecTests {
-
-        /** A missing field is represented as null in a btree index. */
-        class BtreeIndexMissingField {
-        public:
-            void run() {
-                IndexSpec spec( BSON( "a" << 1 ) );
-                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
-            }
-        };
-        
-        /** A missing field is represented as null in a 2d index. */
-        class TwoDIndexMissingField {
-        public:
-            void run() {
-                IndexSpec spec( BSON( "a" << "2d" ) );
-                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
-            }
-        };
-        
-        /** A missing field is represented with the hash of null in a hashed index. */
-        class HashedIndexMissingField {
-        public:
-            void run() {
-                IndexSpec spec( BSON( "a" << "hashed" ) );
-                BSONObj nullObj = BSON( "a" << BSONNULL );
-                BSONObjSet nullFieldKeySet;
-                spec.getKeys( nullObj, nullFieldKeySet );
-                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
-                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0 ),
-                               nullFieldFromKey.Long() );
-                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
-                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
-            }
-        };
-
-        /**
-         * A missing field is represented with the hash of null in a hashed index.  This hash value
-         * depends on the hash seed.
-         */
-        class HashedIndexMissingFieldAlternateSeed {
-        public:
-            void run() {
-                IndexSpec spec( BSON( "a" << "hashed" ), BSON( "seed" << 0x5eed ) );
-                BSONObj nullObj = BSON( "a" << BSONNULL );
-                BSONObjSet nullFieldKeySet;
-                spec.getKeys( BSONObj(), nullFieldKeySet );
-                BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
-                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0x5eed ),
-                               nullFieldFromKey.Long() );
-                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
-                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
-            }
-        };
-        
-    } // namespace IndexSpecTests
     
     namespace NamespaceDetailsTests {
 
@@ -2397,10 +2340,6 @@ namespace NamespaceTests {
             add< IndexSpecSuitability::Hashed::EqualityInsideNonStandaloneSingletonOr >();
             add< IndexSpecSuitability::Hashed::EqualityInsideNonSingletonOr >();
             add< IndexSpecSuitability::Hashed::EqualityOutsideOr >();
-            add< IndexSpecTests::BtreeIndexMissingField >();
-            add< IndexSpecTests::TwoDIndexMissingField >();
-            add< IndexSpecTests::HashedIndexMissingField >();
-            add< IndexSpecTests::HashedIndexMissingFieldAlternateSeed >();
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();

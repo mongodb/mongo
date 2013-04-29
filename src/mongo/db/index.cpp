@@ -26,6 +26,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
+#include "mongo/db/fts/fts_enabled.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -128,7 +130,7 @@ namespace mongo {
     }
 
     static bool needToUpgradeMinorVersion(const string& newPluginName) {
-        if (IndexPlugin::existedBefore24(newPluginName))
+        if (IndexNames::existedBefore24(newPluginName))
             return false;
 
         DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
@@ -146,8 +148,8 @@ namespace mongo {
         for ( ; cursor && cursor->ok(); cursor->advance()) {
             const BSONObj index = cursor->current();
             const BSONObj key = index.getObjectField("key");
-            const string plugin = IndexPlugin::findPluginName(key);
-            if (IndexPlugin::existedBefore24(plugin))
+            const string plugin = KeyPattern::findPluginName(key);
+            if (IndexNames::existedBefore24(plugin))
                 continue;
 
             const string errmsg = str::stream()
@@ -243,13 +245,11 @@ namespace mongo {
                 return false;
         }
 
-        string pluginName = IndexPlugin::findPluginName( key );
-        IndexPlugin * plugin = NULL;
+        string pluginName = KeyPattern::findPluginName( key );
         if (pluginName.size()) {
-            plugin = IndexPlugin::get(pluginName);
             uassert(16734, str::stream() << "Unknown index plugin '" << pluginName << "' "
-                                         << "in index "<< key
-                   , plugin);
+                                         << "in index "<< key,
+                    IndexNames::isKnownName(pluginName));
 
             if (needToUpgradeMinorVersion(pluginName))
                 upgradeMinorVersionOrAssert(pluginName);
@@ -257,8 +257,15 @@ namespace mongo {
 
         { 
             BSONObj o = io;
-            if ( plugin ) {
-                o = plugin->adjustIndexSpec(o);
+            if (IndexNames::TEXT == pluginName || IndexNames::TEXT_INTERNAL == pluginName) {
+                StringData desc  = cc().desc();
+                if ( desc.find( "conn" ) == 0 ) {
+                    // this is to make sure we only complain for users
+                    // if you do get a text index created an a primary
+                    // want it to index on the secondary as well
+                    massert(16808, "text search not enabled", fts::isTextSearchEnabled() );
+                }
+                o = fts::FTSSpec::fixSpec(o);
             }
             BSONObjBuilder b;
             int v = DefaultIndexVersionNumber;
@@ -295,23 +302,17 @@ namespace mongo {
     }
 
     void IndexSpec::reset(const IndexDetails * details) {
-        const DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
-        IndexSpec::PluginRules rules = dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER
-                                            ? IndexSpec::RulesFor24
-                                            : IndexSpec::RulesFor22
-                                            ;
-
         _details = details;
-        reset(details->info, rules);
+        reset(details->info);
     }
 
-    void IndexSpec::reset(const BSONObj& _info, PluginRules rules) {
+    void IndexSpec::reset(const BSONObj& _info) {
         info = _info;
         keyPattern = info["key"].embeddedObjectUserCheck();
         if ( keyPattern.objsize() == 0 ) {
             out() << info.toString() << endl;
             verify(false);
         }
-        _init(rules);
+        _init();
     }
 }

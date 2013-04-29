@@ -42,7 +42,6 @@ namespace mongo {
         // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
         _filteredQuery = query.filterFieldsUndotted(geoFieldsToNuke.obj(), false);
 
-        // FieldRangeVector needs an IndexSpec so we make it one.
         BSONObjBuilder specBuilder;
         BSONObjIterator i(_descriptor->keyPattern());
         while (i.more()) {
@@ -50,7 +49,6 @@ namespace mongo {
             specBuilder.append(e.fieldName(), 1);
         }
         BSONObj spec = specBuilder.obj();
-        IndexSpec specForFRV(spec);
 
         BSONObj frsObj;
 
@@ -74,7 +72,7 @@ namespace mongo {
         frsObj = frsObjBuilder.obj();
 
         FieldRangeSet frs(_descriptor->parentNS().c_str(), frsObj, false, false);
-        shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, specForFRV, 1));
+        shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, spec, 1));
         _btreeCursor.reset(BtreeCursor::make(nsdetails(_descriptor->parentNS()),
                                              _descriptor->getOnDisk(), frv, 0, 1));
         next();

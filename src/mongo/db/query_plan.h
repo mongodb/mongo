@@ -17,6 +17,7 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/indexkey.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher.h"
@@ -29,7 +30,6 @@ namespace mongo {
     class FieldRangeSet;
     class FieldRangeSetPair;
     class IndexDetails;
-    class IndexType;
     class NamespaceDetails;
     class ParsedQuery;
     struct QueryPlanSummary;
@@ -176,10 +176,11 @@ namespace mongo {
         bool _endKeyInclusive;
         Utility _utility;
         string _special;
-        IndexType* _type;
         bool _startOrEndSpec;
         shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
         mutable shared_ptr<CoveredIndexMatcher> _matcher; // Lazy initialization.
+        auto_ptr<IndexDescriptor> _descriptor;
+        string _specialIndexName;
     };
 
     std::ostream &operator<< ( std::ostream& out, const QueryPlan::Utility& utility );

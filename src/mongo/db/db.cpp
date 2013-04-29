@@ -368,8 +368,8 @@ namespace mongo {
                     for ( ; cursor && cursor->ok(); cursor->advance()) {
                         const BSONObj index = cursor->current();
                         const BSONObj key = index.getObjectField("key");
-                        const string plugin = IndexPlugin::findPluginName(key);
-                        if (IndexPlugin::existedBefore24(plugin))
+                        const string plugin = KeyPattern::findPluginName(key);
+                        if (IndexNames::existedBefore24(plugin))
                             continue;
 
                         log() << "Index " << index << " claims to be of type '" << plugin << "', "

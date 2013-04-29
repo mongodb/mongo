@@ -103,7 +103,7 @@ namespace mongo {
     void ScanAndOrder::_addIfBetter(const BSONObj& k, const BSONObj& o, const BestMap::iterator& i,
                                     const DiskLoc* loc) {
         const BSONObj& worstBestKey = i->first;
-        int cmp = worstBestKey.woCompare(k, _order._spec.keyPattern);
+        int cmp = worstBestKey.woCompare(k, _order._keyPattern);
         if ( cmp > 0 ) {
             // k is better, 'upgrade'
             _validateAndUpdateApproxSize( -i->first.objsize() + -i->second.objsize() );

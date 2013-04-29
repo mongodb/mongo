@@ -27,6 +27,7 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
@@ -35,12 +36,61 @@ namespace mongo {
      */
     class CatalogHack {
     public:
+        static bool shouldOverridePlugin(const BSONObj& keyPattern) {
+            string pluginName = KeyPattern::findPluginName(keyPattern);
+            bool known = IndexNames::isKnownName(pluginName);
+
+            if (NULL == cc().database()) {
+                return false;
+            }
+
+            const DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
+
+            if (dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER) {
+                // RulesFor24
+                // This assert will be triggered when downgrading from a future version that
+                // supports an index plugin unsupported by this version.
+                uassert(16736, str::stream() << "Invalid index type '" << pluginName << "' "
+                                             << "in index " << keyPattern,
+                               known);
+                return false;
+            } else {
+                // RulesFor22
+                if (!known) {
+                    log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+                    return true;
+                }
+
+                if (!IndexNames::existedBefore24(pluginName)) {
+                    warning() << "Treating index " << keyPattern << " as ascending since "
+                              << "it was created before 2.4 and '" << pluginName << "' "
+                              << "was not a valid type at that time."
+                              << endl;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        static string findPluginName(const BSONObj& keyPattern) {
+            if (shouldOverridePlugin(keyPattern)) {
+                return "";
+            } else {
+                return KeyPattern::findPluginName(keyPattern);
+            }
+        }
+
         static IndexDescriptor* getDescriptor(NamespaceDetails* nsd, int idxNo) {
             IndexDetails& id = nsd->idx(idxNo);
             return new IndexDescriptor(nsd, idxNo, &id, id.info.obj());
         }
 
         static BtreeBasedAccessMethod* getBtreeBasedIndex(IndexDescriptor* desc) {
+            if (shouldOverridePlugin(desc->keyPattern())) {
+                return new BtreeAccessMethod(desc);
+            }
+
             string type = KeyPattern::findPluginName(desc->keyPattern());
             if (IndexNames::HASHED == type) {
                 return new HashAccessMethod(desc);
@@ -62,6 +112,10 @@ namespace mongo {
         }
 
         static IndexAccessMethod* getIndex(IndexDescriptor* desc) {
+            if (shouldOverridePlugin(desc->keyPattern())) {
+                return new BtreeAccessMethod(desc);
+            }
+
             string type = KeyPattern::findPluginName(desc->keyPattern());
             if (IndexNames::HASHED == type) {
                 return new HashAccessMethod(desc);
