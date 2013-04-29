@@ -31,6 +31,8 @@ namespace mongo {
             // todo: speed up the secondary case.  as written here there are 2 mutex entries, it
             // can b 1.
             if( isMaster() ) return;
+            if ( cc().isGod() ) return;
+
             uassert(13435, "not master and slaveOk=false",
                     !pq || pq->hasOption(QueryOption_SlaveOk) || pq->hasReadPref());
             uassert(13436,
