@@ -18,15 +18,20 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
+#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
 
-    class Matcher2 : boost::noncopyable {
+    class Matcher2 {
+        MONGO_DISALLOW_COPYING( Matcher2 );
+
     public:
-        Matcher2( const BSONObj& pattern );
+        explicit Matcher2( const BSONObj& pattern );
 
         bool matches(const BSONObj& doc, MatchDetails* details = NULL ) const;
 
