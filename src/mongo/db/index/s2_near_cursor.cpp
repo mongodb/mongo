@@ -235,8 +235,6 @@ namespace mongo {
                     continue;
                 }
 
-                seen.insert(cursor->currLoc());
-
                 // Get distance interval from our query point to the cell.
                 // If it doesn't overlap with our current shell, toss.
                 BSONObj currKey(cursor->currKey());
@@ -252,13 +250,20 @@ namespace mongo {
                     continue;
                 }
 
+                // We have to add this document to seen *AFTER* the key intersection test.
+                // A geometry may have several keys, one of which may be in our search shell and one
+                // of which may be outside of it.  We don't want to ignore a document just because
+                // one of its covers isn't inside this annulus.
+                seen.insert(cursor->currLoc());
+
+                // At this point forward, we will not examine the document again in this annulus.
+
                 const BSONObj& indexedObj = cursor->currLoc().obj();
 
                 // Match against indexed geo fields.
                 ++_stats._geoMatchTested;
                 size_t geoFieldsMatched = 0;
-                // OK, cool, non-geo match satisfied.  See if the object actually overlaps w/the geo
-                // query fields.
+                // See if the object actually overlaps w/the geo query fields.
                 for (size_t i = 0; i < _indexedGeoFields.size(); ++i) {
                     BSONElementSet geoFieldElements;
                     indexedObj.getFieldsDotted(_indexedGeoFields[i].getField(), geoFieldElements,
