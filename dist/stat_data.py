@@ -1,8 +1,14 @@
 # Auto-generate statistics #defines, with allocation, clear and print functions.
 #
 # The XXX_stats dictionaries are a set of objects consisting of comma-separated
-# configuration key words and a text description.  The configuration key words
-# are:
+# configuration key words and a text description.  
+#
+# NOTE:  Statistics reports will show individual objects as operations per
+# second.  All objects where that does not make sense should have the phrase
+# 'currently' or 'in the cache' in their text description, such as
+# 'files currently open'.
+#
+# The configuration key words # are:
 #	perm	-- Field is not cleared by the stat clear function.
 
 from operator import attrgetter
