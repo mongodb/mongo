@@ -824,7 +824,7 @@ __clsm_put(
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	int ovfl;
+	int need_signal, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 
@@ -885,16 +885,21 @@ __clsm_put(
 
 		if (ovfl) {
 			/*
-			 * Check that we are up-to-date: don't switch if the
-			 * tree has changed in the meantime.
+			 * Check that we are up-to-date: don't set the switch
+			 * if the tree has changed since we last opened
+			 * cursors: that can lead to switching multiple times
+			 * when only one switch is required, creating very
+			 * small chunks.
 			 */
+			need_signal = 0;
 			WT_RET(__wt_readlock(session, lsm_tree->rwlock));
-			if (clsm->dsk_gen == lsm_tree->dsk_gen) {
+			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
+			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-				ovfl = 0;
+				need_signal = 1;
 			}
 			WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
-			if (ovfl)
+			if (need_signal)
 				WT_RET(__wt_cond_signal(
 				    session, lsm_tree->ckpt_cond));
 			ovfl = 0;
