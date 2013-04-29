@@ -205,6 +205,12 @@ __clsm_open_cursors(
 		nchunks = lsm_tree->nchunks;
 
 	if (clsm->cursors == NULL || nchunks > clsm->nchunks) {
+		/*
+		 * If we are growing the arrays, we need to keep the pointers
+		 * we are skipping.  Our realloc interface requires a non-NULL
+		 * size parameter in that case (but only if the count is
+		 * non-zero), otherwise the new array will be cleared.
+		 */
 		alloc = skip_chunks * sizeof(WT_BLOOM *);
 		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
 		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
