@@ -297,7 +297,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 		}
 		if (j == 0 && !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 			WT_ERR(__wt_cond_wait(
-			    session, lsm_tree->ckpt_cond, 10000));
+			    session, lsm_tree->ckpt_cond, 1000000));
 	}
 err:	__wt_free(session, cookie.chunk_array);
 	/*

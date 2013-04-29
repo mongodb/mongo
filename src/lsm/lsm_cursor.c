@@ -883,9 +883,14 @@ __clsm_put(
 			 * tree has changed in the meantime.
 			 */
 			WT_RET(__wt_readlock(session, lsm_tree->rwlock));
-			if (clsm->dsk_gen == lsm_tree->dsk_gen)
+			if (clsm->dsk_gen == lsm_tree->dsk_gen) {
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+				ovfl = 0;
+			}
 			WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
+			if (ovfl)
+				WT_RET(__wt_cond_signal(
+				    session, lsm_tree->ckpt_cond));
 			ovfl = 0;
 		}
 	} else
