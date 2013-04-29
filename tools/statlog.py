@@ -28,45 +28,68 @@
 
 import fileinput, os, shutil, sys
 from collections import defaultdict
+from datetime import datetime
 from subprocess import call
 
+TIMEFMT = "%b %d %H:%M:%S"
+
 # Plot a set of entries for a title.
-def plot(title, entries, num):
+def plot(title, values, num):
     # Ignore entries where the value never changes.
-    skip = 1
-    v = entries[0][1]
-    for entry in entries:
-        if v != entry[1]:
-            skip = 0
+    skip = True
+    t0, v0 = values[0]
+    for t, v in values:
+        if v != v0:
+            skip = False
             break
-    if skip == 1:
+    if skip:
         print '\tskipping ' + title
         return
 
     print 'building ' + title
 
+    ylabel = 'Value'
+
+	# Most statistics are operation or event counts that can reasonably be
+	# scaled to a value per second, but some (such as the number of bytes in
+	# the cache or the number of files currently open) can't.  This is our
+	# heuristic for distinguishing between them.
+    if 'currently' in title or 'in the cache' in title:
+        seconds = 1
+    else:
+        t1, v1 = values[1]
+        seconds = (datetime.strptime(t1, TIMEFMT) -
+            datetime.strptime(t0, TIMEFMT)).seconds
+        ylabel += ' per second'
+
     # Write the raw data into a file for processing.
-    of = open("reports/raw/report." + num + ".raw", "w")
-    for entry in sorted(entries):
-        of.write(" ".join(entry) + "\n")
+    of = open("reports/raw/report.%s.raw" % num, "w")
+    for t, v in sorted(values):
+        print >>of, "%s %g" % (t, float(v) / seconds)
     of.close()
 
     # Write a command file for gnuplot.
     of = open("gnuplot.cmd", "w")
-    of.write("set terminal png nocrop\n")
-    of.write("set autoscale\n")
-    of.write("set grid\n")
-    of.write("set style data linespoints\n")
-    of.write("set title \"" + title + "\"\n")
-    of.write("set xlabel \"Time\"\n")
-    of.write("set xtics rotate by -45\n")
-    of.write("set xdata time\n")
-    of.write("set timefmt \"%b %d %H:%M:%S\"\n")
-    of.write("set format x \"%b %d %H:%M:%S\"\n")
-    of.write("set ylabel \"Value\"\n")
-    of.write("set yrange [0:]\n")
-    of.write("set output 'reports/report." + num + ".png'\n")
-    of.write("plot \"reports/raw/report." + num + ".raw\" using 1:4 notitle\n")
+    of.write('''
+set terminal png nocrop
+set autoscale
+set grid
+set style data linespoints
+set title "%(title)s"
+set xlabel "Time"
+set xtics rotate by -45
+set xdata time
+set timefmt "%(timefmt)s"
+set format x "%(timefmt)s"
+set ylabel "%(ylabel)s"
+set yrange [0:]
+set output 'reports/report.%(num)s.png'
+plot "reports/raw/report.%(num)s.raw" using 1:4 notitle''' % {
+        'num' : num,
+        'timefmt' : TIMEFMT,
+        'title' : title,
+        'ylabel' : ylabel,
+    })
     of.close()
 
     # Run gnuplot.
@@ -75,22 +98,20 @@ def plot(title, entries, num):
     # Remove the command file.
     os.remove("gnuplot.cmd")
 
-# Remove and re-create the reports folder.
-shutil.rmtree("reports", True)
-os.mkdir("reports")
-os.mkdir("reports/raw")
-
 # Read the input into a dictionary of lists.
 if sys.argv[1:] == []:
     print "usage: " + sys.argv[0] + " file ..."
     sys.exit(1)
+
+# Remove and re-create the reports folder.
+shutil.rmtree("reports", True)
+os.makedirs("reports/raw")
+
 d = defaultdict(list)
 for line in fileinput.input(sys.argv[1:]):
-    s = line.strip('\n').split(" ", 4)
-    d[s[4]].append([" ".join([s[0], s[1], s[2]]), s[3]])
+    month, day, time, v, desc = line.strip('\n').split(" ", 4)
+    d[desc].append((month + " " + day + " " + time, v))
 
 # Plot each entry in the dictionary.
-rno = 0
-for entry in sorted(d.iteritems()):
-    rno = rno + 1
-    plot(entry[0], entry[1], "%03d" % rno)
+for rno, items in enumerate(sorted(d.iteritems()), 1):
+    plot(items[0], items[1], "%03d" % rno)
