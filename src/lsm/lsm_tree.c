@@ -543,6 +543,7 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, **cp;
+	uint64_t record_count;
 	uint32_t in_memory, new_id;
 
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
@@ -561,10 +562,11 @@ __wt_lsm_tree_switch(
 	 * avoid filling the cache with in-memory chunks.  Threads sleep every
 	 * 100 operations, so take that into account in the calculation.
 	 */
+	record_count = 1;
 	for (in_memory = 1, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
 	    in_memory < lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
 	    ++in_memory, --cp)
-		;
+		record_count += (*cp)->count;
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->throttle_sleep = 0;
 	else if (in_memory == lsm_tree->nchunks ||
@@ -579,7 +581,7 @@ __wt_lsm_tree_switch(
 		chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 		lsm_tree->throttle_sleep = (long)((in_memory - 2) *
 		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
-		    (20 * in_memory * chunk->count));
+		    (20 * record_count));
 	}
 
 	WT_VERBOSE_ERR(session, lsm, "Tree switch to: %d, throttle %d",
