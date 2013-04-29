@@ -67,14 +67,14 @@ __wt_lsm_merge_worker(void *vargs)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	u_int id;
-	int progress, stalls;
+	int progress, stallms;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
 	id = args->id;
 	session = lsm_tree->worker_sessions[id];
 	__wt_free(session, args);
-	stalls = 0;
+	stallms = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
@@ -83,7 +83,7 @@ __wt_lsm_merge_worker(void *vargs)
 		session->dhandle = NULL;
 
 		/* Report stalls to merge in seconds. */
-		if (__wt_lsm_merge(session, lsm_tree, id, stalls / 100) == 0)
+		if (__wt_lsm_merge(session, lsm_tree, id, stallms / 1000) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
@@ -99,10 +99,14 @@ __wt_lsm_merge_worker(void *vargs)
 			progress = 1;
 
 		if (progress)
-			stalls = 0;
+			stallms = 0;
 		else {
-			__wt_sleep(0, 10000);
-			++stalls;
+			/*
+			 * The "main" thread polls 10 times per second,
+			 * secondary threads once per second.
+			 */
+			__wt_sleep(0, id == 0 ? 100000 : 1000000);
+			stallms += (id == 0) ? 100 : 1000;
 		}
 	}
 
@@ -162,7 +166,7 @@ __wt_lsm_bloom_worker(void *arg)
 			++j;
 		}
 		if (j == 0)
-			__wt_sleep(0, 10000);
+			__wt_sleep(0, 100000);
 	}
 
 err:	__wt_free(session, cookie.chunk_array);
