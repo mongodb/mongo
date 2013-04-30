@@ -261,6 +261,10 @@ add_option('client-dist-basename', "Name of the client source archive.", 1, Fals
 
 add_option('build-fast-and-loose', "NEVER for production builds", 0, False)
 
+add_option('propagate-shell-environment',
+           "Pass shell environment to sub-processes (NEVER for production builds)",
+           0, False)
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -340,6 +344,9 @@ env = Environment( BUILD_DIR=variantDir,
                    CONFIGUREDIR = '#' + scons_data_dir + '/sconf_temp',
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
+
+if has_option("propagate-shell-environment"):
+    env['ENV'] = dict(os.environ);
 
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
 
