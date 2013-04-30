@@ -23,8 +23,6 @@
 #include <limits>
 #include <string>
 
-#include <third_party/murmurhash3/MurmurHash3.h>
-
 namespace mongo {
 
     using std::string;
@@ -134,11 +132,7 @@ namespace mongo {
          *          to be consistent across versions.
          */
         struct Hasher {
-            size_t operator() (const StringData& str) const {
-                unsigned out;
-                MurmurHash3_x86_32(str.rawData(), str.size(), 0, &out);
-                return out;
-            }
+            size_t operator() (const StringData& str) const;
         };
 
     private:
