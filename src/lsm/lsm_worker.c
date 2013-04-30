@@ -170,7 +170,6 @@ __wt_lsm_bloom_worker(void *arg)
 				break;
 			++j;
 		}
-			goto err;
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			WT_ERR(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
