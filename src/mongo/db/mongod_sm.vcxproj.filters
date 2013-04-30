@@ -1640,6 +1640,12 @@
     <ClCompile Include="query_runner.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
+    <ClCompile Include="matcher\match_details.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\matcher.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3335,6 +3341,12 @@
     </ClInclude>
     <ClInclude Include="query_runner.h">
       <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\match_details.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\matcher.h">
+      <Filter>db\matcher</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
