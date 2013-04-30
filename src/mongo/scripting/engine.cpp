@@ -130,6 +130,10 @@ namespace mongo {
 
         File f;
         f.open(filename.c_str(), true);
+        
+        if (!f.is_open() || f.bad())
+            return false;
+        
         fileofs fo = f.len();
         if (fo > kMaxJsFileLength) {
             warning() << "attempted to execute javascript file larger than 2GB" << endl;
