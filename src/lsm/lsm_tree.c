@@ -475,7 +475,6 @@ __lsm_tree_open(
 	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
 	WT_ERR(__wt_cond_alloc(session, "lsm ckpt", 0, &lsm_tree->work_cond));
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
-	__wt_stat_init_dsrc_stats(&lsm_tree->stats);
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
