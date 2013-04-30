@@ -130,7 +130,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return;
 
 	cache = S2C(session)->cache;
-	__wt_spin_lock(session, &cache->evict_lock);
+	__wt_spin_lock(session, &cache->evict_walk_lock);
 
 	elem = cache->evict_entries;
 	for (evict = cache->evict, i = 0; i < elem; i++, evict++)
@@ -141,7 +141,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
-	__wt_spin_unlock(session, &cache->evict_lock);
+	__wt_spin_unlock(session, &cache->evict_walk_lock);
 }
 
 /*
