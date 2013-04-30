@@ -13,7 +13,7 @@ md = m.getDB("d");
 mc = m.getDB("d")["c"];
 
 print("2. Insert some data");
-N = 500000;
+N = 50000;
 mc.ensureIndex({x:1})
 for( i = 0; i < N; ++i ) {
     mc.save( {_id:i,x:i,a:{}} );
