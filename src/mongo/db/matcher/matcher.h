@@ -36,7 +36,7 @@ namespace mongo {
         bool matches(const BSONObj& doc, MatchDetails* details = NULL ) const;
 
     private:
-        const BSONObj& _pattern; // this is owned by who created us
+        const BSONObj _pattern; // this is owned by who created us
         boost::scoped_ptr<MatchExpression> _expression;
     };
 
