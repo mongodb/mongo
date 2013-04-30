@@ -23,8 +23,7 @@ master.getDB("test").foo.insert({x:2});
 // step down the primary asyncronously
 print("stepdown");
 var command = "sleep(4000); tojson(rs.stepDown());"
-var mongoprogram = startMongoProgram( "mongo", "--quiet", "--port", "" + master.port, 
-                                      "--eval", command );
+var waitfunc = startParallelShell(command, master.port);
 
 print("getlasterror; should assert");
 var gleFunction = function() { 
