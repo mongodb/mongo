@@ -53,14 +53,13 @@ reconnect(B);
 
 print("BEFORE------------------");
 printjson(A.foo.find().toArray());
-printjson(B.foo.find().toArray());
 
 replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 
 print("AFTER------------------");
 printjson(A.foo.find().toArray());
-printjson(B.foo.find().toArray());
+
 assert.eq(2, A.foo.count());
 assert.eq('req', A.foo.findOne({key:'value1'}).req);
 assert.eq(null, A.foo.findOne({key:'value1'}).res);
