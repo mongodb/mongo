@@ -351,7 +351,7 @@ namespace mongo {
             TestAssertion( const std::string& file, unsigned line );
             ~TestAssertion();
 
-            void fail( const std::string& message) const;
+            MONGO_COMPILER_NORETURN void fail( const std::string& message) const;
             void failIf( bool flag, const std::string &message ) const {
                 if ( flag ) fail( message );
             }
