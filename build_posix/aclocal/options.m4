@@ -19,7 +19,15 @@ AC_ARG_ENABLE(bzip2,
 	    [Build the bzip2 compressor extension.])], r=$enableval, r=no)
 case "$r" in
 no)	wt_cv_enable_bzip2=no;;
-*)	wt_cv_enable_bzip2=yes;;
+*)	AC_CHECK_HEADER(bzlib.h)
+	AC_CHECK_LIB(bz2)
+	if test "$ac_cv_header_bzlib_h" = "no"; then
+		AC_MSG_ERROR([--enable-bzip2 requires bzlib.h])
+	fi
+	if test "$ac_cv_lib_bz2" = "no"; then
+		AC_MSG_ERROR([--enable-bzip2 requires bz2 library])
+	fi
+	wt_cv_enable_bzip2=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_bzip2)
 AM_CONDITIONAL([BZIP2], [test x$wt_cv_enable_bzip2 = xyes])
