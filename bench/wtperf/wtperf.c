@@ -183,7 +183,8 @@ CONFIG small_cfg = {
 CONFIG med_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
-	"create,cache_size=1GB", /* conn_config */
+	"create,cache_size=1GB," /* conn_config */
+	"statistics_log=(wait=10,sources=[\"lsm:\"])",
 	DEFAULT_LSM_CONFIG /* table_config */
 	    "lsm_chunk_size=20MB,",
 	1,		/* create */

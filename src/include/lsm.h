@@ -69,10 +69,7 @@ struct __wt_lsm_tree {
 	WT_CONDVAR *work_cond;		/* Used to notify worker of activity */
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
-	uint64_t bloom_hit;		/* Bloom filter statistics */
-	uint64_t bloom_miss;
-	uint64_t bloom_false_positive;
-	uint64_t lookup_no_bloom;
+	WT_DSRC_STATS stats;		/* LSM-level statistics */
 
 	uint64_t dsk_gen;
 

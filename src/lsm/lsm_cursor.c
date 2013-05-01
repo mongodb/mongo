@@ -575,7 +575,6 @@ __clsm_search(WT_CURSOR *cursor)
 {
 	WT_BLOOM *bloom;
 	WT_BLOOM_HASH bhash;
-	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *c;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
@@ -586,8 +585,6 @@ __clsm_search(WT_CURSOR *cursor)
 	have_hash = 0;
 
 	WT_LSM_ENTER(clsm, cursor, session, search);
-	conn = S2C(session);
-
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
@@ -613,13 +610,12 @@ __clsm_search(WT_CURSOR *cursor)
 
 			ret = __wt_bloom_hash_get(bloom, &bhash);
 			if (ret == WT_NOTFOUND) {
-				if (conn->statistics)
-					++clsm->lsm_tree->bloom_miss;
+				WT_STAT_INCR(session,
+				    &clsm->lsm_tree->stats, bloom_miss);
 				continue;
-			} else if (ret == 0) {
-				if (conn->statistics)
-					++clsm->lsm_tree->bloom_hit;
-			}
+			} else if (ret == 0)
+				WT_STAT_INCR(session,
+				    &clsm->lsm_tree->stats, bloom_hit);
 			WT_ERR(ret);
 		}
 		c->set_key(c, &cursor->key);
@@ -633,13 +629,12 @@ __clsm_search(WT_CURSOR *cursor)
 		} else if (ret != WT_NOTFOUND) {
 			goto err;
 		} else if (bloom != NULL) {
-			if (conn->statistics)
-				++clsm->lsm_tree->bloom_false_positive;
+			WT_STAT_INCR(session,
+			    &clsm->lsm_tree->stats, bloom_false_positive);
 		/* The active chunk can't have a bloom filter. */
-		} else if (clsm->primary_chunk == NULL || i != clsm->nchunks) {
-			if (conn->statistics)
-				++clsm->lsm_tree->lookup_no_bloom;
-		}
+		} else if (clsm->primary_chunk == NULL || i != clsm->nchunks)
+			WT_STAT_INCR(session,
+			    &clsm->lsm_tree->stats, lsm_lookup_no_bloom);
 	}
 	ret = WT_NOTFOUND;
 

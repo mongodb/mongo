@@ -133,11 +133,15 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	 * Some statistics are always set, regardless of the configuration of
 	 * run-time statistics in the system.
 	 */
-	WT_STAT_SET(stats, cache_bytes_max, conn->cache_size);
-	WT_STAT_SET(stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
-	WT_STAT_SET(stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
-	WT_STAT_SET(stats, cache_bytes_dirty, __wt_cache_bytes_dirty(cache));
-	WT_STAT_SET(stats, cache_pages_dirty, __wt_cache_pages_dirty(cache));
+	WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
+	WT_STAT_SET(
+	    session, stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
+	WT_STAT_SET(
+	    session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(
+	    session, stats, cache_bytes_dirty, __wt_cache_bytes_dirty(cache));
+	WT_STAT_SET(
+	    session, stats, cache_pages_dirty, __wt_cache_pages_dirty(cache));
 }
 
 /*
