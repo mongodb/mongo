@@ -95,8 +95,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * values from the chunk's information, then aggregate into the
 		 * top-level.
 		 */
-		child = (WT_DSRC_STATS *)
-		    ((WT_CURSOR_STAT *)stat_cursor)->stats_first;
+		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		WT_STAT_SET(
 		    session, child, lsm_generation_max, chunk->generation);
 
@@ -120,8 +119,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * values from the bloom filter's information, then aggregate
 		 * into the top-level.
 		 */
-		child = (WT_DSRC_STATS *)
-		    ((WT_CURSOR_STAT *)stat_cursor)->stats_first;
+		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		WT_STAT_SET(session, child,
 		    bloom_size, (chunk->count * lsm_tree->bloom_bit_count) / 8);
 		WT_STAT_SET(session, child,
