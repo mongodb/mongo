@@ -2303,20 +2303,22 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_RWLOCK_READ			46
 /*! pthread mutex shared lock write-lock calls */
 #define	WT_STAT_CONN_RWLOCK_WRITE			47
+/*! open cursor count */
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		48
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			48
+#define	WT_STAT_CONN_TXN_ANCIENT			49
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				49
+#define	WT_STAT_CONN_TXN_BEGIN				50
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			50
+#define	WT_STAT_CONN_TXN_CHECKPOINT			51
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				51
+#define	WT_STAT_CONN_TXN_COMMIT				52
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			52
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			53
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			53
+#define	WT_STAT_CONN_TXN_ROLLBACK			54
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				54
+#define	WT_STAT_CONN_WRITE_IO				55
 
 /*!
  * @}
@@ -2489,10 +2491,12 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_SPLIT_MAX			80
 /*! object compaction */
 #define	WT_STAT_DSRC_SESSION_COMPACT			81
+/*! open cursor count */
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		82
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		82
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		83
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			83
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			84
 /*! @} */
 /*
  * Statistics section: END

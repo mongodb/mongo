@@ -108,6 +108,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->rec_split_max.desc =
 	    "reconciliation maximum number of splits created by for a page";
 	stats->session_compact.desc = "object compaction";
+	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
 	stats->txn_write_conflict.desc = "write generation conflicts";
 }
@@ -270,6 +271,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->rwlock_read.desc = "pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
+	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_ancient.desc = "ancient transactions";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_checkpoint.desc = "transaction checkpoints";

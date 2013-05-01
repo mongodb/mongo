@@ -63,18 +63,19 @@ err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 void *
 __wt_lsm_merge_worker(void *vargs)
 {
+	WT_DECL_RET;
 	WT_LSM_WORKER_ARGS *args;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	u_int id;
-	int progress, stalls;
+	int progress, stallms;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
 	id = args->id;
 	session = lsm_tree->worker_sessions[id];
 	__wt_free(session, args);
-	stalls = 0;
+	stallms = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
@@ -83,7 +84,7 @@ __wt_lsm_merge_worker(void *vargs)
 		session->dhandle = NULL;
 
 		/* Report stalls to merge in seconds. */
-		if (__wt_lsm_merge(session, lsm_tree, id, stalls / 100) == 0)
+		if (__wt_lsm_merge(session, lsm_tree, id, stallms / 1000) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
@@ -99,11 +100,21 @@ __wt_lsm_merge_worker(void *vargs)
 			progress = 1;
 
 		if (progress)
-			stalls = 0;
-		else {
-			__wt_sleep(0, 10000);
-			++stalls;
+			stallms = 0;
+		else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+			/*
+			 * The "main" thread polls 10 times per second,
+			 * secondary threads once per second.
+			 */
+			WT_ERR(__wt_cond_wait(
+			    session, lsm_tree->work_cond,
+			    id == 0 ? 100000 : 1000000));
+			stallms += (id == 0) ? 100 : 1000;
 		}
+	}
+
+	if (0) {
+err:		__wt_err(session, ret, "LSM merge worker failed");
 	}
 
 	return (NULL);
@@ -129,10 +140,8 @@ __wt_lsm_bloom_worker(void *arg)
 
 	WT_CLEAR(cookie);
 
-	for (;;) {
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
-		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
-			goto err;
 
 		/* Create bloom filters in all checkpointed chunks. */
 		for (i = 0, j = 0; i < cookie.nchunks; i++) {
@@ -161,8 +170,9 @@ __wt_lsm_bloom_worker(void *arg)
 				break;
 			++j;
 		}
-		if (j == 0)
-			__wt_sleep(0, 10000);
+		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+			WT_ERR(__wt_cond_wait(
+			    session, lsm_tree->work_cond, 100000));
 	}
 
 err:	__wt_free(session, cookie.chunk_array);
@@ -197,7 +207,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 	WT_CLEAR(cookie);
 
-	for (;;) {
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
@@ -208,8 +218,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 		}
 
 		WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
-		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
-			goto err;
 
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < cookie.nchunks - 1; i++) {
@@ -282,8 +290,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			++j;
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-			++lsm_tree->dsk_gen;
 			ret = __wt_lsm_meta_write(session, lsm_tree);
+			++lsm_tree->dsk_gen;
 			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 			if (ret != 0) {
@@ -295,9 +303,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointed %u", i);
 		}
-		if (j == 0 && !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			WT_ERR(__wt_cond_wait(
-			    session, lsm_tree->ckpt_cond, 10000));
+			    session, lsm_tree->work_cond, 100000));
 	}
 err:	__wt_free(session, cookie.chunk_array);
 	/*
@@ -382,8 +390,8 @@ __lsm_bloom_create(
 
 	/* Ensure the bloom filter is in the metadata. */
 	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
-	++lsm_tree->dsk_gen;
 	ret = __wt_lsm_meta_write(session, lsm_tree);
+	++lsm_tree->dsk_gen;
 	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (ret != 0)

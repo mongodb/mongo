@@ -54,7 +54,6 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	memset(lsm_tree->chunk + lsm_tree->nchunks, 0,
 	    (nchunks - 1) * sizeof(*lsm_tree->chunk));
 	lsm_tree->chunk[start_chunk] = chunk;
-	lsm_tree->dsk_gen++;
 
 	return (0);
 }
@@ -319,6 +318,7 @@ __wt_lsm_merge(
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
+	lsm_tree->dsk_gen++;
 	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 err:	if (src != NULL)

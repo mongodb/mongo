@@ -90,24 +90,6 @@ __evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 }
 
 /*
- * __evict_list_clr_range --
- *	Clear entries in the LRU eviction list, from a lower-bound to the end.
- */
-static inline void
-__evict_list_clr_range(WT_SESSION_IMPL *session, u_int start)
-{
-	WT_CACHE *cache;
-	WT_EVICT_ENTRY *evict;
-	uint32_t i, elem;
-
-	cache = S2C(session)->cache;
-
-	elem = cache->evict_entries;
-	for (i = start, evict = cache->evict + i; i < elem; i++, evict++)
-		__evict_list_clr(session, evict);
-}
-
-/*
  * __wt_evict_list_clr_page --
  *	Make sure a page is not in the LRU eviction list.  This called from the
  * page eviction code to make sure there is no attempt to evict a child page
@@ -552,14 +534,25 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
+	WT_EVICT_ENTRY *evict;
 	WT_PAGE *next_page, *page;
+	u_int i, elem;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
-	/* We need exclusive access to the file -- disable ordinary eviction. */
-	__wt_spin_lock(session, &cache->evict_lock);
+	/*
+	 * We need exclusive access to the file -- disable ordinary eviction.
+	 *
+	 * Hold the walk lock to set the "no eviction" flag: no new pages will
+	 * be queued for eviction after this point.
+	 */
+	__wt_spin_lock(session, &cache->evict_walk_lock);
 	F_SET(btree, WT_BTREE_NO_EVICTION);
+	__wt_spin_unlock(session, &cache->evict_walk_lock);
+
+	/* Hold the evict lock to remove any queued pages from this file. */
+	__wt_spin_lock(session, &cache->evict_lock);
 
 	/* Clear any existing LRU eviction walk, we're discarding the tree. */
 	__wt_evict_clear_tree_walk(session, NULL);
@@ -568,7 +561,10 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 * The eviction candidate list might reference pages we are about to
 	 * discard; clear it.
 	 */
-	__evict_list_clr_range(session, 0);
+	elem = cache->evict_entries;
+	for (i = 0, evict = cache->evict; i < elem; i++, evict++)
+		if (evict->btree == btree)
+			__evict_list_clr(session, evict);
 	__wt_spin_unlock(session, &cache->evict_lock);
 
 	/*
@@ -783,6 +779,7 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
+	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
 	uint32_t i, candidates;
 
@@ -820,7 +817,11 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 			break;
 	cache->evict_candidates = i + 1;
 
-	__evict_list_clr_range(session, WT_EVICT_WALK_BASE);
+	/* Clear any entries we will overwrite next walk. */
+	for (i = WT_EVICT_WALK_BASE, evict = cache->evict + i;
+	    i < candidates;
+	    i++, evict++)
+		__evict_list_clr(session, evict);
 
 	cache->evict_current = cache->evict;
 	__wt_spin_unlock(session, &cache->evict_lock);

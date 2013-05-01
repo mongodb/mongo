@@ -72,14 +72,17 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt) {
 			/*
 			 * XXX
-			 * Only allow "file:" for now, other data sources have
-			 * not been converted to use data handles so we don't
-			 * have an easy way to get to the lists of open objects.
+			 * Only allow "file:" and "lsm:" for now: "file:" works
+			 * because it's been converted to data handles, "lsm:"
+			 * works because we can easily walk the list of open LSM
+			 * objects, even though it hasn't been converted.
 			 */
-			if (!WT_PREFIX_MATCH(k.str, "file:"))
+			if (!WT_PREFIX_MATCH(k.str, "file:") &&
+			    !WT_PREFIX_MATCH(k.str, "lsm:"))
 				WT_RET_MSG(session, EINVAL,
 				    "statistics_log sources configuration only "
-				    "supports objects of type \"file:\"");
+				    "supports objects of type \"file\" or "
+				    "\"lsm\"");
 			WT_RET(__wt_strndup(session,
 			    k.str, k.len, &conn->stat_sources[cnt]));
 		}
@@ -178,6 +181,31 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __wt_statlog_lsm_apply --
+ *	Review the list open LSM trees, and dump statistics on demand.
+ *
+ * XXX
+ * This code should be removed when LSM objects are converted to data handles.
+ */
+static int
+__wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
+{
+	WT_LSM_TREE *lsm_tree;
+	char **p;
+
+	/*
+	 * Walk the list of LSM trees, checking for a match on the set of
+	 * sources.
+	 */
+	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
+		for (p = S2C(session)->stat_sources; *p != NULL; ++p)
+			if (WT_PREFIX_MATCH(lsm_tree->name, *p))
+				WT_RET(
+				    __statlog_dump(session, lsm_tree->name, 0));
+	return (0);
+}
+
+/*
  * __statlog_server --
  *	The statistics server thread.
  */
@@ -271,6 +299,20 @@ __statlog_server(void *arg)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_conn_btree_apply(
 			    session, __statlog_apply, NULL));
+		WT_ERR(ret);
+
+		/*
+		 * Lock the schema and walk the list of open LSM trees, dumping
+		 * any that match the list of object sources.
+		 *
+		 * XXX
+		 * This code should be removed when LSM objects are converted to
+		 * data handles.
+		 */
+		if (conn->stat_sources != NULL)
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_statlog_lsm_apply(session));
+		WT_ERR(ret);
 
 		/* Flush. */
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
