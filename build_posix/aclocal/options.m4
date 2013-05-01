@@ -20,7 +20,7 @@ AC_ARG_ENABLE(bzip2,
 case "$r" in
 no)	wt_cv_enable_bzip2=no;;
 *)	AC_CHECK_HEADER(bzlib.h)
-	AC_CHECK_LIB(bz2)
+	AC_CHECK_LIB(bz2, bzip2_compress)
 	if test "$ac_cv_header_bzlib_h" = "no"; then
 		AC_MSG_ERROR([--enable-bzip2 requires bzlib.h])
 	fi
