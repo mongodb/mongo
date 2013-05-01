@@ -31,6 +31,7 @@
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/net/ssl_manager.h"
 
 #ifdef MONGO_SSL
 // TODO: Remove references to cmdline from the client.
@@ -1392,9 +1393,9 @@ namespace mongo {
 
 #ifdef MONGO_SSL
     static SimpleMutex s_mtx("SSLManager");
-    static SSLManager* s_sslMgr(NULL);
+    static SSLManagerInterface* s_sslMgr(NULL);
 
-    SSLManager* DBClientConnection::sslManager() {
+    SSLManagerInterface* DBClientConnection::sslManager() {
         SimpleMutex::scoped_lock lk(s_mtx);
         if (s_sslMgr) 
             return s_sslMgr;

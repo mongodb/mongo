@@ -22,6 +22,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/net/message_port.h"
+#include "mongo/util/net/ssl_manager.h"
 
 #ifndef _WIN32
 
