@@ -33,6 +33,7 @@ from subprocess import call
 
 TIMEFMT = "%b %d %H:%M:%S"
 
+# DO NOT EDIT: automatically built by dist/stat.py
 # no scale-per-second list section: BEGIN
 no_scale_per_second_list = [
     'cache: tracked dirty bytes in the cache',
