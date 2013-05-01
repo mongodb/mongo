@@ -6,12 +6,12 @@
 
 // Start a replica set with 3 nodes
 var host = getHostName();
-var replTest = new ReplSetTest( {name: "server9333", nodes: 3, startPort: 32000} );
+var replTest = new ReplSetTest( {name: "tags_with_reconfig", nodes: 3, startPort: 32000} );
 var nodes = replTest.startSet();
 var ports = replTest.ports;
 
 // Set tags and getLastErrorModes
-var conf = {_id : "server9333", version: 1, members : [
+var conf = {_id : "tags_with_reconfig", version: 1, members : [
     {_id : 0, host : host+":"+ports[0], tags : {"dc" : "bbb"}},
     {_id : 1, host : host+":"+ports[1], tags : {"dc" : "bbb"}},
     {_id : 2, host : host+":"+ports[2], tags : {"dc" : "ccc"}}],
@@ -72,7 +72,7 @@ assert.eq (result.err, null);
 
 // Insert a document and getLastError with write concern : alldc
 db.foo.insert( {x:4} );
-var result = db.runCommand( {getLastError:1, w:"alldc", wtimeout:1000} );
+var result = db.runCommand( {getLastError:1, w:"alldc", wtimeout:20000} );
 printjson (result)
 assert.eq (result.err, null);
 
