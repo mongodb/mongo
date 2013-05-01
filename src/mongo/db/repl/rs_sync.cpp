@@ -832,7 +832,7 @@ namespace replset {
 
     void GhostSync::percolate(const BSONObj& id, const OpTime& last) {
         const OID rid = id["_id"].OID();
-        GhostSlave* slave;
+        shared_ptr<GhostSlave> slave;
         {
             rwlock lk( _lock , false );
 
@@ -842,13 +842,12 @@ namespace replset {
                 return;
             }
 
-            slave = i->second.get();
+            slave = i->second;
             if (!slave->init) {
                 OCCASIONALLY log() << "couldn't percolate slave " << rid << " not init" << rsLog;
                 return;
             }
         }
-
         verify(slave->slave);
 
         const Member *target = replset::BackgroundSync::get()->getSyncTarget();
