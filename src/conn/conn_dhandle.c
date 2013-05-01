@@ -433,12 +433,10 @@ err:	session->dhandle = saved_dhandle;
 int
 __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 {
-	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	int inuse;
 
-	btree = S2BT(session);
 	dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
@@ -465,7 +463,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 		 * last session (i.e., the default session for the connection).
 		 */
 		WT_ASSERT(session,
-		    btree != session->metafile ||
+		    S2BT(session) != session->metafile ||
 		    session == S2C(session)->default_session);
 
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
