@@ -377,7 +377,7 @@ namespace mongo {
 
     string SocketException::toString() const {
         stringstream ss;
-        ss << _ei.code << " socket exception [" << _type << "] ";
+        ss << _ei.code << " socket exception [" << _getStringType(_type) << "] ";
         
         if ( _server.size() )
             ss << "server [" << _server << "] ";
