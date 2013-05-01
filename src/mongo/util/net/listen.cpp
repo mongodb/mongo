@@ -531,9 +531,6 @@ namespace mongo {
                << " max conn: " << max
                << endl;
 
-        if ( max > MAX_MAX_CONN )
-            max = MAX_MAX_CONN;
-
         return max;
 #endif
     }
