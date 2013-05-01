@@ -10,7 +10,7 @@
 #	no_clear	Value ignored by the statistics clear function
 #	no_aggregate	Ignore the value when aggregating statistics
 #	max_aggregate	Take the maximum value when aggregating statistics
-#	no_scale	Dno't scale value per second in the logging tool script
+#	no_scale	Don't scale value per second in the logging tool script
 
 from operator import attrgetter
 
