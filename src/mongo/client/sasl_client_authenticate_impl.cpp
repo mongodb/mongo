@@ -56,7 +56,7 @@ namespace {
     /**
      * Gets the password data from "saslParameters" and stores it to "outPassword".
      *
-     * If "saslParameters" indicates that the password needs to be "digested" via
+     * If "digestPassword" indicates that the password needs to be "digested" via
      * DBClientWithCommands::createPasswordDigest(), this method takes care of that.
      * On success, the value of "*outPassword" is always the correct value to set
      * as the password on the SaslClientSession.
@@ -66,6 +66,7 @@ namespace {
      */
     Status extractPassword(DBClientWithCommands* client,
                            const BSONObj& saslParameters,
+                           bool digestPassword,
                            std::string* outPassword) {
 
         std::string rawPassword;
@@ -75,15 +76,7 @@ namespace {
         if (!status.isOK())
             return status;
 
-        bool digest;
-        status = bsonExtractBooleanFieldWithDefault(saslParameters,
-                                                    saslCommandDigestPasswordFieldName,
-                                                    true,
-                                                    &digest);
-        if (!status.isOK())
-            return status;
-
-        if (digest) {
+        if (digestPassword) {
             std::string user;
             status = bsonExtractStringField(saslParameters,
                                             saslCommandPrincipalFieldName,
@@ -109,16 +102,18 @@ namespace {
      */
     Status configureSession(SaslClientSession* session,
                             DBClientWithCommands* client,
+                            const std::string& targetDatabase,
                             const BSONObj& saslParameters) {
 
-        std::string value;
+        std::string mechanism;
         Status status = bsonExtractStringField(saslParameters,
                                                saslCommandMechanismFieldName,
-                                               &value);
+                                               &mechanism);
         if (!status.isOK())
             return status;
-        session->setParameter(SaslClientSession::parameterMechanism, value);
+        session->setParameter(SaslClientSession::parameterMechanism, mechanism);
 
+        std::string value;
         status = bsonExtractStringFieldWithDefault(saslParameters,
                                                    saslCommandServiceNameFieldName,
                                                    saslDefaultServiceName,
@@ -142,7 +137,16 @@ namespace {
             return status;
         session->setParameter(SaslClientSession::parameterUser, value);
 
-        status = extractPassword(client, saslParameters, &value);
+        bool digestPasswordDefault = !(targetDatabase == "$external" && mechanism == "PLAIN");
+        bool digestPassword;
+        status = bsonExtractBooleanFieldWithDefault(saslParameters,
+                                                    saslCommandDigestPasswordFieldName,
+                                                    digestPasswordDefault,
+                                                    &digestPassword);
+        if (!status.isOK())
+            return status;
+
+        status = extractPassword(client, saslParameters, digestPassword, &value);
         if (status.isOK()) {
             session->setParameter(SaslClientSession::parameterPassword, value);
         }
@@ -161,20 +165,20 @@ namespace {
 
         int saslLogLevel = getSaslClientLogLevel(saslParameters);
 
-        SaslClientSession session;
-        Status status = configureSession(&session, client, saslParameters);
-        if (!status.isOK())
-            return status;
-
         std::string targetDatabase;
         try {
-            status = bsonExtractStringFieldWithDefault(saslParameters,
-                                                       saslCommandPrincipalSourceFieldName,
-                                                       saslDefaultDBName,
-                                                       &targetDatabase);
+            Status status = bsonExtractStringFieldWithDefault(saslParameters,
+                                                              saslCommandPrincipalSourceFieldName,
+                                                              saslDefaultDBName,
+                                                              &targetDatabase);
+            if (!status.isOK())
+                return status;
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
+
+        SaslClientSession session;
+        Status status = configureSession(&session, client, targetDatabase, saslParameters);
         if (!status.isOK())
             return status;
 
