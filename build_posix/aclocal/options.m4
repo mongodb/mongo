@@ -19,8 +19,7 @@ AC_ARG_ENABLE(bzip2,
 	    [Build the bzip2 compressor extension.])], r=$enableval, r=no)
 case "$r" in
 no)	wt_cv_enable_bzip2=no;;
-*)
-	wt_cv_enable_bzip2=yes;;
+*)	wt_cv_enable_bzip2=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_bzip2)
 if test "$wt_cv_enable_bzip2" = "yes"; then
@@ -87,8 +86,7 @@ AC_ARG_ENABLE(snappy,
 	    [Build the snappy compressor extension.])], r=$enableval, r=no)
 case "$r" in
 no)	wt_cv_enable_snappy=no;;
-*)
-	wt_cv_enable_snappy=yes;;
+*)	wt_cv_enable_snappy=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 if test "$wt_cv_enable_snappy" = "yes"; then
