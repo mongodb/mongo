@@ -125,9 +125,15 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	    (ret = __wt_writelock(session, dhandle->rwlock)) == 0) {
 		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 
-		/* Add to the connection list. */
+		/*
+		 * Add the handle to the connection list.
+		 *
+		 * Put it at the beginning on the basis that we're likely to
+		 * need new files again soon until they are cached by all
+		 * sessions.
+		 */
 		dhandle->refcnt = 1;
-		TAILQ_INSERT_TAIL(&conn->dhqh, dhandle, q);
+		TAILQ_INSERT_HEAD(&conn->dhqh, dhandle, q);
 	}
 
 	if (ret == 0)
