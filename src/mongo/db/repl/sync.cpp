@@ -33,7 +33,7 @@ namespace mongo {
     }
 
     BSONObj Sync::getMissingDoc(const BSONObj& o) {
-        OplogReader missingObjReader;
+        OplogReader missingObjReader; // why are we using OplogReader to run a non-oplog query?
         const char *ns = o.getStringField("ns");
 
         // capped collections
@@ -43,19 +43,51 @@ namespace mongo {
             return BSONObj();
         }
 
-        uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
+        const int retryMax = 3;
+        for (int retryCount = 1; retryCount <= retryMax; ++retryCount) {
+            if (retryCount != 1) {
+                // if we are retrying, sleep a bit to let the network possibly recover
+                sleepsecs(retryCount * retryCount);
+            }
+            try {
+                bool ok = missingObjReader.connect(hn);
+                if (!ok) {
+                    warning() << "network problem detected while connecting to the "
+                              << "sync source, attempt " << retryCount << " of "
+                              << retryMax << endl;
+                        continue;  // try again
+                }
+            } 
+            catch (const SocketException& exc) {
+                warning() << "network problem detected while connecting to the "
+                          << "sync source, attempt " << retryCount << " of "
+                          << retryMax << endl;
+                continue; // try again
+            }
 
-        // might be more than just _id in the update criteria
-        BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
-        BSONObj missingObj;
-        try {
-            missingObj = missingObjReader.findOne(ns, query);
-        } catch(DBException& e) {
-            log() << "replication assertion fetching missing object: " << e.what() << endl;
-            throw;
+            // might be more than just _id in the update criteria
+            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
+            BSONObj missingObj;
+            try {
+                missingObj = missingObjReader.findOne(ns, query);
+            } 
+            catch (const SocketException& exc) {
+                warning() << "network problem detected while fetching a missing document from the "
+                          << "sync source, attempt " << retryCount << " of "
+                          << retryMax << endl;
+                continue; // try again
+            } 
+            catch (DBException& e) {
+                log() << "replication assertion fetching missing object: " << e.what() << endl;
+                throw;
+            }
+
+            // success!
+            return missingObj;
         }
-
-        return missingObj;
+        // retry count exceeded
+        msgasserted(15916, 
+                    str::stream() << "Can no longer connect to initial sync source: " << hn);
     }
 
     bool Sync::shouldRetry(const BSONObj& o) {
