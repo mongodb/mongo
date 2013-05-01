@@ -38,15 +38,15 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	 */
 	p = &cfg[1];
 	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		*p++ = "statistics_clear";
+		*p++ = "statistics_clear=true";
 	if (LF_ISSET(WT_STATISTICS_FAST))
-		*p++ = "statistics_fast";
+		*p++ = "statistics_fast=true";
 
 	p = &disk_cfg[1];
 	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		*p++ = "statistics_clear";
+		*p++ = "statistics_clear=true";
 	if (LF_ISSET(WT_STATISTICS_FAST))
-		*p++ = "statistics_fast";
+		*p++ = "statistics_fast=true";
 
 	/*
 	 * Allocate an aggregated statistics structure, or clear any already
