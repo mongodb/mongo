@@ -153,12 +153,12 @@ compare_srcfile(tmp_file, '../src/support/stat.c')
 
 
 # Update the statlog file with the entries we can scale per second.
-scale_info = 'scale_per_second_list = [\n'
+scale_info = 'no_scale_per_second_list = [\n'
 for l in sorted(connection_stats):
-	if 'scale' in l.flags:
+	if 'no_scale' in l.flags:
 		scale_info += '    \'' + l.desc + '\',\n'
 for l in sorted(dsrc_stats):
-	if 'scale' in l.flags:
+	if 'no_scale' in l.flags:
 		scale_info += '    \'' + l.desc + '\',\n'
 scale_info += ']\n'
 
@@ -167,12 +167,12 @@ tfile = open(tmp_file, 'w')
 skip = 0
 for line in open('../tools/statlog.py', 'r'):
 	if skip:
-		if line.count('scale-per-second list section: END'):
+		if line.count('no scale-per-second list section: END'):
 			tfile.write(line)
 			skip = 0
 	else:
 		tfile.write(line)
-	if line.count('scale-per-second list section: BEGIN'):
+	if line.count('no scale-per-second list section: BEGIN'):
 		skip = 1
 		tfile.write(scale_info)
 tfile.close()
