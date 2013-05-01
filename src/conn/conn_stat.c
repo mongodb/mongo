@@ -190,19 +190,49 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
 {
-	WT_LSM_TREE *lsm_tree;
+#define	WT_LSM_TREE_LIST_SLOTS	100
+	WT_LSM_TREE *lsm_tree, *list[WT_LSM_TREE_LIST_SLOTS];
+	WT_DECL_RET;
+	int cnt, locked;
 	char **p;
+
+	cnt = locked = 0;
 
 	/*
 	 * Walk the list of LSM trees, checking for a match on the set of
 	 * sources.
+	 *
+	 * XXX
+	 * We can't hold the schema lock for the traversal because the LSM
+	 * statistics code acquires the tree lock, and the LSM cursor code
+	 * acquires the tree lock and then acquires the schema lock, it's a
+	 * classic deadlock.  This is temporary code so I'm not going to do
+	 * anything fancy.
 	 */
-	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
+	locked = 1;
+	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
+		if (cnt == WT_LSM_TREE_LIST_SLOTS)
+			break;
 		for (p = S2C(session)->stat_sources; *p != NULL; ++p)
-			if (WT_PREFIX_MATCH(lsm_tree->name, *p))
-				WT_RET(
-				    __statlog_dump(session, lsm_tree->name, 0));
-	return (0);
+			if (WT_PREFIX_MATCH(lsm_tree->name, *p)) {
+				WT_ERR(__wt_lsm_tree_get(
+				    session, lsm_tree->name, 0, &list[cnt++]));
+				break;
+			}
+	}
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	locked = 0;
+
+	while (cnt > 0) {
+		--cnt;
+		WT_RET(__statlog_dump(session, list[cnt]->name, 0));
+		__wt_lsm_tree_release(session, list[cnt]);
+	}
+
+err:	if (locked)
+		__wt_spin_lock(session, &S2C(session)->schema_lock);
+	return (ret);
 }
 
 /*
@@ -310,9 +340,7 @@ __statlog_server(void *arg)
 		 * data handles.
 		 */
 		if (conn->stat_sources != NULL)
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_statlog_lsm_apply(session));
-		WT_ERR(ret);
+			WT_ERR(__wt_statlog_lsm_apply(session));
 
 		/* Flush. */
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
