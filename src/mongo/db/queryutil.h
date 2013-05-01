@@ -16,7 +16,6 @@
 #pragma once
 
 #include "jsobj.h"
-#include "indexkey.h"
 #include "mongo/db/index/btree_key_generator.h"
 
 namespace mongo {
@@ -548,6 +547,7 @@ namespace mongo {
 
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;
+        // See FieldRangeVector::matches for comment on key generation.
         scoped_ptr<BtreeKeyGenerator> _keyGenerator;
     };
     

@@ -1540,6 +1540,12 @@ namespace mongo {
         bool ok = false;
 
         BSONObjSet keys;
+
+        /**
+         * Key generation by design is behind the index interface.  There is an exception here
+         * because $or uses key generation to dedup its results.  When $or is fixed to not require
+         * this, key generation will be removed from here.
+         */
         _keyGenerator->getKeys(obj, &keys);
 
         // TODO The representation of matching keys could potentially be optimized
@@ -1564,6 +1570,7 @@ namespace mongo {
         verify( _direction >= 0 );
         BSONObjCmp oc(_keyPattern);
         BSONObjSet keys(oc);
+        // See FieldRangeVector::matches for comment on key generation.
         _keyGenerator->getKeys(obj, &keys);
         for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
             if ( matchesKey( *i ) ) {

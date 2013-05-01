@@ -28,20 +28,6 @@ namespace mongo {
         return BSONElementHasher::hash64(e, seed);
     }
 
-    BSONObj HashAccessMethod::getMissingField(const IndexDetails& details) {
-        BSONObj infoObj = details.info.obj();
-        int hashVersion = infoObj["hashVersion"].numberInt();
-        HashSeed seed = infoObj["seed"].numberInt();
-
-        // Explicit null valued fields and missing fields are both represented in hashed indexes
-        // using the hash value of the null BSONElement.  This is partly for historical reasons
-        // (hash of null was used in the initial release of hashed indexes and changing would alter
-        // the data format).  Additionally, in certain places the hashed index code and the index
-        // bound calculation code assume null and missing are indexed identically.
-        BSONObj nullObj = BSON("" << BSONNULL);
-        return BSON("" << makeSingleKey(nullObj.firstElement(), seed, hashVersion));
-    }
-
     HashAccessMethod::HashAccessMethod(IndexDescriptor* descriptor)
         : BtreeBasedAccessMethod(descriptor) {
 
@@ -69,9 +55,6 @@ namespace mongo {
         massert(16765, "error: no hashed index field",
                 firstElt.str().compare(HASHED_INDEX_TYPE_IDENTIFIER) == 0);
         _hashedField = firstElt.fieldName();
-
-        BSONObj nullObj = BSON("" << BSONNULL);
-        _missingKey = BSON("" << makeSingleKey(nullObj.firstElement(), _seed, _hashVersion));
     }
 
     Status HashAccessMethod::newCursor(IndexCursor** out) {
@@ -80,16 +63,24 @@ namespace mongo {
     }
 
     void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        const char* cstr = _hashedField.c_str();
+        getKeysImpl(obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), keys);
+    }
+
+    // static
+    void HashAccessMethod::getKeysImpl(const BSONObj& obj, const string& hashedField, HashSeed seed,
+                                       int hashVersion, bool isSparse, BSONObjSet* keys) {
+        const char* cstr = hashedField.c_str();
         BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);
         uassert(16766, "Error: hashed indexes do not currently support array values",
                 fieldVal.type() != Array );
 
         if (!fieldVal.eoo()) {
-            BSONObj key = BSON( "" << makeSingleKey( fieldVal , _seed , _hashVersion  ) );
-            keys->insert( key );
-        } else if (!_descriptor->isSparse()) {
-            keys->insert( _missingKey.copy() );
+            BSONObj key = BSON( "" << makeSingleKey(fieldVal, seed, hashVersion));
+            keys->insert(key);
+        }
+        else if (!isSparse) {
+            BSONObj nullObj = BSON("" << BSONNULL);
+            keys->insert(BSON("" << makeSingleKey(nullObj.firstElement(), seed, hashVersion)));
         }
     }
 

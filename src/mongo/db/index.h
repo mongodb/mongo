@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/indexkey.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/key.h"
 #include "mongo/db/namespace.h"
@@ -159,8 +158,6 @@ namespace mongo {
             (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill_idx();
-
-        const IndexSpec& getSpec() const;
 
         string toString() const {
             return info.obj().toString();

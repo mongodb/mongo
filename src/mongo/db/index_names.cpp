@@ -16,6 +16,8 @@
 
 #include "mongo/db/index_names.h"
 
+#include "mongo/db/jsobj.h"
+
 namespace mongo {
     const string IndexNames::GEO_2D = "2d";
     const string IndexNames::GEO_HAYSTACK = "geoHaystack";
@@ -23,4 +25,18 @@ namespace mongo {
     const string IndexNames::TEXT = "text";
     const string IndexNames::TEXT_INTERNAL = "_fts";
     const string IndexNames::HASHED = "hashed";
+
+    // static
+    string IndexNames::findPluginName(const BSONObj& keyPattern) {
+        BSONObjIterator i(keyPattern);
+
+        while (i.more()) {
+            BSONElement e = i.next();
+            if (String != e.type()) { continue; }
+            return e.String();
+        }
+
+        return "";
+    }
+
 }  // namespace mongo

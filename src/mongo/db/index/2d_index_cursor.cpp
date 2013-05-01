@@ -322,6 +322,7 @@ namespace mongo {
 
         scoped_ptr<BtreeCursor> _cursor;
         scoped_ptr<FieldRangeSet> _frs;
+        // TODO: Turn into a KeyPattern object when FieldRangeVector takes one.
         BSONObj _keyPattern;
 
         BSONObj key() { return _cursor->currKey(); }

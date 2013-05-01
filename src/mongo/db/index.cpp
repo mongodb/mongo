@@ -26,8 +26,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
-#include "mongo/db/fts/fts_enabled.h"
-#include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/index_legacy.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -39,6 +39,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    // What's the default version of our indices?
+    const int DefaultIndexVersionNumber = 1;
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";
@@ -77,11 +80,6 @@ namespace mongo {
             n++;
         }
         return -1;
-    }
-
-    const IndexSpec& IndexDetails::getSpec() const {
-        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
     /* delete this index.  does NOT clean up the system catalog
@@ -148,7 +146,7 @@ namespace mongo {
         for ( ; cursor && cursor->ok(); cursor->advance()) {
             const BSONObj index = cursor->current();
             const BSONObj key = index.getObjectField("key");
-            const string plugin = KeyPattern::findPluginName(key);
+            const string plugin = IndexNames::findPluginName(key);
             if (IndexNames::existedBefore24(plugin))
                 continue;
 
@@ -245,7 +243,7 @@ namespace mongo {
                 return false;
         }
 
-        string pluginName = KeyPattern::findPluginName( key );
+        string pluginName = IndexNames::findPluginName( key );
         if (pluginName.size()) {
             uassert(16734, str::stream() << "Unknown index plugin '" << pluginName << "' "
                                          << "in index "<< key,
@@ -257,16 +255,7 @@ namespace mongo {
 
         { 
             BSONObj o = io;
-            if (IndexNames::TEXT == pluginName || IndexNames::TEXT_INTERNAL == pluginName) {
-                StringData desc  = cc().desc();
-                if ( desc.find( "conn" ) == 0 ) {
-                    // this is to make sure we only complain for users
-                    // if you do get a text index created an a primary
-                    // want it to index on the secondary as well
-                    massert(16808, "text search not enabled", fts::isTextSearchEnabled() );
-                }
-                o = fts::FTSSpec::fixSpec(o);
-            }
+            o = IndexLegacy::adjustIndexSpecObject(o);
             BSONObjBuilder b;
             int v = DefaultIndexVersionNumber;
             if( !o["v"].eoo() ) {
@@ -299,20 +288,5 @@ namespace mongo {
         }
 
         return true;
-    }
-
-    void IndexSpec::reset(const IndexDetails * details) {
-        _details = details;
-        reset(details->info);
-    }
-
-    void IndexSpec::reset(const BSONObj& _info) {
-        info = _info;
-        keyPattern = info["key"].embeddedObjectUserCheck();
-        if ( keyPattern.objsize() == 0 ) {
-            out() << info.toString() << endl;
-            verify(false);
-        }
-        _init();
     }
 }

@@ -116,10 +116,10 @@ namespace mongo {
 
         // If the parsing or index indicates this is a special query, don't continue the processing
         if (!_special.empty() ||
-            ( ("" != CatalogHack::findPluginName(_descriptor->keyPattern())) && (USELESS !=
+            ( ("" != CatalogHack::getAccessMethodName(_descriptor->keyPattern())) && (USELESS !=
                 IndexSelection::isSuitableFor(_descriptor->keyPattern(), _frs, _order)))) {
 
-            _specialIndexName = CatalogHack::findPluginName(_descriptor->keyPattern());
+            _specialIndexName = CatalogHack::getAccessMethodName(_descriptor->keyPattern());
             if (_special.empty()) _special = _specialIndexName;
 
             massert( 13040 , (string)"no type for special: " + _special , "" != _specialIndexName);
@@ -284,7 +284,7 @@ doneCheckOrder:
                                                           _direction >= 0 ? 1 : -1 ) );
         }
 
-        if ( !_index->getSpec().getTypeName().empty()) { //_index->getSpec().getType() ) {
+        if ( "" != CatalogHack::getAccessMethodName(_descriptor->keyPattern())) {
             return shared_ptr<Cursor>( BtreeCursor::make( _d,
                                                           *_index,
                                                           _frv->startKey(),

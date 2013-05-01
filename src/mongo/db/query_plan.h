@@ -18,7 +18,6 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/indexkey.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/projection.h"

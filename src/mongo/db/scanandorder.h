@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "mongo/db/indexkey.h"
+#include "mongo/db/diskloc.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/queryutil.h"
 

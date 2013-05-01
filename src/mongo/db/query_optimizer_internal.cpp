@@ -545,7 +545,7 @@ namespace mongo {
                 int j = i.pos();
                 IndexDetails& ii = i.next();
                 BSONObj keyPattern = ii.keyPattern();
-                string pluginName = CatalogHack::findPluginName(keyPattern);
+                string pluginName = CatalogHack::getAccessMethodName(keyPattern);
                 if (special.has(pluginName) &&
                     (USELESS != IndexSelection::isSuitableFor(keyPattern,
                         _qps.frsp().frsForIndex(d, j), _qps.order()))) {
@@ -1497,8 +1497,7 @@ namespace mongo {
             while( i.more() ) {
                 IndexDetails& ii = i.next();
                 if ( indexWorks( ii.keyPattern(), min.isEmpty() ? max : min, ret.first, ret.second ) ) {
-                    if ( ii.getSpec().getTypeName().empty()) {
-                    //if ( ii.getSpec().getType() == 0 ) {
+                    if (CatalogHack::getAccessMethodName(ii.keyPattern()).empty()) {
                         id = &ii;
                         keyPattern = ii.keyPattern();
                         break;

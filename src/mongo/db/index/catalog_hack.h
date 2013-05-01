@@ -26,7 +26,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/keypattern.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
@@ -36,8 +35,15 @@ namespace mongo {
      */
     class CatalogHack {
     public:
+
+        /**
+         * Older versions of MongoDB treated unknown index plugins as ascending Btree indices.
+         * We need to replicate this behavior.  We use the version of the on-disk database to hint
+         * to us whether or not a given index was created as an actual instance of a special index,
+         * or if it was just treated as an increasing Btree index.
+         */
         static bool shouldOverridePlugin(const BSONObj& keyPattern) {
-            string pluginName = KeyPattern::findPluginName(keyPattern);
+            string pluginName = IndexNames::findPluginName(keyPattern);
             bool known = IndexNames::isKnownName(pluginName);
 
             if (NULL == cc().database()) {
@@ -73,11 +79,16 @@ namespace mongo {
             }
         }
 
-        static string findPluginName(const BSONObj& keyPattern) {
+        /**
+         * This differs from IndexNames::findPluginName in that returns the plugin name we *should*
+         * use, not the plugin name inside of the provided key pattern.  To understand when these
+         * differ, see shouldOverridePlugin.
+         */
+        static string getAccessMethodName(const BSONObj& keyPattern) {
             if (shouldOverridePlugin(keyPattern)) {
                 return "";
             } else {
-                return KeyPattern::findPluginName(keyPattern);
+                return IndexNames::findPluginName(keyPattern);
             }
         }
 
@@ -87,11 +98,8 @@ namespace mongo {
         }
 
         static BtreeBasedAccessMethod* getBtreeBasedIndex(IndexDescriptor* desc) {
-            if (shouldOverridePlugin(desc->keyPattern())) {
-                return new BtreeAccessMethod(desc);
-            }
+            string type = getAccessMethodName(desc->keyPattern());
 
-            string type = KeyPattern::findPluginName(desc->keyPattern());
             if (IndexNames::HASHED == type) {
                 return new HashAccessMethod(desc);
             } else if (IndexNames::GEO_2DSPHERE == type) {
@@ -112,11 +120,8 @@ namespace mongo {
         }
 
         static IndexAccessMethod* getIndex(IndexDescriptor* desc) {
-            if (shouldOverridePlugin(desc->keyPattern())) {
-                return new BtreeAccessMethod(desc);
-            }
+            string type = getAccessMethodName(desc->keyPattern());
 
-            string type = KeyPattern::findPluginName(desc->keyPattern());
             if (IndexNames::HASHED == type) {
                 return new HashAccessMethod(desc);
             } else if (IndexNames::GEO_2DSPHERE == type) {

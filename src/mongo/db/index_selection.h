@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include "mongo/db/indexkey.h"  // for IndexSuitability
-
 namespace mongo {
 
     class BSONObj;
     class FieldRangeSet;
+
+    enum IndexSuitability { USELESS = 0 , HELPFUL = 1 , OPTIMAL = 2 };
 
     /**
      * This class is part of query optimization.  For a given index (as uniquely described by

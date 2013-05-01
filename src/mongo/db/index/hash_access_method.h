@@ -43,14 +43,17 @@ namespace mongo {
             return Status::OK();
         }
 
-        // Our missing field is different than the default missing field, this needs to be
-        // exposed in s/d_split.cpp.  That's the only thing that calls this.
-        static BSONObj getMissingField(const IndexDetails& details);
-
         /**
          * Hashing function used by both this class and the cursors we create.
+         * Exposed for testing and so mongo/db/index_legacy.cpp can use it.
          */
         static long long int makeSingleKey(const BSONElement& e, HashSeed seed, int v);
+
+        /**
+         * Exposed externally for testing purposes.
+         */
+        static void getKeysImpl(const BSONObj& obj, const string& hashedField, HashSeed seed,
+                                int hashVersion, bool isSparse, BSONObjSet* keys);
 
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);

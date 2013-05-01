@@ -142,7 +142,7 @@ namespace mongo {
         EmulatedCursor(IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod,
                        const BSONObj& order, int numWanted, const BSONObj& keyPattern)
             : _descriptor(descriptor), _indexAccessMethod(indexAccessMethod),
-              _keyPattern(keyPattern), _pluginName(KeyPattern::findPluginName(keyPattern)) {
+              _keyPattern(keyPattern), _pluginName(IndexNames::findPluginName(keyPattern)) {
 
             IndexCursor *cursor;
             indexAccessMethod->newCursor(&cursor);

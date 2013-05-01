@@ -22,6 +22,8 @@ namespace mongo {
 
     using std::string;
 
+    class BSONObj;
+
     /**
      * We use the string representation of index names all over the place, so we declare them all
      * once here.
@@ -46,6 +48,12 @@ namespace mongo {
                 || name == IndexNames::GEO_HAYSTACK
                 || name == IndexNames::HASHED;
         }
+
+        /**
+         * Return the first string value in the provided object.  For an index key pattern,
+         * a field with a non-string value indicates a "special" (not straight Btree) index.
+         */
+        static string findPluginName(const BSONObj& keyPattern);
 
         static bool isKnownName(const string& name) {
             return name.empty()

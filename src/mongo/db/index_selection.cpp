@@ -28,9 +28,10 @@ namespace mongo {
                                                    const FieldRangeSet& queryConstraints,
                                                    const BSONObj& order) {
 
-        string type = CatalogHack::findPluginName(keyPattern);
+        string type = CatalogHack::getAccessMethodName(keyPattern);
         BSONObj query = queryConstraints.originalQuery();
 
+        // "" means it's a b-tree index, ascending or descending.
         if ("" == type) {
             // This is a quick first pass to determine the suitability of the index.  It produces
             // some false positives (returns HELPFUL for some indexes which are not particularly).
