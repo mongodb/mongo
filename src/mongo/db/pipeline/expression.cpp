@@ -2382,26 +2382,23 @@ namespace mongo {
             Value string1 = vpOperand[0]->evaluate(pDocument);
             Value string2 = vpOperand[1]->evaluate(pDocument);
 
-
             string toSplit = string1.coerceToString();
             string pattern = string2.coerceToString();
-
 
             string::size_type length = pattern.length();
             string::size_type limit = toSplit.length();
             vector<Value> result;
 
             if ( pattern != "" && limit >= length ){
-				size_t current;
-				string::size_type next = -1;
-				do{
-					current = next + length;
-					next = toSplit.find(pattern, current);
-					Value toPush = Value::createString(toSplit.substr( current, next - current + length ));
-					if ( toPush.coerceToString() != "" ){
-						result.push_back(toPush);
-					}
-				}while ( next != string::npos);
+                size_t current = 0;
+                string::size_type next = -1;
+                do{
+                    next = toSplit.find(pattern, current);
+                    Value toPush = Value::createString(toSplit.substr( current, next - current));
+                    result.push_back(toPush);
+                    current = next + length;
+
+                }while ( next != string::npos);
             } else {
             	result.push_back(Value::createString(toSplit));
             }
