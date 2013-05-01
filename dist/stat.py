@@ -112,8 +112,8 @@ __wt_stat_clear_''' + name + '''_stats(void *stats_arg)
 \tstats = (WT_''' + name.upper() + '''_STATS *)stats_arg;
 ''')
 	for l in sorted(list):
-		# noclear: don't clear the value.
-		if not 'noclear' in l.flags:
+		# no_clear: don't clear the value.
+		if not 'no_clear' in l.flags:
 			f.write('\tstats->' + l.name + '.v = 0;\n');
 	f.write('}\n')
 
@@ -131,13 +131,11 @@ __wt_stat_aggregate_''' + name + '''_stats(void *child, void *parent)
 \tp = (WT_''' + name.upper() + '''_STATS *)parent;
 ''')
 	for l in sorted(list):
-		if 'aggrignore' in l.flags:
+		if 'no_aggregate' in l.flags:
 			continue;
-		elif 'aggrmax' in l.flags:
+		elif 'max_aggregate' in l.flags:
 			o = 'if (c->' + l.name + '.v > p->' + l.name +\
 			'.v)\n\t    p->' + l.name + '.v = c->' + l.name + '.v;'
-		elif 'aggrset' in l.flags:
-			o = 'p->' + l.name + '.v += c->' + l.name + '.v;'
 		else:
 			o = 'p->' + l.name + '.v += c->' + l.name + '.v;'
 		f.write('\t' + o + '\n')
@@ -155,14 +153,14 @@ compare_srcfile(tmp_file, '../src/support/stat.c')
 
 
 # Update the statlog file with the entries we can scale per second.
-sps_info = 'scale_per_second_list = [\n'
+scale_info = 'scale_per_second_list = [\n'
 for l in sorted(connection_stats):
-	if 'sps' in l.flags:
-		sps_info += '    \'' + l.desc + '\',\n'
+	if 'scale' in l.flags:
+		scale_info += '    \'' + l.desc + '\',\n'
 for l in sorted(dsrc_stats):
-	if 'sps' in l.flags:
-		sps_info += '    \'' + l.desc + '\',\n'
-sps_info += ']\n'
+	if 'scale' in l.flags:
+		scale_info += '    \'' + l.desc + '\',\n'
+scale_info += ']\n'
 
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
@@ -176,6 +174,6 @@ for line in open('../tools/statlog.py', 'r'):
 		tfile.write(line)
 	if line.count('scale-per-second list section: BEGIN'):
 		skip = 1
-		tfile.write(sps_info)
+		tfile.write(scale_info)
 tfile.close()
 compare_srcfile(tmp_file, '../tools/statlog.py')
