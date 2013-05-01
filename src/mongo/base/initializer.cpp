@@ -16,6 +16,7 @@
 #include "mongo/base/initializer.h"
 
 #include <iostream>
+#include "mongo/util/assert_util.h"
 #include "mongo/base/global_initializer.h"
 
 namespace mongo {
@@ -40,7 +41,12 @@ namespace mongo {
                               "topSort returned a node that has no associated function: \"" +
                               sortedNodes[i] + '"');
             }
-            status = fn(&context);
+            try {
+                status = fn(&context);
+            } catch( const DBException& xcp ) {
+                return xcp.toStatus();
+            }
+
             if (Status::OK() != status)
                 return status;
         }
