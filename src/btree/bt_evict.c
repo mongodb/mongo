@@ -1048,11 +1048,17 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 
 			/*
 			 * If the oldest transaction hasn't changed since the
-			 * last time this page was written, there's no chance
-			 * to make progress...
+			 * last time this page was written, it's unlikely that
+			 * we can make progress.  This is a heuristic that
+			 * saves repeated attempts to evict the same page.
+			 *
+			 * That said, if eviction is stuck, try anyway: maybe a
+			 * transaction that were running last time we wrote the
+			 * page has since rolled back.
 			 */
 			if (modified &&
-			    TXNID_LE(oldest_txn, page->modify->disk_txn))
+			    TXNID_LE(oldest_txn, page->modify->disk_txn) &&
+			    !F_ISSET(cache, WT_EVICT_STUCK))
 				continue;
 		}
 
