@@ -314,7 +314,7 @@ __checkpoint_worker(
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
-	int deleted, force, track_ckpt;
+	int deleted, force, hot_backup_locked, track_ckpt;
 	char *name_alloc;
 
 	conn = S2C(session);
@@ -325,6 +325,7 @@ __checkpoint_worker(
 	name_alloc = NULL;
 	txn = &session->txn;
 	saved_isolation = txn->isolation;
+	hot_backup_locked = 0;
 	track_ckpt = 1;
 
 	/*
@@ -467,10 +468,32 @@ __checkpoint_worker(
 	F_SET(ckpt, WT_CKPT_ADD);
 
 	/*
+	 * We can't delete checkpoints if a backup cursor is open.  WiredTiger
+	 * checkpoints are uniquely named and it's OK to have multiple of them
+	 * in the system: clear the delete flag for them, and otherwise fail.
+	 * Hold the lock until we're done (blocking hot backups from starting),
+	 * we don't want to race with a future hot backup.
+	 */
+	__wt_spin_lock(session, &conn->hot_backup_lock);
+	hot_backup_locked = 1;
+	if (conn->hot_backup)
+		WT_CKPT_FOREACH(ckptbase, ckpt) {
+			if (!F_ISSET(ckpt, WT_CKPT_DELETE))
+				continue;
+			if (WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT)) {
+				F_CLR(ckpt, WT_CKPT_DELETE);
+				continue;
+			}
+			WT_ERR_MSG(session, EBUSY,
+			    "named checkpoints cannot be created if backup "
+			    "cursors are open");
+		}
+
+	/*
 	 * Lock the checkpoints that will be deleted.
 	 *
 	 * Checkpoints are only locked when tracking is enabled, which covers
-	 * sync and drop operations, but not close.  The reasoning is that
+	 * checkpoint and drop operations, but not close.  The reasoning is
 	 * there should be no access to a checkpoint during close, because any
 	 * thread accessing a checkpoint will also have the current file handle
 	 * open.
@@ -481,30 +504,12 @@ __checkpoint_worker(
 				continue;
 
 			/*
-			 * We can't drop/update checkpoints if a backup cursor
-			 * is open.  WiredTiger checkpoints are uniquely named
-			 * and it's OK to have multiple in the system: clear the
-			 * delete flag, and otherwise fail.
+			 * We can't delete checkpoints referenced by a cursor.
+			 * WiredTiger checkpoints are uniquely named and it's
+			 * OK to have multiple in the system: clear the delete
+			 * flag for them, and otherwise fail.
 			 */
-			if (conn->ckpt_backup) {
-				if (WT_PREFIX_MATCH(
-				    ckpt->name, WT_CHECKPOINT)) {
-					F_CLR(ckpt, WT_CKPT_DELETE);
-					continue;
-				}
-				WT_ERR_MSG(session, EBUSY,
-				    "named checkpoints cannot be created if "
-				    "backup cursors are open");
-			}
-
-			/*
-			 * We can't drop/update checkpoints if referenced by a
-			 * cursor.  WiredTiger checkpoints are uniquely named
-			 * and it's OK to have multiple in the system: clear the
-			 * delete flag, and otherwise fail.
-			 */
-			ret =
-			    __wt_session_lock_checkpoint(session, ckpt->name);
+			ret = __wt_session_lock_checkpoint(session, ckpt->name);
 			if (ret == 0)
 				continue;
 			if (ret == EBUSY &&
@@ -647,7 +652,8 @@ fake:
 			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
 
-err:
+err:	if (hot_backup_locked)
+		__wt_spin_unlock(session, &conn->hot_backup_lock);
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
 	txn->isolation = saved_isolation;
