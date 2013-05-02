@@ -455,6 +455,8 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	int copied;
 
 	copied = 0;
+	saved_len = 0;
+	saved_v = 0;
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
