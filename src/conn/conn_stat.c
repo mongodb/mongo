@@ -226,7 +226,7 @@ __wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
 
 	while (cnt > 0) {
 		--cnt;
-		WT_RET(__statlog_dump(session, list[cnt]->name, 0));
+		WT_TRET(__statlog_dump(session, list[cnt]->name, 0));
 		__wt_lsm_tree_release(session, list[cnt]);
 	}
 
