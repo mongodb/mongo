@@ -208,6 +208,9 @@ __wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
 	 * acquires the tree lock and then acquires the schema lock, it's a
 	 * classic deadlock.  This is temporary code so I'm not going to do
 	 * anything fancy.
+	 * It is OK to not keep holding the schema lock after populating
+	 * the list of matching LSM trees, since the __wt_lsm_tree_get call
+	 * will bump a reference count, so the tree won't go away.
 	 */
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	locked = 1;
@@ -332,8 +335,8 @@ __statlog_server(void *arg)
 		WT_ERR(ret);
 
 		/*
-		 * Lock the schema and walk the list of open LSM trees, dumping
-		 * any that match the list of object sources.
+		 * Walk the list of open LSM trees, dumping any that match the
+		 * the list of object sources.
 		 *
 		 * XXX
 		 * This code should be removed when LSM objects are converted to
