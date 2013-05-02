@@ -346,7 +346,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 * setting for the btree, but we don't have the correct btree handle
 	 * available.
 	 */
-	if (visit_state.refcnt > 1000)
+	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
 		return (EBUSY);
 
 	/* Make sure the top page isn't queued for eviction. */
