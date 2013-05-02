@@ -1,6 +1,6 @@
 
 
-var rt = new ReplSetTest( { name : "replset9tests" , nodes: 1, oplogSize: 100 } );
+var rt = new ReplSetTest( { name : "replset9tests" , nodes: 1, oplogSize: 255 } );
 
 var nodes = rt.startSet();
 rt.initiate();
