@@ -141,11 +141,13 @@ namespace replset {
              it != ops.end();
              ++it) {
             try {
-                fassert(16359, st->syncApply(*it, convertUpdatesToUpserts));
+                if (!st->syncApply(*it, convertUpdatesToUpserts)) {
+                    fassertFailedNoTrace(16359);
+                }
             } catch (DBException& e) {
-                error() << "writer worker caught exception: " << e.what() 
+                error() << "writer worker caught exception: " << causedBy(e)
                         << " on: " << it->toString() << endl;
-                fassertFailed(16360);
+                fassertFailedNoTrace(16360);
             }
         }
     }
@@ -165,7 +167,9 @@ namespace replset {
                     }
                     if (status) {
                         // retry
-                        fassert(15915, st->syncApply(*it));
+                        if (!st->syncApply(*it)) {
+                            fassertFailedNoTrace(15915);
+                        }
                     }
                     // If shouldRetry() returns false, fall through.
                     // This can happen if the document that was moved and missed by Cloner
@@ -173,8 +177,8 @@ namespace replset {
                 }
             }
             catch (DBException& e) {
-                error() << "exception: " << e.what() << " on: " << it->toString() << endl;
-                fassertFailed(16361);
+                error() << "exception: " << causedBy(e) << " on: " << it->toString() << endl;
+                fassertFailedNoTrace(16361);
             }
         }
     }

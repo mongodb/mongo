@@ -132,6 +132,13 @@ namespace mongo {
         abort();
     }
 
+    NOINLINE_DECL void fassertFailedNoTrace( int msgid ) {
+        problem() << "Fatal Assertion " << msgid << endl;
+        breakpoint();
+        log() << "\n\n***aborting after fassert() failure\n\n" << endl;
+        ::_exit(EXIT_ABRUPT); // bypass our handler for SIGABRT, which prints a stack trace.
+    }
+
     void uasserted(int msgid , const string &msg) {
         uasserted(msgid, msg.c_str());
     }
