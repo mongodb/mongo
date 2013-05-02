@@ -44,6 +44,7 @@ flags = {
 		'VERB_evictserver',
 		'VERB_fileops',
 		'VERB_hazard',
+		'VERB_log',
 		'VERB_lsm',
 		'VERB_mutex',
 		'VERB_read',

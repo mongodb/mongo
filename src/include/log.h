@@ -22,3 +22,7 @@ typedef struct {
 	const char *fmt;
 	const char *fields[];
 } WT_LOGREC_DESC;
+
+typedef struct {
+	uint32_t	fileid;
+} WT_LOG;

@@ -1116,9 +1116,9 @@ struct __wt_connection {
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
 	 * chosen from the following options: \c "block"\, \c "shared_cache"\,
 	 * \c "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c
-	 * "hazard"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
-	 * "reconcile"\, \c "salvage"\, \c "verify"\, \c "write"; default
-	 * empty.}
+	 * "hazard"\, \c "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c
+	 * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c
+	 * "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1356,7 +1356,17 @@ struct __wt_connection {
  * of strings; default empty.}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
- * @config{logging, enable logging., a boolean flag; default \c false.}
+ * @config{log = (, enable logging., a set of related configuration options
+ * defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
+ * archive unneeded log files., a boolean flag; default \c true".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, maximum log file size., an integer
+ * between 1MB and 512GB; default \c 100MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into which the
+ * log records are written.  It will have log numbers appended to it the file
+ * name.  If the value is not an absolute path name\, the file is created
+ * relative to the database home., a string; default \c "WiredTigerLog".}
+ * @config{ ),,}
  * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
  * \c true.}
  * @config{mmap, Use memory mapping to access files when possible., a boolean
@@ -1423,8 +1433,8 @@ struct __wt_connection {
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
  * values chosen from the following options: \c "block"\, \c "shared_cache"\, \c
  * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
- * "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
- * "salvage"\, \c "verify"\, \c "write"; default empty.}
+ * "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
+ * "reconcile"\, \c "salvage"\, \c "verify"\, \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file

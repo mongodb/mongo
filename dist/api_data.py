@@ -322,6 +322,7 @@ connection_runtime_config = [
 		    'evictserver',
 		    'fileops',
 		    'hazard',
+		    'log',
 		    'lsm',
 		    'mutex',
 		    'read',
@@ -564,9 +565,21 @@ methods = {
 		maximum number of simultaneous hazard pointers per session
 		handle''',
 		min='15'),
-	Config('logging', 'false', r'''
+	Config('log', 'false', r'''
 		enable logging''',
-		type='boolean'),
+		type='category', subconfig=[
+		Config('archive', 'true"', r'''
+		automatically archive unneeded log files''',
+                type='boolean'),
+		Config('file_max', '100MB', r'''
+		maximum log file size''',
+		min='1MB', max='512GB'),
+		Config('path', '"WiredTigerLog"', r'''
+		the pathname to a file into which the log records are written.
+                It will have log numbers appended to it the file name.  If the
+		value is not an absolute path name, the file is created
+                relative to the database home'''),
+		]),
 	Config('lsm_merge', 'true', r'''
 		merge LSM chunks where possible''',
 		type='boolean'),
