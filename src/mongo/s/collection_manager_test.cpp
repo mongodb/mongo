@@ -406,7 +406,7 @@ namespace {
         chunk.setMax(BSON("a" << 20 << "b" << 0));
 
         string errMsg;
-        ChunkVersion version(1, 0, OID());
+        ChunkVersion version(2, 0, OID());
         scoped_ptr<CollectionManager> cloned(getCollManager()->cloneMinus(
                 chunk, version, &errMsg));
 
