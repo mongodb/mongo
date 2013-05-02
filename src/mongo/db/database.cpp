@@ -366,6 +366,7 @@ namespace mongo {
                 warning() << "quota exceeded, but can't assert, probably going over quota for: " << ns << endl;
             }
             else {
+                log() << "quota exceeded for namespace: " << ns << endl;
                 uasserted(12501, "quota exceeded");
             }
         }
