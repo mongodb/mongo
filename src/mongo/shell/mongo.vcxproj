@@ -1846,7 +1846,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\d_concurrency.h" />
     <ClInclude Include="..\db\d_globals.h" />
     <ClInclude Include="..\db\index.h" />
-    <ClInclude Include="..\db\indexkey.h" />
     <ClInclude Include="..\db\instance.h" />
     <ClInclude Include="..\db\jsobj.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />

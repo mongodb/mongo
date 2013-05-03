@@ -1950,16 +1950,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
     </ClCompile>
-    <ClCompile Include="fts\fts_index.cpp">
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
-    </ClCompile>
     <ClCompile Include="fts\fts_index_format.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
@@ -2183,16 +2173,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
     </ClCompile>
-    <ClCompile Include="geo\s2index.cpp">
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-    </ClCompile>
     <ClCompile Include="geo\shapes.cpp" />
     <ClCompile Include="index\2d_access_method.cpp" />
     <ClCompile Include="index\2d_index_cursor.cpp" />
@@ -2210,6 +2190,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="index\s2_near_cursor.cpp" />
     <ClCompile Include="index\s2_simple_cursor.cpp" />
     <ClCompile Include="index_builder.cpp" />
+    <ClCompile Include="index_legacy.cpp" />
     <ClCompile Include="index_names.cpp" />
     <ClCompile Include="index_rebuilder.cpp" />
     <ClCompile Include="index_selection.cpp" />
@@ -2365,10 +2346,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="d_concurrency.cpp" />
     <ClCompile Include="d_globals.cpp" />
     <ClCompile Include="explain.cpp" />
-    <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="hasher.cpp" />
-    <ClCompile Include="hashindex.cpp" />
     <ClCompile Include="index_update.cpp" />
     <ClCompile Include="interrupt_status_mongod.cpp" />
     <ClCompile Include="key.cpp" />
@@ -2776,7 +2755,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="filever.h" />
     <ClInclude Include="fts\fts_command.h" />
     <ClInclude Include="fts\fts_enabled.h" />
-    <ClInclude Include="fts\fts_index.h" />
     <ClInclude Include="fts\fts_index_format.h" />
     <ClInclude Include="fts\fts_matcher.h" />
     <ClInclude Include="fts\fts_query.h" />
@@ -2787,14 +2765,12 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="fts\stop_words.h" />
     <ClInclude Include="fts\stop_words_list.h" />
     <ClInclude Include="fts\tokenizer.h" />
-    <ClInclude Include="geo\2d.h" />
     <ClInclude Include="geo\geoparser.h" />
     <ClInclude Include="geo\geoquery.h" />
     <ClInclude Include="geo\hash.h" />
     <ClInclude Include="geo\s2common.h" />
     <ClInclude Include="geo\shapes.h" />
     <ClInclude Include="hasher.h" />
-    <ClInclude Include="hashindex.h" />
     <ClInclude Include="index\2d_access_method.h" />
     <ClInclude Include="index\2d_common.h" />
     <ClInclude Include="index\2d_index_cursor.h" />
@@ -2820,6 +2796,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index\s2_near_cursor.h" />
     <ClInclude Include="index\s2_simple_cursor.h" />
     <ClInclude Include="index_builder.h" />
+    <ClInclude Include="index_legacy.h" />
     <ClInclude Include="index_names.h" />
     <ClInclude Include="index_rebuilder.h" />
     <ClInclude Include="index_selection.h" />
@@ -2889,7 +2866,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="dbwebserver.cpp" />
     <ClCompile Include="extsort.cpp" />
     <ClCompile Include="index.cpp" />
-    <ClCompile Include="indexkey.cpp" />
     <ClCompile Include="instance.cpp" />
     <ClCompile Include="introspect.cpp" />
     <ClCompile Include="jsobj.cpp" />
@@ -3172,7 +3148,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="dbmessage.h" />
     <ClInclude Include="diskloc.h" />
     <ClInclude Include="index.h" />
-    <ClInclude Include="indexkey.h" />
     <ClInclude Include="introspect.h" />
     <ClInclude Include="json.h" />
     <ClInclude Include="matcher.h" />

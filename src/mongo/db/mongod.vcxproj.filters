@@ -163,9 +163,6 @@
     <ClCompile Include="commands\distinct.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="geo\2d.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\accumulator.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
@@ -620,9 +617,6 @@
     <ClCompile Include="index.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
-    <ClCompile Include="indexkey.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="instance.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -740,9 +734,6 @@
     <ClCompile Include="..\util\touch_pages.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="hashindex.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="hasher.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -859,9 +850,6 @@
     </ClCompile>
     <ClCompile Include="auth\authorization_manager.cpp">
       <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="geo\s2index.cpp">
-      <Filter>db\geo</Filter>
     </ClCompile>
     <ClCompile Include="commands\fail_point_cmd.cpp">
       <Filter>db\commands</Filter>
@@ -1679,9 +1667,6 @@
     <ClCompile Include="fts\fts_enabled.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
-    <ClCompile Include="fts\fts_index.cpp">
-      <Filter>db\fts</Filter>
-    </ClCompile>
     <ClCompile Include="fts\fts_index_format.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
@@ -1984,6 +1969,9 @@
     </ClCompile>
     <ClCompile Include="matcher\matcher.cpp">
       <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="index_legacy.cpp">
+      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2494,9 +2482,6 @@
     </ClInclude>
     <ClInclude Include="..\util\touch_pages.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="hashindex.h">
-      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="hasher.h">
       <Filter>db\Header Files\e to n</Filter>
@@ -3545,9 +3530,6 @@
     <ClInclude Include="..\s\type_tags.h">
       <Filter>s</Filter>
     </ClInclude>
-    <ClInclude Include="geo\2d.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="geo\geoparser.h">
       <Filter>db\geo</Filter>
     </ClInclude>
@@ -3884,9 +3866,6 @@
     <ClInclude Include="fts\fts_enabled.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="fts\fts_index.h">
-      <Filter>db\fts</Filter>
-    </ClInclude>
     <ClInclude Include="fts\fts_index_format.h">
       <Filter>db\fts</Filter>
     </ClInclude>
@@ -4163,6 +4142,9 @@
     </ClInclude>
     <ClInclude Include="matcher\matcher.h">
       <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="index_legacy.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -910,9 +910,6 @@
     <ClInclude Include="..\db\index.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\indexkey.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\instance.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>

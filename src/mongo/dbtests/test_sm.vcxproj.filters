@@ -965,16 +965,10 @@
     <ClInclude Include="..\db\filever.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\hashindex.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\index.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\db\index_rebuilder.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\indexkey.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\db\initialize_server_global_state.h">
@@ -1264,9 +1258,6 @@
     </ClInclude>
     <ClInclude Include="..\s\type_tags.h">
       <Filter>s</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\2d.h">
-      <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\db\geo\geoparser.h">
       <Filter>db\geo</Filter>
@@ -1605,9 +1596,6 @@
       <Filter>db\fts</Filter>
     </ClInclude>
     <ClInclude Include="..\db\fts\fts_enabled.h">
-      <Filter>db\fts</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\fts\fts_index.h">
       <Filter>db\fts</Filter>
     </ClInclude>
     <ClInclude Include="..\db\fts\fts_index_format.h">
@@ -1956,6 +1944,9 @@
     <ClInclude Include="..\db\matcher\matcher.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\index_legacy.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -2296,9 +2287,6 @@
     <ClCompile Include="..\db\dur_recover.cpp">
       <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\geo\2d.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="d_chunk_manager_tests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
@@ -2330,9 +2318,6 @@
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\db\index.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\indexkey.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\db\instance.cpp">
@@ -3163,9 +3148,6 @@
     <ClCompile Include="..\db\geo\s2common.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\geo\s2index.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\s2\s1angle.cc">
       <Filter>third_party\s2</Filter>
     </ClCompile>
@@ -3469,9 +3451,6 @@
     <ClCompile Include="..\db\fts\fts_enabled.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\fts\fts_index.cpp">
-      <Filter>db\fts</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\fts\fts_index_format.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
@@ -3572,9 +3551,6 @@
       <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="..\db\index_set.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\hashindex.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\bson\mutable\document.cpp">
@@ -3780,6 +3756,9 @@
     </ClCompile>
     <ClCompile Include="..\db\matcher\matcher.cpp">
       <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_legacy.cpp">
+      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

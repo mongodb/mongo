@@ -150,6 +150,9 @@
     <Filter Include="db\matcher">
       <UniqueIdentifier>{fa857944-2697-49bd-8828-08fde8c359d3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\index">
+      <UniqueIdentifier>{0459ebf5-2166-4cf8-8c8c-bd62aaa1ba75}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -624,9 +627,6 @@
     <ClCompile Include="..\db\dbwebserver.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\indexkey.cpp">
-      <Filter>db\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\jsobj.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
@@ -918,9 +918,6 @@
     <ClCompile Include="..\db\geo\s2common.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\geo\s2index.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\exception_filter_win32.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -959,9 +956,6 @@
     </ClCompile>
     <ClCompile Include="type_tags.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\2d.cpp">
-      <Filter>db\geo</Filter>
     </ClCompile>
     <ClCompile Include="..\db\geo\geonear.cpp">
       <Filter>db\geo</Filter>
@@ -1114,9 +1108,6 @@
       <Filter>db\fts</Filter>
     </ClCompile>
     <ClCompile Include="..\db\fts\fts_enabled.cpp">
-      <Filter>db\fts</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\fts\fts_index.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
     <ClCompile Include="..\db\fts\fts_index_format.cpp">
@@ -1298,6 +1289,9 @@
     </ClCompile>
     <ClCompile Include="..\db\matcher\matcher.cpp">
       <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\btree_key_generator.cpp">
+      <Filter>db\index</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2079,9 +2073,6 @@
     <ClInclude Include="type_tags.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\geo\2d.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\geo\geoparser.h">
       <Filter>db\geo</Filter>
     </ClInclude>
@@ -2328,9 +2319,6 @@
     <ClInclude Include="..\db\fts\fts_enabled.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\fts\fts_index.h">
-      <Filter>db\fts</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\fts\fts_index_format.h">
       <Filter>db\fts</Filter>
     </ClInclude>
@@ -2463,6 +2451,9 @@
     </ClInclude>
     <ClInclude Include="..\db\matcher\matcher.h">
       <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\btree_key_generator.h">
+      <Filter>db\index</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
