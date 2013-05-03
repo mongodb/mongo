@@ -583,9 +583,9 @@ methods = {
 		threads)''',
 		min='1'),
 	Config('statistics_log', '', r'''
-		log database connection statistics into a file when the
-		\c statistics configuration value is set to true.  See
-		@ref statistics_log for more information''',
+		log database connection statistics to a file (implies
+		setting the \c statistics configuration value to true).
+		See @ref statistics_log for more information''',
 		type='category', subconfig=[
 		Config('clear', 'true', r'''
 		reset statistics counters after each set of log records are

@@ -1384,8 +1384,8 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{statistics, Maintain database statistics that may impact
  * performance., a boolean flag; default \c false.}
- * @config{statistics_log = (, log database connection statistics into a file
- * when the \c statistics configuration value is set to true.  See @ref
+ * @config{statistics_log = (, log database connection statistics to a file
+ * (implies setting the \c statistics configuration value to true). See @ref
  * statistics_log for more information., a set of related configuration options
  * defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;clear, reset statistics
