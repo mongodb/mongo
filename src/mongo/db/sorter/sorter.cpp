@@ -287,10 +287,8 @@ namespace mongo {
 
     static AtomicUInt fileCounter;
     template <typename Key, typename Value>
-    SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
-                                                   const Settings& settings)
+    SortedFileWriter<Key, Value>::SortedFileWriter(const Settings& settings)
         : _settings(settings)
-        , _opts(opts)
     {
         {
             StringBuilder sb;
@@ -397,7 +395,7 @@ namespace mongo {
 
         sort();
 
-        SortedFileWriter<Key, Value> writer(_opts, _settings);
+        SortedFileWriter<Key, Value> writer(_settings);
         for ( ; !_data.empty(); _data.pop_front()) {
             writer.addAlreadySorted(_data.front().first, _data.back().second);
         }

@@ -160,14 +160,13 @@ namespace mongo {
                          ,typename Value::SorterDeserializeSettings
                          > Settings;
 
-        explicit SortedFileWriter(const SortOptions& opts, const Settings& = Settings());
+        explicit SortedFileWriter(const Settings& settings = Settings());
 
         void addAlreadySorted(const Key&, const Value&);
         Iterator* done(); /// Can't add more data after calling done()
 
     private:
         const Settings _settings;
-        SortOptions _opts;
         std::string _fileName;
         boost::shared_ptr<sorter::FileDeleter> _fileDeleter; // Must outlive _file
         std::ofstream _file;
