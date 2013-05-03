@@ -2064,6 +2064,27 @@ namespace JsobjTests {
         }
     };
 
+    class NestedBuilderOversize {
+    public:
+        void run() {
+            try {
+                BSONObjBuilder outer;
+                BSONObjBuilder inner(outer.subobjStart("inner"));
+
+                string bigStr(1000, 'x');
+                while (true) {
+                    ASSERT_LESS_THAN_OR_EQUALS(inner.len(), BufferMaxSize);
+                    inner.append("", bigStr);
+                }
+
+                ASSERT(!"Expected Throw");
+            } catch (const DBException& e) {
+                if (e.getCode() != 13548) // we expect the code for oversized buffer
+                    throw;
+            }
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ) {
@@ -2165,6 +2186,7 @@ namespace JsobjTests {
             add< BSONForEachTest >();
             add< CompareOps >();
             add< HashingTest >();
+            add< NestedBuilderOversize >();
         }
     } myall;
 
