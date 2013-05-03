@@ -144,7 +144,7 @@ namespace replset {
                 if (!st->syncApply(*it, convertUpdatesToUpserts)) {
                     fassertFailedNoTrace(16359);
                 }
-            } catch (DBException& e) {
+            } catch (const DBException& e) {
                 error() << "writer worker caught exception: " << causedBy(e)
                         << " on: " << it->toString() << endl;
                 fassertFailedNoTrace(16360);
@@ -176,7 +176,7 @@ namespace replset {
                     // subsequently got deleted and no longer exists on the Sync Target at all
                 }
             }
-            catch (DBException& e) {
+            catch (const DBException& e) {
                 error() << "exception: " << causedBy(e) << " on: " << it->toString() << endl;
                 fassertFailedNoTrace(16361);
             }
@@ -746,7 +746,7 @@ namespace replset {
             try {
                 _syncThread();
             }
-            catch(DBException& e) {
+            catch(const DBException& e) {
                 sethbmsg(str::stream() << "syncThread: " << e.toString());
                 sleepsecs(10);
             }
@@ -897,7 +897,7 @@ namespace replset {
             }
             LOG(2) << "now last is " << slave->last.toString() << rsLog;
         }
-        catch (DBException& e) {
+        catch (const DBException& e) {
             // we'll be back
             LOG(2) << "replSet ghost sync error: " << e.what() << " for "
                    << slave->slave->fullName() << rsLog;
