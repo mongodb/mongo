@@ -108,7 +108,7 @@ static pthread_rwlock_t global_lock;		/* Object list lock */
  *	Limit our use of errno so it's easy to remove.
  */
 static int
-os_errno()
+os_errno(void)
 {
 	return (errno);
 }

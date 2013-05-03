@@ -220,7 +220,7 @@ wts_open(void)
 }
 
 void
-wts_close()
+wts_close(void)
 {
 	WT_CONNECTION *conn;
 	int ret;
