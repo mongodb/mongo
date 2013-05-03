@@ -98,11 +98,6 @@ namespace {
 
         Document& doc() { return _doc; }
 
-        bool checkDoc(const Document& doc, const BSONObj& obj) {
-            BSONObj res = doc.getObject();
-            return res.woCompare(obj) == 0;
-        }
-
         Element root() { return _doc.root(); }
 
         FieldRef& field() { return _field; }
@@ -191,11 +186,6 @@ namespace {
         }
 
         Document& doc() { return _doc; }
-
-        bool checkDoc(const Document& doc, const BSONObj& obj) {
-            BSONObj res = doc.getObject();
-            return res.woCompare(obj) == 0;
-        }
 
         Element root() { return _doc.root(); }
 
@@ -303,11 +293,6 @@ namespace {
         }
 
         Document& doc() { return _doc; }
-
-        bool checkDoc(const Document& doc, const BSONObj& obj) {
-            BSONObj res = doc.getObject();
-            return res.woCompare(obj) == 0;
-        }
 
         Element root() { return _doc.root(); }
 
