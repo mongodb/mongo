@@ -51,7 +51,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
  * TODO: use something other than an empty value as a tombstone: we need
  * to support empty values from the application.
  */
-static WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
+static const WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 
 #define	WT_LSM_NEEDVALUE(c) do {					\
 	WT_CURSOR_NEEDVALUE(c);						\
@@ -819,8 +819,8 @@ err:	API_END(session);
  *	necessary.
  */
 static inline int
-__clsm_put(
-    WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
+__clsm_put(WT_SESSION_IMPL *session,
+    WT_CURSOR_LSM *clsm, const WT_ITEM *key, const WT_ITEM *value)
 {
 	WT_CURSOR *primary;
 	WT_DECL_RET;
