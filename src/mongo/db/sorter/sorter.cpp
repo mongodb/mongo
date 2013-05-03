@@ -16,6 +16,21 @@
 
 /**
  * This is the implementation for the Sorter.
+ *
+ * It is intended to be included in other cpp files like this:
+ *
+ * #include <normal/include/files.h>
+ *
+ * #include "mongo/db/sorter/sorter.h"
+ *
+ * namespace mongo {
+ *     // Your code
+ * }
+ *
+ * #include "mongo/db/sorter/sorter.cpp"
+ * MONGO_CREATE_SORTER(MyKeyType, MyValueType, MyComparatorType);
+ *
+ * Do this once for each unique set of parameters to MONGO_CREATE_SORTER.
  */
 
 #include "mongo/db/sorter/sorter.h"

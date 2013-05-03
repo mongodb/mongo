@@ -27,6 +27,47 @@
 
 /**
  * This is the public API for the Sorter (both in-memory and external)
+ *
+ * Many of the classes in this file are templated on Key and Value types which
+ * require the following public members:
+ *
+ * // A type carrying extra information used by the deserializer. Contents are
+ * // up to you, but  it should be cheap to copy. Use an empty struct if your
+ * // deserializer doesn't need extra data.
+ * struct SorterDeserializeSettings {};
+ *
+ * // Serialize this object to the BufBuilder
+ * void serializeForSorter(BufBuilder& buf) const;
+ *
+ * // Deserialize and return an object from the BufReader
+ * static Type deserializeForSorter(BufReader& buf, const Type::SorterDeserializeSettings&);
+ *
+ * // How much memory is used by your type? Include sizeof(*this) and any memory you reference.
+ * int memUsageForSorter() const;
+ *
+ * // For types with owned and unowned states, such as BSON, return an owned version.
+ * // Return *this if your type doesn't have an unowned state
+ * Type getOwned() const;
+ *
+ * Comparators are functors that that compare pair<Key, Value> and return an
+ * int less than, equal to, or greater than 0 depending on how the two pairs
+ * compare with the same semantics as memcmp.
+ * Example for Key=BSONObj, Value=int:
+ *
+ * class MyComparator {
+ * public:
+ *     int operator()(const std::pair<BSONObj, int>& lhs,
+ *                    const std::pair<BSONObj, int>& rhs) {
+ *         int ret = lhs.first.woCompare(rhs.first, _ord);
+ *         if (ret)
+ *             return ret;
+ *
+ *        if (lhs.second >  rhs.second) return 1;
+ *        if (lhs.second == rhs.second) return 0;
+ *        return -1;
+ *     }
+ *     Ordering _ord;
+ * };
  */
 
 namespace mongo {
@@ -49,6 +90,7 @@ namespace mongo {
         {}
     };
 
+    /// This is the output from the sorting framework
     template <typename Key, typename Value>
     class SortIteratorInterface {
         MONGO_DISALLOW_COPYING(SortIteratorInterface);
@@ -72,6 +114,7 @@ namespace mongo {
         SortIteratorInterface() {} // can only be constructed as a base
     };
 
+    /// This is the main way to input data to the sorting framework
     template <typename Key, typename Value, typename Comparator>
     class Sorter {
         MONGO_DISALLOW_COPYING(Sorter);
@@ -85,12 +128,14 @@ namespace mongo {
         explicit Sorter(const SortOptions& opts,
                         const Comparator& comp,
                         const Settings& settings = Settings());
+
         void add(const Key&, const Value&);
-        Iterator* done();
+        Iterator* done(); /// Can't add more data after calling done()
 
         // TEMP these are here for compatibility. Will be replaced with a general stats API
         int numFiles() const { return _iters.size(); }
         size_t memUsed() const { return _memUsed; }
+
     private:
         class STLComparator;
 
@@ -105,7 +150,7 @@ namespace mongo {
         std::vector<boost::shared_ptr<Iterator> > _iters; // data that has already been spilled
     };
 
-
+    /// Writes pre-sorted data to a sorted file and hands-back an Iterator over that file.
     template <typename Key, typename Value>
     class SortedFileWriter {
         MONGO_DISALLOW_COPYING(SortedFileWriter);
@@ -116,8 +161,9 @@ namespace mongo {
                          > Settings;
 
         explicit SortedFileWriter(const SortOptions& opts, const Settings& = Settings());
+
         void addAlreadySorted(const Key&, const Value&);
-        Iterator* done();
+        Iterator* done(); /// Can't add more data after calling done()
 
     private:
         const Settings _settings;
@@ -128,6 +174,10 @@ namespace mongo {
     };
 }
 
+/**
+ * #include "mongo/db/sorter/sorter.cpp" and call this in a single translation
+ * unit once for each unique set of template parameters.
+ */
 #define MONGO_CREATE_SORTER(Key, Value, Comparator) \
     template class ::mongo::Sorter<Key, Value, Comparator>; \
     template class ::mongo::SortIteratorInterface<Key, Value>; \
@@ -140,4 +190,3 @@ namespace mongo {
                     const std::vector<boost::shared_ptr<SortIteratorInterface> >& iters, \
                     const SortOptions& opts, \
                     const Comparator& comp);
-
