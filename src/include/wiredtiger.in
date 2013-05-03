@@ -2420,9 +2420,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		45
 /*! pages written from cache */
 #define	WT_STAT_DSRC_CACHE_WRITE			46
-/*! raw compression call failed (no additional data available) */
+/*! raw compression call failed, no additional data available */
 #define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			47
-/*! raw compression call failed (additional data available) */
+/*! raw compression call failed, additional data available */
 #define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	48
 /*! raw compression call succeeded */
 #define	WT_STAT_DSRC_COMPRESS_RAW_OK			49
@@ -2487,7 +2487,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_SPLIT_INTL			78
 /*! reconciliation leaf pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_LEAF			79
-/*! reconciliation maximum number of splits created by for a page */
+/*! reconciliation maximum number of splits created for a page */
 #define	WT_STAT_DSRC_REC_SPLIT_MAX			80
 /*! object compaction */
 #define	WT_STAT_DSRC_SESSION_COMPACT			81

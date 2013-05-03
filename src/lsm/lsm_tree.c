@@ -475,7 +475,6 @@ __lsm_tree_open(
 	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
 	WT_ERR(__wt_cond_alloc(session, "lsm ckpt", 0, &lsm_tree->work_cond));
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
-	__wt_stat_init_dsrc_stats(&lsm_tree->stats);
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
@@ -515,6 +514,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 {
 	WT_LSM_TREE *lsm_tree;
 
+	/* See if the tree is already open. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
 			if (exclusive && lsm_tree->refcnt)
@@ -525,10 +525,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			return (0);
 		}
 
-	/*
-	 * If we don't already hold the schema lock, get it now so that we
-	 * can find and/or open the handle.
-	 */
+	/* Open a new tree. */
 	return (__lsm_tree_open(session, uri, treep));
 }
 

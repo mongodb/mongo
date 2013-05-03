@@ -69,7 +69,7 @@ struct __wt_lsm_tree {
 	WT_CONDVAR *work_cond;		/* Used to notify worker of activity */
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
-	WT_DSRC_STATS stats;		/* LSM statistics */
+	WT_DSRC_STATS stats;		/* LSM-level statistics */
 
 	uint64_t dsk_gen;
 

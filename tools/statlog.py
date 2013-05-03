@@ -33,6 +33,46 @@ from subprocess import call
 
 TIMEFMT = "%b %d %H:%M:%S"
 
+# DO NOT EDIT: automatically built by dist/stat.py
+# no scale-per-second list section: BEGIN
+no_scale_per_second_list = [
+    'cache: tracked dirty bytes in the cache',
+    'cache: bytes currently in the cache',
+    'cache: maximum bytes configured',
+    'cache: tracked dirty pages in the cache',
+    'cache: pages currently held in the cache',
+    'files currently open',
+    'open cursor count',
+    'block manager file allocation unit size',
+    'checkpoint size',
+    'file magic number',
+    'file major version number',
+    'minor version number',
+    'block manager file size in bytes',
+    'bloom filters in the LSM tree',
+    'total size of bloom filters',
+    'column-store variable-size deleted values',
+    'column-store fixed-size leaf pages',
+    'column-store internal pages',
+    'column-store variable-size leaf pages',
+    'total LSM, table or file object key/value pairs',
+    'fixed-record size',
+    'maximum tree depth',
+    'maximum internal page item size',
+    'maximum internal page size',
+    'maximum leaf page item size',
+    'maximum leaf page size',
+    'overflow pages',
+    'row-store internal pages',
+    'row-store leaf pages',
+    'overflow values cached in memory',
+    'chunks in the LSM tree',
+    'highest merge generation in the LSM tree',
+    'reconciliation maximum number of splits created for a page',
+    'open cursor count',
+]
+# no scale-per-second list section: END
+
 # Plot a set of entries for a title.
 def plot(title, values, num):
     # Ignore entries where the value never changes.
@@ -49,12 +89,7 @@ def plot(title, values, num):
     print 'building ' + title
 
     ylabel = 'Value'
-
-	# Most statistics are operation or event counts that can reasonably be
-	# scaled to a value per second, but some (such as the number of bytes in
-	# the cache or the number of files currently open) can't.  This is our
-	# heuristic for distinguishing between them.
-    if 'currently' in title or 'in the cache' in title:
+    if title.split(' ', 1)[1] in no_scale_per_second_list:
         seconds = 1
     else:
         t1, v1 = values[1]

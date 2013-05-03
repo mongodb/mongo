@@ -231,6 +231,15 @@ struct __wt_cursor_stat {
 	WT_BTREE *btree;		/* Pinned btree handle. */
 };
 
+/*
+ * WT_CURSOR_STATS --
+ *	Return a reference to a statistic cursor's stats structures; use the
+ * WT_CURSOR.stats_first field instead of WT_CURSOR.stats because the latter
+ * is NULL when non-cursor memory is used to hold the statistics.
+ */
+#define	WT_CURSOR_STATS(cursor)						\
+	(((WT_CURSOR_STAT *)cursor)->stats_first)
+
 struct __wt_cursor_table {
 	WT_CURSOR iface;
 
