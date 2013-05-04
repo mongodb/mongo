@@ -22,38 +22,66 @@
 
 #ifdef MONGO_HAVE_EXECINFO_BACKTRACE
 
-#include <execinfo.h>
+#include <execinfo.h>	/* For backtrace() and backtrace_symbols() */
+#include <dlfcn.h>	/* For dladdr() */
+#ifdef __GNUC__
+#include <cxxabi.h>	/* For __cxa_demangle() */
+#endif
 
 namespace mongo {
     static const int maxBackTraceFrames = 20;
 
     /**
      * Print a stack backtrace for the current thread to the specified ostream.
-     * 
+     *
      * @param os    ostream& to receive printed stack backtrace
      */
     void printStackTrace( std::ostream& os ) {
-        
-        void *b[maxBackTraceFrames];
-        
-        int size = ::backtrace( b, maxBackTraceFrames );
+
+        void *callstack[maxBackTraceFrames];
+
+        const int size = ::backtrace( callstack, maxBackTraceFrames );
         for ( int i = 0; i < size; i++ )
-            os << std::hex << b[i] << std::dec << ' ';
+            os << std::hex << callstack[i] << std::dec << ' ';
         os << std::endl;
-        
-        char **strings;
-        
-        strings = ::backtrace_symbols( b, size );
-        if (strings == NULL) {
+
+        char **symbols = ::backtrace_symbols( callstack, size );
+        if (symbols == NULL) {
             const int err = errno;
             os << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
                << std::endl;
-            return;
         }
-        for ( int i = 0; i < size; i++ )
-            os << ' ' << strings[i] << '\n';
+        for ( int i = 0; i < size; i++ ) {
+	    char buf[1024];
+	    Dl_info info;
+	    if (dladdr(callstack[i], &info) && info.dli_sname) {
+		char *demangled = NULL;
+		int status = -1;
+#ifdef __GNUC__
+		if (info.dli_sname[0] == '_')
+		    demangled = abi::__cxa_demangle(info.dli_sname, NULL, 0, &status);
+#endif
+		const char *symbol = (status == 0) ? demangled : info.dli_sname;
+		snprintf(buf, sizeof(buf), " %-3d %*p %s + %zd\n",
+			 i, int(2 + sizeof(void*) * 2), callstack[i], symbol,
+			(char *)callstack[i] - (char *)info.dli_saddr);
+		free(demangled);
+	    } else {
+		const char *symbol = (symbols != NULL) ? strstr(symbols[i], "0x") : NULL;
+		if (symbol) {
+		    /* Skip over the address and get the mangled name. */
+		    while (!isspace(*symbol++))
+			;
+		} else {
+		    symbol = "???";
+		}
+		snprintf(buf, sizeof(buf), " %-3d %*p %s\n",
+			 i, int(2 + sizeof(void*) * 2), callstack[i], symbol);
+	    }
+	    os << buf;
+	}
         os.flush();
-        ::free( strings );
+        ::free( symbols );
     }
 }
 
@@ -63,7 +91,7 @@ namespace mongo {
 
     /**
      * Get the path string to be used when searching for PDB files.
-     * 
+     *
      * @param process        Process handle
      * @return searchPath    Returned search path string
      */
@@ -83,7 +111,7 @@ namespace mongo {
 
     /**
      * Get the display name of the executable module containing the specified address.
-     * 
+     *
      * @param process               Process handle
      * @param address               Address to find
      * @param returnedModuleName    Returned module name
@@ -107,7 +135,7 @@ namespace mongo {
 
     /**
      * Get the display name and line number of the source file containing the specified address.
-     * 
+     *
      * @param process               Process handle
      * @param address               Address to find
      * @param returnedSourceAndLine Returned source code file name with line number
@@ -144,7 +172,7 @@ namespace mongo {
 
     /**
      * Get the display text of the symbol and offset of the specified address.
-     * 
+     *
      * @param process                   Process handle
      * @param address                   Address to find
      * @param symbolInfo                Caller's pre-built SYMBOL_INFO struct (for efficiency)
@@ -178,7 +206,7 @@ namespace mongo {
 
     /**
      * Print a stack backtrace for the current thread to the specified ostream.
-     * 
+     *
      * @param os    ostream& to receive printed stack backtrace
      */
     void printStackTrace( std::ostream& os ) {
@@ -193,7 +221,7 @@ namespace mongo {
 
     /**
      * Print stack trace (using a specified stack context) to "os"
-     * 
+     *
      * @param context   CONTEXT record for stack trace
      * @param os        ostream& to receive printed stack backtrace
      */
