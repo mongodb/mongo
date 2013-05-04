@@ -43,7 +43,7 @@ namespace pathsupport {
 
         Status maybePadTo(mutablebson::Element* elemArray,
                           size_t sizeRequired) {
-            dassert(elemArray.getType() == Array);
+            dassert(elemArray->getType() == Array);
 
             size_t currSize = mutablebson::countChildren(*elemArray);
             size_t toPad = sizeRequired - currSize;
