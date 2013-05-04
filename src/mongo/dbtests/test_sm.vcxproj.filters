@@ -1947,6 +1947,9 @@
     <ClInclude Include="..\db\index_legacy.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\ops\field_checker.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3760,6 +3763,15 @@
     <ClCompile Include="..\db\index_legacy.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\ops\field_checker.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\field_checker_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\path_support_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">
@@ -3890,6 +3902,9 @@
     </None>
     <None Include="..\platform\SConscript">
       <Filter>platform</Filter>
+    </None>
+    <None Include="..\db\ops\SConscript">
+      <Filter>db\ops</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -1634,6 +1634,15 @@
     <ClCompile Include="index_legacy.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="ops\field_checker.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\field_checker_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\path_support_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3327,6 +3336,9 @@
     <ClInclude Include="index_legacy.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
+    <ClInclude Include="ops\field_checker.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -3469,6 +3481,9 @@
     </None>
     <None Include="..\platform\SConscript">
       <Filter>platform</Filter>
+    </None>
+    <None Include="ops\SConscript">
+      <Filter>db\ops</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
