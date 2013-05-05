@@ -22,10 +22,10 @@
 
 #ifdef MONGO_HAVE_EXECINFO_BACKTRACE
 
-#include <execinfo.h>	/* For backtrace() and backtrace_symbols() */
-#include <dlfcn.h>	/* For dladdr() */
+#include <execinfo.h>   /* For backtrace() and backtrace_symbols() */
+#include <dlfcn.h>      /* For dladdr() */
 #ifdef __GNUC__
-#include <cxxabi.h>	/* For __cxa_demangle() */
+#include <cxxabi.h>     /* For __cxa_demangle() */
 #endif
 
 namespace mongo {
@@ -52,34 +52,34 @@ namespace mongo {
                << std::endl;
         }
         for ( int i = 0; i < size; i++ ) {
-	    char buf[1024];
-	    Dl_info info;
-	    if (dladdr(callstack[i], &info) && info.dli_sname) {
-		char *demangled = NULL;
-		int status = -1;
+            char buf[1024];
+            Dl_info info;
+            if (dladdr(callstack[i], &info) && info.dli_sname) {
+                char *demangled = NULL;
+                int status = -1;
 #ifdef __GNUC__
-		if (info.dli_sname[0] == '_')
-		    demangled = abi::__cxa_demangle(info.dli_sname, NULL, 0, &status);
+                if (info.dli_sname[0] == '_')
+                    demangled = abi::__cxa_demangle(info.dli_sname, NULL, 0, &status);
 #endif
-		const char *symbol = (status == 0) ? demangled : info.dli_sname;
-		snprintf(buf, sizeof(buf), " %-3d %*p %s + %zd\n",
-			 i, int(2 + sizeof(void*) * 2), callstack[i], symbol,
-			(char *)callstack[i] - (char *)info.dli_saddr);
-		free(demangled);
-	    } else {
-		const char *symbol = (symbols != NULL) ? strstr(symbols[i], "0x") : NULL;
-		if (symbol) {
-		    /* Skip over the address and get the mangled name. */
-		    while (!isspace(*symbol++))
-			;
-		} else {
-		    symbol = "???";
-		}
-		snprintf(buf, sizeof(buf), " %-3d %*p %s\n",
-			 i, int(2 + sizeof(void*) * 2), callstack[i], symbol);
-	    }
-	    os << buf;
-	}
+                const char *symbol = (status == 0) ? demangled : info.dli_sname;
+                snprintf(buf, sizeof(buf), " %-3d %*p %s + %zd\n",
+                         i, int(2 + sizeof(void*) * 2), callstack[i], symbol,
+                        (char *)callstack[i] - (char *)info.dli_saddr);
+                free(demangled);
+            } else {
+                const char *symbol = (symbols != NULL) ? strstr(symbols[i], "0x") : NULL;
+                if (symbol) {
+                    /* Skip over the address and get the mangled name. */
+                    while (!isspace(*symbol++))
+                        ;
+                } else {
+                    symbol = "???";
+                }
+                snprintf(buf, sizeof(buf), " %-3d %*p %s\n",
+                         i, int(2 + sizeof(void*) * 2), callstack[i], symbol);
+            }
+            os << buf;
+        }
         os.flush();
         ::free( symbols );
     }
