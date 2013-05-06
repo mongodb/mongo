@@ -27,18 +27,18 @@
 
 namespace mongo {
 
-    class SetModifier : public ModifierInterface {
-        MONGO_DISALLOW_COPYING(SetModifier);
+    class ModifierSet : public ModifierInterface {
+        MONGO_DISALLOW_COPYING(ModifierSet);
 
     public:
 
-        SetModifier();
+        ModifierSet();
 
         //
         // Modifier interface implementation
         //
 
-        virtual ~SetModifier();
+        virtual ~ModifierSet();
 
         /**
          * A 'modExpr' is a BSONElement {<fieldname>: <value>} coming from a $set mod such as

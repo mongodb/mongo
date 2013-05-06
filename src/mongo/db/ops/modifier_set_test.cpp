@@ -33,7 +33,7 @@ namespace {
     using mongo::fromjson;
     using mongo::ModifierInterface;
     using mongo::NumberInt;
-    using mongo::SetModifier;
+    using mongo::ModifierSet;
     using mongo::Status;
     using mongo::StringData;
     using mongo::mutablebson::checkDoc;
@@ -66,10 +66,10 @@ namespace {
             return _mod.log(logRoot);
         }
 
-        SetModifier& mod() { return _mod; }
+        ModifierSet& mod() { return _mod; }
 
     private:
-        SetModifier _mod;
+        ModifierSet _mod;
         BSONObj _modObj;
     };
 
@@ -79,13 +79,13 @@ namespace {
 
     TEST(Init, EmptyOperation) {
         BSONObj modObj = fromjson("{$set: {}}");
-        SetModifier mod;
+        ModifierSet mod;
         ASSERT_NOT_OK(mod.init(modObj["$set"].embeddedObject().firstElement()));
     }
 
     TEST(Init, NotOkForStorage) {
         BSONObj modObj = fromjson("{$set: {a: {$inc: {b: 1}}}}");
-        SetModifier mod;
+        ModifierSet mod;
         ASSERT_NOT_OK(mod.init(modObj["$set"].embeddedObject().firstElement()));
     }
 

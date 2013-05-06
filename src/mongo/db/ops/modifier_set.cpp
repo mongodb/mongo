@@ -24,7 +24,7 @@
 namespace mongo {
 
 
-    struct SetModifier::PreparedState {
+    struct ModifierSet::PreparedState {
 
         PreparedState(mutablebson::Document* targetDoc)
             : doc(*targetDoc)
@@ -55,16 +55,16 @@ namespace mongo {
 
     };
 
-    SetModifier::SetModifier()
+    ModifierSet::ModifierSet()
         : _fieldRef()
         , _posDollar(0)
         , _val() {
     }
 
-    SetModifier::~SetModifier() {
+    ModifierSet::~ModifierSet() {
     }
 
-    Status SetModifier::init(const BSONElement& modExpr) {
+    Status ModifierSet::init(const BSONElement& modExpr) {
 
         //
         // field name analysis
@@ -107,7 +107,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status SetModifier::prepare(mutablebson::Element root,
+    Status ModifierSet::prepare(mutablebson::Element root,
                                 const StringData& matchedField,
                                 ExecInfo* execInfo) {
 
@@ -173,7 +173,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status SetModifier::apply() const {
+    Status ModifierSet::apply() const {
         dassert(!_preparedState->noOp);
 
         // If there's no need to create any further field part, the $set is simply a value
@@ -215,7 +215,7 @@ namespace mongo {
                                          elemToSet);
     }
 
-    Status SetModifier::log(mutablebson::Element logRoot) const {
+    Status ModifierSet::log(mutablebson::Element logRoot) const {
 
         // We'd like to create an entry such as {$set: {<fieldname>: <value>}} under 'logRoot'.
         // We start by creating the {$set: ...} Element.
