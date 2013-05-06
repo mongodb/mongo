@@ -29,11 +29,7 @@ namespace mongo {
     class PrincipalName {
     public:
         PrincipalName() : _splitPoint(0) {}
-        PrincipalName(const StringData& user, const StringData& dbname) :
-            _fullName(user.toString() + "@" + dbname.toString()),
-            _splitPoint(user.size()) {
-        }
-
+        PrincipalName(const StringData& user, const StringData& dbname);
         /**
          * Gets the user-name part of a principal name.
          */
