@@ -138,7 +138,7 @@ namespace mongo {
         case MatchExpression::NE:
         case MatchExpression::REGEX:
         case MatchExpression::MOD:
-        case MatchExpression::IN: {
+        case MatchExpression::MATCH_IN: {
             const LeafMatchExpression* lme = static_cast<const LeafMatchExpression*>( full );
             if ( !keys.count( lme->getPath().toString() ) )
                 return NULL;

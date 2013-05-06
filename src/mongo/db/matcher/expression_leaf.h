@@ -273,7 +273,7 @@ namespace mongo {
      */
     class InMatchExpression : public LeafMatchExpression {
     public:
-        InMatchExpression() : LeafMatchExpression( IN ){}
+        InMatchExpression() : LeafMatchExpression( MATCH_IN ){}
         void init( const StringData& path );
 
         virtual LeafMatchExpression* shallowClone() const;
