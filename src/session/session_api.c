@@ -280,6 +280,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_schema_name_check(session, uri));
+
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_create(session, uri, config));
 
@@ -299,6 +300,10 @@ __session_rename(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, rename, config, cfg);
+
+	/* Disallow objects in the WiredTiger name space. */
+	WT_RET(__wt_schema_name_check(session, uri));
+	WT_RET(__wt_schema_name_check(session, newuri));
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_rename(session, uri, newuri, cfg));
@@ -410,6 +415,9 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, drop, config, cfg);
 
+	/* Disallow objects in the WiredTiger name space. */
+	WT_ERR(__wt_schema_name_check(session, uri));
+
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_drop(session, uri, cfg));
 
@@ -451,8 +459,11 @@ __session_truncate(WT_SESSION *wt_session,
 	int cmp;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
+
+	/* Disallow objects in the WiredTiger name space. */
+	WT_ERR(__wt_schema_name_check(session, uri));
+
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop
 	 * is specified, we don't need a URI.
