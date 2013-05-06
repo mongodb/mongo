@@ -130,8 +130,8 @@ namespace mongo {
         Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState) {
             Status status = Status::OK();
 
-            char type;
-            if ( !buffer->readNumber<char>(&type) )
+            signed char type;
+            if ( !buffer->readNumber<signed char>(&type) )
                 return Status( ErrorCodes::InvalidBSON, "invalid bson" );
 
             if ( type == EOO ) {
