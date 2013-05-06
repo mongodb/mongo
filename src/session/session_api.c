@@ -464,9 +464,6 @@ __session_truncate(WT_SESSION *wt_session,
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
 
-	/* Disallow objects in the WiredTiger name space. */
-	WT_ERR(__wt_schema_name_check(session, uri));
-
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop
 	 * is specified, we don't need a URI.
@@ -483,6 +480,9 @@ __session_truncate(WT_SESSION *wt_session,
 		    "start/stop cursors, but not both");
 
 	if (uri != NULL) {
+		/* Disallow objects in the WiredTiger name space. */
+		WT_ERR(__wt_schema_name_check(session, uri));
+
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_truncate(session, uri, cfg));
 		goto done;
