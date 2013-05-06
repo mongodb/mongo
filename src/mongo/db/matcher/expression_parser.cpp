@@ -32,24 +32,29 @@
 namespace mongo {
 
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
-                                                                ComparisonMatchExpression::Type cmp,
-                                                                const BSONElement& e ) {
-        std::auto_ptr<ComparisonMatchExpression> temp( new ComparisonMatchExpression() );
+                                                                       ComparisonMatchExpression* cmp,
+                                                                       const BSONElement& e ) {
+        std::auto_ptr<ComparisonMatchExpression> temp( cmp );
 
-        Status s = temp->init( name, cmp, e );
+        Status s = temp->init( name, e );
         if ( !s.isOK() )
             return StatusWithMatchExpression(s);
 
         return StatusWithMatchExpression( temp.release() );
     }
 
-    StatusWithMatchExpression MatchExpressionParser::_parseSubField( const char* name,
-                                                           const BSONElement& e ) {
+    StatusWithMatchExpression MatchExpressionParser::_parseSubField( const BSONObj& context,
+                                                                     const char* name,
+                                                                     const BSONElement& e,
+                                                                     int position,
+                                                                     bool* stop ) {
+
+        *stop = false;
 
         // TODO: these should move to getGtLtOp, or its replacement
 
         if ( mongoutils::str::equals( "$eq", e.fieldName() ) )
-            return _parseComparison( name, ComparisonMatchExpression::EQ, e );
+            return _parseComparison( name, new EqualityMatchExpression(), e );
 
         if ( mongoutils::str::equals( "$not", e.fieldName() ) ) {
             return _parseNot( name, e );
@@ -63,17 +68,17 @@ namespace mongo {
                                          mongoutils::str::stream() << "unknown operator: "
                                          << e.fieldName() );
         case BSONObj::LT:
-            return _parseComparison( name, ComparisonMatchExpression::LT, e );
+            return _parseComparison( name, new LTMatchExpression(), e );
         case BSONObj::LTE:
-            return _parseComparison( name, ComparisonMatchExpression::LTE, e );
+            return _parseComparison( name, new LTEMatchExpression(), e );
         case BSONObj::GT:
-            return _parseComparison( name, ComparisonMatchExpression::GT, e );
+            return _parseComparison( name, new GTMatchExpression(), e );
         case BSONObj::GTE:
-            return _parseComparison( name, ComparisonMatchExpression::GTE, e );
+            return _parseComparison( name, new GTEMatchExpression(), e );
         case BSONObj::NE:
-            return _parseComparison( name, ComparisonMatchExpression::NE, e );
+            return _parseComparison( name, new NEMatchExpression(), e );
         case BSONObj::Equality:
-            return _parseComparison( name, ComparisonMatchExpression::EQ, e );
+            return _parseComparison( name, new EqualityMatchExpression(), e );
 
         case BSONObj::opIN: {
             if ( e.type() != Array )
@@ -157,11 +162,22 @@ namespace mongo {
         case BSONObj::opOPTIONS:
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$options has to be after a $regex" );
 
+        case BSONObj::opREGEX: {
+            if ( position != 0 )
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "$regex has to be first" );
+
+            *stop = true;
+            return _parseRegexDocument( name, context );
+        }
+
         case BSONObj::opELEM_MATCH:
             return _parseElemMatch( name, e );
 
         case BSONObj::opALL:
             return _parseAll( name, e );
+
+        case BSONObj::opWITHIN:
+            return expressionParserGeoCallback( name, context );
 
         default:
             return StatusWithMatchExpression( ErrorCodes::BadValue, "not done" );
@@ -169,7 +185,7 @@ namespace mongo {
 
     }
 
-    StatusWithMatchExpression MatchExpressionParser::parse( const BSONObj& obj ) {
+    StatusWithMatchExpression MatchExpressionParser::_parse( const BSONObj& obj, bool topLevel ) {
 
         std::auto_ptr<AndMatchExpression> root( new AndMatchExpression() );
 
@@ -211,10 +227,26 @@ namespace mongo {
                         return StatusWithMatchExpression( s );
                     root->add( temp.release() );
                 }
+                else if ( mongoutils::str::equals( "atomic", rest ) ) {
+                    if ( !topLevel )
+                        return StatusWithMatchExpression( ErrorCodes::BadValue,
+                                                          "$atomic has to be at the top level" );
+                    if ( e.trueValue() )
+                        root->add( new AtomicMatchExpression() );
+                }
+                else if ( mongoutils::str::equals( "where", rest ) ) {
+                    if ( !topLevel )
+                        return StatusWithMatchExpression( ErrorCodes::BadValue,
+                                                          "$within has to be at the top level" );
+                    StatusWithMatchExpression s = expressionParserWhereCallback( e );
+                    if ( !s.isOK() )
+                        return s;
+                    root->add( s.getValue() );
+                }
                 else {
                     return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  mongoutils::str::stream()
-                                                 << "unkown operator: "
+                                                 << "unknown top level operator: "
                                                  << e.fieldName() );
                 }
 
@@ -236,8 +268,8 @@ namespace mongo {
                 continue;
             }
 
-            std::auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-            Status s = eq->init( e.fieldName(), ComparisonMatchExpression::EQ, e );
+            std::auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+            Status s = eq->init( e.fieldName(), e );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
 
@@ -251,31 +283,24 @@ namespace mongo {
                                         const BSONObj& sub,
                                         AndMatchExpression* root ) {
 
-        bool first = true;
+        int position = 0;
 
         BSONObjIterator j( sub );
         while ( j.more() ) {
             BSONElement deep = j.next();
 
-            int op = deep.getGtLtOp();
-            if ( op == BSONObj::opREGEX ) {
-                if ( !first )
-                    return Status( ErrorCodes::BadValue, "$regex has to be first" );
-
-                StatusWithMatchExpression s = _parseRegexDocument( name, sub );
-                if ( !s.isOK() )
-                    return s.getStatus();
-                root->add( s.getValue() );
-                return Status::OK();
-            }
-
-            StatusWithMatchExpression s = _parseSubField( name, deep );
+            bool stop = false;
+            StatusWithMatchExpression s = _parseSubField( sub, name, deep, position, &stop );
             if ( !s.isOK() )
                 return s.getStatus();
 
             root->add( s.getValue() );
-            first = false;
+
+            if ( stop )
+                break;
+            position++;
         }
+
         return Status::OK();
     }
 
@@ -406,8 +431,8 @@ namespace mongo {
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
 
-            for ( size_t i = 0; i < theAnd.size(); i++ ) {
-                temp->add( theAnd.get( i ) );
+            for ( size_t i = 0; i < theAnd.numChildren(); i++ ) {
+                temp->add( theAnd.getChild( i ) );
             }
             theAnd.clearAndRelease();
 
@@ -416,7 +441,7 @@ namespace mongo {
 
         // object case
 
-        StatusWithMatchExpression sub = parse( obj );
+        StatusWithMatchExpression sub = _parse( obj, false );
         if ( !sub.isOK() )
             return sub;
 
@@ -482,6 +507,19 @@ namespace mongo {
 
         return StatusWithMatchExpression( temp.release() );
     }
+
+    StatusWithMatchExpression expressionParserGeoCallbackDefault( const char* name,
+                                                                  const BSONObj& section ) {
+        return StatusWithMatchExpression( ErrorCodes::BadValue, "geo not linked in" );
+    }
+
+    MatchExpressionParserGeoCallback expressionParserGeoCallback = expressionParserGeoCallbackDefault;
+
+    StatusWithMatchExpression expressionParserWhereCallbackDefault(const BSONElement& where) {
+        return StatusWithMatchExpression( ErrorCodes::BadValue, "$where not linked in" );
+    }
+
+    MatchExpressionParserWhereCallback expressionParserWhereCallback = expressionParserWhereCallbackDefault;
 
 
 }

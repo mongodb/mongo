@@ -119,6 +119,14 @@ namespace mongo {
         debug << _path << " $all TODO\n";
     }
 
+    bool AllMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const AllMatchExpression* realOther = static_cast<const AllMatchExpression*>( other );
+        return _path == realOther->_path && _arrayEntries.equivalent( realOther->_arrayEntries );
+    }
+
     // -------
 
     bool ArrayMatchingMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
@@ -167,6 +175,26 @@ namespace mongo {
         if ( e.type() != Array )
             return false;
         return matchesArray( e.Obj(), NULL );
+    }
+
+
+    bool ArrayMatchingMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const ArrayMatchingMatchExpression* realOther =
+            static_cast<const ArrayMatchingMatchExpression*>( other );
+
+        if ( _path != realOther->_path )
+            return false;
+
+        if ( numChildren() != realOther->numChildren() )
+            return false;
+
+        for ( unsigned i = 0; i < numChildren(); i++ )
+            if ( !getChild(i)->equivalent( realOther->getChild(i) ) )
+                return false;
+        return true;
     }
 
 
@@ -319,6 +347,24 @@ namespace mongo {
         }
     }
 
+    bool AllElemMatchOp::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const AllElemMatchOp* realOther = static_cast<const AllElemMatchOp*>( other );
+        if ( _path != realOther->_path )
+            return false;
+
+        if ( _list.size() != realOther->_list.size() )
+            return false;
+
+        for ( unsigned i = 0; i < _list.size(); i++ )
+            if ( !_list[i]->equivalent( realOther->_list[i] ) )
+                return false;
+
+        return true;
+    }
+
 
     // ---------
 
@@ -337,6 +383,14 @@ namespace mongo {
     void SizeMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " $size : " << _size << "\n";
+    }
+
+    bool SizeMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const SizeMatchExpression* realOther = static_cast<const SizeMatchExpression*>( other );
+        return _path == realOther->_path && _size == realOther->_size;
     }
 
 

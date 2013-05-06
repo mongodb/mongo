@@ -18,6 +18,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/util/mongoutils/str.h"
@@ -35,9 +36,138 @@ namespace mongo {
         _expression.reset( result.getValue() );
     }
 
+    Matcher2::Matcher2( const Matcher2 &docMatcher, const BSONObj &constrainIndexKey ) {
+
+        MatchExpression* indexExpression = spliceForIndex( constrainIndexKey,
+                                                          docMatcher._expression.get() );
+        if ( indexExpression )
+            _expression.reset( indexExpression );
+    }
+
     bool Matcher2::matches(const BSONObj& doc, MatchDetails* details ) const {
+        if ( !_expression )
+            return true;
         return _expression->matches( doc, details );
     }
 
+
+    bool Matcher2::atomic() const {
+        if ( !_expression )
+            return false;
+
+        if ( _expression->matchType() == MatchExpression::ATOMIC )
+            return true;
+
+        // we only go down one level
+        for ( unsigned i = 0; i < _expression->numChildren(); i++ ) {
+            if ( _expression->getChild( i )->matchType() == MatchExpression::ATOMIC )
+                return true;
+        }
+
+        return false;
+    }
+
+    bool Matcher2::singleSimpleCriterion() const {
+        if ( !_expression )
+            return false;
+
+        if ( _expression->matchType() == MatchExpression::EQ )
+            return true;
+
+        if ( _expression->matchType() == MatchExpression::AND &&
+             _expression->numChildren() == 1 &&
+             _expression->getChild(0)->matchType() == MatchExpression::EQ )
+            return true;
+
+        return false;
+    }
+
+    bool Matcher2::keyMatch( const Matcher2 &docMatcher ) const {
+        if ( !_expression )
+            return docMatcher._expression.get() == NULL;
+        if ( !docMatcher._expression )
+            return false;
+
+        return _expression->equivalent( docMatcher._expression.get() );
+    }
+
+    MatchExpression* Matcher2::spliceForIndex( const BSONObj& key,
+                                               const MatchExpression* full ) {
+        set<string> keys;
+        for ( BSONObjIterator i(key); i.more(); ) {
+            BSONElement e = i.next();
+            keys.insert( e.fieldName() );
+        }
+        return _spliceForIndex( keys, full );
+    }
+
+    MatchExpression* Matcher2::_spliceForIndex( const set<string>& keys,
+                                                const MatchExpression* full ) {
+
+        switch ( full->matchType() ) {
+        case MatchExpression::NOT:
+        case MatchExpression::NOR:
+            // maybe?
+            return NULL;
+
+        case MatchExpression::AND:
+        case MatchExpression::OR: {
+            auto_ptr<ListOfMatchExpression> dup;
+            for ( unsigned i = 0; i < full->numChildren(); i++ ) {
+                MatchExpression* sub = _spliceForIndex( keys, full->getChild( i ) );
+                if ( !sub )
+                    continue;
+                if ( !dup.get() ) {
+                    if ( full->matchType() == MatchExpression::AND )
+                        dup.reset( new AndMatchExpression() );
+                    else
+                        dup.reset( new OrMatchExpression() );
+                }
+                dup->add( sub );
+            }
+            if ( dup.get() )
+                return dup.release();
+            return NULL;
+        }
+
+        case MatchExpression::LTE:
+        case MatchExpression::LT:
+        case MatchExpression::EQ:
+        case MatchExpression::GT:
+        case MatchExpression::GTE:
+        case MatchExpression::NE:
+        case MatchExpression::REGEX:
+        case MatchExpression::MOD:
+        case MatchExpression::IN: {
+            const LeafMatchExpression* lme = static_cast<const LeafMatchExpression*>( full );
+            if ( !keys.count( lme->getPath().toString() ) )
+                return NULL;
+            return lme->shallowClone();
+        }
+
+        case MatchExpression::ALL:
+            // TODO: conver to $in
+            return NULL;
+
+        case MatchExpression::ELEM_MATCH_OBJECT:
+        case MatchExpression::ELEM_MATCH_VALUE:
+            // future
+            return NULL;
+
+        case MatchExpression::GEO:
+        case MatchExpression::SIZE:
+        case MatchExpression::EXISTS:
+        case MatchExpression::NIN:
+        case MatchExpression::TYPE_OPERATOR:
+        case MatchExpression::ATOMIC:
+        case MatchExpression::WHERE:
+            // no go
+            return NULL;
+
+
+        }
+
+        return NULL;
+    }
 
 }

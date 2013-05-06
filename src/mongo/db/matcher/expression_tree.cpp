@@ -42,11 +42,28 @@ namespace mongo {
             _expressions[i]->debugString( debug, level + 1 );
     }
 
+    bool ListOfMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const ListOfMatchExpression* realOther = static_cast<const ListOfMatchExpression*>( other );
+
+        if ( _expressions.size() != realOther->_expressions.size() )
+            return false;
+
+        // TOOD: order doesn't matter
+        for ( unsigned i = 0; i < _expressions.size(); i++ )
+            if ( !_expressions[i]->equivalent( realOther->_expressions[i] ) )
+                return false;
+
+        return true;
+    }
+
     // -----
 
     bool AndMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
-        for ( size_t i = 0; i < size(); i++ ) {
-            if ( !get(i)->matches( doc, details ) ) {
+        for ( size_t i = 0; i < numChildren(); i++ ) {
+            if ( !getChild(i)->matches( doc, details ) ) {
                 if ( details )
                     details->resetOutput();
                 return false;
@@ -56,8 +73,8 @@ namespace mongo {
     }
 
     bool AndMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        for ( size_t i = 0; i < size(); i++ ) {
-            if ( !get(i)->matchesSingleElement( e ) ) {
+        for ( size_t i = 0; i < numChildren(); i++ ) {
+            if ( !getChild(i)->matchesSingleElement( e ) ) {
                 return false;
             }
         }
@@ -74,8 +91,8 @@ namespace mongo {
     // -----
 
     bool OrMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
-        for ( size_t i = 0; i < size(); i++ ) {
-            if ( get(i)->matches( doc, NULL ) ) {
+        for ( size_t i = 0; i < numChildren(); i++ ) {
+            if ( getChild(i)->matches( doc, NULL ) ) {
                 return true;
             }
         }
@@ -83,8 +100,8 @@ namespace mongo {
     }
 
     bool OrMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        for ( size_t i = 0; i < size(); i++ ) {
-            if ( get(i)->matchesSingleElement( e ) ) {
+        for ( size_t i = 0; i < numChildren(); i++ ) {
+            if ( getChild(i)->matchesSingleElement( e ) ) {
                 return true;
             }
         }
@@ -101,8 +118,8 @@ namespace mongo {
     // ----
 
     bool NorMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
-        for ( size_t i = 0; i < size(); i++ ) {
-            if ( get(i)->matches( doc, NULL ) ) {
+        for ( size_t i = 0; i < numChildren(); i++ ) {
+            if ( getChild(i)->matches( doc, NULL ) ) {
                 return false;
             }
         }
@@ -110,8 +127,8 @@ namespace mongo {
     }
 
     bool NorMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        for ( size_t i = 0; i < size(); i++ ) {
-            if ( get(i)->matchesSingleElement( e ) ) {
+        for ( size_t i = 0; i < numChildren(); i++ ) {
+            if ( getChild(i)->matchesSingleElement( e ) ) {
                 return false;
             }
         }
@@ -130,6 +147,13 @@ namespace mongo {
         _debugAddSpace( debug, level );
         debug << "$not\n";
         _exp->debugString( debug, level + 1 );
+    }
+
+    bool NotMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        return _exp->equivalent( other->getChild(0) );
     }
 
 }

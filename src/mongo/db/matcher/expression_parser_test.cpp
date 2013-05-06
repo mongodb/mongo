@@ -48,6 +48,12 @@ namespace mongo {
         ASSERT( !result.getValue()->matches( BSON( "x" << 5 << "y" << 4 ) ) );
     }
 
+    TEST( AtomicMatchExpressionTest, Simple1 ) {
+        BSONObj query = BSON( "x" << 5 << "$atomic" << BSON( "$gt" << 5 << "$lt" << 8 ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+    }
+
     StatusWith<int> fib( int n ) {
         if ( n < 0 ) return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
         if ( n <= 1 ) return StatusWith<int>( 1 );

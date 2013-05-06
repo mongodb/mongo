@@ -206,12 +206,13 @@ namespace mongo {
 
         const BSONObj *getQuery() const { return &_jsobj; };
 
-    private:
         /**
          * Generate a matcher for the provided index key format using the
          * provided full doc matcher.
          */
         Matcher( const Matcher &docMatcher, const BSONObj &constrainIndexKey );
+
+    private:
 
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.

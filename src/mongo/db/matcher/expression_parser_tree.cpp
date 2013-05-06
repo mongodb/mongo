@@ -39,7 +39,7 @@ namespace mongo {
                 return Status( ErrorCodes::BadValue,
                                "$or/$and/$nor entries need to be full objects" );
 
-            StatusWithMatchExpression sub = parse( e.Obj() );
+            StatusWithMatchExpression sub = _parse( e.Obj(), false );
             if ( !sub.isOK() )
                 return sub.getStatus();
 

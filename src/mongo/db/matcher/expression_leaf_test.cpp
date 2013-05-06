@@ -30,39 +30,40 @@ namespace mongo {
         BSONObj match = BSON( "a" << 5.0 );
         BSONObj notMatch = BSON( "a" << 6 );
 
-        ComparisonMatchExpression eq;
-        eq.init( "", ComparisonMatchExpression::EQ, operand["a"] );
+        EqualityMatchExpression eq;
+        eq.init( "", operand["a"] );
         ASSERT( eq.matchesSingleElement( match.firstElement() ) );
         ASSERT( !eq.matchesSingleElement( notMatch.firstElement() ) );
-    }
 
+        ASSERT( eq.equivalent( &eq ) );
+    }
 
     TEST( EqOp, InvalidEooOperand ) {
         BSONObj operand;
-        ComparisonMatchExpression eq;
-        ASSERT( !eq.init( "", ComparisonMatchExpression::EQ, operand.firstElement() ).isOK() );
+        EqualityMatchExpression eq;
+        ASSERT( !eq.init( "", operand.firstElement() ).isOK() );
     }
 
     TEST( EqOp, MatchesScalar ) {
         BSONObj operand = BSON( "a" << 5 );
-        ComparisonMatchExpression eq;
-        eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] );
+        EqualityMatchExpression eq;
+        eq.init( "a", operand[ "a" ] );
         ASSERT( eq.matches( BSON( "a" << 5.0 ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( EqOp, MatchesArrayValue ) {
         BSONObj operand = BSON( "a" << 5 );
-        ComparisonMatchExpression eq;
-        eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] );
+        EqualityMatchExpression eq;
+        eq.init( "a", operand[ "a" ] );
         ASSERT( eq.matches( BSON( "a" << BSON_ARRAY( 5.0 << 6 ) ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << BSON_ARRAY( 6 << 7 ) ), NULL ) );
     }
 
     TEST( EqOp, MatchesReferencedObjectValue ) {
         BSONObj operand = BSON( "a.b" << 5 );
-        ComparisonMatchExpression eq;
-        eq.init( "a.b", ComparisonMatchExpression::EQ, operand[ "a.b" ] );
+        EqualityMatchExpression eq;
+        eq.init( "a.b", operand[ "a.b" ] );
         ASSERT( eq.matches( BSON( "a" << BSON( "b" << 5 ) ), NULL ) );
         ASSERT( eq.matches( BSON( "a" << BSON( "b" << BSON_ARRAY( 5 ) ) ), NULL ) );
         ASSERT( eq.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << 5 ) ) ), NULL ) );
@@ -70,16 +71,16 @@ namespace mongo {
 
     TEST( EqOp, MatchesReferencedArrayValue ) {
         BSONObj operand = BSON( "a.0" << 5 );
-        ComparisonMatchExpression eq;
-        eq.init( "a.0", ComparisonMatchExpression::EQ, operand[ "a.0" ] );
+        EqualityMatchExpression eq;
+        eq.init( "a.0", operand[ "a.0" ] );
         ASSERT( eq.matches( BSON( "a" << BSON_ARRAY( 5 ) ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
     }
 
     TEST( EqOp, MatchesNull ) {
         BSONObj operand = BSON( "a" << BSONNULL );
-        ComparisonMatchExpression eq;
-        eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] );
+        EqualityMatchExpression eq;
+        eq.init( "a", operand[ "a" ] );
         ASSERT( eq.matches( BSONObj(), NULL ) );
         ASSERT( eq.matches( BSON( "a" << BSONNULL ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << 4 ), NULL ) );
@@ -87,8 +88,8 @@ namespace mongo {
 
     TEST( EqOp, MatchesMinKey ) {
         BSONObj operand = BSON( "a" << MinKey );
-        ComparisonMatchExpression eq;
-        eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] );
+        EqualityMatchExpression eq;
+        eq.init( "a", operand[ "a" ] );
         ASSERT( eq.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << 4 ), NULL ) );
@@ -98,8 +99,8 @@ namespace mongo {
 
     TEST( EqOp, MatchesMaxKey ) {
         BSONObj operand = BSON( "a" << MaxKey );
-        ComparisonMatchExpression eq;
-        ASSERT( eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] ).isOK() );
+        EqualityMatchExpression eq;
+        ASSERT( eq.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( eq.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << 4 ), NULL ) );
@@ -107,8 +108,8 @@ namespace mongo {
 
     TEST( EqOp, MatchesFullArray ) {
         BSONObj operand = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
-        ComparisonMatchExpression eq;
-        ASSERT( eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] ).isOK() );
+        EqualityMatchExpression eq;
+        ASSERT( eq.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( eq.matches( BSON( "a" << BSON_ARRAY( 1 << 2 ) ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) ), NULL ) );
         ASSERT( !eq.matches( BSON( "a" << BSON_ARRAY( 1 ) ), NULL ) );
@@ -117,8 +118,8 @@ namespace mongo {
 
     TEST( EqOp, ElemMatchKey ) {
         BSONObj operand = BSON( "a" << 5 );
-        ComparisonMatchExpression eq;
-        ASSERT( eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] ).isOK() );
+        EqualityMatchExpression eq;
+        ASSERT( eq.init( "a", operand[ "a" ] ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !eq.matches( BSON( "a" << 4 ), &details ) );
@@ -130,11 +131,27 @@ namespace mongo {
         ASSERT_EQUALS( "2", details.elemMatchKey() );
     }
 
+    TEST( EqOp, Equality1 ) {
+        EqualityMatchExpression eq1;
+        EqualityMatchExpression eq2;
+        EqualityMatchExpression eq3;
+
+        BSONObj operand = BSON( "a" << 5 << "b" << 5 << "c" << 4 );
+
+        eq1.init( "a", operand["a"] );
+        eq2.init( "a", operand["b"] );
+        eq3.init( "c", operand["c"] );
+
+        ASSERT( eq1.equivalent( &eq1 ) );
+        ASSERT( eq1.equivalent( &eq2 ) );
+        ASSERT( !eq1.equivalent( &eq3 ) );
+    }
+
     /**
        TEST( EqOp, MatchesIndexKeyScalar ) {
        BSONObj operand = BSON( "a" << 6 );
-       ComparisonMatchExpression eq;
-       ASSERT( eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] ).isOK() );
+       EqualityMatchExpression eq;
+       ASSERT( eq.init( "a", operand[ "a" ] ).isOK() );
        IndexSpec indexSpec( BSON( "a" << 1 ) );
        ASSERT( MatchMatchExpression::PartialMatchResult_True ==
        eq.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
@@ -146,8 +163,8 @@ namespace mongo {
 
        TEST( EqOp, MatchesIndexKeyMissing ) {
        BSONObj operand = BSON( "a" << 6 );
-       ComparisonMatchExpression eq;
-       ASSERT( eq.init( "a", ComparisonMatchExpression::EQ, operand[ "a" ] ).isOK() );
+       EqualityMatchExpression eq;
+       ASSERT( eq.init( "a", operand[ "a" ] ).isOK() );
        IndexSpec indexSpec( BSON( "b" << 1 ) );
        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
        eq.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
@@ -186,8 +203,8 @@ namespace mongo {
         BSONObj notMatch = BSON( "a" << 6 );
         BSONObj notMatchEqual = BSON( "a" << 5 );
         BSONObj notMatchWrongType = BSON( "a" << "foo" );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "", ComparisonMatchExpression::LT, operand[ "$lt" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "", operand[ "$lt" ] ).isOK() );
         ASSERT( lt.matchesSingleElement( match.firstElement() ) );
         ASSERT( !lt.matchesSingleElement( notMatch.firstElement() ) );
         ASSERT( !lt.matchesSingleElement( notMatchEqual.firstElement() ) );
@@ -196,38 +213,38 @@ namespace mongo {
 
     TEST( LtOp, InvalidEooOperand ) {
         BSONObj operand;
-        ComparisonMatchExpression lt;
-        ASSERT( !lt.init( "", ComparisonMatchExpression::LT, operand.firstElement() ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( !lt.init( "", operand.firstElement() ).isOK() );
     }
 
     TEST( LtOp, MatchesScalar ) {
         BSONObj operand = BSON( "$lt" << 5 );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "a", ComparisonMatchExpression::LT, operand[ "$lt" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a", operand[ "$lt" ] ).isOK() );
         ASSERT( lt.matches( BSON( "a" << 4.5 ), NULL ) );
         ASSERT( !lt.matches( BSON( "a" << 6 ), NULL ) );
     }
 
     TEST( LtOp, MatchesArrayValue ) {
         BSONObj operand = BSON( "$lt" << 5 );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "a", ComparisonMatchExpression::LT, operand[ "$lt" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a", operand[ "$lt" ] ).isOK() );
         ASSERT( lt.matches( BSON( "a" << BSON_ARRAY( 6 << 4.5 ) ), NULL ) );
         ASSERT( !lt.matches( BSON( "a" << BSON_ARRAY( 6 << 7 ) ), NULL ) );
     }
 
     TEST( LtOp, MatchesWholeArray ) {
         BSONObj operand = BSON( "$lt" << BSON_ARRAY( 5 ) );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "a", ComparisonMatchExpression::LT, operand[ "$lt" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a", operand[ "$lt" ] ).isOK() );
         // Arrays are not comparable as inequalities.
         ASSERT( !lt.matches( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
     }
 
     TEST( LtOp, MatchesNull ) {
         BSONObj operand = BSON( "$lt" << BSONNULL );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "a", ComparisonMatchExpression::LT, operand[ "$lt" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a", operand[ "$lt" ] ).isOK() );
         ASSERT( !lt.matches( BSONObj(), NULL ) );
         ASSERT( !lt.matches( BSON( "a" << BSONNULL ), NULL ) );
         ASSERT( !lt.matches( BSON( "a" << 4 ), NULL ) );
@@ -235,8 +252,8 @@ namespace mongo {
 
     TEST( LtOp, MatchesMinKey ) {
         BSONObj operand = BSON( "a" << MinKey );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "a", ComparisonMatchExpression::LT, operand[ "a" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( !lt.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( !lt.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( !lt.matches( BSON( "a" << 4 ), NULL ) );
@@ -244,8 +261,8 @@ namespace mongo {
 
     TEST( LtOp, MatchesMaxKey ) {
         BSONObj operand = BSON( "a" << MaxKey );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "a", ComparisonMatchExpression::LT, operand[ "a" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( !lt.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( lt.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( lt.matches( BSON( "a" << 4 ), NULL ) );
@@ -253,8 +270,8 @@ namespace mongo {
 
     TEST( LtOp, ElemMatchKey ) {
         BSONObj operand = BSON( "$lt" << 5 );
-        ComparisonMatchExpression lt;
-        ASSERT( lt.init( "a", ComparisonMatchExpression::LT, operand[ "$lt" ] ).isOK() );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a", operand[ "$lt" ] ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !lt.matches( BSON( "a" << 6 ), &details ) );
@@ -322,8 +339,8 @@ namespace mongo {
         BSONObj equalMatch = BSON( "a" << 5 );
         BSONObj notMatch = BSON( "a" << 6 );
         BSONObj notMatchWrongType = BSON( "a" << "foo" );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "", ComparisonMatchExpression::LTE, operand[ "$lte" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "", operand[ "$lte" ] ).isOK() );
         ASSERT( lte.matchesSingleElement( match.firstElement() ) );
         ASSERT( lte.matchesSingleElement( equalMatch.firstElement() ) );
         ASSERT( !lte.matchesSingleElement( notMatch.firstElement() ) );
@@ -332,38 +349,38 @@ namespace mongo {
 
     TEST( LteOp, InvalidEooOperand ) {
         BSONObj operand;
-        ComparisonMatchExpression lte;
-        ASSERT( !lte.init( "", ComparisonMatchExpression::LTE, operand.firstElement() ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( !lte.init( "", operand.firstElement() ).isOK() );
     }
 
     TEST( LteOp, MatchesScalar ) {
         BSONObj operand = BSON( "$lte" << 5 );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "a", ComparisonMatchExpression::LTE, operand[ "$lte" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a", operand[ "$lte" ] ).isOK() );
         ASSERT( lte.matches( BSON( "a" << 4.5 ), NULL ) );
         ASSERT( !lte.matches( BSON( "a" << 6 ), NULL ) );
     }
 
     TEST( LteOp, MatchesArrayValue ) {
         BSONObj operand = BSON( "$lte" << 5 );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "a", ComparisonMatchExpression::LTE, operand[ "$lte" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a", operand[ "$lte" ] ).isOK() );
         ASSERT( lte.matches( BSON( "a" << BSON_ARRAY( 6 << 4.5 ) ), NULL ) );
         ASSERT( !lte.matches( BSON( "a" << BSON_ARRAY( 6 << 7 ) ), NULL ) );
     }
 
     TEST( LteOp, MatchesWholeArray ) {
         BSONObj operand = BSON( "$lte" << BSON_ARRAY( 5 ) );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "a", ComparisonMatchExpression::LTE, operand[ "$lte" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a", operand[ "$lte" ] ).isOK() );
         // Arrays are not comparable as inequalities.
         ASSERT( !lte.matches( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
     }
 
     TEST( LteOp, MatchesNull ) {
         BSONObj operand = BSON( "$lte" << BSONNULL );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "a", ComparisonMatchExpression::LTE, operand[ "$lte" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a", operand[ "$lte" ] ).isOK() );
         ASSERT( lte.matches( BSONObj(), NULL ) );
         ASSERT( lte.matches( BSON( "a" << BSONNULL ), NULL ) );
         ASSERT( !lte.matches( BSON( "a" << 4 ), NULL ) );
@@ -371,8 +388,8 @@ namespace mongo {
 
     TEST( LteOp, MatchesMinKey ) {
         BSONObj operand = BSON( "a" << MinKey );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "a", ComparisonMatchExpression::LTE, operand[ "a" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( lte.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( !lte.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( !lte.matches( BSON( "a" << 4 ), NULL ) );
@@ -380,8 +397,8 @@ namespace mongo {
 
     TEST( LteOp, MatchesMaxKey ) {
         BSONObj operand = BSON( "a" << MaxKey );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "a", ComparisonMatchExpression::LTE, operand[ "a" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( lte.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( lte.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( lte.matches( BSON( "a" << 4 ), NULL ) );
@@ -390,8 +407,8 @@ namespace mongo {
 
     TEST( LteOp, ElemMatchKey ) {
         BSONObj operand = BSON( "$lte" << 5 );
-        ComparisonMatchExpression lte;
-        ASSERT( lte.init( "a", ComparisonMatchExpression::LTE, operand[ "$lte" ] ).isOK() );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a", operand[ "$lte" ] ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !lte.matches( BSON( "a" << 6 ), &details ) );
@@ -470,38 +487,38 @@ namespace mongo {
 
     TEST( GtOp, InvalidEooOperand ) {
         BSONObj operand;
-        ComparisonMatchExpression gt;
-        ASSERT( !gt.init( "", ComparisonMatchExpression::GT, operand.firstElement() ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( !gt.init( "", operand.firstElement() ).isOK() );
     }
 
     TEST( GtOp, MatchesScalar ) {
         BSONObj operand = BSON( "$gt" << 5 );
-        ComparisonMatchExpression gt;
-        ASSERT( gt.init( "a", ComparisonMatchExpression::GT, operand[ "$gt" ] ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a", operand[ "$gt" ] ).isOK() );
         ASSERT( gt.matches( BSON( "a" << 5.5 ), NULL ) );
         ASSERT( !gt.matches( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( GtOp, MatchesArrayValue ) {
         BSONObj operand = BSON( "$gt" << 5 );
-        ComparisonMatchExpression gt;
-        ASSERT( gt.init( "a", ComparisonMatchExpression::GT, operand[ "$gt" ] ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a", operand[ "$gt" ] ).isOK() );
         ASSERT( gt.matches( BSON( "a" << BSON_ARRAY( 3 << 5.5 ) ), NULL ) );
         ASSERT( !gt.matches( BSON( "a" << BSON_ARRAY( 2 << 4 ) ), NULL ) );
     }
 
     TEST( GtOp, MatchesWholeArray ) {
         BSONObj operand = BSON( "$gt" << BSON_ARRAY( 5 ) );
-        ComparisonMatchExpression gt;
-        ASSERT( gt.init( "a", ComparisonMatchExpression::GT, operand[ "$gt" ] ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a", operand[ "$gt" ] ).isOK() );
         // Arrays are not comparable as inequalities.
         ASSERT( !gt.matches( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
     }
 
     TEST( GtOp, MatchesNull ) {
         BSONObj operand = BSON( "$gt" << BSONNULL );
-        ComparisonMatchExpression gt;
-        ASSERT( gt.init( "a", ComparisonMatchExpression::GT, operand[ "$gt" ] ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a", operand[ "$gt" ] ).isOK() );
         ASSERT( !gt.matches( BSONObj(), NULL ) );
         ASSERT( !gt.matches( BSON( "a" << BSONNULL ), NULL ) );
         ASSERT( !gt.matches( BSON( "a" << 4 ), NULL ) );
@@ -509,8 +526,8 @@ namespace mongo {
 
     TEST( GtOp, MatchesMinKey ) {
         BSONObj operand = BSON( "a" << MinKey );
-        ComparisonMatchExpression gt;
-        ASSERT( gt.init( "a", ComparisonMatchExpression::GT, operand[ "a" ] ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( !gt.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( gt.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( gt.matches( BSON( "a" << 4 ), NULL ) );
@@ -518,8 +535,8 @@ namespace mongo {
 
     TEST( GtOp, MatchesMaxKey ) {
         BSONObj operand = BSON( "a" << MaxKey );
-        ComparisonMatchExpression gt;
-        ASSERT( gt.init( "a", ComparisonMatchExpression::GT, operand[ "a" ] ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( !gt.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( !gt.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( !gt.matches( BSON( "a" << 4 ), NULL ) );
@@ -527,8 +544,8 @@ namespace mongo {
 
     TEST( GtOp, ElemMatchKey ) {
         BSONObj operand = BSON( "$gt" << 5 );
-        ComparisonMatchExpression gt;
-        ASSERT( gt.init( "a", ComparisonMatchExpression::GT, operand[ "$gt" ] ).isOK() );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a", operand[ "$gt" ] ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !gt.matches( BSON( "a" << 4 ), &details ) );
@@ -597,8 +614,8 @@ namespace mongo {
         BSONObj equalMatch = BSON( "a" << 5 );
         BSONObj notMatch = BSON( "a" << 4 );
         BSONObj notMatchWrongType = BSON( "a" << "foo" );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "", ComparisonMatchExpression::GTE, operand[ "$gte" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "", operand[ "$gte" ] ).isOK() );
         ASSERT( gte.matchesSingleElement( match.firstElement() ) );
         ASSERT( gte.matchesSingleElement( equalMatch.firstElement() ) );
         ASSERT( !gte.matchesSingleElement( notMatch.firstElement() ) );
@@ -607,38 +624,38 @@ namespace mongo {
 
     TEST( ComparisonMatchExpression, InvalidEooOperand ) {
         BSONObj operand;
-        ComparisonMatchExpression gte;
-        ASSERT( !gte.init( "", ComparisonMatchExpression::GTE, operand.firstElement() ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( !gte.init( "", operand.firstElement() ).isOK() );
     }
 
     TEST( ComparisonMatchExpression, MatchesScalar ) {
         BSONObj operand = BSON( "$gte" << 5 );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "a", ComparisonMatchExpression::GTE, operand[ "$gte" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
         ASSERT( gte.matches( BSON( "a" << 5.5 ), NULL ) );
         ASSERT( !gte.matches( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( ComparisonMatchExpression, MatchesArrayValue ) {
         BSONObj operand = BSON( "$gte" << 5 );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "a", ComparisonMatchExpression::GTE, operand[ "$gte" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
         ASSERT( gte.matches( BSON( "a" << BSON_ARRAY( 4 << 5.5 ) ), NULL ) );
         ASSERT( !gte.matches( BSON( "a" << BSON_ARRAY( 1 << 2 ) ), NULL ) );
     }
 
     TEST( ComparisonMatchExpression, MatchesWholeArray ) {
         BSONObj operand = BSON( "$gte" << BSON_ARRAY( 5 ) );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "a", ComparisonMatchExpression::GTE, operand[ "$gte" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
         // Arrays are not comparable as inequalities.
         ASSERT( !gte.matches( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
     }
 
     TEST( ComparisonMatchExpression, MatchesNull ) {
         BSONObj operand = BSON( "$gte" << BSONNULL );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "a", ComparisonMatchExpression::GTE, operand[ "$gte" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
         ASSERT( gte.matches( BSONObj(), NULL ) );
         ASSERT( gte.matches( BSON( "a" << BSONNULL ), NULL ) );
         ASSERT( !gte.matches( BSON( "a" << 4 ), NULL ) );
@@ -646,8 +663,8 @@ namespace mongo {
 
     TEST( ComparisonMatchExpression, MatchesMinKey ) {
         BSONObj operand = BSON( "a" << MinKey );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "a", ComparisonMatchExpression::GTE, operand[ "a" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( gte.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( gte.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( gte.matches( BSON( "a" << 4 ), NULL ) );
@@ -655,8 +672,8 @@ namespace mongo {
 
     TEST( ComparisonMatchExpression, MatchesMaxKey ) {
         BSONObj operand = BSON( "a" << MaxKey );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "a", ComparisonMatchExpression::GTE, operand[ "a" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a", operand[ "a" ] ).isOK() );
         ASSERT( gte.matches( BSON( "a" << MaxKey ), NULL ) );
         ASSERT( !gte.matches( BSON( "a" << MinKey ), NULL ) );
         ASSERT( !gte.matches( BSON( "a" << 4 ), NULL ) );
@@ -664,8 +681,8 @@ namespace mongo {
 
     TEST( ComparisonMatchExpression, ElemMatchKey ) {
         BSONObj operand = BSON( "$gte" << 5 );
-        ComparisonMatchExpression gte;
-        ASSERT( gte.init( "a", ComparisonMatchExpression::GTE, operand[ "$gte" ] ).isOK() );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !gte.matches( BSON( "a" << 4 ), &details ) );
@@ -732,30 +749,30 @@ namespace mongo {
         BSONObj operand = BSON( "$ne" << 5 );
         BSONObj match = BSON( "a" << 6 );
         BSONObj notMatch = BSON( "a" << 5 );
-        ComparisonMatchExpression ne;
-        ASSERT( ne.init( "", ComparisonMatchExpression::NE, operand[ "$ne" ] ).isOK() );
+        NEMatchExpression ne;
+        ASSERT( ne.init( "", operand[ "$ne" ] ).isOK() );
         ASSERT( ne.matchesSingleElement( match.firstElement() ) );
         ASSERT( !ne.matchesSingleElement( notMatch.firstElement() ) );
     }
 
     TEST( NeOp, InvalidEooOperand ) {
         BSONObj operand;
-        ComparisonMatchExpression ne;
-        ASSERT( !ne.init( "", ComparisonMatchExpression::NE, operand.firstElement() ).isOK() );
+        NEMatchExpression ne;
+        ASSERT( !ne.init( "", operand.firstElement() ).isOK() );
     }
 
     TEST( NeOp, MatchesScalar ) {
         BSONObj operand = BSON( "$ne" << 5 );
-        ComparisonMatchExpression ne;
-        ASSERT( ne.init( "a", ComparisonMatchExpression::NE, operand[ "$ne" ] ).isOK() );
+        NEMatchExpression ne;
+        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
         ASSERT( ne.matches( BSON( "a" << 4 ), NULL ) );
         ASSERT( !ne.matches( BSON( "a" << 5 ), NULL ) );
     }
 
     TEST( NeOp, MatchesArrayValue ) {
         BSONObj operand = BSON( "$ne" << 5 );
-        ComparisonMatchExpression ne;
-        ASSERT( ne.init( "a", ComparisonMatchExpression::NE, operand[ "$ne" ] ).isOK() );
+        NEMatchExpression ne;
+        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
         ASSERT( ne.matches( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
         ASSERT( !ne.matches( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
         ASSERT( !ne.matches( BSON( "a" << BSON_ARRAY( 5 << 5 ) ), NULL ) );
@@ -763,8 +780,8 @@ namespace mongo {
 
     TEST( NeOp, MatchesNull ) {
         BSONObj operand = BSON( "$ne" << BSONNULL );
-        ComparisonMatchExpression ne;
-        ASSERT( ne.init( "a", ComparisonMatchExpression::NE, operand[ "$ne" ] ).isOK() );
+        NEMatchExpression ne;
+        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
         ASSERT( ne.matches( BSON( "a" << 4 ), NULL ) );
         ASSERT( !ne.matches( BSONObj(), NULL ) );
         ASSERT( !ne.matches( BSON( "a" << BSONNULL ), NULL ) );
@@ -772,8 +789,8 @@ namespace mongo {
 
     TEST( NeOp, ElemMatchKey ) {
         BSONObj operand = BSON( "$ne" << 5 );
-        ComparisonMatchExpression ne;
-        ASSERT( ne.init( "a", ComparisonMatchExpression::NE, operand[ "$ne" ] ).isOK() );
+        NEMatchExpression ne;
+        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !ne.matches( BSON( "a" << BSON_ARRAY( 2 << 6 << 5 ) ), &details ) );
@@ -975,6 +992,22 @@ namespace mongo {
         ASSERT_EQUALS( "1", details.elemMatchKey() );
     }
 
+    TEST( RegexMatchExpression, Equality1 ) {
+        RegexMatchExpression r1;
+        RegexMatchExpression r2;
+        RegexMatchExpression r3;
+        RegexMatchExpression r4;
+        ASSERT( r1.init( "a" , "b" ,"" ).isOK() );
+        ASSERT( r2.init( "a" , "b" ,"x" ).isOK() );
+        ASSERT( r3.init( "a" , "c" ,"" ).isOK() );
+        ASSERT( r4.init( "b" , "b" ,"" ).isOK() );
+
+        ASSERT( r1.equivalent( &r1 ) );
+        ASSERT( !r1.equivalent( &r2 ) );
+        ASSERT( !r1.equivalent( &r3 ) );
+        ASSERT( !r1.equivalent( &r4 ) );
+    }
+
     /**
        TEST( RegexMatchExpression, MatchesIndexKeyScalar ) {
        RegexMatchExpression regex;
@@ -1068,6 +1101,24 @@ namespace mongo {
         ASSERT( details.hasElemMatchKey() );
         ASSERT_EQUALS( "1", details.elemMatchKey() );
     }
+
+    TEST( ModMatchExpression, Equality1 ) {
+        ModMatchExpression m1;
+        ModMatchExpression m2;
+        ModMatchExpression m3;
+        ModMatchExpression m4;
+
+        m1.init( "a" , 1 , 2 );
+        m2.init( "a" , 2 , 2 );
+        m3.init( "a" , 1 , 1 );
+        m4.init( "b" , 1 , 2 );
+
+        ASSERT( m1.equivalent( &m1 ) );
+        ASSERT( !m1.equivalent( &m2 ) );
+        ASSERT( !m1.equivalent( &m3 ) );
+        ASSERT( !m1.equivalent( &m4 ) );
+    }
+
     /**
        TEST( ModMatchExpression, MatchesIndexKey ) {
        BSONObj operand = BSON( "$mod" << BSON_ARRAY( 2 << 1 ) );
@@ -1150,6 +1201,20 @@ namespace mongo {
         ASSERT( details.hasElemMatchKey() );
         ASSERT_EQUALS( "1", details.elemMatchKey() );
     }
+
+    TEST( ExistsMatchExpression, Equivalent ) {
+        ExistsMatchExpression e1;
+        ExistsMatchExpression e2;
+        ExistsMatchExpression e3;
+        e1.init( "a" , false );
+        e2.init( "a" , true );
+        e3.init( "b" , false );
+
+        ASSERT( e1.equivalent( &e1 ) );
+        ASSERT( !e1.equivalent( &e2 ) );
+        ASSERT( !e1.equivalent( &e3 ) );
+    }
+
     /**
        TEST( ExistsMatchExpression, MatchesIndexKey ) {
        BSONObj operand = BSON( "$exists" << true );
@@ -1247,6 +1312,21 @@ namespace mongo {
         ASSERT( details.hasElemMatchKey() );
         ASSERT_EQUALS( "1", details.elemMatchKey() );
     }
+
+    TEST( TypeMatchExpression, Equivalent ) {
+        TypeMatchExpression e1;
+        TypeMatchExpression e2;
+        TypeMatchExpression e3;
+        e1.init( "a", String );
+        e2.init( "a", NumberDouble );
+        e3.init( "b", String );
+
+        ASSERT( e1.equivalent( &e1 ) );
+        ASSERT( !e1.equivalent( &e2 ) );
+        ASSERT( !e1.equivalent( &e3 ) );
+    }
+
+
     /**
        TEST( TypeMatchExpression, MatchesIndexKey ) {
        BSONObj operand = BSON( "$type" << 2 );
@@ -1550,6 +1630,31 @@ namespace mongo {
         // The elemMatchKey feature is not implemented for $nin.
         ASSERT( !details.hasElemMatchKey() );
     }
+
+    TEST( NinMatchExpression, Equivalent ) {
+        BSONArray operand = BSON_ARRAY( 5 << 2 );
+
+        NinMatchExpression e1;
+        NinMatchExpression e2;
+        NinMatchExpression e3;
+
+        e1.init( "a" );
+        e2.init( "a" );
+        e3.init( "b" );
+
+        e1.getArrayFilterEntries()->addEquality( operand[0] );
+        e1.getArrayFilterEntries()->addEquality( operand[1] );
+
+        e2.getArrayFilterEntries()->addEquality( operand[0] );
+
+        e3.getArrayFilterEntries()->addEquality( operand[0] );
+        e3.getArrayFilterEntries()->addEquality( operand[1] );
+
+        ASSERT( e1.equivalent( &e1 ) );
+        ASSERT( !e1.equivalent( &e2 ) );
+        ASSERT( !e1.equivalent( &e3 ) );
+    }
+
 
     /**
     TEST( NinMatchExpression, MatchesIndexKey ) {

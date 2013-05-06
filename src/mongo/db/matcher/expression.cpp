@@ -25,6 +25,11 @@
 
 namespace mongo {
 
+    MatchExpression::MatchExpression( MatchCategory category, MatchType type )
+        : _matchCategory( category ), _matchType( type ){
+    }
+
+
     string MatchExpression::toString() const {
         StringBuilder buf;
         debugString( buf, 0 );
@@ -34,6 +39,11 @@ namespace mongo {
     void MatchExpression::_debugAddSpace( StringBuilder& debug, int level ) const {
         for ( int i = 0; i < level; i++ )
             debug << "    ";
+    }
+
+    void AtomicMatchExpression::debugString( StringBuilder& debug, int level ) const {
+        _debugAddSpace( debug, level );
+        debug << "$atomic\n";
     }
 
 }

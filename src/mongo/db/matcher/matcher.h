@@ -21,6 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/match_details.h"
@@ -33,11 +34,43 @@ namespace mongo {
     public:
         explicit Matcher2( const BSONObj& pattern );
 
+        /**
+         * Generate a matcher for the provided index key format using the
+         * provided full doc matcher.
+         * THIS API WILL GO AWAY EVENTUALLY
+         */
+        explicit Matcher2( const Matcher2 &docMatcher, const BSONObj &constrainIndexKey );
+
+
         bool matches(const BSONObj& doc, MatchDetails* details = NULL ) const;
+
+        bool atomic() const;
+
+        /*
+         * this is from old mature
+         * criteria is 1 equality expression, nothing else
+         */
+        bool singleSimpleCriterion() const;
+
+        const BSONObj* getQuery() const { return &_pattern; };
+        std::string toString() const { return _pattern.toString(); }
+
+        /**
+         * @return true if this key matcher will return the same true/false
+         * value as the provided doc matcher.
+         */
+        bool keyMatch( const Matcher2 &docMatcher ) const;
+
+        static MatchExpression* spliceForIndex( const BSONObj& key,
+                                                const MatchExpression* full );
 
     private:
         const BSONObj _pattern; // this is owned by who created us
         boost::scoped_ptr<MatchExpression> _expression;
+
+        static MatchExpression* _spliceForIndex( const set<std::string>& keys,
+                                                 const MatchExpression* full );
+
     };
 
 }

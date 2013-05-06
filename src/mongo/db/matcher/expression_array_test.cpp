@@ -183,6 +183,31 @@ namespace mongo {
         ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
     }
 
+    TEST( AllMatchExpression, Equivalent ) {
+        BSONObj operand = BSON_ARRAY( 5 << 2 );
+
+        AllMatchExpression e1;
+        AllMatchExpression e2;
+        AllMatchExpression e3;
+
+        e1.init( "a" );
+        e1.getArrayFilterEntries()->addEquality( operand[0] );
+        e1.getArrayFilterEntries()->addEquality( operand[1] );
+
+        e2.init( "a" );
+        e2.getArrayFilterEntries()->addEquality( operand[0] );
+
+        e3.init( "b" );
+        e3.getArrayFilterEntries()->addEquality( operand[0] );
+        e3.getArrayFilterEntries()->addEquality( operand[1] );
+
+        ASSERT( e1.equivalent( &e1 ) );
+        ASSERT( !e1.equivalent( &e2 ) );
+        ASSERT( !e1.equivalent( &e3 ) );
+
+    }
+
+
     /**
     TEST( AllMatchExpression, MatchesIndexKey ) {
         BSONObj operand = BSON( "$all" << BSON_ARRAY( 5 ) );
@@ -199,8 +224,8 @@ namespace mongo {
         BSONObj baseOperand = BSON( "b" << 5 );
         BSONObj match = BSON( "a" << BSON_ARRAY( BSON( "b" << 5.0 ) ) );
         BSONObj notMatch = BSON( "a" << BSON_ARRAY( BSON( "b" << 6 ) ) );
-        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-        ASSERT( eq->init( "b", ComparisonMatchExpression::EQ, baseOperand[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "b", baseOperand[ "b" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
@@ -211,8 +236,8 @@ namespace mongo {
         BSONObj baseOperand = BSON( "1" << 5 );
         BSONObj match = BSON( "a" << BSON_ARRAY( BSON_ARRAY( 's' << 5.0 ) ) );
         BSONObj notMatch = BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 << 6 ) ) );
-        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-        ASSERT( eq->init( "1", ComparisonMatchExpression::EQ, baseOperand[ "1" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "1", baseOperand[ "1" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
@@ -228,12 +253,12 @@ namespace mongo {
         BSONObj notMatch3 = BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 5 << 6 ) ) ) );
         BSONObj match =
             BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 5 << 6 ) << "c" << 7 ) ) );
-        auto_ptr<ComparisonMatchExpression> eq1( new ComparisonMatchExpression() );
-        ASSERT( eq1->init( "b", ComparisonMatchExpression::EQ, baseOperand1[ "b" ] ).isOK() );
-        auto_ptr<ComparisonMatchExpression> eq2( new ComparisonMatchExpression() );
-        ASSERT( eq2->init( "b", ComparisonMatchExpression::EQ, baseOperand2[ "b" ] ).isOK() );
-        auto_ptr<ComparisonMatchExpression> eq3( new ComparisonMatchExpression() );
-        ASSERT( eq3->init( "c", ComparisonMatchExpression::EQ, baseOperand3[ "c" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq1( new EqualityMatchExpression() );
+        ASSERT( eq1->init( "b", baseOperand1[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq2( new EqualityMatchExpression() );
+        ASSERT( eq2->init( "b", baseOperand2[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq3( new EqualityMatchExpression() );
+        ASSERT( eq3->init( "c", baseOperand3[ "c" ] ).isOK() );
 
         auto_ptr<AndMatchExpression> andOp( new AndMatchExpression() );
         andOp->add( eq1.release() );
@@ -250,8 +275,8 @@ namespace mongo {
 
     TEST( ElemMatchObjectMatchExpression, MatchesNonArray ) {
         BSONObj baseOperand = BSON( "b" << 5 );
-        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-        ASSERT( eq->init( "b", ComparisonMatchExpression::EQ, baseOperand[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "b", baseOperand[ "b" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         // Directly nested objects are not matched with $elemMatch.  An intervening array is
@@ -263,8 +288,8 @@ namespace mongo {
 
     TEST( ElemMatchObjectMatchExpression, MatchesArrayObject ) {
         BSONObj baseOperand = BSON( "b" << 5 );
-        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-        ASSERT( eq->init( "b", ComparisonMatchExpression::EQ, baseOperand[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "b", baseOperand[ "b" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << 5 ) ) ), NULL ) );
@@ -276,8 +301,8 @@ namespace mongo {
 
     TEST( ElemMatchObjectMatchExpression, MatchesMultipleNamedValues ) {
         BSONObj baseOperand = BSON( "c" << 5 );
-        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-        ASSERT( eq->init( "c", ComparisonMatchExpression::EQ, baseOperand[ "c" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "c", baseOperand[ "c" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a.b", eq.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" <<
@@ -297,8 +322,8 @@ namespace mongo {
 
     TEST( ElemMatchObjectMatchExpression, ElemMatchKey ) {
         BSONObj baseOperand = BSON( "c" << 6 );
-        auto_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-        ASSERT( eq->init( "c", ComparisonMatchExpression::EQ, baseOperand[ "c" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "c", baseOperand[ "c" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a.b", eq.release() ).isOK() );
         MatchDetails details;
@@ -342,8 +367,8 @@ namespace mongo {
         BSONObj baseOperand = BSON( "$gt" << 5 );
         BSONObj match = BSON( "a" << BSON_ARRAY( 6 ) );
         BSONObj notMatch = BSON( "a" << BSON_ARRAY( 4 ) );
-        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
-        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt( new GTMatchExpression() );
+        ASSERT( gt->init( "", baseOperand[ "$gt" ] ).isOK() );
         ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a", gt.release() ).isOK() );
         ASSERT( op.matchesSingleElement( match[ "a" ] ) );
@@ -356,10 +381,10 @@ namespace mongo {
         BSONObj notMatch1 = BSON( "a" << BSON_ARRAY( 0 << 1 ) );
         BSONObj notMatch2 = BSON( "a" << BSON_ARRAY( 10 << 11 ) );
         BSONObj match = BSON( "a" << BSON_ARRAY( 0 << 5 << 11 ) );
-        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
-        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand1[ "$gt" ] ).isOK() );
-        auto_ptr<ComparisonMatchExpression> lt( new ComparisonMatchExpression() );
-        ASSERT( lt->init( "", ComparisonMatchExpression::LT, baseOperand2[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt( new GTMatchExpression() );
+        ASSERT( gt->init( "", baseOperand1[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> lt( new LTMatchExpression() );
+        ASSERT( lt->init( "", baseOperand2[ "$lt" ] ).isOK() );
 
         ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a" ).isOK() );
@@ -373,8 +398,8 @@ namespace mongo {
 
     TEST( ElemMatchValueMatchExpression, MatchesNonArray ) {
         BSONObj baseOperand = BSON( "$gt" << 5 );
-        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
-        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt( new GTMatchExpression() );
+        ASSERT( gt->init( "", baseOperand[ "$gt" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", gt.release() ).isOK() );
         // Directly nested objects are not matched with $elemMatch.  An intervening array is
@@ -385,8 +410,8 @@ namespace mongo {
 
     TEST( ElemMatchValueMatchExpression, MatchesArrayScalar ) {
         BSONObj baseOperand = BSON( "$gt" << 5 );
-        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
-        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt( new GTMatchExpression() );
+        ASSERT( gt->init( "", baseOperand[ "$gt" ] ).isOK() );
         ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a", gt.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
@@ -396,8 +421,8 @@ namespace mongo {
 
     TEST( ElemMatchValueMatchExpression, MatchesMultipleNamedValues ) {
         BSONObj baseOperand = BSON( "$gt" << 5 );
-        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
-        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt( new GTMatchExpression() );
+        ASSERT( gt->init( "", baseOperand[ "$gt" ] ).isOK() );
         ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a.b", gt.release() ).isOK() );
         ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 6 ) ) ) ), NULL ) );
@@ -409,8 +434,8 @@ namespace mongo {
 
     TEST( ElemMatchValueMatchExpression, ElemMatchKey ) {
         BSONObj baseOperand = BSON( "$gt" << 6 );
-        auto_ptr<ComparisonMatchExpression> gt( new ComparisonMatchExpression() );
-        ASSERT( gt->init( "", ComparisonMatchExpression::GT, baseOperand[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt( new GTMatchExpression() );
+        ASSERT( gt->init( "", baseOperand[ "$gt" ] ).isOK() );
         ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a.b", gt.release() ).isOK() );
         MatchDetails details;
@@ -452,12 +477,12 @@ namespace mongo {
 
 
         BSONObj baseOperanda1 = BSON( "a" << 1 );
-        auto_ptr<ComparisonMatchExpression> eqa1( new ComparisonMatchExpression() );
-        ASSERT( eqa1->init( "a", ComparisonMatchExpression::EQ, baseOperanda1[ "a" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqa1( new EqualityMatchExpression() );
+        ASSERT( eqa1->init( "a", baseOperanda1[ "a" ] ).isOK() );
 
         BSONObj baseOperandb1 = BSON( "b" << 1 );
-        auto_ptr<ComparisonMatchExpression> eqb1( new ComparisonMatchExpression() );
-        ASSERT( eqb1->init( "b", ComparisonMatchExpression::EQ, baseOperandb1[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqb1( new EqualityMatchExpression() );
+        ASSERT( eqb1->init( "b", baseOperandb1[ "b" ] ).isOK() );
 
         auto_ptr<AndMatchExpression> and1( new AndMatchExpression() );
         and1->add( eqa1.release() );
@@ -469,12 +494,12 @@ namespace mongo {
         // elemMatch1 = { x : { $elemMatch : { a : 1, b : 1 } } }
 
         BSONObj baseOperanda2 = BSON( "a" << 2 );
-        auto_ptr<ComparisonMatchExpression> eqa2( new ComparisonMatchExpression() );
-        ASSERT( eqa2->init( "a", ComparisonMatchExpression::EQ, baseOperanda2[ "a" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqa2( new EqualityMatchExpression() );
+        ASSERT( eqa2->init( "a", baseOperanda2[ "a" ] ).isOK() );
 
         BSONObj baseOperandb2 = BSON( "b" << 2 );
-        auto_ptr<ComparisonMatchExpression> eqb2( new ComparisonMatchExpression() );
-        ASSERT( eqb2->init( "b", ComparisonMatchExpression::EQ, baseOperandb2[ "b" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eqb2( new EqualityMatchExpression() );
+        ASSERT( eqb2->init( "b", baseOperandb2[ "b" ] ).isOK() );
 
         auto_ptr<AndMatchExpression> and2( new AndMatchExpression() );
         and2->add( eqa2.release() );
@@ -510,12 +535,12 @@ namespace mongo {
 
     TEST( AllElemMatchOp, Matches ) {
         BSONObj baseOperandgt1 = BSON( "$gt" << 1 );
-        auto_ptr<ComparisonMatchExpression> gt1( new ComparisonMatchExpression() );
-        ASSERT( gt1->init( "", ComparisonMatchExpression::GT, baseOperandgt1[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt1( new GTMatchExpression() );
+        ASSERT( gt1->init( "", baseOperandgt1[ "$gt" ] ).isOK() );
 
         BSONObj baseOperandlt1 = BSON( "$lt" << 10 );
-        auto_ptr<ComparisonMatchExpression> lt1( new ComparisonMatchExpression() );
-        ASSERT( lt1->init( "", ComparisonMatchExpression::LT, baseOperandlt1[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> lt1( new LTMatchExpression() );
+        ASSERT( lt1->init( "", baseOperandlt1[ "$lt" ] ).isOK() );
 
         auto_ptr<ElemMatchValueMatchExpression> elemMatch1( new ElemMatchValueMatchExpression() );
         elemMatch1->init( "x" );
@@ -523,12 +548,12 @@ namespace mongo {
         elemMatch1->add( lt1.release() );
 
         BSONObj baseOperandgt2 = BSON( "$gt" << 101 );
-        auto_ptr<ComparisonMatchExpression> gt2( new ComparisonMatchExpression() );
-        ASSERT( gt2->init( "", ComparisonMatchExpression::GT, baseOperandgt2[ "$gt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> gt2( new GTMatchExpression() );
+        ASSERT( gt2->init( "", baseOperandgt2[ "$gt" ] ).isOK() );
 
         BSONObj baseOperandlt2 = BSON( "$lt" << 110 );
-        auto_ptr<ComparisonMatchExpression> lt2( new ComparisonMatchExpression() );
-        ASSERT( lt2->init( "", ComparisonMatchExpression::LT, baseOperandlt2[ "$lt" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> lt2( new LTMatchExpression() );
+        ASSERT( lt2->init( "", baseOperandlt2[ "$lt" ] ).isOK() );
 
         auto_ptr<ElemMatchValueMatchExpression> elemMatch2( new ElemMatchValueMatchExpression() );
         elemMatch2->init( "x" );
@@ -628,6 +653,20 @@ namespace mongo {
                               &details ) );
         ASSERT( details.hasElemMatchKey() );
         ASSERT_EQUALS( "1", details.elemMatchKey() );
+    }
+
+    TEST( SizeMatchExpression, Equivalent ) {
+        SizeMatchExpression e1;
+        SizeMatchExpression e2;
+        SizeMatchExpression e3;
+
+        e1.init( "a", 5 );
+        e2.init( "a", 6 );
+        e3.init( "v", 5 );
+
+        ASSERT( e1.equivalent( &e1 ) );
+        ASSERT( !e1.equivalent( &e2 ) );
+        ASSERT( !e1.equivalent( &e3 ) );
     }
 
     /**

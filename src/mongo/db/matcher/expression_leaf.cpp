@@ -75,15 +75,39 @@ namespace mongo {
 
     // -------------
 
-    Status ComparisonMatchExpression::init( const StringData& path, Type type, const BSONElement& rhs ) {
+    bool ComparisonMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( other->matchType() != matchType() )
+            return false;
+        const ComparisonMatchExpression* realOther =
+            static_cast<const ComparisonMatchExpression*>( other );
+
+        return
+            _path == realOther->_path &&
+            _rhs.valuesEqual( realOther->_rhs );
+    }
+
+
+    Status ComparisonMatchExpression::init( const StringData& path, const BSONElement& rhs ) {
         _path = path;
-        _type = type;
         _rhs = rhs;
         if ( rhs.eoo() ) {
             return Status( ErrorCodes::BadValue, "need a real operand" );
         }
 
-        _allHaveToMatch = _type == NE;
+        switch ( matchType() ) {
+        case NE:
+            _allHaveToMatch = true;
+            break;
+        case LT:
+        case LTE:
+        case EQ:
+        case GT:
+        case GTE:
+            _allHaveToMatch = false;
+            break;
+        default:
+            return Status( ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression" );
+        }
 
         return Status::OK();
     }
@@ -96,20 +120,20 @@ namespace mongo {
             // some special cases
             //  jstNULL and undefined are treated the same
             if ( e.canonicalType() + _rhs.canonicalType() == 5 ) {
-                return _type == EQ || _type == LTE || _type == GTE;
+                return matchType() == EQ || matchType() == LTE || matchType() == GTE;
             }
             return _invertForNE( false );
         }
 
         if ( _rhs.type() == Array ) {
-            if ( _type != EQ && _type != NE ) {
+            if ( matchType() != EQ && matchType() != NE ) {
                 return false;
             }
         }
 
         int x = compareElementValues( e, _rhs );
 
-        switch ( _type ) {
+        switch ( matchType() ) {
         case LT:
             return x < 0;
         case LTE:
@@ -122,12 +146,14 @@ namespace mongo {
             return x >= 0;
         case NE:
             return x != 0;
+        default:
+            throw 1;
         }
         throw 1;
     }
 
     bool ComparisonMatchExpression::_invertForNE( bool normal ) const {
-        if ( _type == NE )
+        if ( matchType() == NE )
             return !normal;
         return normal;
     }
@@ -135,13 +161,14 @@ namespace mongo {
     void ComparisonMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << _path << " ";
-        switch ( _type ) {
+        switch ( matchType() ) {
         case LT: debug << "$lt"; break;
         case LTE: debug << "$lte"; break;
         case EQ: debug << "=="; break;
         case GT: debug << "$gt"; break;
         case GTE: debug << "$gte"; break;
         case NE: debug << "$ne"; break;
+        default: debug << " UNKNOWN - should be impossible"; break;
         }
         debug << " " << _rhs.toString( false ) << "\n";
     }
@@ -165,6 +192,18 @@ namespace mongo {
         }
         return options;
     }
+
+    bool RegexMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const RegexMatchExpression* realOther = static_cast<const RegexMatchExpression*>( other );
+        return
+            _path == realOther->_path &&
+            _regex == realOther->_regex
+            && _flags == realOther->_flags;
+    }
+
 
     Status RegexMatchExpression::init( const StringData& path, const BSONElement& e ) {
         if ( e.type() != RegEx )
@@ -229,6 +268,17 @@ namespace mongo {
         debug << _path << " mod " << _divisor << " % x == "  << _remainder << "\n";
     }
 
+    bool ModMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const ModMatchExpression* realOther = static_cast<const ModMatchExpression*>( other );
+        return
+            _path == realOther->_path &&
+            _divisor == realOther->_divisor &&
+            _remainder == realOther->_remainder;
+    }
+
 
     // ------------------
 
@@ -249,6 +299,15 @@ namespace mongo {
         _debugAddSpace( debug, level );
         debug << _path << " exists: " << _exists << "\n";
     }
+
+    bool ExistsMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const ExistsMatchExpression* realOther = static_cast<const ExistsMatchExpression*>( other );
+        return _path == realOther->_path && _exists == realOther->_exists;
+    }
+
 
     // ----
 
@@ -311,6 +370,15 @@ namespace mongo {
     }
 
 
+    bool TypeMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const TypeMatchExpression* realOther = static_cast<const TypeMatchExpression*>( other );
+        return _path == realOther->_path && _type == realOther->_type;
+    }
+
+
     // --------
 
     ArrayFilterEntries::ArrayFilterEntries(){
@@ -345,6 +413,27 @@ namespace mongo {
         return Status::OK();
     }
 
+    bool ArrayFilterEntries::equivalent( const ArrayFilterEntries& other ) const {
+        if ( _hasNull != other._hasNull )
+            return false;
+
+        if ( _regexes.size() != other._regexes.size() )
+            return false;
+        for ( unsigned i = 0; i < _regexes.size(); i++ )
+            if ( !_regexes[i]->equivalent( other._regexes[i] ) )
+                return false;
+
+        return _equalities == other._equalities;
+    }
+
+    void ArrayFilterEntries::copyTo( ArrayFilterEntries& toFillIn ) const {
+        toFillIn._hasNull = _hasNull;
+        toFillIn._equalities = _equalities;
+        for ( unsigned i = 0; i < _regexes.size(); i++ )
+            toFillIn._regexes.push_back( static_cast<RegexMatchExpression*>(_regexes[i]->shallowClone()) );
+    }
+
+
     // -----------
 
     void InMatchExpression::init( const StringData& path ) {
@@ -373,12 +462,35 @@ namespace mongo {
         debug << _path << " $in: TODO\n";
     }
 
+    bool InMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+        const InMatchExpression* realOther = static_cast<const InMatchExpression*>( other );
+        log() << "yo: " << _path << " " << realOther->_path << std::endl;
+        return
+            _path == realOther->_path &&
+            _arrayEntries.equivalent( realOther->_arrayEntries );
+    }
+
+    LeafMatchExpression* InMatchExpression::shallowClone() const {
+        InMatchExpression* next = new InMatchExpression();
+        copyTo( next );
+        return next;
+    }
+
+    void InMatchExpression::copyTo( InMatchExpression* toFillIn ) const {
+        toFillIn->init( _path );
+        _arrayEntries.copyTo( toFillIn->_arrayEntries );
+    }
+
+
 
     // ----------
 
     void NinMatchExpression::init( const StringData& path ) {
         _path = path;
         _allHaveToMatch = true;
+        _in.init( path );
     }
 
 
@@ -391,6 +503,22 @@ namespace mongo {
         _debugAddSpace( debug, level );
         debug << _path << " $nin: TODO\n";
     }
+
+    bool NinMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        return _in.equivalent( &(static_cast<const NinMatchExpression*>(other)->_in) );
+
+    }
+
+    LeafMatchExpression* NinMatchExpression::shallowClone() const {
+        NinMatchExpression* next = new NinMatchExpression();
+        next->init( _path );
+        _in.copyTo( &next->_in );
+        return next;
+    }
+
 
 }
 

@@ -30,6 +30,7 @@ namespace mongo {
 
     class ListOfMatchExpression : public MatchExpression {
     public:
+        ListOfMatchExpression( MatchType type ) : MatchExpression( TREE, type ){}
         virtual ~ListOfMatchExpression();
 
         /**
@@ -43,8 +44,10 @@ namespace mongo {
          */
         void clearAndRelease() { _expressions.clear(); }
 
-        size_t size() const { return _expressions.size(); }
-        MatchExpression* get( size_t i ) const { return _expressions[i]; }
+        virtual size_t numChildren() const { return _expressions.size(); }
+        virtual const MatchExpression* getChild( size_t i ) const { return _expressions[i]; }
+
+        bool equivalent( const MatchExpression* other ) const;
 
     protected:
         void _debugList( StringBuilder& debug, int level ) const;
@@ -55,6 +58,7 @@ namespace mongo {
 
     class AndMatchExpression : public ListOfMatchExpression {
     public:
+        AndMatchExpression() : ListOfMatchExpression( AND ){}
         virtual ~AndMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
@@ -65,6 +69,7 @@ namespace mongo {
 
     class OrMatchExpression : public ListOfMatchExpression {
     public:
+        OrMatchExpression() : ListOfMatchExpression( OR ){}
         virtual ~OrMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
@@ -75,6 +80,7 @@ namespace mongo {
 
     class NorMatchExpression : public ListOfMatchExpression {
     public:
+        NorMatchExpression() : ListOfMatchExpression( NOR ){}
         virtual ~NorMatchExpression(){}
 
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
@@ -85,6 +91,7 @@ namespace mongo {
 
     class NotMatchExpression : public MatchExpression {
     public:
+        NotMatchExpression() : MatchExpression( TREE, NOT ){}
         /**
          * @param exp - I own it, and will delete
          */
@@ -102,6 +109,13 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        bool equivalent( const MatchExpression* other ) const;
+
+        virtual size_t numChildren() const { return 1; }
+        virtual MatchExpression* getChild( size_t i ) const { return _exp.get(); }
+
+
     private:
         boost::scoped_ptr<MatchExpression> _exp;
     };

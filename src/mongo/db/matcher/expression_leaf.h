@@ -30,15 +30,20 @@ namespace mongo {
 
     class LeafMatchExpression : public MatchExpression {
     public:
-        LeafMatchExpression() {
+        LeafMatchExpression( MatchType matchType ) : MatchExpression( LEAF, matchType ) {
             _allHaveToMatch = false;
         }
 
         virtual ~LeafMatchExpression(){}
 
+        virtual LeafMatchExpression* shallowClone() const = 0;
+
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
 
         virtual bool matchesSingleElement( const BSONElement& e ) const = 0;
+
+        virtual const StringData getPath() const { return _path; }
+
     protected:
         StringData _path;
         bool _allHaveToMatch;
@@ -48,24 +53,89 @@ namespace mongo {
 
     class ComparisonMatchExpression : public LeafMatchExpression {
     public:
-        enum Type { LTE, LT, EQ, GT, GTE, NE };
+        ComparisonMatchExpression( MatchType type ) : LeafMatchExpression( type ){}
 
-        Status init( const StringData& path, Type type, const BSONElement& rhs );
+        Status init( const StringData& path, const BSONElement& rhs );
 
         virtual ~ComparisonMatchExpression(){}
-
-        virtual Type getType() const { return _type; }
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
     protected:
         bool _invertForNE( bool normal ) const;
 
-    private:
-        Type _type;
         BSONElement _rhs;
     };
+
+    class EqualityMatchExpression : public ComparisonMatchExpression {
+    public:
+        EqualityMatchExpression() : ComparisonMatchExpression( EQ ){}
+        virtual LeafMatchExpression* shallowClone() const {
+            ComparisonMatchExpression* e = new EqualityMatchExpression();
+            e->init( _path, _rhs  );
+            return e;
+        }
+    };
+
+    class LTEMatchExpression : public ComparisonMatchExpression {
+    public:
+        LTEMatchExpression() : ComparisonMatchExpression( LTE ){}
+        virtual LeafMatchExpression* shallowClone() const {
+            ComparisonMatchExpression* e = new LTEMatchExpression();
+            e->init( _path, _rhs  );
+            return e;
+        }
+
+    };
+
+    class LTMatchExpression : public ComparisonMatchExpression {
+    public:
+        LTMatchExpression() : ComparisonMatchExpression( LT ){}
+        virtual LeafMatchExpression* shallowClone() const {
+            ComparisonMatchExpression* e = new LTMatchExpression();
+            e->init( _path, _rhs  );
+            return e;
+        }
+
+    };
+
+    class GTMatchExpression : public ComparisonMatchExpression {
+    public:
+        GTMatchExpression() : ComparisonMatchExpression( GT ){}
+        virtual LeafMatchExpression* shallowClone() const {
+            ComparisonMatchExpression* e = new GTMatchExpression();
+            e->init( _path, _rhs  );
+            return e;
+        }
+
+    };
+
+    class GTEMatchExpression : public ComparisonMatchExpression {
+    public:
+        GTEMatchExpression() : ComparisonMatchExpression( GTE ){}
+        virtual LeafMatchExpression* shallowClone() const {
+            ComparisonMatchExpression* e = new GTEMatchExpression();
+            e->init( _path, _rhs  );
+            return e;
+        }
+
+    };
+
+    class NEMatchExpression : public ComparisonMatchExpression {
+    public:
+        NEMatchExpression() : ComparisonMatchExpression( NE ){}
+        virtual LeafMatchExpression* shallowClone() const {
+            ComparisonMatchExpression* e = new NEMatchExpression();
+            e->init( _path, _rhs  );
+            return e;
+        }
+
+    };
+
 
     class RegexMatchExpression : public LeafMatchExpression {
     public:
@@ -76,12 +146,23 @@ namespace mongo {
          */
         static const size_t MaxPatternSize = 32764;
 
+        RegexMatchExpression() : LeafMatchExpression( REGEX ){}
+
         Status init( const StringData& path, const StringData& regex, const StringData& options );
         Status init( const StringData& path, const BSONElement& e );
+
+        virtual LeafMatchExpression* shallowClone() const {
+            RegexMatchExpression* e = new RegexMatchExpression();
+            e->init( _path, _regex, _flags );
+            return e;
+        }
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
     private:
         std::string _regex;
         std::string _flags;
@@ -90,11 +171,22 @@ namespace mongo {
 
     class ModMatchExpression : public LeafMatchExpression {
     public:
+        ModMatchExpression() : LeafMatchExpression( MOD ){}
+
         Status init( const StringData& path, int divisor, int remainder );
+
+        virtual LeafMatchExpression* shallowClone() const {
+            ModMatchExpression* m = new ModMatchExpression();
+            m->init( _path, _divisor, _remainder );
+            return m;
+        }
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
     private:
         int _divisor;
         int _remainder;
@@ -102,17 +194,30 @@ namespace mongo {
 
     class ExistsMatchExpression : public LeafMatchExpression {
     public:
+        ExistsMatchExpression() : LeafMatchExpression( EXISTS ){}
+
         Status init( const StringData& path, bool exists );
+
+        virtual LeafMatchExpression* shallowClone() const {
+            ExistsMatchExpression* e = new ExistsMatchExpression();
+            e->init( _path, _exists );
+            return e;
+        }
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
     private:
         bool _exists;
     };
 
     class TypeMatchExpression : public MatchExpression {
     public:
+        TypeMatchExpression() : MatchExpression( TYPE_CATEGORY, TYPE_OPERATOR ){}
+
         Status init( const StringData& path, int type );
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
@@ -120,6 +225,8 @@ namespace mongo {
         virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
     private:
         bool _matches( const StringData& path, const BSONObj& doc, MatchDetails* details = 0 ) const;
 
@@ -152,36 +259,54 @@ namespace mongo {
         bool singleNull() const { return size() == 1 && _hasNull; }
         int size() const { return _equalities.size() + _regexes.size(); }
 
+        bool equivalent( const ArrayFilterEntries& other ) const;
+
+        void copyTo( ArrayFilterEntries& toFillIn ) const;
     private:
         bool _hasNull; // if _equalities has a jstNULL element in it
         BSONElementSet _equalities;
         std::vector<RegexMatchExpression*> _regexes;
     };
 
-
     /**
      * query operator: $in
      */
     class InMatchExpression : public LeafMatchExpression {
     public:
+        InMatchExpression() : LeafMatchExpression( IN ){}
         void init( const StringData& path );
+
+        virtual LeafMatchExpression* shallowClone() const;
+
         ArrayFilterEntries* getArrayFilterEntries() { return &_arrayEntries; }
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
+        void copyTo( InMatchExpression* toFillIn ) const;
+
     private:
         ArrayFilterEntries _arrayEntries;
     };
 
     class NinMatchExpression : public LeafMatchExpression {
     public:
+        NinMatchExpression() : LeafMatchExpression( NIN ){}
         void init( const StringData& path );
+
+        virtual LeafMatchExpression* shallowClone() const;
+
         ArrayFilterEntries* getArrayFilterEntries() { return _in.getArrayFilterEntries(); }
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
     private:
         InMatchExpression _in;
     };

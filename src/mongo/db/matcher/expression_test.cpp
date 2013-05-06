@@ -35,8 +35,8 @@ namespace mongo {
 
     TEST( LeafMatchExpressionTest, Equal1 ) {
         BSONObj temp = BSON( "x" << 5 );
-        ComparisonMatchExpression e;
-        e.init( "x", ComparisonMatchExpression::EQ, temp["x"] );
+        EqualityMatchExpression e;
+        e.init( "x", temp["x"] );
 
         ASSERT_TRUE( e.matches( fromjson( "{ x : 5 }" ) ) );
         ASSERT_TRUE( e.matches( fromjson( "{ x : [5] }" ) ) );
@@ -54,8 +54,8 @@ namespace mongo {
         BSONObj temp = BSON( "x" << 5 );
 
         {
-            ComparisonMatchExpression e;
-            e.init( "x", ComparisonMatchExpression::LTE, temp["x"] );
+            LTEMatchExpression e;
+            e.init( "x", temp["x"] );
             ASSERT_TRUE( e.matches( fromjson( "{ x : 5 }" ) ) );
             ASSERT_TRUE( e.matches( fromjson( "{ x : 4 }" ) ) );
             ASSERT_FALSE( e.matches( fromjson( "{ x : 6 }" ) ) );
@@ -63,8 +63,8 @@ namespace mongo {
         }
 
         {
-            ComparisonMatchExpression e;
-            e.init( "x", ComparisonMatchExpression::LT, temp["x"] );
+            LTMatchExpression e;
+            e.init( "x", temp["x"] );
             ASSERT_FALSE( e.matches( fromjson( "{ x : 5 }" ) ) );
             ASSERT_TRUE( e.matches( fromjson( "{ x : 4 }" ) ) );
             ASSERT_FALSE( e.matches( fromjson( "{ x : 6 }" ) ) );
@@ -72,8 +72,8 @@ namespace mongo {
         }
 
         {
-            ComparisonMatchExpression e;
-            e.init( "x", ComparisonMatchExpression::GTE, temp["x"] );
+            GTEMatchExpression e;
+            e.init( "x", temp["x"] );
             ASSERT_TRUE( e.matches( fromjson( "{ x : 5 }" ) ) );
             ASSERT_FALSE( e.matches( fromjson( "{ x : 4 }" ) ) );
             ASSERT_TRUE( e.matches( fromjson( "{ x : 6 }" ) ) );
@@ -81,8 +81,8 @@ namespace mongo {
         }
 
         {
-            ComparisonMatchExpression e;
-            e.init( "x", ComparisonMatchExpression::GT, temp["x"] );
+            GTMatchExpression e;
+            e.init( "x", temp["x"] );
             ASSERT_FALSE( e.matches( fromjson( "{ x : 5 }" ) ) );
             ASSERT_FALSE( e.matches( fromjson( "{ x : 4 }" ) ) );
             ASSERT_TRUE( e.matches( fromjson( "{ x : 6 }" ) ) );
