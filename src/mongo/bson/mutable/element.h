@@ -211,6 +211,11 @@ namespace mutablebson {
          */
         bool hasValue() const;
 
+        /** Returns true if this element is a numeric type (e.g. NumberLong). Currently, the
+         *  only numeric BSON types are NumberLong, NumberInt, and NumberDouble.
+         */
+        bool isNumeric() const;
+
         /** Get the value of this element if available. Note that not all elements have a
          *  representation as a BSONElement. For elements that do have a representation, this
          *  will return it. For elements that do not this method returns an eoo

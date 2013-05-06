@@ -1055,6 +1055,28 @@ namespace {
         ASSERT_OK(elem.pushBack(newElem));
     }
 
+    TEST(Element, IsNumeric) {
+        mmb::Document doc;
+
+        mmb::Element elt = doc.makeElementNull("dummy");
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementInt("dummy", 42);
+        ASSERT_TRUE(elt.isNumeric());
+
+        elt = doc.makeElementString("dummy", "dummy");
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementLong("dummy", 42);
+        ASSERT_TRUE(elt.isNumeric());
+
+        elt = doc.makeElementBool("dummy", false);
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementDouble("dummy", 42.0);
+        ASSERT_TRUE(elt.isNumeric());
+    }
+
     TEST(Document, ArraySerialization) {
 
         static const char inJson[] =

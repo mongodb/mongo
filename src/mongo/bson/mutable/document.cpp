@@ -1122,6 +1122,16 @@ namespace mutablebson {
         return impl.hasValue(thisRep);
     }
 
+    bool Element::isNumeric() const {
+        verify(ok());
+        const Document::Impl& impl = getDocument().getImpl();
+        const ElementRep& thisRep = impl.getElementRep(_repIdx);
+        const BSONType type = impl.getType(thisRep);
+        return ((type == mongo::NumberLong) ||
+                (type == mongo::NumberInt) ||
+                (type == mongo::NumberDouble));
+    }
+
     const BSONElement Element::getValue() const {
         const Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
