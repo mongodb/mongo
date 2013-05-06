@@ -20,6 +20,10 @@
 
 #include "mongo/client/dbclient.h"
 
+#ifndef verify
+#  define verify(x) MONGO_verify(x)
+#endif
+
 using namespace std;
 using namespace mongo;
 
@@ -67,5 +71,5 @@ int main( int argc, const char **argv ) {
         cout << "\t" << obj.jsonString() << endl;
         num++;
     }
-    MONGO_verify( num == 1 );
+    verify( num == 1 );
 }

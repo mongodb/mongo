@@ -20,6 +20,10 @@
 #include "mongo/client/dbclient.h"
 #include "util/net/httpclient.h"
 
+#ifndef verify
+#  define verify(x) MONGO_verify(x)
+#endif
+
 using namespace mongo;
 
 void play( string url ) {
@@ -27,10 +31,10 @@ void play( string url ) {
 
     HttpClient c;
     HttpClient::Result r;
-    MONGO_verify( c.get( url , &r ) == 200 );
+    verify( c.get( url , &r ) == 200 );
 
     HttpClient::Headers h = r.getHeaders();
-    MONGO_verify( h["Content-Type"].find( "text/html" ) == 0 );
+    verify( h["Content-Type"].find( "text/html" ) == 0 );
 
     cout << "\tHeaders" << endl;
     for ( HttpClient::Headers::iterator i = h.begin() ; i != h.end(); ++i ) {
