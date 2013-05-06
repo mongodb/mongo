@@ -49,8 +49,10 @@ int main( int argc, const char **argv, char **envp) {
 
     int port = 27017;
     if ( argc != 1 ) {
-        if ( argc != 3 )
-            throw -12;
+        if ( argc != 3 ) {
+            cout << "need to pass port as second param" << endl;
+            return EXIT_FAILURE;
+        }
         port = atoi( argv[ 2 ] );
     }
     port += 1000;
