@@ -550,8 +550,15 @@ methods = {
 		create the database if it does not exist''',
 		type='boolean'),
 	Config('direct_io', '', r'''
-		Use \c O_DIRECT to access files.  Options are given as a
-		list, such as <code>"direct_io=[data]"</code>''',
+		Use \c O_DIRECT to access files.  Options are given as a list,
+		such as <code>"direct_io=[data]"</code>.  Many Linux systems do
+		not support mixing \c O_DIRECT and memory mapping or normal I/O
+		to the same file.   If \c O_DIRECT is configured for data files
+		on Linux systems, memory mapping should probably be turned off
+		using the \c mmap=false configuration string and any utilities
+		used to copy the database files for the purposes of hot backup
+		should probably also specify \c O_DIRECT when configuring their
+		file access''',
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
 		list of shared library extensions to load (using dlopen).

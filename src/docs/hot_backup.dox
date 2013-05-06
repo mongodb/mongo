@@ -55,4 +55,10 @@ have been copied before the cursor is closed.
 can be created, but no checkpoints can be deleted.  This may result in
 significant file growth.
 
+- Many Linux systems do not support mixing \c O_DIRECT and memory
+mapping or normal I/O to the same file.   If \c O_DIRECT is configured
+for data files on Linux systems (using the wiredtiger_open \c direct_io
+configuration), the utilities used to copy the database files should
+probably also specify \c O_DIRECT when configuring their file access.
+
 */

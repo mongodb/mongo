@@ -1337,8 +1337,14 @@ struct __wt_connection {
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
- * list\, such as <code>"direct_io=[data]"</code>., a list\, with values chosen
- * from the following options: \c "data"\, \c "log"; default empty.}
+ * list\, such as <code>"direct_io=[data]"</code>. Many Linux systems do not
+ * support mixing \c O_DIRECT and memory mapping or normal I/O to the same file.
+ * If \c O_DIRECT is configured for data files on Linux systems\, memory mapping
+ * should probably be turned off using the \c mmap=false configuration string
+ * and any utilities used to copy the database files for the purposes of hot
+ * backup should probably also specify \c O_DIRECT when configuring their file
+ * access., a list\, with values chosen from the following options: \c "data"\,
+ * \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
