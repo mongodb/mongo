@@ -216,6 +216,11 @@ namespace mutablebson {
          */
         bool isNumeric() const;
 
+        /** Returns true if this element is one of the integral numeric types (e.g. NumberLong
+         *  or NumberInt).
+         */
+         bool isIntegral() const;
+
         /** Get the value of this element if available. Note that not all elements have a
          *  representation as a BSONElement. For elements that do have a representation, this
          *  will return it. For elements that do not this method returns an eoo
