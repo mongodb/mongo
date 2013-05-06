@@ -207,6 +207,7 @@ TAB_SIZE               = 8
 
 ALIASES                = "notyet{1}=<b>Not yet supported in WiredTiger.</b>\n@todo fix when \1 supported\n\n" \
                          "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
+                         "ebusy_errors=@returns zero on success, EBUSY if there are open cursors on the object and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
                          "ex_ref{1}=@ref \1 \"\1\"" \
                          "hrow{1}=<tr><th>\1</th></tr>" \
                          "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \

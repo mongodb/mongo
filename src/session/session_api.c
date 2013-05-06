@@ -344,6 +344,9 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
+	/* Disallow objects in the WiredTiger name space. */
+	WT_ERR(__wt_schema_name_check(session, uri));
+
 	/* Compaction makes no sense for LSM objects, ignore requests. */
 	if (WT_PREFIX_MATCH(uri, "lsm:"))
 		return (0);

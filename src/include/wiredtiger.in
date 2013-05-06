@@ -796,7 +796,8 @@ struct __wt_session {
 	 * @snippet ex_all.c Compact a table
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the object to drop, such as \c "table:stock"
+	 * @param name the URI of the object to compact, such as
+	 * \c "table:stock"
 	 * @configstart{session.compact, see dist/api_data.py}
 	 * @config{trigger, Compaction will not be attempted unless the
 	 * specified percentage of the underlying objects is expected to be
@@ -821,7 +822,7 @@ struct __wt_session {
 	 * @config{remove_files, should the underlying files be removed?., a
 	 * boolean flag; default \c true.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -835,7 +836,7 @@ struct __wt_session {
 	 * @param uri the current URI of the object, such as \c "table:old"
 	 * @param newuri the new URI of the object, such as \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(rename)(WT_SESSION *session,
 	    const char *uri, const char *newuri, const char *config);
@@ -863,7 +864,7 @@ struct __wt_session {
 	 * @config{force, force salvage even of files that do not appear to be
 	 * WiredTiger files., a boolean flag; default \c false.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -890,7 +891,7 @@ struct __wt_session {
 	 * if <code>NULL</code>, the truncate continues to the end of the
 	 * object
 	 * @configempty{session.truncate, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
 	    const char *name,
@@ -906,7 +907,7 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the file or table to upgrade
 	 * @configempty{session.upgrade, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(upgrade)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -933,7 +934,7 @@ struct __wt_session {
 	 * are verified\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(verify)(WT_SESSION *session,
 	    const char *name, const char *config);
