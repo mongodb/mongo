@@ -88,8 +88,8 @@ wts_open(void)
 	    (access(RAW_PATH, R_OK) == 0 &&
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-	    access(KVS_BDB_PATH, R_OK) == 0 ? KVS_BDB_PATH : "",
-	    access(MEMRATA_PATH, R_OK) == 0 ? MEMRATA_PATH : "",
+	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
+	    DATASOURCE("memrata") ? MEMRATA_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
