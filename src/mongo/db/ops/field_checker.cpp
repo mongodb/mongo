@@ -18,15 +18,33 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using mongoutils::str::stream;
+
 namespace fieldchecker {
 
     Status basicIsUpdatable(const FieldRef& field) {
+        size_t numParts = field.numParts();
+        if (numParts == 0) {
+            return Status(ErrorCodes::BadValue, "cannot update anempty field name");
+        }
+
+        for (size_t i = 0; i < numParts; i++) {
+            if (field.getPart(i).empty()) {
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() << field.dottedField()
+                                                        << " contains empty fields");
+            }
+        }
+
         StringData firstPart = field.getPart(0);
         if (firstPart.compare("_id") == 0) {
             return Status(ErrorCodes::BadValue, "updated cannot affect the _id");
         }
+
         return Status::OK();
     }
 

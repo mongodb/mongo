@@ -42,6 +42,28 @@ namespace {
         ASSERT_OK(isUpdatable(fieldRef));
     }
 
+    TEST(IsUpdatable, EmptyFields) {
+        FieldRef fieldRef;
+        fieldRef.parse("");
+        ASSERT_NOT_OK(isUpdatable(fieldRef));
+
+        FieldRef fieldRefDot;
+        fieldRefDot.parse(".");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDot));
+
+        FieldRef fieldRefADot;
+        fieldRefADot.parse("a.");
+        ASSERT_NOT_OK(isUpdatable(fieldRefADot));
+
+        FieldRef fieldRefDotB;
+        fieldRefDotB.parse(".b");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDotB));
+
+        FieldRef fieldRefEmptyMiddle;
+        fieldRefEmptyMiddle.parse("a..b");
+        ASSERT_NOT_OK(isUpdatable(fieldRefEmptyMiddle));
+    }
+
     TEST(IsUpdatable, SpecialIDField) {
         FieldRef fieldRefID;
         fieldRefID.parse("_id");
