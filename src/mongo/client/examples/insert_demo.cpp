@@ -24,7 +24,7 @@
 */
 
 #include <iostream>
-#include "dbclient.h" // the mongo c++ driver
+#include "mongo/client/dbclient.h" // the mongo c++ driver
 
 using namespace std;
 using namespace mongo;
