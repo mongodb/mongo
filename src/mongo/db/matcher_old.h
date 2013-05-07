@@ -207,6 +207,8 @@ namespace mongo {
          */
         MatcherOld( const MatcherOld &docMatcher, const BSONObj &constrainIndexKey );
 
+        bool hasExistsFalse() const;
+
     private:
 
         void addBasic(const BSONElement &e, int c, bool isNot) {

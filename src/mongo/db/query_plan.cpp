@@ -390,58 +390,10 @@ doneCheckOrder:
         return 0;
     }
 
-    /**
-     * Detects $exists:false predicates in a matcher.  All $exists:false predicates will be
-     * detected.  Some $exists:true predicates may be incorrectly reported as $exists:false due to
-     * the approximate nature of the implementation.
-     */
-    class ExistsFalseDetector : public mongo::old_matcher::MatcherVisitor {
-    public:
-        ExistsFalseDetector( const Matcher& originalMatcher );
-        bool hasFoundExistsFalse() const { return _foundExistsFalse; }
-        void visitMatcher( const Matcher& matcher ) { _currentMatcher = &matcher; }
-        void visitElementMatcher( const mongo::old_matcher::ElementMatcher& elementMatcher );
-    private:
-        const Matcher* _originalMatcher;
-        const Matcher* _currentMatcher;
-        bool _foundExistsFalse;
-    };
 
-    ExistsFalseDetector::ExistsFalseDetector( const Matcher& originalMatcher ) :
-        _originalMatcher( &originalMatcher ),
-        _currentMatcher( 0 ),
-        _foundExistsFalse() {
-    }
-
-    /** Matches $exists:false and $not:{$exists:true} exactly. */
-    static bool isExistsFalsePredicate( const mongo::old_matcher::ElementMatcher& elementMatcher ) {
-        bool hasTrueValue = elementMatcher._toMatch.trueValue();
-        bool hasNotModifier = elementMatcher._isNot;
-        return hasNotModifier ? hasTrueValue : !hasTrueValue;
-    }
-    
-    void ExistsFalseDetector::visitElementMatcher( const mongo::old_matcher::ElementMatcher& elementMatcher ) {
-        if ( elementMatcher._compareOp != BSONObj::opEXISTS ) {
-            // Only consider $exists predicates.
-            return;
-        }
-        if ( _currentMatcher != _originalMatcher ) {
-            // Treat all $exists predicates nested below the original matcher as $exists:false.
-            // This approximation is used because a nesting operator may change the matching
-            // semantics of $exists:true.
-            _foundExistsFalse = true;
-            return;
-        }
-        if ( isExistsFalsePredicate( elementMatcher ) ) {
-            // Top level $exists operators are matched exactly.
-            _foundExistsFalse = true;
-        }
-    }
 
     bool QueryPlan::hasPossibleExistsFalsePredicate() const {
-        ExistsFalseDetector detector( matcher()->docMatcher() );
-        matcher()->docMatcher().visit( detector );
-        return detector.hasFoundExistsFalse();
+        return matcher()->docMatcher().hasExistsFalse();
     }
     
     bool QueryPlan::queryBoundsExactOrderSuffix() const {
