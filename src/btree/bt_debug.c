@@ -811,9 +811,6 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	case WT_REF_DELETED:
 		__dmsg(ds, "deleted");
 		break;
-	case WT_REF_EVICT_FORCE:
-		__dmsg(ds, "evict-force %p", ref->page);
-		break;
 	case WT_REF_EVICT_WALK:
 		__dmsg(ds, "evict-walk %p", ref->page);
 		break;

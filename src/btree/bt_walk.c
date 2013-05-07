@@ -331,8 +331,7 @@ retry:				if (ref->state != WT_REF_MEM ||
 				 * that the page will be read back in to cache.
 				 */
 				while (LF_ISSET(WT_TREE_WAIT) &&
-				    (ref->state == WT_REF_EVICT_FORCE ||
-				    ref->state == WT_REF_LOCKED))
+				    ref->state == WT_REF_LOCKED)
 					__wt_yield();
 				if (ref->state == WT_REF_DELETED ||
 				    ref->state == WT_REF_DISK)

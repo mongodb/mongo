@@ -357,11 +357,6 @@ struct __wt_page {
  *	row-store leaf pages without reading them if they don't reference
  *	overflow items.
  *
- * WT_REF_EVICT_FORCE:
- *	An application thread has selected this page for eviction. No other
- *	hazard references should be granted. If eviction fails, the eviction
- *	server should set the state back to WT_REF_MEM.
- *
  * WT_REF_EVICT_WALK:
  *	The next page to be walked for LRU eviction.  This page is available
  *	for reads but not eviction.
@@ -404,7 +399,6 @@ struct __wt_page {
 enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
-	WT_REF_EVICT_FORCE,		/* Page is ready for forced eviction */
 	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
