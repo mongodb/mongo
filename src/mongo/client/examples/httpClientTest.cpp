@@ -60,5 +60,6 @@ int main( int argc, const char **argv ) {
 #ifdef MONGO_SSL
     play( "https://www.10gen.com/" );
 #endif
-    
+
+    return EXIT_SUCCESS;
 }

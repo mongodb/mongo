@@ -122,4 +122,5 @@ int main( int argc , const char ** argv ) {
         threads[i]->join();
     }
 
+    return EXIT_SUCCESS;
 }
