@@ -49,6 +49,37 @@ namespace mongo {
     namespace sorter {
         using namespace mongoutils;
 
+        template<typename Data, typename Comparator>
+        void compIsntSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
+            PRINT(typeid(comp).name());
+            PRINT(lhs.first);
+            PRINT(lhs.second);
+            PRINT(rhs.first);
+            PRINT(rhs.second);
+            PRINT(comp(lhs, rhs));
+            PRINT(comp(rhs, lhs));
+            dassert(false);
+        }
+
+        template<typename Data, typename Comparator>
+        void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
+            DEV {
+                // test reversed comparisons
+                const int regular = comp(lhs, rhs);
+                if (regular == 0) {
+                    if (!(comp(rhs, lhs) == 0)) compIsntSane(comp, lhs, rhs);
+                } else if (regular < 0) {
+                    if (!(comp(rhs, lhs) > 0)) compIsntSane(comp, lhs, rhs);
+                } else /*regular > 0*/ {
+                    if (!(comp(rhs, lhs) < 0)) compIsntSane(comp, lhs, rhs);
+                }
+
+                // test reflexivity
+                if (!(comp(lhs, lhs) == 0)) compIsntSane(comp, lhs, lhs);
+                if (!(comp(rhs, rhs) == 0)) compIsntSane(comp, rhs, rhs);
+            }
+        }
+
         /** Ensures a named file is deleted when this object goes out of scope */
         class FileDeleter {
         public:
@@ -267,6 +298,7 @@ namespace mongo {
                 explicit STLComparator(const Comparator& comp) : _comp(comp) {}
                 bool operator () (ptr<const Stream> lhs, ptr<const Stream> rhs) const {
                     // first compare data
+                    sorter::dassertCompIsSane(_comp, lhs->current(), rhs->current());
                     int ret = _comp(lhs->current(), rhs->current());
                     if (ret)
                         return ret > 0;
@@ -389,6 +421,7 @@ namespace mongo {
         public:
             explicit STLComparator(const Comparator& comp) : _comp(comp) {}
             bool operator () (const Data& lhs, const Data& rhs) const {
+                sorter::dassertCompIsSane(_comp, lhs, rhs);
                 return _comp(lhs, rhs) < 0;
             }
         private:
@@ -517,7 +550,7 @@ namespace mongo {
             verify(_data.size() == _opts.limit);
 
             Data contender(key, val);
-            if (_comp(_data.front(), contender) <= 0)
+            if (!less(contender, _data.front()))
                 return; // not good enough
 
             // Remove the old worst pair and insert the contender, adjusting _memUsed
@@ -555,6 +588,7 @@ namespace mongo {
         public:
             explicit STLComparator(const Comparator& comp) : _comp(comp) {}
             bool operator () (const Data& lhs, const Data& rhs) const {
+                sorter::dassertCompIsSane(_comp, lhs, rhs);
                 return _comp(lhs, rhs) < 0;
             }
         private:
@@ -600,7 +634,7 @@ namespace mongo {
         const Settings _settings;
         SortOptions _opts;
         size_t _memUsed;
-        std::vector<Data> _data; // the "current" data
+        std::vector<Data> _data; // the "current" data. Organized as max-heap if size() == limit.
         std::vector<boost::shared_ptr<Iterator> > _iters; // data that has already been spilled
     };
 
