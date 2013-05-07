@@ -85,9 +85,6 @@ __merge_count(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 	WT_UNUSED(parent);
 
 	if (ref->state == WT_REF_LOCKED) {
-		/* Prevent eviction until it is hooked into the new tree. */
-		__wt_evict_list_clr_page(state->session, ref->page);
-
 		if (!state->seen_live) {
 			state->first_live = state->refcnt;
 			state->seen_live = 1;
@@ -348,12 +345,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 */
 	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
 		return (EBUSY);
-
-	/* Make sure the top page isn't queued for eviction. */
-	__wt_evict_list_clr_page(session, top);
-
-	/* Clear the eviction walk: it may be in our subtree. */
-	__wt_evict_clear_tree_walk(session, NULL);
 
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
