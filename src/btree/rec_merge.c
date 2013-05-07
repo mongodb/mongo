@@ -348,12 +348,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
 		return (EBUSY);
 
-	/* Make sure the top page isn't queued for eviction. */
-	__wt_evict_list_clr_page(session, top);
-
-	/* Clear the eviction walk: it may be in our subtree. */
-	__wt_evict_clear_tree_walk(session, NULL);
-
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
 	 * or if there are "enough" keys, we split into two equal internal
