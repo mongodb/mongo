@@ -67,7 +67,8 @@ struct __wt_cache {
 	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
-	uint32_t evict_entries;		/* LRU highest eviction slot in use */
+	uint32_t evict_entries;		/* LRU entries in the queue */
+	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
 	uint32_t evict_slots;		/* LRU list eviction slots */
 	u_int    evict_file_next;	/* LRU: next file to search */
 	uint32_t force_entries;		/* Forced eviction page count */

@@ -456,12 +456,6 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return (ret);
 		}
 
-		/*
-		 * Make sure the page isn't already scheduled for eviction.  We
-		 * have it locked, so after this, LRU eviction won't consider
-		 * it.
-		 */
-		__wt_evict_list_clr_page(session, page);
 		if ((ret = __wt_evict_page(session, page)) == EBUSY)
 			ret = 0;
 		return (ret);

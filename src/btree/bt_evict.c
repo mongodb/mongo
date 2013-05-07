@@ -101,8 +101,8 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	cache = S2C(session)->cache;
 	__wt_spin_lock(session, &cache->evict_lock);
 
-	elem = cache->evict_entries;
-	for (evict = cache->evict, i = 0; i < elem; i++, evict++)
+	elem = cache->evict_max;
+	for (i = 0, evict = cache->evict; i < elem; i++, evict++)
 		if (evict->page == page) {
 			__evict_list_clr(session, evict);
 			break;
@@ -386,7 +386,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 * The eviction candidate list might reference pages we are about to
 	 * discard; clear it.
 	 */
-	elem = cache->evict_entries;
+	elem = cache->evict_max;
 	for (i = 0, evict = cache->evict; i < elem; i++, evict++)
 		if (evict->btree == btree)
 			__evict_list_clr(session, evict);
@@ -647,7 +647,7 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 	/* If we have more than the minimum number of entries, clear them. */
 	if (cache->evict_entries > WT_EVICT_WALK_BASE) {
 		for (i = WT_EVICT_WALK_BASE, evict = cache->evict + i;
-		    i < candidates;
+		    i < cache->evict_entries;
 		    i++, evict++)
 			__evict_list_clr(session, evict);
 		cache->evict_entries = WT_EVICT_WALK_BASE;
@@ -697,7 +697,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	 * that the handles we see are open and valid.
 	 */
 	i = cache->evict_entries;
-	max_entries = cache->evict_entries + WT_EVICT_WALK_INCR;
+	max_entries = i + WT_EVICT_WALK_INCR;
 retry:	file_count = 0;
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
@@ -759,14 +759,15 @@ __evict_init_candidate(
 
 	cache = S2C(session)->cache;
 
+	/* Keep track of the maximum slot we are using. */
+	slot = (u_int)(evict - cache->evict);
+	if (slot >= cache->evict_max)
+		cache->evict_max = slot + 1;
+
 	if (evict->page != NULL)
 		__evict_list_clr(session, evict);
 	evict->page = page;
 	evict->btree = S2BT(session);
-
-	slot = (u_int)(evict - cache->evict);
-	if (slot > cache->evict_entries)
-		cache->evict_entries = slot;
 
 	/* Mark the page on the list */
 	F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
