@@ -130,7 +130,7 @@ namespace mongo {
         // rationale is that there should be no holes in a BSONObj and, to be in place, no
         // field boundaries must change.
         //
-        // TODO
+        // TODO:
         // execInfo->inPlace = true;
         // mutablebson::Element curr = _preparedState->elemFound;
         // while (curr.ok()) {
@@ -149,23 +149,10 @@ namespace mongo {
         // Our semantics says that, if we're unseting an element of an array, we swap that
         // value to null. The rationale is that we don't want other array elements to change
         // indices. (That could be achieved with $pull-ing element from it.)
-        //
-        // Note that we can have two distinct cases of being in an array (a) e.g. [ 1, ... ]
-        // and (b) e.g. [ {a: 1}, .... In the former case _elemFound will be pointing to the
-        // {"0": 1} that is equivalent to '1' in the array. We can set that element to null
-        // directly, resulting in {"0": null}. In the second case, the {"0": {a: 1}} one, the
-        // element that needs to be set to null is the parent of {a:1}. Again, what we're
-        // aiming for here is a {"0": null}
         if (_preparedState->elemFound.parent().ok() &&
             _preparedState->elemFound.parent().getType() == Array) {
             return _preparedState->elemFound.setValueNull();
         }
-        // else if (_preparedState->elemFound.parent().ok() &&
-        //          _preparedState->elemFound.parent().getType() == Object &&
-        //          _preparedState->elemFound.parent().parent().ok() &&
-        //          _preparedState->elemFound.parent().parent().getType() == Array) {
-        //     return _preparedState->elemFound.parent().setValueNull();
-        // }
         else {
             return _preparedState->elemFound.remove();
         }
