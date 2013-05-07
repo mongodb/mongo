@@ -2755,6 +2755,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="ops\modifier_unset.cpp" />
+    <ClCompile Include="ops\modifier_unset_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="ops\path_support.cpp" />
     <ClCompile Include="ops\path_support_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -3536,6 +3547,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="ops\field_checker.h" />
     <ClInclude Include="ops\modifier_interface.h" />
     <ClInclude Include="ops\modifier_set.h" />
+    <ClInclude Include="ops\modifier_unset.h" />
     <ClInclude Include="ops\path_support.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />

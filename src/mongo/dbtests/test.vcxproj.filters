@@ -2445,6 +2445,9 @@
     <ClInclude Include="..\db\ops\modifier_set.h">
       <Filter>db\ops</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_unset.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -4625,6 +4628,12 @@
       <Filter>db\ops</Filter>
     </ClCompile>
     <ClCompile Include="..\db\ops\modifier_set_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_unset.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_unset_test.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
   </ItemGroup>
