@@ -272,23 +272,26 @@ __evict_worker(WT_SESSION_IMPL *session)
 void
 __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_REF *ref;
 
+	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
 	__wt_spin_lock(session, &cache->evict_walk_lock);
 
 	/* If no page stack specified, clear the standard eviction stack. */
 	if (page == NULL) {
-		page = S2BT(session)->evict_page;
-		S2BT(session)->evict_page = NULL;
+		page = btree->evict_page;
+		btree->evict_page = NULL;
 	}
 
 	/* Clear the current eviction point. */
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
 		ref = page->ref;
 		page = page->parent;
+		WT_ASSERT(session, page != btree->evict_page);
 		if (ref->state == WT_REF_EVICT_WALK)
 			ref->state = WT_REF_MEM;
 	}
@@ -449,7 +452,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * pointing to freed memory.
 			 */
 			if (WT_PAGE_IS_ROOT(page))
-				S2BT(session)->root_page = NULL;
+				btree->root_page = NULL;
 			if (__wt_page_is_modified(page))
 				__wt_cache_dirty_decr(
 				    session, page->memory_footprint);
@@ -464,6 +467,7 @@ err:		/* On error, clear any left-over tree walk. */
 		if (next_page != NULL)
 			__wt_evict_clear_tree_walk(session, next_page);
 	}
+	WT_ASSERT(session, btree->evict_page == NULL);
 	F_CLR(btree, WT_BTREE_NO_EVICTION);
 	return (ret);
 }
@@ -719,9 +723,13 @@ retry:	file_count = 0;
 
 		__wt_spin_lock(session, &cache->evict_walk_lock);
 
-		/* Reference the correct WT_BTREE handle. */
-		WT_WITH_BTREE(session, btree,
-		    ret = __evict_walk_file(session, &i, clean));
+		/*
+		 * Re-check the "no eviction" flag -- it is used to enforce
+		 * exclusive access when a handle is being closed.
+		 */
+		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+			WT_WITH_BTREE(session, btree,
+			    ret = __evict_walk_file(session, &i, clean));
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
@@ -786,6 +794,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	if (end > cache->evict + cache->evict_slots)
 		end = cache->evict + cache->evict_slots;
 	oldest_txn = session->txn.oldest_snap_min;
+
+	WT_ASSERT(session, btree->evict_page == NULL ||
+	    WT_PAGE_IS_ROOT(btree->evict_page) ||
+	    btree->evict_page->ref->state == WT_REF_EVICT_WALK);
 
 	/*
 	 * Get some more eviction candidate pages.
