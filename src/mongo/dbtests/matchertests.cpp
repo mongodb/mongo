@@ -325,7 +325,7 @@ namespace MatcherTests {
      * Helper class to extract the top level equality fields of a matcher, which can serve as a
      * useful way to identify the matcher.
      */
-    class EqualityFieldExtractor : public MatcherVisitor {
+    class EqualityFieldExtractor : public mongo::old_matcher::MatcherVisitor {
     public:
         EqualityFieldExtractor( const Matcher &originalMatcher ) :
             _originalMatcher( &originalMatcher ),
@@ -334,7 +334,7 @@ namespace MatcherTests {
         virtual void visitMatcher( const Matcher &matcher ) {
             _currentMatcher = &matcher;
         }
-        virtual void visitElementMatcher( const ElementMatcher &elementMatcher ) {
+        virtual void visitElementMatcher( const mongo::old_matcher::ElementMatcher &elementMatcher ) {
             // If elementMatcher is visited before any Matcher other than _originalMatcher, it is
             // a top level ElementMatcher within _originalMatcher.
             if ( _currentMatcher != _originalMatcher ) {
@@ -405,12 +405,12 @@ namespace MatcherTests {
         }
     private:
         /** Helper MatcherVisitor class that records all visit callbacks. */
-        class Visitor : public MatcherVisitor {
+        class Visitor : public mongo::old_matcher::MatcherVisitor {
         public:
             virtual void visitMatcher( const Matcher &matcher ) {
                 _traversal << "Matcher" << extractEqualityFields( matcher );
             }
-            virtual void visitElementMatcher( const ElementMatcher &elementMatcher ) {
+            virtual void visitElementMatcher( const mongo::old_matcher::ElementMatcher &elementMatcher ) {
                 _traversal << "ElementMatcher" << elementMatcher._toMatch.wrap();
             }
             BSONObj traversal() { return _traversal.obj(); }
@@ -418,7 +418,7 @@ namespace MatcherTests {
             static BSONArray extractEqualityFields( const Matcher &matcher ) {
                 EqualityFieldExtractor extractor( matcher );
                 matcher.visit( extractor );
-                return extractor.equalityFields();                    
+                return extractor.equalityFields();
             }
             BSONObjBuilder _traversal;
         };

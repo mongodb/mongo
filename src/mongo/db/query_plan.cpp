@@ -395,12 +395,12 @@ doneCheckOrder:
      * detected.  Some $exists:true predicates may be incorrectly reported as $exists:false due to
      * the approximate nature of the implementation.
      */
-    class ExistsFalseDetector : public MatcherVisitor {
+    class ExistsFalseDetector : public mongo::old_matcher::MatcherVisitor {
     public:
         ExistsFalseDetector( const Matcher& originalMatcher );
         bool hasFoundExistsFalse() const { return _foundExistsFalse; }
         void visitMatcher( const Matcher& matcher ) { _currentMatcher = &matcher; }
-        void visitElementMatcher( const ElementMatcher& elementMatcher );
+        void visitElementMatcher( const mongo::old_matcher::ElementMatcher& elementMatcher );
     private:
         const Matcher* _originalMatcher;
         const Matcher* _currentMatcher;
@@ -414,13 +414,13 @@ doneCheckOrder:
     }
 
     /** Matches $exists:false and $not:{$exists:true} exactly. */
-    static bool isExistsFalsePredicate( const ElementMatcher& elementMatcher ) {
+    static bool isExistsFalsePredicate( const mongo::old_matcher::ElementMatcher& elementMatcher ) {
         bool hasTrueValue = elementMatcher._toMatch.trueValue();
         bool hasNotModifier = elementMatcher._isNot;
         return hasNotModifier ? hasTrueValue : !hasTrueValue;
     }
     
-    void ExistsFalseDetector::visitElementMatcher( const ElementMatcher& elementMatcher ) {
+    void ExistsFalseDetector::visitElementMatcher( const mongo::old_matcher::ElementMatcher& elementMatcher ) {
         if ( elementMatcher._compareOp != BSONObj::opEXISTS ) {
             // Only consider $exists predicates.
             return;
