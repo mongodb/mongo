@@ -67,6 +67,38 @@ namespace mongo {
         return false;
     }
 
+    namespace {
+        bool _isExistsFalse( const MatchExpression* e, bool negated ) {
+            if ( e->matchType() == MatchExpression::EXISTS ){
+                const ExistsMatchExpression* exists = static_cast<const ExistsMatchExpression*>(e);
+                bool x = !exists->rightSideBool();
+                if ( negated )
+                    x = !x;
+                return x;
+            }
+
+            if ( e->matchType() == MatchExpression::AND ||
+                 e->matchType() == MatchExpression::OR ) {
+
+                for ( unsigned i = 0; i < e->numChildren(); i++  ) {
+                    if ( _isExistsFalse( e->getChild(i), negated ) )
+                        return true;
+                }
+                return false;
+            }
+
+            if ( e->matchType() == MatchExpression::NOT )
+                return _isExistsFalse( e->getChild(0), !negated );
+
+            return false;
+        }
+    }
+
+    bool Matcher2::hasExistsFalse() const {
+        return _isExistsFalse( _expression.get(), false );
+    }
+
+
     bool Matcher2::singleSimpleCriterion() const {
         if ( !_expression )
             return false;

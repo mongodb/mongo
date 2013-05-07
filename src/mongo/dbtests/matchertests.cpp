@@ -500,13 +500,52 @@ namespace MatcherTests {
         }
     };
 
+    template <typename M>
+    class ExistsFalse1 {
+    public:
+        void run() {
+            {
+                M m( BSON( "a" << BSON( "$exists" << true ) ) );
+                ASSERT( !m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "a" << BSON( "$exists" << false ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "a" << BSON( "$not" << BSON( "$exists" << false ) ) ) );
+                ASSERT( !m.hasExistsFalse() );
+            }
+
+
+            {
+                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$not" << BSON( "$exists" << true ) ) ) ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "matcher" ) {
         }
 
 #define ADD_BOTH(TEST) \
-        add< TEST<Matcher> >(); \
+        add< TEST<MatcherOld> >(); \
         add< TEST<Matcher2> >();
 
         void setupTests() {
@@ -530,6 +569,7 @@ namespace MatcherTests {
             ADD_BOTH(AtomicMatchTest);
             ADD_BOTH(SingleSimpleCriterion);
             ADD_BOTH(IndexPortion1);
+            ADD_BOTH(ExistsFalse1);
         }
     } dball;
 

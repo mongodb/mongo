@@ -210,6 +210,9 @@ namespace mongo {
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
+        // this is a terrible name, but trying not to use anythign we may really want
+        bool rightSideBool() const { return _exists; }
+
     private:
         bool _exists;
     };

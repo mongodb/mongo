@@ -46,6 +46,8 @@ namespace mongo {
 
         bool atomic() const;
 
+        bool hasExistsFalse() const;
+
         /*
          * this is from old mature
          * criteria is 1 equality expression, nothing else
