@@ -66,10 +66,10 @@ struct __wt_lsm_tree {
 
 	int refcnt;			/* Number of users of the tree */
 	WT_RWLOCK *rwlock;
-	WT_CONDVAR *ckpt_cond;		/* Used to notify worker of a switch */
+	WT_CONDVAR *work_cond;		/* Used to notify worker of activity */
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
-	WT_DSRC_STATS stats;		/* LSM statistics */
+	WT_DSRC_STATS stats;		/* LSM-level statistics */
 
 	uint64_t dsk_gen;
 

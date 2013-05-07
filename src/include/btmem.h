@@ -450,9 +450,14 @@ struct __wt_ref {
  * WT_MERGE_FULL_PAGE --
  * When the result of a merge contains more than this number of keys, it is
  * considered "done" and will not be merged again.
+ *
+ * WT_MERGE_MAX_REFS --
+ * Don't complete merges that contain more than this number of keys, they tend
+ * to generate pathological trees.
  */
 #define	WT_MERGE_STACK_MIN	3
 #define	WT_MERGE_FULL_PAGE	100
+#define	WT_MERGE_MAX_REFS	1000
 
 /*
  * WT_ROW --

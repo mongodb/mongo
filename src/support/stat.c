@@ -63,9 +63,9 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->cache_read_overflow.desc = "overflow pages read into cache";
 	stats->cache_write.desc = "pages written from cache";
 	stats->compress_raw_fail.desc =
-	    "raw compression call failed (no additional data available)";
+	    "raw compression call failed, no additional data available";
 	stats->compress_raw_fail_temporary.desc =
-	    "raw compression call failed (additional data available)";
+	    "raw compression call failed, additional data available";
 	stats->compress_raw_ok.desc = "raw compression call succeeded";
 	stats->compress_read.desc = "compressed pages read";
 	stats->compress_write.desc = "compressed pages written";
@@ -104,8 +104,9 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->rec_split_intl.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
 	stats->rec_split_max.desc =
-	    "reconciliation maximum number of splits created by for a page";
+	    "reconciliation maximum number of splits created for a page";
 	stats->session_compact.desc = "object compaction";
+	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
 	stats->txn_write_conflict.desc = "write generation conflicts";
 }
@@ -202,6 +203,92 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 }
 
 void
+__wt_stat_aggregate_dsrc_stats(void *child, void *parent)
+{
+	WT_DSRC_STATS *c, *p;
+
+	c = (WT_DSRC_STATS *)child;
+	p = (WT_DSRC_STATS *)parent;
+	p->block_alloc.v += c->block_alloc.v;
+	p->block_checkpoint_size.v += c->block_checkpoint_size.v;
+	p->block_extension.v += c->block_extension.v;
+	p->block_free.v += c->block_free.v;
+	p->block_size.v += c->block_size.v;
+	p->bloom_count.v += c->bloom_count.v;
+	p->bloom_false_positive.v += c->bloom_false_positive.v;
+	p->bloom_hit.v += c->bloom_hit.v;
+	p->bloom_miss.v += c->bloom_miss.v;
+	p->bloom_page_evict.v += c->bloom_page_evict.v;
+	p->bloom_page_read.v += c->bloom_page_read.v;
+	p->bloom_size.v += c->bloom_size.v;
+	p->btree_column_deleted.v += c->btree_column_deleted.v;
+	p->btree_column_fix.v += c->btree_column_fix.v;
+	p->btree_column_internal.v += c->btree_column_internal.v;
+	p->btree_column_variable.v += c->btree_column_variable.v;
+	p->btree_compact_rewrite.v += c->btree_compact_rewrite.v;
+	p->btree_entries.v += c->btree_entries.v;
+	if (c->btree_maximum_depth.v > p->btree_maximum_depth.v)
+	    p->btree_maximum_depth.v = c->btree_maximum_depth.v;
+	p->btree_overflow.v += c->btree_overflow.v;
+	p->btree_row_internal.v += c->btree_row_internal.v;
+	p->btree_row_leaf.v += c->btree_row_leaf.v;
+	p->cache_bytes_read.v += c->cache_bytes_read.v;
+	p->cache_bytes_write.v += c->cache_bytes_write.v;
+	p->cache_eviction_checkpoint.v += c->cache_eviction_checkpoint.v;
+	p->cache_eviction_clean.v += c->cache_eviction_clean.v;
+	p->cache_eviction_dirty.v += c->cache_eviction_dirty.v;
+	p->cache_eviction_fail.v += c->cache_eviction_fail.v;
+	p->cache_eviction_hazard.v += c->cache_eviction_hazard.v;
+	p->cache_eviction_internal.v += c->cache_eviction_internal.v;
+	p->cache_eviction_merge.v += c->cache_eviction_merge.v;
+	p->cache_eviction_merge_fail.v += c->cache_eviction_merge_fail.v;
+	p->cache_eviction_merge_levels.v += c->cache_eviction_merge_levels.v;
+	p->cache_overflow_value.v += c->cache_overflow_value.v;
+	p->cache_read.v += c->cache_read.v;
+	p->cache_read_overflow.v += c->cache_read_overflow.v;
+	p->cache_write.v += c->cache_write.v;
+	p->compress_raw_fail.v += c->compress_raw_fail.v;
+	p->compress_raw_fail_temporary.v += c->compress_raw_fail_temporary.v;
+	p->compress_raw_ok.v += c->compress_raw_ok.v;
+	p->compress_read.v += c->compress_read.v;
+	p->compress_write.v += c->compress_write.v;
+	p->compress_write_fail.v += c->compress_write_fail.v;
+	p->compress_write_too_small.v += c->compress_write_too_small.v;
+	p->cursor_create.v += c->cursor_create.v;
+	p->cursor_insert.v += c->cursor_insert.v;
+	p->cursor_insert_bulk.v += c->cursor_insert_bulk.v;
+	p->cursor_insert_bytes.v += c->cursor_insert_bytes.v;
+	p->cursor_next.v += c->cursor_next.v;
+	p->cursor_prev.v += c->cursor_prev.v;
+	p->cursor_remove.v += c->cursor_remove.v;
+	p->cursor_remove_bytes.v += c->cursor_remove_bytes.v;
+	p->cursor_reset.v += c->cursor_reset.v;
+	p->cursor_search.v += c->cursor_search.v;
+	p->cursor_search_near.v += c->cursor_search_near.v;
+	p->cursor_update.v += c->cursor_update.v;
+	p->cursor_update_bytes.v += c->cursor_update_bytes.v;
+	if (c->lsm_generation_max.v > p->lsm_generation_max.v)
+	    p->lsm_generation_max.v = c->lsm_generation_max.v;
+	p->lsm_lookup_no_bloom.v += c->lsm_lookup_no_bloom.v;
+	p->rec_dictionary.v += c->rec_dictionary.v;
+	p->rec_ovfl_key.v += c->rec_ovfl_key.v;
+	p->rec_ovfl_value.v += c->rec_ovfl_value.v;
+	p->rec_page_delete.v += c->rec_page_delete.v;
+	p->rec_page_merge.v += c->rec_page_merge.v;
+	p->rec_pages.v += c->rec_pages.v;
+	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
+	p->rec_skipped_update.v += c->rec_skipped_update.v;
+	p->rec_split_intl.v += c->rec_split_intl.v;
+	p->rec_split_leaf.v += c->rec_split_leaf.v;
+	if (c->rec_split_max.v > p->rec_split_max.v)
+	    p->rec_split_max.v = c->rec_split_max.v;
+	p->session_compact.v += c->session_compact.v;
+	p->session_cursor_open.v += c->session_cursor_open.v;
+	p->txn_update_conflict.v += c->txn_update_conflict.v;
+	p->txn_write_conflict.v += c->txn_write_conflict.v;
+}
+
+void
 __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 {
 	stats->block_byte_map_read.desc =
@@ -265,6 +352,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->rwlock_read.desc = "pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
+	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_ancient.desc = "ancient transactions";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_checkpoint.desc = "transaction checkpoints";

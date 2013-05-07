@@ -73,7 +73,7 @@ class test_config04(wttest.WiredTigerTestCase):
         Call wiredtiger_open and run a simple test.
         configextra are any extra configuration strings needed on the open.
         """
-        configarg = 'create'
+        configarg = 'create,statistics'
         if configextra != None:
             configarg += ',' + configextra
         self.conn = wiredtiger.wiredtiger_open('.', configarg)

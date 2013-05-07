@@ -339,9 +339,14 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
-	/* Pages cannot grow larger than 2**32, but that should never happen. */
-	if (visit_state.refcnt > UINT32_MAX)
-		return (ENOMEM);
+	/*
+	 * Don't allow split merges to generate arbitrarily large pages.
+	 * Ideally we would choose a size based on the internal_page_max
+	 * setting for the btree, but we don't have the correct btree handle
+	 * available.
+	 */
+	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
+		return (EBUSY);
 
 	/* Make sure the top page isn't queued for eviction. */
 	__wt_evict_list_clr_page(session, top);

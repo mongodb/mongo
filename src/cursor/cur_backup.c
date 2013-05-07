@@ -143,8 +143,8 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	cursor->value_format = "";	/* No value. */
 
 	/*
-	 * Start the backup and fill in the cursor's list.  Acquire the API
-	 * lock, we need a quiescent view.
+	 * Start the backup and fill in the cursor's list.  Acquire the schema
+	 * lock, we need a consistent view when reading creating a copy.
 	 */
 	WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, cfg));
 	WT_ERR(ret);
@@ -180,12 +180,27 @@ __backup_start(
 	cb->list = NULL;
 
 	/*
-	 * Checkpoints cannot be deleted until the backup finishes: set the
-	 * flag while holding the API lock, which blocks any checkpoint calls.
+	 * Single thread hot backups: we're holding the schema lock, so we
+	 * know we'll serialize with other attempts to start a hot backup.
 	 */
-	if (conn->ckpt_backup)
-		WT_ERR_MSG(session, EINVAL,
-		    "there is already a backup cursor open");
+	if (conn->hot_backup)
+		WT_RET_MSG(
+		    session, EINVAL, "there is already a backup cursor open");
+
+	/*
+	 * The hot backup copy is done outside of WiredTiger, which means file
+	 * blocks can't be freed and re-allocated until the backup completes.
+	 * The checkpoint code checks the backup flag, and if a backup cursor
+	 * is open checkpoints aren't discarded.   We release the lock as soon
+	 * as we've set the flag, we don't want to block checkpoints, we just
+	 * want to make sure no checkpoints are deleted.  The checkpoint code
+	 * holds the lock until it's finished the checkpoint, otherwise we
+	 * could start a hot backup that would race with an already-started
+	 * checkpoint.
+	 */
+	__wt_spin_lock(session, &conn->hot_backup_lock);
+	conn->hot_backup = 1;
+	__wt_spin_unlock(session, &conn->hot_backup_lock);
 
 	/* Create the hot backup file. */
 	WT_ERR(__backup_file_create(session, &bfp));
@@ -204,13 +219,11 @@ __backup_start(
 	bfp = NULL;
 	WT_ERR_TEST(ret == EOF, __wt_errno());
 
-	conn->ckpt_backup = 1;
-
 err:	if (bfp != NULL)
 		WT_TRET(fclose(bfp) == 0 ? 0 : __wt_errno());
 
 	if (ret != 0)
-		WT_TRET(__backup_file_remove(session));
+		WT_TRET(__backup_stop(session));
 
 	return (ret);
 }
@@ -227,11 +240,13 @@ __backup_stop(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	/* Checkpoint deletion can proceed. */
-	conn->ckpt_backup = 0;
-
 	/* Remove any backup metadata file. */
-	WT_TRET(__backup_file_remove(session));
+	ret = __backup_file_remove(session);
+
+	/* Checkpoint deletion can proceed, as can the next hot backup. */
+	__wt_spin_lock(session, &conn->hot_backup_lock);
+	conn->hot_backup = 0;
+	__wt_spin_unlock(session, &conn->hot_backup_lock);
 
 	return (ret);
 }

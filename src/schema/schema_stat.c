@@ -101,7 +101,7 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 			WT_ERR(stat_cursor->get_key(stat_cursor, &stat_key));
 			WT_ERR(stat_cursor->get_value(
 			    stat_cursor, &desc, &pvalue, &value));
-			WT_STAT_INCRKV(stats, stat_key, value);
+			WT_STAT_INCRKV(session, stats, stat_key, value);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		WT_ERR(stat_cursor->close(stat_cursor));
@@ -121,7 +121,7 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 			WT_ERR(stat_cursor->get_key(stat_cursor, &stat_key));
 			WT_ERR(stat_cursor->get_value(
 			    stat_cursor, &desc, &pvalue, &value));
-			WT_STAT_INCRKV(stats, stat_key, value);
+			WT_STAT_INCRKV(session, stats, stat_key, value);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		WT_ERR(stat_cursor->close(stat_cursor));

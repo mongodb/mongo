@@ -105,7 +105,8 @@ for f in sorted(flag_cnt.items(),\
 	for m in flag_name[f[0]]:
 		mask &= ~name_mask[m]
 	if mask == 0:
-		print >>sys.stder, "flags.py: ran out of flags at " + m + " method",
+		print >>sys.stderr,\
+		    "flags.py: ran out of flags at " + m + " method",
 		sys.exit(1)
 	for b in bits:
 		if mask & b:

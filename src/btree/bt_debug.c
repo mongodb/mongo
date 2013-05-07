@@ -217,7 +217,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	/*
 	 * This routine depends on the default block manager's view of files,
 	 * where an address consists of a file offset, length, and checksum.
-	 * This is for debugging only.  Other block manager's might not see a
+	 * This is for debugging only.  Other block managers might not see a
 	 * file or address the same way, that's why there's no block manager
 	 * method.
 	 */

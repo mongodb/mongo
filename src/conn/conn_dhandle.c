@@ -125,9 +125,15 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	    (ret = __wt_writelock(session, dhandle->rwlock)) == 0) {
 		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 
-		/* Add to the connection list. */
+		/*
+		 * Add the handle to the connection list.
+		 *
+		 * Put it at the beginning on the basis that we're likely to
+		 * need new files again soon until they are cached by all
+		 * sessions.
+		 */
 		dhandle->refcnt = 1;
-		TAILQ_INSERT_TAIL(&conn->dhqh, dhandle, q);
+		TAILQ_INSERT_HEAD(&conn->dhqh, dhandle, q);
 	}
 
 	if (ret == 0)
@@ -340,8 +346,6 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	WT_CSTAT_INCR(session, file_open);
-
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
 
@@ -435,12 +439,10 @@ err:	session->dhandle = saved_dhandle;
 int
 __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 {
-	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	int inuse;
 
-	btree = S2BT(session);
 	dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
@@ -467,7 +469,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 		 * last session (i.e., the default session for the connection).
 		 */
 		WT_ASSERT(session,
-		    btree != session->metafile ||
+		    S2BT(session) != session->metafile ||
 		    session == S2C(session)->default_session);
 
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))

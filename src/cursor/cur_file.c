@@ -52,7 +52,7 @@ __curfile_next(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
-	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor, 0);
+	ret = __wt_btcur_next(cbt, 0);
 
 err:	API_END(session);
 	return (ret);
@@ -91,7 +91,7 @@ __curfile_prev(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
-	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor, 0);
+	ret = __wt_btcur_prev(cbt, 0);
 
 err:	API_END(session);
 	return (ret);
@@ -172,7 +172,7 @@ __curfile_insert(WT_CURSOR *cursor)
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
+	ret = __wt_btcur_insert(cbt);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -193,7 +193,7 @@ __curfile_update(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
+	ret = __wt_btcur_update(cbt);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -213,7 +213,7 @@ __curfile_remove(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
-	ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
+	ret = __wt_btcur_remove(cbt);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
