@@ -23,15 +23,21 @@
 
 using namespace mongo;
 
-void printIfAge(DBClientConnection& c, int age) {
-    auto_ptr<DBClientCursor> cursor = c.query("tutorial.persons", QUERY( "age" << age ).sort("name") );
+int printIfAge(DBClientConnection& c, int age) {
+    std::auto_ptr<DBClientCursor> cursor = c.query("tutorial.persons", QUERY( "age" << age ).sort("name") );
+    if (!cursor.get()) {
+        cout << "query failure" << endl;
+        return EXIT_FAILURE;
+    }
+
     while( cursor->more() ) {
         BSONObj p = cursor->next();
         cout << p.getStringField("name") << endl;
     }
+    return EXIT_SUCCESS;
 }
 
-void run() {
+int run() {
     DBClientConnection c;
     c.connect("localhost"); //"192.168.58.1");
     cout << "connected ok" << endl;
@@ -50,21 +56,28 @@ void run() {
 
     cout << "count:" << c.count("tutorial.persons") << endl;
 
-    auto_ptr<DBClientCursor> cursor = c.query("tutorial.persons", BSONObj());
+    std::auto_ptr<DBClientCursor> cursor = c.query("tutorial.persons", BSONObj());
+    if (!cursor.get()) {
+        cout << "query failure" << endl;
+        return EXIT_FAILURE;
+    }
+
     while( cursor->more() ) {
         cout << cursor->next().toString() << endl;
     }
 
     cout << "\nprintifage:\n";
-    printIfAge(c, 33);
+    return printIfAge(c, 33);
 }
 
 int main() {
+   int ret = EXIT_SUCCESS;
     try {
-        run();
+        ret = run();
     }
     catch( DBException &e ) {
         cout << "caught " << e.what() << endl;
+        ret = EXIT_FAILURE;
     }
-    return 0;
+    return ret;
 }

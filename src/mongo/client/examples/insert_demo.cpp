@@ -55,8 +55,8 @@ int main() {
     } 
     catch(DBException& e) { 
         cout << "caught DBException " << e.toString() << endl;
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
