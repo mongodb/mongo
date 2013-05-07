@@ -252,7 +252,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * sleep, it's not something we can fix.
 		 */
 		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
-			if (loop == 10) {
+			if (loop == 100) {
 				F_SET(cache, WT_EVICT_STUCK);
 				WT_CSTAT_INCR(session, cache_eviction_slow);
 				WT_VERBOSE_RET(session, evictserver,
@@ -612,18 +612,19 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->evict_lock);
-	while (candidates > 0 && cache->evict[candidates - 1].page == NULL)
-		--candidates;
-	if (candidates == 0) {
-		__wt_spin_unlock(session, &cache->evict_lock);
-		return (0);
-	}
 
 	qsort(cache->evict,
 	    candidates, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 
 	while (candidates > 0 && cache->evict[candidates - 1].page == NULL)
 		--candidates;
+
+	cache->evict_entries = candidates;
+
+	if (candidates == 0) {
+		__wt_spin_unlock(session, &cache->evict_lock);
+		return (0);
+	}
 
 	/* Find the bottom 25% of read generations. */
 	cutoff = (3 * __evict_read_gen(&cache->evict[0]) +
@@ -639,11 +640,14 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 			break;
 	cache->evict_candidates = i + 1;
 
-	/* Clear any entries we will overwrite next walk. */
-	for (i = WT_EVICT_WALK_BASE, evict = cache->evict + i;
-	    i < candidates;
-	    i++, evict++)
-		__evict_list_clr(session, evict);
+	/* If we have more than the minimum number of entries, clear them. */
+	if (cache->evict_entries > WT_EVICT_WALK_BASE) {
+		for (i = WT_EVICT_WALK_BASE, evict = cache->evict + i;
+		    i < candidates;
+		    i++, evict++)
+			__evict_list_clr(session, evict);
+		cache->evict_entries = WT_EVICT_WALK_BASE;
+	}
 
 	cache->evict_current = cache->evict;
 	__wt_spin_unlock(session, &cache->evict_lock);
@@ -675,7 +679,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int file_count, i, retries;
+	u_int file_count, i, max_entries, retries;
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
@@ -688,7 +692,8 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	 * NOTE: we don't hold the schema lock, so we have to take care
 	 * that the handles we see are open and valid.
 	 */
-	i = WT_EVICT_WALK_BASE;
+	i = cache->evict_entries;
+	max_entries = cache->evict_entries + WT_EVICT_WALK_INCR;
 retry:	file_count = 0;
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
@@ -720,13 +725,13 @@ retry:	file_count = 0;
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
-		if (ret != 0 || i == cache->evict_entries)
+		if (ret != 0 || i == max_entries)
 			break;
 	}
 	cache->evict_file_next = (dhandle == NULL) ? 0 : file_count;
 
 	/* Walk the files a few times if we don't find enough pages. */
-	if (ret == 0 && i < cache->evict_entries && retries++ < 10)
+	if (ret == 0 && i < cache->evict_slots && retries++ < 10)
 		goto retry;
 
 	*entriesp = i;
@@ -741,10 +746,19 @@ static void
 __evict_init_candidate(
     WT_SESSION_IMPL *session, WT_EVICT_ENTRY *evict, WT_PAGE *page)
 {
+	WT_CACHE *cache;
+	u_int slot;
+
+	cache = S2C(session)->cache;
+
 	if (evict->page != NULL)
 		__evict_list_clr(session, evict);
 	evict->page = page;
 	evict->btree = S2BT(session);
+
+	slot = (u_int)(evict - cache->evict);
+	if (slot > cache->evict_entries)
+		cache->evict_entries = slot;
 
 	/* Mark the page on the list */
 	F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
@@ -769,8 +783,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	cache = S2C(session)->cache;
 	start = cache->evict + *slotp;
 	end = start + WT_EVICT_WALK_PER_FILE;
-	if (end > cache->evict + cache->evict_entries)
-		end = cache->evict + cache->evict_entries;
+	if (end > cache->evict + cache->evict_slots)
+		end = cache->evict + cache->evict_slots;
 	oldest_txn = session->txn.oldest_snap_min;
 
 	/*
