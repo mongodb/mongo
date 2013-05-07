@@ -981,7 +981,7 @@ namespace mongo {
         if ( name.find( ":" ) != string::npos ) {
             if ( withPort )
                 return name;
-            return name.substr( 0 , name.find( ":" ) );
+            return name.substr( 0 , name.find_last_of( ":" ) );
         }
 
         if ( withPort ) {
