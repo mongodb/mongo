@@ -659,24 +659,6 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			goto done;
 
-		case WT_REF_EVICT_FORCE:
-			/*
-			 * The child was entered onto the eviction queue by an
-			 * application thread, and is waiting to be forcibly
-			 * evicted.  We should not be here if called by the
-			 * eviction server, a child page in this state within
-			 * an evicted page's subtree would cause the eviction
-			 * review process to fail.
-			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
-
-			/*
-			 * If called during checkpoint, the child can't be
-			 * evicted, it's an in-memory case.
-			 */
-			goto in_memory;
-
 		case WT_REF_EVICT_WALK:
 			/*
 			 * The child is locked by a checkpoint or eviction walk
