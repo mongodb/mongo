@@ -80,7 +80,7 @@ namespace mongo {
      * Runtime options that control the Sorter's behavior
      */
     struct SortOptions {
-        long long limit; /// number of KV pairs to be returned. 0 for no limit.
+        unsigned long long limit; /// number of KV pairs to be returned. 0 for no limit.
         size_t maxMemoryUsageBytes; /// Approximate.
         bool extSortAllowed; /// If false, uassert if more mem needed than allowed.
         SortOptions()
@@ -173,6 +173,8 @@ namespace mongo {
 #define MONGO_CREATE_SORTER(Key, Value, Comparator) \
     template class ::mongo::Sorter<Key, Value>; \
     template class ::mongo::NoLimitSorter<Key, Value, Comparator>; \
+    template class ::mongo::LimitOneSorter<Key, Value, Comparator>; \
+    template class ::mongo::TopKSorter<Key, Value, Comparator>; \
     template class ::mongo::SortIteratorInterface<Key, Value>; \
     template class ::mongo::SortedFileWriter<Key, Value>; \
     template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>; \
