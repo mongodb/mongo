@@ -56,7 +56,7 @@ namespace mutablebson {
     class SafeNum {
     public:
         SafeNum();
-        ~SafeNum() { }
+        ~SafeNum();
 
         //
         // construction support
@@ -131,8 +131,8 @@ namespace mutablebson {
         //
         // accessors
         //
-        bool isValid() const { return _type != EOO; }
-        BSONType type() const { return _type; }
+        bool isValid() const;
+        BSONType type() const;
         std::string debugString() const;
 
         //
@@ -189,3 +189,6 @@ namespace mutablebson {
     std::ostream& operator<<(std::ostream& os, const SafeNum& snum);
 
 } // namespace mongo
+
+#include "mongo/util/safe_num-inl.h"
+

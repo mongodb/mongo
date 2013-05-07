@@ -22,18 +22,6 @@
 
 namespace mongo {
 
-    SafeNum::SafeNum() : _type(EOO) {
-    }
-
-    SafeNum::SafeNum(const SafeNum& rhs) : _type(rhs._type), _value(rhs._value) {
-    }
-
-    SafeNum& SafeNum::operator=(const SafeNum& rhs) {
-        _type = rhs._type;
-        _value = rhs._value;
-        return *this;
-    }
-
     SafeNum::SafeNum(const BSONElement& element) {
         switch (element.type()) {
         case NumberInt:
@@ -51,50 +39,6 @@ namespace mongo {
         default:
             _type = EOO;
         }
-    }
-
-    SafeNum::SafeNum(int num) : _type(NumberInt) {
-        _value.int32Val = num;
-    }
-
-    SafeNum::SafeNum(long long int num) : _type(NumberLong) {
-        _value.int64Val = num;
-    }
-
-    SafeNum::SafeNum(double num) : _type(NumberDouble) {
-        _value.doubleVal = num;
-    }
-
-    SafeNum SafeNum::operator+(const SafeNum& rhs) const {
-        return addInternal(*this, rhs);
-    }
-
-    SafeNum& SafeNum::operator+=(const SafeNum& rhs) {
-        return *this = addInternal(*this, rhs);
-    }
-
-    SafeNum SafeNum::operator&(const SafeNum& rhs) const {
-        return andInternal(*this, rhs);
-    }
-
-    SafeNum& SafeNum::operator&=(const SafeNum& rhs) {
-        return *this = andInternal(*this, rhs);
-    }
-
-    SafeNum SafeNum::operator|(const SafeNum& rhs) const {
-        return orInternal(*this, rhs);
-    }
-
-    SafeNum& SafeNum::operator|=(const SafeNum& rhs) {
-        return *this = orInternal(*this, rhs);
-    }
-
-    bool SafeNum::operator==(const SafeNum& rhs) const {
-        return isEquivalent(rhs);
-    }
-
-    bool SafeNum::operator!=(const SafeNum& rhs) const {
-        return ! isEquivalent(rhs);
     }
 
     std::string SafeNum::debugString() const {
