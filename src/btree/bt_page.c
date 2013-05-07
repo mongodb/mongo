@@ -45,7 +45,6 @@ __wt_page_in_func(
 			WT_RET(__wt_cache_read(session, parent, ref));
 			oldgen = F_ISSET(session, WT_SESSION_NO_CACHE) ? 1 : 0;
 			continue;
-		case WT_REF_EVICT_FORCE:
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
 			/*
