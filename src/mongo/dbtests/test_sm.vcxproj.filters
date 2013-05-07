@@ -1628,9 +1628,6 @@
     <ClInclude Include="..\db\fts\tokenizer.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\ops\modifier_base.h">
-      <Filter>db\ops</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\stats\counters.h">
       <Filter>db\stats</Filter>
     </ClInclude>
@@ -1948,6 +1945,15 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\db\ops\field_checker.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_geo.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_interface.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_set.h">
       <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
@@ -3770,6 +3776,27 @@
       <Filter>db\ops</Filter>
     </ClCompile>
     <ClCompile Include="..\db\ops\path_support_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_where.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_set.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_set_test.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
   </ItemGroup>

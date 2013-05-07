@@ -1695,6 +1695,21 @@
     <ClCompile Include="..\db\index\btree_key_generator.cpp">
       <Filter>db\index</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_where.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3327,6 +3342,9 @@
     </ClInclude>
     <ClInclude Include="..\db\index\btree_key_generator.h">
       <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_geo.h">
+      <Filter>db\matcher</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

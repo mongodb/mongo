@@ -1643,6 +1643,27 @@
     <ClCompile Include="ops\path_support_test.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
+    <ClCompile Include="matcher\expression_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_where.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_set.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_set_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3092,9 +3113,6 @@
     <ClInclude Include="fts\stop_words_list.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="ops\modifier_base.h">
-      <Filter>db\ops</Filter>
-    </ClInclude>
     <ClInclude Include="..\scripting\engine_spidermonkey_internal.h">
       <Filter>scripting</Filter>
     </ClInclude>
@@ -3337,6 +3355,15 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="ops\field_checker.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\expression_geo.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_interface.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_set.h">
       <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
