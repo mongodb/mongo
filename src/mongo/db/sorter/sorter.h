@@ -115,7 +115,7 @@ namespace mongo {
     };
 
     /// This is the main way to input data to the sorting framework
-    template <typename Key, typename Value, typename Comparator>
+    template <typename Key, typename Value>
     class Sorter {
         MONGO_DISALLOW_COPYING(Sorter);
     public:
@@ -125,29 +125,22 @@ namespace mongo {
                          ,typename Value::SorterDeserializeSettings
                          > Settings;
 
-        explicit Sorter(const SortOptions& opts,
-                        const Comparator& comp,
-                        const Settings& settings = Settings());
+        template <typename Comparator>
+        static Sorter* make(const SortOptions& opts,
+                            const Comparator& comp,
+                            const Settings& settings = Settings());
 
-        void add(const Key&, const Value&);
-        Iterator* done(); /// Can't add more data after calling done()
+        virtual void add(const Key&, const Value&) =0;
+        virtual Iterator* done() =0; /// Can't add more data after calling done()
+
+        virtual ~Sorter() {}
 
         // TEMP these are here for compatibility. Will be replaced with a general stats API
-        int numFiles() const { return _iters.size(); }
-        size_t memUsed() const { return _memUsed; }
+        virtual int numFiles() const =0;
+        virtual size_t memUsed() const =0;
 
-    private:
-        class STLComparator;
-
-        void sort();
-        void spill();
-
-        const Comparator _comp;
-        const Settings _settings;
-        SortOptions _opts;
-        size_t _memUsed;
-        std::deque<Data> _data; // the "current" data
-        std::vector<boost::shared_ptr<Iterator> > _iters; // data that has already been spilled
+    protected:
+        Sorter() {} // can only be constructed as a base
     };
 
     /// Writes pre-sorted data to a sorted file and hands-back an Iterator over that file.
@@ -178,7 +171,8 @@ namespace mongo {
  * unit once for each unique set of template parameters.
  */
 #define MONGO_CREATE_SORTER(Key, Value, Comparator) \
-    template class ::mongo::Sorter<Key, Value, Comparator>; \
+    template class ::mongo::Sorter<Key, Value>; \
+    template class ::mongo::NoLimitSorter<Key, Value, Comparator>; \
     template class ::mongo::SortIteratorInterface<Key, Value>; \
     template class ::mongo::SortedFileWriter<Key, Value>; \
     template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>; \
@@ -188,4 +182,9 @@ namespace mongo {
                 ::mongo::SortIteratorInterface<Key, Value>::merge<Comparator>( \
                     const std::vector<boost::shared_ptr<SortIteratorInterface> >& iters, \
                     const SortOptions& opts, \
-                    const Comparator& comp);
+                    const Comparator& comp); \
+    template ::mongo::Sorter<Key, Value>* \
+                ::mongo::Sorter<Key, Value>::make<Comparator>( \
+                    const SortOptions& opts, \
+                    const Comparator& comp, \
+                    const Settings& settings);

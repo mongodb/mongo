@@ -38,6 +38,31 @@
 #if MONGO_USE_NEW_SORTER
 namespace mongo {
 
+    namespace {
+        class OldExtSortComparator {
+        public:
+            typedef pair<BSONObj, DiskLoc> Data;
+
+            OldExtSortComparator(const ExternalSortComparison* comp,
+                                 boost::shared_ptr<const bool> mayInterrupt)
+                : _comp(comp)
+                , _mayInterrupt(mayInterrupt)
+            {}
+
+            int operator() (const Data& l, const Data& r) const {
+                RARELY if (*_mayInterrupt) {
+                    killCurrentOp.checkForInterrupt(!*_mayInterrupt);
+                }
+
+                return _comp->compare(l, r);
+            }
+
+        private:
+            const ExternalSortComparison* _comp;
+            boost::shared_ptr<const bool> _mayInterrupt;
+        };
+    }
+
     BSONObjExternalSorter::BSONObjExternalSorter(const ExternalSortComparison* comp,
                                                  long maxFileSize)
         : _mayInterrupt(boost::make_shared<bool>(false))
@@ -46,20 +71,14 @@ namespace mongo {
         opts.maxMemoryUsageBytes = maxFileSize;
         opts.extSortAllowed = true;
 
-        Comparator compForSorter (comp, _mayInterrupt);
-        _sorter.reset(new Sorter<BSONObj, DiskLoc, Comparator>(opts, compForSorter));
+        OldExtSortComparator compForSorter (comp, _mayInterrupt);
+        _sorter.reset(Sorter<BSONObj, DiskLoc>::make(opts, compForSorter));
     }
 
-    int BSONObjExternalSorter::Comparator::operator() (const Data& l, const Data& r) const {
-        RARELY if (*_mayInterrupt) {
-            killCurrentOp.checkForInterrupt(!*_mayInterrupt);
-        }
-        return _comp->compare(l, r);
-    }
 }
 
 #include "mongo/db/sorter/sorter.cpp"
-MONGO_CREATE_SORTER(mongo::BSONObj, mongo::DiskLoc, mongo::BSONObjExternalSorter::Comparator);
+MONGO_CREATE_SORTER(mongo::BSONObj, mongo::DiskLoc, mongo::OldExtSortComparator);
 
 #else
 

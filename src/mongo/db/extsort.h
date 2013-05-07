@@ -68,21 +68,8 @@ namespace mongo {
         void hintNumObjects(long long) {} // unused
 
     private:
-        class Comparator {
-        public:
-            Comparator(const ExternalSortComparison* comp,
-                       boost::shared_ptr<const bool> mayInterrupt)
-                : _comp(comp)
-                , _mayInterrupt(mayInterrupt)
-            {}
-            int operator() (const Data& l, const Data& r) const;
-        private:
-            const ExternalSortComparison* _comp;
-            boost::shared_ptr<const bool> _mayInterrupt;
-        };
-
         shared_ptr<bool> _mayInterrupt;
-        scoped_ptr<Sorter<BSONObj, DiskLoc, Comparator> > _sorter;
+        scoped_ptr<Sorter<BSONObj, DiskLoc> > _sorter;
     };
 #else
     /**

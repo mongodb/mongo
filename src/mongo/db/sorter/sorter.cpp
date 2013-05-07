@@ -327,82 +327,108 @@ namespace mongo {
         return new sorter::FileIterator<Key, Value>(_fileName, _settings, _fileDeleter);
     }
 
-    //
-    // Sorter
-    //
-
     template <typename Key, typename Value, typename Comparator>
-    Sorter<Key, Value, Comparator>::Sorter(const SortOptions& opts,
-                                           const Comparator& comp,
-                                           const Settings& settings)
-        : _comp(comp)
-        , _settings(settings)
-        , _opts(opts)
-        , _memUsed(0)
-    {}
-
-    template <typename Key, typename Value, typename Comparator>
-    void Sorter<Key, Value, Comparator>::add(const Key& key, const Value& val) {
-        _data.push_back(std::make_pair(key, val));
-
-        _memUsed += key.memUsageForSorter();
-        _memUsed += val.memUsageForSorter();
-
-        if (_memUsed > _opts.maxMemoryUsageBytes)
-            spill();
-    }
-
-    template <typename Key, typename Value, typename Comparator>
-    SortIteratorInterface<Key, Value>* Sorter<Key, Value, Comparator>::done() {
-        if (_iters.empty()) {
-            sort();
-            return new sorter::InMemIterator<Key, Value>(_data);
-        }
-
-        spill();
-        return Iterator::merge(_iters, _opts, _comp);
-    }
-
-    template <typename Key, typename Value, typename Comparator>
-    class Sorter<Key, Value, Comparator>::STLComparator {
+    class NoLimitSorter : public Sorter<Key, Value> {
     public:
-        STLComparator(const Comparator& comp) : _comp(comp) {}
-        bool operator () (const Data& lhs, const Data& rhs) const {
-            return _comp(lhs, rhs) < 0;
+        typedef std::pair<Key, Value> Data;
+        typedef SortIteratorInterface<Key, Value> Iterator;
+        typedef std::pair<typename Key::SorterDeserializeSettings
+                         ,typename Value::SorterDeserializeSettings
+                         > Settings;
+
+        NoLimitSorter(const SortOptions& opts,
+                      const Comparator& comp,
+                      const Settings& settings = Settings())
+            : _comp(comp)
+            , _settings(settings)
+            , _opts(opts)
+            , _memUsed(0)
+        {}
+
+        void add(const Key& key, const Value& val) {
+            _data.push_back(std::make_pair(key, val));
+
+            _memUsed += key.memUsageForSorter();
+            _memUsed += val.memUsageForSorter();
+
+            if (_memUsed > _opts.maxMemoryUsageBytes)
+                spill();
         }
+
+        Iterator* done() {
+            if (_iters.empty()) {
+                sort();
+                return new sorter::InMemIterator<Key, Value>(_data);
+            }
+
+            spill();
+            return Iterator::merge(_iters, _opts, _comp);
+        }
+
+        // TEMP these are here for compatibility. Will be replaced with a general stats API
+        int numFiles() const { return _iters.size(); }
+        size_t memUsed() const { return _memUsed; }
+
     private:
-        const Comparator& _comp;
+        class STLComparator {
+        public:
+            STLComparator(const Comparator& comp) : _comp(comp) {}
+            bool operator () (const Data& lhs, const Data& rhs) const {
+                return _comp(lhs, rhs) < 0;
+            }
+        private:
+            const Comparator& _comp;
+        };
+
+        void sort() {
+            STLComparator less(_comp);
+            std::stable_sort(_data.begin(), _data.end(), less);
+
+            // Does 2x more compares than stable_sort
+            // TODO test on windows
+            //std::sort(_data.begin(), _data.end(), comp);
+        }
+
+        void spill() {
+            if (_data.empty())
+                return;
+
+            if (!_opts.extSortAllowed)
+                uasserted(16819, str::stream()
+                    << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
+                    << " bytes, but did not opt-in to external sorting. Aborting operation."
+                    );
+
+            sort();
+
+            SortedFileWriter<Key, Value> writer(_settings);
+            for ( ; !_data.empty(); _data.pop_front()) {
+                writer.addAlreadySorted(_data.front().first, _data.back().second);
+            }
+
+            _iters.push_back(boost::shared_ptr<Iterator>(writer.done()));
+
+            _memUsed = 0;
+        }
+
+        const Comparator _comp;
+        const Settings _settings;
+        SortOptions _opts;
+        size_t _memUsed;
+        std::deque<Data> _data; // the "current" data
+        std::vector<boost::shared_ptr<Iterator> > _iters; // data that has already been spilled
     };
 
-    template <typename Key, typename Value, typename Comparator>
-    void Sorter<Key, Value, Comparator>::sort() {
-        STLComparator comp (_comp);
-        std::stable_sort(_data.begin(), _data.end(), comp);
-        //std::sort(_data.begin(), _data.end(), comp); // Does 2x more compares than stable_sort?
-                                                       // TODO test on windows
-    }
-
-    template <typename Key, typename Value, typename Comparator>
-    void Sorter<Key, Value, Comparator>::spill() {
-        if (_data.empty())
-            return;
-
-        if (!_opts.extSortAllowed)
-            uasserted(16819, str::stream()
-                << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
-                << " bytes, but did not opt-in to external sorting. Aborting operation."
-                );
-
-        sort();
-
-        SortedFileWriter<Key, Value> writer(_settings);
-        for ( ; !_data.empty(); _data.pop_front()) {
-            writer.addAlreadySorted(_data.front().first, _data.back().second);
+    template <typename Key, typename Value>
+    template <typename Comparator>
+    Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
+                                                 const Comparator& comp,
+                                                 const Settings& settings) {
+        if (opts.limit == 0) {
+            return new NoLimitSorter<Key, Value, Comparator>(opts, comp, settings);
         }
 
-        _iters.push_back(boost::shared_ptr<Iterator>(writer.done()));
-
-        _memUsed = 0;
+        verify(!"limit not yet supported");
     }
 }
 
