@@ -18,9 +18,9 @@ __wt_page_is_modified(WT_PAGE *page)
 
 /*
  * __wt_eviction_page_force --
- *      Add a page for forced eviction if it matches the criteria.
+ *      Check if a page matches the criteria for forced eviction.
  */
-static inline void
+static inline int
 __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -31,13 +31,13 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Ignore internal pages (check read-only information first to the
 	 * extent possible, this is shared data).
 	 */
-	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
-		return;
-
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+	if (page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
+	    !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
 	    __wt_page_is_modified(page) &&
 	    page->memory_footprint > btree->maxmempage)
-		__wt_evict_forced_page(session, page);
+		return (1);
+
+	return (0);
 }
 
 /*
@@ -445,22 +445,17 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 
 	/*
-	 * Try to immediately evict pages with the special "oldest" read
-	 * generation.
+	 * Try to immediately evict pages if they require forced eviction or
+	 * have the special "oldest" read generation.
 	 */
-	if (page->read_gen == WT_READ_GEN_OLDEST &&
+	if ((page->read_gen == WT_READ_GEN_OLDEST ||
+	    __wt_eviction_page_force(session, page)) &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
 			page->ref->state = WT_REF_MEM;
 			return (ret);
 		}
 
-		/*
-		 * Make sure the page isn't already scheduled for eviction.  We
-		 * have it locked, so after this, LRU eviction won't consider
-		 * it.
-		 */
-		__wt_evict_list_clr_page(session, page);
 		if ((ret = __wt_evict_page(session, page)) == EBUSY)
 			ret = 0;
 		return (ret);

@@ -100,8 +100,8 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	__wt_spin_init(session, &cache->evict_walk_lock);
 
 	/* Allocate the LRU eviction queue. */
-	cache->evict_entries = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-	WT_ERR(__wt_calloc_def(session, cache->evict_entries, &cache->evict));
+	cache->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
+	WT_ERR(__wt_calloc_def(session, cache->evict_slots, &cache->evict));
 
 	/*
 	 * We get/set some values in the cache statistics (rather than have
