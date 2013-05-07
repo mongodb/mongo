@@ -49,7 +49,7 @@ bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, u_int,
 #endif
 
 static WT_COMPRESSOR bzip2_compressor = {
-    bzip2_compress, NULL, bzip2_decompress, NULL };
+    bzip2_compress, NULL, bzip2_decompress, NULL, NULL };
 
 /* between 0-4: set the amount of verbosity to stderr */
 static int bz_verbosity = 0;

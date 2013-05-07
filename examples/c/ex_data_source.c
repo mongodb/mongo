@@ -326,6 +326,18 @@ my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (0);
 }
 
+/*! [WT_DATA_SOURCE terminate] */
+static int
+my_terminate(WT_DATA_SOURCE *dsrc, WT_SESSION *session)
+/*! [WT_DATA_SOURCE terminate] */
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+
+	return (0);
+}
+
 int
 main(void)
 {
@@ -346,7 +358,8 @@ main(void)
 		my_rename,
 		my_salvage,
 		my_truncate,
-		my_verify
+		my_verify,
+		my_terminate
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
 	/*! [WT_DATA_SOURCE register] */

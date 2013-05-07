@@ -135,19 +135,25 @@ err:	if (ncoll != NULL) {
  *	remove collator added by WT_CONNECTION->add_collator,
  *	only used internally.
  */
-static void
+static int
 __conn_remove_collator(WT_CONNECTION_IMPL *conn, WT_NAMED_COLLATOR *ncoll)
 {
 	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
 
 	session = conn->default_session;
 
-	/* Remove from the connection's list. */
-	TAILQ_REMOVE(&conn->collqh, ncoll, q);
+	/* Call any termination method. */
+	if (ncoll->collator->terminate != NULL)
+		ret = ncoll->collator->terminate(
+		    ncoll->collator, (WT_SESSION *)session);
 
-	/* Free associated memory */
+	/* Remove from the connection's list, free memory. */
+	TAILQ_REMOVE(&conn->collqh, ncoll, q);
 	__wt_free(session, ncoll->name);
 	__wt_free(session, ncoll);
+
+	return (ret);
 }
 
 /*
@@ -193,19 +199,25 @@ err:	if (ncomp != NULL) {
  *	remove compressor added by WT_CONNECTION->add_compressor,
  *	only used internally.
  */
-static void
+static int
 __conn_remove_compressor(WT_CONNECTION_IMPL *conn, WT_NAMED_COMPRESSOR *ncomp)
 {
 	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
 
 	session = conn->default_session;
 
-	/* Remove from the connection's list. */
-	TAILQ_REMOVE(&conn->compqh, ncomp, q);
+	/* Call any termination method. */
+	if (ncomp->compressor->terminate != NULL)
+		ret = ncomp->compressor->terminate(
+		    ncomp->compressor, (WT_SESSION *)session);
 
-	/* Free associated memory */
+	/* Remove from the connection's list, free memory. */
+	TAILQ_REMOVE(&conn->compqh, ncomp, q);
 	__wt_free(session, ncomp->name);
 	__wt_free(session, ncomp);
+
+	return (ret);
 }
 
 /*
@@ -250,18 +262,25 @@ err:	if (ndsrc != NULL) {
  *	remove compressor added by WT_CONNECTION->add_compressor,
  *	only used internally.
  */
-static void
-__conn_remove_data_source(
-    WT_CONNECTION_IMPL *conn, WT_NAMED_DATA_SOURCE *ndsrc)
+static int
+__conn_remove_data_source(WT_CONNECTION_IMPL *conn, WT_NAMED_DATA_SOURCE *ndsrc)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = conn->default_session;
 
-	/* Remove from the connection's list. */
+	/* Call any termination method. */
+	if (ndsrc->dsrc->terminate != NULL)
+		ret =
+		    ndsrc->dsrc->terminate(ndsrc->dsrc, (WT_SESSION *)session);
+
+	/* Remove from the connection's list, free memory. */
 	TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
 	__wt_free(session, ndsrc->prefix);
 	__wt_free(session, ndsrc);
+
+	return (ret);
 }
 
 /*
@@ -383,15 +402,15 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
-		__conn_remove_collator(conn, ncoll);
+		WT_TRET(__conn_remove_collator(conn, ncoll));
 
 	/* Free memory for compressors */
 	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		__conn_remove_compressor(conn, ncomp);
+		WT_TRET(__conn_remove_compressor(conn, ncomp));
 
 	/* Free memory for data sources */
 	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL)
-		__conn_remove_data_source(conn, ndsrc);
+		WT_TRET(__conn_remove_data_source(conn, ndsrc));
 
 	WT_TRET(__wt_connection_close(conn));
 
