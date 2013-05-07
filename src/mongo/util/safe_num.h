@@ -112,10 +112,12 @@ namespace mutablebson {
         //
 
         // Bitwise 'and' support
+        SafeNum bitAnd(const SafeNum& rhs) const;
         SafeNum operator&(const SafeNum& rhs) const;
         SafeNum& operator&=(const SafeNum& rhs);
 
         // Bitwise 'or' support
+        SafeNum bitOr(const SafeNum& rhs) const;
         SafeNum operator|(const SafeNum& rhs) const;
         SafeNum& operator|=(const SafeNum& rhs);
 

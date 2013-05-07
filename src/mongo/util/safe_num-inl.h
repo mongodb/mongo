@@ -60,20 +60,28 @@ namespace mongo {
         return *this = addInternal(*this, rhs);
     }
 
-    inline SafeNum SafeNum::operator&(const SafeNum& rhs) const {
+    inline SafeNum SafeNum::bitAnd(const SafeNum& rhs) const {
         return andInternal(*this, rhs);
     }
 
-    inline SafeNum& SafeNum::operator&=(const SafeNum& rhs) {
-        return *this = andInternal(*this, rhs);
+    inline SafeNum SafeNum::operator&(const SafeNum& rhs) const {
+        return bitAnd(rhs);
     }
 
-    inline SafeNum SafeNum::operator|(const SafeNum& rhs) const {
+    inline SafeNum& SafeNum::operator&=(const SafeNum& rhs) {
+        return *this = bitAnd(rhs);
+    }
+
+    inline SafeNum SafeNum::bitOr(const SafeNum& rhs) const {
         return orInternal(*this, rhs);
     }
 
+    inline SafeNum SafeNum::operator|(const SafeNum& rhs) const {
+        return bitOr(rhs);
+    }
+
     inline SafeNum& SafeNum::operator|=(const SafeNum& rhs) {
-        return *this = orInternal(*this, rhs);
+        return *this = bitOr(rhs);
     }
 
     inline bool SafeNum::isValid() const {
