@@ -20,10 +20,7 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/geo/geoquery.h"
-#include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
 
@@ -48,50 +45,5 @@ namespace mongo {
 
     typedef MatcherOld Matcher;
     //typedef Matcher2 Matcher;
-
-    // If match succeeds on index key, then attempt to match full document.
-    class CoveredIndexMatcher : boost::noncopyable {
-    public:
-        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-        bool matchesWithSingleKeyIndex( const BSONObj& key, const DiskLoc& recLoc,
-                                        MatchDetails* details = 0 ) const {
-            return matches( key, recLoc, details, true );
-        }
-        /**
-         * This is the preferred method for matching against a cursor, as it
-         * can handle both multi and single key cursors.
-         */
-        bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 ) const;
-        bool needRecord() const { return _needRecord; }
-
-        const Matcher &docMatcher() const { return *_docMatcher; }
-
-        /**
-         * @return a matcher for a following $or clause.
-         * @param prevClauseFrs The index range scanned by the previous $or clause.  May be empty.
-         * @param nextClauseIndexKeyPattern The index key of the following $or clause.
-         */
-        CoveredIndexMatcher *nextClauseMatcher( const shared_ptr<FieldRangeVector>& prevClauseFrv,
-                                                const BSONObj& nextClauseIndexKeyPattern ) const {
-            return new CoveredIndexMatcher( *this, prevClauseFrv, nextClauseIndexKeyPattern );
-        }
-
-        string toString() const;
-
-    private:
-        bool matches( const BSONObj& key, const DiskLoc& recLoc, MatchDetails* details = 0,
-                      bool keyUsable = true ) const;
-        bool isOrClauseDup( const BSONObj &obj ) const;
-        CoveredIndexMatcher( const CoveredIndexMatcher &prevClauseMatcher,
-                            const shared_ptr<FieldRangeVector> &prevClauseFrv,
-                            const BSONObj &nextClauseIndexKeyPattern );
-        void init();
-        shared_ptr< Matcher > _docMatcher;
-        Matcher _keyMatcher;
-        vector<shared_ptr<FieldRangeVector> > _orDedupConstraints;
-
-        bool _needRecord; // if the key itself isn't good enough to determine a positive match
-    };
-
-} // namespace mongo
+}
 
