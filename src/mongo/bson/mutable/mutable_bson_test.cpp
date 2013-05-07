@@ -1149,5 +1149,16 @@ namespace {
         ASSERT_EQUALS(mongo::StringData(), noname.getFieldName());
     }
 
+    TEST(Document, CreateElementFromBSONElement) {
+        mongo::BSONObj obj = mongo::fromjson("{a:1}}");
+        mmb::Document doc;
+        ASSERT_OK(doc.root().appendElement(obj["a"]));
+
+        mmb::Element newElem = doc.root()["a"];
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(newElem.getType(), mongo::NumberInt);
+        ASSERT_EQUALS(newElem.getValueInt(), 1);
+    }
+
 } // namespace
 
