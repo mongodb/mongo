@@ -20,13 +20,16 @@
 
 #pragma once
 
+#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/matcher/match_details.h"
 
-#define USE_OLD_MATCHER 1
-
 namespace mongo {
+
+    class Cursor;
+    class CoveredIndexMatcher;
+    class FieldRangeVector;
 
     struct element_lt {
         bool operator()(const BSONElement& l, const BSONElement& r) const {
@@ -38,19 +41,13 @@ namespace mongo {
     };
 }
 
-#ifdef USE_OLD_MATCHER
 #include "matcher_old.h"
-#else
 #include "mongo/db/matcher/matcher.h"
-#endif
 
 namespace mongo {
 
-#ifdef USE_OLD_MATCHER
     typedef MatcherOld Matcher;
-#else
-    typedef Matcher2 Matcher;
-#endif
+    //typedef Matcher2 Matcher;
 
     // If match succeeds on index key, then attempt to match full document.
     class CoveredIndexMatcher : boost::noncopyable {

@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-    Matcher2::Matcher2( const BSONObj& pattern )
+    Matcher2::Matcher2( const BSONObj& pattern, bool nested )
         : _pattern( pattern ) {
 
         StatusWithMatchExpression result = MatchExpressionParser::parse( pattern );

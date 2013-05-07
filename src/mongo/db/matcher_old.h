@@ -20,16 +20,12 @@
 
 #include <pcrecpp.h>
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
 
-    class Cursor;
-    class CoveredIndexMatcher;
-    class FieldRangeVector;
     class MatcherOld;
 
     namespace old_matcher {

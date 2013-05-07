@@ -150,12 +150,12 @@ namespace mongo {
                 BSONObj x = m.embeddedObject();
                 if ( x.firstElement().getGtLtOp() == BSONObj::Equality &&
                      !str::equals( x.firstElement().fieldName(), "$not" ) ) {
-                    _subMatcher.reset( new Matcher( x ) );
+                    _subMatcher.reset( new MatcherOld( x ) );
                     _subMatcherOnPrimitives = false;
                 }
                 else {
                     // meant to act on primitives
-                    _subMatcher.reset( new Matcher( BSON( "" << x ) ) );
+                    _subMatcher.reset( new MatcherOld( BSON( "" << x ) ) );
                     _subMatcherOnPrimitives = true;
                 }
             }
@@ -170,8 +170,8 @@ namespace mongo {
             while ( i.more() ) {
                 BSONElement ie = i.next();
                 if ( op == BSONObj::opALL && ie.type() == Object && ie.embeddedObject().firstElement().getGtLtOp() == BSONObj::opELEM_MATCH ) {
-                    shared_ptr<Matcher> s;
-                    s.reset( new Matcher( ie.embeddedObject().firstElement().embeddedObjectUserCheck() ) );
+                    shared_ptr<MatcherOld> s;
+                    s.reset( new MatcherOld( ie.embeddedObject().firstElement().embeddedObjectUserCheck() ) );
                     _allMatchers.push_back( s );
                 }
                 else if ( ie.type() == RegEx ) {
@@ -222,7 +222,7 @@ namespace mongo {
             if ( _subMatcher ) {
                 _subMatcher->visit( visitor );
             }
-            for( vector<shared_ptr<Matcher> >::const_iterator j = _allMatchers.begin();
+            for( vector<shared_ptr<MatcherOld> >::const_iterator j = _allMatchers.begin();
                  j != _allMatchers.end(); ++j ) {
                 (*j)->visit( visitor );
             }
@@ -364,13 +364,13 @@ namespace mongo {
         return true;
     }
 
-    void MatcherOld::parseExtractedClause( const BSONElement &e, list< shared_ptr< Matcher > > &matchers ) {
+    void MatcherOld::parseExtractedClause( const BSONElement &e, list< shared_ptr< MatcherOld > > &matchers ) {
         uassert( 13086, "$and/$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator j( e.embeddedObject() );
         while( j.more() ) {
             BSONElement f = j.next();
             uassert( 13087, "$and/$or/$nor match element must be an object", f.type() == Object );
-            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), true ) ) );
+            matchers.push_back( shared_ptr< MatcherOld >( new MatcherOld( f.embeddedObject(), true ) ) );
         }
     }
 
@@ -573,11 +573,11 @@ namespace mongo {
             }
         }
         // Recursively filter match components for and and or matchers.
-        for( list< shared_ptr< Matcher > >::const_iterator i = docMatcher._andMatchers.begin(); i != docMatcher._andMatchers.end(); ++i ) {
-            _andMatchers.push_back( shared_ptr< Matcher >( new Matcher( **i, key ) ) );
+        for( list< shared_ptr< MatcherOld > >::const_iterator i = docMatcher._andMatchers.begin(); i != docMatcher._andMatchers.end(); ++i ) {
+            _andMatchers.push_back( shared_ptr< MatcherOld >( new MatcherOld( **i, key ) ) );
         }
-        for( list< shared_ptr< Matcher > >::const_iterator i = docMatcher._orMatchers.begin(); i != docMatcher._orMatchers.end(); ++i ) {
-            _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( **i, key ) ) );
+        for( list< shared_ptr< MatcherOld > >::const_iterator i = docMatcher._orMatchers.begin(); i != docMatcher._orMatchers.end(); ++i ) {
+            _orMatchers.push_back( shared_ptr< MatcherOld >( new MatcherOld( **i, key ) ) );
         }
     }
 
@@ -981,7 +981,7 @@ namespace mongo {
         }
 
         if ( _andMatchers.size() > 0 ) {
-            for( list< shared_ptr< Matcher > >::const_iterator i = _andMatchers.begin();
+            for( list< shared_ptr< MatcherOld > >::const_iterator i = _andMatchers.begin();
                  i != _andMatchers.end(); ++i ) {
                 // SERVER-3192 Track field matched using details the same as for
                 // top level fields, at least for now.
@@ -993,7 +993,7 @@ namespace mongo {
 
         if ( _orMatchers.size() > 0 ) {
             bool match = false;
-            for( list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
+            for( list< shared_ptr< MatcherOld > >::const_iterator i = _orMatchers.begin();
                  i != _orMatchers.end(); ++i ) {
                 // SERVER-205 don't submit details - we don't want to track field
                 // matched within $or
@@ -1008,7 +1008,7 @@ namespace mongo {
         }
 
         if ( _norMatchers.size() > 0 ) {
-            for( list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
+            for( list< shared_ptr< MatcherOld > >::const_iterator i = _norMatchers.begin();
                  i != _norMatchers.end(); ++i ) {
                 // SERVER-205 don't submit details - we don't want to track field
                 // matched within $nor
@@ -1026,8 +1026,8 @@ namespace mongo {
     }
 
     static void visitList( MatcherVisitor& visitor,
-                           const list<shared_ptr<Matcher> >& matchers ) {
-        for( list<shared_ptr<Matcher> >::const_iterator i = matchers.begin(); i != matchers.end();
+                           const list<shared_ptr<MatcherOld> >& matchers ) {
+        for( list<shared_ptr<MatcherOld> >::const_iterator i = matchers.begin(); i != matchers.end();
              ++i ) {
             (*i)->visit( visitor );
         }
@@ -1056,7 +1056,7 @@ namespace mongo {
         bool _foundExistsFalse;
     };
 
-    ExistsFalseDetector::ExistsFalseDetector( const Matcher& originalMatcher ) :
+    ExistsFalseDetector::ExistsFalseDetector( const MatcherOld& originalMatcher ) :
         _originalMatcher( &originalMatcher ),
         _currentMatcher( 0 ),
         _foundExistsFalse() {
@@ -1110,7 +1110,7 @@ namespace mongo {
         visitList( visitor, _norMatchers );
     }
     
-    bool MatcherOld::keyMatch( const Matcher &docMatcher ) const {
+    bool MatcherOld::keyMatch( const MatcherOld &docMatcher ) const {
         // Quick check certain non key match cases.
         if ( docMatcher._all
              || docMatcher._haveSize
@@ -1138,8 +1138,8 @@ namespace mongo {
         
         // Recursively check that all submatchers support key match.
         {
-            list< shared_ptr< Matcher > >::const_iterator i = _andMatchers.begin();
-            list< shared_ptr< Matcher > >::const_iterator j = docMatcher._andMatchers.begin();
+            list< shared_ptr< MatcherOld > >::const_iterator i = _andMatchers.begin();
+            list< shared_ptr< MatcherOld > >::const_iterator j = docMatcher._andMatchers.begin();
             while( i != _andMatchers.end() ) {
                 if ( !(*i)->keyMatch( **j ) ) {
                     return false;
@@ -1148,8 +1148,8 @@ namespace mongo {
             }
         }
         {
-            list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
-            list< shared_ptr< Matcher > >::const_iterator j = docMatcher._orMatchers.begin();
+            list< shared_ptr< MatcherOld > >::const_iterator i = _orMatchers.begin();
+            list< shared_ptr< MatcherOld > >::const_iterator j = docMatcher._orMatchers.begin();
             while( i != _orMatchers.end() ) {
                 if ( !(*i)->keyMatch( **j ) ) {
                     return false;

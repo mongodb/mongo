@@ -32,7 +32,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( Matcher2 );
 
     public:
-        explicit Matcher2( const BSONObj& pattern );
+        explicit Matcher2( const BSONObj& pattern, bool nested=false /* do not use */ );
 
         /**
          * Generate a matcher for the provided index key format using the

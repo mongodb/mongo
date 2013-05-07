@@ -18,19 +18,5 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "matcher.h"
-#include "../util/goodies.h"
-#include "../util/startup_test.h"
-#include "diskloc.h"
-#include "../scripting/engine.h"
-#include "db.h"
-#include "queryutil.h"
-#include "client.h"
-
-#include "pdfile.h"
-
-#ifdef USE_OLD_MATCHER
 #include "matcher_old.cpp"
-#endif
 

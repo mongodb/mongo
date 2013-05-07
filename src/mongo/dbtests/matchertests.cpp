@@ -321,111 +321,9 @@ namespace MatcherTests {
         }
     };
 
-    /**
-     * Helper class to extract the top level equality fields of a matcher, which can serve as a
-     * useful way to identify the matcher.
-     */
-    class EqualityFieldExtractor : public mongo::old_matcher::MatcherVisitor {
-    public:
-        EqualityFieldExtractor( const Matcher &originalMatcher ) :
-            _originalMatcher( &originalMatcher ),
-            _currentMatcher( 0 ) {
-        }
-        virtual void visitMatcher( const Matcher &matcher ) {
-            _currentMatcher = &matcher;
-        }
-        virtual void visitElementMatcher( const mongo::old_matcher::ElementMatcher &elementMatcher ) {
-            // If elementMatcher is visited before any Matcher other than _originalMatcher, it is
-            // a top level ElementMatcher within _originalMatcher.
-            if ( _currentMatcher != _originalMatcher ) {
-                return;
-            }
-            if ( elementMatcher._compareOp != BSONObj::Equality ) {
-                return;
-            }
-            _equalityFields.insert( elementMatcher._toMatch.fieldName() );
-        }
-        BSONArray equalityFields() const {
-            BSONArrayBuilder ret;
-            for( set<string>::const_iterator i = _equalityFields.begin();
-                i != _equalityFields.end(); ++i ) {
-                ret << *i;
-            }
-            return ret.arr();
-        }
-        const Matcher *_originalMatcher;
-        const Matcher *_currentMatcher;
-        set<string> _equalityFields;
-    };
-
-    /**
-     * Matcher::visit() visits all nested Matchers and ElementMatchers, in the expected
-     * order.  In particular:
-     * - All of a Matcher's top level ElementMatchers are visited immediately after the Matcher
-     *   itself (before any other Matchers are visited).
-     * - All nested Matchers and ElementMatchers are visited.
-     */
-    class Visit {
-    public:
-        void run() {
-            Matcher matcher( fromjson( "{ a:1, b:2, $and:[ { c:6, d:7 }, { n:12 } ],"
-                                      "$or:[ { e:8, l:10 } ], $nor:[ { f:9, m:11 } ],"
-                                      "g:{ $elemMatch:{ h:3 } },"
-                                      "i:{ $all:[ { $elemMatch:{ j:4 } },"
-                                      "{ $elemMatch:{ k:5 } } ] } }" ) );
-            Visitor testVisitor;
-            matcher.visit( testVisitor );
-            BSONObj expectedTraversal = fromjson
-                    ( "{"
-                     "Matcher:[ 'a', 'b' ],"
-                     "ElementMatcher:{ a:1 },"
-                     "ElementMatcher:{ b:2 },"
-                     "ElementMatcher:{ g:{ h:3 } },"
-                     "ElementMatcher:{ i:{ $all:[ { $elemMatch:{ j:4 } },"
-                            "{ $elemMatch:{ k:5 } } ] } },"
-                     "Matcher:[ 'h' ],"
-                     "ElementMatcher:{ h:3 },"
-                     "Matcher:[ 'j' ],"
-                     "ElementMatcher:{ j:4 },"
-                     "Matcher:[ 'k' ],"
-                     "ElementMatcher:{ k:5 },"
-                     "Matcher:[ 'c', 'd' ],"
-                     "ElementMatcher:{ c:6 },"
-                     "ElementMatcher:{ d:7 },"
-                     "Matcher:[ 'n' ],"
-                     "ElementMatcher:{ n:12 },"
-                     "Matcher:[ 'e', 'l' ],"
-                     "ElementMatcher:{ e:8 },"
-                     "ElementMatcher:{ l:10 },"
-                     "Matcher:[ 'f', 'm' ],"
-                     "ElementMatcher:{ f:9 },"
-                     "ElementMatcher:{ m:11 }"
-                     "}" );
-            ASSERT_EQUALS( expectedTraversal, testVisitor.traversal() );
-        }
-    private:
-        /** Helper MatcherVisitor class that records all visit callbacks. */
-        class Visitor : public mongo::old_matcher::MatcherVisitor {
-        public:
-            virtual void visitMatcher( const Matcher &matcher ) {
-                _traversal << "Matcher" << extractEqualityFields( matcher );
-            }
-            virtual void visitElementMatcher( const mongo::old_matcher::ElementMatcher &elementMatcher ) {
-                _traversal << "ElementMatcher" << elementMatcher._toMatch.wrap();
-            }
-            BSONObj traversal() { return _traversal.obj(); }
-        private:
-            static BSONArray extractEqualityFields( const Matcher &matcher ) {
-                EqualityFieldExtractor extractor( matcher );
-                matcher.visit( extractor );
-                return extractor.equalityFields();
-            }
-            BSONObjBuilder _traversal;
-        };
-    };
 
     template <typename M>
-    class AtomicMatchTest {
+      class AtomicMatchTest {
     public:
         void run() {
 
@@ -562,7 +460,6 @@ namespace MatcherTests {
             add<Covered::ElemMatchKeyIndexed>();
             add<Covered::ElemMatchKeyIndexedSingleKey>();
             ADD_BOTH(AllTiming);
-            add<Visit>();
             ADD_BOTH(WithinBox);
             ADD_BOTH(WithinCenter);
             ADD_BOTH(WithinPolygon);
