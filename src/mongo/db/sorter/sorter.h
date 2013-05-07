@@ -171,15 +171,18 @@ namespace mongo {
  * unit once for each unique set of template parameters.
  */
 #define MONGO_CREATE_SORTER(Key, Value, Comparator) \
+    /* public classes */ \
     template class ::mongo::Sorter<Key, Value>; \
-    template class ::mongo::NoLimitSorter<Key, Value, Comparator>; \
-    template class ::mongo::LimitOneSorter<Key, Value, Comparator>; \
-    template class ::mongo::TopKSorter<Key, Value, Comparator>; \
     template class ::mongo::SortIteratorInterface<Key, Value>; \
     template class ::mongo::SortedFileWriter<Key, Value>; \
+    /* internal classes */ \
+    template class ::mongo::sorter::NoLimitSorter<Key, Value, Comparator>; \
+    template class ::mongo::sorter::LimitOneSorter<Key, Value, Comparator>; \
+    template class ::mongo::sorter::TopKSorter<Key, Value, Comparator>; \
     template class ::mongo::sorter::MergeIterator<Key, Value, Comparator>; \
     template class ::mongo::sorter::InMemIterator<Key, Value>; \
     template class ::mongo::sorter::FileIterator<Key, Value>; \
+    /* factory functions */ \
     template ::mongo::SortIteratorInterface<Key, Value>* \
                 ::mongo::SortIteratorInterface<Key, Value>::merge<Comparator>( \
                     const std::vector<boost::shared_ptr<SortIteratorInterface> >& iters, \
