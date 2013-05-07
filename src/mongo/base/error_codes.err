@@ -31,5 +31,8 @@ error_code("IndexNotFound", 27)
 error_code("PathNotViable", 28)
 error_code("NonExistentPath", 29)
 error_code("InvalidPath", 30)
+error_code("RoleNotFound", 31)
+error_code("RolesNotRelated", 32)
+error_code("PrivilegeNotFound", 33)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

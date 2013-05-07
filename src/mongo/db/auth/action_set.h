@@ -41,6 +41,8 @@ namespace mongo {
 
         bool empty() const { return _actions.none(); }
 
+        bool equals(const ActionSet& other) const { return this->_actions == other._actions; }
+
         bool contains(const ActionType& action) const;
 
         // Returns true only if this ActionSet contains all the actions present in the 'other'
@@ -59,5 +61,9 @@ namespace mongo {
         // bitmask of actions this privilege grants
         std::bitset<ActionType::NUM_ACTION_TYPES> _actions;
     };
+
+    static inline bool operator==(const ActionSet& lhs, const ActionSet& rhs) {
+        return lhs.equals(rhs);
+    }
 
 } // namespace mongo

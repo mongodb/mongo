@@ -18,6 +18,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/platform/hash_namespace.h"
 
 namespace mongo {
 
@@ -70,3 +71,12 @@ namespace mongo {
     }
 
 }  // namespace mongo
+
+// Define hash function for PrincipalNames so they can be keys in std::unordered_map
+MONGO_HASH_NAMESPACE_START
+    template <> struct hash<mongo::PrincipalName> {
+        size_t operator()(const mongo::PrincipalName& pname) const {
+            return hash<const std::string&>()(pname.getFullName());
+        }
+    };
+MONGO_HASH_NAMESPACE_END

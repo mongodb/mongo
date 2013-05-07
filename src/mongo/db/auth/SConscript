@@ -12,6 +12,8 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'action_type.cpp',
                                'auth_external_state.cpp',
                                'authorization_manager.cpp',
+                               'role_graph.cpp',
+                               'role_name.cpp',
                                'principal.cpp',
                                'principal_name.cpp',
                                'principal_set.cpp',
@@ -39,5 +41,6 @@ env.StaticLibrary('authmongos',
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('principal_set_test', 'principal_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('privilege_set_test', 'privilege_set_test.cpp', LIBDEPS=['authcore'])
+env.CppUnitTest('role_graph_test', 'role_graph_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                 LIBDEPS=['authcore'])

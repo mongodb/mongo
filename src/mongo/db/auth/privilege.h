@@ -16,6 +16,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -37,6 +38,9 @@ namespace mongo {
 
         const ActionSet& getActions() const { return _actions; }
 
+        void addActions(const ActionSet& actionsToAdd);
+        void removeActions(const ActionSet& actionsToRemove);
+
         // Checks if the given action is present in the Privilege.
         bool includesAction(const ActionType& action) const;
         // Checks if the given actions are present in the Privilege.
@@ -47,5 +51,7 @@ namespace mongo {
         std::string _resource;
         ActionSet _actions; // bitmask of actions this privilege grants
     };
+
+    typedef std::vector<Privilege> PrivilegeVector;
 
 } // namespace mongo

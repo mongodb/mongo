@@ -31,6 +31,14 @@ namespace mongo {
     Privilege::Privilege(const std::string& resource, const ActionSet& actions) :
             _resource(resource), _actions(actions) {}
 
+    void Privilege::addActions(const ActionSet& actionsToAdd) {
+        _actions.addAllActionsFromSet(actionsToAdd);
+    }
+
+    void Privilege::removeActions(const ActionSet& actionsToRemove) {
+        _actions.removeAllActionsFromSet(actionsToRemove);
+    }
+
     bool Privilege::includesAction(const ActionType& action) const {
         return _actions.contains(action);
     }
