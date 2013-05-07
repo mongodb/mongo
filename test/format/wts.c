@@ -109,7 +109,8 @@ wts_open(void)
 	 * Make sure at least 2 internal page per thread can fit in cache.
 	 */
 	maxintlpage = 1U << g.c_intl_page_max;
-	while (2 * g.c_threads * maxintlpage > g.c_cache << 20)
+	while (maxintlpage > 512 &&
+	    2 * g.c_threads * maxintlpage > g.c_cache << 20)
 		maxintlpage >>= 1;
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
@@ -117,7 +118,8 @@ wts_open(void)
 
 	/* Make sure at least two leaf pages per thread can fit in cache. */
 	maxleafpage = 1U << g.c_leaf_page_max;
-	while (2 * g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
+	while (maxleafpage > 512 &&
+	    2 * g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
 		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafitem < 40)
@@ -208,7 +210,7 @@ wts_open(void)
 	/* Configure KVS devices. */
 	if (DATASOURCE("memrata"))
 		p += snprintf(
-		    p, (size_t)(end - p), ",kvs_devices=[RUNDIR/KVS]");
+		    p, (size_t)(end - p), ",kvs_devices=[\"/dev/loop0\"]");
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
@@ -218,7 +220,7 @@ wts_open(void)
 }
 
 void
-wts_close()
+wts_close(void)
 {
 	WT_CONNECTION *conn;
 	int ret;

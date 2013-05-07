@@ -20,7 +20,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ITEM buf;
 	WT_LSM_CHUNK *chunk;
 	const char *lsmconfig;
-	size_t chunk_sz, alloc;
+	size_t chunk_sz;
 	u_int nchunks;
 
 	WT_CLEAR(buf);
@@ -124,7 +124,6 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				}
 				if ((nchunks + 1) * chunk_sz >
 				    lsm_tree->old_avail * chunk_sz) {
-					alloc = lsm_tree->old_alloc;
 					WT_ERR(__wt_realloc(session,
 					    &lsm_tree->old_alloc,
 					    chunk_sz * WT_MAX(10,
@@ -133,9 +132,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					    &lsm_tree->old_chunks));
 					lsm_tree->nold_chunks = (u_int)
 					    (lsm_tree->old_alloc / chunk_sz);
-					lsm_tree->old_avail += (u_int)
-					    ((lsm_tree->old_alloc - alloc) /
-					    chunk_sz);
+					lsm_tree->old_avail =
+					    lsm_tree->nold_chunks - nchunks;
 				}
 				WT_ERR(__wt_calloc_def(session, 1, &chunk));
 				lsm_tree->old_chunks[nchunks++] = chunk;

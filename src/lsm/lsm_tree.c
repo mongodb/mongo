@@ -35,7 +35,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_free(session, lsm_tree->file_config);
 
 	WT_TRET(__wt_rwlock_destroy(session, &lsm_tree->rwlock));
-	WT_TRET(__wt_cond_destroy(session, &lsm_tree->ckpt_cond));
+	WT_TRET(__wt_cond_destroy(session, &lsm_tree->work_cond));
 
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		if ((chunk = lsm_tree->chunk[i]) == NULL)
@@ -75,13 +75,23 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
+		/*
+		 * Signal twice to wake up all threads, even if they are racing
+		 * to check the "working" flag.
+		 */
 		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
-			for (i = 0; i < lsm_tree->merge_threads; i++)
+			for (i = 0; i < lsm_tree->merge_threads; i++) {
+				WT_TRET(__wt_cond_signal(
+				    session, lsm_tree->work_cond));
 				WT_TRET(__wt_thread_join(
 				    session, lsm_tree->worker_tids[i]));
+			}
+		WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
 		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
-		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST))
+		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
+			WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
 			WT_TRET(__wt_thread_join(session, lsm_tree->bloom_tid));
+		}
 	}
 
 	/*
@@ -463,9 +473,8 @@ __lsm_tree_open(
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
-	WT_ERR(__wt_cond_alloc(session, "lsm ckpt", 0, &lsm_tree->ckpt_cond));
+	WT_ERR(__wt_cond_alloc(session, "lsm ckpt", 0, &lsm_tree->work_cond));
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
-	__wt_stat_init_dsrc_stats(&lsm_tree->stats);
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
@@ -505,6 +514,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 {
 	WT_LSM_TREE *lsm_tree;
 
+	/* See if the tree is already open. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
 			if (exclusive && lsm_tree->refcnt)
@@ -515,10 +525,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			return (0);
 		}
 
-	/*
-	 * If we don't already hold the schema lock, get it now so that we
-	 * can find and/or open the handle.
-	 */
+	/* Open a new tree. */
 	return (__lsm_tree_open(session, uri, treep));
 }
 
@@ -543,6 +550,7 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, **cp;
+	uint64_t record_count;
 	uint32_t in_memory, new_id;
 
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
@@ -561,11 +569,12 @@ __wt_lsm_tree_switch(
 	 * avoid filling the cache with in-memory chunks.  Threads sleep every
 	 * 100 operations, so take that into account in the calculation.
 	 */
+	record_count = 1;
 	for (in_memory = 1, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
 	    in_memory < lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
 	    ++in_memory, --cp)
-		;
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 2)
+		record_count += (*cp)->count;
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->throttle_sleep = 0;
 	else if (in_memory == lsm_tree->nchunks ||
 	    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {
@@ -579,7 +588,7 @@ __wt_lsm_tree_switch(
 		chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 		lsm_tree->throttle_sleep = (long)((in_memory - 2) *
 		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
-		    (20 * in_memory * chunk->count));
+		    (20 * record_count));
 	}
 
 	WT_VERBOSE_ERR(session, lsm, "Tree switch to: %d, throttle %d",
@@ -590,9 +599,9 @@ __wt_lsm_tree_switch(
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
-	++lsm_tree->dsk_gen;
-	F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
+	F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+	++lsm_tree->dsk_gen;
 
 err:	/* TODO: mark lsm_tree bad on error(?) */
 	return (ret);

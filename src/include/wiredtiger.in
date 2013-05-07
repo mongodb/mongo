@@ -796,7 +796,8 @@ struct __wt_session {
 	 * @snippet ex_all.c Compact a table
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the object to drop, such as \c "table:stock"
+	 * @param name the URI of the object to compact, such as
+	 * \c "table:stock"
 	 * @configstart{session.compact, see dist/api_data.py}
 	 * @config{trigger, Compaction will not be attempted unless the
 	 * specified percentage of the underlying objects is expected to be
@@ -821,7 +822,7 @@ struct __wt_session {
 	 * @config{remove_files, should the underlying files be removed?., a
 	 * boolean flag; default \c true.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -835,7 +836,7 @@ struct __wt_session {
 	 * @param uri the current URI of the object, such as \c "table:old"
 	 * @param newuri the new URI of the object, such as \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(rename)(WT_SESSION *session,
 	    const char *uri, const char *newuri, const char *config);
@@ -863,7 +864,7 @@ struct __wt_session {
 	 * @config{force, force salvage even of files that do not appear to be
 	 * WiredTiger files., a boolean flag; default \c false.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -890,7 +891,7 @@ struct __wt_session {
 	 * if <code>NULL</code>, the truncate continues to the end of the
 	 * object
 	 * @configempty{session.truncate, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
 	    const char *name,
@@ -906,7 +907,7 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the file or table to upgrade
 	 * @configempty{session.upgrade, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(upgrade)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -933,7 +934,7 @@ struct __wt_session {
 	 * are verified\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(verify)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -1336,8 +1337,14 @@ struct __wt_connection {
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
- * list\, such as <code>"direct_io=[data]"</code>., a list\, with values chosen
- * from the following options: \c "data"\, \c "log"; default empty.}
+ * list\, such as <code>"direct_io=[data]"</code>. Many Linux systems do not
+ * support mixing \c O_DIRECT and memory mapping or normal I/O to the same file.
+ * If \c O_DIRECT is configured for data files on Linux systems\, memory mapping
+ * should probably be turned off using the \c mmap=false configuration string
+ * and any utilities used to copy the database files for the purposes of hot
+ * backup should probably also specify \c O_DIRECT when configuring their file
+ * access., a list\, with values chosen from the following options: \c "data"\,
+ * \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
@@ -1384,8 +1391,8 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{statistics, Maintain database statistics that may impact
  * performance., a boolean flag; default \c false.}
- * @config{statistics_log = (, log database connection statistics into a file
- * when the \c statistics configuration value is set to true.  See @ref
+ * @config{statistics_log = (, log database connection statistics to a file
+ * (implies setting the \c statistics configuration value to true). See @ref
  * statistics_log for more information., a set of related configuration options
  * defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;clear, reset statistics
@@ -2303,20 +2310,22 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_RWLOCK_READ			46
 /*! pthread mutex shared lock write-lock calls */
 #define	WT_STAT_CONN_RWLOCK_WRITE			47
+/*! open cursor count */
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		48
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			48
+#define	WT_STAT_CONN_TXN_ANCIENT			49
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				49
+#define	WT_STAT_CONN_TXN_BEGIN				50
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			50
+#define	WT_STAT_CONN_TXN_CHECKPOINT			51
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				51
+#define	WT_STAT_CONN_TXN_COMMIT				52
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			52
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			53
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			53
+#define	WT_STAT_CONN_TXN_ROLLBACK			54
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				54
+#define	WT_STAT_CONN_WRITE_IO				55
 
 /*!
  * @}
@@ -2418,9 +2427,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		45
 /*! pages written from cache */
 #define	WT_STAT_DSRC_CACHE_WRITE			46
-/*! raw compression call failed (no additional data available) */
+/*! raw compression call failed, no additional data available */
 #define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			47
-/*! raw compression call failed (additional data available) */
+/*! raw compression call failed, additional data available */
 #define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	48
 /*! raw compression call succeeded */
 #define	WT_STAT_DSRC_COMPRESS_RAW_OK			49
@@ -2485,14 +2494,16 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_SPLIT_INTL			78
 /*! reconciliation leaf pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_LEAF			79
-/*! reconciliation maximum number of splits created by for a page */
+/*! reconciliation maximum number of splits created for a page */
 #define	WT_STAT_DSRC_REC_SPLIT_MAX			80
 /*! object compaction */
 #define	WT_STAT_DSRC_SESSION_COMPACT			81
+/*! open cursor count */
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		82
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		82
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		83
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			83
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			84
 /*! @} */
 /*
  * Statistics section: END

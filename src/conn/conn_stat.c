@@ -69,9 +69,23 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		WT_RET(__wt_calloc_def(session, cnt + 1, &conn->stat_sources));
 		WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 		for (cnt = 0;
-		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
+		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt) {
+			/*
+			 * XXX
+			 * Only allow "file:" and "lsm:" for now: "file:" works
+			 * because it's been converted to data handles, "lsm:"
+			 * works because we can easily walk the list of open LSM
+			 * objects, even though it hasn't been converted.
+			 */
+			if (!WT_PREFIX_MATCH(k.str, "file:") &&
+			    !WT_PREFIX_MATCH(k.str, "lsm:"))
+				WT_RET_MSG(session, EINVAL,
+				    "statistics_log sources configuration only "
+				    "supports objects of type \"file\" or "
+				    "\"lsm\"");
 			WT_RET(__wt_strndup(session,
 			    k.str, k.len, &conn->stat_sources[cnt]));
+		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
 
@@ -164,6 +178,64 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 		if (WT_PREFIX_MATCH(dhandle->name, *p))
 			return (__statlog_dump(session, dhandle->name, 0));
 	return (0);
+}
+
+/*
+ * __wt_statlog_lsm_apply --
+ *	Review the list open LSM trees, and dump statistics on demand.
+ *
+ * XXX
+ * This code should be removed when LSM objects are converted to data handles.
+ */
+static int
+__wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
+{
+#define	WT_LSM_TREE_LIST_SLOTS	100
+	WT_LSM_TREE *lsm_tree, *list[WT_LSM_TREE_LIST_SLOTS];
+	WT_DECL_RET;
+	int cnt, locked;
+	char **p;
+
+	cnt = locked = 0;
+
+	/*
+	 * Walk the list of LSM trees, checking for a match on the set of
+	 * sources.
+	 *
+	 * XXX
+	 * We can't hold the schema lock for the traversal because the LSM
+	 * statistics code acquires the tree lock, and the LSM cursor code
+	 * acquires the tree lock and then acquires the schema lock, it's a
+	 * classic deadlock.  This is temporary code so I'm not going to do
+	 * anything fancy.
+	 * It is OK to not keep holding the schema lock after populating
+	 * the list of matching LSM trees, since the __wt_lsm_tree_get call
+	 * will bump a reference count, so the tree won't go away.
+	 */
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
+	locked = 1;
+	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
+		if (cnt == WT_LSM_TREE_LIST_SLOTS)
+			break;
+		for (p = S2C(session)->stat_sources; *p != NULL; ++p)
+			if (WT_PREFIX_MATCH(lsm_tree->name, *p)) {
+				WT_ERR(__wt_lsm_tree_get(
+				    session, lsm_tree->name, 0, &list[cnt++]));
+				break;
+			}
+	}
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	locked = 0;
+
+	while (cnt > 0) {
+		--cnt;
+		WT_TRET(__statlog_dump(session, list[cnt]->name, 0));
+		__wt_lsm_tree_release(session, list[cnt]);
+	}
+
+err:	if (locked)
+		__wt_spin_lock(session, &S2C(session)->schema_lock);
+	return (ret);
 }
 
 /*
@@ -260,6 +332,18 @@ __statlog_server(void *arg)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_conn_btree_apply(
 			    session, __statlog_apply, NULL));
+		WT_ERR(ret);
+
+		/*
+		 * Walk the list of open LSM trees, dumping any that match the
+		 * the list of object sources.
+		 *
+		 * XXX
+		 * This code should be removed when LSM objects are converted to
+		 * data handles.
+		 */
+		if (conn->stat_sources != NULL)
+			WT_ERR(__wt_statlog_lsm_apply(session));
 
 		/* Flush. */
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());

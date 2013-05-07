@@ -226,10 +226,6 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	const char *p, *t;
 
-	/* Disallow renames to/from the WiredTiger name space. */
-	WT_RET(__wt_schema_name_check(session, uri));
-	WT_RET(__wt_schema_name_check(session, newuri));
-
 	/* The target type must match the source type. */
 	for (p = uri, t = newuri; *p == *t && *p != ':'; ++p, ++t)
 		;

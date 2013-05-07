@@ -112,10 +112,33 @@ __wt_stat_clear_''' + name + '''_stats(void *stats_arg)
 \tstats = (WT_''' + name.upper() + '''_STATS *)stats_arg;
 ''')
 	for l in sorted(list):
-		# Items marked permanent aren't cleared by the stat clear
-		# methods.
-		if not l.flags.get('perm', 0):
+		# no_clear: don't clear the value.
+		if not 'no_clear' in l.flags:
 			f.write('\tstats->' + l.name + '.v = 0;\n');
+	f.write('}\n')
+
+	# Aggregation is only interesting for data-source statistics.
+	if name == 'connection':
+		return;
+
+	f.write('''
+void
+__wt_stat_aggregate_''' + name + '''_stats(void *child, void *parent)
+{
+\tWT_''' + name.upper() + '''_STATS *c, *p;
+
+\tc = (WT_''' + name.upper() + '''_STATS *)child;
+\tp = (WT_''' + name.upper() + '''_STATS *)parent;
+''')
+	for l in sorted(list):
+		if 'no_aggregate' in l.flags:
+			continue;
+		elif 'max_aggregate' in l.flags:
+			o = 'if (c->' + l.name + '.v > p->' + l.name +\
+			'.v)\n\t    p->' + l.name + '.v = c->' + l.name + '.v;'
+		else:
+			o = 'p->' + l.name + '.v += c->' + l.name + '.v;'
+		f.write('\t' + o + '\n')
 	f.write('}\n')
 
 # Write the stat initialization and clear routines to the stat.c file.
@@ -127,3 +150,30 @@ print_func('dsrc', dsrc_stats)
 print_func('connection', connection_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/support/stat.c')
+
+
+# Update the statlog file with the entries we can scale per second.
+scale_info = 'no_scale_per_second_list = [\n'
+for l in sorted(connection_stats):
+	if 'no_scale' in l.flags:
+		scale_info += '    \'' + l.desc + '\',\n'
+for l in sorted(dsrc_stats):
+	if 'no_scale' in l.flags:
+		scale_info += '    \'' + l.desc + '\',\n'
+scale_info += ']\n'
+
+tmp_file = '__tmp'
+tfile = open(tmp_file, 'w')
+skip = 0
+for line in open('../tools/statlog.py', 'r'):
+	if skip:
+		if line.count('no scale-per-second list section: END'):
+			tfile.write(line)
+			skip = 0
+	else:
+		tfile.write(line)
+	if line.count('no scale-per-second list section: BEGIN'):
+		skip = 1
+		tfile.write(scale_info)
+tfile.close()
+compare_srcfile(tmp_file, '../tools/statlog.py')

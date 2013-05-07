@@ -28,7 +28,7 @@
 #include "format.h"
 
 void
-key_len_setup()
+key_len_setup(void)
 {
 	size_t i;
 
