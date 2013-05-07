@@ -95,8 +95,13 @@ namespace mongo {
         public:
             typedef std::pair<Key, Value> Data;
 
+            /// No data to iterate
+            InMemIterator() {}
+
+            /// Only a single value
             InMemIterator(const Data& singleValue) :_data(1, singleValue) {}
 
+            /// Any number of values
             template <typename Container>
             InMemIterator(const Container& input) :_data(input.begin(), input.end()) {}
 
@@ -421,18 +426,29 @@ namespace mongo {
 
             LimitOneSorter(const SortOptions& opts, const Comparator& comp)
                 : _comp(comp)
+                , _haveData(false)
             { verify(opts.limit == 1); }
 
             void add(const Key& key, const Value& val) {
                 Data contender(key, val);
-                if (_comp(_best, contender) <= 0)
-                    return; // not good enough
+
+                if (_haveData) {
+                    dassertCompIsSane(_comp, _best, contender);
+                    if (_comp(_best, contender) <= 0)
+                        return; // not good enough
+                } else {
+                    _haveData = true;
+                }
 
                 _best = contender;
             }
 
             Iterator* done() {
-                return new InMemIterator<Key, Value>(_best);
+                if (_haveData) {
+                    return new InMemIterator<Key, Value>(_best);
+                } else {
+                    return new InMemIterator<Key, Value>();
+                }
             }
 
             // TEMP these are here for compatibility. Will be replaced with a general stats API
@@ -443,6 +459,7 @@ namespace mongo {
         private:
             const Comparator _comp;
             Data _best;
+            bool _haveData; // false at start, set to true on first call to add()
         };
 
         template <typename Key, typename Value, typename Comparator>
