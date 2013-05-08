@@ -779,7 +779,6 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::exists( const string& ns ) {
-        list<string> names;
 
         string db = nsGetDB( ns ) + ".system.namespaces";
         BSONObj q = BSON( "name" << ns );
