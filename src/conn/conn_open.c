@@ -61,7 +61,9 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	return (0);
 
-err:	WT_TRET(__wt_connection_close(conn));
+err:	WT_TRET(__wt_checkpoint_destroy(conn));
+	WT_TRET(__wt_statlog_destroy(conn));
+	WT_TRET(__wt_connection_close(conn));
 	return (ret);
 }
 
