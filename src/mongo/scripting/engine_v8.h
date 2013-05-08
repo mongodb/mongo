@@ -24,6 +24,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/v8_deadline_monitor.h"
 #include "mongo/scripting/v8_profiler.h"
@@ -202,9 +203,9 @@ namespace mongo {
         virtual void injectNative(const char* field, NativeFunction func, void* data = 0);
         void injectNative(const char* field, NativeFunction func, v8::Handle<v8::Object>& obj,
                           void* data = 0);
-        void injectV8Function(const char* field, v8Function func);
-        void injectV8Function(const char* field, v8Function func, v8::Handle<v8::Object>& obj);
-        void injectV8Function(const char* field, v8Function func, v8::Handle<v8::Template>& t);
+        void injectV8Function(const char* name, v8Function func);
+        void injectV8Function(const char* name, v8Function func, v8::Handle<v8::Object>& obj);
+        void injectV8Function(const char* name, v8Function func, v8::Handle<v8::Template>& t);
         v8::Handle<v8::FunctionTemplate> createV8Function(v8Function func);
         virtual ScriptingFunction _createFunction(const char* code,
                                                   ScriptingFunction functionNumber = 0);
@@ -222,36 +223,36 @@ namespace mongo {
          */
         mongo::BSONObj v8ToMongo(v8::Handle<v8::Object> obj, int depth = 0);
         void v8ToMongoElement(BSONObjBuilder& b,
-                              const string& sname,
+                              const StringData& sname,
                               v8::Handle<v8::Value> value,
                               int depth = 0,
                               BSONObj* originalParent = 0);
         void v8ToMongoObject(BSONObjBuilder& b,
-                             const string& sname,
+                             const StringData& sname,
                              v8::Handle<v8::Value> value,
                              int depth,
                              BSONObj* originalParent);
         void v8ToMongoNumber(BSONObjBuilder& b,
-                             const string& elementName,
+                             const StringData& elementName,
                              v8::Handle<v8::Value> value,
                              BSONObj* originalParent);
         void v8ToMongoNumberLong(BSONObjBuilder& b,
-                                 const string& elementName,
+                                 const StringData& elementName,
                                  v8::Handle<v8::Object> obj);
         void v8ToMongoInternal(BSONObjBuilder& b,
-                               const string& elementName,
+                               const StringData& elementName,
                                v8::Handle<v8::Object> obj);
         void v8ToMongoRegex(BSONObjBuilder& b,
-                            const string& elementName,
+                            const StringData& elementName,
                             v8::Handle<v8::Object> v8Regex);
         void v8ToMongoDBRef(BSONObjBuilder& b,
-                            const string& elementName,
+                            const StringData& elementName,
                             v8::Handle<v8::Object> obj);
         void v8ToMongoBinData(BSONObjBuilder& b,
-                              const string& elementName,
+                              const StringData& elementName,
                               v8::Handle<v8::Object> obj);
         void v8ToMongoObjectID(BSONObjBuilder& b,
-                               const string& elementName,
+                               const StringData& elementName,
                                v8::Handle<v8::Object> obj);
 
         v8::Function* getNamedCons(const char* name);
@@ -275,7 +276,7 @@ namespace mongo {
          * Create a V8 string with a local handle
          */
         static inline v8::Handle<v8::String> v8StringData(StringData str) {
-            return v8::String::New(str.rawData());
+            return v8::String::New(str.rawData(), str.size());
         }
 
         /**
@@ -363,6 +364,27 @@ namespace mongo {
                                bool reportError = true,
                                bool assertOnError = true);
 
+        template <size_t N>
+        v8::Handle<v8::String> strLitToV8(const char (&str)[N]) {
+            // Note that _strLitMap is keyed on string pointer not string
+            // value. This is OK because each string literal has a constant
+            // pointer for the program's lifetime. This works best if (but does
+            // not require) the linker interns all string literals giving
+            // identical strings used in different places the same pointer.
+
+            StrLitMap::iterator it = _strLitMap.find(str);
+            if (it != _strLitMap.end())
+                return it->second;
+
+            StringData sd (str, StringData::LiteralTag());
+            v8::Handle<v8::String> v8Str = v8StringData(sd);
+
+            // We never need to Dispose since this should last as long as V8Scope exists
+            _strLitMap[str] = v8::Persistent<v8::String>::New(v8Str);
+
+            return v8Str;
+        }
+
         V8ScriptEngine* _engine;
 
         v8::Persistent<v8::Context> _context;
@@ -381,6 +403,10 @@ namespace mongo {
 
         v8::Isolate* _isolate;
         V8CpuProfiler _cpuProfiler;
+
+        // See comments in strLitToV8
+        typedef unordered_map<const char*, v8::Handle<v8::String> > StrLitMap;
+        StrLitMap _strLitMap;
 
         mongo::mutex _interruptLock; // protects interruption-related flags
         bool _inNativeExecution;     // protected by _interruptLock

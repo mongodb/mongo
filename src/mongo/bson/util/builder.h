@@ -202,18 +202,19 @@ namespace mongo {
         /* returns the pre-grow write position */
         inline char* grow(int by) {
             int oldlen = l;
-            l += by;
-            if ( l > size ) {
-                grow_reallocate();
+            int newLen = l + by;
+            if ( newLen > size ) {
+                grow_reallocate(newLen);
             }
+            l = newLen;
             return data + oldlen;
         }
 
     private:
         /* "slow" portion of 'grow()'  */
-        void NOINLINE_DECL grow_reallocate() {
+        void NOINLINE_DECL grow_reallocate(int newLen) {
             int a = 64;
-            while( a < l ) 
+            while( a < newLen ) 
                 a = a * 2;
             if ( a > BufferMaxSize ) {
                 std::stringstream ss;

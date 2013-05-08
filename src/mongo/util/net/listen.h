@@ -24,7 +24,6 @@
 namespace mongo {
 
     const int DEFAULT_MAX_CONN = 20000;
-    const int MAX_MAX_CONN = 20000;
 
     class MessagingPort;
 
@@ -71,7 +70,7 @@ namespace mongo {
         long long _elapsedTime;
         
 #ifdef MONGO_SSL
-        SSLManager* _ssl;
+        SSLManagerInterface* _ssl;
 #endif
         
         /**

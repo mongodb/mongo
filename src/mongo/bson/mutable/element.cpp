@@ -141,6 +141,10 @@ namespace mutablebson {
         return pushBack(getDocument().makeElementMaxKey(fieldName));
     }
 
+    Status Element::appendElement(const BSONElement& value) {
+        return pushBack(getDocument().makeElement(value));
+    }
+
     Status Element::appendSafeNum(const StringData& fieldName, SafeNum value) {
         return pushBack(getDocument().makeElementSafeNum(fieldName, value));
     }

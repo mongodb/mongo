@@ -45,8 +45,15 @@ namespace mongo {
 
         /**
          * Hashing function used by both this class and the cursors we create.
+         * Exposed for testing and so mongo/db/index_legacy.cpp can use it.
          */
         static long long int makeSingleKey(const BSONElement& e, HashSeed seed, int v);
+
+        /**
+         * Exposed externally for testing purposes.
+         */
+        static void getKeysImpl(const BSONObj& obj, const string& hashedField, HashSeed seed,
+                                int hashVersion, bool isSparse, BSONObjSet* keys);
 
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
@@ -60,9 +67,6 @@ namespace mongo {
         // _hashVersion defaults to zero.
         int _hashVersion;
 
-        // What key do we insert when the field is missing?
-        // TODO: fix migration code to do the right thing.
-        // TODO: see http://codereview.10gen.com/9497028/patch/3001/4007
         BSONObj _missingKey;
     };
 

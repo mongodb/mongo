@@ -25,126 +25,57 @@
 #include <openssl/ssl.h>
 
 namespace mongo {
-    class SSLManager;
 
-    // Access SSL functions through this instance, after
-    // calling initializeSSL() via runMongoInitializers initialization
-    SSLManager* getSSLManager();
-
-    class SSLParams {
+    class SSLManagerInterface {
     public:
-        SSLParams(const std::string& pemfile, 
-                  const std::string& pempwd,
-                  const std::string& cafile = "",
-                  const std::string& crlfile = "",
-                  bool weakCertificateValidation = false,
-                  bool fipsMode = false) :
-            pemfile(pemfile),
-            pempwd(pempwd),
-            cafile(cafile),
-            crlfile(crlfile),
-            weakCertificateValidation(weakCertificateValidation),
-            fipsMode(fipsMode) {};
-
-        std::string pemfile;
-        std::string pempwd;
-        std::string cafile;
-        std::string crlfile;
-        bool weakCertificateValidation;
-        bool fipsMode;
-    };
-
-    class SSLManager {
-    MONGO_DISALLOW_COPYING(SSLManager);
-    public:
-        explicit SSLManager(const SSLParams& params);
+        virtual ~SSLManagerInterface();
 
         /**
          * Initiates a TLS connection.
          * Throws SocketException on failure.
          * @return a pointer to an SSL context; caller must SSL_free it.
          */
-        SSL* connect(int fd);
+        virtual SSL* connect(int fd) = 0;
 
         /**
          * Waits for the other side to initiate a TLS connection.
          * Throws SocketException on failure.
          * @return a pointer to an SSL context; caller must SSL_free it.
          */
-        SSL* accept(int fd);
+        virtual SSL* accept(int fd) = 0;
 
         /**
          * Fetches a peer certificate and validates it if it exists
          * Throws SocketException on failure
          */
-        void validatePeerCertificate(const SSL* ssl);
+        virtual void validatePeerCertificate(const SSL* ssl) = 0;
 
         /**
          * Cleans up SSL thread local memory; use at thread exit
          * to avoid memory leaks
          */
-        static void cleanupThreadLocals();
+        virtual void cleanupThreadLocals() = 0;
 
         /**
-         * Callbacks for SSL functions
+         * ssl.h shims
          */
-        static int password_cb( char *buf,int num, int rwflag,void *userdata );
-        static int verify_cb(int ok, X509_STORE_CTX *ctx);
+        virtual int SSL_read(SSL* ssl, void* buf, int num) = 0;
 
-    private:
-        SSL_CTX* _context;
-        std::string _password;
-        bool _validateCertificates;
-        bool _weakValidation;
-        /**
-         * creates an SSL context to be used for this file descriptor.
-         * caller must SSL_free it.
-         */
-        SSL* _secure(int fd);
+        virtual int SSL_write(SSL* ssl, const void* buf, int num) = 0;
 
-        /**
-         * Fetches the error text for an error code, in a thread-safe manner.
-         */
-        std::string _getSSLErrorMessage(int code);
+        virtual unsigned long ERR_get_error() = 0;
 
-        /**
-         * Given an error code from an SSL-type IO function, logs an 
-         * appropriate message and throws a SocketException
-         */
-        void _handleSSLError(int code);
+        virtual char* ERR_error_string(unsigned long e, char* buf) = 0;
 
-        /** @return true if was successful, otherwise false */
-        bool _setupPEM( const std::string& keyFile , const std::string& password );
+        virtual int SSL_get_error(const SSL* ssl, int ret) = 0;
 
-        /*
-         * Set up SSL for certificate validation by loading a CA
-         */
-        bool _setupCA(const std::string& caFile);
+        virtual int SSL_shutdown(SSL* ssl) = 0;
 
-        /*
-         * Import a certificate revocation list into our SSL context
-         * for use with validating certificates
-         */
-        bool _setupCRL(const std::string& crlFile);
-
-        /*
-         * Activate FIPS 140-2 mode, if the server started with a command line
-         * parameter.
-         */
-        void _setupFIPS();
-
-        /*
-         * Wrapper for SSL_Connect() that handles SSL_ERROR_WANT_READ,
-         * see SERVER-7940
-         */
-        int _ssl_connect(SSL* ssl);
-
-        /*
-         * Initialize the SSL Library.
-         * This function can be called multiple times; it ensures it only
-         * does the SSL initialization once per process.
-         */
-        void _initializeSSL(const SSLParams& params);
+        virtual void SSL_free(SSL* ssl) = 0;
     };
+
+    // Access SSL functions through this instance.
+    SSLManagerInterface* getSSLManager();
+
 }
 #endif

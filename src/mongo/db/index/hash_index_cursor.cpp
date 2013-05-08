@@ -67,7 +67,6 @@ namespace mongo {
         inObj.done();
         BSONObj newQuery = newQueryBuilder.obj();
 
-        // FieldRangeVector needs an IndexSpec so we make it one.
         BSONObjBuilder specBuilder;
         BSONObjIterator it(_descriptor->keyPattern());
         while (it.more()) {
@@ -75,12 +74,11 @@ namespace mongo {
             specBuilder.append(e.fieldName(), 1);
         }
         BSONObj spec = specBuilder.obj();
-        IndexSpec specForFRV(spec);
 
         //Use the point-intervals of the new query to create a Btree cursor
         FieldRangeSet newfrs( "" , newQuery , true, true );
         shared_ptr<FieldRangeVector> newVector(
-                new FieldRangeVector( newfrs , specForFRV, 1 ) );
+                new FieldRangeVector( newfrs , spec, 1 ) );
 
         _oldCursor.reset(
                 BtreeCursor::make(nsdetails(_descriptor->parentNS()),

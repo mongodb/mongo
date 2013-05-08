@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    class Principal;
+
     /**
      * Public interface for a class that encapsulates all the information related to system state
      * not stored in AuthorizationManager.  This is primarily to make AuthorizationManager easier
@@ -57,6 +59,14 @@ namespace mongo {
         Status getPrivilegeDocument(const std::string& dbname,
                                     const PrincipalName& principalName,
                                     BSONObj* result);
+
+        // Authorization event hooks
+
+        // Handle any global state which needs to be updated when a new user has been authorized
+        virtual void onAddAuthorizedPrincipal(Principal*) = 0;
+
+        // Handle any global state which needs to be updated when a user logs out
+        virtual void onLogoutDatabase(const std::string& dbname) = 0;
 
     protected:
         AuthExternalState(); // This class should never be instantiated directly.

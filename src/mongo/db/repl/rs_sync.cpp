@@ -141,11 +141,13 @@ namespace replset {
              it != ops.end();
              ++it) {
             try {
-                fassert(16359, st->syncApply(*it, convertUpdatesToUpserts));
-            } catch (DBException& e) {
-                error() << "writer worker caught exception: " << e.what() 
+                if (!st->syncApply(*it, convertUpdatesToUpserts)) {
+                    fassertFailedNoTrace(16359);
+                }
+            } catch (const DBException& e) {
+                error() << "writer worker caught exception: " << causedBy(e)
                         << " on: " << it->toString() << endl;
-                fassertFailed(16360);
+                fassertFailedNoTrace(16360);
             }
         }
     }
@@ -165,16 +167,18 @@ namespace replset {
                     }
                     if (status) {
                         // retry
-                        fassert(15915, st->syncApply(*it));
+                        if (!st->syncApply(*it)) {
+                            fassertFailedNoTrace(15915);
+                        }
                     }
                     // If shouldRetry() returns false, fall through.
                     // This can happen if the document that was moved and missed by Cloner
                     // subsequently got deleted and no longer exists on the Sync Target at all
                 }
             }
-            catch (DBException& e) {
-                error() << "exception: " << e.what() << " on: " << it->toString() << endl;
-                fassertFailed(16361);
+            catch (const DBException& e) {
+                error() << "exception: " << causedBy(e) << " on: " << it->toString() << endl;
+                fassertFailedNoTrace(16361);
             }
         }
     }
@@ -742,7 +746,7 @@ namespace replset {
             try {
                 _syncThread();
             }
-            catch(DBException& e) {
+            catch(const DBException& e) {
                 sethbmsg(str::stream() << "syncThread: " << e.toString());
                 sleepsecs(10);
             }
@@ -782,6 +786,11 @@ namespace replset {
             // RECOVERING until we unblock
             changeState(MemberState::RS_RECOVERING);
         }
+    }
+
+    void GhostSync::clearCache() {
+        rwlock lk(_lock, true);
+        _ghostCache.clear();
     }
 
     void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
@@ -827,7 +836,7 @@ namespace replset {
 
     void GhostSync::percolate(const BSONObj& id, const OpTime& last) {
         const OID rid = id["_id"].OID();
-        GhostSlave* slave;
+        shared_ptr<GhostSlave> slave;
         {
             rwlock lk( _lock , false );
 
@@ -837,13 +846,12 @@ namespace replset {
                 return;
             }
 
-            slave = i->second.get();
+            slave = i->second;
             if (!slave->init) {
                 OCCASIONALLY log() << "couldn't percolate slave " << rid << " not init" << rsLog;
                 return;
             }
         }
-
         verify(slave->slave);
 
         const Member *target = replset::BackgroundSync::get()->getSyncTarget();
@@ -889,7 +897,7 @@ namespace replset {
             }
             LOG(2) << "now last is " << slave->last.toString() << rsLog;
         }
-        catch (DBException& e) {
+        catch (const DBException& e) {
             // we'll be back
             LOG(2) << "replSet ghost sync error: " << e.what() << " for "
                    << slave->slave->fullName() << rsLog;

@@ -26,6 +26,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
+#include "mongo/db/index_legacy.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -38,87 +40,8 @@
 
 namespace mongo {
 
-    IndexInterface& IndexInterface::defaultVersion() {
-        return *IndexDetails::iis[ DefaultIndexVersionNumber ];
-    }
-
-    template< class V >
-    class IndexInterfaceImpl : public IndexInterface { 
-    public:
-        typedef typename V::KeyOwned KeyOwned;
-        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
-
-    public:
-        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
-            return thisLoc.btree<V>()->fullValidate(thisLoc, order);
-        }
-        virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const { 
-            return thisLoc.btree<V>()->findSingle(indexdetails,thisLoc,key);
-        } 
-        virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const {
-            return thisLoc.btree<V>()->unindex(thisLoc, id, key, recordLoc);
-        }
-        virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
-                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
-                      IndexDetails& idx, bool toplevel = true) const {
-            return thisLoc.btree<V>()->bt_insert(thisLoc, recordLoc, key, order, dupsAllowed, idx, toplevel);
-        }
-        virtual DiskLoc addBucket(const IndexDetails& id) { 
-            return BtreeBucket<V>::addBucket(id);
-        }
-        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, DiskLoc self, const Ordering& ordering) { 
-            const BtreeBucket<V> *h = head.btree<V>();
-            for( vector<BSONObj*>::iterator i = addedKeys.begin(); i != addedKeys.end(); i++ ) {
-                KeyOwned k(**i);
-                bool dup = h->wouldCreateDup(idx, head, k, ordering, self);
-                uassert( 11001 , h->dupKeyError( idx , k ) , !dup);
-            }
-        }
-
-        // for geo:
-        virtual bool isUsed(DiskLoc thisLoc, int pos) { return thisLoc.btree<V>()->isUsed(pos); }
-        virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj& key, DiskLoc& recordLoc) {
-            recordLoc = DiskLoc();
-            const BtreeBucket<V>* bucket = thisLoc.btree<V>();
-            int n = bucket->nKeys();
-
-            if( pos < 0 || pos >= n || n == 0xffff /* bucket deleted */ || ! bucket->isUsed( pos ) ){
-                // log() << "Pos: " << pos << " n " << n << endl;
-                return;
-            }
-
-            typename BtreeBucket<V>::KeyNode kn = bucket->keyNode(pos);
-            key = kn.key.toBson();
-            recordLoc = kn.recordLoc;
-        }
-        virtual BSONObj keyAt(DiskLoc thisLoc, int pos) {
-            return thisLoc.btree<V>()->keyAt(pos).toBson();
-        }
-        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
-                int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) { 
-            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
-        }
-        virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) { 
-            return thisLoc.btree<V>()->advance(thisLoc,keyOfs,direction,caller);
-        }
-    };
-
-    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
-
-    template <>
-    int IndexInterfaceImpl< V0 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
-        return oldCompare(l, r, ordering);
-    }
-
-    template <>
-    int IndexInterfaceImpl< V1 >::keyCompare(const BSONObj& l, const BSONObj& r, const Ordering &ordering) { 
-        return l.woCompare(r, ordering, /*considerfieldname*/false);
-    }
-
-    IndexInterfaceImpl<V0> iii_v0;
-    IndexInterfaceImpl<V1> iii_v1;
-
-    IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
+    // What's the default version of our indices?
+    const int DefaultIndexVersionNumber = 1;
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";
@@ -157,11 +80,6 @@ namespace mongo {
             n++;
         }
         return -1;
-    }
-
-    const IndexSpec& IndexDetails::getSpec() const {
-        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
     /* delete this index.  does NOT clean up the system catalog
@@ -210,7 +128,7 @@ namespace mongo {
     }
 
     static bool needToUpgradeMinorVersion(const string& newPluginName) {
-        if (IndexPlugin::existedBefore24(newPluginName))
+        if (IndexNames::existedBefore24(newPluginName))
             return false;
 
         DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
@@ -228,8 +146,8 @@ namespace mongo {
         for ( ; cursor && cursor->ok(); cursor->advance()) {
             const BSONObj index = cursor->current();
             const BSONObj key = index.getObjectField("key");
-            const string plugin = IndexPlugin::findPluginName(key);
-            if (IndexPlugin::existedBefore24(plugin))
+            const string plugin = IndexNames::findPluginName(key);
+            if (IndexNames::existedBefore24(plugin))
                 continue;
 
             const string errmsg = str::stream()
@@ -325,13 +243,11 @@ namespace mongo {
                 return false;
         }
 
-        string pluginName = IndexPlugin::findPluginName( key );
-        IndexPlugin * plugin = NULL;
+        string pluginName = IndexNames::findPluginName( key );
         if (pluginName.size()) {
-            plugin = IndexPlugin::get(pluginName);
             uassert(16734, str::stream() << "Unknown index plugin '" << pluginName << "' "
-                                         << "in index "<< key
-                   , plugin);
+                                         << "in index "<< key,
+                    IndexNames::isKnownName(pluginName));
 
             if (needToUpgradeMinorVersion(pluginName))
                 upgradeMinorVersionOrAssert(pluginName);
@@ -339,9 +255,7 @@ namespace mongo {
 
         { 
             BSONObj o = io;
-            if ( plugin ) {
-                o = plugin->adjustIndexSpec(o);
-            }
+            o = IndexLegacy::adjustIndexSpecObject(o);
             BSONObjBuilder b;
             int v = DefaultIndexVersionNumber;
             if( !o["v"].eoo() ) {
@@ -374,26 +288,5 @@ namespace mongo {
         }
 
         return true;
-    }
-
-    void IndexSpec::reset(const IndexDetails * details) {
-        const DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
-        IndexSpec::PluginRules rules = dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER
-                                            ? IndexSpec::RulesFor24
-                                            : IndexSpec::RulesFor22
-                                            ;
-
-        _details = details;
-        reset(details->info, rules);
-    }
-
-    void IndexSpec::reset(const BSONObj& _info, PluginRules rules) {
-        info = _info;
-        keyPattern = info["key"].embeddedObjectUserCheck();
-        if ( keyPattern.objsize() == 0 ) {
-            out() << info.toString() << endl;
-            verify(false);
-        }
-        _init(rules);
     }
 }

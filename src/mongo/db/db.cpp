@@ -33,6 +33,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
@@ -368,8 +369,8 @@ namespace mongo {
                     for ( ; cursor && cursor->ok(); cursor->advance()) {
                         const BSONObj index = cursor->current();
                         const BSONObj key = index.getObjectField("key");
-                        const string plugin = IndexPlugin::findPluginName(key);
-                        if (IndexPlugin::existedBefore24(plugin))
+                        const string plugin = IndexNames::findPluginName(key);
+                        if (IndexNames::existedBefore24(plugin))
                             continue;
 
                         log() << "Index " << index << " claims to be of type '" << plugin << "', "
@@ -720,7 +721,6 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 void show_help_text(po::options_description options) {
-    show_warnings();
     cout << options << endl;
 };
 

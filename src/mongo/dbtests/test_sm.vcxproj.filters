@@ -200,6 +200,9 @@
     <Filter Include="db\index">
       <UniqueIdentifier>{847d3a8d-c6b8-448a-b1c2-a9b3bfe08654}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\matcher">
+      <UniqueIdentifier>{0589a570-b563-4f40-9159-11b792fb0d8a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -962,16 +965,10 @@
     <ClInclude Include="..\db\filever.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\hashindex.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\index.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\db\index_rebuilder.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\indexkey.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\db\initialize_server_global_state.h">
@@ -1262,22 +1259,10 @@
     <ClInclude Include="..\s\type_tags.h">
       <Filter>s</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\geo\2d.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\geo\geoparser.h">
       <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\db\geo\s2common.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\s2cursor.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\s2index.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\s2nearcursor.h">
       <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\third_party\s2\hash.h">
@@ -1613,9 +1598,6 @@
     <ClInclude Include="..\db\fts\fts_enabled.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\fts\fts_index.h">
-      <Filter>db\fts</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\fts\fts_index_format.h">
       <Filter>db\fts</Filter>
     </ClInclude>
@@ -1645,9 +1627,6 @@
     </ClInclude>
     <ClInclude Include="..\db\fts\tokenizer.h">
       <Filter>db\fts</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\ops\modifier_base.h">
-      <Filter>db\ops</Filter>
     </ClInclude>
     <ClInclude Include="..\db\stats\counters.h">
       <Filter>db\stats</Filter>
@@ -1926,6 +1905,72 @@
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="..\server.h" />
+    <ClInclude Include="..\base\status_with.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_array.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_internal.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_leaf.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_parser.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_tree.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_names.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_selection.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query_runner.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\match_details.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\matcher.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_legacy.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\field_checker.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_geo.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_interface.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_set.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_unset.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\safe_num-inl.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher_covered.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher_old.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_inc.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -2266,9 +2311,6 @@
     <ClCompile Include="..\db\dur_recover.cpp">
       <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\geo\2d.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="d_chunk_manager_tests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
@@ -2300,9 +2342,6 @@
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\db\index.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\indexkey.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\db\instance.cpp">
@@ -3133,15 +3172,6 @@
     <ClCompile Include="..\db\geo\s2common.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\geo\s2cursor.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2index.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2nearcursor.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\s2\s1angle.cc">
       <Filter>third_party\s2</Filter>
     </ClCompile>
@@ -3445,9 +3475,6 @@
     <ClCompile Include="..\db\fts\fts_enabled.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\fts\fts_index.cpp">
-      <Filter>db\fts</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\fts\fts_index_format.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
@@ -3548,9 +3575,6 @@
       <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="..\db\index_set.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\hashindex.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\bson\mutable\document.cpp">
@@ -3697,6 +3721,114 @@
     <ClCompile Include="..\db\index\btree_based_builder.cpp">
       <Filter>db\index</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\matcher\expression.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_array.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_array_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_internal.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_leaf.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_leaf_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_array_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_leaf_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_tree.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_tree_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_tree.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_tree_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_names.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_selection.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query_runner.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\match_details.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\matcher.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_legacy.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\field_checker.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\field_checker_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\path_support_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_where.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_set.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_set_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_unset.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_unset_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher_old.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_inc.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_inc_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">
@@ -3827,6 +3959,9 @@
     </None>
     <None Include="..\platform\SConscript">
       <Filter>platform</Filter>
+    </None>
+    <None Include="..\db\ops\SConscript">
+      <Filter>db\ops</Filter>
     </None>
   </ItemGroup>
 </Project>

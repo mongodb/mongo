@@ -107,6 +107,17 @@ namespace mongo {
          */
         virtual Status touch(const BSONObj& obj) = 0;
 
+        /**
+         * Walk the entire index, checking the internal structure for consistency.
+         * Set numKeys to the number of keys in the index.
+         *
+         * Return OK if the index is valid.
+         *
+         * Currently wasserts that the index is invalid.  This could/should be changed in
+         * the future to return a Status.
+         */
+        virtual Status validate(int64_t* numKeys) = 0;
+
         //
         // Bulk operations support (TODO)
         //

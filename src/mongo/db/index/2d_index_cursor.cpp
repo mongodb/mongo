@@ -19,8 +19,10 @@
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_interface.h"
+#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/core.h"
+#include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/pdfile.h"
@@ -320,7 +322,8 @@ namespace mongo {
 
         scoped_ptr<BtreeCursor> _cursor;
         scoped_ptr<FieldRangeSet> _frs;
-        scoped_ptr<IndexSpec> _spec;
+        // TODO: Turn into a KeyPattern object when FieldRangeVector takes one.
+        BSONObj _keyPattern;
 
         BSONObj key() { return _cursor->currKey(); }
 
@@ -388,11 +391,11 @@ namespace mongo {
             }
             BSONObj iSpec = bob.obj();
 
-            min._spec.reset(new IndexSpec(iSpec));
-            max._spec.reset(new IndexSpec(iSpec));
+            min._keyPattern = iSpec;
+            max._keyPattern = iSpec;
 
-            shared_ptr<FieldRangeVector> frvMin(new FieldRangeVector(*min._frs, *min._spec, -1));
-            shared_ptr<FieldRangeVector> frvMax(new FieldRangeVector(*max._frs, *max._spec, 1));
+            shared_ptr<FieldRangeVector> frvMin(new FieldRangeVector(*min._frs, min._keyPattern, -1));
+            shared_ptr<FieldRangeVector> frvMax(new FieldRangeVector(*max._frs, max._keyPattern, 1));
 
             min._cursor.reset(BtreeCursor::make(nsdetails(descriptor->parentNS()),
                                                 descriptor->getOnDisk(), frvMin, 0, -1));
@@ -1762,6 +1765,69 @@ namespace mongo {
         GeoHash _start;
         shared_ptr<GeoHashConverter> _converter;
     };
+
+    bool TwoDGeoNearRunner::run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
+                             const GeoNearArguments &parsedArgs, string& errmsg,
+                             BSONObjBuilder& result, unordered_map<string, double>* stats) {
+
+        auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsd, idxNo));
+        auto_ptr<TwoDAccessMethod> sam(new TwoDAccessMethod(descriptor.get()));
+        const TwoDIndexingParams& params = sam->getParams();
+
+        uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
+        const Point n(cmdObj["near"]);
+        result.append("near", params.geoHashConverter->hash(cmdObj["near"]).toString());
+
+        double maxDistance = numeric_limits<double>::max();
+        if (cmdObj["maxDistance"].isNumber())
+            maxDistance = cmdObj["maxDistance"].number();
+
+        GeoDistType type = parsedArgs.isSpherical ? GEO_SPHERE : GEO_PLANE;
+
+        GeoSearch gs(sam.get(), n, parsedArgs.numWanted, parsedArgs.query, maxDistance, type,
+                     parsedArgs.uniqueDocs, true);
+
+        if (cmdObj["start"].type() == String) {
+            GeoHash start ((string) cmdObj["start"].valuestr());
+            gs._start = start;
+        }
+
+        gs.exec();
+
+        double totalDistance = 0;
+
+        BSONObjBuilder arr(result.subarrayStart("results"));
+        int x = 0;
+        for (GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++) {
+
+            const GeoPoint& p = *i;
+            double dis = parsedArgs.distanceMultiplier * p.distance();
+            totalDistance += dis;
+
+            BSONObjBuilder bb(arr.subobjStart(BSONObjBuilder::numStr(x++)));
+            bb.append("dis", dis);
+            if (parsedArgs.includeLocs) {
+                if(p._pt.couldBeArray()) bb.append("loc", BSONArray(p._pt));
+                else bb.append("loc", p._pt);
+            }
+            bb.append("obj", p._o);
+            bb.done();
+
+            if (arr.len() > BSONObjMaxUserSize) {
+                warning() << "Too many results to fit in single document. Truncating..." << endl;
+                break;
+            }
+        }
+        arr.done();
+
+        (*stats)["btreelocs"] = gs._nscanned;
+        (*stats)["nscanned"] = gs._lookedAt;
+        (*stats)["objectsLoaded"] = gs._objectsLoaded;
+        (*stats)["avgDistance"] = totalDistance / x;
+        (*stats)["maxDistance"] = gs.farthest();
+
+        return true;
+    }
 
     }  // namespace twod_internal
 

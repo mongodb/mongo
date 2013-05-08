@@ -55,7 +55,7 @@ namespace mongo {
         }
 
         // Have we stored as many points as we can?
-        const bool limitReached() const {
+        bool limitReached() const {
             return _locs.size() >= _limit;
         }
     private:

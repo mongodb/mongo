@@ -701,13 +701,13 @@ namespace mongo {
     static v8::Handle<v8::Value> hexToBinData(V8Scope* scope, v8::Local<v8::Object> it, int type,
                                               string hexstr) {
         int len = hexstr.length() / 2;
-        scoped_array<char> data(new char[16]);
+        scoped_array<char> data(new char[len]);
         const char* src = hexstr.c_str();
-        for(int i = 0; i < 16; i++) {
+        for(int i = 0; i < len; i++) {
             data[i] = fromHex(src + i * 2);
         }
 
-        string encoded = base64::encode(data.get(), 16);
+        string encoded = base64::encode(data.get(), len);
         it->ForceSet(v8::String::New("len"), v8::Number::New(len));
         it->ForceSet(v8::String::New("type"), v8::Number::New(type));
         it->SetHiddenValue(v8::String::New("__BinData"), v8::Number::New(1));

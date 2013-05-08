@@ -23,8 +23,10 @@
 
 #include "../db/db.h"
 #include "../db/json.h"
-#include "mongo/db/hashindex.h"
+#include "mongo/db/index_legacy.h"
+#include "mongo/db/index_selection.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/queryutil.h"
 
 #include "dbtests.h"
@@ -954,11 +956,11 @@ namespace NamespaceTests {
         class IndexedQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ) );
                 FieldRangeSet frs( "n/a", BSON( "a" << 2 ), true , true );
                 // Checking a return value of HELPFUL instead of OPTIMAL is descriptive rather than
                 // normative.  See SERVER-4485.
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -966,9 +968,9 @@ namespace NamespaceTests {
         class NoIndexedQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ) );
                 FieldRangeSet frs( "n/a", BSON( "b" << 2 ), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -976,9 +978,9 @@ namespace NamespaceTests {
         class ChildOfIndexQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSON( "a.b" << 2 ), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -986,9 +988,9 @@ namespace NamespaceTests {
         class ParentOfIndexQueryField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a.b" << 1 ));
                 FieldRangeSet frs( "n/a", BSON( "a" << 2 ), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -999,9 +1001,9 @@ namespace NamespaceTests {
         class ObjectMatchCompletingIndexField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a.b" << 1 ));
                 FieldRangeSet frs( "n/a", BSON( "a" << BSON( "b" << 2 ) ), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSONObj() ) );
             }
         };
         
@@ -1009,9 +1011,9 @@ namespace NamespaceTests {
         class IndexedOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSON( "a" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -1019,9 +1021,9 @@ namespace NamespaceTests {
         class IndexedReverseOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << -1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << -1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSON( "a" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -1032,9 +1034,9 @@ namespace NamespaceTests {
         class NonPrefixIndexedOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSON( "b" << 1 << "a" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs, BSON( "b" << 1 << "a" << 1 ) ) );
             }
         };
 
@@ -1042,9 +1044,9 @@ namespace NamespaceTests {
         class NoIndexedOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp(BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSON( "b" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSON( "b" << 1 ) ) );
             }
         };
         
@@ -1052,9 +1054,9 @@ namespace NamespaceTests {
         class ChildOfIndexOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a" << 1 ));
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSON( "a.b" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSON( "a.b" << 1 ) ) );
             }
         };
         
@@ -1062,9 +1064,9 @@ namespace NamespaceTests {
         class ParentOfIndexOrderField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a.b" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "a.b" << 1 ) );
                 FieldRangeSet frs( "n/a", BSONObj(), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs, BSON( "a" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -1072,13 +1074,13 @@ namespace NamespaceTests {
         class NumericFieldSuitability {
         public:
             void run() {
-                IndexSpec spec( BSON( "1" << 1 ), BSONObj() );
+                BSONObj kp( BSON( "1" << 1 ));
                 FieldRangeSet frs1( "n/a", BSON( "1" << 2 ), true , true );
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs1, BSONObj() ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs1, BSONObj() ) );
                 FieldRangeSet frs2( "n/a", BSON( "01" << 3), true , true );
-                ASSERT_EQUALS( USELESS, spec.suitability( frs2, BSON( "01" << 1 ) ) );
+                ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(kp, frs2, BSON( "01" << 1 ) ) );
                 FieldRangeSet frs3( "n/a", BSONObj() , true , true );
-                ASSERT_EQUALS( HELPFUL, spec.suitability( frs3, BSON( "1" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(kp, frs3, BSON( "1" << 1 ) ) );
             }
         };
 
@@ -1090,8 +1092,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$within:{$box:[[100,0],[120,100]]}}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( OPTIMAL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1101,8 +1103,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$within:{$box:[[100,0],[120,100]]}}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "b" << "2d" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "b" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1112,8 +1114,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$near:[100,0]}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( OPTIMAL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1125,8 +1127,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{lat:4,lon:5}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1139,8 +1141,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$gt:4,$lt:5}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1150,8 +1152,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:[1,1]}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1161,8 +1163,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:1}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1172,8 +1174,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
 
@@ -1186,8 +1188,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{$and:[{a:{$near:[100,0]}}]}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1201,9 +1203,9 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{a:{$near:[100,0]},$or:[{b:1}]}" );
                     OrRangeGenerator org( "n/a", query, true );
                     scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
-                    IndexSpec spec( BSON( "a" << "2d" ) );
+                    BSONObj spec( BSON( "a" << "2d" ) );
                     ASSERT_EQUALS( OPTIMAL,
-                                   spec.suitability( frsp->getSingleKeyFRS(), BSONObj() ) );
+                                   IndexSelection::isSuitableFor(spec, frsp->getSingleKeyFRS(), BSONObj() ) );
                 }
             };
 
@@ -1218,8 +1220,8 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{a:{$geoIntersects:{$geometry:{type:'Point',"
                                               "coordinates:[40,5]}}}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( OPTIMAL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1230,8 +1232,8 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{a:{$geoIntersects:{$geometry:{type:'Point',"
                                               "coordinates:[40,5]}}}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "b" << "2dsphere" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "b" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1241,8 +1243,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$near:[100,0]}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( OPTIMAL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( OPTIMAL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1255,8 +1257,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{lat:4,lon:5}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1266,8 +1268,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$gt:4,$lt:5}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1277,8 +1279,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:[1,1]}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1290,8 +1292,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:1}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1301,8 +1303,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
 
@@ -1315,8 +1317,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{$and:[{a:{$near:[100,0]}}]}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1330,9 +1332,9 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{a:{$near:[100,0]},$or:[{b:1}]}" );
                     OrRangeGenerator org( "n/a", query, true );
                     scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
-                    IndexSpec spec( BSON( "a" << "2dsphere" ) );
+                    BSONObj spec( BSON( "a" << "2dsphere" ) );
                     ASSERT_EQUALS( OPTIMAL,
-                                   spec.suitability( frsp->getSingleKeyFRS(), BSONObj() ) );
+                                   IndexSelection::isSuitableFor(spec, frsp->getSingleKeyFRS(), BSONObj() ) );
                 }
             };
 
@@ -1346,8 +1348,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:5}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1357,8 +1359,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$gt:4}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( USELESS, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( USELESS, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1368,8 +1370,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{a:{$in:[1,2]}}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1382,8 +1384,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{$and:[{a:5}]}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1396,8 +1398,8 @@ namespace NamespaceTests {
                 void run() {
                     BSONObj query = fromjson( "{$and:[{a:5},{b:5}]}" );
                     FieldRangeSet frs( "n/a", query, true, true );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frs, BSONObj() ) );
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frs, BSONObj() ) );
                 }
             };
             
@@ -1411,8 +1413,8 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{$or:[{a:5}]}" );
                     OrRangeGenerator org( "n/a", query, true );
                     scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frsp->getSingleKeyFRS(),
                                                               BSONObj() ) );
                 }
             };
@@ -1427,8 +1429,8 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{z:5,$or:[{a:5}]}" );
                     OrRangeGenerator org( "n/a", query, true );
                     scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frsp->getSingleKeyFRS(),
                                                               BSONObj() ) );
                 }
             };
@@ -1443,8 +1445,8 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{$or:[{a:5},{b:5}]}" );
                     OrRangeGenerator org( "n/a", query, true );
                     scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frsp->getSingleKeyFRS(),
                                                               BSONObj() ) );
                 }
             };
@@ -1459,8 +1461,8 @@ namespace NamespaceTests {
                     BSONObj query = fromjson( "{a:5,$or:[{z:5}]}" );
                     OrRangeGenerator org( "n/a", query, true );
                     scoped_ptr<FieldRangeSetPair> frsp( org.topFrsp() );
-                    IndexSpec spec( BSON( "a" << "hashed" ) );
-                    ASSERT_EQUALS( HELPFUL, spec.suitability( frsp->getSingleKeyFRS(),
+                    BSONObj spec( BSON( "a" << "hashed" ) );
+                    ASSERT_EQUALS( HELPFUL, IndexSelection::isSuitableFor(spec, frsp->getSingleKeyFRS(),
                                                               BSONObj() ) );
                 }
             };
@@ -1471,14 +1473,14 @@ namespace NamespaceTests {
          
     } // namespace IndexSpecSuitability
 
-    namespace IndexSpecTests {
+    namespace MissingFieldTests {
 
         /** A missing field is represented as null in a btree index. */
         class BtreeIndexMissingField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << 1 ) );
-                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
+                BSONObj spec( BSON("key" << BSON( "a" << 1 ) ));
+                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(spec).firstElement().type());
             }
         };
         
@@ -1486,24 +1488,29 @@ namespace NamespaceTests {
         class TwoDIndexMissingField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << "2d" ) );
-                ASSERT_EQUALS( jstNULL, spec.missingField().type() );
+                BSONObj spec( BSON("key" << BSON( "a" << "2d" ) ));
+                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(spec).firstElement().type());
             }
         };
-        
+
         /** A missing field is represented with the hash of null in a hashed index. */
         class HashedIndexMissingField {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << "hashed" ) );
+                BSONObj spec( BSON("key" << BSON( "a" << "hashed" ) ));
                 BSONObj nullObj = BSON( "a" << BSONNULL );
+
+                // Call getKeys on the nullObj.
                 BSONObjSet nullFieldKeySet;
-                spec.getKeys( nullObj, nullFieldKeySet );
+                HashAccessMethod::getKeysImpl(nullObj, "a", 0, 0, false, &nullFieldKeySet);
                 BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
-                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0 ),
+
+                ASSERT_EQUALS( HashAccessMethod::makeSingleKey( nullObj.firstElement(), 0, 0 ),
                                nullFieldFromKey.Long() );
-                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
-                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
+
+                BSONObj missingField = IndexLegacy::getMissingField(spec);
+                ASSERT_EQUALS( NumberLong, missingField.firstElement().type() );
+                ASSERT_EQUALS( nullFieldFromKey, missingField.firstElement());
             }
         };
 
@@ -1514,19 +1521,25 @@ namespace NamespaceTests {
         class HashedIndexMissingFieldAlternateSeed {
         public:
             void run() {
-                IndexSpec spec( BSON( "a" << "hashed" ), BSON( "seed" << 0x5eed ) );
+                BSONObj spec( BSON("key" << BSON( "a" << "hashed" ) <<  "seed" << 0x5eed ));
                 BSONObj nullObj = BSON( "a" << BSONNULL );
+
                 BSONObjSet nullFieldKeySet;
-                spec.getKeys( BSONObj(), nullFieldKeySet );
+                HashAccessMethod::getKeysImpl(nullObj, "a", 0x5eed, 0, false, &nullFieldKeySet);
                 BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
-                ASSERT_EQUALS( HashedIndexType::makeSingleKey( nullObj.firstElement(), 0x5eed ),
+
+                ASSERT_EQUALS( HashAccessMethod::makeSingleKey( nullObj.firstElement(), 0x5eed, 0 ),
                                nullFieldFromKey.Long() );
-                ASSERT_EQUALS( NumberLong, spec.missingField().type() );
-                ASSERT_EQUALS( nullFieldFromKey, spec.missingField() );
+
+                // Ensure that getMissingField recognizes that the seed is different (and returns
+                // the right key).
+                BSONObj missingField = IndexLegacy::getMissingField(spec);
+                ASSERT_EQUALS( NumberLong, missingField.firstElement().type());
+                ASSERT_EQUALS( nullFieldFromKey, missingField.firstElement());
             }
         };
         
-    } // namespace IndexSpecTests
+    } // namespace MissingFieldTests
     
     namespace NamespaceDetailsTests {
 
@@ -2396,10 +2409,6 @@ namespace NamespaceTests {
             add< IndexSpecSuitability::Hashed::EqualityInsideNonStandaloneSingletonOr >();
             add< IndexSpecSuitability::Hashed::EqualityInsideNonSingletonOr >();
             add< IndexSpecSuitability::Hashed::EqualityOutsideOr >();
-            add< IndexSpecTests::BtreeIndexMissingField >();
-            add< IndexSpecTests::TwoDIndexMissingField >();
-            add< IndexSpecTests::HashedIndexMissingField >();
-            add< IndexSpecTests::HashedIndexMissingFieldAlternateSeed >();
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
@@ -2430,6 +2439,10 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Size >();
             add< NamespaceDetailsTests::SetIndexIsMultikey >();
             add< NamespaceDetailsTransientTests::ClearQueryCache >();
+            add< MissingFieldTests::BtreeIndexMissingField >();
+            add< MissingFieldTests::TwoDIndexMissingField >();
+            add< MissingFieldTests::HashedIndexMissingField >();
+            add< MissingFieldTests::HashedIndexMissingFieldAlternateSeed >();
         }
     } myall;
 } // namespace NamespaceTests

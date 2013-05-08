@@ -20,14 +20,13 @@
 #include <vector>
 
 #include "mongo/db/geo/core.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/2d_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
-
-    const string TwoDIndexingParams::TWOD_NAME = "2d";
 
     static double configValueWithDefault(IndexDescriptor *desc, const string& name, double def) {
         BSONElement e = desc->getInfoElement(name);
@@ -41,7 +40,7 @@ namespace mongo {
         BSONObjIterator i(descriptor->keyPattern());
         while (i.more()) {
             BSONElement e = i.next();
-            if (e.type() == String && TwoDIndexingParams::TWOD_NAME == e.valuestr()) {
+            if (e.type() == String && IndexNames::GEO_2D == e.valuestr()) {
                 uassert(16800, "can't have 2 geo fields", _params.geo.size() == 0);
                 uassert(16801, "2d has to be first in index", _params.other.size() == 0);
                 _params.geo = e.fieldName();

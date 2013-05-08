@@ -35,10 +35,7 @@ using namespace std;
 namespace mongo {
 
     std::string toSTLString(const v8::Handle<v8::Value>& o) {
-        v8::String::Utf8Value str(o);
-        massert(16686, "error converting js type to Utf8Value", *str);
-        std::string s(*str, str.length());
-        return s;
+        return StringData(V8String(o)).toString();
     }
 
     /** Get the properties of an object (and its prototype) as a comma-delimited string */
@@ -96,7 +93,7 @@ namespace mongo {
             // arguments need to be copied into the isolate, go through bson
             BSONObjBuilder b;
             for(int i = 0; i < args.Length(); ++i) {
-                scope->v8ToMongoElement(b, mongoutils::str::stream() << "arg" << i, args[i]);
+                scope->v8ToMongoElement(b, "arg" + BSONObjBuilder::numStr(i), args[i]);
             }
             _args = b.obj();
         }

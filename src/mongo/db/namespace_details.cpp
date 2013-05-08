@@ -681,14 +681,12 @@ namespace mongo {
     /* ------------------------------------------------------------------------- */
 
     SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
-    SimpleMutex NamespaceDetailsTransient::_isMutex("is");
     NamespaceDetailsTransient::DMap NamespaceDetailsTransient::_nsdMap;
 
     void NamespaceDetailsTransient::reset() {
         Lock::assertWriteLocked(_ns); 
         clearQueryCache();
         _keysComputed = false;
-        _indexSpecs.clear();
     }
 
     NamespaceDetailsTransient::CMap& NamespaceDetailsTransient::get_cmap_inlock(const string& ns) {

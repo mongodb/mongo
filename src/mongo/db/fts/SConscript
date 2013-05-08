@@ -47,7 +47,6 @@ env.StaticLibrary( 'server_common', [
 
 env.StaticLibrary('ftsmongod', [
         'fts_command_mongod.cpp',
-        'fts_index.cpp',
         'fts_search.cpp',
         ], LIBDEPS=["base","server_common"])
 

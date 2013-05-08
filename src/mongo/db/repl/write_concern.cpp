@@ -179,7 +179,9 @@ namespace mongo {
         }
 
         bool waitForReplication(OpTime& op, int w, int maxSecondsToWait) {
-            massert( 16806, "waitForReplication called but not master anymore", _isMaster() );
+            static const int noLongerMasterAssertCode = 16806;
+            massert(noLongerMasterAssertCode, 
+                    "waitForReplication called but not master anymore", _isMaster() );
 
             if ( w <= 1 )
                 return true;
@@ -192,8 +194,13 @@ namespace mongo {
             
             scoped_lock mylk(_mutex);
             while ( ! _replicatedToNum_slaves_locked( op, w ) ) {
-                if ( ! _threadsWaitingForReplication.timed_wait( mylk.boost() , xt ) )
+                if ( ! _threadsWaitingForReplication.timed_wait( mylk.boost() , xt ) ) {
+                    massert(noLongerMasterAssertCode,
+                            "waitForReplication called but not master anymore", _isMaster());
                     return false;
+                }
+                massert(noLongerMasterAssertCode, 
+                        "waitForReplication called but not master anymore", _isMaster());
             }
             return true;
         }

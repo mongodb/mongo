@@ -24,6 +24,7 @@
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 
@@ -104,10 +105,8 @@ namespace mongo {
         
         if ( ssl ) {
 #ifdef MONGO_SSL
-            const SSLParams params(cmdLine.sslPEMKeyFile, 
-                                   cmdLine.sslPEMKeyPassword);
             // pointer to global singleton instance
-            SSLManager* mgr = getSSLManager();
+            SSLManagerInterface* mgr = getSSLManager();
 
             sock.secure(mgr);
 #else

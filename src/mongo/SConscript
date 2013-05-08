@@ -111,6 +111,51 @@ env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
                 LIBDEPS=['bson','index_set'])
 
 
+
+env.StaticLibrary('expressions',
+                  ['db/matcher/expression.cpp',
+                   'db/matcher/expression_array.cpp',
+                   'db/matcher/expression_internal.cpp',
+                   'db/matcher/expression_leaf.cpp',
+                   'db/matcher/expression_tree.cpp',
+                   'db/matcher/expression_parser.cpp',
+                   'db/matcher/expression_parser_tree.cpp',
+                   'db/matcher/match_details.cpp'],
+                  LIBDEPS=['bson',
+                           '$BUILD_DIR/mongo/db/common',
+                           '$BUILD_DIR/third_party/pcrecpp'
+                           ] )
+
+env.StaticLibrary('expressions_geo',
+                  ['db/matcher/expression_geo.cpp',
+                   'db/matcher/expression_parser_geo.cpp'],
+                  LIBDEPS=['expressions','geoquery','geoparser'] )
+
+env.StaticLibrary('expressions_where',
+                  ['db/matcher/expression_where.cpp'],
+                  LIBDEPS=['expressions'] )
+
+
+env.CppUnitTest('expression_test',
+                ['db/matcher/expression_test.cpp',
+                 'db/matcher/expression_leaf_test.cpp',
+                 'db/matcher/expression_tree_test.cpp',
+                 'db/matcher/expression_array_test.cpp'],
+                LIBDEPS=['expressions'] )
+
+env.CppUnitTest('expression_geo_test',
+                ['db/matcher/expression_geo_test.cpp',
+                 'db/matcher/expression_parser_geo_test.cpp'],
+                LIBDEPS=['expressions_geo'] )
+
+env.CppUnitTest('expression_parser_test',
+                ['db/matcher/expression_parser_test.cpp',
+                 'db/matcher/expression_parser_array_test.cpp',
+                 'db/matcher/expression_parser_tree_test.cpp',
+                 'db/matcher/expression_parser_leaf_test.cpp'],
+                LIBDEPS=['expressions'] )
+
+
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 
 env.CppUnitTest('descriptive_stats_test',
@@ -238,8 +283,11 @@ env.StaticLibrary("coredb", [
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",
+        "db/index_names.cpp",
+        "db/index/btree_key_generator.cpp",
         "db/keypattern.cpp",
         "db/matcher.cpp",
+        "db/matcher/matcher.cpp",
         "db/pipeline/accumulator.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",
         "db/pipeline/accumulator_avg.cpp",
@@ -282,11 +330,13 @@ env.StaticLibrary("coredb", [
                            'server_parameters',
                            'geoparser',
                            'geoquery',
+                           'expressions',
+                           'expressions_geo',
+                           'expressions_where',
                            '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",
                     "util/net/miniwebserver.cpp",
-                    "db/indexkey.cpp",
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
                     ]
@@ -342,7 +392,8 @@ if has_option( "asio" ):
 
 env.StaticLibrary('index_set', [ 'db/index_set.cpp' ] )
 
-# mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
+# mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
+# libs.
 serverOnlyFiles = [ "db/curop.cpp",
                     "db/kill_current_op.cpp",
                     "db/memconcept.cpp",
@@ -397,13 +448,14 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/prefetch.cpp",
                     "db/repl/write_concern.cpp",
                     "db/btreecursor.cpp",
+                    "db/index_legacy.cpp",
+                    "db/index_selection.cpp",
                     "db/index/2d_access_method.cpp",
                     "db/index/2d_index_cursor.cpp",
                     "db/index/btree_access_method.cpp",
                     "db/index/btree_based_builder.cpp",
                     "db/index/btree_index_cursor.cpp",
                     "db/index/btree_interface.cpp",
-                    "db/index/btree_key_generator.cpp",
                     "db/index/fts_access_method.cpp",
                     "db/index/hash_access_method.cpp",
                     "db/index/hash_index_cursor.cpp",
@@ -425,7 +477,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/client.cpp",
                     "db/database.cpp",
                     "db/pdfile.cpp",
-                    "db/record.cpp",
                     "db/cursor.cpp",
                     "db/query_optimizer.cpp",
                     "db/query_optimizer_internal.cpp",
@@ -437,22 +488,19 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/index_builder.cpp",
                     "db/index_update.cpp",
                     "db/index_rebuilder.cpp",
+                    "db/record.cpp",
                     "db/scanandorder.cpp",
                     "db/explain.cpp",
-                    "db/geo/2d.cpp",
                     "db/geo/geonear.cpp",
                     "db/geo/haystack.cpp",
                     "db/geo/s2common.cpp",
-                    "db/geo/s2cursor.cpp",
-                    "db/geo/s2index.cpp",
-                    "db/geo/s2nearcursor.cpp",
-                    "db/hashindex.cpp",
                     "db/ops/count.cpp",
                     "db/ops/delete.cpp",
                     "db/ops/query.cpp",
                     "db/ops/update.cpp",
                     "db/ops/update_internal.cpp",
                     "db/parsed_query.cpp",
+                    "db/query_runner.cpp",
                     "db/dbcommands.cpp",
                     "db/compact.cpp",
                     "db/dbcommands_admin.cpp",

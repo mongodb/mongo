@@ -16,11 +16,18 @@
 #include "mongo/base/string_data.h"
 
 #include <ostream>
+#include <third_party/murmurhash3/MurmurHash3.h>
 
 namespace mongo {
 
     std::ostream& operator<<(std::ostream& stream, const StringData& value) {
         return stream.write(value.rawData(), value.size());
+    }
+
+    size_t StringData::Hasher::operator() (const StringData& str) const {
+        unsigned out;
+        MurmurHash3_x86_32(str.rawData(), str.size(), 0, &out);
+        return out;
     }
 
 } // namespace mongo

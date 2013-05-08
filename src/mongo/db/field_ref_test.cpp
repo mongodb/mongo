@@ -66,6 +66,17 @@ namespace {
         ASSERT_EQUALS(fieldRef.dottedField(), field);
     }
 
+    TEST(Normal, ParseTwice) {
+        string field = "a";
+        FieldRef fieldRef;
+        for (int i = 0; i < 2; i++) {
+            fieldRef.parse(field);
+            ASSERT_EQUALS(fieldRef.numParts(), 1U);
+            ASSERT_EQUALS(fieldRef.getPart(0), field);
+            ASSERT_EQUALS(fieldRef.dottedField(), field);
+        }
+    }
+
     TEST(Normal, MulitplePartsVariable) {
         const char* parts[] = {"a", "b", "c", "d", "e"};
         size_t size = sizeof(parts)/sizeof(char*);

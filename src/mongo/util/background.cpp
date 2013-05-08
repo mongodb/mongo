@@ -78,7 +78,9 @@ namespace mongo {
         }
 
 #ifdef MONGO_SSL
-        SSLManager::cleanupThreadLocals();
+        SSLManagerInterface* manager = getSSLManager();
+        if (manager)
+            manager->cleanupThreadLocals();
 #endif
         if( status->deleteSelf )
             delete this;

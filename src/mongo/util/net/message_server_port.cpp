@@ -229,7 +229,9 @@ namespace mongo {
 
             // Normal disconnect path.
 #ifdef MONGO_SSL
-            SSLManager::cleanupThreadLocals();
+            SSLManagerInterface* manager = getSSLManager();
+            if (manager)
+                manager->cleanupThreadLocals();
 #endif
             handler->disconnected( p.get() );
 

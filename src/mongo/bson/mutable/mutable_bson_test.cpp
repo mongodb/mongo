@@ -1042,6 +1042,60 @@ namespace {
         ASSERT_FALSE(doc.root().leftChild() == doc.root().rightChild());
     }
 
+    TEST(Document, AddChildToEmptyOpaqueSubobject) {
+        mongo::BSONObj inObj = mongo::fromjson("{a: {}}");
+        mmb::Document doc(inObj);
+
+        mmb::Element elem = doc.root()["a"];
+        ASSERT_TRUE(elem.ok());
+
+        mmb::Element newElem = doc.makeElementInt("0", 1);
+        ASSERT_TRUE(newElem.ok());
+
+        ASSERT_OK(elem.pushBack(newElem));
+    }
+
+    TEST(Element, IsNumeric) {
+        mmb::Document doc;
+
+        mmb::Element elt = doc.makeElementNull("dummy");
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementInt("dummy", 42);
+        ASSERT_TRUE(elt.isNumeric());
+
+        elt = doc.makeElementString("dummy", "dummy");
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementLong("dummy", 42);
+        ASSERT_TRUE(elt.isNumeric());
+
+        elt = doc.makeElementBool("dummy", false);
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementDouble("dummy", 42.0);
+        ASSERT_TRUE(elt.isNumeric());
+    }
+
+    TEST(Element, IsIntegral) {
+        mmb::Document doc;
+
+        mmb::Element elt = doc.makeElementNull("dummy");
+        ASSERT_FALSE(elt.isIntegral());
+
+        elt = doc.makeElementInt("dummy", 42);
+        ASSERT_TRUE(elt.isIntegral());
+
+        elt = doc.makeElementString("dummy", "dummy");
+        ASSERT_FALSE(elt.isIntegral());
+
+        elt = doc.makeElementLong("dummy", 42);
+        ASSERT_TRUE(elt.isIntegral());
+
+        elt = doc.makeElementDouble("dummy", 42.0);
+        ASSERT_FALSE(elt.isIntegral());
+    }
+
     TEST(Document, ArraySerialization) {
 
         static const char inJson[] =
@@ -1086,6 +1140,24 @@ namespace {
 
         static const char outJson[] = "{ a : 5 }";
         ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    }
+
+    TEST(Document, CreateElementWithEmptyFieldName) {
+        mmb::Document doc;
+        mmb::Element noname = doc.makeElementObject(mongo::StringData());
+        ASSERT_TRUE(noname.ok());
+        ASSERT_EQUALS(mongo::StringData(), noname.getFieldName());
+    }
+
+    TEST(Document, CreateElementFromBSONElement) {
+        mongo::BSONObj obj = mongo::fromjson("{a:1}}");
+        mmb::Document doc;
+        ASSERT_OK(doc.root().appendElement(obj["a"]));
+
+        mmb::Element newElem = doc.root()["a"];
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(newElem.getType(), mongo::NumberInt);
+        ASSERT_EQUALS(newElem.getValueInt(), 1);
     }
 
 } // namespace

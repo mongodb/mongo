@@ -49,13 +49,4 @@ namespace mongo {
      */
     void ensureHaveIdIndex(const char* ns, bool mayInterrupt);
 
-    ////// The remaining functions are only included in this header file for unit testing.
-
-    class BSONObjExternalSorter;
-    class CurOp;
-    class ProgressMeter;
-    class ProgressMeterHolder;
-    struct SortPhaseOne;
-    class Timer;
-
 } // namespace mongo

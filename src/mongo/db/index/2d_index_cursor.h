@@ -24,13 +24,22 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
     class TwoDAccessMethod;
+    class GeoNearArguments;
 
     namespace twod_internal {
         class GeoCursorBase;
+
+        class TwoDGeoNearRunner {
+        public:
+            static bool run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
+                                     const GeoNearArguments &parsedArgs, string& errmsg,
+                                     BSONObjBuilder& result, unordered_map<string, double>* stats);
+        };
     }
 
     class TwoDIndexCursor : public IndexCursor {

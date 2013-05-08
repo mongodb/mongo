@@ -34,114 +34,223 @@
 
 namespace mongo {
 
-    /**
-     * Multithreaded Support for SSL.
-     *
-     * In order to allow OpenSSL to work in a multithreaded environment, you
-     * must provide some callbacks for it to use for locking.  The following code
-     * sets up a vector of mutexes and uses thread-local storage to assign an id
-     * to each thread.
-     * The so-called SSLThreadInfo class encapsulates most of the logic required for
-     * OpenSSL multithreaded support.
-     */
+    namespace {
 
-    static unsigned long _ssl_id_callback();
-    static void _ssl_locking_callback(int mode, int type, const char *file, int line);
+        /**
+         * Multithreaded Support for SSL.
+         *
+         * In order to allow OpenSSL to work in a multithreaded environment, you
+         * must provide some callbacks for it to use for locking.  The following code
+         * sets up a vector of mutexes and uses thread-local storage to assign an id
+         * to each thread.
+         * The so-called SSLThreadInfo class encapsulates most of the logic required for
+         * OpenSSL multithreaded support.
+         */
 
-    class SSLThreadInfo {
-    public:
-        
-        SSLThreadInfo() {
-            _id = ++_next;
-            CRYPTO_set_id_callback(_ssl_id_callback);
-            CRYPTO_set_locking_callback(_ssl_locking_callback);
-        }
-        
-        ~SSLThreadInfo() {
-            CRYPTO_set_id_callback(0);
-        }
+        unsigned long _ssl_id_callback();
+        void _ssl_locking_callback(int mode, int type, const char *file, int line);
 
-        unsigned long id() const { return _id; }
-        
-        void lock_callback( int mode, int type, const char *file, int line ) {
-            if ( mode & CRYPTO_LOCK ) {
-                _mutex[type]->lock();
+        class SSLThreadInfo {
+        public:
+
+            SSLThreadInfo() {
+                _id = ++_next;
+                CRYPTO_set_id_callback(_ssl_id_callback);
+                CRYPTO_set_locking_callback(_ssl_locking_callback);
             }
-            else {
-                _mutex[type]->unlock();
+
+            ~SSLThreadInfo() {
+                CRYPTO_set_id_callback(0);
             }
-        }
-        
-        static void init() {
-            while ( (int)_mutex.size() < CRYPTO_num_locks() )
-                _mutex.push_back( new boost::recursive_mutex );
-        }
 
-        static SSLThreadInfo* get() {
-            SSLThreadInfo* me = _thread.get();
-            if ( ! me ) {
-                me = new SSLThreadInfo();
-                _thread.reset( me );
+            unsigned long id() const { return _id; }
+
+            void lock_callback( int mode, int type, const char *file, int line ) {
+                if ( mode & CRYPTO_LOCK ) {
+                    _mutex[type]->lock();
+                }
+                else {
+                    _mutex[type]->unlock();
+                }
             }
-            return me;
+
+            static void init() {
+                while ( (int)_mutex.size() < CRYPTO_num_locks() )
+                    _mutex.push_back( new boost::recursive_mutex );
+            }
+
+            static SSLThreadInfo* get() {
+                SSLThreadInfo* me = _thread.get();
+                if ( ! me ) {
+                    me = new SSLThreadInfo();
+                    _thread.reset( me );
+                }
+                return me;
+            }
+
+        private:
+            unsigned _id;
+
+            static AtomicUInt _next;
+            // Note: see SERVER-8734 for why we are using a recursive mutex here.
+            // Once the deadlock fix in OpenSSL is incorporated into most distros of
+            // Linux, this can be changed back to a nonrecursive mutex.
+            static std::vector<boost::recursive_mutex*> _mutex;
+            static boost::thread_specific_ptr<SSLThreadInfo> _thread;
+        };
+
+        unsigned long _ssl_id_callback() {
+            return SSLThreadInfo::get()->id();
         }
 
-    private:
-        unsigned _id;
-        
-        static AtomicUInt _next;
-        // Note: see SERVER-8734 for why we are using a recursive mutex here.
-        // Once the deadlock fix in OpenSSL is incorporated into most distros of
-        // Linux, this can be changed back to a nonrecursive mutex.
-        static std::vector<boost::recursive_mutex*> _mutex;
-        static boost::thread_specific_ptr<SSLThreadInfo> _thread;
-    };
+        void _ssl_locking_callback(int mode, int type, const char *file, int line) {
+            SSLThreadInfo::get()->lock_callback( mode , type , file , line );
+        }
 
-    static unsigned long _ssl_id_callback() {
-        return SSLThreadInfo::get()->id();
-    }
-    static void _ssl_locking_callback(int mode, int type, const char *file, int line) {
-        SSLThreadInfo::get()->lock_callback( mode , type , file , line );
-    }
+        AtomicUInt SSLThreadInfo::_next;
+        std::vector<boost::recursive_mutex*> SSLThreadInfo::_mutex;
+        boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
 
-    AtomicUInt SSLThreadInfo::_next;
-    std::vector<boost::recursive_mutex*> SSLThreadInfo::_mutex;
-    boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
-    
-    ////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////
 
-    static SimpleMutex sslManagerMtx("SSL Manager");
-    SSLManager* theSSLManager = NULL;
+        SimpleMutex sslManagerMtx("SSL Manager");
+        SSLManagerInterface* theSSLManager = NULL;
 
-    void initializeSSL() {
+        struct Params {
+            Params(const std::string& pemfile,
+                   const std::string& pempwd,
+                   const std::string& cafile = "",
+                   const std::string& crlfile = "",
+                   bool weakCertificateValidation = false,
+                   bool fipsMode = false) :
+                pemfile(pemfile),
+                pempwd(pempwd),
+                cafile(cafile),
+                crlfile(crlfile),
+                weakCertificateValidation(weakCertificateValidation),
+                fipsMode(fipsMode) {};
+
+            std::string pemfile;
+            std::string pempwd;
+            std::string cafile;
+            std::string crlfile;
+            bool weakCertificateValidation;
+            bool fipsMode;
+        };
+
+        class SSLManager : public SSLManagerInterface {
+        public:
+            explicit SSLManager(const Params& params);
+
+            virtual ~SSLManager();
+
+            virtual SSL* connect(int fd);
+
+            virtual SSL* accept(int fd);
+
+            virtual void validatePeerCertificate(const SSL* ssl);
+
+            virtual void cleanupThreadLocals();
+
+            virtual int SSL_read(SSL* ssl, void* buf, int num);
+
+            virtual int SSL_write(SSL* ssl, const void* buf, int num);
+
+            virtual unsigned long ERR_get_error();
+
+            virtual char* ERR_error_string(unsigned long e, char* buf);
+
+            virtual int SSL_get_error(const SSL* ssl, int ret);
+
+            virtual int SSL_shutdown(SSL* ssl);
+
+            virtual void SSL_free(SSL* ssl);
+
+        private:
+            SSL_CTX* _context;
+            std::string _password;
+            bool _validateCertificates;
+            bool _weakValidation;
+            /**
+             * creates an SSL context to be used for this file descriptor.
+             * caller must SSL_free it.
+             */
+            SSL* _secure(int fd);
+
+            /**
+             * Fetches the error text for an error code, in a thread-safe manner.
+             */
+            std::string _getSSLErrorMessage(int code);
+
+            /**
+             * Given an error code from an SSL-type IO function, logs an
+             * appropriate message and throws a SocketException
+             */
+            void _handleSSLError(int code);
+
+            /** @return true if was successful, otherwise false */
+            bool _setupPEM( const std::string& keyFile , const std::string& password );
+
+            /*
+             * Set up SSL for certificate validation by loading a CA
+             */
+            bool _setupCA(const std::string& caFile);
+
+            /*
+             * Import a certificate revocation list into our SSL context
+             * for use with validating certificates
+             */
+            bool _setupCRL(const std::string& crlFile);
+
+            /*
+             * Activate FIPS 140-2 mode, if the server started with a command line
+             * parameter.
+             */
+            void _setupFIPS();
+
+            /*
+             * Wrapper for SSL_Connect() that handles SSL_ERROR_WANT_READ,
+             * see SERVER-7940
+             */
+            int _ssl_connect(SSL* ssl);
+
+            /**
+             * Callbacks for SSL functions
+             */
+            static int password_cb( char *buf,int num, int rwflag,void *userdata );
+            static int verify_cb(int ok, X509_STORE_CTX *ctx);
+        };
+
+    } // namespace
+
+    MONGO_INITIALIZER(SSLManager)(InitializerContext* context) {
         SimpleMutex::scoped_lock lck(sslManagerMtx);
-
-        if (theSSLManager != NULL) return;
-
         if (cmdLine.sslOnNormalPorts) {
-            const SSLParams params(cmdLine.sslPEMKeyFile, 
-                                   cmdLine.sslPEMKeyPassword,
-                                   cmdLine.sslCAFile,
-                                   cmdLine.sslCRLFile,
-                                   cmdLine.sslWeakCertificateValidation,
-                                   cmdLine.sslFIPSMode);
+            const Params params(
+                cmdLine.sslPEMKeyFile,
+                cmdLine.sslPEMKeyPassword,
+                cmdLine.sslCAFile,
+                cmdLine.sslCRLFile,
+                cmdLine.sslWeakCertificateValidation,
+                cmdLine.sslFIPSMode);
             theSSLManager = new SSLManager(params);
         }
-    }
-    
-    MONGO_INITIALIZER(SSLManager)(InitializerContext* context) {
-        initializeSSL();
         return Status::OK();
     }
 
-    SSLManager* getSSLManager() {
+    SSLManagerInterface* getSSLManager() {
         SimpleMutex::scoped_lock lck(sslManagerMtx);
         if (theSSLManager)
             return theSSLManager;
         return NULL;
     }
 
-    void SSLManager::_initializeSSL(const SSLParams& params) {
+    SSLManagerInterface::~SSLManagerInterface() {}
+
+    SSLManager::SSLManager(const Params& params) :
+        _validateCertificates(false),
+        _weakValidation(params.weakCertificateValidation) {
+
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
@@ -153,20 +262,13 @@ namespace mongo {
         // Add all digests and ciphers to OpenSSL's internal table
         // so that encryption/decryption is backwards compatible
         OpenSSL_add_all_algorithms();
-    }
 
-    SSLManager::SSLManager(const SSLParams& params) : 
-        _validateCertificates(false),
-        _weakValidation(params.weakCertificateValidation) {
-        
-        _initializeSSL(params);
-  
         _context = SSL_CTX_new(SSLv23_method());
-        massert(15864, 
-                mongoutils::str::stream() << "can't create SSL Context: " << 
-                _getSSLErrorMessage(ERR_get_error()), 
+        massert(15864,
+                mongoutils::str::stream() << "can't create SSL Context: " <<
+                _getSSLErrorMessage(ERR_get_error()),
                 _context);
-   
+
         // Activate all bug workaround options, to support buggy client SSL's.
         SSL_CTX_set_options(_context, SSL_OP_ALL);
 
@@ -204,6 +306,9 @@ namespace mongo {
         }
     }
 
+    SSLManager::~SSLManager() {
+    }
+
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
         SSLManager* sm = static_cast<SSLManager*>(userdata);
         std::string pass = sm->_password;
@@ -214,6 +319,35 @@ namespace mongo {
     int SSLManager::verify_cb(int ok, X509_STORE_CTX *ctx) {
 	return 1; // always succeed; we will catch the error in our get_verify_result() call
     }
+
+    int SSLManager::SSL_read(SSL* ssl, void* buf, int num) {
+        return ::SSL_read(ssl, buf, num);
+    }
+
+    int SSLManager::SSL_write(SSL* ssl, const void* buf, int num) {
+        return ::SSL_write(ssl, buf, num);
+    }
+
+    unsigned long SSLManager::ERR_get_error() {
+        return ::ERR_get_error();
+    }
+
+    char* SSLManager::ERR_error_string(unsigned long e, char* buf) {
+        return ::ERR_error_string(e, buf);
+    }
+
+    int SSLManager::SSL_get_error(const SSL* ssl, int ret) {
+        return ::SSL_get_error(ssl, ret);
+    }
+
+    int SSLManager::SSL_shutdown(SSL* ssl) {
+        return ::SSL_shutdown(ssl);
+    }
+
+    void SSLManager::SSL_free(SSL* ssl) {
+        return ::SSL_free(ssl);
+    }
+
 
     void SSLManager::_setupFIPS() {
         // Turn on FIPS mode if requested.

@@ -18,10 +18,11 @@
 
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/cmdline.h"
+#include "mongo/db/index_selection.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/emulated_cursor.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/intervalbtreecursor.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/parsed_query.h"
@@ -87,7 +88,6 @@ namespace mongo {
         _endKeyInclusive(),
         _utility( Helpful ),
         _special( special ),
-        _type( 0 ),
         _startOrEndSpec() {
     }
     
@@ -111,24 +111,24 @@ namespace mongo {
             return;
         }
 
+        _descriptor.reset(CatalogHack::getDescriptor(_d, _idxNo));
         _index = &_d->idx(_idxNo);
 
         // If the parsing or index indicates this is a special query, don't continue the processing
         if (!_special.empty() ||
-            ( _index->getSpec().getType() &&
-             _index->getSpec().getType()->suitability( _frs, _order ) != USELESS ) ) {
+            ( ("" != CatalogHack::getAccessMethodName(_descriptor->keyPattern())) && (USELESS !=
+                IndexSelection::isSuitableFor(_descriptor->keyPattern(), _frs, _order)))) {
 
-            _type  = _index->getSpec().getType();
-            if (_special.empty()) _special = _index->getSpec().getType()->getPlugin()->getName();
+            _specialIndexName = CatalogHack::getAccessMethodName(_descriptor->keyPattern());
+            if (_special.empty()) _special = _specialIndexName;
 
-            massert( 13040 , (string)"no type for special: " + _special , _type );
+            massert( 13040 , (string)"no type for special: " + _special , "" != _specialIndexName);
             // hopefully safe to use original query in these contexts;
             // don't think we can mix special with $or clause separation yet
-            _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , _order );
+            _scanAndOrderRequired = !_order.isEmpty();
             return;
         }
 
-        const IndexSpec &idxSpec = _index->getSpec();
         BSONObjIterator o( _order );
         BSONObjIterator k( idxKey );
         if ( !o.moreWithEOO() )
@@ -191,7 +191,7 @@ doneCheckOrder:
         if ( !_scanAndOrderRequired &&
                 ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
             _utility = Optimal;
-        _frv.reset( new FieldRangeVector( _frs, idxSpec, _direction ) );
+        _frv.reset( new FieldRangeVector( _frs, _descriptor->keyPattern(), _direction ) );
 
         if ( // If all field range constraints are on indexed fields and ...
              _utility == Optimal &&
@@ -207,7 +207,7 @@ doneCheckOrder:
 
         if ( originalFrsp ) {
             _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ),
-                                                      idxSpec,
+                                                      _descriptor->keyPattern(),
                                                       _direction ) );
         }
         else {
@@ -230,7 +230,7 @@ doneCheckOrder:
             _utility = Unhelpful;
         }
             
-        if ( idxSpec.isSparse() && hasPossibleExistsFalsePredicate() ) {
+        if ( _descriptor->isSparse() && hasPossibleExistsFalsePredicate() ) {
             _utility = Disallowed;
         }
 
@@ -243,7 +243,7 @@ doneCheckOrder:
     shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc& startLoc,
                                              bool requestIntervalCursor ) const {
 
-        if ( _type ) {
+        if ("" != _specialIndexName) {
             // hopefully safe to use original query in these contexts - don't think we can mix type
             // with $or clause separation yet
             int numWanted = 0;
@@ -252,6 +252,7 @@ doneCheckOrder:
                 numWanted = _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
             }
 
+            // Why do we get new objects here?  Because EmulatedCursor takes ownership of them.
             IndexDescriptor* descriptor = CatalogHack::getDescriptor(_d, _idxNo);
             IndexAccessMethod* iam = CatalogHack::getIndex(descriptor);
             return shared_ptr<Cursor>(EmulatedCursor::make(descriptor, iam, _originalQuery,
@@ -283,7 +284,7 @@ doneCheckOrder:
                                                           _direction >= 0 ? 1 : -1 ) );
         }
 
-        if ( _index->getSpec().getType() ) {
+        if ( "" != CatalogHack::getAccessMethodName(_descriptor->keyPattern())) {
             return shared_ptr<Cursor>( BtreeCursor::make( _d,
                                                           *_index,
                                                           _frv->startKey(),
@@ -389,58 +390,10 @@ doneCheckOrder:
         return 0;
     }
 
-    /**
-     * Detects $exists:false predicates in a matcher.  All $exists:false predicates will be
-     * detected.  Some $exists:true predicates may be incorrectly reported as $exists:false due to
-     * the approximate nature of the implementation.
-     */
-    class ExistsFalseDetector : public MatcherVisitor {
-    public:
-        ExistsFalseDetector( const Matcher& originalMatcher );
-        bool hasFoundExistsFalse() const { return _foundExistsFalse; }
-        void visitMatcher( const Matcher& matcher ) { _currentMatcher = &matcher; }
-        void visitElementMatcher( const ElementMatcher& elementMatcher );
-    private:
-        const Matcher* _originalMatcher;
-        const Matcher* _currentMatcher;
-        bool _foundExistsFalse;
-    };
 
-    ExistsFalseDetector::ExistsFalseDetector( const Matcher& originalMatcher ) :
-        _originalMatcher( &originalMatcher ),
-        _currentMatcher( 0 ),
-        _foundExistsFalse() {
-    }
-
-    /** Matches $exists:false and $not:{$exists:true} exactly. */
-    static bool isExistsFalsePredicate( const ElementMatcher& elementMatcher ) {
-        bool hasTrueValue = elementMatcher._toMatch.trueValue();
-        bool hasNotModifier = elementMatcher._isNot;
-        return hasNotModifier ? hasTrueValue : !hasTrueValue;
-    }
-    
-    void ExistsFalseDetector::visitElementMatcher( const ElementMatcher& elementMatcher ) {
-        if ( elementMatcher._compareOp != BSONObj::opEXISTS ) {
-            // Only consider $exists predicates.
-            return;
-        }
-        if ( _currentMatcher != _originalMatcher ) {
-            // Treat all $exists predicates nested below the original matcher as $exists:false.
-            // This approximation is used because a nesting operator may change the matching
-            // semantics of $exists:true.
-            _foundExistsFalse = true;
-            return;
-        }
-        if ( isExistsFalsePredicate( elementMatcher ) ) {
-            // Top level $exists operators are matched exactly.
-            _foundExistsFalse = true;
-        }
-    }
 
     bool QueryPlan::hasPossibleExistsFalsePredicate() const {
-        ExistsFalseDetector detector( matcher()->docMatcher() );
-        matcher()->docMatcher().visit( detector );
-        return detector.hasFoundExistsFalse();
+        return matcher()->docMatcher().hasExistsFalse();
     }
     
     bool QueryPlan::queryBoundsExactOrderSuffix() const {

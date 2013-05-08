@@ -18,8 +18,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    // XXX: sigh this shouldnt' be here OR in indexkey.h
-    static const int ParallelArraysCode = 10088;
+
+    // Used in scanandorder.cpp to inforatively error when we try to sort keys with parallel arrays.
+    const int BtreeKeyGenerator::ParallelArraysCode = 10088;
 
     BtreeKeyGenerator::BtreeKeyGenerator(vector<const char*> fieldNames, vector<BSONElement> fixed, 
                                          bool isSparse)
@@ -50,7 +51,7 @@ namespace mongo {
     static void assertParallelArrays( const char *first, const char *second ) {
         stringstream ss;
         ss << "cannot index parallel arrays [" << first << "] [" << second << "]";
-        uasserted( ParallelArraysCode ,  ss.str() );
+        uasserted( BtreeKeyGenerator::ParallelArraysCode ,  ss.str() );
     }
 
     BtreeKeyGeneratorV0::BtreeKeyGeneratorV0(vector<const char*> fieldNames,

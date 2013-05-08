@@ -24,7 +24,6 @@
 #include <queue>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/fts/fts_index.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_util.h"

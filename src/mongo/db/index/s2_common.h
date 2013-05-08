@@ -36,8 +36,6 @@ namespace mongo {
     };
 
     struct S2IndexingParams {
-        static const string SPHERE_2D_NAME;
-
         static const double kRadiusOfEarthInMeters;
 
         // Since we take the cartesian product when we generate keys for an insert,

@@ -17,6 +17,7 @@
 #include "mongo/db/index/s2_index_cursor.h"
 
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_near_cursor.h"
@@ -42,7 +43,7 @@ namespace mongo {
         while (keyIt.more()) {
             BSONElement keyElt = keyIt.next();
 
-            if (keyElt.type() != String || S2IndexingParams::SPHERE_2D_NAME != keyElt.valuestr()) {
+            if (keyElt.type() != String || IndexNames::GEO_2DSPHERE != keyElt.valuestr()) {
                 continue;
             }
 

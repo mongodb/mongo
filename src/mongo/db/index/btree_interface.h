@@ -94,6 +94,8 @@ namespace mongo {
                                 int direction,
                                 const char* caller) const = 0;
 
+        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj& keyPattern) = 0;
+
         /**
          * These methods are here so that the BtreeCursor doesn't need to do any templating for the
          * two on-disk formats.

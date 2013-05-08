@@ -23,6 +23,9 @@
 #include <string>
 #include <v8.h>
 
+#include <mongo/base/string_data.h>
+#include <mongo/util/assert_util.h>
+
 namespace mongo {
 
 #define jsassert(x,msg) uassert(16664, (msg), (x))
@@ -37,6 +40,45 @@ namespace mongo {
 
     /** Simple v8 object to string conversion helper */
     std::string toSTLString(const v8::Handle<v8::Value>& o);
+
+    /** Like toSTLString but doesn't allocate a new std::string
+     *
+     *  This owns the string's memory so you need to be careful not to let the
+     *  converted StringDatas outlive the V8Scope object. These rules are the
+     *  same as converting from a std::string into a StringData.
+     *
+     *  Safe:
+     *      void someFunction(StringData argument);
+     *      v8::Handle<v8::String> aString;
+     *
+     *      someFunction(V8String(aString)); // passing down stack as temporary
+     *
+     *      V8String named (aString);
+     *      someFunction(named); // passing up stack as named value
+     *
+     *      StringData sd = named; // scope of sd is less than named
+     *
+     *  Unsafe:
+     *      StringData _member;
+     *
+     *      StringData returningFunction() {
+     *          StringData sd = V8String(aString); // sd outlives the temporary
+     *
+     *          V8String named(aString)
+     *          _member = named; // _member outlives named scope
+     *
+     *          return V8String(aString); // passing up stack
+     *      }
+     */
+    class V8String {
+    public:
+        explicit V8String(const v8::Handle<v8::Value>& o) :_str(o) {
+            massert(16686, "error converting js type to Utf8Value", *_str);
+        }
+        operator StringData () const { return StringData(*_str, _str.length()); }
+    private:
+        v8::String::Utf8Value _str;
+    };
 
     /** Get the properties of an object (and it's prototype) as a comma-delimited string */
     std::string v8ObjectToString(const v8::Handle<v8::Object>& o);

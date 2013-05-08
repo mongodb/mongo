@@ -297,7 +297,6 @@ namespace mongo {
     }
 
     extern bool inDBRepair;
-    extern const int DefaultIndexVersionNumber; // from indexkey.cpp
     void ensureIdIndexForNewNs(const char *ns);
 
     bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode) {

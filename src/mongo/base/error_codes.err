@@ -30,5 +30,6 @@ error_code("NamespaceNotFound", 26)
 error_code("IndexNotFound", 27)
 error_code("PathNotViable", 28)
 error_code("NonExistentPath", 29)
+error_code("InvalidPath", 30)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

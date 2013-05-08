@@ -20,6 +20,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongommf.h"
@@ -296,7 +297,7 @@ namespace mongo {
         void findIndexByType( const string& name , vector<int>& matches ) {
             IndexIterator i = ii();
             while ( i.more() ) {
-                if ( i.next().getSpec().getTypeName() == name )
+                if ( IndexNames::findPluginName(i.next().keyPattern()) == name )
                     matches.push_back( i.pos() - 1 );
             }
         }
@@ -494,23 +495,6 @@ namespace mongo {
             if ( !_keysComputed )
                 computeIndexKeys();
             return _indexedPaths;
-        }
-
-        /* IndexSpec caching */
-    private:
-        map<const IndexDetails*,IndexSpec> _indexSpecs;
-        static SimpleMutex _isMutex;
-    public:
-        const IndexSpec& getIndexSpec( const IndexDetails * details ) {
-            IndexSpec& spec = _indexSpecs[details];
-            if ( ! spec._finishedInit ) {
-                SimpleMutex::scoped_lock lk(_isMutex);
-                if ( ! spec._finishedInit ) {
-                    spec.reset( details );
-                    verify( spec._finishedInit );
-                }
-            }
-            return spec;
         }
 
         /* query cache (for query optimizer) ------------------------------------- */

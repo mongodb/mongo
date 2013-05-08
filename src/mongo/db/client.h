@@ -74,6 +74,12 @@ namespace mongo {
             initThread(desc);
         }
 
+        /**
+         * Allows detaching a thread from a Client object.  Use for testing and for the creation
+         * of non-connection clients.
+         */
+        static void resetThread( const StringData& origThreadName );
+
         /** this has to be called as the client goes away, but before thread termination
          *  @return true if anything was done
          */
@@ -113,7 +119,7 @@ namespace mongo {
         LockState& lockState() { return _ls; }
 
     private:
-        Client(const char *desc, AbstractMessagingPort *p = 0);
+        Client(const std::string& desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
         string _threadId; // "" on non support systems

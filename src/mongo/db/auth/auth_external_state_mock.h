@@ -47,6 +47,10 @@ namespace mongo {
 
         virtual void startRequest() {}
 
+        virtual void onAddAuthorizedPrincipal(Principal*) {}
+
+        virtual void onLogoutDatabase(const std::string& dbname) {}
+
     private:
         bool _returnValue;
     };

@@ -30,7 +30,6 @@
 
 namespace mongo {
     extern void runQuery(Message& m, QueryMessage& q, Message &response );
-    extern void __forceLinkGeoPlugin();
 } // namespace mongo
 
 namespace {
@@ -794,7 +793,6 @@ namespace {
         All() : Suite( "queryoptimizer2" ) {}
 
         void setupTests() {
-            __forceLinkGeoPlugin();
             add<QueryPlanSetTests::ToString>();
             add<QueryPlanSetTests::NoIndexes>();
             add<QueryPlanSetTests::Optimal>();

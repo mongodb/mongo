@@ -2,9 +2,75 @@
 
 Import("env")
 
-env.StaticLibrary('update', ['path_support.cpp'],
-                  LIBDEPS=['$BUILD_DIR/mongo/bson',
-                           '$BUILD_DIR/mongo/foundation',
-                           '$BUILD_DIR/mongo/db/common'])
+env.StaticLibrary(
+    target='update-common',
+    source=[
+        'field_checker.cpp',
+        'path_support.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/foundation',
+    ],
+)
 
-env.CppUnitTest('path_support_test', ['path_support_test.cpp'], LIBDEPS=['update'])
+env.CppUnitTest(
+    target='field_checker_test',
+    source=[
+        'field_checker_test.cpp',
+    ],
+    LIBDEPS=[
+        'update-common',
+    ],
+)
+
+env.CppUnitTest(
+    target='path_support_test',
+    source=[
+        'path_support_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update-common',
+    ],
+)
+
+env.StaticLibrary(
+    target='update',
+    source=[
+        'modifier_inc.cpp',
+        'modifier_set.cpp',
+        'modifier_unset.cpp',
+    ],
+    LIBDEPS=[
+        'update-common',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_inc_test',
+    source='modifier_inc_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_set_test',
+    source='modifier_set_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_unset_test',
+    source='modifier_unset_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update',
+    ],
+)

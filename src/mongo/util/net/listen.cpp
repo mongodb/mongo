@@ -22,6 +22,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/net/message_port.h"
+#include "mongo/util/net/ssl_manager.h"
 
 #ifndef _WIN32
 
@@ -530,9 +531,6 @@ namespace mongo {
                << " soft:" << limit.rlim_cur
                << " max conn: " << max
                << endl;
-
-        if ( max > MAX_MAX_CONN )
-            max = MAX_MAX_CONN;
 
         return max;
 #endif

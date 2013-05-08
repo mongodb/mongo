@@ -16,13 +16,26 @@
 #include <iosfwd>
 
 namespace mongo {
+
+    class BSONObj;
+
 namespace mutablebson {
 
-    // Utilities for mutable BSON unit tests.
-
     class ConstElement;
+    class Document;
 
-    // Stream out an element; useful within ASSERT calls.
+    //
+    // Utilities for mutable BSON unit tests.
+    //
+
+    /**
+     * Catch all comparator between a mutable 'doc' and the expected BSON 'exp'. It compares
+     * (a) 'doc's generated object, (b) 'exp', the expected object, and (c) 'doc(exp)', a
+     * document created from 'exp'. Returns true if all three are equal, otherwise false.
+     */
+    bool checkDoc(const Document& doc, const BSONObj& exp);
+
+    /** Stream out an element; useful within ASSERT calls */
     std::ostream& operator<<(std::ostream& stream, const ConstElement& elt);
 
 } // namespace mutablebson

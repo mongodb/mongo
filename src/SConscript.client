@@ -84,6 +84,7 @@ clientSourceBasic = [
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
     'mongo/util/version.cpp',
+    'third_party/murmurhash3/MurmurHash3.cpp',
     ]
 
 clientSourceSasl = ['mongo/client/sasl_client_authenticate_impl.cpp',
@@ -160,6 +161,7 @@ env.Install(
                  'mongo/base/error_codes.err',
                  'mongo/db/auth/generate_action_types.py',
                  'mongo/db/auth/action_types.txt',
+                 'third_party/murmurhash3/MurmurHash3.h',
                  '#buildscripts/make_archive.py',
                  clientSourceAll,
                  clientHeaders,

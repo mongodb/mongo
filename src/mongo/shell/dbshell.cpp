@@ -41,6 +41,7 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <shlobj.h>
 #define isatty _isatty
 #define fileno _fileno
 #else
@@ -900,6 +901,27 @@ int _main( int argc, char* argv[], char **envp ) {
 
     if( runShell )
         cout << "type \"help\" for help" << endl;
+   
+    // Load and execute /etc/mongorc.js before starting shell
+    std::string rcGlobalLocation;
+#ifndef _WIN32
+    rcGlobalLocation = "/etc/mongorc.js" ;
+#else
+	wchar_t programDataPath[MAX_PATH];
+	if ( S_OK == SHGetFolderPathW(NULL,
+                                CSIDL_COMMON_APPDATA,
+                                NULL,
+                                0,
+                                programDataPath) ) {
+        rcGlobalLocation = str::stream() << toUtf8String(programDataPath)
+                                         << "\\MongoDB\\mongorc.js";
+    }
+#endif   
+    if ( !rcGlobalLocation.empty() && fileExists(rcGlobalLocation) ) {
+        if ( ! scope->execFile( rcGlobalLocation , false , true ) ) {
+            cout << "The \"" << rcGlobalLocation << "\" file could not be executed" << endl;
+        }
+    }
 
     if ( !script.empty() ) {
         mongo::shell_utils::MongoProgramScope s;

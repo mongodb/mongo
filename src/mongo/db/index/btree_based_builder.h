@@ -31,6 +31,7 @@ namespace IndexUpdateTests {
 namespace mongo {
 
     class BSONObjExternalSorter;
+    class ExternalSortComparison;
     class IndexDetails;
     class NamespaceDetails;
     class ProgressMeter;
@@ -44,15 +45,20 @@ namespace mongo {
          */
         static uint64_t fastBuildIndex(const char* ns, NamespaceDetails* d, IndexDetails& idx,
                                        bool mayInterrupt, int idxNo);
+        static DiskLoc makeEmptyIndex(const IndexDetails& idx);
+        static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
+
     private:
         friend class IndexUpdateTests::AddKeysToPhaseOne;
         friend class IndexUpdateTests::InterruptAddKeysToPhaseOne;
         friend class IndexUpdateTests::DoDropDups;
         friend class IndexUpdateTests::InterruptDoDropDups;
 
+
         static void addKeysToPhaseOne(NamespaceDetails* d, const char* ns, const IndexDetails& idx,
                                       const BSONObj& order, SortPhaseOne* phaseOne,
-                                      int64_t nrecords, ProgressMeter* progressMeter, bool mayInterrupt,
+                                      int64_t nrecords, ProgressMeter* progressMeter,
+                                      bool mayInterrupt,
                                       int idxNo);
 
         static void doDropDups(const char* ns, NamespaceDetails* d, const set<DiskLoc>& dupsToDrop,

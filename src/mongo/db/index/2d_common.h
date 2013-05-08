@@ -24,7 +24,6 @@
 namespace mongo {
 
     struct TwoDIndexingParams {
-        static const string TWOD_NAME;
         string geo;
         vector<pair<string, int> > other;
         shared_ptr<GeoHashConverter> geoHashConverter;

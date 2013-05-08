@@ -19,8 +19,6 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/util/net/sock.h"
-
 namespace mongo {
 
     class HttpClient : boost::noncopyable {
@@ -69,11 +67,5 @@ namespace mongo {
 
     private:
         int _go( const char * command , string url , const char * body , Result * result );
-
-#ifdef MONGO_SSL
-        void _checkSSLManager();
-
-        scoped_ptr<SSLManager> _sslManager;
-#endif
     };
 }

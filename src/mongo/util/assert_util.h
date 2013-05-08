@@ -166,6 +166,7 @@ namespace mongo {
     MONGO_COMPILER_NORETURN void verifyFailed(const char *msg, const char *file, unsigned line);
     void wasserted(const char *msg, const char *file, unsigned line);
     MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
+    MONGO_COMPILER_NORETURN void fassertFailedNoTrace( int msgid );
     
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
         could cause, such as duplicate key, disk full, etc.

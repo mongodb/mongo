@@ -33,6 +33,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
+#include "mongo/db/query_runner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/s/d_logic.h"
@@ -123,7 +124,7 @@ namespace mongo {
 
         BSONObj key = i.getKeyFromQuery( query );
 
-        DiskLoc loc = i.idxInterface().findSingle(i , i.head , key);
+        DiskLoc loc = QueryRunner::fastFindSingle(i, key);
         if ( loc.isNull() )
             return false;
         result = loc.obj();
@@ -136,7 +137,7 @@ namespace mongo {
         uassert(13430, "no _id index", idxNo>=0);
         IndexDetails& i = d->idx( idxNo );
         BSONObj key = i.getKeyFromQuery( idquery );
-        return i.idxInterface().findSingle(i , i.head , key);
+        return QueryRunner::fastFindSingle(i, key);
     }
 
     vector<BSONObj> Helpers::findAll( const string& ns , const BSONObj& query ) {
@@ -473,7 +474,6 @@ namespace mongo {
         stringstream ss;
         ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
         _file /= ss.str();
-
     }
 
     RemoveSaver::~RemoveSaver() {
@@ -490,7 +490,8 @@ namespace mongo {
             _out = new ofstream();
             _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
             if ( ! _out->good() ) {
-                LOG( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
+                error() << "couldn't create file: " << _file.string() << 
+                    " for remove saving" << endl;
                 delete _out;
                 _out = 0;
                 return;

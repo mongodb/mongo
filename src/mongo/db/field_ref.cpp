@@ -25,6 +25,10 @@ namespace mongo {
             return;
         }
 
+        if (_size != 0) {
+            clear();
+        }
+
         // We guarantee that accesses through getPart() will be valid while 'this' is. So we
         // take a copy. We're going to be "chopping" up the copy into c-strings.
         _fieldBase.reset(new char[dottedField.size()+1]);

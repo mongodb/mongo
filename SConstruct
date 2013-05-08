@@ -14,6 +14,7 @@
 # several, subordinate SConscript files, which describe specific build rules.
 
 import buildscripts
+import copy
 import datetime
 import imp
 import os
@@ -169,6 +170,8 @@ add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
 
 add_option( "cxx", "compiler to use" , 1 , True )
 add_option( "cc", "compiler to use for c" , 1 , True )
+add_option( "cc-use-shell-environment", "use $CC from shell for C compiler" , 0 , False )
+add_option( "cxx-use-shell-environment", "use $CXX from shell for C++ compiler" , 0 , False )
 add_option( "ld", "linker to use" , 1 , True )
 add_option( "c++11", "enable c++11 support (experimental)", 0, True )
 
@@ -258,6 +261,10 @@ add_option('client-dist-basename', "Name of the client source archive.", 1, Fals
 
 add_option('build-fast-and-loose', "NEVER for production builds", 0, False)
 
+add_option('propagate-shell-environment',
+           "Pass shell environment to sub-processes (NEVER for production builds)",
+           0, False)
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -338,6 +345,9 @@ env = Environment( BUILD_DIR=variantDir,
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
 
+if has_option("propagate-shell-environment"):
+    env['ENV'] = dict(os.environ);
+
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
 
 if has_option('build-fast-and-loose'):
@@ -366,6 +376,19 @@ if os.sys.platform == 'win32':
     env['OS_FAMILY'] = 'win'
 else:
     env['OS_FAMILY'] = 'posix'
+
+if has_option( "cc-use-shell-environment" ) and has_option( "cc" ):
+    print("Cannot specify both --cc-use-shell-environment and --cc")
+    Exit(1)
+elif has_option( "cxx-use-shell-environment" ) and has_option( "cxx" ):
+    print("Cannot specify both --cxx-use-shell-environment and --cxx")
+    Exit(1)
+
+if has_option( "cxx-use-shell-environment" ):
+    env["CXX"] = os.getenv("CXX");
+    env["CC"] = env["CXX"]
+if has_option( "cc-use-shell-environment" ):
+    env["CC"] = os.getenv("CC");
 
 if has_option( "cxx" ):
     env["CC"] = get_option( "cxx" )
@@ -504,15 +527,6 @@ isBuildingLatest = False
 if has_option( "prefix" ):
     installDir = GetOption( "prefix" )
 
-def findVersion( root , choices ):
-    if not isinstance(root, list):
-        root = [root]
-    for r in root:
-        for c in choices:
-            if ( os.path.exists( r + c ) ):
-                return r + c
-    raise RuntimeError("can't find a version of [" + repr(root) + "] choices: " + repr(choices))
-
 def filterExists(paths):
     return filter(os.path.exists, paths)
 
@@ -609,22 +623,18 @@ elif "win32" == os.sys.platform:
         print("Can't specify both 'win-version-min' and 'win2008plus'")
         Exit(1)
 
+    # If tools configuration fails to set up 'cl' in the path, fall back to importing the whole
+    # shell environment and hope for the best. This will work, for instance, if you have loaded
+    # an SDK shell.
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
         if os.path.exists(os.path.join(pathdir, 'cl.exe')):
-            print( "found visual studio at " + pathdir )
             break
     else:
-        #use current environment
+        print("NOTE: Tool configuration did not find 'cl' compiler, falling back to os environment")
         env['ENV'] = dict(os.environ)
 
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
-
-    winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
-                              [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
-    print( "Windows SDK Root '" + winSDKHome + "'" )
-
-    env.Append( EXTRACPPPATH=[ winSDKHome + "/Include" ] )
 
     # /EHsc exception handling style for visual studio
     # /W3 warning level
@@ -683,7 +693,7 @@ elif "win32" == os.sys.platform:
     # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
     env.Append( LINKFLAGS=" /LARGEADDRESSAWARE " )
 
-    env.Append(LIBS=['ws2_32.lib', 'kernel32.lib', 'advapi32.lib', 'Psapi.lib', 'DbgHelp.lib'])
+    env.Append(LIBS=['ws2_32.lib', 'kernel32.lib', 'advapi32.lib', 'Psapi.lib', 'DbgHelp.lib', 'shell32.lib'])
 
     # v8 calls timeGetTime()
     if usev8:
@@ -806,7 +816,7 @@ def doConfigure(myenv):
     # TODO: Currently, we have some flags already injected. Eventually, this should test the
     # bare compilers, and we should re-check at the very end that TryCompile and TryLink still
     # work with the flags we have selected.
-    conf = Configure(myenv, clean=False, help=False)
+    conf = Configure(myenv, help=False)
 
     if 'CheckCXX' in dir( conf ):
         if not conf.CheckCXX():
@@ -861,7 +871,7 @@ def doConfigure(myenv):
         context.Result(result)
         return result
 
-    conf = Configure(myenv, clean=False, help=False, custom_tests = {
+    conf = Configure(myenv, help=False, custom_tests = {
         'CheckForToolchain' : CheckForToolchain,
     })
 
@@ -923,7 +933,7 @@ def doConfigure(myenv):
                     context.Result(result)
                     return result
 
-                conf = Configure(myenv, clean=False, help=False, custom_tests = {
+                conf = Configure(myenv, help=False, custom_tests = {
                     'CheckFor64Bit' : CheckFor64Bit
                 })
                 if conf.CheckFor64Bit():
@@ -960,18 +970,33 @@ def doConfigure(myenv):
             context.Result(ret)
             return ret
 
-        cloned = env.Clone()
-        cloned.Append(**mutation)
-
         if using_msvc():
             print("AddFlagIfSupported is not currently supported with MSVC")
             Exit(1)
+
+        test_mutation = mutation
+        if using_gcc():
+            test_mutation = copy.deepcopy(mutation)
+            # GCC helpfully doesn't issue a diagnostic on unkown flags of the form -Wno-xxx
+            # unless other diagnostics are triggered. That makes it tough to check for support
+            # for -Wno-xxx. To work around, if we see that we are testing for a flag of the
+            # form -Wno-xxx (but not -Wno-error=xxx), we also add -Wxxx to the flags. GCC does
+            # warn on unknown -Wxxx style flags, so this lets us probe for availablity of
+            # -Wno-xxx.
+            for kw in test_mutation.keys():
+                test_flags = test_mutation[kw]
+                for test_flag in test_flags:
+                    if test_flag.startswith("-Wno-") and not test_flag.startswith("-Wno-error="):
+                        test_flags.append(re.sub("^-Wno-", "-W", test_flag))
+
+        cloned = env.Clone()
+        cloned.Append(**test_mutation)
 
         # For GCC, we don't need anything since bad flags are already errors, but
         # adding -Werror won't hurt. For clang, bad flags are only warnings, so we need -Werror
         # to make them real errors.
         cloned.Append(CCFLAGS=['-Werror'])
-        conf = Configure(cloned, clean=False, help=False, custom_tests = {
+        conf = Configure(cloned, help=False, custom_tests = {
                 'CheckFlag' : lambda(ctx) : CheckFlagTest(ctx, tool, extension, flag)
         })
         available = conf.CheckFlag()
@@ -989,7 +1014,10 @@ def doConfigure(myenv):
     def AddToCXXFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C++', '.cpp', flag, CXXFLAGS=[flag])
 
-    if using_clang():
+    if using_gcc() or using_clang():
+        # This warning was added in g++-4.8.
+        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-local-typedefs')
+
         # Clang likes to warn about unused functions, which seems a tad aggressive and breaks
         # -Werror, which we want to be able to use.
         AddToCCFLAGSIfSupported(myenv, '-Wno-unused-function')
@@ -1003,11 +1031,17 @@ def doConfigure(myenv):
         # Clang likes to warn about unused private fields, but some of our third_party
         # libraries have such things.
         AddToCCFLAGSIfSupported(myenv, '-Wno-unused-private-field')
+
         # Clang warns about struct/class tag mismatch, but most people think that that is not
         # really an issue, see
         # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. We disable the
         # warning so it doesn't become an error.
         AddToCCFLAGSIfSupported(myenv, '-Wno-mismatched-tags')
+
+        # Prevents warning about using deprecated features (such as auto_ptr in c++11)
+        # Using -Wno-error=deprecated-declarations does not seem to work on some compilers,
+        # including at least g++-4.6.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-deprecated-declarations")
 
     if has_option('c++11'):
         # The Microsoft compiler does not need a switch to enable C++11. Again we should be
@@ -1087,10 +1121,6 @@ def doConfigure(myenv):
     # glibc's memcmp is faster than gcc's
     if linux:
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
-
-    if using_gcc() or using_clang():
-        # If possible, don't make deprecated declarations errors.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-error=deprecated-declarations")
 
     conf = Configure(myenv)
 

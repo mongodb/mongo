@@ -312,10 +312,6 @@ namespace {
                 out() << "maxConns has to be at least 5" << endl;
                 return false;
             }
-            else if ( cmdLine.maxConns > MAX_MAX_CONN ) {
-                out() << "maxConns can't be greater than " << MAX_MAX_CONN << endl;
-                return false;
-            }
         }
 
         if (params.count("objcheck")) {

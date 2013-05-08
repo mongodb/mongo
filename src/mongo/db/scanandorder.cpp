@@ -22,6 +22,7 @@
 
 #include "mongo/db/scanandorder.h"
 
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/parsed_query.h"
 #include "mongo/util/mongoutils/str.h"
@@ -37,7 +38,7 @@ namespace mongo {
             k = _order.getKeyFromObject(o);
         }
         catch (UserException &e) {
-            if ( e.getCode() == ParallelArraysCode ) { // cannot get keys for parallel arrays
+            if ( e.getCode() == BtreeKeyGenerator::ParallelArraysCode) { // cannot get keys for parallel arrays
                 // fix lasterror text to be more accurate.
                 uasserted( 15925, "cannot sort with keys that are parallel arrays" );
             }
@@ -103,7 +104,7 @@ namespace mongo {
     void ScanAndOrder::_addIfBetter(const BSONObj& k, const BSONObj& o, const BestMap::iterator& i,
                                     const DiskLoc* loc) {
         const BSONObj& worstBestKey = i->first;
-        int cmp = worstBestKey.woCompare(k, _order._spec.keyPattern);
+        int cmp = worstBestKey.woCompare(k, _order._keyPattern);
         if ( cmp > 0 ) {
             // k is better, 'upgrade'
             _validateAndUpdateApproxSize( -i->first.objsize() + -i->second.objsize() );
