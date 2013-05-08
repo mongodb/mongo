@@ -52,7 +52,7 @@ namespace mongo {
                 found = matchesSingleElement( x );
             }
             else if ( x.isABSONObj() ) {
-                string rest = pathToString( _fieldRef, idxPath+1 ); // TODO: remove
+                string rest = _fieldRef.dottedField( idxPath+1 );
                 BSONElement y = x.Obj().getField( rest );
                 found = matchesSingleElement( y );
             }
@@ -339,7 +339,7 @@ namespace mongo {
         size_t idxPath = 0;
         BSONElement e = doc->getFieldDottedOrArray( fieldRef, &idxPath, &traversedArray );
 
-        string rest = pathToString( fieldRef, idxPath+1 );
+        string rest = fieldRef.dottedField( idxPath + 1 );
 
         if ( e.type() != Array ) {
             return matchesSingleElement( e );

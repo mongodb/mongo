@@ -44,7 +44,7 @@ namespace mongo {
             return matchesSingleElement( e );
         }
 
-        string rest = pathToString( _fieldRef, idxPath+1 );
+        string rest = _fieldRef.dottedField( idxPath+1 );
 
         BSONElementSet all;
 
@@ -137,7 +137,7 @@ namespace mongo {
         size_t idxPath = 0;
         BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
-        string rest = pathToString( path, idxPath+1 );
+        string rest = path.dottedField( idxPath+1 );
 
         if ( rest.size() == 0 ) {
             if ( e.type() == Array )

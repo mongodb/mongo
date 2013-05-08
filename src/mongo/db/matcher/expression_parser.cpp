@@ -280,6 +280,12 @@ namespace mongo {
             root->add( eq.release() );
         }
 
+        if ( root->numChildren() == 1 ) {
+            const MatchExpression* real = root->getChild(0);
+            root->clearAndRelease();
+            return StatusWithMatchExpression( const_cast<MatchExpression*>(real) );
+        }
+
         return StatusWithMatchExpression( root.release() );
     }
 
