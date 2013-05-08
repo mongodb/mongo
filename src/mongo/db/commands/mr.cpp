@@ -341,7 +341,7 @@ namespace mongo {
                 // copy indexes
                 auto_ptr<DBClientCursor> idx = _db.getIndexes(_config.outputOptions.finalNamespace);
                 while ( idx->more() ) {
-                    BSONObj i = idx->next();
+                    BSONObj i = idx->nextSafe();
 
                     BSONObjBuilder b( i.objsize() + 16 );
                     b.append( "ns" , _config.tempNamespace );
@@ -506,7 +506,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::DBWrite lock( _config.outputOptions.finalNamespace );
-                    BSONObj o = cursor->next();
+                    BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _config.outputOptions.finalNamespace , o );
                     getDur().commitIfNeeded();
                     pm.hit();
@@ -524,7 +524,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock; // TODO(erh) why global?
-                    BSONObj temp = cursor->next();
+                    BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
                     bool found;
@@ -841,7 +841,7 @@ namespace mongo {
 
                 auto_ptr<DBClientCursor> idx = _db.getIndexes( _config.incLong );
                 while ( idx.get() && idx->more() ) {
-                    BSONObj x = idx->next();
+                    BSONObj x = idx->nextSafe();
                     if ( sortKey.woCompare( x["key"].embeddedObject() ) == 0 ) {
                         foundIndex = true;
                         break;
