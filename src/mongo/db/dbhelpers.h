@@ -31,8 +31,6 @@ namespace mongo {
     class Cursor;
     class CoveredIndexMatcher;
 
-    struct IndexChunk;
-
     /**
      * db helpers are helper functions and classes that let us easily manipulate the local
      * database instance in-proc.
@@ -155,7 +153,7 @@ namespace mongo {
 
         /**
          * Get sorted disklocs that belong to a range of a namespace defined over an index
-         * key pattern (IndexChunk).
+         * key pattern (KeyRange).
          *
          * @param chunk range of a namespace over an index key pattern.
          * @param maxChunkSizeBytes max number of bytes that we will retrieve locs for, if the

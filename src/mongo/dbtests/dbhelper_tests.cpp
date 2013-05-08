@@ -45,11 +45,11 @@ namespace mongo {
                 // Remove _id range [_min, _max).
                 Lock::DBWrite lk( ns );
                 Client::Context ctx( ns );
-                IndexChunk chunk( ns,
-                                  BSON( "_id" << _min ),
-                                  BSON( "_id" << _max ),
-                                  BSON( "_id" << 1 ) );
-                Helpers::removeRange( chunk );
+                KeyRange range( ns,
+                                BSON( "_id" << _min ),
+                                BSON( "_id" << _max ),
+                                BSON( "_id" << 1 ) );
+                Helpers::removeRange( range );
             }
 
             // Check that the expected documents remain.
@@ -115,12 +115,12 @@ namespace mongo {
             // search _id range (0, 10)
             Lock::DBRead lk( ns );
             Client::Context ctx( ns );
-            IndexChunk chunk( ns,
-                              BSON( "_id" << 0 ),
-                              BSON( "_id" << numDocsInserted ),
-                              BSON( "_id" << 1 ) );
+            KeyRange range( ns,
+                            BSON( "_id" << 0 ),
+                            BSON( "_id" << numDocsInserted ),
+                            BSON( "_id" << 1 ) );
 
-            Status result = Helpers::getLocsInRange( chunk,
+            Status result = Helpers::getLocsInRange( range,
                                                      maxSizeBytes,
                                                      &locs,
                                                      &numDocsFound,
@@ -158,12 +158,12 @@ namespace mongo {
             Client::Context ctx( ns );
 
             // search invalid index range
-            IndexChunk chunk( ns,
-                              BSON( "badIndex" << 0 ),
-                              BSON( "badIndex" << 10 ),
-                              BSON( "badIndex" << 1 ) );
+            KeyRange range( ns,
+                            BSON( "badIndex" << 0 ),
+                            BSON( "badIndex" << 10 ),
+                            BSON( "badIndex" << 1 ) );
 
-            Status result = Helpers::getLocsInRange( chunk,
+            Status result = Helpers::getLocsInRange( range,
                                                      maxSizeBytes,
                                                      &locs,
                                                      &numDocsFound,
@@ -200,12 +200,12 @@ namespace mongo {
         {
             Lock::DBRead lk( ns );
             Client::Context ctx( ns );
-            IndexChunk chunk( ns,
-                              BSON( "_id" << 0 ),
-                              BSON( "_id" << numDocsInserted ),
-                              BSON( "_id" << 1 ) );
+            KeyRange range( ns,
+                            BSON( "_id" << 0 ),
+                            BSON( "_id" << numDocsInserted ),
+                            BSON( "_id" << 1 ) );
 
-            Status result = Helpers::getLocsInRange( chunk,
+            Status result = Helpers::getLocsInRange( range,
                                                      maxSizeBytes,
                                                      &locs,
                                                      &numDocsFound,
