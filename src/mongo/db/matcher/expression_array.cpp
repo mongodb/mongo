@@ -30,22 +30,21 @@ namespace mongo {
 
     Status AllMatchExpression::init( const StringData& path ) {
         _path = path;
+        _fieldRef.parse( _path );
         return Status::OK();
     }
 
     bool AllMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        FieldRef path;
-        path.parse(_path);
 
         bool traversedArray = false;
         size_t idxPath = 0;
-        BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
+        BSONElement e = doc->getFieldDottedOrArray( _fieldRef, &idxPath, &traversedArray );
 
-        string rest = pathToString( path, idxPath+1 );
-
-        if ( e.type() != Array || traversedArray || rest.size() == 0 ) {
+        if ( e.type() != Array || traversedArray || idxPath + 1 == _fieldRef.numParts() ) {
             return matchesSingleElement( e );
         }
+
+        string rest = pathToString( _fieldRef, idxPath+1 );
 
         BSONElementSet all;
 

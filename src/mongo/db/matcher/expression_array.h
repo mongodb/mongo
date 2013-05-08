@@ -58,6 +58,7 @@ namespace mongo {
         bool _match( const BSONElementSet& all ) const;
 
         StringData _path;
+        FieldRef _fieldRef;
         ArrayFilterEntries _arrayEntries;
     };
 
