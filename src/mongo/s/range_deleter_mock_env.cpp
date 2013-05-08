@@ -78,7 +78,7 @@ namespace mongo {
         }
     }
 
-    bool RangeDeleterMockEnv::deleteOccured() const {
+    bool RangeDeleterMockEnv::deleteOccurred() const {
         scoped_lock sl(_deleteListMutex);
         return !_deleteList.empty();
     }

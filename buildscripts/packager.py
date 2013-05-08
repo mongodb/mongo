@@ -388,7 +388,7 @@ def make_deb(distro, arch, spec, srcdir):
 
 def make_deb_repo(repo):
     # Note: the Debian repository Packages files must be generated
-    # very carefully in order to be usable.
+    # very carefuly in order to be usable.
     oldpwd=os.getcwd()
     os.chdir(repo+"../../../../")
     try:

@@ -58,7 +58,7 @@ namespace {
                                          NULL /* notifier not needed */,
                                          &errMsg));
         ASSERT_FALSE(errMsg.empty());
-        ASSERT_FALSE(env->deleteOccured());
+        ASSERT_FALSE(env->deleteOccurred());
     }
 
     // Should not start delete if the set of cursors that were open when the
@@ -82,7 +82,7 @@ namespace {
         ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::PendingDeletesField,
                                          &pendingCount, NULL /* don't care errMsg */));
         ASSERT_EQUALS(1, pendingCount);
-        ASSERT_FALSE(env->deleteOccured());
+        ASSERT_FALSE(env->deleteOccurred());
 
         // Set the open cursors to a totally different sets of cursorIDs.
         env->addCursorId(ns, 200);
@@ -90,7 +90,7 @@ namespace {
 
         notifyDone.waitToBeNotified();
 
-        ASSERT_TRUE(env->deleteOccured());
+        ASSERT_TRUE(env->deleteOccurred());
         const DeletedRange deletedChunk(env->getLastDelete());
 
         ASSERT_EQUALS(ns, deletedChunk.ns);
@@ -117,7 +117,7 @@ namespace {
         env->waitForNthGetCursor(1u);
 
         deleter.stopWorkers();
-        ASSERT_FALSE(env->deleteOccured());
+        ASSERT_FALSE(env->deleteOccurred());
     }
 
     // Should not start delete if the set of cursors that were open when the
@@ -150,7 +150,7 @@ namespace {
                                          &inProgCount, NULL /* don't care errMsg */));
         ASSERT_EQUALS(1, inProgCount);
 
-        ASSERT_FALSE(env->deleteOccured());
+        ASSERT_FALSE(env->deleteOccurred());
 
         // Set the open cursors to a totally different sets of cursorIDs.
         env->addCursorId(ns, 200);
@@ -159,7 +159,7 @@ namespace {
         ASSERT_TRUE(deleterThread.timed_join(
                 boost::posix_time::seconds(MAX_IMMEDIATE_DELETE_WAIT_SECS)));
 
-        ASSERT_TRUE(env->deleteOccured());
+        ASSERT_TRUE(env->deleteOccurred());
         const DeletedRange deletedChunk(env->getLastDelete());
 
         ASSERT_EQUALS(ns, deletedChunk.ns);
@@ -199,14 +199,14 @@ namespace {
                                          &inProgCount, NULL /* don't care errMsg */));
         ASSERT_EQUALS(1, inProgCount);
 
-        ASSERT_FALSE(env->deleteOccured());
+        ASSERT_FALSE(env->deleteOccurred());
 
         deleter.stopWorkers();
 
         ASSERT_TRUE(deleterThread.timed_join(
                 boost::posix_time::seconds(MAX_IMMEDIATE_DELETE_WAIT_SECS)));
 
-        ASSERT_FALSE(env->deleteOccured());
+        ASSERT_FALSE(env->deleteOccurred());
     }
 
     // Tests the interaction of multiple deletes queued with different states.
@@ -287,7 +287,7 @@ namespace {
         env->resumeOneDelete();
         notifyDone1.waitToBeNotified();
 
-        ASSERT_TRUE(env->deleteOccured());
+        ASSERT_TRUE(env->deleteOccurred());
 
         // { x: 10 } => { x: 20 } should be the first one since it is already in
         // progress before the others are queued.
@@ -349,7 +349,7 @@ namespace {
                                        BSON("x" << 1), false, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
-        ASSERT_FALSE(env->deleteOccured());
+        ASSERT_FALSE(env->deleteOccurred());
 
         deleter.stopWorkers();
     }

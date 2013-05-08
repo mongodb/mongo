@@ -95,10 +95,10 @@ namespace mongo {
         /**
          * Returns true if deleteRange was called at least once.
          */
-        bool deleteOccured() const;
+        bool deleteOccurred() const;
 
         /**
-         * Returns the last delete. Undefined if deleteOccured is false.
+         * Returns the last delete. Undefined if deleteOccurred is false.
          */
         DeletedRange getLastDelete() const;
 

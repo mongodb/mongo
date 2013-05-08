@@ -306,7 +306,7 @@ namespace {
 
         bool serviceInstalled;
 
-        // TODO: If neccessary grant user "Login as a Service" permission.
+        // TODO: If necessary grant user "Login as a Service" permission.
         if ( !serviceUser.empty() ) {
             wstring actualServiceUser;
             if ( serviceUser.find(L"\\") == string::npos ) {
