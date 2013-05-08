@@ -986,7 +986,7 @@ main(void)
 	/*! [Configure bzip2 extension] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
+	    "extensions=[/usr/local/lib/wiredtiger_bzip2.so]", &conn);
 	/*! [Configure bzip2 extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
@@ -994,7 +994,7 @@ main(void)
 	/*! [Configure snappy extension] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
+	    "extensions=[/usr/local/lib/wiredtiger_snappy.so]", &conn);
 	/*! [Configure snappy extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
@@ -1051,7 +1051,7 @@ main(void)
 	/*! [Statistics logging with path] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "statistics_log=(wait=120,path=\"/log/log.%m.%d.%y\")", &conn);
+	    "statistics_log=(wait=120,path=/log/log.%m.%d.%y)", &conn);
 	/*! [Statistics logging with path] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
