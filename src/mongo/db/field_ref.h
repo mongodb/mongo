@@ -66,7 +66,7 @@ namespace mongo {
          * Returns a copy of the full dotted field in its current state (i.e., some parts may
          * have been replaced since the parse() call).
          */
-        std::string dottedField() const;
+        std::string dottedField( size_t offset = 0 ) const;
 
         /**
          * Resets the internal state. See note in parse() call.

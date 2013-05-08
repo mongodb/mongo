@@ -101,15 +101,16 @@ namespace mongo {
         _replacements.clear();
     }
 
-    std::string FieldRef::dottedField() const {
+    std::string FieldRef::dottedField( size_t offset ) const {
         std::string res;
-        if (_size == 0) {
+
+        if (_size == 0 || offset >= numParts() ) {
             return res;
         }
 
-        res.append(_fixed[0].rawData(), _fixed[0].size());
-        for (size_t i=1; i<_size; i++) {
-            res.append(1, '.');
+        for (size_t i=offset; i<_size; i++) {
+            if ( i > offset )
+                res.append(1, '.');
             StringData part = getPart(i);
             res.append(part.rawData(), part.size());
         }

@@ -157,4 +157,17 @@ namespace {
         ASSERT( !a.equalsDottedField( "a.b.c" ) );
     }
 
+    TEST( DottedField, Simple1 ) {
+        FieldRef a;
+        a.parse( "a.b.c.d.e" );
+        ASSERT_EQUALS( "a.b.c.d.e", a.dottedField() );
+        ASSERT_EQUALS( "a.b.c.d.e", a.dottedField(0) );
+        ASSERT_EQUALS( "b.c.d.e", a.dottedField(1) );
+        ASSERT_EQUALS( "c.d.e", a.dottedField(2) );
+        ASSERT_EQUALS( "d.e", a.dottedField(3) );
+        ASSERT_EQUALS( "e", a.dottedField(4) );
+        ASSERT_EQUALS( "", a.dottedField(5) );
+        ASSERT_EQUALS( "", a.dottedField(6) );
+    }
+
 } // namespace mongo
