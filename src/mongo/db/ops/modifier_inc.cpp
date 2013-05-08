@@ -163,8 +163,6 @@ namespace mongo {
 
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
 
-        // TODO: Is it possible for the current value to be EOO?
-
         // Update newValue w.r.t to the current value of the found element.
         _preparedState->newValue += currentValue;
 
