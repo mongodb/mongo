@@ -28,23 +28,22 @@ namespace mongo {
 namespace mutablebson {
 
     bool checkDoc(const Document& doc, const BSONObj& exp) {
-        return doc.getObject().woCompare(exp) == 0;
 
-#if 0
-        // Get the fundamental result via mutables woCompare path.
-        const bool primary_result = (doc.compareWithBSONObj(exp) == 0);
+        // Get the fundamental result via BSONObj's woCompare path. This is the best starting
+        // point, because we think that Document::getObject and the serialization mechanism is
+        // pretty well sorted.
+        BSONObj fromDoc = doc.getObject();
+        const int primaryResult = fromDoc.woCompare(exp);
 
         // Validate primary result via other comparison paths.
-        BSONObj fromDoc = doc.getObject();
-
-        // Check that mutables serialized result matches against its origin.
-        ASSERT_EQUALS(primary_result, doc.compareWithBSONObj(fromDoc) == 0);
 
         // Check that the serialized doc compares against the expected value.
-        ASSERT_EQUALS(primary_result, fromDoc.woCompare(exp) == 0);
+        ASSERT_EQUALS(primaryResult, doc.compareWithBSONObj(exp));
 
-        return primary_result;
-#endif
+        // Check that mutables serialized result matches against its origin.
+        ASSERT_EQUALS(primaryResult, doc.compareWithBSONObj(fromDoc));
+
+        return (primaryResult == 0);
     }
 
     std::ostream& operator<<(std::ostream& stream, const ConstElement& elt) {
