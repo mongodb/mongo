@@ -48,11 +48,7 @@ namespace mongo {
             ATOMIC
         };
 
-        enum MatchCategory {
-            LEAF, ARRAY, TREE, TYPE_CATEGORY, SPECIAL
-        };
-
-        MatchExpression( MatchCategory category, MatchType type );
+        MatchExpression( MatchType type );
         virtual ~MatchExpression(){}
 
         /**
@@ -73,7 +69,6 @@ namespace mongo {
         virtual const MatchExpression* getChild( size_t i ) const { return NULL; }
 
         MatchType matchType() const { return _matchType; }
-        MatchCategory matchCategory() const { return _matchCategory; }
 
         virtual string toString() const;
         virtual void debugString( StringBuilder& debug, int level = 0 ) const = 0;
@@ -83,7 +78,6 @@ namespace mongo {
         void _debugAddSpace( StringBuilder& debug, int level ) const;
 
     private:
-        MatchCategory _matchCategory;
         MatchType _matchType;
     };
 
@@ -93,7 +87,7 @@ namespace mongo {
      */
     class AtomicMatchExpression : public MatchExpression {
     public:
-        AtomicMatchExpression() : MatchExpression( SPECIAL, ATOMIC ){}
+        AtomicMatchExpression() : MatchExpression( ATOMIC ){}
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const {
             return true;

@@ -25,8 +25,8 @@
 
 namespace mongo {
 
-    MatchExpression::MatchExpression( MatchCategory category, MatchType type )
-        : _matchCategory( category ), _matchType( type ){
+    MatchExpression::MatchExpression( MatchType type )
+        : _matchType( type ){
     }
 
 

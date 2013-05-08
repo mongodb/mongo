@@ -30,7 +30,7 @@ namespace mongo {
 
     class ListOfMatchExpression : public MatchExpression {
     public:
-        ListOfMatchExpression( MatchType type ) : MatchExpression( TREE, type ){}
+        ListOfMatchExpression( MatchType type ) : MatchExpression( type ){}
         virtual ~ListOfMatchExpression();
 
         /**
@@ -91,7 +91,7 @@ namespace mongo {
 
     class NotMatchExpression : public MatchExpression {
     public:
-        NotMatchExpression() : MatchExpression( TREE, NOT ){}
+        NotMatchExpression() : MatchExpression( NOT ){}
         /**
          * @param exp - I own it, and will delete
          */

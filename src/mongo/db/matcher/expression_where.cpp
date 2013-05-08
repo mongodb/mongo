@@ -29,7 +29,7 @@ namespace mongo {
 
     class WhereMatchExpression : public MatchExpression {
     public:
-        WhereMatchExpression() : MatchExpression( SPECIAL, WHERE ){ _func = 0; }
+        WhereMatchExpression() : MatchExpression( WHERE ){ _func = 0; }
         virtual ~WhereMatchExpression(){}
 
         Status init( const StringData& ns, const StringData& theCode, const BSONObj& scope );

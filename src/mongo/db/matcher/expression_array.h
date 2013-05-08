@@ -42,7 +42,7 @@ namespace mongo {
      */
     class AllMatchExpression : public MatchExpression {
     public:
-        AllMatchExpression() : MatchExpression( ARRAY, ALL ){}
+        AllMatchExpression() : MatchExpression( ALL ){}
         Status init( const StringData& path );
         ArrayFilterEntries* getArrayFilterEntries() { return &_arrayEntries; }
 
@@ -65,7 +65,7 @@ namespace mongo {
 
     class ArrayMatchingMatchExpression : public MatchExpression {
     public:
-        ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( ARRAY, matchType ){}
+        ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( matchType ){}
         virtual ~ArrayMatchingMatchExpression(){}
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
@@ -128,7 +128,7 @@ namespace mongo {
      */
     class AllElemMatchOp : public MatchExpression {
     public:
-        AllElemMatchOp() : MatchExpression( ARRAY, ALL ){}
+        AllElemMatchOp() : MatchExpression( ALL ){}
         virtual ~AllElemMatchOp();
 
         Status init( const StringData& path );

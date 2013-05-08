@@ -30,7 +30,7 @@ namespace mongo {
 
     class LeafMatchExpression : public MatchExpression {
     public:
-        LeafMatchExpression( MatchType matchType ) : MatchExpression( LEAF, matchType ) {
+        LeafMatchExpression( MatchType matchType ) : MatchExpression( matchType ) {
             _allHaveToMatch = false;
         }
 
@@ -225,7 +225,7 @@ namespace mongo {
 
     class TypeMatchExpression : public MatchExpression {
     public:
-        TypeMatchExpression() : MatchExpression( TYPE_CATEGORY, TYPE_OPERATOR ){}
+        TypeMatchExpression() : MatchExpression( TYPE_OPERATOR ){}
 
         Status init( const StringData& path, int type );
 
