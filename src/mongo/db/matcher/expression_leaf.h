@@ -38,7 +38,7 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const = 0;
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual bool matchesSingleElement( const BSONElement& e ) const = 0;
 
@@ -225,13 +225,15 @@ namespace mongo {
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
     private:
-        bool _matches( const StringData& path, const BSONObj& doc, MatchDetails* details = 0 ) const;
+        bool _matches( const StringData& path,
+                       const MatchableDocument* doc,
+                       MatchDetails* details = 0 ) const;
 
         StringData _path;
         int _type;

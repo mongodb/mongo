@@ -27,7 +27,7 @@
 
 namespace mongo {
 
-    bool LeafMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool LeafMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         //log() << "e doc: " << doc << " path: " << _path << std::endl;
 
         FieldRef path;
@@ -35,7 +35,7 @@ namespace mongo {
 
         bool traversedArray = false;
         int32_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray( doc, path, &idxPath, &traversedArray );
+        BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
         string rest = pathToString( path, idxPath+1 );
 
@@ -321,18 +321,20 @@ namespace mongo {
         return e.type() == _type;
     }
 
-    bool TypeMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool TypeMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         return _matches( _path, doc, details );
     }
 
-    bool TypeMatchExpression::_matches( const StringData& path, const BSONObj& doc, MatchDetails* details ) const {
+    bool TypeMatchExpression::_matches( const StringData& path,
+                                        const MatchableDocument* doc,
+                                        MatchDetails* details ) const {
 
         FieldRef pathRef;
         pathRef.parse(path);
 
         bool traversedArray = false;
         int32_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray( doc, pathRef, &idxPath, &traversedArray );
+        BSONElement e = doc->getFieldDottedOrArray( pathRef, &idxPath, &traversedArray );
 
         string rest = pathToString( pathRef, idxPath+1 );
 
@@ -348,7 +350,8 @@ namespace mongo {
                 found = matchesSingleElement( x );
             }
             else if ( x.isABSONObj() ) {
-                found = _matches( rest, x.Obj(), details );
+                BSONMatchableDocument doc( x.Obj() );
+                found = _matches( rest, &doc, details );
             }
 
             if ( found ) {

@@ -34,7 +34,7 @@ namespace mongo {
 
         Status init( const StringData& ns, const StringData& theCode, const BSONObj& scope );
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual bool matchesSingleElement( const BSONElement& e ) const {
             return false;
@@ -76,8 +76,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool WhereMatchExpression::matches( const BSONObj& obj, MatchDetails* details ) const {
+    bool WhereMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         verify( _func );
+        BSONObj obj = doc->toBSON();
 
         if ( ! _userScope.isEmpty() ) {
             _scope->init( &_userScope );

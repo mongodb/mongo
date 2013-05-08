@@ -32,10 +32,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1  ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1  ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
     }
 
     TEST( MatchExpressionParserArrayTest, SizeAsString ) {
@@ -43,10 +43,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << BSONArray() ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
     }
 
     TEST( MatchExpressionParserArrayTest, SizeWithDouble ) {
@@ -54,11 +54,11 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1  ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSONArray() ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1  ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
     }
 
     TEST( MatchExpressionParserArrayTest, SizeBad ) {
@@ -74,10 +74,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" <<
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
                                                   BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
 
     }
@@ -87,9 +87,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 4 ) ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << BSON_ARRAY( 6 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 4 ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 6 ) ) ) );
     }
 
     TEST( MatchExpressionParserArrayTest, All1 ) {
@@ -97,12 +97,12 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 2 ) ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 2 << 3 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 2 ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 2 << 3 ) ) ) );
     }
 
     TEST( MatchExpressionParserArrayTest, AllBadArg ) {
@@ -169,10 +169,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" <<
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
                                                   BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
 
     }

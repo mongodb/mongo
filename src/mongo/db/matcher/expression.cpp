@@ -41,6 +41,12 @@ namespace mongo {
             debug << "    ";
     }
 
+    bool MatchExpression::matchesBSON( const BSONObj& doc, MatchDetails* details ) const {
+        BSONMatchableDocument mydoc( doc );
+        return matches( &mydoc, details );
+    }
+
+
     void AtomicMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << "$atomic\n";

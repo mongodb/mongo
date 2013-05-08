@@ -32,8 +32,8 @@ namespace mongo {
         ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
         NotMatchExpression notOp;
         ASSERT( notOp.init( lt.release() ).isOK() );
-        ASSERT( notOp.matches( BSON( "a" << 6 ), NULL ) );
-        ASSERT( !notOp.matches( BSON( "a" << 4 ), NULL ) );
+        ASSERT( notOp.matchesBSON( BSON( "a" << 6 ), NULL ) );
+        ASSERT( !notOp.matchesBSON( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( NotMatchExpression, MatchesArray ) {
@@ -42,10 +42,10 @@ namespace mongo {
         ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
         NotMatchExpression notOp;
         ASSERT( notOp.init( lt.release() ).isOK() );
-        ASSERT( notOp.matches( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
-        ASSERT( !notOp.matches( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( notOp.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        ASSERT( !notOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
         // All array elements must match.
-        ASSERT( !notOp.matches( BSON( "a" << BSON_ARRAY( 4 << 5 << 6 ) ), NULL ) );
+        ASSERT( !notOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5 << 6 ) ), NULL ) );
     }
 
     TEST( NotMatchExpression, ElemMatchKey ) {
@@ -56,11 +56,11 @@ namespace mongo {
         ASSERT( notOp.init( lt.release() ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !notOp.matches( BSON( "a" << BSON_ARRAY( 1 ) ), &details ) );
+        ASSERT( !notOp.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( notOp.matches( BSON( "a" << 6 ), &details ) );
+        ASSERT( notOp.matchesBSON( BSON( "a" << 6 ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( notOp.matches( BSON( "a" << BSON_ARRAY( 6 ) ), &details ) );
+        ASSERT( notOp.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), &details ) );
         // elemMatchKey is not implemented for negative match operators.
         ASSERT( !details.hasElemMatchKey() );
     }
@@ -96,7 +96,7 @@ namespace mongo {
 
     TEST( AndOp, NoClauses ) {
         AndMatchExpression andMatchExpression;
-        ASSERT( andMatchExpression.matches( BSONObj(), NULL ) );
+        ASSERT( andMatchExpression.matchesBSON( BSONObj(), NULL ) );
     }
 
     TEST( AndOp, MatchesElementThreeClauses ) {
@@ -119,10 +119,10 @@ namespace mongo {
         andOp.add( sub2.release() );
         andOp.add( sub3.release() );
 
-        ASSERT( andOp.matches( match ) );
-        ASSERT( !andOp.matches( notMatch1 ) );
-        ASSERT( !andOp.matches( notMatch2 ) );
-        ASSERT( !andOp.matches( notMatch3 ) );
+        ASSERT( andOp.matchesBSON( match ) );
+        ASSERT( !andOp.matchesBSON( notMatch1 ) );
+        ASSERT( !andOp.matchesBSON( notMatch2 ) );
+        ASSERT( !andOp.matchesBSON( notMatch3 ) );
     }
 
     TEST( AndOp, MatchesSingleClause ) {
@@ -133,10 +133,10 @@ namespace mongo {
         AndMatchExpression andOp;
         andOp.add( ne.release() );
 
-        ASSERT( andOp.matches( BSON( "a" << 4 ), NULL ) );
-        ASSERT( andOp.matches( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
-        ASSERT( !andOp.matches( BSON( "a" << 5 ), NULL ) );
-        ASSERT( !andOp.matches( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
+        ASSERT( andOp.matchesBSON( BSON( "a" << 4 ), NULL ) );
+        ASSERT( andOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
+        ASSERT( !andOp.matchesBSON( BSON( "a" << 5 ), NULL ) );
+        ASSERT( !andOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
     }
 
     TEST( AndOp, MatchesThreeClauses ) {
@@ -158,11 +158,11 @@ namespace mongo {
         andOp.add( sub2.release() );
         andOp.add( sub3.release() );
 
-        ASSERT( andOp.matches( BSON( "a" << 5 << "b" << 6 ), NULL ) );
-        ASSERT( !andOp.matches( BSON( "a" << 5 ), NULL ) );
-        ASSERT( !andOp.matches( BSON( "b" << 6 ), NULL ) );
-        ASSERT( !andOp.matches( BSON( "a" << 1 << "b" << 6 ), NULL ) );
-        ASSERT( !andOp.matches( BSON( "a" << 10 << "b" << 6 ), NULL ) );
+        ASSERT( andOp.matchesBSON( BSON( "a" << 5 << "b" << 6 ), NULL ) );
+        ASSERT( !andOp.matchesBSON( BSON( "a" << 5 ), NULL ) );
+        ASSERT( !andOp.matchesBSON( BSON( "b" << 6 ), NULL ) );
+        ASSERT( !andOp.matchesBSON( BSON( "a" << 1 << "b" << 6 ), NULL ) );
+        ASSERT( !andOp.matchesBSON( BSON( "a" << 10 << "b" << 6 ), NULL ) );
     }
 
     TEST( AndOp, ElemMatchKey ) {
@@ -181,11 +181,11 @@ namespace mongo {
 
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !andOp.matches( BSON( "a" << BSON_ARRAY( 1 ) ), &details ) );
+        ASSERT( !andOp.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( !andOp.matches( BSON( "b" << BSON_ARRAY( 2 ) ), &details ) );
+        ASSERT( !andOp.matchesBSON( BSON( "b" << BSON_ARRAY( 2 ) ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( andOp.matches( BSON( "a" << BSON_ARRAY( 1 ) << "b" << BSON_ARRAY( 1 << 2 ) ),
+        ASSERT( andOp.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) << "b" << BSON_ARRAY( 1 << 2 ) ),
                                &details ) );
         ASSERT( details.hasElemMatchKey() );
         // The elem match key for the second $and clause is recorded.
@@ -259,7 +259,7 @@ namespace mongo {
 
     TEST( OrOp, NoClauses ) {
         OrMatchExpression orOp;
-        ASSERT( !orOp.matches( BSONObj(), NULL ) );
+        ASSERT( !orOp.matchesBSON( BSONObj(), NULL ) );
     }
     /*
     TEST( OrOp, MatchesElementThreeClauses ) {
@@ -296,10 +296,10 @@ namespace mongo {
         OrMatchExpression orOp;
         orOp.add( ne.release() );
 
-        ASSERT( orOp.matches( BSON( "a" << 4 ), NULL ) );
-        ASSERT( orOp.matches( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
-        ASSERT( !orOp.matches( BSON( "a" << 5 ), NULL ) );
-        ASSERT( !orOp.matches( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
+        ASSERT( orOp.matchesBSON( BSON( "a" << 4 ), NULL ) );
+        ASSERT( orOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
+        ASSERT( !orOp.matchesBSON( BSON( "a" << 5 ), NULL ) );
+        ASSERT( !orOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
     }
 
     TEST( OrOp, MatchesThreeClauses ) {
@@ -318,13 +318,13 @@ namespace mongo {
         orOp.add( sub2.release() );
         orOp.add( sub3.release() );
 
-        ASSERT( orOp.matches( BSON( "a" << -1 ), NULL ) );
-        ASSERT( orOp.matches( BSON( "a" << 11 ), NULL ) );
-        ASSERT( !orOp.matches( BSON( "a" << 5 ), NULL ) );
-        ASSERT( orOp.matches( BSON( "b" << 100 ), NULL ) );
-        ASSERT( !orOp.matches( BSON( "b" << 101 ), NULL ) );
-        ASSERT( !orOp.matches( BSONObj(), NULL ) );
-        ASSERT( orOp.matches( BSON( "a" << 11 << "b" << 100 ), NULL ) );
+        ASSERT( orOp.matchesBSON( BSON( "a" << -1 ), NULL ) );
+        ASSERT( orOp.matchesBSON( BSON( "a" << 11 ), NULL ) );
+        ASSERT( !orOp.matchesBSON( BSON( "a" << 5 ), NULL ) );
+        ASSERT( orOp.matchesBSON( BSON( "b" << 100 ), NULL ) );
+        ASSERT( !orOp.matchesBSON( BSON( "b" << 101 ), NULL ) );
+        ASSERT( !orOp.matchesBSON( BSONObj(), NULL ) );
+        ASSERT( orOp.matchesBSON( BSON( "a" << 11 << "b" << 100 ), NULL ) );
     }
 
     TEST( OrOp, ElemMatchKey ) {
@@ -341,12 +341,12 @@ namespace mongo {
 
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !orOp.matches( BSONObj(), &details ) );
+        ASSERT( !orOp.matchesBSON( BSONObj(), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( !orOp.matches( BSON( "a" << BSON_ARRAY( 10 ) << "b" << BSON_ARRAY( 10 ) ),
+        ASSERT( !orOp.matchesBSON( BSON( "a" << BSON_ARRAY( 10 ) << "b" << BSON_ARRAY( 10 ) ),
                                &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( orOp.matches( BSON( "a" << BSON_ARRAY( 1 ) << "b" << BSON_ARRAY( 1 << 2 ) ),
+        ASSERT( orOp.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) << "b" << BSON_ARRAY( 1 << 2 ) ),
                               &details ) );
         // The elem match key feature is not implemented for $or.
         ASSERT( !details.hasElemMatchKey() );
@@ -419,7 +419,7 @@ namespace mongo {
 
     TEST( NorOp, NoClauses ) {
         NorMatchExpression norOp;
-        ASSERT( norOp.matches( BSONObj(), NULL ) );
+        ASSERT( norOp.matchesBSON( BSONObj(), NULL ) );
     }
     /*
     TEST( NorOp, MatchesElementThreeClauses ) {
@@ -457,10 +457,10 @@ namespace mongo {
         NorMatchExpression norOp;
         norOp.add( ne.release() );
 
-        ASSERT( !norOp.matches( BSON( "a" << 4 ), NULL ) );
-        ASSERT( !norOp.matches( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
-        ASSERT( norOp.matches( BSON( "a" << 5 ), NULL ) );
-        ASSERT( norOp.matches( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
+        ASSERT( !norOp.matchesBSON( BSON( "a" << 4 ), NULL ) );
+        ASSERT( !norOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
+        ASSERT( norOp.matchesBSON( BSON( "a" << 5 ), NULL ) );
+        ASSERT( norOp.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
     }
 
     TEST( NorOp, MatchesThreeClauses ) {
@@ -480,13 +480,13 @@ namespace mongo {
         norOp.add( sub2.release() );
         norOp.add( sub3.release() );
 
-        ASSERT( !norOp.matches( BSON( "a" << -1 ), NULL ) );
-        ASSERT( !norOp.matches( BSON( "a" << 11 ), NULL ) );
-        ASSERT( norOp.matches( BSON( "a" << 5 ), NULL ) );
-        ASSERT( !norOp.matches( BSON( "b" << 100 ), NULL ) );
-        ASSERT( norOp.matches( BSON( "b" << 101 ), NULL ) );
-        ASSERT( norOp.matches( BSONObj(), NULL ) );
-        ASSERT( !norOp.matches( BSON( "a" << 11 << "b" << 100 ), NULL ) );
+        ASSERT( !norOp.matchesBSON( BSON( "a" << -1 ), NULL ) );
+        ASSERT( !norOp.matchesBSON( BSON( "a" << 11 ), NULL ) );
+        ASSERT( norOp.matchesBSON( BSON( "a" << 5 ), NULL ) );
+        ASSERT( !norOp.matchesBSON( BSON( "b" << 100 ), NULL ) );
+        ASSERT( norOp.matchesBSON( BSON( "b" << 101 ), NULL ) );
+        ASSERT( norOp.matchesBSON( BSONObj(), NULL ) );
+        ASSERT( !norOp.matchesBSON( BSON( "a" << 11 << "b" << 100 ), NULL ) );
     }
 
     TEST( NorOp, ElemMatchKey ) {
@@ -503,12 +503,12 @@ namespace mongo {
 
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !norOp.matches( BSON( "a" << 1 ), &details ) );
+        ASSERT( !norOp.matchesBSON( BSON( "a" << 1 ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( !norOp.matches( BSON( "a" << BSON_ARRAY( 1 ) << "b" << BSON_ARRAY( 10 ) ),
+        ASSERT( !norOp.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) << "b" << BSON_ARRAY( 10 ) ),
                                 &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( norOp.matches( BSON( "a" << BSON_ARRAY( 3 ) << "b" << BSON_ARRAY( 4 ) ),
+        ASSERT( norOp.matchesBSON( BSON( "a" << BSON_ARRAY( 3 ) << "b" << BSON_ARRAY( 4 ) ),
                                &details ) );
         // The elem match key feature is not implemented for $nor.
         ASSERT( !details.hasElemMatchKey() );

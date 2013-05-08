@@ -33,10 +33,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "y" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "y" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "y" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "y" << 1 ) ) );
     }
 
     TEST( MatchExpressionParserTreeTest, OREmbedded ) {
@@ -46,10 +46,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query2 );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "y" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "y" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "y" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "y" << 1 ) ) );
     }
 
 
@@ -59,12 +59,12 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "y" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "y" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 1 << "y" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 2 << "y" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "y" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "y" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 << "y" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 << "y" << 2 ) ) );
     }
 
     TEST( MatchExpressionParserTreeTest, NOREmbedded ) {
@@ -73,10 +73,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "y" << 2 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 3 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "y" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "y" << 2 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "y" << 1 ) ) );
     }
 
     TEST( MatchExpressionParserTreeTest, NOT1 ) {
@@ -84,8 +84,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 8 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 8 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, NotRegex1 ) {
@@ -95,9 +95,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << "abc" ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << "ABC" ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << "AC" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
     }
 
 }

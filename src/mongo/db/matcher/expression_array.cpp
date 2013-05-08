@@ -33,13 +33,13 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AllMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool AllMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         FieldRef path;
         path.parse(_path);
 
         bool traversedArray = false;
         int32_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray( doc, path, &idxPath, &traversedArray );
+        BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
         string rest = pathToString( path, idxPath+1 );
 
@@ -129,14 +129,14 @@ namespace mongo {
 
     // -------
 
-    bool ArrayMatchingMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool ArrayMatchingMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
 
         FieldRef path;
         path.parse(_path);
 
         bool traversedArray = false;
         int32_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray( doc, path, &idxPath, &traversedArray );
+        BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
         string rest = pathToString( path, idxPath+1 );
 
@@ -214,7 +214,7 @@ namespace mongo {
             BSONElement inner = i.next();
             if ( !inner.isABSONObj() )
                 continue;
-            if ( _sub->matches( inner.Obj(), NULL ) ) {
+            if ( _sub->matchesBSON( inner.Obj(), NULL ) ) {
                 if ( details && details->needRecord() ) {
                     details->setElemMatchKey( inner.fieldName() );
                 }
@@ -306,9 +306,9 @@ namespace mongo {
         _list.push_back( expr );
     }
 
-    bool AllElemMatchOp::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool AllElemMatchOp::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         BSONElementSet all;
-        doc.getFieldsDotted( _path, all, false );
+        doc->getFieldsDotted( _path, all, false );
 
         for ( BSONElementSet::const_iterator i = all.begin(); i != all.end(); ++i ) {
             BSONElement sub = *i;

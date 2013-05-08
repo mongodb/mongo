@@ -21,6 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
@@ -58,7 +59,9 @@ namespace mongo {
          * determins if the doc matches the expression
          * there could be an expression that looks at fields, or the entire doc
          */
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const = 0;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const = 0;
+
+        virtual bool matchesBSON( const BSONObj& doc, MatchDetails* details = 0 ) const;
 
         /**
          * does the element match the expression
@@ -92,7 +95,7 @@ namespace mongo {
     public:
         AtomicMatchExpression() : MatchExpression( SPECIAL, ATOMIC ){}
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const {
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const {
             return true;
         }
 

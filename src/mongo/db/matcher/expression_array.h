@@ -46,7 +46,7 @@ namespace mongo {
         Status init( const StringData& path );
         ArrayFilterEntries* getArrayFilterEntries() { return &_arrayEntries; }
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
@@ -67,7 +67,7 @@ namespace mongo {
         ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( ARRAY, matchType ){}
         virtual ~ArrayMatchingMatchExpression(){}
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
 
         /**
          * @param e - has to be an array.  calls matchesArray with e as an array
@@ -133,7 +133,7 @@ namespace mongo {
         Status init( const StringData& path );
         void add( const ArrayMatchingMatchExpression* expr );
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
 
         /**
          * @param e has to be an array
