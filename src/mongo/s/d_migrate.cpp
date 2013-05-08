@@ -217,9 +217,9 @@ namespace mongo {
                     return;
                 }
 
-                IndexChunk chunk( ns, min, max, indexKeyPattern );
+                KeyRange range( ns, min, max, indexKeyPattern );
                 long long numDeleted =
-                        Helpers::removeRange( chunk,
+                        Helpers::removeRange( range,
                                               false, /*maxInclusive*/
                                               secondaryThrottle,
                                               cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -1655,8 +1655,8 @@ namespace mongo {
 
                 // 2. delete any data already in range
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                IndexChunk chunk( ns, min, max, indexKeyPattern );
-                long long num = Helpers::removeRange( chunk,
+                KeyRange range( ns, min, max, indexKeyPattern );
+                long long num = Helpers::removeRange( range,
                                                       false, /*maxInclusive*/
                                                       secondaryThrottle, /* secondaryThrottle */
                                                       cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -1882,8 +1882,8 @@ namespace mongo {
                     BSONObj idIndexPattern = Helpers::inferKeyPattern( id );
 
                     // TODO: create a better interface to remove objects directly
-                    IndexChunk chunk( ns, id, id, idIndexPattern );
-                    Helpers::removeRange( chunk ,
+                    KeyRange range( ns, id, id, idIndexPattern );
+                    Helpers::removeRange( range ,
                                           true , /*maxInclusive*/
                                           false , /* secondaryThrottle */
                                           cmdLine.moveParanoia ? &rs : 0 , /*callback*/

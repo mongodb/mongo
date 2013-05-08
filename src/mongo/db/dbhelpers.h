@@ -22,6 +22,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/s/range_arithmetic.h"
 
 namespace mongo {
 
@@ -141,12 +142,16 @@ namespace mongo {
          * Does oplog the individual document deletions.
          * // TODO: Refactor this mechanism, it is growing too large
          */
-        static long long removeRange( const IndexChunk& chunk,
+        static long long removeRange( const KeyRange& range,
                                       bool maxInclusive = false,
                                       bool secondaryThrottle = false,
                                       RemoveCallback * callback = 0,
                                       bool fromMigrate = false,
                                       bool onlyRemoveOrphanedDocs = false );
+
+
+        // TODO: This will supersede Chunk::MaxObjectsPerChunk
+        static const long long kMaxDocsPerChunk;
 
         /**
          * Get sorted disklocs that belong to a range of a namespace defined over an index
@@ -164,7 +169,7 @@ namespace mongo {
          * @return IndexNotFound if the index pattern doesn't match any indexes
          * @return InvalidLength if the estimated size exceeds maxChunkSizeBytes
          */
-        static Status getLocsInRange( const IndexChunk& chunk,
+        static Status getLocsInRange( const KeyRange& range,
                                       long long maxChunkSizeBytes,
                                       set<DiskLoc>* locs,
                                       long long* numDocs,
@@ -195,45 +200,5 @@ namespace mongo {
         ofstream* _out;
 
     };
-
-    //
-    // Useful structs
-    //
-
-    // Make the distinction explicit between ShardKeyPatterns (for sharding) and
-    // (Index)KeyPatterns for indices.
-    typedef KeyPattern IndexKeyPattern;
-
-    /**
-     * An IndexChunk represents a range over a namespace, qualified by an index pattern over
-     * which the range is calculated.
-     */
-    struct IndexChunk {
-
-        // TODO: This will supersede Chunk::MaxObjectsPerChunk
-        static const long long kMaxDocsPerChunk;
-
-        IndexChunk( const std::string& ns_,
-                    const BSONObj& min_,
-                    const BSONObj& max_,
-                    const IndexKeyPattern& keyPattern_ ) :
-                ns( ns_ ), min( min_ ), max( max_ ), keyPattern( keyPattern_ )
-        {
-        }
-
-        IndexChunk( const std::string& ns_,
-                    const BSONObj& min_,
-                    const BSONObj& max_,
-                    const BSONObj& keyPattern_ ) :
-                ns( ns_ ), min( min_ ), max( max_ ), keyPattern( keyPattern_ )
-        {
-        }
-
-        std::string ns;
-        BSONObj min;
-        BSONObj max;
-        IndexKeyPattern keyPattern;
-    };
-
 
 } // namespace mongo
