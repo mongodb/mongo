@@ -336,7 +336,7 @@ namespace mongo {
             _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
-        logOpForSharding( opstr , ns , obj , patt , fullObj );
+        logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
     }
 
     void createOplog() {

@@ -420,6 +420,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/btree_stats.cpp",
                     "db/clientcursor.cpp",
                     "db/tests.cpp",
+                    "db/range_deleter_db_env.cpp",
+                    "db/range_deleter_service.cpp",
                     "db/repl/repl_start.cpp",
                     "db/repl/rs.cpp",
                     "db/repl/consensus.cpp",
@@ -652,6 +654,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "geoparser",
                            "geoquery",
                            "index_set",
+                           '$BUILD_DIR/mongo/s/range_deleter',
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.

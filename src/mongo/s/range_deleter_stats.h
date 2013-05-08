@@ -56,6 +56,9 @@ namespace mongo {
          */
         BSONObj toBSON() const;
 
+        // Returns the current number of active and pending deletes.
+        int getCurrentDeletes() const;
+
         //
         // Setters - Should be holding mutex passed to
         // the constructor when calling these methods.

@@ -137,6 +137,8 @@ namespace mongo {
          *
          * Caller must hold a write lock on 'ns'
          *
+         * Returns -1 when no usable index exists
+         *
          * Does oplog the individual document deletions.
          * // TODO: Refactor this mechanism, it is growing too large
          */

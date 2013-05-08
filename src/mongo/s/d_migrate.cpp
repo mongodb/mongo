@@ -47,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
@@ -55,6 +56,8 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/field_parser.h"
+#include "mongo/s/range_deleter_stats.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/assert_util.h"
@@ -67,27 +70,6 @@
 using namespace std;
 
 namespace mongo {
-
-    bool findShardKeyIndexPattern_locked( const string& ns,
-                                          const BSONObj& shardKeyPattern,
-                                          BSONObj* indexPattern ) {
-        verify( Lock::isLocked() );
-        NamespaceDetails* nsd = nsdetails( ns );
-        if ( !nsd )
-            return false;
-        const IndexDetails* idx = nsd->findIndexByPrefix( shardKeyPattern , true );  /* require single key */
-        if ( !idx )
-            return false;
-        *indexPattern = idx->keyPattern().getOwned();
-        return true;
-    }
-
-    bool findShardKeyIndexPattern_unlocked( const string& ns,
-                                            const BSONObj& shardKeyPattern,
-                                            BSONObj* indexPattern ) {
-        Client::ReadContext context( ns );
-        return findShardKeyIndexPattern_locked( ns, shardKeyPattern, indexPattern );
-    }
 
     Tee* migrateLog = new RamLog( "migrate" );
 
@@ -174,81 +156,6 @@ namespace mongo {
 
     };
 
-    struct OldDataCleanup {
-        static AtomicUInt _numThreads; // how many threads are doing async cleanup
-
-        bool secondaryThrottle;
-        string ns;
-        BSONObj min;
-        BSONObj max;
-        BSONObj shardKeyPattern;
-        set<CursorId> initial;
-
-        OldDataCleanup(){
-            _numThreads++;
-        }
-        OldDataCleanup( const OldDataCleanup& other ) {
-            secondaryThrottle = other.secondaryThrottle;
-            ns = other.ns;
-            min = other.min.getOwned();
-            max = other.max.getOwned();
-            shardKeyPattern = other.shardKeyPattern.getOwned();
-            initial = other.initial;
-            _numThreads++;
-        }
-        ~OldDataCleanup(){
-            _numThreads--;
-        }
-
-        string toString() const {
-            return str::stream() << ns << " from " << min << " -> " << max;
-        }
-
-        void doRemove() {
-            ShardForceVersionOkModeBlock sf;
-            {
-                RemoveSaver rs("moveChunk",ns,"post-cleanup");
-
-                log() << "moveChunk starting delete for: " << this->toString() << migrateLog;
-
-                BSONObj indexKeyPattern;
-                if ( !findShardKeyIndexPattern_unlocked( ns, shardKeyPattern, &indexKeyPattern ) ) {
-                    warning() << "collection or index dropped before data could be cleaned" << endl;
-                    return;
-                }
-
-                KeyRange range( ns, min, max, indexKeyPattern );
-                long long numDeleted =
-                        Helpers::removeRange( range,
-                                              false, /*maxInclusive*/
-                                              secondaryThrottle,
-                                              cmdLine.moveParanoia ? &rs : 0, /*callback*/
-                                              true, /*fromMigrate*/
-                                              true ); /*onlyRemoveOrphans*/ 
-
-                log() << "moveChunk deleted " << numDeleted << " documents for "
-                      << this->toString() << migrateLog;
-            }
-
-            ReplTime lastOpApplied = cc().getLastOp().asDate();
-            Timer t;
-            for ( int i=0; i<3600; i++ ) {
-                if ( opReplicatedEnough( lastOpApplied , ( getSlaveCount() / 2 ) + 1 ) ) {
-                    LOG(t.seconds() < 30 ? 1 : 0) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
-                    return;
-                }
-                sleepsecs(1);
-            }
-            
-            warning() << "moveChunk repl sync timed out after " << t.seconds() << " seconds" << migrateLog;
-        }
-
-    };
-
-    AtomicUInt OldDataCleanup::_numThreads = 0;
-
-    static const char * const cleanUpThreadName = "cleanupOldData";
-
     class ChunkCommandHelper : public Command {
     public:
         ChunkCommandHelper( const char * name )
@@ -277,8 +184,7 @@ namespace mongo {
     class MigrateFromStatus {
     public:
 
-        MigrateFromStatus() : _mutex("MigrateFromStatus"),
-			      _cleanupTickets(1) /* only one cleanup thread at once */ {
+        MigrateFromStatus() : _mutex("MigrateFromStatus") {
             _active = false;
             _inCriticalSection = false;
             _memoryUsed = 0;
@@ -337,7 +243,11 @@ namespace mongo {
             _inCriticalSectionCV.notify_all();
         }
 
-        void logOp( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ) {
+        void logOp(const char* opstr,
+                   const char* ns,
+                   const BSONObj& obj,
+                   BSONObj* patt,
+                   bool notInActiveChunk) {
             if ( ! _getActive() )
                 return;
 
@@ -368,7 +278,7 @@ namespace mongo {
 
             case 'd': {
 
-                if (getThreadName().find(cleanUpThreadName) == 0) {
+                if (notInActiveChunk) {
                     // we don't want to xfer things we're cleaning
                     // as then they'll be deleted on TO
                     // which is bad
@@ -668,15 +578,6 @@ namespace mongo {
         }
 
         bool isActive() const { return _getActive(); }
-        
-        void doRemove( OldDataCleanup& cleanup ) {
-
-            log() << "waiting to remove documents for " << cleanup.toString() << endl;
-
-            ScopedTicket ticket(&_cleanupTickets);
-
-            cleanup.doRemove();
-        }
 
     private:
         mutable mongo::mutex _mutex; // protect _inCriticalSection and _active
@@ -704,9 +605,6 @@ namespace mongo {
         list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
         long long _memoryUsed; // bytes in _reload + _deleted
 
-        // this is used to make sure only a certain number of threads are doing cleanup at once.
-        mutable TicketHolder _cleanupTickets;
-
         bool _getActive() const { scoped_lock l(_mutex); return _active; }
         void _setActive( bool b ) { scoped_lock l(_mutex); _active = b; }
 
@@ -733,73 +631,14 @@ namespace mongo {
         bool _isAnotherMigrationActive;
     };
 
-    void _cleanupOldData( OldDataCleanup cleanup ) {
-
-        Client::initThread((string(cleanUpThreadName) + string("-") +
-                                                        OID::gen().toString()).c_str());
-
-        if (AuthorizationManager::isAuthEnabled()) {
-            cc().getAuthorizationManager()->grantInternalAuthorization("_cleanupOldData");
-        }
-
-        log() << " (start) waiting to cleanup " << cleanup
-              << ", # cursors remaining: " << cleanup.initial.size() << migrateLog;
-
-        int loops = 0;
-        Timer t;
-        while ( t.seconds() < 900 ) { // 15 minutes
-            verify( !Lock::isLocked() );
-            sleepmillis( 20 );
-
-            set<CursorId> now;
-            ClientCursor::find( cleanup.ns , now );
-
-            set<CursorId> left;
-            for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                CursorId id = *i;
-                if ( now.count(id) )
-                    left.insert( id );
-            }
-
-            if ( left.size() == 0 )
-                break;
-            cleanup.initial = left;
-
-            if ( ( loops++ % 200 ) == 0 ) {
-                log() << " (looping " << loops << ") waiting to cleanup " << cleanup.ns << " from " << cleanup.min << " -> " << cleanup.max << "  # cursors:" << cleanup.initial.size() << migrateLog;
-
-                stringstream ss;
-                for ( set<CursorId>::iterator i=cleanup.initial.begin(); i!=cleanup.initial.end(); ++i ) {
-                    CursorId id = *i;
-                    ss << id << " ";
-                }
-                log() << " cursors: " << ss.str() << migrateLog;
-            }
-        }
-
-        migrateFromStatus.doRemove( cleanup );
-
-        cc().shutdown();
-    }
-
-    void cleanupOldData( OldDataCleanup cleanup ) {
-        try {
-            _cleanupOldData( cleanup );
-        }
-        catch ( std::exception& e ) {
-            log() << " error cleaning old data:" << e.what() << migrateLog;
-        }
-        catch ( ... ) {
-            log() << " unknown error cleaning old data" << migrateLog;
-        }
-    }
-
-    void logOpForSharding( const char * opstr,
-                           const char * ns,
-                           const BSONObj& obj,
-                           BSONObj * patt,
-                           const BSONObj* fullObj ) {
-        migrateFromStatus.logOp( opstr , ns , obj , patt /*, fullObj TODO */ );
+    void logOpForSharding(const char * opstr,
+                          const char * ns,
+                          const BSONObj& obj,
+                          BSONObj * patt,
+                          const BSONObj* fullObj,
+                          bool notInActiveChunk) {
+        // TODO: include fullObj?
+        migrateFromStatus.logOp(opstr, ns, obj, patt, notInActiveChunk);
     }
 
     void aboutToDeleteForSharding( const StringData& ns,
@@ -1500,25 +1339,35 @@ namespace mongo {
             migrateFromStatus.done();
             timing.done(5);
 
-            {
-                // 6.
-                OldDataCleanup c;
-                c.secondaryThrottle = secondaryThrottle;
-                c.ns = ns;
-                c.min = min.getOwned();
-                c.max = max.getOwned();
-                c.shardKeyPattern = shardKeyPattern.getOwned();
-                ClientCursor::find( ns , c.initial );
+            // 6.
+            RangeDeleter* deleter = getDeleter();
+            if (waitForDelete) {
+                log() << "doing delete inline for cleanup of chunk data" << migrateLog;
 
-                if (!waitForDelete) {
-                    // 7.
-                    log() << "forking for cleanup of chunk data" << migrateLog;
-                    boost::thread t( boost::bind( &cleanupOldData , c ) );
+                string errMsg;
+                // This is an immediate delete, and as a consequence, there could be more
+                // deletes happening simultaneously than there are deleter worker threads.
+                if (!deleter->deleteNow(ns,
+                                        min.getOwned(),
+                                        max.getOwned(),
+                                        shardKeyPattern.getOwned(),
+                                        secondaryThrottle,
+                                        &errMsg)) {
+                    log() << "Error occured while performing cleanup: " << errMsg << endl;
                 }
-                else {
-                    // 7.
-                    log() << "doing delete inline for cleanup of chunk data" << migrateLog;
-                    c.doRemove();
+            }
+            else {
+                log() << "forking for cleanup of chunk data" << migrateLog;
+
+                string errMsg;
+                if (!deleter->queueDelete(ns,
+                                          min.getOwned(),
+                                          max.getOwned(),
+                                          shardKeyPattern.getOwned(),
+                                          secondaryThrottle,
+                                          NULL, // Don't want to be notified.
+                                          &errMsg)) {
+                    log() << "could not queue migration cleanup: " << errMsg << endl;
                 }
             }
             timing.done(6);
@@ -1647,23 +1496,22 @@ namespace mongo {
             }
 
             {
+                // 2. delete any data already in range
+                RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
+                KeyRange range( ns, min, max, shardKeyPattern );
+                long long num = Helpers::removeRange( range,
+                                                      false, /*maxInclusive*/
+                                                      secondaryThrottle, /* secondaryThrottle */
+                                                      cmdLine.moveParanoia ? &rs : 0, /*callback*/
+                                                      true ); /* flag fromMigrate in oplog */
 
-                BSONObj indexKeyPattern;
-                if ( !findShardKeyIndexPattern_unlocked( ns, shardKeyPattern, &indexKeyPattern ) ) {
+                if (num < 0) {
                     errmsg = "collection or index dropped during migrate";
                     warning() << errmsg << endl;
                     state = FAIL;
                     return;
                 }
 
-                // 2. delete any data already in range
-                RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                KeyRange range( ns, min, max, indexKeyPattern );
-                long long num = Helpers::removeRange( range,
-                                                      false, /*maxInclusive*/
-                                                      secondaryThrottle, /* secondaryThrottle */
-                                                      cmdLine.moveParanoia ? &rs : 0, /*callback*/
-                                                      true ); /* flag fromMigrate in oplog */
                 if ( num )
                     warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
 
@@ -2049,12 +1897,12 @@ namespace mongo {
                 errmsg = "migrate already in progress";
                 return false;
             }
-            
-            if ( OldDataCleanup::_numThreads > 0 ) {
-                errmsg = 
-                    str::stream() 
-                    << "still waiting for a previous migrates data to get cleaned, can't accept new chunks, num threads: " 
-                    << OldDataCleanup::_numThreads;
+
+            int numDeletes = getDeleter()->getStats()->getCurrentDeletes();
+            if (numDeletes > 0) {
+                errmsg = str::stream() << "can't accept new chunks because "
+                        << " there are still " << numDeletes
+                        << " deletes from previous migration";
                 return false;
             }
 

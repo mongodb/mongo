@@ -31,4 +31,13 @@ namespace mongo {
 
         return builder.obj();
     }
+
+    // Note: If we ever to decide to expose the other individual stats as well, we have
+    // to remind the caller that calling them individually is never guaranteed to have a
+    // consistent view of the stats. So toBSON should be used instead if the caller needs
+    // a snapshot view of the state on more than one property.
+    int RangeDeleterStats::getCurrentDeletes() const {
+        scoped_lock sl(*_lockPtr);
+        return _totalDeletes;
+    }
 }
