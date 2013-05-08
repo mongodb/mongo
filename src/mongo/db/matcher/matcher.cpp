@@ -57,7 +57,7 @@ namespace mongo {
 
     BSONElement IndexKeyMatchableDocument::_getElement( const FieldRef& path ) const {
         BSONObjIterator patternIterator( _pattern );
-        BSONObjIterator docIterator( _pattern );
+        BSONObjIterator docIterator( _doc );
 
         while ( patternIterator.more() ) {
             BSONElement patternElement = patternIterator.next();
@@ -229,11 +229,11 @@ namespace mongo {
         switch ( full->matchType() ) {
         case MatchExpression::NOT:
         case MatchExpression::NOR:
+        case MatchExpression::OR:
             // maybe?
             return NULL;
 
-        case MatchExpression::AND:
-        case MatchExpression::OR: {
+        case MatchExpression::AND: {
             auto_ptr<ListOfMatchExpression> dup;
             for ( unsigned i = 0; i < full->numChildren(); i++ ) {
                 MatchExpression* sub = _spliceForIndex( keys, full->getChild( i ) );

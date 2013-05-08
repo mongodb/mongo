@@ -31,6 +31,10 @@
 namespace mongo {
 
     Status MatchExpressionParser::_parseTreeList( const BSONObj& arr, ListOfMatchExpression* out ) {
+        if ( arr.isEmpty() )
+            return Status( ErrorCodes::BadValue,
+                           "$and/$or/$nor must be a nonempty array" );
+
         BSONObjIterator i( arr );
         while ( i.more() ) {
             BSONElement e = i.next();

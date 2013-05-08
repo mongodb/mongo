@@ -230,6 +230,7 @@ namespace mongo {
         switch (e.type()) {
         case String:
         case Symbol:
+            // TODO
             //if (rm._prefix.empty())
                 return _re->PartialMatch(e.valuestr());
                 //else
