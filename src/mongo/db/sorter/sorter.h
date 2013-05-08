@@ -83,11 +83,29 @@ namespace mongo {
         unsigned long long limit; /// number of KV pairs to be returned. 0 for no limit.
         size_t maxMemoryUsageBytes; /// Approximate.
         bool extSortAllowed; /// If false, uassert if more mem needed than allowed.
+
         SortOptions()
             : limit(0)
             , maxMemoryUsageBytes(64*1024*1024)
             , extSortAllowed(false)
         {}
+
+        /// Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
+
+        SortOptions& Limit(unsigned long long newLimit) {
+            limit = newLimit;
+            return *this;
+        }
+
+        SortOptions& MaxMemoryUsageBytes(size_t newMaxMemoryUsageBytes) {
+            maxMemoryUsageBytes = newMaxMemoryUsageBytes;
+            return *this;
+        }
+
+        SortOptions& ExtSortAllowed(bool newExtSortAllowed=true) {
+            extSortAllowed = newExtSortAllowed;
+            return *this;
+        }
     };
 
     /// This is the output from the sorting framework

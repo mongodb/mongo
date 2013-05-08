@@ -66,15 +66,10 @@ namespace mongo {
     BSONObjExternalSorter::BSONObjExternalSorter(const ExternalSortComparison* comp,
                                                  long maxFileSize)
         : _mayInterrupt(boost::make_shared<bool>(false))
-    {
-        SortOptions opts;
-        opts.maxMemoryUsageBytes = maxFileSize;
-        opts.extSortAllowed = true;
-
-        OldExtSortComparator compForSorter (comp, _mayInterrupt);
-        _sorter.reset(Sorter<BSONObj, DiskLoc>::make(opts, compForSorter));
-    }
-
+        , _sorter(Sorter<BSONObj, DiskLoc>::make(
+                    SortOptions().ExtSortAllowed().MaxMemoryUsageBytes(maxFileSize),
+                    OldExtSortComparator(comp, _mayInterrupt)))
+    {}
 }
 
 #include "mongo/db/sorter/sorter.cpp"
