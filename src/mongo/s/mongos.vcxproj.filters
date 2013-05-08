@@ -3346,6 +3346,9 @@
     <ClInclude Include="..\db\matcher\expression_geo.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\safe_num-inl.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\base\error_codes.err">
