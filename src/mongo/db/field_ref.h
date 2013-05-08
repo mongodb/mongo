@@ -88,6 +88,11 @@ namespace mongo {
          */
         size_t numReplaced() const;
 
+        /**
+         * compares the full dotted path represented by this FieldRef to other
+         */
+        bool equalsDottedField( const StringData& other ) const;
+
     private:
         // Dotted fields are most often not longer than three parts. We use a mixed structure
         // here that will not require any extra memory allocation when that is the case. And

@@ -139,4 +139,22 @@ namespace {
         ASSERT_EQUALS(fieldRef.numReplaced(), 1U);
     }
 
+    TEST(Equality, Simple1 ) {
+        FieldRef a;
+        a.parse( "a.b" );
+        ASSERT( a.equalsDottedField( "a.b" ) );
+        ASSERT( !a.equalsDottedField( "a" ) );
+        ASSERT( !a.equalsDottedField( "b" ) );
+        ASSERT( !a.equalsDottedField( "a.b.c" ) );
+    }
+
+    TEST(Equality, Simple2 ) {
+        FieldRef a;
+        a.parse( "a" );
+        ASSERT( !a.equalsDottedField( "a.b" ) );
+        ASSERT( a.equalsDottedField( "a" ) );
+        ASSERT( !a.equalsDottedField( "b" ) );
+        ASSERT( !a.equalsDottedField( "a.b.c" ) );
+    }
+
 } // namespace mongo
