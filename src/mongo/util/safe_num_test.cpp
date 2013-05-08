@@ -190,9 +190,9 @@ namespace {
     }
 
     TEST(BitAnd, 32and32) {
-        const SafeNum val1(static_cast<int>(0xE0F1));
-        const SafeNum val2(static_cast<int>(0xDF01));
-        const SafeNum expected(static_cast<int>(0xC001));
+        const SafeNum val1(static_cast<int>(0xE0F1U));
+        const SafeNum val2(static_cast<int>(0xDF01U));
+        const SafeNum expected(static_cast<int>(0xC001U));
         const SafeNum result = val1 & val2;
         ASSERT_EQUALS(mongo::NumberInt, result.type());
 
@@ -200,18 +200,18 @@ namespace {
     }
 
     TEST(BitAnd, 64and64) {
-        const SafeNum val1(static_cast<long long>(0xE0F1E0F1E0F1));
-        const SafeNum val2(static_cast<long long>(0xDF01DF01DF01));
-        const SafeNum expected(static_cast<long long>(0xC001C001C001));
+        const SafeNum val1(static_cast<long long>(0xE0F1E0F1E0F1ULL));
+        const SafeNum val2(static_cast<long long>(0xDF01DF01DF01ULL));
+        const SafeNum expected(static_cast<long long>(0xC001C001C001ULL));
         const SafeNum result = val1 & val2;
         ASSERT_EQUALS(mongo::NumberLong, result.type());
         ASSERT_TRUE(expected.isIdentical(result));
     }
 
     TEST(BitAnd, MixedSize) {
-        const SafeNum val_small(static_cast<int>(0xE0F1));
-        const SafeNum val_big(static_cast<long long>(0xDF01));
-        const SafeNum expected(static_cast<long long>(0xC001));
+        const SafeNum val_small(static_cast<int>(0xE0F1U));
+        const SafeNum val_big(static_cast<long long>(0xDF01U));
+        const SafeNum expected(static_cast<long long>(0xC001U));
         const SafeNum result_s_b = val_small & val_big;
         const SafeNum result_b_s = val_big & val_small;
 
@@ -234,27 +234,27 @@ namespace {
     }
 
     TEST(BitOr, 32and32) {
-        const SafeNum val1(static_cast<int>(0xE0F1));
-        const SafeNum val2(static_cast<int>(0xDF01));
+        const SafeNum val1(static_cast<int>(0xE0F1U));
+        const SafeNum val2(static_cast<int>(0xDF01U));
         const SafeNum result = val1 | val2;
-        const SafeNum expected(static_cast<int>(0xFFF1));
+        const SafeNum expected(static_cast<int>(0xFFF1U));
         ASSERT_EQUALS(mongo::NumberInt, result.type());
         ASSERT_TRUE(expected.isIdentical(result));
     }
 
     TEST(BitOr, 64and64) {
-        const SafeNum val1(static_cast<long long>(0xE0F1E0F1E0F1));
-        const SafeNum val2(static_cast<long long>(0xDF01DF01DF01));
+        const SafeNum val1(static_cast<long long>(0xE0F1E0F1E0F1ULL));
+        const SafeNum val2(static_cast<long long>(0xDF01DF01DF01ULL));
         const SafeNum result = val1 | val2;
-        const SafeNum expected(static_cast<long long>(0xFFF1FFF1FFF1));
+        const SafeNum expected(static_cast<long long>(0xFFF1FFF1FFF1ULL));
         ASSERT_EQUALS(mongo::NumberLong, result.type());
         ASSERT_TRUE(expected.isIdentical(result));
     }
 
     TEST(BitOr, MixedSize) {
-        const SafeNum val_small(static_cast<int>(0xE0F1));
-        const SafeNum val_big(static_cast<long long>(0xDF01));
-        const SafeNum expected(static_cast<long long>(0xFFF1));
+        const SafeNum val_small(static_cast<int>(0xE0F1U));
+        const SafeNum val_big(static_cast<long long>(0xDF01U));
+        const SafeNum expected(static_cast<long long>(0xFFF1U));
         const SafeNum result_s_b = val_small | val_big;
         const SafeNum result_b_s = val_big | val_small;
 
