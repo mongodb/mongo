@@ -378,11 +378,7 @@ namespace replset {
             Timer batchTimer;
             int lastTimeChecked = 0;
 
-            // always fetch a few ops first
-            // tryPopAndWaitForMore returns true when we need to end a batch early
-            while (!tryPopAndWaitForMore(&ops) && 
-                   (ops.getSize() < replBatchLimitBytes)) {
-
+            do {
                 if (theReplSet->isPrimary()) {
                     massert(16620, "there are ops to sync, but I'm primary", ops.empty());
                     return;
@@ -398,6 +394,8 @@ namespace replset {
                         break;
                 }
                 // occasionally check some things
+                // (always checked in the first iteration of this do-while loop, because
+                // ops is empty)
                 if (ops.empty() || now > lastTimeChecked) {
                     lastTimeChecked = now;
                     // can we become secondary?
@@ -435,7 +433,10 @@ namespace replset {
                         break;
                     }
                 }
-            }
+                // keep fetching more ops as long as we haven't filled up a full batch yet
+            } while (!tryPopAndWaitForMore(&ops) && // tryPopAndWaitForMore returns true 
+                                                    // when we need to end a batch early
+                   (ops.getSize() < replBatchLimitBytes));
 
             // For pausing replication in tests
             while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
