@@ -1211,13 +1211,17 @@ namespace mutablebson {
         ConstElement thisIter = leftChild();
         ConstElement otherIter = other.leftChild();
 
+        const bool considerChildFieldNames =
+            (impl.getType(thisRep) != mongo::Array) &&
+            (impl.getType(otherRep) != mongo::Array);
+
         while (true) {
             if (!thisIter.ok())
                 return !otherIter.ok() ? 0 : -1;
             if (!otherIter.ok())
                 return 1;
 
-            const int result = thisIter.compareWithElement(otherIter, considerFieldName);
+            const int result = thisIter.compareWithElement(otherIter, considerChildFieldNames);
             if (result != 0)
                 return result;
 
@@ -1259,7 +1263,11 @@ namespace mutablebson {
                 return fnamesComp;
         }
 
-        return compareWithBSONObj(other.Obj(), considerFieldName);
+        const bool considerChildFieldNames =
+            (impl.getType(thisRep) != mongo::Array) &&
+            (other.type() != mongo::Array);
+
+        return compareWithBSONObj(other.Obj(), considerChildFieldNames);
     }
 
     int Element::compareWithBSONObj(const BSONObj& other, bool considerFieldName) const {
