@@ -35,7 +35,7 @@ namespace mongo {
 
 
     BSONElement BSONMatchableDocument::getFieldDottedOrArray( const FieldRef& path,
-                                                              int32_t* idxPath,
+                                                              size_t* idxPath,
                                                               bool* inArray ) const {
         return mongo::getFieldDottedOrArray( _obj, path, idxPath, inArray );
     }

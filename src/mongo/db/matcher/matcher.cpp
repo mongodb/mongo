@@ -39,7 +39,7 @@ namespace mongo {
         }
 
         virtual BSONElement getFieldDottedOrArray( const FieldRef& path,
-                                                   int32_t* idxPath,
+                                                   size_t* idxPath,
                                                    bool* inArray ) const;
 
         virtual void getFieldsDotted( const StringData& name,
@@ -74,7 +74,7 @@ namespace mongo {
 
 
     BSONElement IndexKeyMatchableDocument::getFieldDottedOrArray( const FieldRef& path,
-                                                                  int32_t* idxPath,
+                                                                  size_t* idxPath,
                                                                   bool* inArray ) const {
         BSONElement res = _getElement( path );
         if ( !res.eoo() ) {
@@ -262,7 +262,7 @@ namespace mongo {
         case MatchExpression::MOD:
         case MatchExpression::MATCH_IN: {
             const LeafMatchExpression* lme = static_cast<const LeafMatchExpression*>( full );
-            if ( !keys.count( lme->getPath().toString() ) )
+            if ( !keys.count( lme->path().toString() ) )
                 return NULL;
             return lme->shallowClone();
         }

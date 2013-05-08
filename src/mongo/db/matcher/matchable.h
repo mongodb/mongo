@@ -30,7 +30,7 @@ namespace mongo {
         virtual BSONObj toBSON() const = 0;
 
         virtual BSONElement getFieldDottedOrArray( const FieldRef& path,
-                                                   int32_t* idxPath,
+                                                   size_t* idxPath,
                                                    bool* inArray ) const = 0;
 
         virtual void getFieldsDotted( const StringData& name,
@@ -47,7 +47,7 @@ namespace mongo {
         virtual BSONObj toBSON() const { return _obj; }
 
         virtual BSONElement getFieldDottedOrArray( const FieldRef& path,
-                                                   int32_t* idxPath,
+                                                   size_t* idxPath,
                                                    bool* inArray ) const;
 
         virtual void getFieldsDotted( const StringData& name,

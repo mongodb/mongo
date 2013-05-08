@@ -38,7 +38,7 @@ namespace mongo {
         path.parse(_path);
 
         bool traversedArray = false;
-        int32_t idxPath = 0;
+        size_t idxPath = 0;
         BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
         string rest = pathToString( path, idxPath+1 );
@@ -135,7 +135,7 @@ namespace mongo {
         path.parse(_path);
 
         bool traversedArray = false;
-        int32_t idxPath = 0;
+        size_t idxPath = 0;
         BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
         string rest = pathToString( path, idxPath+1 );

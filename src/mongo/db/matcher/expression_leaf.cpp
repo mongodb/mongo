@@ -27,17 +27,18 @@
 
 namespace mongo {
 
+    void LeafMatchExpression::initPath( const StringData& path ) {
+        _path = path;
+        _fieldRef.parse( _path );
+    }
+
+
     bool LeafMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         //log() << "e doc: " << doc << " path: " << _path << std::endl;
 
-        FieldRef path;
-        path.parse(_path);
-
         bool traversedArray = false;
-        int32_t idxPath = 0;
-        BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
-
-        string rest = pathToString( path, idxPath+1 );
+        size_t idxPath = 0;
+        BSONElement e = doc->getFieldDottedOrArray( _fieldRef, &idxPath, &traversedArray );
 
         if ( e.type() != Array || traversedArray ) {
             return matchesSingleElement( e );
@@ -47,10 +48,11 @@ namespace mongo {
         while ( i.more() ) {
             BSONElement x = i.next();
             bool found = false;
-            if ( rest.size() == 0 ) {
+            if ( idxPath + 1 == _fieldRef.numParts() ) {
                 found = matchesSingleElement( x );
             }
             else if ( x.isABSONObj() ) {
+                string rest = pathToString( _fieldRef, idxPath+1 ); // TODO: remove
                 BSONElement y = x.Obj().getField( rest );
                 found = matchesSingleElement( y );
             }
@@ -82,13 +84,13 @@ namespace mongo {
             static_cast<const ComparisonMatchExpression*>( other );
 
         return
-            _path == realOther->_path &&
+            path() == realOther->path() &&
             _rhs.valuesEqual( realOther->_rhs );
     }
 
 
     Status ComparisonMatchExpression::init( const StringData& path, const BSONElement& rhs ) {
-        _path = path;
+        initPath( path );
         _rhs = rhs;
         if ( rhs.eoo() ) {
             return Status( ErrorCodes::BadValue, "need a real operand" );
@@ -160,7 +162,7 @@ namespace mongo {
 
     void ComparisonMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " ";
+        debug << path() << " ";
         switch ( matchType() ) {
         case LT: debug << "$lt"; break;
         case LTE: debug << "$lte"; break;
@@ -199,7 +201,7 @@ namespace mongo {
 
         const RegexMatchExpression* realOther = static_cast<const RegexMatchExpression*>( other );
         return
-            _path == realOther->_path &&
+            path() == realOther->path() &&
             _regex == realOther->_regex
             && _flags == realOther->_flags;
     }
@@ -213,7 +215,7 @@ namespace mongo {
 
 
     Status RegexMatchExpression::init( const StringData& path, const StringData& regex, const StringData& options ) {
-        _path = path;
+        initPath( path );
 
         if ( regex.size() > MaxPatternSize ) {
             return Status( ErrorCodes::BadValue, "Regular expression is too long" );
@@ -244,13 +246,13 @@ namespace mongo {
 
     void RegexMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " regex /" << _regex << "/" << _flags << "\n";
+        debug << path() << " regex /" << _regex << "/" << _flags << "\n";
     }
 
     // ---------
 
     Status ModMatchExpression::init( const StringData& path, int divisor, int remainder ) {
-        _path = path;
+        initPath( path );
         if ( divisor == 0 )
             return Status( ErrorCodes::BadValue, "divisor cannot be 0" );
         _divisor = divisor;
@@ -266,7 +268,7 @@ namespace mongo {
 
     void ModMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " mod " << _divisor << " % x == "  << _remainder << "\n";
+        debug << path() << " mod " << _divisor << " % x == "  << _remainder << "\n";
     }
 
     bool ModMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -275,7 +277,7 @@ namespace mongo {
 
         const ModMatchExpression* realOther = static_cast<const ModMatchExpression*>( other );
         return
-            _path == realOther->_path &&
+            path() == realOther->path() &&
             _divisor == realOther->_divisor &&
             _remainder == realOther->_remainder;
     }
@@ -284,7 +286,7 @@ namespace mongo {
     // ------------------
 
     Status ExistsMatchExpression::init( const StringData& path, bool exists ) {
-        _path = path;
+        initPath( path );
         _exists = exists;
         return Status::OK();
     }
@@ -298,7 +300,7 @@ namespace mongo {
 
     void ExistsMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " exists: " << _exists << "\n";
+        debug << path() << " exists: " << _exists << "\n";
     }
 
     bool ExistsMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -306,7 +308,7 @@ namespace mongo {
             return false;
 
         const ExistsMatchExpression* realOther = static_cast<const ExistsMatchExpression*>( other );
-        return _path == realOther->_path && _exists == realOther->_exists;
+        return path() == realOther->path() && _exists == realOther->_exists;
     }
 
 
@@ -330,14 +332,14 @@ namespace mongo {
                                         const MatchableDocument* doc,
                                         MatchDetails* details ) const {
 
-        FieldRef pathRef;
-        pathRef.parse(path);
+        FieldRef fieldRef;
+        fieldRef.parse( path );
 
         bool traversedArray = false;
-        int32_t idxPath = 0;
-        BSONElement e = doc->getFieldDottedOrArray( pathRef, &idxPath, &traversedArray );
+        size_t idxPath = 0;
+        BSONElement e = doc->getFieldDottedOrArray( fieldRef, &idxPath, &traversedArray );
 
-        string rest = pathToString( pathRef, idxPath+1 );
+        string rest = pathToString( fieldRef, idxPath+1 );
 
         if ( e.type() != Array ) {
             return matchesSingleElement( e );
@@ -441,7 +443,7 @@ namespace mongo {
     // -----------
 
     void InMatchExpression::init( const StringData& path ) {
-        _path = path;
+        initPath( path );
         _allHaveToMatch = false;
     }
 
@@ -463,16 +465,16 @@ namespace mongo {
 
     void InMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " $in: TODO\n";
+        debug << path() << " $in: TODO\n";
     }
 
     bool InMatchExpression::equivalent( const MatchExpression* other ) const {
         if ( matchType() != other->matchType() )
             return false;
         const InMatchExpression* realOther = static_cast<const InMatchExpression*>( other );
-        log() << "yo: " << _path << " " << realOther->_path << std::endl;
+        log() << "yo: " << path() << " " << realOther->path() << std::endl;
         return
-            _path == realOther->_path &&
+            path() == realOther->path() &&
             _arrayEntries.equivalent( realOther->_arrayEntries );
     }
 
@@ -483,7 +485,7 @@ namespace mongo {
     }
 
     void InMatchExpression::copyTo( InMatchExpression* toFillIn ) const {
-        toFillIn->init( _path );
+        toFillIn->init( path() );
         _arrayEntries.copyTo( toFillIn->_arrayEntries );
     }
 
@@ -492,7 +494,7 @@ namespace mongo {
     // ----------
 
     void NinMatchExpression::init( const StringData& path ) {
-        _path = path;
+        initPath( path );
         _allHaveToMatch = true;
         _in.init( path );
     }
@@ -505,7 +507,7 @@ namespace mongo {
 
     void NinMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " $nin: TODO\n";
+        debug << path() << " $nin: TODO\n";
     }
 
     bool NinMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -518,7 +520,7 @@ namespace mongo {
 
     LeafMatchExpression* NinMatchExpression::shallowClone() const {
         NinMatchExpression* next = new NinMatchExpression();
-        next->init( _path );
+        next->init( path() );
         _in.copyTo( &next->_in );
         return next;
     }

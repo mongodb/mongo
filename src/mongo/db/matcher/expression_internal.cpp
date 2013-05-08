@@ -44,7 +44,7 @@ namespace mongo {
 
     BSONElement getFieldDottedOrArray( const BSONObj& doc,
                                        const FieldRef& path,
-                                       int32_t* idxPath,
+                                       size_t* idxPath,
                                        bool* inArray )  {
         BSONElement res;
 
