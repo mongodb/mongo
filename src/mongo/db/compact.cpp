@@ -279,34 +279,6 @@ namespace mongo {
         return true;
     }
 
-    bool compact(const string& ns, string &errmsg, bool validate, BSONObjBuilder& result, double pf, int pb) {
-        massert( 14028, "bad ns", NamespaceString::normal(ns.c_str()) );
-        massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
-
-        bool ok;
-        {
-            Lock::DBWrite lk(ns);
-            BackgroundOperation::assertNoBgOpInProgForNs(ns.c_str());
-            Client::Context ctx(ns);
-            NamespaceDetails *d = nsdetails(ns);
-            massert( 13660, str::stream() << "namespace " << ns << " does not exist", d );
-            massert( 13661, "cannot compact capped collection", !d->isCapped() );
-            log() << "compact " << ns << " begin" << endl;
-            if( pf != 0 || pb != 0 ) { 
-                log() << "paddingFactor:" << pf << " paddingBytes:" << pb << endl;
-            } 
-            try { 
-                ok = _compact(ns.c_str(), d, errmsg, validate, result, pf, pb);
-            }
-            catch(...) { 
-                log() << "compact " << ns << " end (with error)" << endl;
-                throw;
-            }
-            log() << "compact " << ns << " end" << endl;
-        }
-        return ok;
-    }
-
     bool isCurrentlyAReplSetPrimary();
 
     class CompactCmd : public Command {
@@ -393,12 +365,37 @@ namespace mongo {
                 verify( pb >= 0 && pb <= 1024 * 1024 );
             }
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
-
             bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
-            bool ok = compact(ns, errmsg, validate, result, pf, pb);
 
-            IndexBuilder::restoreIndexes(db+".system.indexes", indexesInProg);
+            massert( 14028, "bad ns", NamespaceString::normal(ns.c_str()) );
+            massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
+
+            bool ok;
+            {
+                Lock::DBWrite lk(ns);
+                BackgroundOperation::assertNoBgOpInProgForNs(ns.c_str());
+                Client::Context ctx(ns);
+                NamespaceDetails *d = nsdetails(ns);
+                massert( 13660, str::stream() << "namespace " << ns << " does not exist", d );
+                massert( 13661, "cannot compact capped collection", !d->isCapped() );
+                log() << "compact " << ns << " begin" << endl;
+
+                std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
+
+                if( pf != 0 || pb != 0 ) { 
+                    log() << "paddingFactor:" << pf << " paddingBytes:" << pb << endl;
+                } 
+                try { 
+                    ok = _compact(ns.c_str(), d, errmsg, validate, result, pf, pb);
+                }
+                catch(...) { 
+                    log() << "compact " << ns << " end (with error)" << endl;
+                    throw;
+                }
+                log() << "compact " << ns << " end" << endl;
+
+                IndexBuilder::restoreIndexes(db+".system.indexes", indexesInProg);
+            }
 
             return ok;
         }

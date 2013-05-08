@@ -53,11 +53,12 @@ namespace mongo {
     }
 
     std::vector<BSONObj> IndexBuilder::killMatchingIndexBuilds(const BSONObj& criteria) {
+        verify(Lock::somethingWriteLocked());
         std::vector<BSONObj> indexes;
         CurOp* op = NULL;
         while ((op = CurOp::getOp(criteria)) != NULL) {
             BSONObj index = op->query();
-            killCurrentOp.blockingKill(op->opNum());
+            killCurrentOp.kill(op->opNum());
             indexes.push_back(index);
         }
         if (indexes.size() > 0) {
