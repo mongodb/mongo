@@ -272,8 +272,9 @@ String.prototype.startsWith = function(str){
     return this.indexOf(str) == 0
 }
 
-String.prototype.endsWith = function(str){
-    return new RegExp(RegExp.escape(str) + "$").test(this)
+String.prototype.endsWith = function(str) {
+    var i = this.lastIndexOf(str);
+    return i > -1 && i === (this.length - str.length);
 }
 
 // Returns a copy padded with the provided character _chr_ so it becomes (at least) _length_
