@@ -19,6 +19,7 @@
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/db/json.h"
 #include "mongo/platform/basic.h"
 #include "mongo/unittest/unittest.h"
 
@@ -256,6 +257,12 @@ namespace {
         Element threeChildren = findFirstChildNamed(doc().root(), "threeChildren");
         ASSERT_TRUE(threeChildren.ok());
         ASSERT_EQUALS(countChildren(threeChildren), 3u);
+    }
+
+    TEST(DeduplicateTest, ManyDuplicates) {
+        Document doc(mongo::fromjson("{ x : [ 1, 2, 2, 3, 3, 3, 4, 4, 4 ] }"));
+        deduplicateChildren(doc.root().leftChild(), woEqual(false));
+        ASSERT_TRUE(checkDoc(doc, mongo::fromjson("{x : [ 1, 2, 3, 4 ]}")));
     }
 
 } // namespace

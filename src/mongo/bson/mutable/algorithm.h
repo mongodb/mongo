@@ -111,6 +111,68 @@ namespace mutablebson {
         }
     }
 
+    /** Remove any consecutive children that compare as identical according to 'comp'. The
+     *  children must be sorted (see sortChildren, above), and the equality comparator here
+     *  must be compatible with the comparator used for the sort.
+     */
+    template<typename EqualityComparator>
+    void deduplicateChildren(Element parent, EqualityComparator equal) {
+        Element current = parent.leftChild();
+        while (current.ok()) {
+            Element next = current.rightSibling();
+            if (next.ok() && equal(current, next)) {
+                next.remove();
+            } else {
+                current = next;
+            }
+        }
+    }
+
+    /** A less-than ordering for Elements that compares based on woCompare */
+    class woLess {
+        // TODO: This should possibly derive from std::binary_function.
+    public:
+        woLess(bool considerFieldName = true)
+            : _considerFieldName(considerFieldName) {
+        }
+
+        inline bool operator()(const ConstElement& left, const ConstElement& right) const {
+            return left.compareWithElement(right, _considerFieldName) < 0;
+        }
+    private:
+        const bool _considerFieldName;
+    };
+
+    /** A greater-than ordering for Elements that compares based on woCompare */
+    class woGreater {
+        // TODO: This should possibly derive from std::binary_function.
+    public:
+        woGreater(bool considerFieldName = true)
+            : _considerFieldName(considerFieldName) {
+        }
+
+        inline bool operator()(const ConstElement& left, const ConstElement& right) const {
+            return left.compareWithElement(right, _considerFieldName) > 0;
+        }
+    private:
+        const bool _considerFieldName;
+    };
+
+    /** An equality predicate for elements that compares based on woCompare */
+    class woEqual {
+        // TODO: This should possibly derive from std::binary_function.
+    public:
+        woEqual(bool considerFieldName = true)
+            : _considerFieldName(considerFieldName) {
+        }
+
+        inline bool operator()(const ConstElement& left, const ConstElement& right) const {
+            return left.compareWithElement(right, _considerFieldName) == 0;
+        }
+    private:
+        const bool _considerFieldName;
+    };
+
     /** Return the element that is 'n' Elements to the left in the sibling chain of 'element'. */
     template<typename ElementType>
     ElementType getNthLeftSibling(ElementType element, std::size_t n) {
