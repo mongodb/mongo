@@ -2293,42 +2293,60 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_UPDATE			36
 /*! files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				37
+/*! log: total log bytes written */
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			38
+/*! log: maximum log file size */
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			39
+/*! log: total consolidated slot closures */
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			40
+/*! log: total logging bytes consolidated */
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		41
+/*! log: total consolidated slot joins */
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			42
+/*! log: total consolidated slot join races */
+#define	WT_STAT_CONN_LOG_SLOT_RACES			43
+/*! log: record size exceeded maximum */
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			44
+/*! log: total consolidated slot join transitions */
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		45
+/*! log: total log sync operations */
+#define	WT_STAT_CONN_LOG_SYNC				46
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			38
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			47
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			39
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			48
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			40
+#define	WT_STAT_CONN_MEMORY_FREE			49
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			41
+#define	WT_STAT_CONN_MEMORY_GROW			50
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				42
+#define	WT_STAT_CONN_READ_IO				51
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				43
+#define	WT_STAT_CONN_REC_PAGES				52
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			44
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			53
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			45
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			54
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			46
+#define	WT_STAT_CONN_RWLOCK_READ			55
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			47
+#define	WT_STAT_CONN_RWLOCK_WRITE			56
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		48
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		57
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			49
+#define	WT_STAT_CONN_TXN_ANCIENT			58
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				50
+#define	WT_STAT_CONN_TXN_BEGIN				59
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			51
+#define	WT_STAT_CONN_TXN_CHECKPOINT			60
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				52
+#define	WT_STAT_CONN_TXN_COMMIT				61
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			53
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			62
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			54
+#define	WT_STAT_CONN_TXN_ROLLBACK			63
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				55
+#define	WT_STAT_CONN_WRITE_IO				64
 
 /*!
  * @}

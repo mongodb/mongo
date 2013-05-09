@@ -229,6 +229,7 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerHome
+WiredTigerLog
 WiredTigerStat
 WithSeeds
 Wmissing

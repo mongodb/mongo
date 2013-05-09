@@ -372,6 +372,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	 * exit before files are closed.
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
+	WT_TRET(__wt_log_destroy(conn));
 	WT_TRET(__wt_checkpoint_destroy(conn));
 	WT_TRET(__wt_statlog_destroy(conn));
 

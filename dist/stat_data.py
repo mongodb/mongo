@@ -8,7 +8,7 @@
 # 'currently' or 'in the cache' in their text description, such as
 # 'files currently open'.
 #
-# The configuration key words # are:
+# The configuration key words are:
 #	perm	-- Field is not cleared by the stat clear function.
 
 from operator import attrgetter
@@ -81,6 +81,21 @@ connection_stats = [
 	    'cache: pages currently held in the cache', perm=1),
 	Stat('cache_read', 'cache: pages read into cache'),
 	Stat('cache_write', 'cache: pages written from cache'),
+
+	##########################################
+	# Logging statistics
+	##########################################
+	Stat('log_bytes_written', 'log: total log bytes written'),
+	Stat('log_max_filesize', 'log: maximum log file size', perm=1),
+	Stat('log_sync', 'log: total log sync operations'),
+
+	Stat('log_slot_consolidated', 'log: total logging bytes consolidated'),
+	Stat('log_slot_closes', 'log: total consolidated slot closures'),
+	Stat('log_slot_joins', 'log: total consolidated slot joins'),
+	Stat('log_slot_races', 'log: total consolidated slot join races'),
+	Stat('log_slot_toobig', 'log: record size exceeded maximum'),
+	Stat('log_slot_transitions',
+            'log: total consolidated slot join transitions'),
 
 	##########################################
 	# Reconciliation statistics

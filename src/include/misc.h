@@ -16,6 +16,11 @@
 #define	WT_PETABYTE	((uint64_t)1125899906842624)
 
 /*
+ * Size to build an entry prefix with a pathname.
+ */
+#define	ENTRY_SIZE	128
+
+/*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
  * common structures to save space.  To minimize conversions from size_t to
  * uint32_t through the code, we use the following macros.

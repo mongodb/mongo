@@ -54,6 +54,9 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	conn->cache_evict_tid_set = 1;
 
 	/* Start the optional checkpoint thread. */
+	WT_ERR(__wt_log_create(conn, cfg));
+
+	/* Start the optional checkpoint thread. */
 	WT_ERR(__wt_checkpoint_create(conn, cfg));
 
 	/* Start the optional statistics thread. */
