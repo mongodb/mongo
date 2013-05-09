@@ -46,6 +46,7 @@ namespace mongo {
     class SSLManagerInterface;
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
+    const int MAX_REFRESH_SECS=60;
 
     void disableNagle(int sock);
 
@@ -77,6 +78,8 @@ namespace mongo {
     void enableIPv6(bool state=true);
     bool IPv6Enabled();
     void setSockTimeouts(int sock, double secs);
+
+    void refreshResolv();
 
     /**
      * wrapped around os representation of network address

@@ -52,3 +52,4 @@ assert.soon(
 
 assert.eq( 0 , t.find( { y : { $lt : new Date( now - 10000000 ) } } ).count() );
 assert.eq( 9 , t.count() );
+assert.lte( 21, db.serverStatus().metrics.ttl.deletedDocuments );
