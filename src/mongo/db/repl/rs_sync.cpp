@@ -412,11 +412,14 @@ namespace replset {
                     if (theReplSet->config().members.size() == 1 &&
                         theReplSet->myConfig().potentiallyHot()) {
                         Manager* mgr = theReplSet->mgr;
-                        // When would mgr be null?  During replsettest'ing.
-                        if (mgr) mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
-                        sleepsecs(1);
-                        // There should never be ops to sync in a 1-member set, anyway
-                        return;
+                        // When would mgr be null?  During replsettest'ing, in which case we should
+                        // fall through and actually apply ops as if we were a real secondary.
+                        if (mgr) { 
+                            mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
+                            sleepsecs(1);
+                            // There should never be ops to sync in a 1-member set, anyway
+                            return;
+                        }
                     }
                 }
 
@@ -455,6 +458,14 @@ namespace replset {
             multiApply(ops.getDeque(), multiSyncApply);
 
             applyOpsToOplog(&ops.getDeque());
+
+            // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
+            if (!theReplSet->mgr) {
+                BSONObj op;
+                if (!peek(&op)) {
+                    return;
+                }
+            }
         }
     }
 

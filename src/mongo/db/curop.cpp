@@ -96,7 +96,7 @@ namespace mongo {
             if ( curop->killPendingStrict() )
                 continue;
 
-            BSONObj info = curop->info();
+            BSONObj info = curop->description();
             if (matcher.matches(info)) {
                 return curop;
             }
@@ -224,6 +224,23 @@ namespace mongo {
         b.append( "lockStats" , _lockStat.report() );
 
         return b.obj();
+    }
+
+    BSONObj CurOp::description() {
+        BSONObjBuilder bob;
+        bool a = _active && _start;
+        bob.append("active", a);
+        bob.append( "op" , opToString( _op ) );
+        bob.append("ns", _ns);
+        if (_op == dbInsert) {
+            _query.append(bob, "insert");
+        }
+        else {
+            _query.append(bob, "query");
+        }
+        if( killPending() )
+            bob.append("killPending", true);
+        return bob.obj();
     }
 
     void CurOp::setKillWaiterFlags() {

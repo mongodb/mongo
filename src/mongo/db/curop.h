@@ -220,7 +220,12 @@ namespace mongo {
         int elapsedSeconds() { return elapsedMillis() / 1000; }
         void setQuery(const BSONObj& query) { _query.set( query ); }
         Client * getClient() const { return _client; }
+
         BSONObj info();
+
+        // Fetches less information than "info()"; used to search for ops with certain criteria
+        BSONObj description();
+
         string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
         ProgressMeter& setMessage(const char * msg,
                                   std::string name = "Progress",
