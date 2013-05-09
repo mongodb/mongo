@@ -243,7 +243,6 @@ class mongod(object):
         child processes of this process can be killed with a single
         call to TerminateJobObject (see self.stop()).
         """
-        proc = Popen(argv)
 
         if os.sys.platform == "win32":
             # Create a job object with the "kill on job close"
@@ -252,6 +251,12 @@ class mongod(object):
             # and lets us terminate the whole tree of processes
             # rather than orphaning the mongod.
             import win32job
+
+            # Magic number needed to allow job reassignment in Windows 7
+            # see: MSDN - Process Creation Flags - ms684863
+            CREATE_BREAKAWAY_FROM_JOB = 0x01000000
+
+            proc = Popen(argv, creationflags=CREATE_BREAKAWAY_FROM_JOB)
 
             self.job_object = win32job.CreateJobObject(None, '')
 
@@ -264,6 +269,9 @@ class mongod(object):
                 job_info)
 
             win32job.AssignProcessToJobObject(self.job_object, proc._handle)
+
+        else:
+            proc = Popen(argv)
 
         return proc
 
