@@ -959,14 +959,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	/*
-	 * Open the connection; if that fails, the connection handle has been
-	 * destroyed by the time the open function returns.
-	 */
-	if ((ret = __wt_connection_open(conn, cfg)) != 0) {
-		conn = NULL;
-		WT_ERR(ret);
-	}
+	/* Open the connection. */
+	WT_ERR(__wt_connection_open(conn, cfg));
 
 	/* Open the default session. */
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &conn->default_session));
