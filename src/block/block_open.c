@@ -14,7 +14,8 @@ static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
  *	Truncate a file.
  */
 int
-__wt_block_manager_truncate(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_truncate(
+    WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -26,7 +27,7 @@ __wt_block_manager_truncate(WT_SESSION_IMPL *session, const char *filename)
 	WT_ERR(__wt_ftruncate(session, fh, (off_t)0));
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh);
+	ret = __wt_desc_init(session, fh, allocsize);
 
 	/* Close the file handle. */
 err:	WT_TRET(__wt_close(session, fh));
@@ -39,7 +40,8 @@ err:	WT_TRET(__wt_close(session, fh));
  *	Create a file.
  */
 int
-__wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_create(
+    WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -48,7 +50,7 @@ __wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename)
 	WT_RET(__wt_open(session, filename, 1, 1, 1, &fh));
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh);
+	ret = __wt_desc_init(session, fh, allocsize);
 
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, fh));
@@ -214,15 +216,15 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	Write a file's initial descriptor structure.
  */
 int
-__wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
+__wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 {
 	WT_BLOCK_DESC *desc;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
-	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
-	memset(buf->mem, 0, WT_BLOCK_DESC_SECTOR);
+	WT_RET(__wt_scr_alloc(session, allocsize, &buf));
+	memset(buf->mem, 0, allocsize);
 
 	desc = buf->mem;
 	desc->magic = WT_BLOCK_MAGIC;
@@ -231,9 +233,9 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/* Update the checksum. */
 	desc->cksum = 0;
-	desc->cksum = __wt_cksum(desc, WT_BLOCK_DESC_SECTOR);
+	desc->cksum = __wt_cksum(desc, allocsize);
 
-	ret = __wt_write(session, fh, (off_t)0, WT_BLOCK_DESC_SECTOR, desc);
+	ret = __wt_write(session, fh, (off_t)0, allocsize, desc);
 
 	__wt_scr_free(&buf);
 	return (ret);
@@ -252,11 +254,11 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	uint32_t cksum;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
-	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
+	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
 
 	/* Read the first sector and verify the file's format. */
 	WT_ERR(__wt_read(
-	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf->mem));
+	    session, block->fh, (off_t)0, block->allocsize, buf->mem));
 
 	desc = buf->mem;
 	WT_VERBOSE_ERR(session, block,
@@ -279,7 +281,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	cksum = desc->cksum;
 	desc->cksum = 0;
 	if (desc->magic != WT_BLOCK_MAGIC ||
-	    cksum != __wt_cksum(desc, WT_BLOCK_DESC_SECTOR))
+	    cksum != __wt_cksum(desc, block->allocsize))
 		WT_ERR_MSG(session, WT_ERROR,
 		    "%s does not appear to be a WiredTiger file", block->name);
 

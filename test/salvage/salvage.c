@@ -560,8 +560,8 @@ copy(u_int gen, u_int recno)
 	 */
 	if (access(SLVG, F_OK)) {
 		assert((ofp = fopen(SLVG, "w")) != NULL);
-		assert(fread(buf, 1, 512, ifp) == 512);
-		assert(fwrite(buf, 1, 512, ofp) == 512);
+		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
+		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	} else
 		assert((ofp = fopen(SLVG, "a")) != NULL);
 
@@ -569,7 +569,7 @@ copy(u_int gen, u_int recno)
 	 * If there's data, copy/update the first formatted page.
 	 */
 	if (gen != 0) {
-		assert(fseek(ifp, (long)512, SEEK_SET) == 0);
+		assert(fseek(ifp, (long)PSIZE, SEEK_SET) == 0);
 		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
 		dsk = (void *)buf;
 		if (page_type != WT_PAGE_ROW_LEAF)

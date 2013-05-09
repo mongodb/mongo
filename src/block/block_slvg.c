@@ -17,35 +17,34 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	off_t len;
 	uint32_t allocsize;
 
+	allocsize = block->allocsize;
+
 	/* Reset the description sector. */
-	WT_RET(__wt_desc_init(session, block->fh));
+	WT_RET(__wt_desc_init(session, block->fh, allocsize));
 
 	/*
 	 * Salvage creates a new checkpoint when it's finished, set up for
 	 * rolling an empty file forward.
 	 */
-	WT_RET(__wt_block_ckpt_init(session, &block->live, "live"));
+	WT_RET(__wt_block_ckpt_init(session, &block->live, "live", allocsize));
 
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
 	 * units (bytes trailing the last multiple of an allocation size
 	 * unit must be garbage, by definition).
 	 */
-	if (block->fh->file_size > WT_BLOCK_DESC_SECTOR) {
-		allocsize = block->allocsize;
-		len = block->fh->file_size - WT_BLOCK_DESC_SECTOR;
-		len = (len / allocsize) * allocsize;
-		len += WT_BLOCK_DESC_SECTOR;
+	if (block->fh->file_size > allocsize) {
+		len = (block->fh->file_size / allocsize) * allocsize;
 		if (len != block->fh->file_size)
 			WT_RET(__wt_ftruncate(session, block->fh, len));
 	} else
-		len = WT_BLOCK_DESC_SECTOR;
+		len = allocsize;
 
 	/*
 	 * The first sector of the file is the description record, skip it as
 	 * we read the file.
 	 */
-	block->slvg_off = WT_BLOCK_DESC_SECTOR;
+	block->slvg_off = allocsize;
 
 	/*
 	 * The only checkpoint extent we care about is the allocation list.
@@ -53,7 +52,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * any blocks we don't want as we process the file.
 	 */
 	WT_RET(__wt_block_insert_ext(session, block, &block->live.alloc,
-	    WT_BLOCK_DESC_SECTOR, len - WT_BLOCK_DESC_SECTOR));
+	    allocsize, len - allocsize));
 
 	return (0);
 }

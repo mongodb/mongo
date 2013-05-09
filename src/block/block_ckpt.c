@@ -18,8 +18,8 @@ static int __ckpt_update(WT_SESSION_IMPL *,
  *	Initialize a checkpoint structure.
  */
 int
-__wt_block_ckpt_init(
-    WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci, const char *name)
+__wt_block_ckpt_init(WT_SESSION_IMPL *session,
+    WT_BLOCK_CKPT *ci, const char *name, uint32_t allocsize)
 {
 	memset(ci, 0, sizeof(*ci));
 
@@ -29,7 +29,7 @@ __wt_block_ckpt_init(
 	WT_RET(__wt_block_extlist_init(session, &ci->avail, name, "avail"));
 	WT_RET(__wt_block_extlist_init(session, &ci->discard, name, "discard"));
 
-	ci->file_size = WT_BLOCK_DESC_SECTOR;
+	ci->file_size = allocsize;
 	WT_RET(__wt_block_extlist_init(
 	    session, &ci->ckpt_avail, name, "ckpt_avail"));
 
@@ -77,7 +77,8 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	if (checkpoint) {
 		ci = &_ci;
-		WT_ERR(__wt_block_ckpt_init(session, ci, "checkpoint"));
+		WT_ERR(__wt_block_ckpt_init(
+		    session, ci, "checkpoint", block->allocsize));
 	} else {
 		/*
 		 * We depend on the btree level for locking: things will go
@@ -86,7 +87,8 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * file, for that matter.
 		 */
 		ci = &block->live;
-		WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
+		WT_ERR(__wt_block_ckpt_init(
+		    session, ci, "live", block->allocsize));
 	}
 
 	/* If the checkpoint has an on-disk root page, load it. */
@@ -236,7 +238,7 @@ __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_BLOCK_CKPT), &ckpt->bpriv));
 
 	ci = ckpt->bpriv;
-	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
+	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name, block->allocsize));
 	WT_RET(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
 	WT_RET(__wt_block_extlist_read(
 	    session, block, &ci->alloc, ci->file_size));
@@ -691,7 +693,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 
 	/* Initialize the checkpoint, crack the cookie. */
 	ci = &_ci;
-	WT_RET(__wt_block_ckpt_init(session, ci, "string"));
+	WT_RET(__wt_block_ckpt_init(session, ci, "string", block->allocsize));
 	WT_RET(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 
 	WT_RET(__wt_buf_fmt(session, buf,

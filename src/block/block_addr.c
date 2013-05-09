@@ -24,9 +24,9 @@ __block_buffer_to_addr(WT_BLOCK *block,
 
 	/*
 	 * To avoid storing large offsets, we minimize the value by subtracting
-	 * 512B (the size of the description sector), and then storing a count
-	 * of block allocation units.   That implies there is no such thing as
-	 * an "invalid" offset though, they could all be valid (other than very
+	 * a block for the description sector, then storing a count of block
+	 * allocation units.  That implies there is no such thing as an
+	 * "invalid" offset though, they could all be valid (other than very
 	 * large numbers), which is what we didn't want to store in the first
 	 * place.  Use the size: writing a block of size 0 makes no sense, so
 	 * that's the out-of-band value.  Once we're out of this function and
@@ -38,7 +38,7 @@ __block_buffer_to_addr(WT_BLOCK *block,
 		*offsetp = 0;
 		*sizep = *cksump = 0;
 	} else {
-		*offsetp = (off_t)o * block->allocsize + WT_BLOCK_DESC_SECTOR;
+		*offsetp = (off_t)(o + 1) * block->allocsize;
 		*sizep = (uint32_t)s * block->allocsize;
 		*cksump = (uint32_t)c;
 	}
@@ -60,8 +60,7 @@ __wt_block_addr_to_buffer(WT_BLOCK *block,
 		o = WT_BLOCK_INVALID_OFFSET;
 		s = c = 0;
 	} else {
-		o = (uint64_t)
-		    (offset - WT_BLOCK_DESC_SECTOR) / block->allocsize;
+		o = (uint64_t)offset / block->allocsize - 1;
 		s = size / block->allocsize;
 		c = cksum;
 	}

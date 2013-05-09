@@ -10,10 +10,9 @@
  */
 
 /*
- * The file's description is written into the first 512B of the file, which
+ * The file's description is written into the first block of the file, which
  * means we can use an offset of 0 as an invalid offset.
  */
-#define	WT_BLOCK_DESC_SECTOR		512
 #define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
