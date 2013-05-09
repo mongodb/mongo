@@ -17,9 +17,7 @@
 
 #include "mongo/db/ops/modifier_bit.h"
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
@@ -32,7 +30,6 @@ namespace {
     using mongo::BSONObj;
     using mongo::ModifierBit;
     using mongo::ModifierInterface;
-    using mongo::NumberInt;
     using mongo::Status;
     using mongo::StringData;
     using mongo::fromjson;
@@ -40,9 +37,8 @@ namespace {
     using mongo::mutablebson::ConstElement;
     using mongo::mutablebson::Document;
     using mongo::mutablebson::Element;
-    using mongo::mutablebson::countChildren;
 
-    /** Helper to build and manipulate a $inc mod. */
+    /** Helper to build and manipulate a $bit mod. */
     class Mod {
     public:
         Mod() : _mod() {}
