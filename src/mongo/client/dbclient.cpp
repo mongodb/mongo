@@ -869,6 +869,10 @@ namespace mongo {
         return true;
     }
 
+    void DBClientConnection::logout(const string& dbname, BSONObj& info){
+        authCache.erase(dbname);
+        runCommand(dbname, BSON("logout" << 1), info);
+    }
 
     inline bool DBClientConnection::runCommand(const string &dbname,
                                                const BSONObj& cmd,

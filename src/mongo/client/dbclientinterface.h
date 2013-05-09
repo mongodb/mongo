@@ -1174,6 +1174,15 @@ namespace mongo {
                 throw ConnectException(string("can't connect ") + errmsg);
         }
 
+        /**
+         * Logs out the connection for the given database.
+         *
+         * @param dbname the database to logout from.
+         * @param info the result object for the logout command (provided for backwards
+         *     compatibility with mongo shell)
+         */
+        virtual void logout(const string& dbname, BSONObj& info);
+
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query=Query(), int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 ) {
             checkConnection();
