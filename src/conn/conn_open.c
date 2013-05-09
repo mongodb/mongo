@@ -98,15 +98,15 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
-		__wt_conn_remove_collator(conn, ncoll);
+		WT_TRET(__wt_conn_remove_collator(conn, ncoll));
 
 	/* Free memory for compressors */
 	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		__wt_conn_remove_compressor(conn, ncomp);
+		WT_TRET(__wt_conn_remove_compressor(conn, ncomp));
 
 	/* Free memory for data sources */
 	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL)
-		__wt_conn_remove_data_source(conn, ndsrc);
+		WT_TRET(__wt_conn_remove_data_source(conn, ndsrc));
 
 	/*
 	 * Complain if files weren't closed (ignoring the lock and logging

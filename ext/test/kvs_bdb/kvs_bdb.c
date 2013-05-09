@@ -36,12 +36,12 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
+#undef	INLINE
+#define	INLINE	inline				/* Turn off inline */
+
 #ifndef	UINT32_MAX                      	/* Maximum 32-bit unsigned */
 #define	UINT32_MAX	4294967295U
 #endif
-
-static DB_ENV *dbenv;				/* Enclosing environment */
-static WT_EXTENSION_API *wt_ext;		/* Extension functions */
 
 /*
  * Macros to output an error message and set or return an error.
@@ -49,41 +49,32 @@ static WT_EXTENSION_API *wt_ext;		/* Extension functions */
  *	int ret;
  */
 #undef	ERET
-#define	ERET(session, v, ...) do {					\
-	(void)wt_ext->err_printf(wt_ext, session, __VA_ARGS__);		\
+#define	ERET(wtext, session, v, ...) do {				\
+	(void)wtext->err_printf(wtext, session, __VA_ARGS__);		\
 	return (v);							\
 } while (0)
 #undef	ESET
-#define	ESET(session, v, ...) do {					\
-	(void)wt_ext->err_printf(wt_ext, session, __VA_ARGS__);		\
+#define	ESET(wtext, session, v, ...) do {				\
+	(void)wtext->err_printf(wtext, session, __VA_ARGS__);		\
 	ret = v;							\
+} while (0)
+#undef	ETRET
+#define	ETRET(a) do {							\
+	int __ret;							\
+	if ((__ret = (a)) != 0 &&					\
+	    (__ret == WT_PANIC ||					\
+	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
+		ret = __ret;						\
 } while (0)
 
 typedef struct __data_source DATA_SOURCE;
-struct __data_source {
-	WT_DATA_SOURCE dsrc;			/* Must come first */
 
-	/*
-	 * XXX
-	 * This only works for a single object: if there were more than one
-	 * object in test/format, cursor open would use the passed-in uri to
-	 * find a { lock, cursor-count } pair to reference from each cursor
-	 * object, and each session.XXX method call would have to use the
-	 * appropriate { lock, cursor-count } pair based on their passed-in
-	 * uri.
-	 */
-	pthread_rwlock_t rwlock;		/* Object's lock */
-	int open_cursors;			/* Object's cursor count */
-};
-static DATA_SOURCE ds;
+typedef struct __cursor_source {
+	WT_CURSOR wtcursor;			/* Must come first */
 
-typedef struct __cursor_source CURSOR_SOURCE;
-struct __cursor_source {
-	WT_CURSOR cursor;			/* Must come first */
+	WT_EXTENSION_API *wtext;		/* Extension functions */
 
-	WT_SESSION *session;			/* Enclosing session */
-
-	WT_DATA_SOURCE *dsrc;			/* Enclosing data source */
+	DATA_SOURCE *ds;			/* Underlying Berkeley DB */
 
 	DB	*db;				/* Berkeley DB handles */
 	DBC	*dbc;
@@ -94,164 +85,241 @@ struct __cursor_source {
 	int	 config_bitfield;		/* config "value_format=#t" */
 	int	 config_overwrite;		/* config "overwrite" */
 	int	 config_recno;			/* config "key_format=r" */
+} CURSOR_SOURCE;
+
+struct __data_source {
+	WT_DATA_SOURCE wtds;			/* Must come first */
+
+	WT_EXTENSION_API *wtext;		/* Extension functions */
+
+	/*
+	 * We single thread all WT_SESSION methods and return EBUSY if a
+	 * WT_SESSION method is called and there's an open cursor.
+	 *
+	 * XXX
+	 * This only works for a single object: if there were more than one
+	 * object in test/format, cursor open would use the passed-in uri to
+	 * find a { lock, cursor-count } pair to reference from each cursor
+	 * object, and each session.XXX method call would have to use the
+	 * appropriate { lock, cursor-count } pair based on their passed-in
+	 * uri.
+	 */
+	pthread_rwlock_t rwlock;		/* Global lock */
+
+	DB_ENV *dbenv;				/* Berkeley DB environment */
+	int open_cursors;			/* Open cursor count */
 };
 
+/*
+ * os_errno --
+ *	Limit our use of errno so it's easy to remove.
+ */
 static int
-lock_init(void)
+os_errno(void)
 {
-	int ret;
+	return (errno);
+}
 
-	if ((ret = pthread_rwlock_init(&ds.rwlock, NULL)) != 0)
-		ERET(NULL, WT_PANIC, "lock init: %s", strerror(ret));
-	return (ret);
+/*
+ * lock_init --
+ *	Initialize an object's lock.
+ */
+static int
+lock_init(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
+{
+	int ret = 0;
+
+	if ((ret = pthread_rwlock_init(lockp, NULL)) != 0)
+		ERET(wtext, session, WT_PANIC, "lock init: %s", strerror(ret));
+	return (0);
+}
+
+/*
+ * lock_destroy --
+ *	Destroy an object's lock.
+ */
+static int
+lock_destroy(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
+{
+	int ret = 0;
+
+	if ((ret = pthread_rwlock_destroy(lockp)) != 0)
+		ERET(wtext,
+		    session, WT_PANIC, "lock destroy: %s", strerror(ret));
+	return (0);
+}
+
+/*
+ * writelock --
+ *	Acquire a write lock.
+ */
+static INLINE int
+writelock(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
+{
+	int ret = 0;
+
+	if ((ret = pthread_rwlock_wrlock(lockp)) != 0)
+		ERET(wtext,
+		    session, WT_PANIC, "write-lock: %s", strerror(ret));
+	return (0);
+}
+
+/*
+ * unlock --
+ *	Release an object's lock.
+ */
+static INLINE int
+unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
+{
+	int ret = 0;
+
+	if ((ret = pthread_rwlock_unlock(lockp)) != 0)
+		ERET(wtext, session, WT_PANIC, "unlock: %s", strerror(ret));
+	return (0);
 }
 
 static int
-lock_destroy(void)
+single_thread(
+    WT_DATA_SOURCE *wtds, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
-	int ret;
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 
-	if ((ret = pthread_rwlock_destroy(&ds.rwlock)) != 0)
-		ERET(NULL, WT_PANIC, "lock destroy: %s", strerror(ret));
-	return (ret);
-}
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 
-static inline void
-writelock(void)
-{
-	(void)pthread_rwlock_wrlock(&ds.rwlock);
-}
-
-static inline void
-unlock(void)
-{
-	(void)pthread_rwlock_unlock(&ds.rwlock);
-}
-
-static int
-single_thread(WT_DATA_SOURCE *dsrc)
-{
-	DATA_SOURCE *data;
-
-	data = (DATA_SOURCE *)dsrc;
-	writelock();
-	if (data->open_cursors != 0) {
-		unlock();
+	if ((ret = writelock(wtext, session, lockp)) != 0)
+		return (ret);
+	if (ds->open_cursors != 0) {
+		if ((ret = unlock(wtext, session, lockp)) != 0)
+			return (ret);
 		return (EBUSY);
 	}
 	return (0);
 }
 
 static int
-uri2name(WT_SESSION *session, const char *uri, const char **namep)
+uri2name(WT_EXTENSION_API *wtext,
+    WT_SESSION *session, const char *uri, const char **namep)
 {
 	const char *name;
 
 	if ((name = strchr(uri, ':')) == NULL || *++name == '\0')
-		ERET(session, EINVAL, "unsupported object: %s", uri);
+		ERET(wtext, session, EINVAL, "unsupported object: %s", uri);
 	*namep = name;
 	return (0);
 }
 
-static inline int
-recno_convert(WT_CURSOR *wt_cursor, db_recno_t *recnop)
+static INLINE int
+recno_convert(WT_CURSOR *wtcursor, db_recno_t *recnop)
 {
 	CURSOR_SOURCE *cursor;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
 
-	if (wt_cursor->recno > UINT32_MAX)
-		ERET(session, ERANGE, "record number %" PRIuMAX ": %s",
-		    (uintmax_t)wt_cursor->recno, strerror(ERANGE));
+	if (wtcursor->recno > UINT32_MAX)
+		ERET(wtext,
+		    session, ERANGE, "record number %" PRIuMAX ": %s",
+		    (uintmax_t)wtcursor->recno, strerror(ERANGE));
 
-	*recnop = (uint32_t)wt_cursor->recno;
+	*recnop = (uint32_t)wtcursor->recno;
 	return (0);
 }
 
-static inline int
-copyin_key(WT_CURSOR *wt_cursor)
+static INLINE int
+copyin_key(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBT *key;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
+	cursor = (CURSOR_SOURCE *)wtcursor;
 	key = &cursor->key;
 
 	if (cursor->config_recno) {
-		if ((ret = recno_convert(wt_cursor, &cursor->recno)) != 0)
+		if ((ret = recno_convert(wtcursor, &cursor->recno)) != 0)
 			return (ret);
 		key->data = &cursor->recno;
 		key->size = sizeof(db_recno_t);
 	} else {
-		key->data = (char *)wt_cursor->key.data;
-		key->size = wt_cursor->key.size;
+		key->data = (char *)wtcursor->key.data;
+		key->size = wtcursor->key.size;
 	}
 	return (0);
 }
 
-static inline void
-copyout_key(WT_CURSOR *wt_cursor)
+static INLINE void
+copyout_key(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBT *key;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
+	cursor = (CURSOR_SOURCE *)wtcursor;
 	key = &cursor->key;
 
 	if (cursor->config_recno)
-		wt_cursor->recno = *(db_recno_t *)key->data;
+		wtcursor->recno = *(db_recno_t *)key->data;
 	else {
-		wt_cursor->key.data = key->data;
-		wt_cursor->key.size = key->size;
+		wtcursor->key.data = key->data;
+		wtcursor->key.size = key->size;
 	}
 }
 
-static inline void
-copyin_value(WT_CURSOR *wt_cursor)
+static INLINE void
+copyin_value(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBT *value;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
+	cursor = (CURSOR_SOURCE *)wtcursor;
 	value = &cursor->value;
 
-	value->data = (char *)wt_cursor->value.data;
-	value->size = wt_cursor->value.size;
+	value->data = (char *)wtcursor->value.data;
+	value->size = wtcursor->value.size;
 }
 
-static inline void
-copyout_value(WT_CURSOR *wt_cursor)
+static INLINE void
+copyout_value(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBT *value;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
+	cursor = (CURSOR_SOURCE *)wtcursor;
 	value = &cursor->value;
 
-	wt_cursor->value.data = value->data;
-	wt_cursor->value.size = value->size;
+	wtcursor->value.data = value->data;
+	wtcursor->value.size = value->size;
 }
 
-#ifdef HAVE_DIAGNOSTIC
+#if 0
 static int
-bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
+bdb_dump(WT_CURSOR *wtcursor, WT_SESSION *session, const char *tag)
 {
 	CURSOR_SOURCE *cursor;
 	DB *db;
 	DBC *dbc;
 	DBT *key, *value;
-	int ret;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	db = cursor->db;
 	key = &cursor->key;
 	value = &cursor->value;
 
 	if ((ret = db->cursor(db, NULL, &dbc, 0)) != 0)
-		ERET(session, WT_ERROR, "Db.cursor: %s", db_strerror(ret));
+		ERET(wtext,
+		    session, WT_ERROR, "Db.cursor: %s", db_strerror(ret));
 	printf("==> %s\n", tag);
 	while ((ret = dbc->get(dbc, key, value, DB_NEXT)) == 0)
 		if (cursor->config_recno)
@@ -264,84 +332,93 @@ bdb_dump(WT_CURSOR *wt_cursor, WT_SESSION *session, const char *tag)
 			    (int)value->size, (char *)value->data);
 
 	if (ret != DB_NOTFOUND)
-		ERET(session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
+		ERET(wtext,
+		    session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
 
 	return (0);
 }
 #endif
 
 static int
-kvs_cursor_next(WT_CURSOR *wt_cursor)
+kvs_cursor_next(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBC *dbc;
 	DBT *key, *value;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	dbc = cursor->dbc;
 	key = &cursor->key;
 	value = &cursor->value;
 
 	if ((ret = dbc->get(dbc, key, value, DB_NEXT)) == 0)  {
-		copyout_key(wt_cursor);
-		copyout_value(wt_cursor);
+		copyout_key(wtcursor);
+		copyout_value(wtcursor);
 		return (0);
 	}
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	ERET(session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
+	ERET(wtext, session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
 }
 
 static int
-kvs_cursor_prev(WT_CURSOR *wt_cursor)
+kvs_cursor_prev(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBC *dbc;
 	DBT *key, *value;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	dbc = cursor->dbc;
 	key = &cursor->key;
 	value = &cursor->value;
 
 	if ((ret = dbc->get(dbc, key, value, DB_PREV)) == 0)  {
-		copyout_key(wt_cursor);
-		copyout_value(wt_cursor);
+		copyout_key(wtcursor);
+		copyout_value(wtcursor);
 		return (0);
 	}
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	ERET(session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
+	ERET(wtext, session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
 }
 
 static int
-kvs_cursor_reset(WT_CURSOR *wt_cursor)
+kvs_cursor_reset(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBC *dbc;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
 
 	/* Close and re-open the Berkeley DB cursor */
 	if ((dbc = cursor->dbc) != NULL) {
 		cursor->dbc = NULL;
 		if ((ret = dbc->close(dbc)) != 0)
-			ERET(session, WT_ERROR,
+			ERET(wtext, session, WT_ERROR,
 			    "DbCursor.close: %s", db_strerror(ret));
 
 		if ((ret = cursor->db->cursor(cursor->db, NULL, &dbc, 0)) != 0)
-			ERET(session, WT_ERROR,
+			ERET(wtext, session, WT_ERROR,
 			    "Db.cursor: %s", db_strerror(ret));
 		cursor->dbc = dbc;
 	}
@@ -349,51 +426,57 @@ kvs_cursor_reset(WT_CURSOR *wt_cursor)
 }
 
 static int
-kvs_cursor_search(WT_CURSOR *wt_cursor)
+kvs_cursor_search(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBC *dbc;
 	DBT *key, *value;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	dbc = cursor->dbc;
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
 
 	if ((ret = dbc->get(dbc, key, value, DB_SET)) == 0) {
-		copyout_key(wt_cursor);
-		copyout_value(wt_cursor);
+		copyout_key(wtcursor);
+		copyout_value(wtcursor);
 		return (0);
 	}
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	ERET(session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
+	ERET(wtext, session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
 }
 
 static int
-kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
+kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
 {
 	CURSOR_SOURCE *cursor;
 	DBC *dbc;
 	DBT *key, *value;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	uint32_t len;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	dbc = cursor->dbc;
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
 
 retry:	if ((ret = dbc->get(dbc, key, value, DB_SET_RANGE)) == 0) {
@@ -404,13 +487,13 @@ retry:	if ((ret = dbc->get(dbc, key, value, DB_SET_RANGE)) == 0) {
 		 * specified key.  Check for an exact match, otherwise Berkeley
 		 * DB must have returned a larger key than the one specified.
 		 */
-		if (key->size == wt_cursor->key.size &&
-		    memcmp(key->data, wt_cursor->key.data, key->size) == 0)
+		if (key->size == wtcursor->key.size &&
+		    memcmp(key->data, wtcursor->key.data, key->size) == 0)
 			*exact = 0;
 		else
 			*exact = 1;
-		copyout_key(wt_cursor);
-		copyout_value(wt_cursor);
+		copyout_key(wtcursor);
+		copyout_value(wtcursor);
 		return (0);
 	}
 
@@ -425,12 +508,12 @@ retry:	if ((ret = dbc->get(dbc, key, value, DB_SET_RANGE)) == 0) {
 	 * hands and try again.
 	 */
 	if ((ret = dbc->get(dbc, key, value, DB_LAST)) == 0) {
-		len = key->size < wt_cursor->key.size ?
-		    key->size : wt_cursor->key.size;
-		if (memcmp(key->data, wt_cursor->key.data, len) < 0) {
+		len = key->size < wtcursor->key.size ?
+		    key->size : wtcursor->key.size;
+		if (memcmp(key->data, wtcursor->key.data, len) < 0) {
 			*exact = -1;
-			copyout_key(wt_cursor);
-			copyout_value(wt_cursor);
+			copyout_key(wtcursor);
+			copyout_value(wtcursor);
 			return (0);
 		}
 		goto retry;
@@ -438,29 +521,32 @@ retry:	if ((ret = dbc->get(dbc, key, value, DB_SET_RANGE)) == 0) {
 
 	if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 		return (WT_NOTFOUND);
-	ERET(session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
+	ERET(wtext, session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
 }
 
 static int
-kvs_cursor_insert(WT_CURSOR *wt_cursor)
+kvs_cursor_insert(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DB *db;
 	DBC *dbc;
 	DBT *key, *value;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	dbc = cursor->dbc;
 	db = cursor->db;
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
-	copyin_value(wt_cursor);
+	copyin_value(wtcursor);
 
 	if (cursor->config_append) {
 		/*
@@ -472,15 +558,16 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 		 * number.
 		 */
 		if ((ret = db->put(db, NULL, key, value, DB_APPEND)) != 0)
-			ERET(session, WT_ERROR, "Db.put: %s", db_strerror(ret));
-		wt_cursor->recno = *(db_recno_t *)key->data;
+			ERET(wtext,
+			    session, WT_ERROR, "Db.put: %s", db_strerror(ret));
+		wtcursor->recno = *(db_recno_t *)key->data;
 
 		if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0)
-			ERET(session, WT_ERROR,
+			ERET(wtext, session, WT_ERROR,
 			    "DbCursor.get: %s", db_strerror(ret));
 	} else if (cursor->config_overwrite) {
 		if ((ret = dbc->put(dbc, key, value, DB_KEYFIRST)) != 0)
-			ERET(session, WT_ERROR,
+			ERET(wtext, session, WT_ERROR,
 			    "DbCursor.put: %s", db_strerror(ret));
 	} else {
 		/*
@@ -491,10 +578,11 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 		    db->put(db, NULL, key, value, DB_NOOVERWRITE)) != 0) {
 			if (ret == DB_KEYEXIST)
 				return (WT_DUPLICATE_KEY);
-			ERET(session, WT_ERROR, "Db.put: %s", db_strerror(ret));
+			ERET(wtext,
+			    session, WT_ERROR, "Db.put: %s", db_strerror(ret));
 		}
 		if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0)
-			ERET(session, WT_ERROR,
+			ERET(wtext, session, WT_ERROR,
 			    "DbCursor.get: %s", db_strerror(ret));
 	}
 
@@ -502,41 +590,48 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 }
 
 static int
-kvs_cursor_update(WT_CURSOR *wt_cursor)
+kvs_cursor_update(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBC *dbc;
 	DBT *key, *value;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	dbc = cursor->dbc;
 	key = &cursor->key;
 	value = &cursor->value;
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
-	copyin_value(wt_cursor);
+	copyin_value(wtcursor);
 
 	if ((ret = dbc->put(dbc, key, value, DB_KEYFIRST)) != 0)
-		ERET(session, WT_ERROR, "DbCursor.put: %s", db_strerror(ret));
+		ERET(wtext,
+		    session, WT_ERROR, "DbCursor.put: %s", db_strerror(ret));
 
 	return (0);
 }
 
 static int
-kvs_cursor_remove(WT_CURSOR *wt_cursor)
+kvs_cursor_remove(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
 	DBC *dbc;
 	DBT *key, *value;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	wtext = cursor->wtext;
+
 	dbc = cursor->dbc;
 	key = &cursor->key;
 	value = &cursor->value;
@@ -546,355 +641,436 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
 	 * of a single byte of zero.
 	 */
 	if (cursor->config_bitfield) {
-		wt_cursor->value.size = 1;
-		wt_cursor->value.data = "\0";
-		return (kvs_cursor_update(wt_cursor));
+		wtcursor->value.size = 1;
+		wtcursor->value.data = "\0";
+		return (kvs_cursor_update(wtcursor));
 	}
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
 
 	if ((ret = dbc->get(dbc, key, value, DB_SET)) != 0) {
 		if (ret == DB_NOTFOUND || ret == DB_KEYEMPTY)
 			return (WT_NOTFOUND);
-		ERET(session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
+		ERET(wtext,
+		    session, WT_ERROR, "DbCursor.get: %s", db_strerror(ret));
 	}
 	if ((ret = dbc->del(dbc, 0)) != 0)
-		ERET(session, WT_ERROR, "DbCursor.del: %s", db_strerror(ret));
+		ERET(wtext,
+		    session, WT_ERROR, "DbCursor.del: %s", db_strerror(ret));
 
 	return (0);
 }
 
 static int
-kvs_cursor_close(WT_CURSOR *wt_cursor)
+kvs_cursor_close(WT_CURSOR *wtcursor)
 {
 	CURSOR_SOURCE *cursor;
-	DATA_SOURCE *data;
+	DATA_SOURCE *ds;
 	DB *db;
 	DBC *dbc;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret, tret;
+	int ret = 0;
 
-	cursor = (CURSOR_SOURCE *)wt_cursor;
-	session = cursor->session;
-	data = (DATA_SOURCE *)cursor->dsrc;
-	ret = 0;
+	session = wtcursor->session;
+	cursor = (CURSOR_SOURCE *)wtcursor;
+	ds = cursor->ds;
+	wtext = cursor->wtext;
 
 	dbc = cursor->dbc;
 	cursor->dbc = NULL;
-	if (dbc != NULL && (tret = dbc->close(dbc)) != 0)
-		ERET(session, WT_ERROR,
-		    "DbCursor.close: %s", db_strerror(tret));
+	if (dbc != NULL && (ret = dbc->close(dbc)) != 0)
+		ERET(wtext, session, WT_ERROR,
+		    "DbCursor.close: %s", db_strerror(ret));
 
 	db = cursor->db;
 	cursor->db = NULL;
-	if (db != NULL && (tret = db->close(db, 0)) != 0)
-		ERET(session, WT_ERROR, "Db.close: %s", db_strerror(tret));
-	free(wt_cursor);
+	if (db != NULL && (ret = db->close(db, 0)) != 0)
+		ERET(wtext,
+		    session, WT_ERROR, "Db.close: %s", db_strerror(ret));
+	free(wtcursor);
 
-	writelock();
-	--data->open_cursors;
-	unlock();
+	if ((ret = writelock(wtext, session, &ds->rwlock)) != 0)
+		return (ret);
+	--ds->open_cursors;
+	if ((ret = unlock(wtext, session, &ds->rwlock)) != 0)
+		return (ret);
 
-	return (ret);
+	return (0);
 }
 
 static int
-kvs_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, WT_CONFIG_ARG *config)
+kvs_session_create(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
+	DATA_SOURCE *ds;
 	DB *db;
 	DBTYPE type;
 	WT_CONFIG_ITEM v;
-	int ret, tret;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 	const char *name;
 
-	(void)dsrc;				/* Unused parameters */
-
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 						/* Get the object name */
-	if ((ret = uri2name(session, uri, &name)) != 0)
+	if ((ret = uri2name(wtext, session, uri, &name)) != 0)
 		return (ret);
-
 						/* Check key/value formats */
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "key_format", &v)) != 0)
-		ERET(session, ret,
-		    "key_format configuration: %s", wt_ext->strerror(ret));
+	if ((ret =
+	    wtext->config_get(wtext, session, config, "key_format", &v)) != 0)
+		ERET(wtext, session, ret,
+		    "key_format configuration: %s", wtext->strerror(ret));
 	type = v.len == 1 && v.str[0] == 'r' ? DB_RECNO : DB_BTREE;
 
-	ret = 0;			/* Create the Berkeley DB table */
-	if ((tret = db_create(&db, dbenv, 0)) != 0)
-		ERET(session, WT_ERROR, "db_create: %s", db_strerror(tret));
-	if ((tret = db->open(db, NULL, name, NULL, type, DB_CREATE, 0)) != 0)
-		ESET(session, WT_ERROR, "Db.open: %s", uri, db_strerror(tret));
-	if ((tret = db->close(db, 0)) != 0)
-		ESET(session, WT_ERROR, "Db.close", db_strerror(tret));
-	return (ret);
+	/* Create the Berkeley DB table */
+	if ((ret = db_create(&db, ds->dbenv, 0)) != 0)
+		ERET(wtext,
+		    session, WT_ERROR, "db_create: %s", db_strerror(ret));
+	if ((ret = db->open(db, NULL, name, NULL, type, DB_CREATE, 0)) != 0)
+		ERET(wtext,
+		    session, WT_ERROR, "Db.open: %s", uri, db_strerror(ret));
+	if ((ret = db->close(db, 0)) != 0)
+		ERET(wtext, session, WT_ERROR, "Db.close", db_strerror(ret));
+
+	return (0);
 }
 
 static int
-kvs_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, WT_CONFIG_ARG *config)
+kvs_session_drop(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	DB *db;
-	int ret, tret;
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 	const char *name;
 
 	(void)config;				/* Unused parameters */
 
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 						/* Get the object name */
-	if ((ret = uri2name(session, uri, &name)) != 0)
+	if ((ret = uri2name(wtext, session, uri, &name)) != 0)
 		return (ret);
 
-	if ((ret = single_thread(dsrc)) != 0)
+	if ((ret = single_thread(wtds, session, &ds->rwlock)) != 0)
 		return (ret);
 
-	ret = 0;
-	if ((tret = db_create(&db, dbenv, 0)) != 0)
-		ESET(session, WT_ERROR, "db_create: %s", db_strerror(tret));
-	else if ((tret = db->remove(db, name, NULL, 0)) != 0)
-		ESET(session, WT_ERROR, "Db.remove: %s", db_strerror(tret));
+	if ((ret = db_create(&db, ds->dbenv, 0)) != 0)
+		ESET(wtext,
+		    session, WT_ERROR, "db_create: %s", db_strerror(ret));
+	else if ((ret = db->remove(db, name, NULL, 0)) != 0)
+		ESET(wtext,
+		    session, WT_ERROR, "Db.remove: %s", db_strerror(ret));
 	/* db handle is dead */
 
-	unlock();
+	ETRET(unlock(wtext, session, &ds->rwlock));
 	return (ret);
 }
 
 static int
-kvs_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
 {
 	CURSOR_SOURCE *cursor;
-	DATA_SOURCE *data;
+	DATA_SOURCE *ds;
 	DB *db;
 	WT_CONFIG_ITEM v;
-	int locked, ret, tret;
+	WT_EXTENSION_API *wtext;
+	int locked, ret;
 	const char *name;
 
-	data = (DATA_SOURCE *)dsrc;
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 	locked = 0;
 						/* Get the object name */
-	if ((ret = uri2name(session, uri, &name)) != 0)
+	if ((ret = uri2name(wtext, session, uri, &name)) != 0)
 		return (ret);
 						/* Allocate the cursor */
-	cursor = calloc(1, sizeof(CURSOR_SOURCE));
-	cursor->session = session;
-	cursor->dsrc = dsrc;
+	if ((cursor = calloc(1, sizeof(CURSOR_SOURCE))) == NULL)
+		return (os_errno());
+	cursor->ds = (DATA_SOURCE *)wtds;
+	cursor->wtext = wtext;
 						/* Parse configuration */
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "append", &v)) != 0) {
-		ESET(session, ret,
-		    "append configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "append", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "append configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
 
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "overwrite", &v)) != 0) {
-		ESET(session, ret,
-		    "overwrite configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "overwrite", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "overwrite configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
 
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "key_format", &v)) != 0) {
-		ESET(session, ret,
-		    "key_format configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "key_format", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "key_format configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
 
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "value_format", &v)) != 0) {
-		ESET(session, ret,
-		    "value_format configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "value_format", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "value_format configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_bitfield =
 	    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
-	writelock();
+	if ((ret = writelock(wtext, session, &ds->rwlock)) != 0)
+		goto err;
 	locked = 1;
 				/* Open the Berkeley DB cursor */
-	if ((tret = db_create(&cursor->db, dbenv, 0)) != 0) {
-		ESET(session, WT_ERROR, "db_create: %s", db_strerror(tret));
+	if ((ret = db_create(&cursor->db, ds->dbenv, 0)) != 0) {
+		ESET(wtext,
+		    session, WT_ERROR, "db_create: %s", db_strerror(ret));
 		goto err;
 	}
 	db = cursor->db;
-	if ((tret = db->open(db, NULL, name, NULL,
+	if ((ret = db->open(db, NULL, name, NULL,
 	    cursor->config_recno ? DB_RECNO : DB_BTREE, DB_CREATE, 0)) != 0) {
-		ESET(session, WT_ERROR, "Db.open: %s", db_strerror(tret));
+		ESET(wtext,
+		    session, WT_ERROR, "Db.open: %s", db_strerror(ret));
 		goto err;
 	}
-	if ((tret = db->cursor(db, NULL, &cursor->dbc, 0)) != 0) {
-		ESET(session, WT_ERROR, "Db.cursor: %s", db_strerror(tret));
+	if ((ret = db->cursor(db, NULL, &cursor->dbc, 0)) != 0) {
+		ESET(wtext,
+		    session, WT_ERROR, "Db.cursor: %s", db_strerror(ret));
 		goto err;
 	}
 
 				/* Initialize the methods */
-	cursor->cursor.next = kvs_cursor_next;
-	cursor->cursor.prev = kvs_cursor_prev;
-	cursor->cursor.reset = kvs_cursor_reset;
-	cursor->cursor.search = kvs_cursor_search;
-	cursor->cursor.search_near = kvs_cursor_search_near;
-	cursor->cursor.insert = kvs_cursor_insert;
-	cursor->cursor.update = kvs_cursor_update;
-	cursor->cursor.remove = kvs_cursor_remove;
-	cursor->cursor.close = kvs_cursor_close;
+	cursor->wtcursor.next = kvs_cursor_next;
+	cursor->wtcursor.prev = kvs_cursor_prev;
+	cursor->wtcursor.reset = kvs_cursor_reset;
+	cursor->wtcursor.search = kvs_cursor_search;
+	cursor->wtcursor.search_near = kvs_cursor_search_near;
+	cursor->wtcursor.insert = kvs_cursor_insert;
+	cursor->wtcursor.update = kvs_cursor_update;
+	cursor->wtcursor.remove = kvs_cursor_remove;
+	cursor->wtcursor.close = kvs_cursor_close;
 
 	*new_cursor = (WT_CURSOR *)cursor;
 
-	++data->open_cursors;
+	++ds->open_cursors;
 
 	if (0) {
 err:		free(cursor);
 	}
 
 	if (locked)
-		unlock();
+		ETRET(unlock(wtext, session, &ds->rwlock));
 	return (ret);
 }
 
 static int
-kvs_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, const char *newname, WT_CONFIG_ARG *config)
 {
+	DATA_SOURCE *ds;
 	DB *db;
-	int ret, tret;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 	const char *name;
 
 	(void)config;				/* Unused parameters */
 
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 						/* Get the object name */
-	if ((ret = uri2name(session, uri, &name)) != 0)
+	if ((ret = uri2name(wtext, session, uri, &name)) != 0)
 		return (ret);
 
-	if ((ret = single_thread(dsrc)) != 0)
+	if ((ret = single_thread(wtds, session, &ds->rwlock)) != 0)
 		return (ret);
 
-	ret = 0;
-	if ((tret = db_create(&db, dbenv, 0)) != 0)
-		ESET(session, WT_ERROR, "db_create: %s", db_strerror(tret));
-	else if ((tret = db->rename(db, name, NULL, newname, 0)) != 0)
-		ESET(session, WT_ERROR, "Db.rename: %s", db_strerror(tret));
+	if ((ret = db_create(&db, ds->dbenv, 0)) != 0)
+		ESET(wtext,
+		    session, WT_ERROR, "db_create: %s", db_strerror(ret));
+	else if ((ret = db->rename(db, name, NULL, newname, 0)) != 0)
+		ESET(wtext,
+		    session, WT_ERROR, "Db.rename: %s", db_strerror(ret));
 	/* db handle is dead */
 
-	unlock();
+	ETRET(unlock(wtext, session, &ds->rwlock));
 	return (ret);
 }
 
 static int
-kvs_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, WT_CONFIG_ARG *config)
+kvs_session_truncate(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
+	DATA_SOURCE *ds;
 	DB *db;
-	int ret, tret;
+	WT_EXTENSION_API *wtext;
+	int tret, ret = 0;
 	const char *name;
 
 	(void)config;				/* Unused parameters */
 
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 						/* Get the object name */
-	if ((ret = uri2name(session, uri, &name)) != 0)
+	if ((ret = uri2name(wtext, session, uri, &name)) != 0)
 		return (ret);
 
-	if ((ret = single_thread(dsrc)) != 0)
+	if ((ret = single_thread(wtds, session, &ds->rwlock)) != 0)
 		return (ret);
 
-	ret = 0;
-	if ((tret = db_create(&db, dbenv, 0)) == 0) {
-		if ((tret = db->open(db,
+	if ((ret = db_create(&db, ds->dbenv, 0)) != 0)
+		ESET(wtext,
+		    session, WT_ERROR, "db_create: %s", db_strerror(ret));
+	else {
+		if ((ret = db->open(db,
 		    NULL, name, NULL, DB_UNKNOWN, DB_TRUNCATE, 0)) != 0)
-			ESET(session, WT_ERROR,
-			    "Db.open: %s", db_strerror(tret));
+			ESET(wtext, session, WT_ERROR,
+			    "Db.open: %s", db_strerror(ret));
 		if ((tret = db->close(db, 0)) != 0)
-			ESET(session, WT_ERROR,
+			ESET(wtext, session, WT_ERROR,
 			    "Db.close: %s", db_strerror(tret));
-	} else
-		ESET(session, WT_ERROR, "db_create: %s", db_strerror(tret));
+	}
 
-	unlock();
+	ETRET(unlock(wtext, session, &ds->rwlock));
 	return (ret);
 }
 
 static int
-kvs_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *uri, WT_CONFIG_ARG *config)
+kvs_session_verify(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
+	DATA_SOURCE *ds;
 	DB *db;
-	int ret, tret;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 	const char *name;
 
 	(void)config;				/* Unused parameters */
 
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 						/* Get the object name */
-	if ((ret = uri2name(session, uri, &name)) != 0)
+	if ((ret = uri2name(wtext, session, uri, &name)) != 0)
 		return (ret);
 
-	if ((ret = single_thread(dsrc)) != 0)
+	if ((ret = single_thread(wtds, session, &ds->rwlock)) != 0)
 		return (ret);
 
-	ret = 0;
-	if ((tret = db_create(&db, dbenv, 0)) != 0)
-		ESET(session, WT_ERROR, "db_create: %s", db_strerror(tret));
-	else if ((tret = db->verify(db, name, NULL, NULL, 0)) != 0)
-		ESET(session, WT_ERROR,
-		    "Db.verify: %s: %s", uri, db_strerror(tret));
+	if ((ret = db_create(&db, ds->dbenv, 0)) != 0)
+		ESET(wtext,
+		    session, WT_ERROR, "db_create: %s", db_strerror(ret));
+	else if ((ret = db->verify(db, name, NULL, NULL, 0)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "Db.verify: %s: %s", uri, db_strerror(ret));
 	/* db handle is dead */
 
-	unlock();
+	ETRET(unlock(wtext, session, &ds->rwlock));
+	return (ret);
+}
+
+static int
+kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
+{
+	DB_ENV *dbenv;
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+	dbenv = ds->dbenv;
+
+	if (dbenv != NULL && (ret = dbenv->close(dbenv, 0)) != 0)
+		ESET(wtext,
+		    session, WT_ERROR, "DbEnv.close: %s", db_strerror(ret));
+
+	ETRET(lock_destroy(wtext, session, &ds->rwlock));
+
 	return (ret);
 }
 
 int
-wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	int ret;
+	/*
+	 * List of the WT_DATA_SOURCE methods -- it's static so it breaks at
+	 * compile-time should the structure changes underneath us.
+	 */
+	static WT_DATA_SOURCE wtds = {
+		kvs_session_create,		/* session.create */
+		NULL,				/* No session.compaction */
+		kvs_session_drop,		/* session.drop */
+		kvs_session_open_cursor,	/* session.open_cursor */
+		kvs_session_rename,		/* session.rename */
+		NULL,				/* No session.salvage */
+		kvs_session_truncate,		/* session.truncate */
+		kvs_session_verify,		/* session.verify */
+		kvs_terminate			/* termination */
+	};
+	DATA_SOURCE *ds;
+	DB_ENV *dbenv;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 
 	(void)config;				/* Unused parameters */
 
-						/* Acquire the extension API. */
-	wt_ext = conn->get_extension_api(conn);
+	ds = NULL;
+	dbenv = NULL;
+						/* Acquire the extension API */
+	wtext = connection->get_extension_api(connection);
 
-	memset(&ds, 0, sizeof(ds));
+	/* Allocate the local data-source structure. */
+	if ((ds = calloc(1, sizeof(DATA_SOURCE))) == NULL)
+		return (os_errno());
+	ds->wtext = wtext;
+						/* Configure the global lock */
+	if ((ret = lock_init(wtext, NULL, &ds->rwlock)) != 0)
+		goto err;
 
-	if ((ret = lock_init()) != 0)
-		return (ret);
+	ds->wtds = wtds;			/* Configure the methods */
 
-	if ((ret = db_env_create(&dbenv, 0)) != 0)
-		ERET(NULL, WT_ERROR, "db_env_create: %s", db_strerror(ret));
+						/* Berkeley DB environment */
+	if ((ret = db_env_create(&dbenv, 0)) != 0) {
+		ESET(wtext,
+		    NULL, WT_ERROR, "db_env_create: %s", db_strerror(ret));
+		goto err;
+	}
 	dbenv->set_errpfx(dbenv, "bdb");
 	dbenv->set_errfile(dbenv, stderr);
 	if ((ret = dbenv->open(dbenv, "RUNDIR/KVS",
-	    DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_PRIVATE, 0)) != 0)
-		ERET(NULL, WT_ERROR, "DbEnv.open: %s", db_strerror(ret));
+	    DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_PRIVATE, 0)) != 0) {
+		ESET(wtext, NULL, WT_ERROR, "DbEnv.open: %s", db_strerror(ret));
+		goto err;
+	}
+	ds->dbenv = dbenv;
 
-	ds.dsrc.create = kvs_create;
-	ds.dsrc.compact = NULL;			/* No compaction */
-	ds.dsrc.drop = kvs_drop;
-	ds.dsrc.open_cursor = kvs_open_cursor;
-	ds.dsrc.rename = kvs_rename;
-	ds.dsrc.salvage = NULL;			/* No salvage */
-	ds.dsrc.truncate = kvs_truncate;
-	ds.dsrc.verify = kvs_verify;
-	if ((ret =
-	    conn->add_data_source(conn, "kvsbdb:", &ds.dsrc, NULL)) != 0)
-		ERET(NULL, ret, "WT_CONNECTION.add_data_source");
-
+	if ((ret =				/* Add the data source */
+	    connection->add_data_source(
+	    connection, "kvsbdb:", (WT_DATA_SOURCE *)ds, NULL)) != 0) {
+		ESET(wtext, NULL, ret, "WT_CONNECTION.add_data_source");
+		goto err;
+	}
 	return (0);
+
+err:	if (dbenv != NULL)
+		(void)dbenv->close(dbenv, 0);
+	free(ds);
+	return (ret);
 }
 
 int
-wiredtiger_extension_terminate(WT_CONNECTION *conn)
+wiredtiger_extension_terminate(WT_CONNECTION *connection)
 {
-	int ret;
-
-	(void)conn;				/* Unused parameters */
-
-	ret = lock_destroy();
-
-	if (dbenv != NULL && (ret = dbenv->close(dbenv, 0)) != 0)
-		ERET(NULL, WT_ERROR, "DbEnv.close: %s", db_strerror(ret));
+	(void)connection;			/* Unused parameters */
 
 	return (0);
 }

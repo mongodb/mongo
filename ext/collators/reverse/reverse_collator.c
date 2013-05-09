@@ -44,7 +44,7 @@ collate_reverse(WT_COLLATOR *collator, WT_SESSION *session,
 	return (0);
 }
 
-static WT_COLLATOR reverse_collator = { collate_reverse };
+static WT_COLLATOR reverse_collator = { collate_reverse, NULL };
 
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
