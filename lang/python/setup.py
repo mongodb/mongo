@@ -15,7 +15,7 @@ if not 'ARCHFLAGS' in os.environ:
 
 # Suppress warnings building SWIG generated code
 extra_cflags = [
-				'-Wno-error',
+				'-w',
 ]
 
 dir = os.path.dirname(__file__)

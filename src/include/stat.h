@@ -21,56 +21,51 @@ struct __wt_stats {
 
 #define	WT_STAT(stats, fld)						\
 	((stats)->fld.v)
-#define	WT_STAT_32V(stats, fld)						\
+#define	WT_STAT_ATOMIC_V(stats, fld)					\
 	(((uint32_t *)&(stats)->fld.v)[0])
 
-#define	WT_STAT_ATOMIC_DECR(stats, fld) do {				\
-	(void)WT_ATOMIC_SUB(WT_STAT_32V(stats, fld), 1);		\
+#define	WT_STAT_ATOMIC_DECR(session, stats, fld) do {			\
+	if (S2C(session)->statistics)					\
+		(void)WT_ATOMIC_SUB(WT_STAT_ATOMIC_V(stats, fld), 1);	\
 } while (0)
-#define	WT_STAT_DECR(stats, fld) do {					\
-	--(stats)->fld.v;						\
+#define	WT_STAT_DECR(session, stats, fld) do {				\
+	if (S2C(session)->statistics)					\
+		--(stats)->fld.v;					\
 } while (0)
-#define	WT_STAT_ATOMIC_INCR(stats, fld) do {				\
-	(void)WT_ATOMIC_ADD(WT_STAT_32V(stats, fld), 1);		\
+#define	WT_STAT_ATOMIC_INCR(session, stats, fld) do {			\
+	if (S2C(session)->statistics)					\
+		(void)WT_ATOMIC_ADD(WT_STAT_ATOMIC_V(stats, fld), 1);	\
 } while (0)
-#define	WT_STAT_INCR(stats, fld) do {					\
-	++(stats)->fld.v;						\
+#define	WT_STAT_INCR(session, stats, fld) do {				\
+	if (S2C(session)->statistics)					\
+		++(stats)->fld.v;					\
 } while (0)
-#define	WT_STAT_INCRV(stats, fld, value) do {				\
-	(stats)->fld.v += (value);					\
+#define	WT_STAT_INCRV(session, stats, fld, value) do {			\
+	if (S2C(session)->statistics)					\
+		(stats)->fld.v += (value);				\
 } while (0)
-#define	WT_STAT_INCRKV(stats, key, value) do {				\
-	((WT_STATS *)stats)[(key)].v += (value);			\
+#define	WT_STAT_INCRKV(session, stats, key, value) do {			\
+	if (S2C(session)->statistics)					\
+		((WT_STATS *)stats)[(key)].v += (value);		\
 } while (0)
-#define	WT_STAT_SET(stats, fld, value) do {				\
-	(stats)->fld.v = (uint64_t)(value);				\
+#define	WT_STAT_SET(session, stats, fld, value) do {			\
+	if (S2C(session)->statistics)					\
+		(stats)->fld.v = (uint64_t)(value);			\
 } while (0)
 
 /* Connection statistics. */
-#define	WT_CSTAT_ATOMIC_DECR(session, fld) do {				\
-	if (S2C(session)->statistics)					\
-		WT_STAT_ATOMIC_DECR(&S2C(session)->stats, fld);		\
-} while (0)
-#define	WT_CSTAT_DECR(session, fld) do {				\
-	if (S2C(session)->statistics)					\
-		WT_STAT_DECR(&S2C(session)->stats, fld);		\
-} while (0)
-#define	WT_CSTAT_ATOMIC_INCR(session, fld) do {				\
-	if (S2C(session)->statistics)					\
-		WT_STAT_ATOMIC_INCR(&S2C(session)->stats, fld);		\
-} while (0)
-#define	WT_CSTAT_INCR(session, fld) do {				\
-	if (S2C(session)->statistics)					\
-		WT_STAT_INCR(&S2C(session)->stats, fld);		\
-} while (0)
-#define	WT_CSTAT_INCRV(session, fld, v) do {				\
-	if (S2C(session)->statistics)					\
-		WT_STAT_INCRV(&S2C(session)->stats, fld, v);		\
-} while (0)
-#define	WT_CSTAT_SET(session, fld, v) do {				\
-	if (S2C(session)->statistics)					\
-		WT_STAT_SET(&S2C(session)->stats, fld, v);		\
-} while (0)
+#define	WT_CSTAT_ATOMIC_DECR(session, fld)				\
+	WT_STAT_ATOMIC_DECR(session, &S2C(session)->stats, fld)
+#define	WT_CSTAT_DECR(session, fld)					\
+	WT_STAT_DECR(session, &S2C(session)->stats, fld)
+#define	WT_CSTAT_ATOMIC_INCR(session, fld)				\
+	WT_STAT_ATOMIC_INCR(session, &S2C(session)->stats, fld)
+#define	WT_CSTAT_INCR(session, fld)					\
+	WT_STAT_INCR(session, &S2C(session)->stats, fld)
+#define	WT_CSTAT_INCRV(session, fld, v)					\
+	WT_STAT_INCRV(session, &S2C(session)->stats, fld, v)
+#define	WT_CSTAT_SET(session, fld, v)					\
+	WT_STAT_SET(session, &S2C(session)->stats, fld, v)
 
 /*
  * Data-source statistics.
@@ -80,20 +75,22 @@ struct __wt_stats {
  * useful until everything is converted to using data-source handles.
  */
 #define	WT_DSTAT_DECR(session, fld) do {				\
-	if (session->dhandle != NULL && S2C(session)->statistics)	\
-		WT_STAT_DECR(&(session)->dhandle->stats, fld);		\
+	if ((session)->dhandle != NULL)					\
+		WT_STAT_DECR(session, &(session)->dhandle->stats, fld);	\
 } while (0)
 #define	WT_DSTAT_INCR(session, fld) do {				\
-	if (session->dhandle != NULL && S2C(session)->statistics)	\
-		WT_STAT_INCR(&session->dhandle->stats, fld);		\
+	if ((session)->dhandle != NULL)					\
+		WT_STAT_INCR(session, &(session)->dhandle->stats, fld);	\
 } while (0)
 #define	WT_DSTAT_INCRV(session, fld, v) do {				\
-	if (session->dhandle != NULL && S2C(session)->statistics)	\
-		WT_STAT_INCRV(&session->dhandle->stats, fld, v);	\
+	if ((session)->dhandle != NULL)					\
+		WT_STAT_INCRV(						\
+		    session, &(session)->dhandle->stats, fld, v);	\
 } while (0)
 #define	WT_DSTAT_SET(session, fld, v) do {				\
-	if (session->dhandle != NULL && S2C(session)->statistics)	\
-		WT_STAT_SET(&session->dhandle->stats, fld, v);		\
+	if ((session)->dhandle != NULL)					\
+		WT_STAT_SET(						\
+		   session, &(session)->dhandle->stats, fld, v);	\
 } while (0)
 
 /* Flags used by statistics initialization. */
@@ -146,7 +143,6 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;
-	WT_STATS cache_eviction_force;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
 	WT_STATS cache_eviction_merge;
@@ -215,7 +211,6 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;
-	WT_STATS cache_eviction_force;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
 	WT_STATS cache_eviction_merge;

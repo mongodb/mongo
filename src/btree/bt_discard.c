@@ -37,6 +37,11 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	page->parent = NULL;
 	page->ref = NULL;
 
+	/*
+	 * We should never discard the file's current eviction point or a page
+	 * queued for LRU eviction.
+	 */
+	WT_ASSERT(session, S2BT(session)->evict_page != page);
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
 #ifdef HAVE_DIAGNOSTIC

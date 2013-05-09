@@ -326,6 +326,18 @@ my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (0);
 }
 
+/*! [WT_DATA_SOURCE terminate] */
+static int
+my_terminate(WT_DATA_SOURCE *dsrc, WT_SESSION *session)
+/*! [WT_DATA_SOURCE terminate] */
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+
+	return (0);
+}
+
 int
 main(void)
 {
@@ -346,7 +358,8 @@ main(void)
 		my_rename,
 		my_salvage,
 		my_truncate,
-		my_verify
+		my_verify,
+		my_terminate
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
 	/*! [WT_DATA_SOURCE register] */
@@ -391,8 +404,8 @@ main(void)
 	 * to /home.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "target=\"/home\"", "string",
-	    "choices=[\"/device\", \"/home\", \"/target\"]");
+	    "session.open_cursor", NULL, "target=/home", "string",
+	    "choices=[/device, /home, /target]");
 	/*! [WT_DATA_SOURCE configure string with checking] */
 
 	/*! [WT_DATA_SOURCE configure list with checking] */
@@ -401,8 +414,8 @@ main(void)
 	 * /target; default to /mnt.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "paths=[\"/mnt\"]", "list",
-	    "choices=[\"/device\", \"/home\", \"/mnt\", \"/target\"]");
+	    "session.open_cursor", NULL, "paths=[/mnt]", "list",
+	    "choices=[/device, /home, /mnt, /target]");
 	/*! [WT_DATA_SOURCE configure list with checking] */
 
 	/*! [WT_EXTENSION_API default_session] */

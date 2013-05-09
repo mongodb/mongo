@@ -217,7 +217,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	/*
 	 * This routine depends on the default block manager's view of files,
 	 * where an address consists of a file offset, length, and checksum.
-	 * This is for debugging only.  Other block manager's might not see a
+	 * This is for debugging only.  Other block managers might not see a
 	 * file or address the same way, that's why there's no block manager
 	 * method.
 	 */
@@ -810,9 +810,6 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 		break;
 	case WT_REF_DELETED:
 		__dmsg(ds, "deleted");
-		break;
-	case WT_REF_EVICT_FORCE:
-		__dmsg(ds, "evict-force %p", ref->page);
 		break;
 	case WT_REF_EVICT_WALK:
 		__dmsg(ds, "evict-walk %p", ref->page);

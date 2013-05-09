@@ -51,7 +51,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
  * TODO: use something other than an empty value as a tombstone: we need
  * to support empty values from the application.
  */
-static WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
+static const WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 
 #define	WT_LSM_NEEDVALUE(c) do {					\
 	WT_CURSOR_NEEDVALUE(c);						\
@@ -610,11 +610,12 @@ __clsm_search(WT_CURSOR *cursor)
 
 			ret = __wt_bloom_hash_get(bloom, &bhash);
 			if (ret == WT_NOTFOUND) {
-				WT_STAT_INCR(
+				WT_STAT_INCR(session,
 				    &clsm->lsm_tree->stats, bloom_miss);
 				continue;
 			} else if (ret == 0)
-				WT_STAT_INCR(&clsm->lsm_tree->stats, bloom_hit);
+				WT_STAT_INCR(session,
+				    &clsm->lsm_tree->stats, bloom_hit);
 			WT_ERR(ret);
 		}
 		c->set_key(c, &cursor->key);
@@ -625,14 +626,14 @@ __clsm_search(WT_CURSOR *cursor)
 			if (__clsm_deleted(clsm, &cursor->value))
 				ret = WT_NOTFOUND;
 			goto done;
-		} else if (ret != WT_NOTFOUND)
+		} else if (ret != WT_NOTFOUND) {
 			goto err;
-		else if (bloom != NULL)
-			WT_STAT_INCR(
+		} else if (bloom != NULL) {
+			WT_STAT_INCR(session,
 			    &clsm->lsm_tree->stats, bloom_false_positive);
 		/* The active chunk can't have a bloom filter. */
-		else if (clsm->primary_chunk == NULL || i != clsm->nchunks)
-			WT_STAT_INCR(
+		} else if (clsm->primary_chunk == NULL || i != clsm->nchunks)
+			WT_STAT_INCR(session,
 			    &clsm->lsm_tree->stats, lsm_lookup_no_bloom);
 	}
 	ret = WT_NOTFOUND;
@@ -818,8 +819,8 @@ err:	API_END(session);
  *	necessary.
  */
 static inline int
-__clsm_put(
-    WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
+__clsm_put(WT_SESSION_IMPL *session,
+    WT_CURSOR_LSM *clsm, const WT_ITEM *key, const WT_ITEM *value)
 {
 	WT_CURSOR *primary;
 	WT_DECL_RET;

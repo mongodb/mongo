@@ -44,7 +44,7 @@ static int
 wt_snappy_pre_size(WT_COMPRESSOR *, WT_SESSION *, uint8_t *, size_t, size_t *);
 
 static WT_COMPRESSOR wt_snappy_compressor = {
-    wt_snappy_compress, NULL, wt_snappy_decompress, wt_snappy_pre_size };
+    wt_snappy_compress, NULL, wt_snappy_decompress, wt_snappy_pre_size, NULL };
 
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)

@@ -270,13 +270,8 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 static void
 __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
-	/* We should never evict the file's current eviction point. */
-	WT_ASSERT(session, S2BT(session)->evict_page != page);
-
 	/* Make sure a page is not in the eviction request list. */
-	if (exclusive)
-		WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
-	else
+	if (!exclusive)
 		__wt_evict_list_clr_page(session, page);
 
 	/* Discard the page. */
@@ -329,7 +324,6 @@ __rec_review(WT_SESSION_IMPL *session,
 				    ref, ref->page, exclusive, merge, 0));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
-			case WT_REF_EVICT_FORCE:	/* Forced evict */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 				return (EBUSY);

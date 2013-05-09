@@ -168,9 +168,6 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_RET(__wt_config_gets_defno(session, cfg, "force", &cval));
 	force = (cval.val != 0);
 
-	/* Disallow drops from the WiredTiger name space. */
-	WT_RET(__wt_schema_name_check(session, uri));
-
 	WT_RET(__wt_meta_track_on(session));
 
 	/* Be careful to ignore any btree handle in our caller. */

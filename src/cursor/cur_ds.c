@@ -291,10 +291,7 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 
 	metaconf = NULL;
 
-	/*
-	 * Open the WiredTiger cursor and link it onto the linked list (so the
-	 * cleanup on error works).
-	 */
+	/* Open the WiredTiger cursor. */
 	WT_RET(__wt_calloc_def(session, 1, &cursor));
 	*cursor = iface;
 	cursor->session = (WT_SESSION *)session;

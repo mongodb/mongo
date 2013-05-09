@@ -46,15 +46,15 @@
  *	int ret;
  */
 #undef	ERET
-#define	ERET(session, v, ...) do {					\
-	(void)wt_ext->err_printf(					\
-	    wt_ext, session, "memrata: " __VA_ARGS__);			\
+#define	ERET(wtext, session, v, ...) do {				\
+	(void)								\
+	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
 	return (v);							\
 } while (0)
 #undef	ESET
-#define	ESET(session, v, ...) do {					\
-	(void)wt_ext->err_printf(					\
-	    wt_ext, session, "memrata: " __VA_ARGS__);			\
+#define	ESET(wtext, session, v, ...) do {				\
+	(void)								\
+	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
 	if (ret == 0)							\
 		ret = v;						\
 } while (0)
@@ -67,25 +67,25 @@
 		ret = __ret;						\
 } while (0)
 
-typedef struct __data_source {
-	kvs_t kvs;				/* Underlying KVS store */
+typedef struct __kvs_source {
+	kvs_t kvs;				/* Underlying KVS reference */
+	pthread_rwlock_t lock;			/* KVS lock */
 
-	char  *uri;				/* Object URI */
-	pthread_rwlock_t lock;			/* Object lock */
+	char *uri;				/* URI */
+
+	u_int open_cursors;			/* Cursor count */
 
 	uint64_t append_recno;			/* Allocation record number */
 
-	u_int	open_cursors;			/* Object's cursor count */
-
-	struct __data_source *next;		/* List of objects */
-} DATA_SOURCE;
+	struct __kvs_source *next;		/* List of KVS sources */
+} KVS_SOURCE;
 
 typedef struct __cursor {
-	WT_CURSOR wt_cursor;			/* Must come first */
+	WT_CURSOR wtcursor;			/* Must come first */
 
-	WT_SESSION *session;			/* Enclosing session */
+	WT_EXTENSION_API *wtext;		/* Extension functions */
 
-	DATA_SOURCE *data_source;		/* Underlying  KVS object */
+	KVS_SOURCE *ks;				/* Underlying KVS source */
 
 	struct kvs_record record;		/* Record */
 	char   key[KVS_MAX_KEY_LEN];		/* key, value */
@@ -98,17 +98,22 @@ typedef struct __cursor {
 	int	 config_recno;			/* config "key_format=r" */
 } CURSOR;
 
-static WT_EXTENSION_API *wt_ext;		/* Extension functions */
+typedef struct __data_source {
+	WT_DATA_SOURCE wtds;			/* Must come first */
 
-static DATA_SOURCE *data_source_head;		/* List of objects */
-static pthread_rwlock_t global_lock;		/* Object list lock */
+	WT_EXTENSION_API *wtext;		/* Extension functions */
+
+	pthread_rwlock_t global_lock;		/* Global lock */
+
+	KVS_SOURCE *head;			/* List of KVS sources */
+} DATA_SOURCE;
 
 /*
  * os_errno --
  *	Limit our use of errno so it's easy to remove.
  */
 static int
-os_errno()
+os_errno(void)
 {
 	return (errno);
 }
@@ -118,13 +123,14 @@ os_errno()
  *	Initialize an object's lock.
  */
 static int
-lock_init(WT_SESSION *session, pthread_rwlock_t *lockp)
+lock_init(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
-	int ret;
+	int ret = 0;
 
 	if ((ret = pthread_rwlock_init(lockp, NULL)) != 0)
-		ERET(session, WT_PANIC, "lock init: %s", strerror(ret));
-	return (ret);
+		ERET(wtext, session, WT_PANIC, "lock init: %s", strerror(ret));
+	return (0);
 }
 
 /*
@@ -132,12 +138,14 @@ lock_init(WT_SESSION *session, pthread_rwlock_t *lockp)
  *	Destroy an object's lock.
  */
 static int
-lock_destroy(WT_SESSION *session, pthread_rwlock_t *lockp)
+lock_destroy(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
-	int ret;
+	int ret = 0;
 
 	if ((ret = pthread_rwlock_destroy(lockp)) != 0)
-		ERET(session, WT_PANIC, "lock destroy: %s", strerror(ret));
+		ERET(wtext,
+		    session, WT_PANIC, "lock destroy: %s", strerror(ret));
 	return (0);
 }
 
@@ -146,13 +154,15 @@ lock_destroy(WT_SESSION *session, pthread_rwlock_t *lockp)
  *	Acquire a write lock.
  */
 static INLINE int
-writelock(WT_SESSION *session, pthread_rwlock_t *lockp)
+writelock(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
-	int ret;
+	int ret = 0;
 
 	if ((ret = pthread_rwlock_wrlock(lockp)) != 0)
-		ERET(session, WT_PANIC, "lock: %s", strerror(ret));
-	return (ret);
+		ERET(wtext,
+		    session, WT_PANIC, "write-lock: %s", strerror(ret));
+	return (0);
 }
 
 /*
@@ -160,116 +170,120 @@ writelock(WT_SESSION *session, pthread_rwlock_t *lockp)
  *	Release an object's lock.
  */
 static INLINE int
-unlock(WT_SESSION *session, pthread_rwlock_t *lockp)
+unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
-	int ret;
+	int ret = 0;
 
 	if ((ret = pthread_rwlock_unlock(lockp)) != 0)
-		ERET(session, WT_PANIC, "unlock: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC, "unlock: %s", strerror(ret));
 	return (0);
 }
 
 /*
  * copyin_key --
- *	Connect a WT_CURSOR key to a struct kvs_record key.
+ *	Copy a WT_CURSOR key to a struct kvs_record key.
  */
 static INLINE int
-copyin_key(WT_CURSOR *wt_cursor)
+copyin_key(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	size_t size;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
 	r = &cursor->record;
-	ret = 0;
 
-	/*
-	 * XXX
-	 * The underlying KVS library data fields aren't const.
-	 */
 	if (cursor->config_recno) {
-		if ((ret = wt_ext->struct_size(wt_ext, session,
-		    &size, "r", wt_cursor->recno)) != 0 ||
-		    (ret = wt_ext->struct_pack(wt_ext, session,
-		    r->key, sizeof(r->key), "r", wt_cursor->recno)) != 0)
+		if ((ret = wtext->struct_size(wtext, session,
+		    &size, "r", wtcursor->recno)) != 0 ||
+		    (ret = wtext->struct_pack(wtext, session,
+		    r->key, sizeof(r->key), "r", wtcursor->recno)) != 0)
 			return (ret);
 		r->key_len = size;
 	} else {
-		r->key = (char *)wt_cursor->key.data;
-		r->key_len = (unsigned long)wt_cursor->key.size;
+		/*
+		 * XXX
+		 * The underlying KVS library data fields aren't const.
+		 */
+		r->key = (char *)wtcursor->key.data;
+		r->key_len = (unsigned long)wtcursor->key.size;
 	}
 	return (0);
 }
 
 /*
  * copyout_key --
- *	Connect a struct kvs_record key to a WT_CURSOR key.
+ *	Copy a struct kvs_record key to a WT_CURSOR key.
  */
 static INLINE int
-copyout_key(WT_CURSOR *wt_cursor)
+copyout_key(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
 	r = &cursor->record;
-	ret = 0;
 
 	if (cursor->config_recno) {
-		if ((ret = wt_ext->struct_unpack(wt_ext, session,
-		    r->key, sizeof(r->key), "r", &wt_cursor->recno)) != 0)
+		if ((ret = wtext->struct_unpack(wtext, session,
+		    r->key, sizeof(r->key), "r", &wtcursor->recno)) != 0)
 			return (ret);
 	} else {
-		wt_cursor->key.data = r->key;
-		wt_cursor->key.size = (uint32_t)r->key_len;
+		wtcursor->key.data = r->key;
+		wtcursor->key.size = (uint32_t)r->key_len;
 	}
 	return (0);
 }
 
 /*
  * copyin_val --
- *	Connect a WT_CURSOR value to a struct kvs_record value .
+ *	Copy a WT_CURSOR value to a struct kvs_record value .
  */
 static INLINE int
-copyin_val(WT_CURSOR *wt_cursor)
+copyin_val(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
 
-	cursor = (CURSOR *)wt_cursor;
+	cursor = (CURSOR *)wtcursor;
 	r = &cursor->record;
 
 	/*
 	 * XXX
 	 * The underlying KVS library data fields aren't const.
 	 */
-	r->val = (char *)wt_cursor->value.data;
-	r->val_len = (unsigned long)wt_cursor->value.size;
+	r->val = (char *)wtcursor->value.data;
+	r->val_len = (unsigned long)wtcursor->value.size;
 	return (0);
 }
 
 /*
  * copyout_val --
- *	Connect a struct kvs_record value to a WT_CURSOR value.
+ *	Copy a struct kvs_record value to a WT_CURSOR value.
  */
 static INLINE int
-copyout_val(WT_CURSOR *wt_cursor)
+copyout_val(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
 
-	cursor = (CURSOR *)wt_cursor;
+	cursor = (CURSOR *)wtcursor;
 	r = &cursor->record;
 
-	wt_cursor->value.data = r->val;
-	wt_cursor->value.size = (uint32_t)r->val_len;
+	wtcursor->value.data = r->val;
+	wtcursor->value.size = (uint32_t)r->val_len;
 	return (0);
 }
 
@@ -278,22 +292,27 @@ copyout_val(WT_CURSOR *wt_cursor)
  *	Copy the key for methods where the underlying KVS call returns a key.
  */
 static INLINE int
-copy_key(WT_CURSOR *wt_cursor)
+copy_key(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
 	r = &cursor->record;
 
 	if (cursor->key == r->key)
 		return (0);
+
 	if (r->key_len > sizeof(cursor->key))
-		ERET(session, ERANGE,
+		ERET(wtext, session, ERANGE,
 		    "key too large, maximum is %" PRIuMAX,
 		    (uintmax_t)sizeof(cursor->key));
+
 	memcpy(cursor->key, r->key, r->key_len);
 	r->key = cursor->key;
 	return (0);
@@ -304,20 +323,21 @@ copy_key(WT_CURSOR *wt_cursor)
  *	Call a KVS function.
  */
 static INLINE int
-kvs_call(WT_CURSOR *wt_cursor, const char *fname,
+kvs_call(WT_CURSOR *wtcursor, const char *fname,
     int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
 {
 	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	kvs_t kvs;
-	int ret;
+	int ret = 0;
 	char *p;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
-	kvs = cursor->data_source->kvs;
-	ret = 0;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
 
+	kvs = cursor->ks->kvs;
 	cursor->record.val = cursor->val;
 
 restart:
@@ -325,7 +345,8 @@ restart:
 	    (unsigned long)0, (unsigned long)cursor->val_len)) != 0) {
 		if (ret == KVS_E_KEY_NOT_FOUND)
 			return (WT_NOTFOUND);
-		ERET(session, WT_ERROR, "%s: %s", fname, kvs_strerror(ret));
+		ERET(wtext,
+		    session, WT_ERROR, "%s: %s", fname, kvs_strerror(ret));
 	}
 
 	/*
@@ -356,7 +377,7 @@ restart:
 		    (unsigned long)0, (unsigned long)cursor->val_len)) != 0) {
 			if (ret == KVS_E_KEY_NOT_FOUND)
 				goto restart;
-			ERET(session,
+			ERET(wtext, session,
 			    WT_ERROR, "kvs_get: %s", kvs_strerror(ret));
 		}
 	}
@@ -368,17 +389,17 @@ restart:
  *	WT_CURSOR::next method.
  */
 static int
-kvs_cursor_next(WT_CURSOR *wt_cursor)
+kvs_cursor_next(WT_CURSOR *wtcursor)
 {
-	int ret;
+	int ret = 0;
 
-	if ((ret = copy_key(wt_cursor)) != 0)
+	if ((ret = copy_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = kvs_call(wt_cursor, "kvs_next", kvs_next)) != 0)
+	if ((ret = kvs_call(wtcursor, "kvs_next", kvs_next)) != 0)
 		return (ret);
-	if ((ret = copyout_key(wt_cursor)) != 0)
+	if ((ret = copyout_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = copyout_val(wt_cursor)) != 0)
+	if ((ret = copyout_val(wtcursor)) != 0)
 		return (ret);
 	return (0);
 }
@@ -388,17 +409,17 @@ kvs_cursor_next(WT_CURSOR *wt_cursor)
  *	WT_CURSOR::prev method.
  */
 static int
-kvs_cursor_prev(WT_CURSOR *wt_cursor)
+kvs_cursor_prev(WT_CURSOR *wtcursor)
 {
-	int ret;
+	int ret = 0;
 
-	if ((ret = copy_key(wt_cursor)) != 0)
+	if ((ret = copy_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = kvs_call(wt_cursor, "kvs_prev", kvs_prev)) != 0)
+	if ((ret = kvs_call(wtcursor, "kvs_prev", kvs_prev)) != 0)
 		return (ret);
-	if ((ret = copyout_key(wt_cursor)) != 0)
+	if ((ret = copyout_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = copyout_val(wt_cursor)) != 0)
+	if ((ret = copyout_val(wtcursor)) != 0)
 		return (ret);
 	return (0);
 }
@@ -408,11 +429,11 @@ kvs_cursor_prev(WT_CURSOR *wt_cursor)
  *	WT_CURSOR::reset method.
  */
 static int
-kvs_cursor_reset(WT_CURSOR *wt_cursor)
+kvs_cursor_reset(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
 
-	cursor = (CURSOR *)wt_cursor;
+	cursor = (CURSOR *)wtcursor;
 
 	/*
 	 * Reset the cursor by setting the key length to 0, causing subsequent
@@ -427,15 +448,15 @@ kvs_cursor_reset(WT_CURSOR *wt_cursor)
  *	WT_CURSOR::search method.
  */
 static int
-kvs_cursor_search(WT_CURSOR *wt_cursor)
+kvs_cursor_search(WT_CURSOR *wtcursor)
 {
-	int ret;
+	int ret = 0;
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = kvs_call(wt_cursor, "kvs_get", kvs_get)) != 0)
+	if ((ret = kvs_call(wtcursor, "kvs_get", kvs_get)) != 0)
 		return (ret);
-	if ((ret = copyout_val(wt_cursor)) != 0)
+	if ((ret = copyout_val(wtcursor)) != 0)
 		return (ret);
 	return (0);
 }
@@ -445,9 +466,9 @@ kvs_cursor_search(WT_CURSOR *wt_cursor)
  *	WT_CURSOR::search_near method.
  */
 static int
-kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
+kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
 {
-	int ret;
+	int ret = 0;
 
 	/*
 	 * XXX
@@ -459,7 +480,7 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 	 */
 
 	/* Search for an exact match. */
-	if ((ret = kvs_cursor_search(wt_cursor)) == 0) {
+	if ((ret = kvs_cursor_search(wtcursor)) == 0) {
 		*exact = 0;
 		return (0);
 	}
@@ -467,7 +488,7 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 		return (ret);
 
 	/* Search for a key that's larger. */
-	if ((ret = kvs_cursor_next(wt_cursor)) == 0) {
+	if ((ret = kvs_cursor_next(wtcursor)) == 0) {
 		*exact = 1;
 		return (0);
 	}
@@ -475,7 +496,7 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
 		return (ret);
 
 	/* Search for a key that's smaller. */
-	if ((ret = kvs_cursor_prev(wt_cursor)) == 0) {
+	if ((ret = kvs_cursor_prev(wtcursor)) == 0) {
 		*exact = -1;
 		return (0);
 	}
@@ -488,19 +509,23 @@ kvs_cursor_search_near(WT_CURSOR *wt_cursor, int *exact)
  *	Allocate a new record number.
  */
 static INLINE int
-kvs_recno_alloc(WT_CURSOR *wt_cursor)
+kvs_recno_alloc(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+	ks = cursor->ks;
+
 	r = &cursor->record;
 
-	/* Lock the data-source. */
-	if ((ret = writelock(session, &cursor->data_source->lock)) != 0)
+	if ((ret = writelock(wtext, session, &ks->lock)) != 0)
 		return (ret);
 
 	/*
@@ -517,20 +542,19 @@ kvs_recno_alloc(WT_CURSOR *wt_cursor)
 	 * write the transactional code, because that's going to change all of
 	 * the locking in here.
 	 */
-	if (cursor->data_source->append_recno == 0) {
-		if ((ret = kvs_last(cursor->data_source->kvs,
+	if (ks->append_recno == 0) {
+		if ((ret = kvs_last(ks->kvs,
 		    &cursor->record, (unsigned long)0, (unsigned long)0)) != 0)
 			goto err;
 
-		if ((ret = wt_ext->struct_unpack(wt_ext, session,
-		    r->key, sizeof(r->key),
-		    "r", &cursor->data_source->append_recno)) != 0)
+		if ((ret = wtext->struct_unpack(wtext, session,
+		    r->key, sizeof(r->key), "r", &ks->append_recno)) != 0)
 			goto err;
 	}
 
-	wt_cursor->recno = ++cursor->data_source->append_recno;
+	wtcursor->recno = ++ks->append_recno;
 
-err:	ETRET(unlock(session, &cursor->data_source->lock));
+err:	ETRET(unlock(wtext, session, &ks->lock));
 	return (ret);
 }
 
@@ -539,23 +563,26 @@ err:	ETRET(unlock(session, &cursor->data_source->lock));
  *	WT_CURSOR::insert method.
  */
 static int
-kvs_cursor_insert(WT_CURSOR *wt_cursor)
+kvs_cursor_insert(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
-	ret = 0;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+	ks = cursor->ks;
 
 	/* Allocate a new record for append operations. */
-	if (cursor->config_append && (ret = kvs_recno_alloc(wt_cursor)) != 0)
+	if (cursor->config_append && (ret = kvs_recno_alloc(wtcursor)) != 0)
 		return (ret);
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = copyin_val(wt_cursor)) != 0)
+	if ((ret = copyin_val(wtcursor)) != 0)
 		return (ret);
 
 	/*
@@ -566,16 +593,14 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
 	 * does not exist, fail if it does exist), maps to kvs_add.
 	 */
 	if (cursor->config_overwrite) {
-		if ((ret = kvs_set(
-		    cursor->data_source->kvs, &cursor->record)) != 0)
-			ERET(session, WT_ERROR,
+		if ((ret = kvs_set(ks->kvs, &cursor->record)) != 0)
+			ERET(wtext, session, WT_ERROR,
 			    "kvs_set: %s", kvs_strerror(ret));
 	} else
-		if ((ret = kvs_add(
-		    cursor->data_source->kvs, &cursor->record)) != 0) {
+		if ((ret = kvs_add(ks->kvs, &cursor->record)) != 0) {
 			if (ret == KVS_E_KEY_EXISTS)
 				return (WT_DUPLICATE_KEY);
-			ERET(session, WT_ERROR,
+			ERET(wtext, session, WT_ERROR,
 			    "kvs_add: %s", kvs_strerror(ret));
 		}
 	return (0);
@@ -586,26 +611,31 @@ kvs_cursor_insert(WT_CURSOR *wt_cursor)
  *	WT_CURSOR::update method.
  */
 static int
-kvs_cursor_update(WT_CURSOR *wt_cursor)
+kvs_cursor_update(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+	ks = cursor->ks;
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = copyin_val(wt_cursor)) != 0)
+	if ((ret = copyin_val(wtcursor)) != 0)
 		return (ret);
 
 	/*
 	 * WT_CURSOR::update (update the record if it does exist, fail if it
 	 * does not exist), maps to kvs_replace.
 	 */
-	if ((ret = kvs_replace(cursor->data_source->kvs, &cursor->record)) != 0)
-		ERET(session, WT_ERROR, "kvs_replace: %s", kvs_strerror(ret));
+	if ((ret = kvs_replace(ks->kvs, &cursor->record)) != 0)
+		ERET(wtext,
+		    session, WT_ERROR, "kvs_replace: %s", kvs_strerror(ret));
 
 	return (0);
 }
@@ -615,33 +645,36 @@ kvs_cursor_update(WT_CURSOR *wt_cursor)
  *	WT_CURSOR::remove method.
  */
 static int
-kvs_cursor_remove(WT_CURSOR *wt_cursor)
+kvs_cursor_remove(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
-	ret = 0;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+	ks = cursor->ks;
 
 	/*
 	 * WiredTiger's "remove" of a bitfield is really an update with a value
 	 * of a single byte of zero.
 	 */
 	if (cursor->config_bitfield) {
-		wt_cursor->value.size = 1;
-		wt_cursor->value.data = "\0";
-		return (kvs_cursor_update(wt_cursor));
+		wtcursor->value.size = 1;
+		wtcursor->value.data = "\0";
+		return (kvs_cursor_update(wtcursor));
 	}
 
-	if ((ret = copyin_key(wt_cursor)) != 0)
+	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
-	if ((ret = kvs_del(cursor->data_source->kvs, &cursor->record)) == 0)
+	if ((ret = kvs_del(ks->kvs, &cursor->record)) == 0)
 		return (0);
 	if (ret == KVS_E_KEY_NOT_FOUND)
 		return (WT_NOTFOUND);
-	ERET(session, WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
+	ERET(wtext, session, WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
 }
 
 /*
@@ -649,20 +682,23 @@ kvs_cursor_remove(WT_CURSOR *wt_cursor)
  *	WT_CURSOR::close method.
  */
 static int
-kvs_cursor_close(WT_CURSOR *wt_cursor)
+kvs_cursor_close(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	int ret;
+	int ret = 0;
 
-	cursor = (CURSOR *)wt_cursor;
-	session = cursor->session;
-	ret = 0;
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+	ks = cursor->ks;
 
-	if ((ret = writelock(session, &global_lock)) != 0)
+	if ((ret = writelock(wtext, session, &ks->lock)) != 0)
 		goto err;
-	--cursor->data_source->open_cursors;
-	if ((ret = unlock(session, &global_lock)) != 0)
+	--ks->open_cursors;
+	if ((ret = unlock(wtext, session, &ks->lock)) != 0)
 		goto err;
 
 err:	free(cursor->val);
@@ -710,12 +746,10 @@ static const KVS_OPTIONS kvs_options[] = {
  * process.
  */
 static int
-kvs_config_add(WT_CONNECTION *conn)
+kvs_config_add(WT_CONNECTION *connection, WT_EXTENSION_API *wtext)
 {
 	const KVS_OPTIONS *p;
-	int ret;
-
-	ret = 0;
+	int ret = 0;
 
 	/*
 	 * KVS options are currently only allowed on session.create, which means
@@ -723,13 +757,13 @@ kvs_config_add(WT_CONNECTION *conn)
 	 * is permanent.
 	 */
 	for (p = kvs_options; p->name != NULL; ++p)
-		if ((ret = conn->configure_method(conn,
+		if ((ret = connection->configure_method(connection,
 		    "session.create", "memrata:",
 		    p->name, p->type, p->checks)) != 0)
-			ERET(NULL, ret,
+			ERET(wtext, NULL, ret,
 			    "WT_CONNECTION.configure_method: session.create: "
 			    "{%s, %s, %s}",
-			    p->name, p->type, p->checks, wt_ext->strerror(ret));
+			    p->name, p->type, p->checks, wtext->strerror(ret));
 	return (0);
 }
 
@@ -738,29 +772,29 @@ kvs_config_add(WT_CONNECTION *conn)
  *	Convert the device list into an argv[] array.
  */
 static int
-kvs_config_devices(WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
+kvs_config_devices(WT_EXTENSION_API *wtext,
+    WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
 	size_t len;
 	u_int cnt, slots;
-	int ret;
+	int ret = 0;
 	char **argv, **p;
 
-	ret = 0;
 	argv = NULL;
 
 	/* Set up the scan of the device list. */
-	if ((ret = wt_ext->config_scan_begin(
-	    wt_ext, session, orig->str, orig->len, &scan)) != 0) {
-		ESET(session, ret,
+	if ((ret = wtext->config_scan_begin(
+	    wtext, session, orig->str, orig->len, &scan)) != 0) {
+		ESET(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_begin: %s",
-		    wt_ext->strerror(ret));
+		    wtext->strerror(ret));
 		return (ret);
 	}
 
-	for (cnt = slots = 0; (ret = wt_ext->
-	    config_scan_next(wt_ext, scan, &k, &v)) == 0; ++cnt) {
+	for (cnt = slots = 0; (ret = wtext->
+	    config_scan_next(wtext, scan, &k, &v)) == 0; ++cnt) {
 		if (cnt + 1 >= slots) {		/* NULL-terminate the array */
 			len = slots + 20 * sizeof(*argv);
 			if ((p = realloc(argv, len)) == NULL) {
@@ -771,7 +805,7 @@ kvs_config_devices(WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
 			slots += 20;
 		}
 		len = k.len + 1;
-		if ((argv[cnt] = (char *)calloc(len, sizeof(**argv))) == NULL) {
+		if ((argv[cnt] = calloc(len, sizeof(**argv))) == NULL) {
 			ret = os_errno();
 			goto err;
 		}
@@ -779,15 +813,15 @@ kvs_config_devices(WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
 		memcpy(argv[cnt], k.str, k.len);
 	}
 	if (ret != WT_NOTFOUND) {
-		ESET(session, ret,
+		ESET(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_next: %s",
-		    wt_ext->strerror(ret));
+		    wtext->strerror(ret));
 		return (ret);
 	}
-	if ((ret = wt_ext->config_scan_end(wt_ext, scan)) != 0) {
-		ESET(session, ret,
+	if ((ret = wtext->config_scan_end(wtext, scan)) != 0) {
+		ESET(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_end: %s",
-		    wt_ext->strerror(ret));
+		    wtext->strerror(ret));
 		return (ret);
 	}
 
@@ -807,18 +841,17 @@ err:	if (argv != NULL) {
  *	Read KVS configuration.
  */
 static int
-kvs_config_read(WT_SESSION *session, WT_CONFIG_ARG *config,
+kvs_config_read(WT_EXTENSION_API *wtext,
+    WT_SESSION *session, WT_CONFIG_ARG *config,
     char ***devices, struct kvs_config *kvs_config, int *flagsp)
 {
 	const KVS_OPTIONS *p;
 	WT_CONFIG_ITEM v;
-	int ret;
+	int ret = 0;
 	char *t, name[128];
 
 	*flagsp = 0;				/* Clear return values */
 	memset(kvs_config, 0, sizeof(*kvs_config));
-
-	ret = 0;
 
 	for (p = kvs_options; p->name != NULL; ++p) {
 		/* Truncate the name, discarding the trailing value. */
@@ -826,14 +859,14 @@ kvs_config_read(WT_SESSION *session, WT_CONFIG_ARG *config,
 		if ((t = strchr(name, '=')) != NULL)
 			*t = '\0';
 		if ((ret =
-		    wt_ext->config_get(wt_ext, session, config, name, &v)) != 0)
-			ERET(session, ret,
+		    wtext->config_get(wtext, session, config, name, &v)) != 0)
+			ERET(wtext, session, ret,
 			    "WT_EXTENSION_API.config: %s: %s",
-			    name, wt_ext->strerror(ret));
+			    name, wtext->strerror(ret));
 
 		if (strcmp(name, "kvs_devices") == 0) {
-			if ((ret =
-			    kvs_config_devices(session, &v, devices)) != 0)
+			if ((ret = kvs_config_devices(
+			    wtext, session, &v, devices)) != 0)
 				return (ret);
 			continue;
 		}
@@ -897,16 +930,21 @@ kvs_create_path_string(char **devices)
  *	Drop a data source from our list, closing any underlying KVS handle.
  */
 static int
-drop_data_source(WT_SESSION *session, const char *uri)
+drop_data_source(WT_DATA_SOURCE *wtds, WT_SESSION *session, const char *uri)
 {
-	DATA_SOURCE *p, **ref;
-	int ret;
+	DATA_SOURCE *ds;
+	KVS_SOURCE *p, **ref;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 
-	if ((ret = writelock(session, &global_lock)) != 0)
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	if ((ret = writelock(wtext, session, &ds->global_lock)) != 0)
 		return (ret);
 
 	/* Search our list of objects for a match. */
-	for (ref = &data_source_head; (p = *ref) != NULL; p = p->next)
+	for (ref = &ds->head; (p = *ref) != NULL; p = p->next)
 		if (strcmp(p->uri, uri) == 0)
 			break;
 
@@ -920,16 +958,16 @@ drop_data_source(WT_SESSION *session, const char *uri)
 			ret = EBUSY;
 	} else {
 		if ((ret = kvs_close(p->kvs)) != 0)
-			ESET(session, WT_ERROR,
+			ESET(wtext, session, WT_ERROR,
 			    "kvs_close: %s: %s", uri, kvs_strerror(ret));
 		*ref = p->next;
 
+		ETRET(lock_destroy(wtext, session, &p->lock));
 		free(p->uri);
-		ETRET(lock_destroy(session, &p->lock));
 		free(p);
 	}
 
-	ETRET(unlock(session, &global_lock));
+	ETRET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
 }
 
@@ -938,15 +976,18 @@ drop_data_source(WT_SESSION *session, const char *uri)
  *	WT_SESSION::create method.
  */
 static int
-kvs_session_create(WT_DATA_SOURCE *dsrc,
+kvs_session_create(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	struct kvs_config kvs_config;
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
 	kvs_t kvs;
-	int flags, ret;
+	int flags, ret = 0;
 	char **devices, *emsg;
 
-	(void)dsrc;				/* Unused parameters */
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 
 	devices = NULL;
 	emsg = NULL;
@@ -956,17 +997,17 @@ kvs_session_create(WT_DATA_SOURCE *dsrc,
 	 * care about is if it's busy, we don't want to continue in the face
 	 * of open cursors.
 	 */
-	if ((ret = drop_data_source(session, uri)) != 0)
+	if ((ret = drop_data_source(wtds, session, uri)) != 0)
 		return (ret);
 
 	/* Read the configuration. */
 	if ((ret = kvs_config_read(
-	    session, config, &devices, &kvs_config, &flags)) != 0)
+	    wtext, session, config, &devices, &kvs_config, &flags)) != 0)
 		goto err;
 
 	/* We require a list of devices underlying the URI. */
 	if (devices[0] == NULL) {
-		ESET(session, EINVAL,
+		ESET(wtext, session, EINVAL,
 		    "WT_SESSION.create: no devices specified");
 		goto err;
 	}
@@ -978,14 +1019,14 @@ kvs_session_create(WT_DATA_SOURCE *dsrc,
 	if ((kvs =
 	    kvs_open(devices, &kvs_config, flags | KVS_O_CREATE)) == NULL) {
 		emsg = kvs_create_path_string(devices);
-		ESET(session, WT_ERROR,
+		ESET(wtext, session, WT_ERROR,
 		    "WT_SESSION.create: kvs_open: %s: %s",
 		    emsg == NULL ? devices[0] : emsg, kvs_strerror(os_errno()));
 		goto err;
 	}
 	if ((ret = kvs_close(kvs)) != 0) {
 		emsg = kvs_create_path_string(devices);
-		ESET(session, WT_ERROR,
+		ESET(wtext, session, WT_ERROR,
 		    "%s: WT_SESSION.create: kvs_close: %s: %s",
 		    emsg == NULL ? devices[0] : emsg, kvs_strerror(ret));
 		goto err;
@@ -1001,11 +1042,10 @@ err:	free(emsg);
  *	WT_SESSION::drop method.
  */
 static int
-kvs_session_drop(WT_DATA_SOURCE *dsrc,
+kvs_session_drop(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
-	(void)dsrc;				/* Unused parameters */
-	(void)config;
+	(void)config;				/* Unused parameters */
 
 	/*
 	 * Discard the URI from our list.  The KVS object might still exist on
@@ -1014,7 +1054,7 @@ kvs_session_drop(WT_DATA_SOURCE *dsrc,
 	 * object can (must) be re-created, WiredTiger won't allow any other
 	 * calls.
 	 */
-	return (drop_data_source(session, uri));
+	return (drop_data_source(wtds, session, uri));
 }
 
 /*
@@ -1022,38 +1062,44 @@ kvs_session_drop(WT_DATA_SOURCE *dsrc,
  *	Open a new data source and insert it into the list.
  */
 static int
-open_data_source(WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
+open_data_source(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	struct kvs_config kvs_config;
-	DATA_SOURCE *data_source, *p;
-	int ds_lockinit, flags, locked, ret;
+	DATA_SOURCE *ds;
+	KVS_SOURCE *ks, *p;
+	WT_EXTENSION_API *wtext;
+	int flags, locked, lockinit, ret = 0;
 	char **devices, *emsg;
 
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	ks = NULL;
 	devices = NULL;
 	emsg = NULL;
-	ds_lockinit = locked = ret = 0;
+	lockinit = locked = 0;
 
 	/*
 	 * The first time we open a cursor on an object, allocate an underlying
-	 * data source object.
+	 * KVS source object.
 	 */
-	if ((data_source =
-	    (DATA_SOURCE *)calloc(1, sizeof(DATA_SOURCE))) == NULL)
+	if ((ks = calloc(1, sizeof(KVS_SOURCE))) == NULL)
 		return (os_errno());
-	if ((data_source->uri = strdup(uri)) == NULL)
+	if ((ret = lock_init(wtext, session, &ks->lock)) != 0)
 		goto err;
-	if ((ret = lock_init(session, &data_source->lock)) != 0)
+	lockinit = 1;
+	if ((ks->uri = strdup(uri)) == NULL)
 		goto err;
-	ds_lockinit = 1;
 
 	/* Read the configuration. */
-	if ((ret = kvs_config_read(
+	if ((ret = kvs_config_read(wtext,
 	    session, config, &devices, &kvs_config, &flags)) != 0)
 		goto err;
 
 	/* We require a list of devices underlying the URI. */
 	if (devices[0] == NULL) {
-		ESET(
+		ESET(wtext,
 		    session, EINVAL, "WT_SESSION.create: no devices specified");
 		goto err;
 	}
@@ -1062,7 +1108,7 @@ open_data_source(WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 	 * kvs_open isn't re-entrant: lock things down while we make sure we
 	 * don't have more than a single handle at a time.
 	 */
-	if ((ret = writelock(session, &global_lock)) != 0)
+	if ((ret = writelock(wtext, session, &ds->global_lock)) != 0)
 		goto err;
 	locked = 1;
 
@@ -1070,34 +1116,32 @@ open_data_source(WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 	 * Check for a match: if we find one, we raced, but we return success,
 	 * someone else did the work.
 	 */
-	for (p = data_source_head; p != NULL; p = p->next)
+	for (p = ds->head; p != NULL; p = p->next)
 		if (strcmp(p->uri, uri) == 0)
 			goto err;
 
 	/* Open the KVS handle. */
-	if ((data_source->kvs =
-	    kvs_open(devices, &kvs_config, flags)) == NULL) {
+	if ((ks->kvs = kvs_open(devices, &kvs_config, flags)) == NULL) {
 		emsg = kvs_create_path_string(devices);
-		ESET(session, WT_ERROR,
+		ESET(wtext, session, WT_ERROR,
 		    "WT_SESSION.create: kvs_open: %s: %s",
 		    emsg == NULL ? devices[0] : emsg, kvs_strerror(os_errno()));
 		goto err;
 	}
 
 	/* Insert the new entry at the head of the list. */
-	data_source->next = data_source_head;
-	data_source_head = data_source;
-	data_source = NULL;
+	ks->next = ds->head;
+	ds->head = ks;
+	ks = NULL;
 
 err:	if (locked)
-		ETRET(unlock(session, &global_lock));
+		ETRET(unlock(wtext, session, &ds->global_lock));
 
-	if (data_source != NULL) {
-		if (data_source->uri != NULL)
-			free(data_source->uri);
-		if (ds_lockinit)
-			ETRET(lock_destroy(session, &data_source->lock));
-		free(data_source);
+	if (ks != NULL) {
+		if (lockinit)
+			ETRET(lock_destroy(wtext, session, &ks->lock));
+		free(ks->uri);
+		free(ks);
 	}
 	free(devices);
 	free(emsg);
@@ -1109,96 +1153,98 @@ err:	if (locked)
  *	WT_SESSION::open_cursor method.
  */
 static int
-kvs_session_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
 {
 	CURSOR *cursor;
-	DATA_SOURCE *p;
+	DATA_SOURCE *ds;
+	KVS_SOURCE *p;
 	WT_CONFIG_ITEM v;
-	int ret;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 
-	(void)dsrc;				/* Unused parameters */
+	*new_cursor = NULL;
 
 	cursor = NULL;
-	ret = 0;
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 
 	/* Allocate and initialize a cursor. */
-	if ((cursor = (CURSOR *)calloc(1, sizeof(CURSOR))) == NULL)
+	if ((cursor = calloc(1, sizeof(CURSOR))) == NULL)
 		return (os_errno());
 
-	cursor->session = session;
+	cursor->wtcursor.next = kvs_cursor_next;
+	cursor->wtcursor.prev = kvs_cursor_prev;
+	cursor->wtcursor.reset = kvs_cursor_reset;
+	cursor->wtcursor.search = kvs_cursor_search;
+	cursor->wtcursor.search_near = kvs_cursor_search_near;
+	cursor->wtcursor.insert = kvs_cursor_insert;
+	cursor->wtcursor.update = kvs_cursor_update;
+	cursor->wtcursor.remove = kvs_cursor_remove;
+	cursor->wtcursor.close = kvs_cursor_close;
+
+	cursor->wtext = ds->wtext;
+
 	cursor->record.key = cursor->key;
 	if ((cursor->val = malloc(128)) == NULL)
 		goto err;
 	cursor->val_len = 128;
-						/* Initialize the methods */
-	cursor->wt_cursor.next = kvs_cursor_next;
-	cursor->wt_cursor.prev = kvs_cursor_prev;
-	cursor->wt_cursor.reset = kvs_cursor_reset;
-	cursor->wt_cursor.search = kvs_cursor_search;
-	cursor->wt_cursor.search_near = kvs_cursor_search_near;
-	cursor->wt_cursor.insert = kvs_cursor_insert;
-	cursor->wt_cursor.update = kvs_cursor_update;
-	cursor->wt_cursor.remove = kvs_cursor_remove;
-	cursor->wt_cursor.close = kvs_cursor_close;
-
 						/* Parse configuration */
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "append", &v)) != 0) {
-		ESET(session, ret,
-		    "append configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "append", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "append configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
 
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "overwrite", &v)) != 0) {
-		ESET(session, ret,
-		    "overwrite configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "overwrite", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "overwrite configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
 
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "key_format", &v)) != 0) {
-		ESET(session, ret,
-		    "key_format configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "key_format", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "key_format configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
 
-	if ((ret = wt_ext->config_get(
-	    wt_ext, session, config, "value_format", &v)) != 0) {
-		ESET(session, ret,
-		    "value_format configuration: %s", wt_ext->strerror(ret));
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "value_format", &v)) != 0) {
+		ESET(wtext, session, ret,
+		    "value_format configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_bitfield =
 	    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
 	/*
-	 * See if the object already exists: if it does, increment the count of
-	 * open cursors to pin it, and release the lock.
+	 * See if the KVS source already exists: if it does, increment the count
+	 * of open cursors to pin it, and release the lock.
 	 */
 	for (;;) {
-		if ((ret = writelock(session, &global_lock)) != 0)
+		if ((ret = writelock(wtext, session, &ds->global_lock)) != 0)
 			goto err;
-		for (p = data_source_head; p != NULL; p = p->next)
+		for (p = ds->head; p != NULL; p = p->next)
 			if (strcmp(p->uri, uri) == 0) {
 				++p->open_cursors;
 				break;
 			}
-		if ((ret = unlock(session, &global_lock)) != 0)
+		if ((ret = unlock(wtext, session, &ds->global_lock)) != 0)
 			goto err;
 		if (p != NULL) {
-			cursor->data_source = p;
-
+			cursor->ks = p;
 			*new_cursor = (WT_CURSOR *)cursor;
 			return (0);
 		}
 
 		/* Create the object. */
-		if ((ret = open_data_source(session, uri, config)) != 0)
+		if ((ret = open_data_source(wtds, session, uri, config)) != 0)
 			goto err;
 
 		/*
@@ -1208,8 +1254,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 err:	if (cursor != NULL) {
-		if (cursor->val != NULL)
-			free(cursor->val);
+		free(cursor->val);
 		free(cursor);
 	}
 	return (ret);
@@ -1220,15 +1265,14 @@ err:	if (cursor != NULL) {
  *	WT_SESSION::rename method.
  */
 static int
-kvs_session_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, const char *newname, WT_CONFIG_ARG *config)
 {
-	(void)dsrc;				/* Unused parameters */
-	(void)newname;
+	(void)newname;				/* Unused parameters */
 	(void)config;
 
 	/* Discard the URI from our list. */
-	return (drop_data_source(session, uri));
+	return (drop_data_source(wtds, session, uri));
 }
 
 /*
@@ -1236,13 +1280,16 @@ kvs_session_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
  *	WT_SESSION::truncate method.
  */
 static int
-kvs_session_truncate(WT_DATA_SOURCE *dsrc,
+kvs_session_truncate(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
-	DATA_SOURCE *p;
-	int ret, tret;
+	DATA_SOURCE *ds;
+	KVS_SOURCE *p;
+	WT_EXTENSION_API *wtext;
+	int tret, ret = 0;
 
-	(void)dsrc;				/* Unused parameters */
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 
 	/*
 	 * Truncate should work even if the object is not yet opened: if we
@@ -1250,30 +1297,32 @@ kvs_session_truncate(WT_DATA_SOURCE *dsrc,
 	 * race with other threads creating/deleting the object.
 	 */
 	for (;;) {
-		if ((ret = writelock(session, &global_lock)) != 0)
+		if ((ret = writelock(wtext, session, &ds->global_lock)) != 0)
 			return (ret);
 
 		/* Search our list of objects for a match. */
-		for (p = data_source_head; p != NULL; p = p->next)
+		for (p = ds->head; p != NULL; p = p->next)
 			if (strcmp(p->uri, uri) == 0)
 				break;
 
 		/* If we don't find the object, open it. */
 		if (p == NULL) {
-			if ((ret = unlock(session, &global_lock)) != 0)
+			if ((ret =
+			    unlock(wtext, session, &ds->global_lock)) != 0)
 				return (ret);
-			if ((ret = open_data_source(session, uri, config)) != 0)
+			if ((ret =
+			    open_data_source(wtds, session, uri, config)) != 0)
 				return (ret);
 			continue;
 		}
 		if (p->open_cursors == 0) {
 			if ((tret = kvs_truncate(p->kvs)) != 0)
-				ESET(NULL, WT_ERROR,
+				ESET(wtext, session, WT_ERROR,
 				    "kvs_truncate: %s: %s",
 				    p->uri, kvs_strerror(tret));
 		} else
 			ret = EBUSY;
-		ETRET(unlock(session, &global_lock));
+		ETRET(unlock(wtext, session, &ds->global_lock));
 		return (ret);
 	}
 	/* NOTREACHED */
@@ -1284,14 +1333,66 @@ kvs_session_truncate(WT_DATA_SOURCE *dsrc,
  *	WT_SESSION::verify method.
  */
 static int
-kvs_session_verify(WT_DATA_SOURCE *dsrc,
+kvs_session_verify(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
-	(void)dsrc;				/* Unused parameters */
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+
 	(void)uri;
 	(void)config;
 
-	ERET(session, ENOTSUP, "verify: %s", strerror(ENOTSUP));
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	ERET(wtext, session, ENOTSUP, "verify: %s", strerror(ENOTSUP));
+}
+
+/*
+ * kvs_terminate --
+ *	Unload the data-source.
+ */
+static int
+kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
+{
+	DATA_SOURCE *ds;
+	KVS_SOURCE *p;
+	WT_EXTENSION_API *wtext;
+	int tret, ret = 0;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	ret = writelock(wtext, session, &ds->global_lock);
+
+	/* Start a flush on any open objects. */
+	for (p = ds->head; p != NULL; p = p->next)
+		if ((tret = kvs_commit(p->kvs)) != 0)
+			ESET(wtext, session, WT_ERROR,
+			    "kvs_commit: %s: %s", p->uri, kvs_strerror(tret));
+
+	/* Complain if any of the objects are in use. */
+	for (p = ds->head; p != NULL; p = p->next)
+		if (p->open_cursors != 0)
+			ESET(wtext, session, WT_ERROR,
+			    "%s: has open cursors during close", p->uri);
+
+	/* Close and discard the remaining objects. */
+	while ((p = ds->head) != NULL) {
+		if ((tret = kvs_close(p->kvs)) != 0)
+			ESET(wtext, session, WT_ERROR,
+			    "kvs_close: %s: %s", p->uri, kvs_strerror(tret));
+		ds->head = p->next;
+
+		ETRET(lock_destroy(wtext, session, &p->lock));
+		free(p->uri);
+		free(p);
+	}
+
+	ETRET(unlock(wtext, session, &ds->global_lock));
+	ETRET(lock_destroy(wtext, NULL, &ds->global_lock));
+
+	return (ret);
 }
 
 /*
@@ -1301,45 +1402,60 @@ kvs_session_verify(WT_DATA_SOURCE *dsrc,
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	static WT_DATA_SOURCE data_source;	/* Enclosing data source */
-	int ret;
+	/*
+	 * List of the WT_DATA_SOURCE methods -- it's static so it breaks at
+	 * compile-time should the structure changes underneath us.
+	 */
+	static WT_DATA_SOURCE wtds = {
+		kvs_session_create,		/* session.create */
+		NULL,				/* No session.compaction */
+		kvs_session_drop,		/* session.drop */
+		kvs_session_open_cursor,	/* session.open_cursor */
+		kvs_session_rename,		/* session.rename */
+		NULL,				/* No session.salvage */
+		kvs_session_truncate,		/* session.truncate */
+		kvs_session_verify,		/* session.verify */
+		kvs_terminate			/* termination */
+	};
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
 
 	(void)config;				/* Unused parameters */
 
-	ret = 0;
+	ds = NULL;
 						/* Acquire the extension API */
-	wt_ext = connection->get_extension_api(connection);
+	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
 #if KVS_VERSION_MAJOR != 2 || KVS_VERSION_MINOR != 8
-	ERET(NULL, EINVAL,
+	ERET(wtext, NULL, EINVAL,
 	    "unsupported KVS library version %d.%d",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
 #endif
 
-	/* Initialize the WT_DATA_SOURCE structure. */
-	memset(&data_source, 0, sizeof(data_source));
-	data_source.create = kvs_session_create;
-	data_source.compact = NULL;		/* No compaction */
-	data_source.drop = kvs_session_drop;
-	data_source.open_cursor = kvs_session_open_cursor;
-	data_source.rename = kvs_session_rename;
-	data_source.salvage = NULL;		/* No salvage */
-	data_source.truncate = kvs_session_truncate;
-	data_source.verify = kvs_session_verify;
-	if ((ret = connection->add_data_source(
-	    connection, "memrata:", &data_source, NULL)) != 0)
-		ERET(NULL, ret,
-		    "WT_CONNECTION.add_data_source: %s", wt_ext->strerror(ret));
+	/* Allocate the local data-source structure. */
+	if ((ds = calloc(1, sizeof(DATA_SOURCE))) == NULL)
+		return (os_errno());
+	ds->wtext = wtext;
 
-	/* Add the KVS-specific configuration options. */
-	if ((ret = kvs_config_add(connection)) != 0)
-		return (ret);
+						/* Configure the global lock */
+	if ((ret = lock_init(wtext, NULL, &ds->global_lock)) != 0)
+		goto err;
 
-	if ((ret = lock_init(NULL, &global_lock)) != 0)
-		return (ret);
+	ds->wtds = wtds;			/* Configure the methods */
 
-	return (0);
+	if ((ret = connection->add_data_source(	/* Add the data source */
+	    connection, "memrata:", (WT_DATA_SOURCE *)ds, NULL)) != 0)
+		ESET(wtext, NULL, ret,
+		    "WT_CONNECTION.add_data_source: %s", wtext->strerror(ret));
+
+	/* Add KVS-specific configuration options. */
+	ret = kvs_config_add(connection, wtext);
+
+err:	if (ret != 0)
+		free(ds);
+	return (ret);
 }
 
 /*
@@ -1349,40 +1465,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 int
 wiredtiger_extension_terminate(WT_CONNECTION *connection)
 {
-	DATA_SOURCE *p;
-	int ret, tret;
-
 	(void)connection;			/* Unused parameters */
 
-	ret = writelock(NULL, &global_lock);
-
-	/* Start a flush on any open objects. */
-	for (p = data_source_head; p != NULL; p = p->next)
-		if ((tret = kvs_commit(p->kvs)) != 0)
-			ESET(NULL, WT_ERROR,
-			    "kvs_commit: %s: %s", p->uri, kvs_strerror(tret));
-
-	/* Complain if any of the objects are in use. */
-	for (p = data_source_head; p != NULL; p = p->next)
-		if (p->open_cursors != 0)
-			ESET(NULL, WT_ERROR,
-			    "%s: has open cursors during close", p->uri);
-
-	/* Close and discard the remaining objects. */
-	while ((p = data_source_head) != NULL) {
-		if ((tret = kvs_close(p->kvs)) != 0)
-			ESET(NULL, WT_ERROR,
-			    "kvs_close: %s: %s", p->uri, kvs_strerror(tret));
-		data_source_head = p->next;
-		free(p->uri);
-		ETRET(lock_destroy(NULL, &p->lock));
-		free(p);
-	}
-
-	ETRET(unlock(NULL, &global_lock));
-	ETRET(lock_destroy(NULL, &global_lock));
-
-	wt_ext = NULL;
-
-	return (ret);
+	return (0);
 }

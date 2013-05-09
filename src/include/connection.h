@@ -141,7 +141,8 @@ struct __wt_connection_impl {
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
-	int ckpt_backup;		/* Backup: don't delete checkpoints */
+	WT_SPINLOCK hot_backup_lock;	/* Hot backup serialization */
+	int hot_backup;
 
 	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
 	pthread_t	 ckpt_tid;	/* Checkpoint thread */

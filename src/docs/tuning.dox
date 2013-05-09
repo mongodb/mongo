@@ -43,7 +43,7 @@ cache eviction), can be configured with the WT_SESSION::create
 "cache_resident" configuration string.
 
 Configuring a cache resident object has two effects: first, once the
-object's page have been instantiated in memory, no further I/O cost is
+object's pages have been instantiated in memory, no further I/O cost is
 ever paid for object access, minimizing potential latency.  Second,
 in-memory objects can be accessed faster than objects tracked for
 potential eviction, and applications able to guarantee sufficient memory

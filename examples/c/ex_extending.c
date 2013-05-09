@@ -52,7 +52,7 @@ __compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
 	return (0);
 }
 
-static WT_COLLATOR nocasecoll = { __compare_nocase };
+static WT_COLLATOR nocasecoll = { __compare_nocase, NULL };
 /*! [case insensitive comparator] */
 
 /*! [n character comparator] */
@@ -79,7 +79,7 @@ __compare_prefixes(WT_COLLATOR *collator, WT_SESSION *session,
 	return (0);
 }
 
-static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes}, 10 };
+static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes, NULL}, 10 };
 /*! [n character comparator] */
 
 int main(void)

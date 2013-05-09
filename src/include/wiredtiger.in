@@ -796,7 +796,8 @@ struct __wt_session {
 	 * @snippet ex_all.c Compact a table
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the object to drop, such as \c "table:stock"
+	 * @param name the URI of the object to compact, such as
+	 * \c "table:stock"
 	 * @configstart{session.compact, see dist/api_data.py}
 	 * @config{trigger, Compaction will not be attempted unless the
 	 * specified percentage of the underlying objects is expected to be
@@ -821,7 +822,7 @@ struct __wt_session {
 	 * @config{remove_files, should the underlying files be removed?., a
 	 * boolean flag; default \c true.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -835,7 +836,7 @@ struct __wt_session {
 	 * @param uri the current URI of the object, such as \c "table:old"
 	 * @param newuri the new URI of the object, such as \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(rename)(WT_SESSION *session,
 	    const char *uri, const char *newuri, const char *config);
@@ -863,7 +864,7 @@ struct __wt_session {
 	 * @config{force, force salvage even of files that do not appear to be
 	 * WiredTiger files., a boolean flag; default \c false.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -890,7 +891,7 @@ struct __wt_session {
 	 * if <code>NULL</code>, the truncate continues to the end of the
 	 * object
 	 * @configempty{session.truncate, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
 	    const char *name,
@@ -906,7 +907,7 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the file or table to upgrade
 	 * @configempty{session.upgrade, see dist/api_data.py}
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(upgrade)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -933,7 +934,7 @@ struct __wt_session {
 	 * are verified\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
 	 * @configend
-	 * @errors
+	 * @ebusy_errors
 	 */
 	int __F(verify)(WT_SESSION *session,
 	    const char *name, const char *config);
@@ -1336,8 +1337,14 @@ struct __wt_connection {
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
- * list\, such as <code>"direct_io=[data]"</code>., a list\, with values chosen
- * from the following options: \c "data"\, \c "log"; default empty.}
+ * list\, such as <code>"direct_io=[data]"</code>. Many Linux systems do not
+ * support mixing \c O_DIRECT and memory mapping or normal I/O to the same file.
+ * If \c O_DIRECT is configured for data files on Linux systems\, memory mapping
+ * should probably be turned off using the \c mmap=false configuration string
+ * and any utilities used to copy the database files for the purposes of hot
+ * backup should probably also specify \c O_DIRECT when configuring their file
+ * access., a list\, with values chosen from the following options: \c "data"\,
+ * \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
@@ -1351,9 +1358,9 @@ struct __wt_connection {
  * (as a percentage)., an integer between 10 and 99; default \c 95.}
  * @config{extensions, list of shared library extensions to load (using dlopen).
  * Optional values are passed as the \c config parameter to
- * WT_CONNECTION::load_extension.  Complex paths may require quoting\, for
- * example\, <code>extensions=("/path/ext.so"="entry=my_entry")</code>., a list
- * of strings; default empty.}
+ * WT_CONNECTION::load_extension.  For example\,
+ * <code>extensions=(/path/ext.so={entry=my_entry})</code>., a list of strings;
+ * default empty.}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
  * @config{log = (, enable logging., a set of related configuration options
@@ -1394,8 +1401,8 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{statistics, Maintain database statistics that may impact
  * performance., a boolean flag; default \c false.}
- * @config{statistics_log = (, log database connection statistics into a file
- * when the \c statistics configuration value is set to true.  See @ref
+ * @config{statistics_log = (, log database connection statistics to a file
+ * (implies setting the \c statistics configuration value to true). See @ref
  * statistics_log for more information., a set of related configuration options
  * defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;clear, reset statistics
@@ -1825,6 +1832,14 @@ struct __wt_collator {
 	 */
 	int (*compare)(WT_COLLATOR *collator, WT_SESSION *session,
 	    const WT_ITEM *key1, const WT_ITEM *key2, int *cmp);
+
+	/*!
+	 * If non-NULL, a callback performed when the database is closed.
+	 *
+	 * The WT_COLLATOR::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 */
+	int (*terminate)(WT_COLLATOR *collator, WT_SESSION *session);
 };
 
 /*!
@@ -2070,6 +2085,14 @@ struct __wt_compressor {
 	 */
 	int (*pre_size)(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len, size_t *result_lenp);
+
+	/*!
+	 * If non-NULL, a callback performed when the database is closed.
+	 *
+	 * The WT_COMPRESSOR::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 */
+	int (*terminate)(WT_COMPRESSOR *compressor, WT_SESSION *session);
 };
 
 /*!
@@ -2151,6 +2174,16 @@ struct __wt_data_source {
 	 */
 	int (*verify)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*!
+	 * If non-NULL, a callback performed when the database is closed.
+	 *
+	 * The WT_DATA_SOURCE::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE terminate
+	 */
+	int (*terminate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session);
 };
 
 /*!
@@ -2247,106 +2280,104 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		13
 /*! cache: pages selected for eviction unable to be evicted */
 #define	WT_STAT_CONN_CACHE_EVICTION_FAIL		14
-/*! cache: pages queued for forced eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_FORCE		15
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		16
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		15
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		17
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		16
 /*! cache: internal page merge operations completed */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE		18
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE		17
 /*! cache: internal page merge attempts that could not complete */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_FAIL		19
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_FAIL		18
 /*! cache: internal levels merged */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_LEVELS	20
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_LEVELS	19
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		21
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		20
 /*! cache: pages walked for eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK		22
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK		21
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			23
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			22
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			24
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			23
 /*! cache: pages read into cache */
-#define	WT_STAT_CONN_CACHE_READ				25
+#define	WT_STAT_CONN_CACHE_READ				24
 /*! cache: pages written from cache */
-#define	WT_STAT_CONN_CACHE_WRITE			26
+#define	WT_STAT_CONN_CACHE_WRITE			25
 /*! pthread mutex condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				27
+#define	WT_STAT_CONN_COND_WAIT				26
 /*! cursor creation */
-#define	WT_STAT_CONN_CURSOR_CREATE			28
+#define	WT_STAT_CONN_CURSOR_CREATE			27
 /*! Btree cursor insert calls */
-#define	WT_STAT_CONN_CURSOR_INSERT			29
+#define	WT_STAT_CONN_CURSOR_INSERT			28
 /*! Btree cursor next calls */
-#define	WT_STAT_CONN_CURSOR_NEXT			30
+#define	WT_STAT_CONN_CURSOR_NEXT			29
 /*! Btree cursor prev calls */
-#define	WT_STAT_CONN_CURSOR_PREV			31
+#define	WT_STAT_CONN_CURSOR_PREV			30
 /*! Btree cursor remove calls */
-#define	WT_STAT_CONN_CURSOR_REMOVE			32
+#define	WT_STAT_CONN_CURSOR_REMOVE			31
 /*! Btree cursor reset calls */
-#define	WT_STAT_CONN_CURSOR_RESET			33
+#define	WT_STAT_CONN_CURSOR_RESET			32
 /*! Btree cursor search calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH			34
+#define	WT_STAT_CONN_CURSOR_SEARCH			33
 /*! Btree cursor search near calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			35
+#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			34
 /*! Btree cursor update calls */
-#define	WT_STAT_CONN_CURSOR_UPDATE			36
+#define	WT_STAT_CONN_CURSOR_UPDATE			35
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				37
+#define	WT_STAT_CONN_FILE_OPEN				36
 /*! log: total log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			38
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			37
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			39
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			38
 /*! log: total consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			40
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			39
 /*! log: total logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		41
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		40
 /*! log: total consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			42
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			41
 /*! log: total consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			43
+#define	WT_STAT_CONN_LOG_SLOT_RACES			42
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			44
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			43
 /*! log: total consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		45
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		44
 /*! log: total log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				46
+#define	WT_STAT_CONN_LOG_SYNC				45
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			47
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			46
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			48
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			47
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			49
+#define	WT_STAT_CONN_MEMORY_FREE			48
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			50
+#define	WT_STAT_CONN_MEMORY_GROW			49
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				51
+#define	WT_STAT_CONN_READ_IO				50
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				52
+#define	WT_STAT_CONN_REC_PAGES				51
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			53
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			52
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			54
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			53
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			55
+#define	WT_STAT_CONN_RWLOCK_READ			54
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			56
+#define	WT_STAT_CONN_RWLOCK_WRITE			55
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		57
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		56
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			58
+#define	WT_STAT_CONN_TXN_ANCIENT			57
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				59
+#define	WT_STAT_CONN_TXN_BEGIN				58
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			60
+#define	WT_STAT_CONN_TXN_CHECKPOINT			59
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				61
+#define	WT_STAT_CONN_TXN_COMMIT				60
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			62
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			61
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			63
+#define	WT_STAT_CONN_TXN_ROLLBACK			62
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				64
+#define	WT_STAT_CONN_WRITE_IO				63
 
 /*!
  * @}
@@ -2428,103 +2459,101 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		35
 /*! data source pages selected for eviction unable to be evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		36
-/*! cache: pages queued for forced eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_FORCE		37
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		38
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		37
 /*! internal pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		39
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		38
 /*! cache: internal page merge operations completed */
-#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE		40
+#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE		39
 /*! cache: internal page merge attempts that could not complete */
-#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_FAIL		41
+#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_FAIL		40
 /*! cache: internal levels merged */
-#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_LEVELS	42
+#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_LEVELS	41
 /*! overflow values cached in memory */
-#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		43
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		42
 /*! pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ				44
+#define	WT_STAT_DSRC_CACHE_READ				43
 /*! overflow pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		45
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		44
 /*! pages written from cache */
-#define	WT_STAT_DSRC_CACHE_WRITE			46
-/*! raw compression call failed (no additional data available) */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			47
-/*! raw compression call failed (additional data available) */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	48
+#define	WT_STAT_DSRC_CACHE_WRITE			45
+/*! raw compression call failed, no additional data available */
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			46
+/*! raw compression call failed, additional data available */
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	47
 /*! raw compression call succeeded */
-#define	WT_STAT_DSRC_COMPRESS_RAW_OK			49
+#define	WT_STAT_DSRC_COMPRESS_RAW_OK			48
 /*! compressed pages read */
-#define	WT_STAT_DSRC_COMPRESS_READ			50
+#define	WT_STAT_DSRC_COMPRESS_READ			49
 /*! compressed pages written */
-#define	WT_STAT_DSRC_COMPRESS_WRITE			51
+#define	WT_STAT_DSRC_COMPRESS_WRITE			50
 /*! page written failed to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		52
+#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		51
 /*! page written was too small to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		53
+#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		52
 /*! cursor creation */
-#define	WT_STAT_DSRC_CURSOR_CREATE			54
+#define	WT_STAT_DSRC_CURSOR_CREATE			53
 /*! cursor insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			55
+#define	WT_STAT_DSRC_CURSOR_INSERT			54
 /*! bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			56
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			55
 /*! cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		57
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		56
 /*! cursor next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			58
+#define	WT_STAT_DSRC_CURSOR_NEXT			57
 /*! cursor prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			59
+#define	WT_STAT_DSRC_CURSOR_PREV			58
 /*! cursor remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			60
+#define	WT_STAT_DSRC_CURSOR_REMOVE			59
 /*! cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		61
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		60
 /*! cursor reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			62
+#define	WT_STAT_DSRC_CURSOR_RESET			61
 /*! cursor search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			63
+#define	WT_STAT_DSRC_CURSOR_SEARCH			62
 /*! cursor search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			64
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			63
 /*! cursor update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			65
+#define	WT_STAT_DSRC_CURSOR_UPDATE			64
 /*! cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		66
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		65
 /*! chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			67
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			66
 /*! highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			68
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			67
 /*! queries that could have benefited from a Bloom filter that did not
  * exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		69
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		68
 /*! reconciliation dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			70
+#define	WT_STAT_DSRC_REC_DICTIONARY			69
 /*! reconciliation overflow keys written */
-#define	WT_STAT_DSRC_REC_OVFL_KEY			71
+#define	WT_STAT_DSRC_REC_OVFL_KEY			70
 /*! reconciliation overflow values written */
-#define	WT_STAT_DSRC_REC_OVFL_VALUE			72
+#define	WT_STAT_DSRC_REC_OVFL_VALUE			71
 /*! reconciliation pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			73
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			72
 /*! reconciliation pages merged */
-#define	WT_STAT_DSRC_REC_PAGE_MERGE			74
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			73
 /*! page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				75
+#define	WT_STAT_DSRC_REC_PAGES				74
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			76
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			75
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			77
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			76
 /*! reconciliation internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTL			78
+#define	WT_STAT_DSRC_REC_SPLIT_INTL			77
 /*! reconciliation leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			79
-/*! reconciliation maximum number of splits created by for a page */
-#define	WT_STAT_DSRC_REC_SPLIT_MAX			80
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			78
+/*! reconciliation maximum number of splits created for a page */
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			79
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			81
+#define	WT_STAT_DSRC_SESSION_COMPACT			80
 /*! open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		82
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		81
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		83
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		82
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			84
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			83
 /*! @} */
 /*
  * Statistics section: END

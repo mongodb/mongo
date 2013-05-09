@@ -676,7 +676,7 @@ add_collator(WT_CONNECTION *conn)
 	int ret;
 
 	/*! [WT_COLLATOR register] */
-	static WT_COLLATOR my_collator = { my_compare };
+	static WT_COLLATOR my_collator = { my_compare, NULL };
 	ret = conn->add_collator(conn, "my_collator", &my_collator, NULL);
 	/*! [WT_COLLATOR register] */
 
@@ -785,7 +785,8 @@ add_compressor(WT_CONNECTION *conn)
 	    my_compress,
 	    my_compress_raw,		/* NULL, if no raw compression */
 	    my_decompress,
-	    my_pre_size			/* NULL, if pre-sizing not needed */
+	    my_pre_size,		/* NULL, if pre-sizing not needed */
+	    NULL			/* NULL, if no termination cleanup */
 	};
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [WT_COMPRESSOR register] */
@@ -815,8 +816,8 @@ add_extractor(WT_CONNECTION *conn)
 	int ret;
 
 	/*! [WT_EXTRACTOR register] */
-	static WT_EXTRACTOR my_extractor;
-	my_extractor.extract = my_extract;
+	static WT_EXTRACTOR my_extractor = {my_extract};
+
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 	/*! [WT_EXTRACTOR register] */
 
@@ -986,7 +987,7 @@ main(void)
 	/*! [Configure bzip2 extension] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
+	    "extensions=[/usr/local/lib/wiredtiger_bzip2.so]", &conn);
 	/*! [Configure bzip2 extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
@@ -994,7 +995,7 @@ main(void)
 	/*! [Configure snappy extension] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
+	    "extensions=[/usr/local/lib/wiredtiger_snappy.so]", &conn);
 	/*! [Configure snappy extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
@@ -1051,7 +1052,7 @@ main(void)
 	/*! [Statistics logging with path] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "statistics_log=(wait=120,path=\"/log/log.%m.%d.%y\")", &conn);
+	    "statistics_log=(wait=120,path=/log/log.%m.%d.%y)", &conn);
 	/*! [Statistics logging with path] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);

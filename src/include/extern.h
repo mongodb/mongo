@@ -262,7 +262,6 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
     const char *ofile);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern void __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page);
@@ -528,6 +527,12 @@ extern int __wt_ext_config_scan_next( WT_EXTENSION_API *wt_api,
     WT_CONFIG_SCAN *scan,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
+extern int __wt_conn_remove_collator(WT_CONNECTION_IMPL *conn,
+    WT_NAMED_COLLATOR *ncoll);
+extern int __wt_conn_remove_compressor( WT_CONNECTION_IMPL *conn,
+    WT_NAMED_COMPRESSOR *ncomp);
+extern int __wt_conn_remove_data_source( WT_CONNECTION_IMPL *conn,
+    WT_NAMED_DATA_SOURCE *ndsrc);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
@@ -1244,6 +1249,7 @@ extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern void __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats);
 extern void __wt_stat_clear_dsrc_stats(void *stats_arg);
+extern void __wt_stat_aggregate_dsrc_stats(void *child, void *parent);
 extern void __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats);
 extern void __wt_stat_clear_connection_stats(void *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);

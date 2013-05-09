@@ -64,7 +64,6 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 			(*visit)(page, ref, state);
 			break;
 
-		case WT_REF_EVICT_FORCE:
 		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 		case WT_REF_READING:
@@ -349,12 +348,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
 		return (EBUSY);
 
-	/* Make sure the top page isn't queued for eviction. */
-	__wt_evict_list_clr_page(session, top);
-
-	/* Clear the eviction walk: it may be in our subtree. */
-	__wt_evict_clear_tree_walk(session, NULL);
-
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
 	 * or if there are "enough" keys, we split into two equal internal
@@ -508,11 +501,11 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	    " split-merge pages containing %" PRIu32 " keys\n",
 	    promote ? "promoted" : "merged", visit_state.maxdepth, refcnt);
 
-	/* Queue new child pages for forced eviction, if possible. */
+	/* Evict new child pages as soon as possible. */
 	if (lchild != NULL && !F_ISSET(lchild->modify, WT_PM_REC_SPLIT_MERGE))
-		__wt_evict_forced_page(session, lchild);
+		lchild->read_gen = WT_READ_GEN_OLDEST;
 	if (rchild != NULL && !F_ISSET(rchild->modify, WT_PM_REC_SPLIT_MERGE))
-		__wt_evict_forced_page(session, rchild);
+		rchild->read_gen = WT_READ_GEN_OLDEST;
 
 	/* Update statistics. */
 	WT_CSTAT_INCR(session, cache_eviction_merge);
