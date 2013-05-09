@@ -86,6 +86,10 @@ namespace mongo {
 
         static void setMaxPerHost( unsigned max ) { _maxPerHost = max; }
         static unsigned getMaxPerHost() { return _maxPerHost; }
+
+        static void setConnPoolTimeout( unsigned timeout ) { _connPoolTimeout = timeout; }
+        static unsigned getConnPoolTimeout() { return _connPoolTimeout; }
+
     private:
 
         struct StoredConnection {
@@ -105,6 +109,9 @@ namespace mongo {
         ConnectionString::ConnectionType _type;
 
         static unsigned _maxPerHost;
+
+        static unsigned _connPoolTimeout;
+        static unsigned _maxSpareConnPools;
     };
 
     class DBConnectionHook {
