@@ -115,6 +115,10 @@ __wt_log_open(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
+	/*
+	 * Create name.
+	 * Open last log file.
+	 */
 	WT_RET(__wt_open());
 }
 
@@ -127,21 +131,35 @@ __wt_log_close(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
+	/*
+	 * Close fh
+	 */
 }
 
 static int
 __log_acquire()
 {
+	/*
+	 * Called locked.  Add size to alloc_lsn.  Update some lsns.
+	 * Return base lsn.
+	 */
 }
 
 static int
 __log_fill()
 {
+	/*
+	 * Call __wt_write.
+	 */
 }
 
 static int
 __log_release()
 {
+	/*
+	 * Take flags.  While current write lsn != my end lsn wait my turn.
+	 * Set my lsn.  If sync, call __wt_fsync.  Update lsns.
+	 */
 }
 
 int
@@ -161,4 +179,15 @@ int
 __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
+	/*
+	 * If lock_try succeeds: acquire, fill, release.
+	 * else slot_join.
+	 * if slot leader (offset==0) wait to get lock.
+	 * else wait for slot leader
+	 * fill
+	 * if my_release is last one
+	 * else if I'm sync, wait 
+	 * release buffer
+	 * free slot
+	 */
 }
