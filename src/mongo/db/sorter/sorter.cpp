@@ -63,21 +63,25 @@ namespace mongo {
 
         template<typename Data, typename Comparator>
         void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
-            DEV {
-                // test reversed comparisons
-                const int regular = comp(lhs, rhs);
-                if (regular == 0) {
-                    if (!(comp(rhs, lhs) == 0)) compIsntSane(comp, lhs, rhs);
-                } else if (regular < 0) {
-                    if (!(comp(rhs, lhs) > 0)) compIsntSane(comp, lhs, rhs);
-                } else /*regular > 0*/ {
-                    if (!(comp(rhs, lhs) < 0)) compIsntSane(comp, lhs, rhs);
-                }
+#if defined(_DEBUG) && !defined(_MSC_VER)
+            // MSVC++ already does similar verification in debug mode in addition to using
+            // algorithms that do more comparisons. Doing our own verification in addition makes
+            // debug builds considerably slower without any additional safety.
 
-                // test reflexivity
-                if (!(comp(lhs, lhs) == 0)) compIsntSane(comp, lhs, lhs);
-                if (!(comp(rhs, rhs) == 0)) compIsntSane(comp, rhs, rhs);
+            // test reversed comparisons
+            const int regular = comp(lhs, rhs);
+            if (regular == 0) {
+                if (!(comp(rhs, lhs) == 0)) compIsntSane(comp, lhs, rhs);
+            } else if (regular < 0) {
+                if (!(comp(rhs, lhs) > 0)) compIsntSane(comp, lhs, rhs);
+            } else /*regular > 0*/ {
+                if (!(comp(rhs, lhs) < 0)) compIsntSane(comp, lhs, rhs);
             }
+
+            // test reflexivity
+            if (!(comp(lhs, lhs) == 0)) compIsntSane(comp, lhs, lhs);
+            if (!(comp(rhs, rhs) == 0)) compIsntSane(comp, rhs, rhs);
+#endif
         }
 
         /** Ensures a named file is deleted when this object goes out of scope */
@@ -143,12 +147,14 @@ namespace mongo {
             }
 
             bool more() {
-                fillIfNeeded();
+                if (!_done)
+                    fillIfNeeded(); // may change _done
                 return !_done;
             }
 
             Data next() {
                 verify(!_done);
+                fillIfNeeded();
 
                 Data out;
                 // Note: key must be read before value so can't pass directly to Data constructor
@@ -243,6 +249,7 @@ namespace mongo {
                 // Can't do this in next() due to lifetime guarantees of unowned Data.
                 _heap.clear();
                 _current.reset();
+                _remaining = 0;
 
                 return false;
             }
