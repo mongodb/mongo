@@ -1673,6 +1673,12 @@
     <ClCompile Include="matcher_old.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="ops\modifier_bit.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_bit_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3386,6 +3392,9 @@
     </ClInclude>
     <ClInclude Include="..\util\safe_num-inl.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_bit.h">
+      <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
