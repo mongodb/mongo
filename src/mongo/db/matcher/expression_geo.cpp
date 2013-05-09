@@ -22,7 +22,7 @@
 namespace mongo {
 
     Status GeoMatchExpression::init( const StringData& path, const GeoQuery& query ) {
-        _path = path;
+        initPath( path );
         _query = query;
         return Status::OK();
     }
@@ -49,7 +49,7 @@ namespace mongo {
 
         const GeoMatchExpression* realOther = static_cast<const GeoMatchExpression*>( other );
 
-        if ( _path != realOther->_path )
+        if ( path() != realOther->path() )
             return false;
 
         // TODO:
@@ -59,7 +59,7 @@ namespace mongo {
 
     LeafMatchExpression* GeoMatchExpression::shallowClone() const {
         GeoMatchExpression* next = new GeoMatchExpression();
-        next->init( _path, _query );
+        next->init( path(), _query );
         return next;
     }
 

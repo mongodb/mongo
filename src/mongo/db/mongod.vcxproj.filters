@@ -2018,6 +2018,15 @@
     <ClCompile Include="ops\modifier_inc_test.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
+    <ClCompile Include="ops\modifier_bit.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_bit_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\matchable.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4214,6 +4223,12 @@
     </ClInclude>
     <ClInclude Include="ops\modifier_inc.h">
       <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_bit.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\matchable.h">
+      <Filter>db\matcher</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

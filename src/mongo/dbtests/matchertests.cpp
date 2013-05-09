@@ -299,8 +299,10 @@ namespace MatcherTests {
         long dotime( const BSONObj& patt , const BSONObj& obj ) {
             M m( patt );
             Timer t;
-            for ( int i=0; i<10000; i++ ) {
-                ASSERT( m.matches( obj ) );
+            for ( int i=0; i<900000; i++ ) {
+                if ( !m.matches( obj ) ) {
+                    ASSERT( 0 );
+                }
             }
             return t.millis();
         }

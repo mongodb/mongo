@@ -28,23 +28,9 @@ namespace mongo {
         return true;
     }
 
-    string pathToString( const FieldRef& path, int32_t size ) {
-        string res;
-        if ( (size_t)size >= path.numParts() ) {
-            return res;
-        }
-
-        res = path.getPart( size ).toString();
-        for (size_t i = (size_t)size + 1; i < path.numParts(); i++ ) {
-            res += ".";
-            res += path.getPart( i ).toString();
-        }
-        return res;
-    }
-
     BSONElement getFieldDottedOrArray( const BSONObj& doc,
                                        const FieldRef& path,
-                                       int32_t* idxPath,
+                                       size_t* idxPath,
                                        bool* inArray )  {
         BSONElement res;
 

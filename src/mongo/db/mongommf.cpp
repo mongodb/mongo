@@ -225,10 +225,10 @@ namespace mongo {
             if( cmdLine.dur ) {
                 dur::closingFileNotification();
             }
-	    /* todo: is it ok to close files if we are not globally locked exclusively?
+            /* todo: is it ok to close files if we are not globally locked exclusively?
                      probably, but need to review. also note the lock assert below is
-		     rather vague and not checking if the right database is locked 
-	    */
+                     rather vague and not checking if the right database is locked 
+            */
             if( !Lock::somethingWriteLocked() ) { 
                 verify( inShutdown() );
                 DEV { 

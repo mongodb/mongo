@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/ops/modifier_inc.h"
+#include "mongo/db/ops/modifier_bit.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
@@ -26,14 +26,13 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
-    struct ModifierInc::PreparedState {
+    struct ModifierBit::PreparedState {
 
         PreparedState(mutablebson::Document& doc)
             : doc(doc)
             , idxFound(0)
             , elemFound(doc.end())
             , boundDollar("")
-            , newValue()
             , inPlace(false)
             , noOp(false) {
         }
@@ -50,31 +49,28 @@ namespace mongo {
         // Value to bind to a $-positional field, if one is provided.
         std::string boundDollar;
 
-        // Value to be applied
+        // Value to be applied.
         SafeNum newValue;
 
-        // This $inc is in-place?
+        // True if this update can be applied in place.
         bool inPlace;
 
-        // This $inc is a no-op?
+        // True if this update is a no-op
         bool noOp;
     };
 
-    ModifierInc::ModifierInc()
+    ModifierBit::ModifierBit()
         : ModifierInterface ()
         , _fieldRef()
         , _posDollar(0)
-        , _val() {
+        , _val()
+        , _op(NULL) {
     }
 
-    ModifierInc::~ModifierInc() {
+    ModifierBit::~ModifierBit() {
     }
 
-    Status ModifierInc::init(const BSONElement& modExpr) {
-
-        //
-        // field name analysis
-        //
+    Status ModifierBit::init(const BSONElement& modExpr) {
 
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
@@ -86,24 +82,40 @@ namespace mongo {
         // If a $-positional operator was used, get the index in which it occurred.
         fieldchecker::isPositional(_fieldRef, &_posDollar);
 
-        //
-        // value analysis
-        //
-
-        if (!modExpr.isNumber()) {
-            // TODO: Context for mod error messages would be helpful
-            // include mod code, etc.
+        if (modExpr.type() != mongo::Object)
             return Status(ErrorCodes::BadValue,
-                          "Cannot increment with non-numeric argument");
-        }
+                          "Value following $bit must be an Object");
 
-        _val = modExpr;
-        dassert(_val.isValid());
+        BSONElement payloadElt = modExpr.embeddedObject().firstElement();
+        dassert(!payloadElt.eoo());
+
+        const StringData payloadFieldName = payloadElt.fieldName();
+
+        // TODO: If this becomes three items, we should consider how to provide "subclasses" of
+        // this mod. This would probably involve makign 'init' a static factory.
+        const bool isAnd = (payloadFieldName == "and");
+        const bool isOr = (payloadFieldName == "or");
+
+        if (!(isAnd || isOr))
+            return Status(
+                ErrorCodes::BadValue,
+                "Only 'and' and 'or' are supported $bit sub-operators");
+
+        if ((payloadElt.type() != mongo::NumberInt) &&
+            (payloadElt.type() != mongo::NumberLong))
+            return Status(
+                ErrorCodes::BadValue,
+                "Argument to $bit operation must be a NumberInt or NumberLong");
+
+        _val = SafeNum(payloadElt);
+        _op = isAnd ?
+            &SafeNum::bitAnd :
+            &SafeNum::bitOr;
 
         return Status::OK();
     }
 
-    Status ModifierInc::prepare(mutablebson::Element root,
+    Status ModifierBit::prepare(mutablebson::Element root,
                                 const StringData& matchedField,
                                 ExecInfo* execInfo) {
 
@@ -118,14 +130,12 @@ namespace mongo {
             _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
         }
 
-        // Locate the field name in 'root'. Note that we may not have all the parts in the path
-        // in the doc -- which is fine. Our goal now is merely to reason about whether this mod
-        // apply is a noOp or whether is can be in place. The remaining path, if missing, will
-        // be created during the apply.
+        // Locate the field name in 'root'.
         Status status = pathsupport::findLongestPrefix(_fieldRef,
                                                        root,
                                                        &_preparedState->idxFound,
                                                        &_preparedState->elemFound);
+
 
         // FindLongestPrefix may say the path does not exist at all, which is fine here, or
         // that the path was not viable or otherwise wrong, in which case, the mod cannot
@@ -141,35 +151,33 @@ namespace mongo {
         // there is any conflict among mods.
         execInfo->fieldRef[0] = &_fieldRef;
 
-        // Capture the value we are going to write. At this point, there may not be a value
-        // against which to operate, so the result will be simply _val.
-        _preparedState->newValue = _val;
-
         //
         // in-place and no-op logic
         //
+
         // If the field path is not fully present, then this mod cannot be in place, nor is a
         // noOp.
         if (!_preparedState->elemFound.ok() ||
             _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
+            // If no target element exists, the value we will write is the result of applying
+            // the operation to a zero-initialized integer element.
+            _preparedState->newValue = (SafeNum(static_cast<int>(0)).*_op)(_val);
             return Status::OK();
         }
 
-        // If the value being $inc'ed is the same as the one already in the doc, than this is a
-        // noOp.
-        if (!_preparedState->elemFound.isNumeric())
-            return Status(ErrorCodes::BadValue,
-                          "invalid attempt to increment a non-numeric field");
+        if (!_preparedState->elemFound.isIntegral())
+            return Status(
+                ErrorCodes::BadValue,
+                "Cannot apply $bit to a value of non-integral type");
 
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
 
-        // Update newValue w.r.t to the current value of the found element.
-        _preparedState->newValue += currentValue;
+        // Apply the op over the existing value and the mod value, and capture the result.
+        _preparedState->newValue = (currentValue.*_op)(_val);
 
-        // If the result of the addition is invalid, we must return an error.
         if (!_preparedState->newValue.isValid())
             return Status(ErrorCodes::BadValue,
-                          "Failed to increment current value");
+                          "Failed to apply $bit to current value");
 
         // If the values are identical (same type, same value), then this is a no-op, and
         // therefore in-place as well.
@@ -179,21 +187,18 @@ namespace mongo {
             return Status::OK();
         }
 
-        // If the types are the same, this can be done in place.
-        //
-        // TODO: Potentially, cases where $inc results in a mixed type of the same size could
-        // be in-place as well, but we don't currently handle them.
-        if (_preparedState->newValue.type() == currentValue.type()) {
+        // TODO: Cases where the type changes but size is the same.
+        if (currentValue.type() == _preparedState->newValue.type()) {
             _preparedState->inPlace = execInfo->inPlace = true;
         }
 
         return Status::OK();
     }
 
-    Status ModifierInc::apply() const {
+    Status ModifierBit::apply() const {
         dassert(_preparedState->noOp == false);
 
-        // If there's no need to create any further field part, the $inc is simply a value
+        // If there's no need to create any further field part, the $bit is simply a value
         // assignment.
         if (_preparedState->elemFound.ok() &&
             _preparedState->idxFound == static_cast<int32_t>(_fieldRef.numParts() - 1)) {
@@ -232,7 +237,7 @@ namespace mongo {
                                          elemToSet);
     }
 
-    Status ModifierInc::log(mutablebson::Element logRoot) const {
+    Status ModifierBit::log(mutablebson::Element logRoot) const {
 
         // We'd like to create an entry such as {$set: {<fieldname>: <value>}} under 'logRoot'.
         // We start by creating the {$set: ...} Element.
@@ -243,10 +248,8 @@ namespace mongo {
         }
 
         // Then we create the {<fieldname>: <value>} Element.
-        mutablebson::Element logElement = doc.makeElementSafeNum(
-            _fieldRef.dottedField(),
-            _preparedState->newValue);
-
+        mutablebson::Element logElement = doc.makeElementSafeNum(_fieldRef.dottedField(),
+                                                                 _preparedState->newValue);
         if (!logElement.ok()) {
             return Status(ErrorCodes::InternalError, "cannot append details for $set mod");
         }

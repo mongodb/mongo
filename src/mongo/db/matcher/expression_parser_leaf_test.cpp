@@ -32,9 +32,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleGT1 ) {
@@ -42,8 +42,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleLT1 ) {
@@ -51,9 +51,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleGTE1 ) {
@@ -61,9 +61,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleLTE1 ) {
@@ -71,9 +71,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleNE1 ) {
@@ -81,9 +81,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleModBad1 ) {
@@ -117,9 +117,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 5 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 4 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 8 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 8 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleModNotNumber ) {
@@ -127,10 +127,10 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 4 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << "a" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "a" ) ) );
     }
 
 
@@ -139,9 +139,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
 
@@ -195,13 +195,13 @@ namespace mongo {
         BSONObj notMatch = BSON( "a" << "l" );
         BSONObj notMatchRegex = BSONObjBuilder().appendRegex( "a", "B", "" ).obj();
 
-        ASSERT( result.getValue()->matches( matchFirst ) );
-        ASSERT( result.getValue()->matches( matchFirstRegex ) );
-        ASSERT( result.getValue()->matches( matchSecond ) );
-        ASSERT( result.getValue()->matches( matchSecondRegex ) );
-        ASSERT( result.getValue()->matches( matchThird ) );
-        ASSERT( !result.getValue()->matches( notMatch ) );
-        ASSERT( !result.getValue()->matches( notMatchRegex ) );
+        ASSERT( result.getValue()->matchesBSON( matchFirst ) );
+        ASSERT( result.getValue()->matchesBSON( matchFirstRegex ) );
+        ASSERT( result.getValue()->matchesBSON( matchSecond ) );
+        ASSERT( result.getValue()->matchesBSON( matchSecondRegex ) );
+        ASSERT( result.getValue()->matchesBSON( matchThird ) );
+        ASSERT( !result.getValue()->matchesBSON( notMatch ) );
+        ASSERT( !result.getValue()->matchesBSON( notMatchRegex ) );
     }
 
     TEST( MatchExpressionParserLeafTest, SimpleNIN1 ) {
@@ -209,9 +209,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 1 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 2 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 3 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, NINNotArray ) {
@@ -228,9 +228,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << "abc" ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << "ABC" ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << "AC" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, Regex2 ) {
@@ -238,9 +238,9 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << "abc" ) ) );
-        ASSERT( result.getValue()->matches( BSON( "x" << "ABC" ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << "AC" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, RegexBad ) {
@@ -274,8 +274,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << "abc" ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "y" << "AC" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "y" << "AC" ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, ExistsNO1 ) {
@@ -285,8 +285,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << "abc" ) ) );
-        ASSERT( result.getValue()->matches( BSON( "y" << "AC" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "y" << "AC" ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, Type1 ) {
@@ -294,8 +294,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << "abc" ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, Type2 ) {
@@ -303,8 +303,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( result.getValue()->matches( BSON( "x" << 5.3 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, TypeDoubleOperator ) {
@@ -312,8 +312,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5.3 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, TypeNull ) {
@@ -321,11 +321,11 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSONObj() ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSONObj() ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
         BSONObjBuilder b;
         b.appendNull( "x" );
-        ASSERT( result.getValue()->matches( b.obj() ) );
+        ASSERT( result.getValue()->matchesBSON( b.obj() ) );
     }
 
     TEST( MatchExpressionParserLeafTest, TypeBadType ) {
@@ -335,8 +335,8 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5.3 ) ) );
-        ASSERT( !result.getValue()->matches( BSON( "x" << 5 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
     }
 
     TEST( MatchExpressionParserLeafTest, TypeBad ) {

@@ -289,8 +289,10 @@ namespace ReplSetTests {
             ASSERT(!t4.curop()->killPending());
             ASSERT(!t5.curop()->killPending());
 
-            dropDB->stopIndexBuilds(dbname, cmdObj);
-
+            {
+                Lock::DBWrite lk(ns());
+                dropDB->stopIndexBuilds(dbname, cmdObj);
+            }
             sleepsecs(1);
 
             ASSERT(t1.finished());
@@ -335,8 +337,10 @@ namespace ReplSetTests {
 
             std::string coll(strchr(ns(), '.')+1);
             BSONObj cmdObj = BSON("drop" << coll);
-            drop->stopIndexBuilds(dbname, cmdObj);
-
+            {
+                Lock::DBWrite lk(ns());
+                drop->stopIndexBuilds(dbname, cmdObj);
+            }
             sleepsecs(1);
 
             ASSERT(t1.finished());
@@ -373,9 +377,10 @@ namespace ReplSetTests {
             ASSERT(!t1.curop()->killPending());
             ASSERT(!t2.curop()->killPending());
             ASSERT(!t3.curop()->killPending());
-
-            c->stopIndexBuilds(dbname, cmd1);
-
+            {
+                Lock::DBWrite lk(ns());
+                c->stopIndexBuilds(dbname, cmd1);
+            }
             sleepsecs(1);
 
             ASSERT(t1.finished());
@@ -407,9 +412,10 @@ namespace ReplSetTests {
             ASSERT(!t1.curop()->killPending());
             ASSERT(!t2.curop()->killPending());
             ASSERT(!t3.curop()->killPending());
-
-            c->stopIndexBuilds(dbname, cmd2);
-
+            {
+                Lock::DBWrite lk(ns());
+                c->stopIndexBuilds(dbname, cmd2);
+            }
             sleepsecs(1);
 
             ASSERT(!t1.finished());
@@ -443,9 +449,10 @@ namespace ReplSetTests {
             ASSERT(!t1.curop()->killPending());
             ASSERT(!t2.curop()->killPending());
             ASSERT(!t3.curop()->killPending());
-
-            c->stopIndexBuilds(dbname, cmd3);
-
+            {
+                Lock::DBWrite lk(ns());
+                c->stopIndexBuilds(dbname, cmd3);
+            }
             sleepsecs(1);
 
             ASSERT(!t1.finished());
@@ -496,7 +503,11 @@ namespace ReplSetTests {
             ASSERT(!t3.curop()->killPending());
             ASSERT(!t4.curop()->killPending());
 
-            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+            std::vector<BSONObj> indexes;
+            {
+                Lock::DBWrite lk(ns());
+                indexes = c->stopIndexBuilds(dbname, cmdObj);
+            }
 
             ASSERT(t1.finished());
             ASSERT(t2.finished());
@@ -550,10 +561,12 @@ namespace ReplSetTests {
             ASSERT(!t1.curop()->killPending());
             ASSERT(!t2.curop()->killPending());
 
-            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
-            ASSERT_EQUALS(1U, indexes.size());
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
-
+            {
+                Lock::DBWrite lk(ns());
+                std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+                ASSERT_EQUALS(1U, indexes.size());
+                IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+            }
             ASSERT(!t2.finished());
             t2.finish();
 
@@ -593,9 +606,10 @@ namespace ReplSetTests {
 
             ASSERT(!t1.curop()->killPending());
             ASSERT(!t2.curop()->killPending());
-
-            c->stopIndexBuilds(dbname, cmdObj);
-
+            {
+                Lock::DBWrite lk(ns());
+                c->stopIndexBuilds(dbname, cmdObj);
+            }
             sleepsecs(1);
 
             ASSERT(t1.finished());
@@ -630,10 +644,11 @@ namespace ReplSetTests {
 
             ASSERT(!t1.curop()->killPending());
             ASSERT(!t2.curop()->killPending());
-
-            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
-
+            {
+                Lock::DBWrite lk(ns());
+                std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+                IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+            }
             ASSERT(!t2.finished());
             t2.finish();
 
@@ -693,8 +708,11 @@ namespace ReplSetTests {
             ASSERT(!t4.curop()->killPending());
             ASSERT(!t5.curop()->killPending());
 
-            std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
-
+            std::vector<BSONObj> indexes;
+            {
+                Lock::DBWrite lk(ns());
+                indexes = c->stopIndexBuilds(dbname, cmdObj);
+            }
             sleepsecs(1);
 
             ASSERT(t1.finished());

@@ -21,6 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
@@ -47,18 +48,16 @@ namespace mongo {
             ATOMIC
         };
 
-        enum MatchCategory {
-            LEAF, ARRAY, TREE, TYPE_CATEGORY, SPECIAL
-        };
-
-        MatchExpression( MatchCategory category, MatchType type );
+        MatchExpression( MatchType type );
         virtual ~MatchExpression(){}
 
         /**
          * determins if the doc matches the expression
          * there could be an expression that looks at fields, or the entire doc
          */
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const = 0;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const = 0;
+
+        virtual bool matchesBSON( const BSONObj& doc, MatchDetails* details = 0 ) const;
 
         /**
          * does the element match the expression
@@ -70,7 +69,6 @@ namespace mongo {
         virtual const MatchExpression* getChild( size_t i ) const { return NULL; }
 
         MatchType matchType() const { return _matchType; }
-        MatchCategory matchCategory() const { return _matchCategory; }
 
         virtual string toString() const;
         virtual void debugString( StringBuilder& debug, int level = 0 ) const = 0;
@@ -80,7 +78,6 @@ namespace mongo {
         void _debugAddSpace( StringBuilder& debug, int level ) const;
 
     private:
-        MatchCategory _matchCategory;
         MatchType _matchType;
     };
 
@@ -90,9 +87,9 @@ namespace mongo {
      */
     class AtomicMatchExpression : public MatchExpression {
     public:
-        AtomicMatchExpression() : MatchExpression( SPECIAL, ATOMIC ){}
+        AtomicMatchExpression() : MatchExpression( ATOMIC ){}
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const {
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const {
             return true;
         }
 

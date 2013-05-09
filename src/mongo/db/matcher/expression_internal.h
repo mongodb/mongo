@@ -26,13 +26,10 @@
 namespace mongo {
 
     // XXX document me
-    string pathToString( const FieldRef& path, int32_t size );
-
-    // XXX document me
     // Replaces getFieldDottedOrArray without recursion nor string manipulation
     BSONElement getFieldDottedOrArray( const BSONObj& doc,
                                        const FieldRef& path,
-                                       int32_t* idxPath,
+                                       size_t* idxPath,
                                        bool* inArray );
 
 }  // namespace mongo

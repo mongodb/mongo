@@ -30,22 +30,21 @@ namespace mongo {
 
     Status AllMatchExpression::init( const StringData& path ) {
         _path = path;
+        _fieldRef.parse( _path );
         return Status::OK();
     }
 
-    bool AllMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
-        FieldRef path;
-        path.parse(_path);
+    bool AllMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
 
         bool traversedArray = false;
-        int32_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray( doc, path, &idxPath, &traversedArray );
+        size_t idxPath = 0;
+        BSONElement e = doc->getFieldDottedOrArray( _fieldRef, &idxPath, &traversedArray );
 
-        string rest = pathToString( path, idxPath+1 );
-
-        if ( e.type() != Array || traversedArray || rest.size() == 0 ) {
+        if ( e.type() != Array || traversedArray || idxPath + 1 == _fieldRef.numParts() ) {
             return matchesSingleElement( e );
         }
+
+        string rest = _fieldRef.dottedField( idxPath+1 );
 
         BSONElementSet all;
 
@@ -129,16 +128,16 @@ namespace mongo {
 
     // -------
 
-    bool ArrayMatchingMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool ArrayMatchingMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
 
         FieldRef path;
         path.parse(_path);
 
         bool traversedArray = false;
-        int32_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray( doc, path, &idxPath, &traversedArray );
+        size_t idxPath = 0;
+        BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
-        string rest = pathToString( path, idxPath+1 );
+        string rest = path.dottedField( idxPath+1 );
 
         if ( rest.size() == 0 ) {
             if ( e.type() == Array )
@@ -214,7 +213,7 @@ namespace mongo {
             BSONElement inner = i.next();
             if ( !inner.isABSONObj() )
                 continue;
-            if ( _sub->matches( inner.Obj(), NULL ) ) {
+            if ( _sub->matchesBSON( inner.Obj(), NULL ) ) {
                 if ( details && details->needRecord() ) {
                     details->setElemMatchKey( inner.fieldName() );
                 }
@@ -306,9 +305,9 @@ namespace mongo {
         _list.push_back( expr );
     }
 
-    bool AllElemMatchOp::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool AllElemMatchOp::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         BSONElementSet all;
-        doc.getFieldsDotted( _path, all, false );
+        doc->getFieldsDotted( _path, all, false );
 
         for ( BSONElementSet::const_iterator i = all.begin(); i != all.end(); ++i ) {
             BSONElement sub = *i;

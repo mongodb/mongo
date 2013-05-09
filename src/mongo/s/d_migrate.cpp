@@ -217,9 +217,9 @@ namespace mongo {
                     return;
                 }
 
-                IndexChunk chunk( ns, min, max, indexKeyPattern );
+                KeyRange range( ns, min, max, indexKeyPattern );
                 long long numDeleted =
-                        Helpers::removeRange( chunk,
+                        Helpers::removeRange( range,
                                               false, /*maxInclusive*/
                                               secondaryThrottle,
                                               cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -1219,7 +1219,7 @@ namespace mongo {
 
             // Before we get into the critical section of the migration, let's double check
             // that the config servers are reachable and the lock is in place.
-            log() << "About to check if it is safe to enter critical section";
+            log() << "About to check if it is safe to enter critical section" << endl;
 
             string lockHeldMsg;
             bool lockHeld = dlk.isLockHeld( 30.0 /* timeout */, &lockHeldMsg );
@@ -1230,7 +1230,7 @@ namespace mongo {
                 return false;
             }
 
-            log() << "About to enter migrate critical section";
+            log() << "About to enter migrate critical section" << endl;
 
             {
                 // 5.a
@@ -1655,8 +1655,8 @@ namespace mongo {
 
                 // 2. delete any data already in range
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                IndexChunk chunk( ns, min, max, indexKeyPattern );
-                long long num = Helpers::removeRange( chunk,
+                KeyRange range( ns, min, max, indexKeyPattern );
+                long long num = Helpers::removeRange( range,
                                                       false, /*maxInclusive*/
                                                       secondaryThrottle, /* secondaryThrottle */
                                                       cmdLine.moveParanoia ? &rs : 0, /*callback*/
@@ -1882,8 +1882,8 @@ namespace mongo {
                     BSONObj idIndexPattern = Helpers::inferKeyPattern( id );
 
                     // TODO: create a better interface to remove objects directly
-                    IndexChunk chunk( ns, id, id, idIndexPattern );
-                    Helpers::removeRange( chunk ,
+                    KeyRange range( ns, id, id, idIndexPattern );
+                    Helpers::removeRange( range ,
                                           true , /*maxInclusive*/
                                           false , /* secondaryThrottle */
                                           cmdLine.moveParanoia ? &rs : 0 , /*callback*/

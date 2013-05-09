@@ -30,7 +30,7 @@ namespace mongo {
 
     class ListOfMatchExpression : public MatchExpression {
     public:
-        ListOfMatchExpression( MatchType type ) : MatchExpression( TREE, type ){}
+        ListOfMatchExpression( MatchType type ) : MatchExpression( type ){}
         virtual ~ListOfMatchExpression();
 
         /**
@@ -61,7 +61,7 @@ namespace mongo {
         AndMatchExpression() : ListOfMatchExpression( AND ){}
         virtual ~AndMatchExpression(){}
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
@@ -72,7 +72,7 @@ namespace mongo {
         OrMatchExpression() : ListOfMatchExpression( OR ){}
         virtual ~OrMatchExpression(){}
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
@@ -83,7 +83,7 @@ namespace mongo {
         NorMatchExpression() : ListOfMatchExpression( NOR ){}
         virtual ~NorMatchExpression(){}
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
@@ -91,7 +91,7 @@ namespace mongo {
 
     class NotMatchExpression : public MatchExpression {
     public:
-        NotMatchExpression() : MatchExpression( TREE, NOT ){}
+        NotMatchExpression() : MatchExpression( NOT ){}
         /**
          * @param exp - I own it, and will delete
          */
@@ -100,7 +100,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const {
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const {
             return !_exp->matches( doc, NULL );
         }
 

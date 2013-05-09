@@ -172,8 +172,11 @@ namespace mongo {
             if( isTracked( diffChunkDoc ) ) newTracked.push_back( diffChunkDoc.getOwned() );
         }
 
-        LOG(3) << "found " << _validDiffs << " new chunks for collection " << _ns
-               << " (tracking " << newTracked.size() << "), new version is " << _maxVersion << endl;
+        LOG(3) << "found " << _validDiffs
+               << " new chunks for collection " << _ns
+               << " (tracking " << newTracked.size()
+               << "), new version is " << *_maxVersion
+               << endl;
 
         for( vector<BSONObj>::iterator it = newTracked.begin(); it != newTracked.end(); it++ ){
 

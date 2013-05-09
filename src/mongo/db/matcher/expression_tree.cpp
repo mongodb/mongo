@@ -61,7 +61,7 @@ namespace mongo {
 
     // -----
 
-    bool AndMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool AndMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         for ( size_t i = 0; i < numChildren(); i++ ) {
             if ( !getChild(i)->matches( doc, details ) ) {
                 if ( details )
@@ -90,7 +90,7 @@ namespace mongo {
 
     // -----
 
-    bool OrMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool OrMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         for ( size_t i = 0; i < numChildren(); i++ ) {
             if ( getChild(i)->matches( doc, NULL ) ) {
                 return true;
@@ -117,7 +117,7 @@ namespace mongo {
 
     // ----
 
-    bool NorMatchExpression::matches( const BSONObj& doc, MatchDetails* details ) const {
+    bool NorMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         for ( size_t i = 0; i < numChildren(); i++ ) {
             if ( getChild(i)->matches( doc, NULL ) ) {
                 return false;

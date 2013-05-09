@@ -42,11 +42,11 @@ namespace mongo {
      */
     class AllMatchExpression : public MatchExpression {
     public:
-        AllMatchExpression() : MatchExpression( ARRAY, ALL ){}
+        AllMatchExpression() : MatchExpression( ALL ){}
         Status init( const StringData& path );
         ArrayFilterEntries* getArrayFilterEntries() { return &_arrayEntries; }
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
@@ -58,16 +58,17 @@ namespace mongo {
         bool _match( const BSONElementSet& all ) const;
 
         StringData _path;
+        FieldRef _fieldRef;
         ArrayFilterEntries _arrayEntries;
     };
 
 
     class ArrayMatchingMatchExpression : public MatchExpression {
     public:
-        ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( ARRAY, matchType ){}
+        ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( matchType ){}
         virtual ~ArrayMatchingMatchExpression(){}
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
 
         /**
          * @param e - has to be an array.  calls matchesArray with e as an array
@@ -127,13 +128,13 @@ namespace mongo {
      */
     class AllElemMatchOp : public MatchExpression {
     public:
-        AllElemMatchOp() : MatchExpression( ARRAY, ALL ){}
+        AllElemMatchOp() : MatchExpression( ALL ){}
         virtual ~AllElemMatchOp();
 
         Status init( const StringData& path );
         void add( const ArrayMatchingMatchExpression* expr );
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
 
         /**
          * @param e has to be an array

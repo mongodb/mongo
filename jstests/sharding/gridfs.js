@@ -1,6 +1,10 @@
 // tests gridfs with a sharded fs.chunks collection.
 
-var test = new ShardingTest({shards: 3, mongos: 1, config: 1, other: {chunksize:1, separateConfig:true}})
+var test = new ShardingTest({shards: 3,
+                             mongos: 1,
+                             config: 1,
+                             verbose: 2,
+                             other: {chunksize:1, separateConfig:true}})
 
 var mongos = test.s0
 

@@ -235,13 +235,17 @@ namespace mongo {
                         root->add( new AtomicMatchExpression() );
                 }
                 else if ( mongoutils::str::equals( "where", rest ) ) {
+                    /*
                     if ( !topLevel )
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                          "$within has to be at the top level" );
+                                                          "$where has to be at the top level" );
+                    */
                     StatusWithMatchExpression s = expressionParserWhereCallback( e );
                     if ( !s.isOK() )
                         return s;
                     root->add( s.getValue() );
+                }
+                else if ( mongoutils::str::equals( "comment", rest ) ) {
                 }
                 else {
                     return StatusWithMatchExpression( ErrorCodes::BadValue,
@@ -274,6 +278,12 @@ namespace mongo {
                 return StatusWithMatchExpression( s );
 
             root->add( eq.release() );
+        }
+
+        if ( root->numChildren() == 1 ) {
+            const MatchExpression* real = root->getChild(0);
+            root->clearAndRelease();
+            return StatusWithMatchExpression( const_cast<MatchExpression*>(real) );
         }
 
         return StatusWithMatchExpression( root.release() );

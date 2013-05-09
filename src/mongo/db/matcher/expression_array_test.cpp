@@ -44,8 +44,8 @@ namespace mongo {
         AllMatchExpression all;
 
         ASSERT( !all.matchesSingleElement( notMatch[ "a" ] ) );
-        ASSERT( !all.matches( BSON( "a" << 1 ), NULL ) );
-        ASSERT( !all.matches( BSONObj(), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << 1 ), NULL ) );
+        ASSERT( !all.matchesBSON( BSONObj(), NULL ) );
     }
 
     TEST( AllMatchExpression, MatchesElementMultiple ) {
@@ -69,8 +69,8 @@ namespace mongo {
         all.init( "a" );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
-        ASSERT( all.matches( BSON( "a" << 5.0 ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
+        ASSERT( all.matchesBSON( BSON( "a" << 5.0 ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( AllMatchExpression, MatchesArrayValue ) {
@@ -79,9 +79,9 @@ namespace mongo {
         all.init( "a" );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
-        ASSERT( all.matches( BSON( "a" << BSON_ARRAY( 5.0 << 6 ) ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << BSON_ARRAY( 6 << 7 ) ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
+        ASSERT( all.matchesBSON( BSON( "a" << BSON_ARRAY( 5.0 << 6 ) ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << BSON_ARRAY( 6 << 7 ) ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
     }
 
     TEST( AllMatchExpression, MatchesNonArrayMultiValues ) {
@@ -91,12 +91,12 @@ namespace mongo {
         all.getArrayFilterEntries()->addEquality( operand[0] );
         all.getArrayFilterEntries()->addEquality( operand[1] );
 
-        ASSERT( all.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << 5.0 ) << BSON( "b" << 6 ) ) ),
+        ASSERT( all.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 5.0 ) << BSON( "b" << 6 ) ) ),
                              NULL ) );
-        ASSERT( all.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 5.0 << 7 ) ) <<
+        ASSERT( all.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 5.0 << 7 ) ) <<
                                                       BSON( "b" << BSON_ARRAY( 10 << 6 ) ) ) ),
                              NULL ) );
-        ASSERT( !all.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << 5.0 ) << BSON( "c" << 6 ) ) ),
+        ASSERT( !all.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 5.0 ) << BSON( "c" << 6 ) ) ),
                               NULL ) );
     }
 
@@ -109,7 +109,7 @@ namespace mongo {
         all.getArrayFilterEntries()->addEquality( operand[2] );
         all.getArrayFilterEntries()->addEquality( operand[3] );
 
-        ASSERT( all.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 4 << 5 << 2 ) ) <<
+        ASSERT( all.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 4 << 5 << 2 ) ) <<
                                                       BSON( "b" << 3 ) <<
                                                       BSON( "b" << BSONArray() ) <<
                                                       BSON( "b" << BSON_ARRAY( 1 ) ) ) ),
@@ -125,9 +125,9 @@ namespace mongo {
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
-        ASSERT( all.matches( BSONObj(), NULL ) );
-        ASSERT( all.matches( BSON( "a" << BSONNULL ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
+        ASSERT( all.matchesBSON( BSONObj(), NULL ) );
+        ASSERT( all.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( AllMatchExpression, MatchesFullArray ) {
@@ -138,10 +138,10 @@ namespace mongo {
         all.getArrayFilterEntries()->addEquality( operand[1] );
 
         // $all does not match full arrays.
-        ASSERT( !all.matches( BSON( "a" << BSON_ARRAY( 1 << 2 ) ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << BSON_ARRAY( 1 ) ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << 1 ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << BSON_ARRAY( 1 << 2 ) ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << 1 ), NULL ) );
     }
 
     TEST( AllMatchExpression, ElemMatchKey ) {
@@ -152,11 +152,11 @@ namespace mongo {
 
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !all.matches( BSON( "a" << 4 ), &details ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << 4 ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( all.matches( BSON( "a" << 5 ), &details ) );
+        ASSERT( all.matchesBSON( BSON( "a" << 5 ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( all.matches( BSON( "a" << BSON_ARRAY( 1 << 2 << 5 ) ), &details ) );
+        ASSERT( all.matchesBSON( BSON( "a" << BSON_ARRAY( 1 << 2 << 5 ) ), &details ) );
         // The elemMatchKey feature is not implemented for $all.
         ASSERT( !details.hasElemMatchKey() );
     }
@@ -167,9 +167,9 @@ namespace mongo {
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
-        ASSERT( all.matches( BSON( "a" << MinKey ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << MaxKey ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
+        ASSERT( all.matchesBSON( BSON( "a" << MinKey ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << MaxKey ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( AllMatchExpression, MatchesMaxKey ) {
@@ -178,9 +178,9 @@ namespace mongo {
         ASSERT( all.init( "a" ).isOK() );
         all.getArrayFilterEntries()->addEquality( operand[0] );
 
-        ASSERT( all.matches( BSON( "a" << MaxKey ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << MinKey ), NULL ) );
-        ASSERT( !all.matches( BSON( "a" << 4 ), NULL ) );
+        ASSERT( all.matchesBSON( BSON( "a" << MaxKey ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << MinKey ), NULL ) );
+        ASSERT( !all.matchesBSON( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( AllMatchExpression, Equivalent ) {
@@ -281,9 +281,9 @@ namespace mongo {
         ASSERT( op.init( "a", eq.release() ).isOK() );
         // Directly nested objects are not matched with $elemMatch.  An intervening array is
         // required.
-        ASSERT( !op.matches( BSON( "a" << BSON( "b" << 5 ) ), NULL ) );
-        ASSERT( !op.matches( BSON( "a" << BSON( "0" << ( BSON( "b" << 5 ) ) ) ), NULL ) );
-        ASSERT( !op.matches( BSON( "a" << 4 ), NULL ) );
+        ASSERT( !op.matchesBSON( BSON( "a" << BSON( "b" << 5 ) ), NULL ) );
+        ASSERT( !op.matchesBSON( BSON( "a" << BSON( "0" << ( BSON( "b" << 5 ) ) ) ), NULL ) );
+        ASSERT( !op.matchesBSON( BSON( "a" << 4 ), NULL ) );
     }
 
     TEST( ElemMatchObjectMatchExpression, MatchesArrayObject ) {
@@ -292,10 +292,10 @@ namespace mongo {
         ASSERT( eq->init( "b", baseOperand[ "b" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a", eq.release() ).isOK() );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << 5 ) ) ), NULL ) );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( 4 << BSON( "b" << 5 ) ) ), NULL ) );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSONObj() << BSON( "b" << 5 ) ) ), NULL ) );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << 6 ) << BSON( "b" << 5 ) ) ),
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 5 ) ) ), NULL ) );
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << BSON( "b" << 5 ) ) ), NULL ) );
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( BSONObj() << BSON( "b" << 5 ) ) ), NULL ) );
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 6 ) << BSON( "b" << 5 ) ) ),
                             NULL ) );
     }
 
@@ -305,12 +305,12 @@ namespace mongo {
         ASSERT( eq->init( "c", baseOperand[ "c" ] ).isOK() );
         ElemMatchObjectMatchExpression op;
         ASSERT( op.init( "a.b", eq.release() ).isOK() );
-        ASSERT( op.matches( BSON( "a" <<
+        ASSERT( op.matchesBSON( BSON( "a" <<
                                   BSON_ARRAY( BSON( "b" <<
                                                     BSON_ARRAY( BSON( "c" <<
                                                                       5 ) ) ) ) ),
                             NULL ) );
-        ASSERT( op.matches( BSON( "a" <<
+        ASSERT( op.matchesBSON( BSON( "a" <<
                                   BSON_ARRAY( BSON( "b" <<
                                                     BSON_ARRAY( BSON( "c" <<
                                                                       1 ) ) ) <<
@@ -328,17 +328,17 @@ namespace mongo {
         ASSERT( op.init( "a.b", eq.release() ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !op.matches( BSONObj(), &details ) );
+        ASSERT( !op.matchesBSON( BSONObj(), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( !op.matches( BSON( "a" << BSON( "b" << BSON_ARRAY( BSON( "c" << 7 ) ) ) ),
+        ASSERT( !op.matchesBSON( BSON( "a" << BSON( "b" << BSON_ARRAY( BSON( "c" << 7 ) ) ) ),
                              &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( op.matches( BSON( "a" << BSON( "b" << BSON_ARRAY( 3 << BSON( "c" << 6 ) ) ) ),
+        ASSERT( op.matchesBSON( BSON( "a" << BSON( "b" << BSON_ARRAY( 3 << BSON( "c" << 6 ) ) ) ),
                             &details ) );
         ASSERT( details.hasElemMatchKey() );
         // The entry within the $elemMatch array is reported.
         ASSERT_EQUALS( "1", details.elemMatchKey() );
-        ASSERT( op.matches( BSON( "a" <<
+        ASSERT( op.matchesBSON( BSON( "a" <<
                                   BSON_ARRAY( 1 << 2 <<
                                               BSON( "b" << BSON_ARRAY( 3 <<
                                                                        5 <<
@@ -404,8 +404,8 @@ namespace mongo {
         ASSERT( op.init( "a", gt.release() ).isOK() );
         // Directly nested objects are not matched with $elemMatch.  An intervening array is
         // required.
-        ASSERT( !op.matches( BSON( "a" << 6 ), NULL ) );
-        ASSERT( !op.matches( BSON( "a" << BSON( "0" << 6 ) ), NULL ) );
+        ASSERT( !op.matchesBSON( BSON( "a" << 6 ), NULL ) );
+        ASSERT( !op.matchesBSON( BSON( "a" << BSON( "0" << 6 ) ), NULL ) );
     }
 
     TEST( ElemMatchValueMatchExpression, MatchesArrayScalar ) {
@@ -414,9 +414,9 @@ namespace mongo {
         ASSERT( gt->init( "", baseOperand[ "$gt" ] ).isOK() );
         ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a", gt.release() ).isOK() );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSONObj() << 7 ) ), NULL ) );
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( BSONObj() << 7 ) ), NULL ) );
     }
 
     TEST( ElemMatchValueMatchExpression, MatchesMultipleNamedValues ) {
@@ -425,8 +425,8 @@ namespace mongo {
         ASSERT( gt->init( "", baseOperand[ "$gt" ] ).isOK() );
         ElemMatchValueMatchExpression op;
         ASSERT( op.init( "a.b", gt.release() ).isOK() );
-        ASSERT( op.matches( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 6 ) ) ) ), NULL ) );
-        ASSERT( op.matches( BSON( "a" <<
+        ASSERT( op.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << BSON_ARRAY( 6 ) ) ) ), NULL ) );
+        ASSERT( op.matchesBSON( BSON( "a" <<
                                   BSON_ARRAY( BSON( "b" << BSON_ARRAY( 4 ) ) <<
                                               BSON( "b" << BSON_ARRAY( 4 << 6 ) ) ) ),
                             NULL ) );
@@ -440,17 +440,17 @@ namespace mongo {
         ASSERT( op.init( "a.b", gt.release() ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !op.matches( BSONObj(), &details ) );
+        ASSERT( !op.matchesBSON( BSONObj(), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( !op.matches( BSON( "a" << BSON( "b" << BSON_ARRAY( 2 ) ) ),
+        ASSERT( !op.matchesBSON( BSON( "a" << BSON( "b" << BSON_ARRAY( 2 ) ) ),
                              &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( op.matches( BSON( "a" << BSON( "b" << BSON_ARRAY( 3 << 7 ) ) ),
+        ASSERT( op.matchesBSON( BSON( "a" << BSON( "b" << BSON_ARRAY( 3 << 7 ) ) ),
                             &details ) );
         ASSERT( details.hasElemMatchKey() );
         // The entry within the $elemMatch array is reported.
         ASSERT_EQUALS( "1", details.elemMatchKey() );
-        ASSERT( op.matches( BSON( "a" <<
+        ASSERT( op.matchesBSON( BSON( "a" <<
                                   BSON_ARRAY( 1 << 2 <<
                                               BSON( "b" << BSON_ARRAY( 3 << 7 ) ) ) ),
                             &details ) );
@@ -567,19 +567,19 @@ namespace mongo {
 
 
         BSONObj nonArray = BSON( "x" << 4 );
-        ASSERT( !op.matches( nonArray, NULL ) );
+        ASSERT( !op.matchesBSON( nonArray, NULL ) );
         BSONObj emptyArray = BSON( "x" << BSONArray() );
-        ASSERT( !op.matches( emptyArray, NULL ) );
+        ASSERT( !op.matchesBSON( emptyArray, NULL ) );
         BSONObj nonNumberArray = BSON( "x" << BSON_ARRAY( "q" ) );
-        ASSERT( !op.matches( nonNumberArray, NULL ) );
+        ASSERT( !op.matchesBSON( nonNumberArray, NULL ) );
         BSONObj singleMatch = BSON( "x" << BSON_ARRAY( 5 ) );
-        ASSERT( !op.matches( singleMatch, NULL ) );
+        ASSERT( !op.matchesBSON( singleMatch, NULL ) );
         BSONObj otherMatch = BSON( "x" << BSON_ARRAY( 105 ) );
-        ASSERT( !op.matches( otherMatch, NULL ) );
+        ASSERT( !op.matchesBSON( otherMatch, NULL ) );
         BSONObj bothMatch = BSON( "x" << BSON_ARRAY( 5 << 105 ) );
-        ASSERT( op.matches( bothMatch, NULL ) );
+        ASSERT( op.matchesBSON( bothMatch, NULL ) );
         BSONObj neitherMatch = BSON( "x" << BSON_ARRAY( 0 << 200 ) );
-        ASSERT( !op.matches( neitherMatch, NULL ) );
+        ASSERT( !op.matchesBSON( neitherMatch, NULL ) );
     }
 
     /**
@@ -624,9 +624,9 @@ namespace mongo {
     TEST( SizeMatchExpression, MatchesArray ) {
         SizeMatchExpression size;
         ASSERT( size.init( "a", 2 ).isOK() );
-        ASSERT( size.matches( BSON( "a" << BSON_ARRAY( 4 << 5.5 ) ), NULL ) );
+        ASSERT( size.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5.5 ) ), NULL ) );
         // Arrays are not unwound to look for matching subarrays.
-        ASSERT( !size.matches( BSON( "a" << BSON_ARRAY( 4 << 5.5 << BSON_ARRAY( 1 << 2 ) ) ),
+        ASSERT( !size.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5.5 << BSON_ARRAY( 1 << 2 ) ) ),
                                NULL ) );
     }
 
@@ -634,7 +634,7 @@ namespace mongo {
         SizeMatchExpression size;
         ASSERT( size.init( "a.2", 2 ).isOK() );
         // A numerically referenced nested array is matched.
-        ASSERT( size.matches( BSON( "a" << BSON_ARRAY( 4 << 5.5 << BSON_ARRAY( 1 << 2 ) ) ),
+        ASSERT( size.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5.5 << BSON_ARRAY( 1 << 2 ) ) ),
                               NULL ) );
     }
 
@@ -643,11 +643,11 @@ namespace mongo {
         ASSERT( size.init( "a.b", 3 ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
-        ASSERT( !size.matches( BSON( "a" << 1 ), &details ) );
+        ASSERT( !size.matchesBSON( BSON( "a" << 1 ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( size.matches( BSON( "a" << BSON( "b" << BSON_ARRAY( 1 << 2 << 3 ) ) ), &details ) );
+        ASSERT( size.matchesBSON( BSON( "a" << BSON( "b" << BSON_ARRAY( 1 << 2 << 3 ) ) ), &details ) );
         ASSERT( !details.hasElemMatchKey() );
-        ASSERT( size.matches( BSON( "a" <<
+        ASSERT( size.matchesBSON( BSON( "a" <<
                                     BSON_ARRAY( 2 <<
                                                 BSON( "b" << BSON_ARRAY( 1 << 2 << 3 ) ) ) ),
                               &details ) );

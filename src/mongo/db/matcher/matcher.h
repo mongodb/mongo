@@ -67,7 +67,10 @@ namespace mongo {
                                                 const MatchExpression* full );
 
     private:
-        const BSONObj _pattern; // this is owned by who created us
+        BSONObj _pattern;
+
+        BSONObj _indexKey;
+
         boost::scoped_ptr<MatchExpression> _expression;
 
         static MatchExpression* _spliceForIndex( const set<std::string>& keys,

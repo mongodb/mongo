@@ -25,8 +25,8 @@
 
 namespace mongo {
 
-    MatchExpression::MatchExpression( MatchCategory category, MatchType type )
-        : _matchCategory( category ), _matchType( type ){
+    MatchExpression::MatchExpression( MatchType type )
+        : _matchType( type ){
     }
 
 
@@ -40,6 +40,12 @@ namespace mongo {
         for ( int i = 0; i < level; i++ )
             debug << "    ";
     }
+
+    bool MatchExpression::matchesBSON( const BSONObj& doc, MatchDetails* details ) const {
+        BSONMatchableDocument mydoc( doc );
+        return matches( &mydoc, details );
+    }
+
 
     void AtomicMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );

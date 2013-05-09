@@ -16,6 +16,7 @@
 
 #include "mongo/db/field_ref.h"
 
+#include "mongo/util/log.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -100,20 +101,49 @@ namespace mongo {
         _replacements.clear();
     }
 
-    std::string FieldRef::dottedField() const {
+    std::string FieldRef::dottedField( size_t offset ) const {
         std::string res;
-        if (_size == 0) {
+
+        if (_size == 0 || offset >= numParts() ) {
             return res;
         }
 
-        res.append(_fixed[0].rawData(), _fixed[0].size());
-        for (size_t i=1; i<_size; i++) {
-            res.append(1, '.');
+        for (size_t i=offset; i<_size; i++) {
+            if ( i > offset )
+                res.append(1, '.');
             StringData part = getPart(i);
             res.append(part.rawData(), part.size());
         }
         return res;
     }
+
+    bool FieldRef::equalsDottedField( const StringData& other ) const {
+        StringData rest = other;
+
+
+        for ( size_t i = 0; i < _size; i++ ) {
+
+            StringData part = getPart( i );
+
+            if ( !rest.startsWith( part ) )
+                return false;
+
+            if ( i == _size - 1 )
+                return rest.size() == part.size();
+
+            // make sure next thing is a dot
+            if ( rest.size() == part.size() )
+                return false;
+
+            if ( rest[part.size()] != '.' )
+                return false;
+
+            rest = rest.substr( part.size() + 1 );
+        }
+
+        return false;
+    }
+
 
     size_t FieldRef::numReplaced() const {
         size_t res = 0;

@@ -33,11 +33,11 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        ASSERT(!result.getValue()->matches(fromjson("{a: [3,4]}")));
-        ASSERT(result.getValue()->matches(fromjson("{a: [4,4]}")));
-        ASSERT(result.getValue()->matches(fromjson("{a: [5,5]}")));
-        ASSERT(result.getValue()->matches(fromjson("{a: [5,5.1]}")));
-        ASSERT(result.getValue()->matches(fromjson("{a: {x: 5, y:5.1}}")));
+        ASSERT(!result.getValue()->matchesBSON(fromjson("{a: [3,4]}")));
+        ASSERT(result.getValue()->matchesBSON(fromjson("{a: [4,4]}")));
+        ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5]}")));
+        ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5.1]}")));
+        ASSERT(result.getValue()->matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
 
     }
 }

@@ -30,7 +30,7 @@ namespace mongo {
 
     class LeafMatchExpression : public MatchExpression {
     public:
-        LeafMatchExpression( MatchType matchType ) : MatchExpression( LEAF, matchType ) {
+        LeafMatchExpression( MatchType matchType ) : MatchExpression( matchType ) {
             _allHaveToMatch = false;
         }
 
@@ -38,15 +38,21 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const = 0;
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual bool matchesSingleElement( const BSONElement& e ) const = 0;
 
-        virtual const StringData getPath() const { return _path; }
+        const StringData path() const { return _path; }
+        bool allHaveToMatch() const { return _allHaveToMatch; }
 
     protected:
-        StringData _path;
+        void initPath( const StringData& path );
+
         bool _allHaveToMatch;
+
+    private:
+        StringData _path;
+        FieldRef _fieldRef;
     };
 
     // -----
@@ -76,7 +82,7 @@ namespace mongo {
         EqualityMatchExpression() : ComparisonMatchExpression( EQ ){}
         virtual LeafMatchExpression* shallowClone() const {
             ComparisonMatchExpression* e = new EqualityMatchExpression();
-            e->init( _path, _rhs  );
+            e->init( path(), _rhs  );
             return e;
         }
     };
@@ -86,7 +92,7 @@ namespace mongo {
         LTEMatchExpression() : ComparisonMatchExpression( LTE ){}
         virtual LeafMatchExpression* shallowClone() const {
             ComparisonMatchExpression* e = new LTEMatchExpression();
-            e->init( _path, _rhs  );
+            e->init( path(), _rhs  );
             return e;
         }
 
@@ -97,7 +103,7 @@ namespace mongo {
         LTMatchExpression() : ComparisonMatchExpression( LT ){}
         virtual LeafMatchExpression* shallowClone() const {
             ComparisonMatchExpression* e = new LTMatchExpression();
-            e->init( _path, _rhs  );
+            e->init( path(), _rhs  );
             return e;
         }
 
@@ -108,7 +114,7 @@ namespace mongo {
         GTMatchExpression() : ComparisonMatchExpression( GT ){}
         virtual LeafMatchExpression* shallowClone() const {
             ComparisonMatchExpression* e = new GTMatchExpression();
-            e->init( _path, _rhs  );
+            e->init( path(), _rhs  );
             return e;
         }
 
@@ -119,7 +125,7 @@ namespace mongo {
         GTEMatchExpression() : ComparisonMatchExpression( GTE ){}
         virtual LeafMatchExpression* shallowClone() const {
             ComparisonMatchExpression* e = new GTEMatchExpression();
-            e->init( _path, _rhs  );
+            e->init( path(), _rhs  );
             return e;
         }
 
@@ -130,7 +136,7 @@ namespace mongo {
         NEMatchExpression() : ComparisonMatchExpression( NE ){}
         virtual LeafMatchExpression* shallowClone() const {
             ComparisonMatchExpression* e = new NEMatchExpression();
-            e->init( _path, _rhs  );
+            e->init( path(), _rhs  );
             return e;
         }
 
@@ -153,7 +159,7 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const {
             RegexMatchExpression* e = new RegexMatchExpression();
-            e->init( _path, _regex, _flags );
+            e->init( path(), _regex, _flags );
             return e;
         }
 
@@ -177,7 +183,7 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const {
             ModMatchExpression* m = new ModMatchExpression();
-            m->init( _path, _divisor, _remainder );
+            m->init( path(), _divisor, _remainder );
             return m;
         }
 
@@ -200,7 +206,7 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const {
             ExistsMatchExpression* e = new ExistsMatchExpression();
-            e->init( _path, _exists );
+            e->init( path(), _exists );
             return e;
         }
 
@@ -219,19 +225,21 @@ namespace mongo {
 
     class TypeMatchExpression : public MatchExpression {
     public:
-        TypeMatchExpression() : MatchExpression( TYPE_CATEGORY, TYPE_OPERATOR ){}
+        TypeMatchExpression() : MatchExpression( TYPE_OPERATOR ){}
 
         Status init( const StringData& path, int type );
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
-        virtual bool matches( const BSONObj& doc, MatchDetails* details = 0 ) const;
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
     private:
-        bool _matches( const StringData& path, const BSONObj& doc, MatchDetails* details = 0 ) const;
+        bool _matches( const StringData& path,
+                       const MatchableDocument* doc,
+                       MatchDetails* details = 0 ) const;
 
         StringData _path;
         int _type;
