@@ -563,9 +563,8 @@ methods = {
 	Config('extensions', '', r'''
 		list of shared library extensions to load (using dlopen).
 		Optional values are passed as the \c config parameter to
-		WT_CONNECTION::load_extension.  Complex paths may require
-		quoting, for example,
-		<code>extensions=("/path/ext.so"="entry=my_entry")</code>''',
+		WT_CONNECTION::load_extension.  For example,
+		<code>extensions=(/path/ext.so={entry=my_entry})</code>''',
 		type='list'),
 	Config('hazard_max', '1000', r'''
 		maximum number of simultaneous hazard pointers per session

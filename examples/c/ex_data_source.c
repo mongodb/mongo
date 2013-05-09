@@ -404,8 +404,8 @@ main(void)
 	 * to /home.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "target=\"/home\"", "string",
-	    "choices=[\"/device\", \"/home\", \"/target\"]");
+	    "session.open_cursor", NULL, "target=/home", "string",
+	    "choices=[/device, /home, /target]");
 	/*! [WT_DATA_SOURCE configure string with checking] */
 
 	/*! [WT_DATA_SOURCE configure list with checking] */
@@ -414,8 +414,8 @@ main(void)
 	 * /target; default to /mnt.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "paths=[\"/mnt\"]", "list",
-	    "choices=[\"/device\", \"/home\", \"/mnt\", \"/target\"]");
+	    "session.open_cursor", NULL, "paths=[/mnt]", "list",
+	    "choices=[/device, /home, /mnt, /target]");
 	/*! [WT_DATA_SOURCE configure list with checking] */
 
 	/*! [WT_EXTENSION_API default_session] */

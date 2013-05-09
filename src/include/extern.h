@@ -527,6 +527,12 @@ extern int __wt_ext_config_scan_next( WT_EXTENSION_API *wt_api,
     WT_CONFIG_SCAN *scan,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
+extern int __wt_conn_remove_collator(WT_CONNECTION_IMPL *conn,
+    WT_NAMED_COLLATOR *ncoll);
+extern int __wt_conn_remove_compressor( WT_CONNECTION_IMPL *conn,
+    WT_NAMED_COMPRESSOR *ncomp);
+extern int __wt_conn_remove_data_source( WT_CONNECTION_IMPL *conn,
+    WT_NAMED_DATA_SOURCE *ndsrc);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,

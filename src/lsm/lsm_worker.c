@@ -303,7 +303,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointed %u", i);
 		}
-		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 			WT_ERR(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
 	}

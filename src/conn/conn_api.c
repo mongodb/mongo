@@ -131,12 +131,12 @@ err:	if (ncoll != NULL) {
 }
 
 /*
- * __conn_remove_collator --
+ * __wt_conn_remove_collator --
  *	remove collator added by WT_CONNECTION->add_collator,
  *	only used internally.
  */
-static int
-__conn_remove_collator(WT_CONNECTION_IMPL *conn, WT_NAMED_COLLATOR *ncoll)
+int
+__wt_conn_remove_collator(WT_CONNECTION_IMPL *conn, WT_NAMED_COLLATOR *ncoll)
 {
 	WT_SESSION_IMPL *session;
 	WT_DECL_RET;
@@ -195,12 +195,13 @@ err:	if (ncomp != NULL) {
 }
 
 /*
- * __conn_remove_compressor --
+ * __wt_conn_remove_compressor --
  *	remove compressor added by WT_CONNECTION->add_compressor,
  *	only used internally.
  */
-static int
-__conn_remove_compressor(WT_CONNECTION_IMPL *conn, WT_NAMED_COMPRESSOR *ncomp)
+int
+__wt_conn_remove_compressor(
+    WT_CONNECTION_IMPL *conn, WT_NAMED_COMPRESSOR *ncomp)
 {
 	WT_SESSION_IMPL *session;
 	WT_DECL_RET;
@@ -258,12 +259,13 @@ err:	if (ndsrc != NULL) {
 }
 
 /*
- * __conn_remove_compressor --
+ * __wt_conn_remove_compressor --
  *	remove compressor added by WT_CONNECTION->add_compressor,
  *	only used internally.
  */
-static int
-__conn_remove_data_source(WT_CONNECTION_IMPL *conn, WT_NAMED_DATA_SOURCE *ndsrc)
+int
+__wt_conn_remove_data_source(
+    WT_CONNECTION_IMPL *conn, WT_NAMED_DATA_SOURCE *ndsrc)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -355,9 +357,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_NAMED_COLLATOR *ncoll;
-	WT_NAMED_COMPRESSOR *ncomp;
-	WT_NAMED_DATA_SOURCE *ndsrc;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *s, *session;
 	uint32_t i;
@@ -383,34 +382,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
 		if (!F_ISSET(s, WT_SESSION_INTERNAL))
 			__wt_free(session, s->hazard);
-
-	/*
-	 * Shut down server threads other than the eviction server, which is
-	 * needed later to close btree handles.  Some of these threads access
-	 * btree handles, so take care in ordering shutdown to make sure they
-	 * exit before files are closed.
-	 */
-	F_CLR(conn, WT_CONN_SERVER_RUN);
-	WT_TRET(__wt_checkpoint_destroy(conn));
-	WT_TRET(__wt_statlog_destroy(conn));
-
-	/* Clean up open LSM handles. */
-	WT_ERR(__wt_lsm_tree_close_all(session));
-
-	/* Close open data handles. */
-	WT_TRET(__wt_conn_dhandle_discard(conn));
-
-	/* Free memory for collators */
-	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
-		WT_TRET(__conn_remove_collator(conn, ncoll));
-
-	/* Free memory for compressors */
-	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		WT_TRET(__conn_remove_compressor(conn, ncomp));
-
-	/* Free memory for data sources */
-	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL)
-		WT_TRET(__conn_remove_data_source(conn, ndsrc));
 
 	WT_TRET(__wt_connection_close(conn));
 
@@ -1008,14 +979,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	/*
-	 * Open the connection; if that fails, the connection handle has been
-	 * destroyed by the time the open function returns.
-	 */
-	if ((ret = __wt_connection_open(conn, cfg)) != 0) {
-		conn = NULL;
-		WT_ERR(ret);
-	}
+	/* Open the connection. */
+	WT_ERR(__wt_connection_open(conn, cfg));
 
 	/* Open the default session. */
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &conn->default_session));

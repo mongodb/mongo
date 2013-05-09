@@ -12,11 +12,9 @@ Note that maintaining statistics involves updating shared-memory data
 structures and may decrease application performance.
 
 @section statistics_log Statistics logging
-WiredTiger will optionally log the current database statistics into a
-file when configured the \c statistics_log.log configuration string of
-the ::wiredtiger_open function is set.
-
-The following example logs statistics every 30 seconds:
+WiredTiger will optionally log database statistics into a file when the
+the ::wiredtiger_open \c statistics_log configuration is set.  The
+following example logs statistics every 30 seconds:
 
 @snippet ex_all.c Statistics logging
 
