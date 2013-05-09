@@ -1710,6 +1710,9 @@
     <ClCompile Include="..\db\matcher\expression_where.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\matcher\matchable.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3348,6 +3351,9 @@
     </ClInclude>
     <ClInclude Include="..\util\safe_num-inl.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\matchable.h">
+      <Filter>db\matcher</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

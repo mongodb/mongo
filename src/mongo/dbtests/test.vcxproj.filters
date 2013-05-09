@@ -2463,6 +2463,9 @@
     <ClInclude Include="..\db\ops\modifier_bit.h">
       <Filter>db\ops</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\matcher\matchable.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -4665,6 +4668,9 @@
     </ClCompile>
     <ClCompile Include="..\db\ops\modifier_bit_test.cpp">
       <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\matchable.cpp">
+      <Filter>db\matcher</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -2722,6 +2722,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="matcher\expression_where.cpp" />
+    <ClCompile Include="matcher\matchable.cpp" />
     <ClCompile Include="matcher\matcher.cpp">
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)matcher2.obj</ObjectFileName>
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)matcher2.obj</ObjectFileName>
@@ -3569,6 +3570,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="matcher\expression_leaf.h" />
     <ClInclude Include="matcher\expression_parser.h" />
     <ClInclude Include="matcher\expression_tree.h" />
+    <ClInclude Include="matcher\matchable.h" />
     <ClInclude Include="matcher\matcher.h" />
     <ClInclude Include="matcher\match_details.h" />
     <ClInclude Include="matcher_covered.h" />
