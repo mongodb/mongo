@@ -192,7 +192,7 @@ namespace mongo {
     };
 
     /**
-     * Provides the funcionality of both BasicEstimators and DistributionEstimators.
+     * Provides the functionality of both BasicEstimators and DistributionEstimators.
      */
     template <class Sample, std::size_t NumQuantiles>
     class SummaryEstimators :
