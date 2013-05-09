@@ -1219,7 +1219,7 @@ namespace mongo {
 
             // Before we get into the critical section of the migration, let's double check
             // that the config servers are reachable and the lock is in place.
-            log() << "About to check if it is safe to enter critical section";
+            log() << "About to check if it is safe to enter critical section" << endl;
 
             string lockHeldMsg;
             bool lockHeld = dlk.isLockHeld( 30.0 /* timeout */, &lockHeldMsg );
@@ -1230,7 +1230,7 @@ namespace mongo {
                 return false;
             }
 
-            log() << "About to enter migrate critical section";
+            log() << "About to enter migrate critical section" << endl;
 
             {
                 // 5.a
