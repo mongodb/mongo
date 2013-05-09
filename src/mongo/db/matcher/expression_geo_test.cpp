@@ -37,11 +37,11 @@ namespace mongo {
         GeoMatchExpression ge;
         ASSERT( ge.init( "a", gq ).isOK() );
 
-        ASSERT(!ge.matches(fromjson("{a: [3,4]}")));
-        ASSERT(ge.matches(fromjson("{a: [4,4]}")));
-        ASSERT(ge.matches(fromjson("{a: [5,5]}")));
-        ASSERT(ge.matches(fromjson("{a: [5,5.1]}")));
-        ASSERT(ge.matches(fromjson("{a: {x: 5, y:5.1}}")));
+        ASSERT(!ge.matchesBSON(fromjson("{a: [3,4]}")));
+        ASSERT(ge.matchesBSON(fromjson("{a: [4,4]}")));
+        ASSERT(ge.matchesBSON(fromjson("{a: [5,5]}")));
+        ASSERT(ge.matchesBSON(fromjson("{a: [5,5.1]}")));
+        ASSERT(ge.matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
 
     }
 
