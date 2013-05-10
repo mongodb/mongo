@@ -104,14 +104,14 @@ namespace {
         readWriteRoleActions.addAllActionsFromSet(readRoleActions);
         readWriteRoleActions.addAction(ActionType::cloneCollectionTarget);
         readWriteRoleActions.addAction(ActionType::convertToCapped);
-        readWriteRoleActions.addAction(ActionType::createCollection); // db admin gets this also
-        readWriteRoleActions.addAction(ActionType::dropCollection);
-        readWriteRoleActions.addAction(ActionType::dropIndexes);
+        readWriteRoleActions.addAction(ActionType::createCollection); // dbAdmin gets this also
+        readWriteRoleActions.addAction(ActionType::dropCollection); // dbAdmin gets this also
+        readWriteRoleActions.addAction(ActionType::dropIndexes); // dbAdmin gets this also
         readWriteRoleActions.addAction(ActionType::emptycapped);
-        readWriteRoleActions.addAction(ActionType::ensureIndex);
+        readWriteRoleActions.addAction(ActionType::ensureIndex); // dbAdmin gets this also
         readWriteRoleActions.addAction(ActionType::insert);
         readWriteRoleActions.addAction(ActionType::remove);
-        readWriteRoleActions.addAction(ActionType::renameCollectionSameDB); // db admin gets this also
+        readWriteRoleActions.addAction(ActionType::renameCollectionSameDB); // dbAdmin gets this also
         readWriteRoleActions.addAction(ActionType::update);
 
         // User admin role
@@ -124,17 +124,17 @@ namespace {
         dbAdminRoleActions.addAction(ActionType::collStats);
         dbAdminRoleActions.addAction(ActionType::compact);
         dbAdminRoleActions.addAction(ActionType::convertToCapped);
-        dbAdminRoleActions.addAction(ActionType::createCollection); // read_write gets this also
+        dbAdminRoleActions.addAction(ActionType::createCollection); // readWrite gets this also
         dbAdminRoleActions.addAction(ActionType::dbStats);
-        dbAdminRoleActions.addAction(ActionType::dropCollection);
-        dbAdminRoleActions.addAction(ActionType::dropIndexes);
-        dbAdminRoleActions.addAction(ActionType::ensureIndex);
+        dbAdminRoleActions.addAction(ActionType::dropCollection); // readWrite gets this also
+        dbAdminRoleActions.addAction(ActionType::dropIndexes); // readWrite gets this also
+        dbAdminRoleActions.addAction(ActionType::ensureIndex); // readWrite gets this also
         dbAdminRoleActions.addAction(ActionType::indexRead);
         dbAdminRoleActions.addAction(ActionType::indexStats);
         dbAdminRoleActions.addAction(ActionType::profileEnable);
         dbAdminRoleActions.addAction(ActionType::profileRead);
         dbAdminRoleActions.addAction(ActionType::reIndex);
-        dbAdminRoleActions.addAction(ActionType::renameCollectionSameDB); // read_write gets this also
+        dbAdminRoleActions.addAction(ActionType::renameCollectionSameDB); // readWrite gets this also
         dbAdminRoleActions.addAction(ActionType::storageDetails);
         dbAdminRoleActions.addAction(ActionType::validate);
 
