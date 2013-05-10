@@ -28,8 +28,6 @@ __wt_block_ckpt_init(
 	WT_RET(__wt_block_extlist_init(session, &ci->alloc, name, "alloc"));
 	WT_RET(__wt_block_extlist_init(session, &ci->avail, name, "avail"));
 	WT_RET(__wt_block_extlist_init(session, &ci->discard, name, "discard"));
-
-	ci->file_size = WT_BLOCK_DESC_SECTOR;
 	WT_RET(__wt_block_extlist_init(
 	    session, &ci->ckpt_avail, name, "ckpt_avail"));
 
@@ -89,8 +87,13 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
 	}
 
-	/* If the checkpoint has an on-disk root page, load it. */
-	if (addr != NULL && addr_size != 0) {
+	/*
+	 * If the checkpoint has an on-disk root page, load it.  Otherwise, size
+	 * the file past the description information.
+	 */
+	if (addr == NULL || addr_size == 0)
+		ci->file_size = block->allocsize;
+	else {
 		/* Crack the checkpoint cookie. */
 		WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 

@@ -129,17 +129,21 @@ extern int __wt_block_manager_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     int forced_salvage,
     WT_BM **bmp);
-extern int __wt_block_manager_truncate(WT_SESSION_IMPL *session,
-    const char *filename);
-extern int __wt_block_manager_create(WT_SESSION_IMPL *session,
-    const char *filename);
+extern int __wt_block_manager_truncate( WT_SESSION_IMPL *session,
+    const char *filename,
+    uint32_t allocsize);
+extern int __wt_block_manager_create( WT_SESSION_IMPL *session,
+    const char *filename,
+    uint32_t allocsize);
 extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *cfg[],
     int forced_salvage,
     WT_BLOCK **blockp);
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh);
+extern int __wt_desc_init(WT_SESSION_IMPL *session,
+    WT_FH *fh,
+    uint32_t allocsize);
 extern void __wt_block_stat(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_DSRC_STATS *stats);

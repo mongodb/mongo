@@ -459,7 +459,7 @@ __block_extend(
 	 *
 	 * We should never be allocating from an empty file.
 	 */
-	if (fh->file_size < WT_BLOCK_DESC_SECTOR)
+	if (fh->file_size < block->allocsize)
 		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate from a file with no description "
 		    "information");
@@ -1076,8 +1076,8 @@ __wt_block_extlist_read(
 		 * a cheap test to do here and we'd have to do the check as part
 		 * of file verification, regardless.
 		 */
-		if (off < WT_BLOCK_DESC_SECTOR ||
-		    (off - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
+		if (off < block->allocsize ||
+		    off % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
 		    off + size > ckpt_size)
 corrupted:		WT_ERR_MSG(session, WT_ERROR,

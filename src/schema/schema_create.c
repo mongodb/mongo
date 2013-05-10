@@ -11,10 +11,14 @@ static int
 __create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
+	uint32_t allocsize;
 	int is_metadata;
-	const char *filecfg[4], *fileconf, *filename;
+	const char *fileconf, *filename;
+	const char *filecfg[] =
+	    { WT_CONFIG_BASE(session, file_meta), config, NULL, NULL };
 
 	fileconf = NULL;
 
@@ -32,8 +36,11 @@ __create_file(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
+	WT_RET(__wt_config_gets(session, filecfg, "allocation_size", &cval));
+	allocsize = (uint32_t)cval.val;
+
 	/* Create the file. */
-	WT_ERR(__wt_block_manager_create(session, filename));
+	WT_ERR(__wt_block_manager_create(session, filename, allocsize));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
@@ -46,10 +53,7 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_scr_alloc(session, 0, &val));
 		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
-		filecfg[0] = WT_CONFIG_BASE(session, file_meta);
-		filecfg[1] = config;
 		filecfg[2] = val->data;
-		filecfg[3] = NULL;
 		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
 		if ((ret = __wt_metadata_insert(session, uri, fileconf)) != 0) {
 			if (ret == WT_DUPLICATE_KEY)
