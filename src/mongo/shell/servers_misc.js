@@ -287,8 +287,7 @@ function startParallelShell( jsCode, port ){
     args.push("--eval", jsCode);
 
     if (typeof db == "object") {
-        // Must start connected to admin DB so auth works when running tests with auth.
-        args.push(db.getMongo().host + "/admin");
+        args.push(db.getMongo().host);
     }
 
     x = startMongoProgramNoConnect.apply(null, args);
