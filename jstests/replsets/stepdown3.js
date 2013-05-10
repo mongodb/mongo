@@ -27,7 +27,9 @@ var waitfunc = startParallelShell(command, master.port);
 
 print("getlasterror; should assert");
 var gleFunction = function() { 
-    master.getDB("test").runCommand({getLastError : 1, w: 2 , wtimeout :30000 }) 
+    var result = master.getDB("test").runCommand({getLastError : 1, w: 2 , wtimeout :30000 });
+    print("failed to throw exception; GLE returned: ");
+    printjson(result);
 };
 var result = assert.throws(gleFunction);
 print("result of gle:");
