@@ -4,9 +4,9 @@ function (testName, numShards, verboseLevel, numMongos, otherParams) {
 */
 var shardedAggTest = new ShardingTest({
     shards: 2,
-    verbose: 1,
+    verbose: 2,
     mongos: 1,
-    other: { chunksize: 1}
+    other: { chunksize : 1, separateConfig : true }
     }
 );
 
