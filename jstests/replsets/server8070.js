@@ -26,7 +26,7 @@ var checkRepl = function(db1, db2) {
                 .next();
             print(tojson(last1)+" "+tojson(last2));
 
-            return last2.ts.t == last1.ts.t;
+            return ((last1.ts.t === last2.ts.t) && (last1.ts.i === last2.ts.i))
         }
     );
 };
