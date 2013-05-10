@@ -49,7 +49,7 @@ MongoRunner.stopMongod( st.shard0, killWith );
 
 jsTest.log("Restart shard...");
 
-st.shard0 = MongoRunner.runMongod({ restart : st.shard0 });
+st.shard0 = MongoRunner.runMongod({ restart : st.shard0, forceLock : true });
 
 jsTest.log("Waiting for socket timeout time...");
 
