@@ -83,7 +83,7 @@ for (var i = 50; i < 75; i++) {
 var last = primary.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next();
 
 print("waiting a bit for the secondaries to get the write");
-sleep(20000);
+sleep(10000);
 
 print("Shut down the primary");
 replSet.stop(0);
@@ -125,8 +125,8 @@ assert.soon(
     function() {
         var last3 = member3.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1)
             .next();
-        print("primary: " + last.ts.t + " secondary: " + last3.ts.t);
-        return last.ts.t == last3.ts.t;
+        print("primary: " + tojson(last.ts) + " secondary: " + tojson(last3.ts));
+        return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i))
     }
 );
 
@@ -134,10 +134,10 @@ print(" --- start 3's bgsync thread ---");
 member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'off'});
 
 print("Shouldn't hit rollback");
-var end = (new Date()).getTime()+30000;
+var end = (new Date()).getTime()+10000;
 while ((new Date()).getTime() < end) {
     assert('ROLLBACK' != member3.runCommand({replSetGetStatus:1}).members[2].stateStr);
-    sleep(1000);
+    sleep(30);
 }
 
 replSet.stopSet();

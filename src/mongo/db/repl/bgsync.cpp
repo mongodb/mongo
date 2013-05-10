@@ -317,10 +317,6 @@ namespace replset {
             return;
         }
 
-        while (MONGO_FAIL_POINT(rsBgSyncProduce)) {
-            sleepmillis(0);
-        }
-
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
         if (isRollbackRequired(r)) {
@@ -489,6 +485,10 @@ namespace replset {
             while (!_appliedBuffer) {
                 _condvar.wait(lock);
             }
+        }
+
+        while (MONGO_FAIL_POINT(rsBgSyncProduce)) {
+            sleepmillis(0);
         }
 
         verify(r.conn() == NULL);
