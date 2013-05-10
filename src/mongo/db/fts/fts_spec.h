@@ -96,7 +96,7 @@ namespace mongo {
             bool _wildcard;
 
             // _weights stores a mapping between the fields and the value as a double
-            // basically, how much should an occurence of (query term) in (field) be worth
+            // basically, how much should an occurrence of (query term) in (field) be worth
             Weights _weights;
 
             // other fields to index

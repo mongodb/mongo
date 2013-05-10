@@ -115,7 +115,7 @@ namespace mongo {
                 (like creating an index or update with $atomic) can call this
                 whenever the db is in a sane state and it will prevent commits
                 from growing too large.
-                @return true if commited
+                @return true if committed
             */
             virtual bool commitIfNeeded(bool force=false) = 0;
 

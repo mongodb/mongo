@@ -76,7 +76,7 @@ private:
     cstring                 m_work_buffer;
 
     cstring                 m_token;
-    cstring::iterator       m_commited_end;
+    cstring::iterator       m_committed_end;
 
     shared_array<char_type> m_remainder;
     std::size_t             m_remainder_size;

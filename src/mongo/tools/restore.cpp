@@ -59,7 +59,7 @@ public:
     int _oplogEntrySkips; // oplog entries skipped
     int _oplogEntryApplies; // oplog entries applied
     Restore() : BSONTool( "restore" ) , _drop(false) {
-        // Default values set here will show up in help text, but will supercede any default value
+        // Default values set here will show up in help text, but will supersede any default value
         // used when calling getParam below.
         add_options()
         ("drop" , "drop each collection before import" )

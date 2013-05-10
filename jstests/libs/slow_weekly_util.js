@@ -15,6 +15,6 @@ SlowWeeklyMongod.prototype.getDB = function( name ) {
 SlowWeeklyMongod.prototype.stop = function(){
     stopMongod( this.port );
     var end = new Date();
-    print( "slowWeekly test: " + this.name + " completed succesfully in " + ( ( end.getTime() - this.start.getTime() ) / 1000 ) + " seconds" );
+    print( "slowWeekly test: " + this.name + " completed successfully in " + ( ( end.getTime() - this.start.getTime() ) / 1000 ) + " seconds" );
 };
 

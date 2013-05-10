@@ -695,7 +695,7 @@ class FrameFunctionIterator {
     return next_function;
   }
 
-  // Iterate through functions until the first occurence of 'function'.
+  // Iterate through functions until the first occurrence of 'function'.
   // Returns true if 'function' is found, and false if the iterator ends
   // without finding it.
   bool Find(JSFunction* function) {

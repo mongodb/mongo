@@ -58,7 +58,7 @@ argv_traverser::init( int argc, char_type** argv )
     m_remainder.reset( new char_type[m_buffer.size()+1] );
     m_remainder_size    = 0;
     m_work_buffer       = m_buffer;
-    m_commited_end      = m_work_buffer.begin();
+    m_committed_end      = m_work_buffer.begin();
 
     BOOST_RT_PARAM_TRACE( "Input buffer: " << m_buffer );
 
@@ -158,7 +158,7 @@ argv_traverser::eoi() const
 BOOST_RT_PARAM_INLINE void
 argv_traverser::commit()
 {
-    m_commited_end = m_work_buffer.begin();
+    m_committed_end = m_work_buffer.begin();
 }
 
 //____________________________________________________________________________//
@@ -166,7 +166,7 @@ argv_traverser::commit()
 BOOST_RT_PARAM_INLINE void
 argv_traverser::rollback()
 {
-    m_work_buffer.assign( m_commited_end, m_work_buffer.end() );
+    m_work_buffer.assign( m_committed_end, m_work_buffer.end() );
     m_token.assign( m_work_buffer.begin(),
                     std::find( m_work_buffer.begin(), m_work_buffer.end(), p_separator ) );
 
@@ -177,7 +177,7 @@ argv_traverser::rollback()
 BOOST_RT_PARAM_INLINE std::size_t
 argv_traverser::input_pos() const
 {
-    return m_work_buffer.begin() - m_commited_end;
+    return m_work_buffer.begin() - m_committed_end;
 }
 
 //____________________________________________________________________________//

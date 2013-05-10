@@ -65,7 +65,7 @@ typedef enum _match_flags
    format_sed = match_max << 1,                      /* sed style replacement. */
    format_all = format_sed << 1,                     /* enable all extentions to sytax. */
    format_no_copy = format_all << 1,                 /* don't copy non-matching segments. */
-   format_first_only = format_no_copy << 1,          /* Only replace first occurance. */
+   format_first_only = format_no_copy << 1,          /* Only replace first occurrence. */
    format_is_if = format_first_only << 1,            /* internal use only. */
    format_literal = format_is_if << 1                /* treat string as a literal */
 

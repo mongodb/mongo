@@ -104,7 +104,7 @@ namespace mongo {
      * Requests to prepareToTouchEarlierIterate() or recoverFromTouchingEarlierIterate() are
      * forwarded as prepareToTouchEarlierIterate()/recoverFromTouchingEarlierIterate() to the
      * delegate Cursor when a single delegate Cursor is active.  If multiple delegate Cursors are
-     * active, the advance() call preceeding prepareToTouchEarlierIterate() may not properly advance
+     * active, the advance() call preceding prepareToTouchEarlierIterate() may not properly advance
      * all delegate Cursors, so the calls are forwarded as prepareToYield()/recoverFromYield() to a
      * ClientCursor for each delegate Cursor.
      *

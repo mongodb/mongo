@@ -153,7 +153,7 @@ var case6 = function() {
 case6();
 
 // -------------------------
-// Case 7: enough occurances of min key documents to pass the chunk limit
+// Case 7: enough occurrences of min key documents to pass the chunk limit
 // [1111111111111111,2,3)
 
 f.drop();

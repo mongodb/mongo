@@ -202,7 +202,7 @@ class ThreadLocalTop BASE_EMBEDDED {
 
   // Get the top C++ try catch handler or NULL if none are registered.
   //
-  // This method is not guarenteed to return an address that can be
+  // This method is not guaranteed to return an address that can be
   // used for comparison with addresses into the JS stack.  If such an
   // address is needed, use try_catch_handler_address.
   v8::TryCatch* TryCatchHandler();

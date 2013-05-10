@@ -781,7 +781,7 @@ namespace mongo {
         scoped_lock lk( _checkConnectionLock );
         bool isMaster = false;
         bool changed = false;
-        bool errorOccured = false;
+        bool errorOccurred = false;
 
         if ( nodesOffset >= 0 ){
             scoped_lock lk( _lock );
@@ -859,10 +859,10 @@ namespace mongo {
             LOG( verbose ? 0 : 1 ) << "ReplicaSetMonitor::_checkConnection: caught exception "
                              << conn->toString() << ' ' << e.what() << endl;
 
-            errorOccured = true;
+            errorOccurred = true;
         }
 
-        if ( errorOccured && nodesOffset >= 0 ) {
+        if ( errorOccurred && nodesOffset >= 0 ) {
             scoped_lock lk( _lock );
 
             if (_checkConnMatch_inlock(conn, nodesOffset)) {

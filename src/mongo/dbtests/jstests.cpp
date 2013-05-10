@@ -779,7 +779,7 @@ namespace JSTests {
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
             scope->localConnect("ExecTimeoutDB");
-            // assert timeout occured
+            // assert timeout occurred
             ASSERT(!scope->exec("var a = 1; while (true) { ; }",
                                 "ExecTimeout", false, true, false, 1));
         }
@@ -793,7 +793,7 @@ namespace JSTests {
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
             scope->localConnect("ExecNoTimeoutDB");
-            // assert no timeout occured
+            // assert no timeout occurred
             ASSERT(scope->exec("var a = function() { return 1; }",
                                "ExecNoTimeout", false, true, false, 5 * 60 * 1000));
         }

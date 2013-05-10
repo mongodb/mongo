@@ -10,7 +10,7 @@
 #define BOOST_VERSION_HPP
 
 //
-//  Caution, this is the only boost header that is guarenteed
+//  Caution, this is the only boost header that is guaranteed
 //  to change with every boost release, including this header
 //  will cause a recompile every time a new boost version is
 //  released.
