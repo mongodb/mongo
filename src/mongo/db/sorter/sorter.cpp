@@ -627,7 +627,7 @@ namespace mongo {
 
         _file.open(_fileName.c_str(), ios::binary | ios::out);
         massert(16818, str::stream() << "error opening file \"" << _fileName << "\": "
-                                 << errnoWithDescription(),
+                                     << errnoWithDescription(),
                 _file.good());
 
         _fileDeleter = boost::make_shared<sorter::FileDeleter>(_fileName);
@@ -638,17 +638,33 @@ namespace mongo {
 
     template <typename Key, typename Value>
     void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value& val) {
-        BufBuilder bb;
-        key.serializeForSorter(bb);
-        val.serializeForSorter(bb);
+        key.serializeForSorter(_buffer);
+        val.serializeForSorter(_buffer);
 
-        int32_t size = bb.len();
-        _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
-        _file.write(bb.buf(), size);
+        if (_buffer.len() > 64*1024)
+            spill();
+    }
+
+    template <typename Key, typename Value>
+    void SortedFileWriter<Key, Value>::spill() {
+        const int32_t size = _buffer.len();
+        if (size == 0)
+            return;
+
+        try {
+            _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+            _file.write(_buffer.buf(), size);
+        } catch (const std::exception&) {
+            msgasserted(16821, str::stream() << "error writing to file \"" << _fileName << "\": "
+                                             << errnoWithDescription());
+        }
+
+        _buffer.reset();
     }
 
     template <typename Key, typename Value>
     SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
+        spill();
         _file.close();
         return new sorter::FileIterator<Key, Value>(_fileName, _settings, _fileDeleter);
     }

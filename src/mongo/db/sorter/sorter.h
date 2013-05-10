@@ -177,10 +177,13 @@ namespace mongo {
         Iterator* done(); /// Can't add more data after calling done()
 
     private:
+        void spill();
+
         const Settings _settings;
         std::string _fileName;
         boost::shared_ptr<sorter::FileDeleter> _fileDeleter; // Must outlive _file
         std::ofstream _file;
+        BufBuilder _buffer;
     };
 }
 
