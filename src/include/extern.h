@@ -27,10 +27,9 @@ extern int __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint8_t **pp,
     WT_BLOCK_CKPT *ci);
-extern int __wt_block_ckpt_init(WT_SESSION_IMPL *session,
+extern int __wt_block_ckpt_init( WT_SESSION_IMPL *session,
     WT_BLOCK_CKPT *ci,
-    const char *name,
-    uint32_t allocsize);
+    const char *name);
 extern int __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,

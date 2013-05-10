@@ -165,10 +165,10 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	__wt_spin_init(session, &block->live_lock);
 
 	/*
-	 * Read the description sector.
+	 * Read the description information from the first block.
 	 *
-	 * Salvage is a special case -- if we're forcing the salvage, we don't
-	 * even look at the description sector.
+	 * Salvage is a special case: if we're forcing the salvage, we don't
+	 * look at anything, including the description information.
 	 */
 	if (!forced_salvage)
 		WT_ERR(__desc_read(session, block));
@@ -256,16 +256,16 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
 
-	/* Read the first sector and verify the file's format. */
+	/* Read the first allocation-sized block and verify the file format. */
 	WT_ERR(__wt_read(
 	    session, block->fh, (off_t)0, block->allocsize, buf->mem));
 
 	desc = buf->mem;
 	WT_VERBOSE_ERR(session, block,
-	    "open: magic %" PRIu32
+	    "%s: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32,
-	    desc->magic,
+	    block->name, desc->magic,
 	    desc->majorv, desc->minorv,
 	    desc->cksum);
 

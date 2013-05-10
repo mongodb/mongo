@@ -15,7 +15,7 @@ static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_last_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 
-/* The bit list ignores the first sector: convert to/from a frag/offset. */
+/* The bit list ignores the first block: convert to/from a frag/offset. */
 #define	WT_OFF_TO_FRAG(block, off)					\
 	((off) / (block)->allocsize - 1)
 #define	WT_FRAG_TO_OFF(block, frag)					\
@@ -46,10 +46,7 @@ __wt_block_verify_start(
 	/* Truncate the file to the size of the last checkpoint. */
 	WT_RET(__verify_last_truncate(session, block, ckptbase));
 
-	/*
-	 * The file size should be a multiple of the allocsize, offset by the
-	 * size of the descriptor sector, the first 512B of the file.
-	 */
+	/* The file size should be a multiple of the allocation size. */
 	if (fh->file_size % block->allocsize != 0)
 		WT_RET_MSG(session, WT_ERROR,
 		    "the file size is not a multiple of the allocation size");
@@ -114,7 +111,7 @@ __verify_last_avail(
 	--ckpt;
 
 	ci = &_ci;
-	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name, block->allocsize));
+	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
 
 	el = &ci->avail;
@@ -151,7 +148,7 @@ __verify_last_truncate(
 	--ckpt;
 
 	ci = &_ci;
-	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name, block->allocsize));
+	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
 	WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
 

@@ -249,8 +249,8 @@ struct __wt_block_desc {
 /*
  * WT_BLOCK_DESC_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (padding won't cause failure,
- * since we reserve the first sector of the file for this information, but it
- * would be worth investigation, regardless).
+ * we reserve the first allocation-size block of the file for this information,
+ * but it would be worth investigation, regardless).
  */
 #define	WT_BLOCK_DESC_SIZE		16
 
