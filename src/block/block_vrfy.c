@@ -29,6 +29,7 @@ int
 __wt_block_verify_start(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
+	WT_CKPT *ckpt;
 	WT_FH *fh;
 
 	/*
@@ -39,12 +40,23 @@ __wt_block_verify_start(
 	fh = block->fh;
 	if (fh->file_size == block->allocsize)
 		return (0);
-	if (ckptbase[0].name == NULL)
-		WT_RET_MSG(session, WT_ERROR,
-		    "%s has no checkpoints to verify", block->name);
+
+	/*
+	 * Find the last checkpoint in the list: if there are none, or the only
+	 * checkpoint we have is fake, there's no work to do.  Don't complain,
+	 * that's not our problem to solve.
+	 */
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		;
+	for (;; --ckpt) {
+		if (ckpt->name != NULL && !F_ISSET(ckpt, WT_CKPT_FAKE))
+			break;
+		if (ckpt == ckptbase)
+			return (0);
+	}
 
 	/* Truncate the file to the size of the last checkpoint. */
-	WT_RET(__verify_last_truncate(session, block, ckptbase));
+	WT_RET(__verify_last_truncate(session, block, ckpt));
 
 	/* The file size should be a multiple of the allocation size. */
 	if (fh->file_size % block->allocsize != 0)
@@ -82,7 +94,7 @@ __wt_block_verify_start(
 	 * The only checkpoint avail list we care about is the last one written;
 	 * get it now and initialize the list of file fragments.
 	 */
-	WT_RET(__verify_last_avail(session, block, ckptbase));
+	WT_RET(__verify_last_avail(session, block, ckpt));
 
 	block->verify = 1;
 	return (0);
@@ -94,21 +106,12 @@ __wt_block_verify_start(
  * fragments.
  */
 static int
-__verify_last_avail(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
+__verify_last_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 {
 	WT_BLOCK_CKPT *ci, _ci;
-	WT_CKPT *ckpt;
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
-
-	/* Get the last on-disk checkpoint, if one exists. */
-	WT_CKPT_FOREACH(ckptbase, ckpt)
-		;
-	if (ckpt == ckptbase)
-		return (0);
-	--ckpt;
 
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
@@ -133,19 +136,10 @@ err:	__wt_block_ckpt_destroy(session, ci);
  *	Truncate the file to the last checkpoint's size.
  */
 static int
-__verify_last_truncate(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
+__verify_last_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 {
 	WT_BLOCK_CKPT *ci, _ci;
-	WT_CKPT *ckpt;
 	WT_DECL_RET;
-
-	/* Get the last on-disk checkpoint, if one exists. */
-	WT_CKPT_FOREACH(ckptbase, ckpt)
-		;
-	if (ckpt == ckptbase)
-		return (0);
-	--ckpt;
 
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
