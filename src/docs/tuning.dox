@@ -185,6 +185,27 @@ Direct I/O implies a writing thread waits for the write to complete
 and configuring direct I/O is likely to decrease overall application
 performance.
 
+Many Linux systems do not support mixing \c O_DIRECT and memory
+mapping or normal I/O to the same file, and attempting to do so can
+result in data loss or corruption.   For this reason:
+
+- WiredTiger silently ignores the setting of the \c mmap configuration
+to the wiredtiger_open function in those cases, and will never memory
+map a file which is configured for direct I/O.
+
+- If \c O_DIRECT is configured for data files on Linux systems, any
+system utilities used to copy database files for the purposes of hot
+backup should also specify \c O_DIRECT when configuring their file
+access.
+
+Additionally, many Linux systems require specific alignment for buffers
+used for I/O when direct I/O is configured, and using the wrong
+alignment can cause data loss or corruption.  When direct I/O is
+configured on Linux systems, WiredTiger aligns I/O buffers to 4KB; if
+different alignment is required by your system, the \c buffer_alignment
+configuration to the wiredtiger_open call should be configured to the
+correct value.
+
 Direct I/O is based on the non-standard \c O_DIRECT flag to the POSIX
 1003.1 open system call and may not available on all platforms.
 
