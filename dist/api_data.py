@@ -272,21 +272,21 @@ table_meta = format_meta + table_only_meta
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
 	Config('shared_cache', '', r'''
-		shared cache configuration options. A database should configure either
-		a cache_size or a shared_cache not both''',
+		shared cache configuration options. A database should configure
+		either a cache_size or a shared_cache not both''',
 		type='category', subconfig=[
 		Config('chunk', '10MB', r'''
 			the granularity that a shared cache is redistributed''',
 			min='1MB', max='10TB'),
 		Config('reserve', '0', r'''
-			amount of cache this database is guaranteed to have available
-			from the shared cache. This setting is per database. Defaults
-			to the chunk size''', type='int'),
+			amount of cache this database is guaranteed to have
+			available from the shared cache. This setting is per
+			database. Defaults to the chunk size''', type='int'),
 		Config('name', 'pool', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''
-			maximum memory to allocate for the shared cache. Setting this
-			will update the value if one is already set''',
+			maximum memory to allocate for the shared cache. Setting
+			this will update the value if one is already set''',
 			min='1MB', max='10TB')
 		]),
 	Config('cache_size', '100MB', r'''
