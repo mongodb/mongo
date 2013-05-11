@@ -117,21 +117,20 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			WT_ERR(__wt_block_extlist_read_avail(
 			    session, block, &ci->avail, ci->file_size));
 
-		/*
-		 * If the checkpoint can be written, that means anything written
-		 * after the checkpoint is no longer interesting, truncate the
-		 * file.  Don't bother checking the avail list for a block at
-		 * the end of the file, that was done when the checkpoint was
-		 * first written (re-writing the checkpoint might possibly make
-		 * it relevant here, but it's unlikely enough I don't bother).
-		 */
-		if (!checkpoint) {
-			WT_VERBOSE_ERR(session, ckpt,
-			    "truncate file to %" PRIuMAX,
-			    (uintmax_t)ci->file_size);
-			WT_ERR(
-			    __wt_ftruncate(session, block->fh, ci->file_size));
-		}
+	}
+
+	/*
+	 * If the checkpoint can be written, that means anything written after
+	 * the checkpoint is no longer interesting, truncate the file.  Don't
+	 * bother checking the avail list for a block at the end of the file,
+	 * that was done when the checkpoint was first written (re-writing the
+	 * checkpoint might possibly make it relevant here, but it's unlikely
+	 * enough I don't bother).
+	 */
+	if (!checkpoint) {
+		WT_VERBOSE_ERR(session, ckpt,
+		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size);
+		WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
 	}
 
 	if (0) {
@@ -615,7 +614,7 @@ __ckpt_update(
 	 * if there ever is, this will need to be fixed.
 	 */
 	if (is_live)
-		WT_RET(__wt_filesize(session, block->fh, &ci->file_size));
+		ci->file_size = block->fh->size;
 
 	/* Set the checkpoint size for the live system. */
 	if (is_live)

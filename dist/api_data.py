@@ -560,6 +560,19 @@ methods = {
 		WT_CONNECTION::load_extension.  For example,
 		<code>extensions=(/path/ext.so={entry=my_entry})</code>''',
 		type='list'),
+	Config('file_extend', '', r'''
+		file extension configuration.  If set, extend files a chunk at
+		a time instead instead of a block at a time as each new block
+		is written''',
+		type='category', subconfig=[
+		Config('size', '8MB', r'''
+		granularity (in bytes) for file extension''',
+		min='1MB'),
+		Config('type', '', r'''
+		types of files to extend.  Options are given as a list, such as
+		<code>"file_extend=(type=[data])"</code>''',
+		type='list', choices=['data', 'log'])
+		]),
 	Config('hazard_max', '1000', r'''
 		maximum number of simultaneous hazard pointers per session
 		handle''',

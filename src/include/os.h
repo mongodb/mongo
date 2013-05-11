@@ -41,6 +41,8 @@ struct __wt_fh {
 
 	int	fd;				/* POSIX file handle */
 	off_t	size;				/* File size */
+	off_t   extend_size;			/* File extended size */
+	off_t   extend_len;			/* File extend chunk size */
 
 	int	direct_io;			/* O_DIRECT configured */
 };
