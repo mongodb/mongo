@@ -532,9 +532,8 @@ methods = {
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
 		in-memory alignment (in bytes) for buffers used for I/O.  The
-		default value of -1 indicates that a platform-specific
-		alignment value should be used (512 bytes on Linux systems,
-		zero elsewhere)''',
+		default value of -1 indicates a platform-specific alignment
+		value should be used (4KB on Linux systems, zero elsewhere)''',
 		min='-1', max='1MB'),
 	Config('checkpoint', '', r'''
 		periodically checkpoint the database''',

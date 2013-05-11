@@ -1320,9 +1320,9 @@ struct __wt_connection {
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
- * I/O. The default value of -1 indicates that a platform-specific alignment
- * value should be used (512 bytes on Linux systems\, zero elsewhere)., an
- * integer between -1 and 1MB; default \c -1.}
+ * I/O. The default value of -1 indicates a platform-specific alignment value
+ * should be used (4KB on Linux systems\, zero elsewhere)., an integer between
+ * -1 and 1MB; default \c -1.}
  * @config{cache_size, maximum heap memory to allocate for the cache.  A
  * database should configure either a cache_size or a shared_cache not both., an
  * integer between 1MB and 10TB; default \c 100MB.}
