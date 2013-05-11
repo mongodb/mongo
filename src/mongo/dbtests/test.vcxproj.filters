@@ -2466,6 +2466,15 @@
     <ClInclude Include="..\db\matcher\matchable.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\auth\auth_external_state_mock.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_external_state_server_common.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -4672,6 +4681,24 @@
     <ClCompile Include="..\db\matcher\matchable.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\auth\action_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authorization_manager_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\principal_name.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\principal_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\privilege_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">
@@ -4862,6 +4889,9 @@
     </None>
     <None Include="..\db\ops\SConscript">
       <Filter>db\ops</Filter>
+    </None>
+    <None Include="..\db\auth\SConscript">
+      <Filter>db\auth</Filter>
     </None>
   </ItemGroup>
 </Project>

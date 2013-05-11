@@ -1682,6 +1682,24 @@
     <ClCompile Include="matcher\matchable.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
+    <ClCompile Include="auth\action_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authorization_manager_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\principal_name.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\principal_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3402,6 +3420,12 @@
     <ClInclude Include="matcher\matchable.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
+    <ClInclude Include="auth\auth_external_state_mock.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -3547,6 +3571,9 @@
     </None>
     <None Include="ops\SConscript">
       <Filter>db\ops</Filter>
+    </None>
+    <None Include="auth\SConscript">
+      <Filter>db\auth</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
