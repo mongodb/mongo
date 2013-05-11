@@ -459,7 +459,7 @@ __block_extend(
 	 *
 	 * We should never be allocating from an empty file.
 	 */
-	if (fh->file_size < block->allocsize)
+	if (fh->size < block->allocsize)
 		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate from a file with no description "
 		    "information");
@@ -470,12 +470,12 @@ __block_extend(
 	 * bits (we currently check an off_t is 8B in verify_build.h).  I don't
 	 * think we're likely to see anything bigger for awhile.
 	 */
-	if (fh->file_size > (off_t)INT64_MAX - size)
+	if (fh->size > (off_t)INT64_MAX - size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "block allocation failed, file cannot grow further");
 
-	*offp = fh->file_size;
-	fh->file_size += size;
+	*offp = fh->size;
+	fh->size += size;
 
 	WT_DSTAT_INCR(session, block_extension);
 	WT_VERBOSE_RET(session, block,
@@ -1203,7 +1203,7 @@ __wt_block_extlist_truncate(
 {
 	WT_EXT *ext;
 	WT_FH *fh;
-	off_t file_size;
+	off_t size;
 
 	fh = block->fh;
 
@@ -1213,22 +1213,22 @@ __wt_block_extlist_truncate(
 	 */
 	if ((ext = __block_extlist_last(el->off)) == NULL)
 		return (0);
-	if (ext->off + ext->size != fh->file_size)
+	if (ext->off + ext->size != fh->size)
 		return (0);
 
 	WT_VERBOSE_RET(session, block,
 	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
-	    (intmax_t)fh->file_size, (intmax_t)ext->off);
+	    (intmax_t)fh->size, (intmax_t)ext->off);
 
 	/*
 	 * We're about to remove the extent list entry, save the value, we need
 	 * it to reset the cached file size, and that can't happen until after
 	 * truncate and extent list removal succeed.
 	 */
-	file_size = ext->off;
-	WT_RET(__wt_ftruncate(session, fh, file_size));
-	WT_RET(__block_off_remove(session, block, el, file_size, NULL));
-	fh->file_size = file_size;
+	size = ext->off;
+	WT_RET(__wt_ftruncate(session, fh, size));
+	WT_RET(__block_off_remove(session, block, el, size, NULL));
+	fh->size = size;
 
 	return (0);
 }

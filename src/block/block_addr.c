@@ -100,7 +100,7 @@ __wt_block_addr_valid(WT_SESSION_IMPL *session,
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* All we care about is if it's past the end of the file. */
-	return (offset + size > block->fh->file_size ? 0 : 1);
+	return (offset + size > block->fh->size ? 0 : 1);
 }
 
 /*

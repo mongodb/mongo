@@ -17,9 +17,9 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	void *map;
 
 	WT_VERBOSE_RET(session, fileops,
-	    "%s: map %" PRIuMAX " bytes", fh->name, (uintmax_t)fh->file_size);
+	    "%s: map %" PRIuMAX " bytes", fh->name, (uintmax_t)fh->size);
 
-	if ((map = mmap(NULL, (size_t)fh->file_size,
+	if ((map = mmap(NULL, (size_t)fh->size,
 	    PROT_READ,
 #ifdef MAP_NOCORE
 	    MAP_NOCORE |
@@ -28,11 +28,11 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	    fh->fd, (off_t)0)) == MAP_FAILED) {
 		WT_RET_MSG(session, __wt_errno(),
 		    "%s map error: failed to map %" PRIuMAX " bytes",
-		    fh->name, (uintmax_t)fh->file_size);
+		    fh->name, (uintmax_t)fh->size);
 	}
 
 	*(void **)mapp = map;
-	*lenp = (size_t)fh->file_size;
+	*lenp = (size_t)fh->size;
 	return (0);
 }
 

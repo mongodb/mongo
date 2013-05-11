@@ -38,7 +38,7 @@ __wt_block_verify_start(
 	 * sense if we don't have a checkpoint.
 	 */
 	fh = block->fh;
-	if (fh->file_size == block->allocsize)
+	if (fh->size == block->allocsize)
 		return (0);
 
 	/*
@@ -59,7 +59,7 @@ __wt_block_verify_start(
 	WT_RET(__verify_last_truncate(session, block, ckpt));
 
 	/* The file size should be a multiple of the allocation size. */
-	if (fh->file_size % block->allocsize != 0)
+	if (fh->size % block->allocsize != 0)
 		WT_RET_MSG(session, WT_ERROR,
 		    "the file size is not a multiple of the allocation size");
 
@@ -80,7 +80,7 @@ __wt_block_verify_start(
 	 * verify many non-contiguous blocks creating too many entries on the
 	 * list to fit into memory.
 	 */
-	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, fh->file_size);
+	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, fh->size);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
@@ -332,7 +332,7 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/* Check each chunk against the total file size. */
-	if (offset + size > block->fh->file_size)
+	if (offset + size > block->fh->size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "fragment %" PRIuMAX "-%" PRIuMAX " references "
 		    "non-existent file blocks",

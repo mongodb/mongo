@@ -34,19 +34,19 @@ __wt_block_compact_skip(
 	 * compaction unless we have an expectation of moving N % of the file
 	 * from the last half of the file to the first half of the file.)
 	 */
-	if (fh->file_size <= 10 * 1024)
+	if (fh->size <= 10 * 1024)
 		return (0);
 
 	__wt_spin_lock(session, &block->live_lock);
 
 	avail = 0;
-	half = fh->file_size / 2;
+	half = fh->size / 2;
 
 	el = &block->live.avail;
 	WT_EXT_FOREACH(ext, el->off)
 		if (ext->off < half)
 			avail += ext->size;
-	pct = (int)((avail * 100) / fh->file_size);
+	pct = (int)((avail * 100) / fh->size);
 
 	__wt_spin_unlock(session, &block->live_lock);
 
@@ -91,7 +91,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	 * here a lot.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	*skipp = offset > fh->file_size / 2 ? 0 : 1;
+	*skipp = offset > fh->size / 2 ? 0 : 1;
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (0);

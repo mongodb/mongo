@@ -159,7 +159,7 @@ __wt_open(WT_SESSION_IMPL *session,
 #endif
 
 	/* Set the file's size. */
-	WT_ERR(__wt_filesize(session, fh, &fh->file_size));
+	WT_ERR(__wt_filesize(session, fh, &fh->size));
 
 	/* Link onto the environment's list of files. */
 	__wt_spin_lock(session, &conn->fh_lock);

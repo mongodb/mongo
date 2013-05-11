@@ -32,9 +32,9 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * Truncate the file to an allocation-size multiple of blocks (bytes
 	 * trailing the last block must be garbage, by definition).
 	 */
-	if (block->fh->file_size > allocsize) {
-		len = (block->fh->file_size / allocsize) * allocsize;
-		if (len != block->fh->file_size)
+	if (block->fh->size > allocsize) {
+		len = (block->fh->size / allocsize) * allocsize;
+		if (len != block->fh->size)
 			WT_RET(__wt_ftruncate(session, block->fh, len));
 	} else
 		len = allocsize;
@@ -91,7 +91,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, allocsize, &tmp));
 
 	/* Read through the file, looking for pages. */
-	for (max = fh->file_size;;) {
+	for (max = fh->size;;) {
 		offset = block->slvg_off;
 		if (offset >= max) {			/* Check eof. */
 			*eofp = 1;
