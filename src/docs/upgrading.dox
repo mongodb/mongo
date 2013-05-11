@@ -1,5 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_154 Upgrading to Version 1.5.4
+<dl>
+
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.5.4 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+</dl>
+<hr>
 @section version_153 Upgrading to Version 1.5.3
 <dl>
 
