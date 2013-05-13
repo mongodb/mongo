@@ -15,14 +15,15 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include <algorithm>
 
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/config.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
 
-#include <algorithm>
 
 namespace mongo {
 

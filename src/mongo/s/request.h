@@ -19,9 +19,10 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "../util/net/message.h"
-#include "../db/dbmessage.h"
-#include "config.h"
+
+#include "mongo/db/dbmessage.h"
+#include "mongo/s/config.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 

@@ -16,9 +16,11 @@
  */
 
 
-#include "pch.h"
-#include "../jsobj.h"
-#include "counters.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/stats/counters.h"
+
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
     OpCounters::OpCounters() {}

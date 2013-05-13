@@ -16,8 +16,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "base64.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/base64.h"
 
 namespace mongo {
     namespace base64 {

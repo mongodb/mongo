@@ -16,12 +16,11 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/pch.h"
 
 #include "mongo/client/dbclientmockcursor.h"
 #include "mongo/client/parallel.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"

@@ -17,13 +17,14 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../db/jsobj.h"
-#include "../db/json.h"
-
-#include "dbtests.h"
+#include "mongo/pch.h"
 
 #include <limits>
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/dbtests/dbtests.h"
+
 
 namespace JsonTests {
     namespace JsonStringTests {

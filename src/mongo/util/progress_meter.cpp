@@ -15,9 +15,11 @@
  *    limitations under the License.
  */
 
-#include "pch.h" // needed for log.h
-#include "progress_meter.h"
-#include "log.h"
+#include "mongo/pch.h" // needed for log.h
+
+#include "mongo/util/progress_meter.h"
+
+#include "mongo/util/log.h"
 
 using namespace std;
 

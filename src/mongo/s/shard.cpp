@@ -16,7 +16,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/s/shard.h"
 
 #include <set>
 #include <string>
@@ -34,7 +36,6 @@
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/version_manager.h"
 

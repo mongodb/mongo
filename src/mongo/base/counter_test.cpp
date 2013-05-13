@@ -13,14 +13,14 @@
  *    limitations under the License.
  */
 
-#include "mongo/platform/basic.h"
 
-#include <iostream>
+#include "mongo/platform/basic.h"
 
 #include <boost/static_assert.hpp>
 #include <climits>
+#include <iostream>
 
-#include "counter.h"
+#include "mongo/base/counter.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

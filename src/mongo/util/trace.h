@@ -19,7 +19,7 @@
 #include "mongo/pch.h"
 
 #include <boost/unordered_map.hpp>
-#include "util/concurrency/rwlock.h"
+#include "mongo/util/concurrency/rwlock.h"
 
 
 namespace mongo {

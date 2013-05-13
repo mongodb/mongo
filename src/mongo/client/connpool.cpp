@@ -18,11 +18,12 @@
 
 // _ todo: reconnect?
 
-#include "pch.h"
-#include "connpool.h"
-#include "syncclusterconnection.h"
-#include "../s/shard.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/client/syncclusterconnection.h"
+#include "mongo/s/shard.h"
 
 namespace mongo {
 

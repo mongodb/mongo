@@ -15,9 +15,11 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "model.h"
-#include "connpool.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/model.h"
+
+#include "mongo/client/connpool.h"
 
 namespace mongo {
 

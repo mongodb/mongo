@@ -17,13 +17,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../db/pdfile.h"
+#include "mongo/pch.h"
 
-#include "../db/db.h"
-#include "../db/json.h"
-
-#include "dbtests.h"
+#include "mongo/db/db.h"
+#include "mongo/db/json.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {
 

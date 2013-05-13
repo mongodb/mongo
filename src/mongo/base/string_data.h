@@ -174,4 +174,4 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "string_data-inl.h"
+#include "mongo/base/string_data-inl.h"

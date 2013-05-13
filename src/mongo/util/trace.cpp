@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "util/trace.h"
+#include "mongo/util/trace.h"
 
 namespace mongo {
 

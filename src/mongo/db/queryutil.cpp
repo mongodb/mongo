@@ -13,14 +13,14 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/queryutil.h"
-#include "mongo/db/index_names.h"
 
-#include "pdfile.h"
-#include "../util/startup_test.h"
-#include "../util/mongoutils/str.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 

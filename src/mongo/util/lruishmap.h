@@ -18,7 +18,7 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "../util/goodies.h"
+#include "mongo/util/goodies.h"
 
 namespace mongo {
 

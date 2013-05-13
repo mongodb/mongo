@@ -20,8 +20,8 @@
 
 #include "mongo/pch.h"
 
-#include "util/intrusive_counter.h"
-#include "util/timer.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
     class BSONObj;

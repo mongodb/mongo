@@ -14,9 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "s/interrupt_status_mongos.h"
+#include "mongo/s/interrupt_status_mongos.h"
 
 namespace mongo {
 

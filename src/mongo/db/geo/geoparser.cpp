@@ -14,10 +14,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/db/geo/geoparser.h"
+
 #include <string>
 #include <vector>
 
-#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"

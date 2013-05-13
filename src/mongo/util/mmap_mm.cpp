@@ -15,8 +15,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "mmap.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/mmap.h"
 
 /* in memory (no file) version */
 

@@ -25,7 +25,7 @@
 // so we define the following macro
 #define MONGO_EXPOSE_MACROS 1
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <iostream>
 

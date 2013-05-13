@@ -40,11 +40,13 @@
   2002-04-13 lpd Splits off main program into a separate file, md5main.c.
  */
 
-#include "pch.h"
-#include "md5.h"
+#include "mongo/pch.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "md5.h"
 
 /*
  * This file builds an executable that performs various functions related

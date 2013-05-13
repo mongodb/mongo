@@ -16,12 +16,13 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "chunk.h"
-#include "../db/jsobj.h"
+#include "mongo/pch.h"
+
+#include "mongo/s/chunk.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "../util/startup_test.h"
-#include "../util/timer.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

@@ -16,29 +16,27 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
+#include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
-#include "server.h"
-#include "../util/scopeguard.h"
-#include "../db/commands.h"
-#include "../db/commands/server_status.h"
-#include "../db/dbmessage.h"
-#include "../db/stats/counters.h"
-#include "../db/stats/timer_stats.h"
-
-#include "../client/connpool.h"
-
-#include "client_info.h"
-#include "request.h"
-#include "config.h"
-#include "chunk.h"
-#include "cursors.h"
-#include "grid.h"
-#include "s/writeback_listener.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/timer_stats.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/config.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request.h"
+#include "mongo/s/writeback_listener.h"
+#include "mongo/server.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 

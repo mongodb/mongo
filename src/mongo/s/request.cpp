@@ -16,21 +16,20 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "server.h"
+#include "mongo/pch.h"
 
-#include "../db/commands.h"
-#include "../db/dbmessage.h"
-#include "../db/stats/counters.h"
+#include "mongo/s/request.h"
 
-#include "../client/connpool.h"
-
-#include "request.h"
-#include "config.h"
-#include "chunk.h"
-#include "cursors.h"
-#include "grid.h"
-#include "client_info.h"
+#include "mongo/client/connpool.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/config.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/server.h"
 
 namespace mongo {
 

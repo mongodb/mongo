@@ -15,17 +15,18 @@
  *    limitations under the License.
  */
 
+#include "mongo/pch.h"
+
 #include <iomanip>
 
-#include "pch.h"
-#include "goodies.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
-#include "file_allocator.h"
-#include "time_support.h"
-#include "mongoutils/str.h"
-#include "timer.h"
-#include "platform/atomic_word.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

@@ -16,12 +16,12 @@
 
 // client.cpp
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "dbtests.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace ClientTests {
 

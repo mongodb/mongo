@@ -20,8 +20,8 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "jsobj.h"
-#include "pdfile.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/pdfile.h"
 
 namespace mongo {
 

@@ -20,8 +20,8 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include "../util/time_support.h"
-#include "../util/concurrency/mutex.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/concurrency/mutex.h"
 
 #include "config.h"  // DBConfigPtr
 

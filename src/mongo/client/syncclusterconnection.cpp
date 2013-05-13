@@ -16,7 +16,7 @@
  */
 
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/client/syncclusterconnection.h"
 

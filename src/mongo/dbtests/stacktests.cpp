@@ -15,10 +15,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "dbtests.h"
-
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/util/stack_introspect.h"
 
 class MyClass {

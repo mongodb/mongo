@@ -16,11 +16,12 @@
  */
 
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/parallel.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/client/parallel.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"

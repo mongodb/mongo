@@ -18,8 +18,8 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "connpool.h"
-#include "syncclusterconnection.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/syncclusterconnection.h"
 
 #define LOCK_TIMEOUT (15 * 60 * 1000)
 #define LOCK_SKEW_FACTOR (30)

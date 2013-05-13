@@ -22,7 +22,7 @@
    mostly around shard management and checking
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <algorithm>
 #include <boost/thread/thread.hpp>

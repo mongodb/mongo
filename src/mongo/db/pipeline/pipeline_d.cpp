@@ -14,9 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 
 #include "mongo/client/dbclientinterface.h"
@@ -24,6 +23,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query_optimizer.h"
 
 

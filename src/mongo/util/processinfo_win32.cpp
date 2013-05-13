@@ -15,10 +15,12 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "processinfo.h"
+#include "mongo/pch.h"
+
 #include <iostream>
 #include <psapi.h>
+
+#include "mongo/util/processinfo.h"
 
 using namespace std;
 

@@ -20,11 +20,11 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/client/connpool.h"
+#include "mongo/db/client.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
-#include "../client/connpool.h"
-#include "../util/background.h"
-#include "../db/client.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 

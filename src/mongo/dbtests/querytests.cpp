@@ -16,9 +16,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-
-#include "mongo/db/ops/query.h"
+#include "mongo/pch.h"
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
@@ -27,12 +25,12 @@
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/ops/query.h"
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/scanandorder.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
-
-#include "dbtests.h"
 
 namespace mongo {
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip,

@@ -15,8 +15,10 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "projection.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/projection.h"
+
 #include "mongo/db/matcher.h"
 #include "mongo/util/mongoutils/str.h"
 

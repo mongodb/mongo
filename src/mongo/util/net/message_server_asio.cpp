@@ -25,9 +25,9 @@
 #include <iostream>
 #include <vector>
 
-#include "message.h"
-#include "message_server.h"
-#include "../util/concurrency/mvar.h"
+#include "mongo/util/concurrency/mvar.h"
+#include "mongo/util/message.h"
+#include "mongo/util/message_server.h"
 
 using namespace boost;
 using namespace boost::asio;

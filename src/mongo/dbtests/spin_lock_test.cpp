@@ -16,11 +16,13 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
 #include <boost/thread/thread.hpp>
-#include "dbtests.h"
-#include "../util/concurrency/spin_lock.h"
-#include "../util/timer.h"
+
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/timer.h"
 
 namespace {
 
