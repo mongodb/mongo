@@ -22,6 +22,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -158,8 +159,10 @@ namespace mongo {
     }
 
     namespace {
-        bool _isExistsFalse( const MatchExpression* e, bool negated ) {
+        bool _isExistsFalse( const MatchExpression* e, bool negated, int depth ) {
             if ( e->matchType() == MatchExpression::EXISTS ){
+                if ( depth > 0 )
+                    return true;
                 const ExistsMatchExpression* exists = static_cast<const ExistsMatchExpression*>(e);
                 bool x = !exists->rightSideBool();
                 if ( negated )
@@ -168,24 +171,29 @@ namespace mongo {
             }
 
             if ( e->matchType() == MatchExpression::AND ||
+                 e->matchType() == MatchExpression::NOR ||
                  e->matchType() == MatchExpression::OR ) {
 
                 for ( unsigned i = 0; i < e->numChildren(); i++  ) {
-                    if ( _isExistsFalse( e->getChild(i), negated ) )
+                    if ( _isExistsFalse( e->getChild(i), negated, depth + 1 ) )
                         return true;
                 }
                 return false;
             }
 
-            if ( e->matchType() == MatchExpression::NOT )
-                return _isExistsFalse( e->getChild(0), !negated );
+            if ( e->matchType() == MatchExpression::NOT ) {
+                if ( e->getChild(0)->matchType() == MatchExpression::AND )
+                    depth--;
+                return _isExistsFalse( e->getChild(0), !negated, depth );
+            }
 
             return false;
         }
     }
 
     bool Matcher2::hasExistsFalse() const {
-        return _isExistsFalse( _expression.get(), false );
+        return _isExistsFalse( _expression.get(), false,
+                               _expression->matchType() == MatchExpression::AND ? -1 : 0 );
     }
 
 
