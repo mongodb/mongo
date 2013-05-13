@@ -102,8 +102,13 @@ namespace mongo {
     Status ComparisonMatchExpression::init( const StringData& path, const BSONElement& rhs ) {
         initPath( path );
         _rhs = rhs;
+
         if ( rhs.eoo() ) {
             return Status( ErrorCodes::BadValue, "need a real operand" );
+        }
+
+        if ( rhs.type() == Undefined ) {
+            return Status( ErrorCodes::BadValue, "cannot compare to undefined" );
         }
 
         switch ( matchType() ) {
