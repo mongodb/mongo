@@ -198,9 +198,9 @@ namespace ReplSetTests {
             // dbs can be opened (which requires the write lock)
             while (!_curop || !_curop->killPendingStrict()) {
                 dbtemprelease temp;
-                sleepmillis(0);
+                sleepmillis(10);
             }
-
+            log() << "index build ending" << endl;
             killCurrentOp.notifyAllWaiters();
             cc().shutdown();
             _done = true;
@@ -209,13 +209,13 @@ namespace ReplSetTests {
         // Make sure the test doesn't end while this "index build" is still spinning
         void finish() {
             while (!_curop) {
-                sleepmillis(0);
+                sleepmillis(10);
             }
 
             _curop->kill();
 
             while (!_done) {
-                sleepmillis(0);
+                sleepmillis(10);
             }
         }
 
@@ -229,7 +229,7 @@ namespace ReplSetTests {
             }
 
             while (_client == NULL) {
-                sleepmillis(0);
+                sleepmillis(10);
             }
 
             // On the first time through, make sure the curop is set up correctly
