@@ -34,8 +34,6 @@ namespace mongo {
 
 
     bool LeafMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        //log() << "e doc: " << doc << " path: " << _path << std::endl;
-
         bool traversedArray = false;
         size_t idxPath = 0;
         BSONElement e = doc->getFieldDottedOrArray( _fieldRef, &idxPath, &traversedArray );
@@ -53,8 +51,20 @@ namespace mongo {
             }
             else if ( x.isABSONObj() ) {
                 string rest = _fieldRef.dottedField( idxPath+1 );
-                BSONElement y = x.Obj().getField( rest );
+                BSONElement y = x.Obj().getFieldDotted( rest );
                 found = matchesSingleElement( y );
+
+                if ( !found && y.type() == Array ) {
+                    // we iterate this array as well it seems
+                    BSONObjIterator j( y.Obj() );
+                    while( j.more() ) {
+                        BSONElement sub = j.next();
+                        found = matchesSingleElement( sub );
+                        if ( found )
+                            break;
+                    }
+                }
+
             }
 
             if ( found ) {
@@ -116,7 +126,8 @@ namespace mongo {
 
 
     bool ComparisonMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        //log() << "\t ComparisonMatchExpression e: " << e << " _rhs: " << _rhs << std::endl;
+        //log() << "\t ComparisonMatchExpression e: " << e << " _rhs: " << _rhs << "\n"
+        //<< toString() << std::endl;
 
         if ( e.canonicalType() != _rhs.canonicalType() ) {
             // some special cases
@@ -124,6 +135,11 @@ namespace mongo {
             if ( e.canonicalType() + _rhs.canonicalType() == 5 ) {
                 return matchType() == EQ || matchType() == LTE || matchType() == GTE;
             }
+
+            if ( _rhs.type() == MaxKey || _rhs.type() == MinKey ) {
+                return matchType() != EQ;
+            }
+
             return _invertForNE( false );
         }
 
@@ -134,6 +150,8 @@ namespace mongo {
         }
 
         int x = compareElementValues( e, _rhs );
+
+        //log() << "\t\t" << x << endl;
 
         switch ( matchType() ) {
         case LT:
@@ -472,7 +490,6 @@ namespace mongo {
         if ( matchType() != other->matchType() )
             return false;
         const InMatchExpression* realOther = static_cast<const InMatchExpression*>( other );
-        log() << "yo: " << path() << " " << realOther->path() << std::endl;
         return
             path() == realOther->path() &&
             _arrayEntries.equivalent( realOther->_arrayEntries );

@@ -252,9 +252,30 @@ namespace mongo {
             return NULL;
         }
 
+        case MatchExpression::EQ: {
+            const ComparisonMatchExpression* cmp =
+                static_cast<const ComparisonMatchExpression*>( full );
+            if ( cmp->getRHS().type() == Array ) {
+                // need to convert array to an $in
+
+                if ( !keys.count( cmp->path().toString() ) )
+                    return NULL;
+
+                auto_ptr<InMatchExpression> newIn( new InMatchExpression() );
+                newIn->init( cmp->path() );
+
+                BSONObjIterator i( cmp->getRHS().Obj() );
+                while ( i.more() ) {
+                    Status s = newIn->getArrayFilterEntries()->addEquality( i.next() );
+                    if ( !s.isOK() )
+                        return NULL;
+                }
+                return newIn.release();
+            }
+        }
+
         case MatchExpression::LTE:
         case MatchExpression::LT:
-        case MatchExpression::EQ:
         case MatchExpression::GT:
         case MatchExpression::GTE:
         case MatchExpression::NE:

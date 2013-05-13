@@ -67,6 +67,8 @@ namespace mongo {
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
+        virtual const BSONElement& getRHS() const { return _rhs; }
+
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;

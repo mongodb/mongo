@@ -304,7 +304,8 @@ namespace mongo {
             if ( !s.isOK() )
                 return s.getStatus();
 
-            root->add( s.getValue() );
+            if ( s.getValue() )
+                root->add( s.getValue() );
 
             if ( stop )
                 break;
