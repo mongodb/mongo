@@ -893,6 +893,13 @@ namespace mongo {
                     ;
             }
 
+            // check no regexp for _id (SERVER-9502)
+            if (mongoutils::str::equals(e.fieldName(), "_id")) {
+                if (e.type() == RegEx) {
+                    return false;
+                }
+            }
+
             if ( e.mayEncapsulate() ) {
                 switch ( e.type() ) {
                 case Object:
