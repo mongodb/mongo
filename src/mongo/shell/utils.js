@@ -863,8 +863,11 @@ shellHelper.show = function (what) {
                     print( res.log[i] )
                 }
                 return "";
-            } else if (res.errmsg == "unauthorized") {
-                // Don't print of startupWarnings command failed due to auth
+            } else if (res.errmsg == "no such cmd: getLog" ) {
+                // Don't print if the command is not available
+                return "";
+            } else if (res.errmsg == "unauthorized" || res.errmsg == "need to login") {
+                // Don't print if startupWarnings command failed due to auth
                 return "";
             } else {
                 print("Error while trying to show server startup warnings: " + res.errmsg);
