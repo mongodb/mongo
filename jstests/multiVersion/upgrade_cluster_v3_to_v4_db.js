@@ -152,7 +152,7 @@ var coll = mongos.getCollection("foo.bar");
 
 printjson(admin.runCommand({ enableSharding : coll.getDB() + "" }));
 printjson(admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }));
-printjson(admin.runCommand({ split : coll + "", middle : { _id : 0 } })); 
+printjson(admin.runCommand({ split : coll + "", middle : { _id : 0 } }));
 
 config.collections.update({ _id : coll + "" }, { $set : { lastmodEpoch : ObjectId() }});
 assert.eq(null, config.getLastError());
@@ -170,6 +170,11 @@ resetBackupDBs();
 jsTest.log("Adding bad (dropped) sharded collection data...")
 
 printjson(coll.drop());
+// Disable balancing on the (dropped) coll to trigger additional collection validation.
+// At least in 2.2, dropping a collection drops the noBalance flag as well, but this has been seen
+// in the wild.
+// TODO: Enable when 2.4.4 comes out
+//sh.disableBalancing( coll );
 printjson(config.collections.find().toArray());
 
 // Make sure up
