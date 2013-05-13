@@ -311,7 +311,7 @@ namespace ExtSortTests {
             BSONObjExternalSorter sorter(cmp.get(), 10 * 1024 );
             // Register a request to kill the current operation.
             cc().curop()->kill();
-            if ( _mayInterrupt && !isSolaris() ) { // This interrupt is unsupported on solaris.
+            if (_mayInterrupt) {
                 // When enough keys are added to fill the first file, an interruption will be
                 // triggered as the records are sorted for the file.
                 ASSERT_THROWS( addKeysUntilFileFlushed( &sorter, _mayInterrupt ), UserException );
@@ -358,7 +358,7 @@ namespace ExtSortTests {
             ASSERT( sorter.getCurSizeSoFar() > 0 );
             // Register a request to kill the current operation.
             cc().curop()->kill();
-            if ( _mayInterrupt && !isSolaris() ) { // This interrupt is unsupported on solaris.
+            if (_mayInterrupt) {
                 // The sort is aborted due to the kill request.
                 ASSERT_THROWS( {
                     sorter.sort( _mayInterrupt );
@@ -499,7 +499,7 @@ namespace ExtSortTests {
         vector<IWPair> vec;
         for (int i=0; i<N; i++)
             vec.push_back(IWPair(array[i], 0));
-        return make_shared<sorter::InMemIterator<IntWrapper, IntWrapper> >(vec);
+        return boost::make_shared<sorter::InMemIterator<IntWrapper, IntWrapper> >(vec);
     }
 
     template <typename IteratorPtr, int N>
