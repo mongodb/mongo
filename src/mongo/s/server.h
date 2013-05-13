@@ -17,8 +17,9 @@
 */
 
 #include <string>
-#include "../util/net/message.h"
-#include "../db/jsobj.h"
+
+#include "mongo/db/jsobj.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 

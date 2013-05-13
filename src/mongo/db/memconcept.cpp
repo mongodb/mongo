@@ -1,4 +1,3 @@
-#include "pch.h"
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -20,14 +19,17 @@
 
 #define DDD(x) 
 
-#include <string>
-#include <map>
-#include "memconcept.h"
-#include "../util/assert_util.h"
+#include "mongo/db/memconcept.h"
+
 #include <boost/functional/hash.hpp>
+#include <map>
+#include <string>
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
+#include "mongo/util/startup_test.h"
+
 using namespace std;
-#include "../util/log.h"
-#include "../util/startup_test.h"
 
 namespace mongo {
     namespace memconcept { 

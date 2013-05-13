@@ -17,9 +17,10 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../util/net/sock.h"
-#include "dbtests.h"
+#include "mongo/pch.h"
+
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/util/net/sock.h"
 
 namespace SockTests {
 

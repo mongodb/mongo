@@ -17,11 +17,12 @@
  */
 
 #include "mongo/pch.h"
+
+#include <boost/filesystem/operations.hpp>
+
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/util/timer.h"
 #include "mongo/dbtests/dbtests.h"
-
-#include <boost/filesystem/operations.hpp>
 
 namespace MMapTests {
 

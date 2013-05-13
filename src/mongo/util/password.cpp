@@ -14,8 +14,10 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "password.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/password.h"
+
 #include <iostream>
 
 #ifndef _WIN32

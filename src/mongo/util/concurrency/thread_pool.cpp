@@ -16,12 +16,13 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/concurrency/thread_pool.h"
 
 #include <boost/thread/thread.hpp>
 
-#include "thread_pool.h"
-#include "mvar.h"
+#include "mongo/util/concurrency/mvar.h"
 
 namespace mongo {
     namespace threadpool {

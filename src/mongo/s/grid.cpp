@@ -16,7 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/s/grid.h"
 
 #include "pcrecpp.h"
 #include <iomanip>

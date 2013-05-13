@@ -16,15 +16,14 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/interrupt_status_mongod.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-
-#include "dbtests.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace DocumentSourceTests {
 

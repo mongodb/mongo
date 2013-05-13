@@ -17,8 +17,8 @@
 
 /* example of using a tailable cursor */
 
-#include "../../client/dbclient.h"
-#include "../../util/goodies.h"
+#include "mongo/client/dbclient.h"
+#include "mongo/util/goodies.h"
 
 using namespace mongo;
 

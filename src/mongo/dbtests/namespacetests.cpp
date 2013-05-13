@@ -26,10 +26,10 @@
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_selection.h"
 #include "mongo/db/json.h"
-#include "mongo/db/storage/namespace.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/storage/namespace.h"
+#include "mongo/dbtests/dbtests.h"
 
-#include "dbtests.h"
 
 namespace NamespaceTests {
 

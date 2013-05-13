@@ -14,9 +14,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "db/pipeline/field_path.h"
-#include "util/mongoutils/str.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/pipeline/field_path.h"
+
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 

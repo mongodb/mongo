@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/filesystem/convenience.hpp>
 #include <fstream>

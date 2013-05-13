@@ -17,15 +17,14 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-
-#include "mongo/db/matcher.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/cursor.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/query_optimizer.h"
-#include "mongo/db/matcher/matcher.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 

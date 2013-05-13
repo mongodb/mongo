@@ -16,7 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/s/server.h"
 
 #include <boost/thread/thread.hpp>
 
@@ -41,7 +43,6 @@
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
-#include "mongo/s/server.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/concurrency/task.h"

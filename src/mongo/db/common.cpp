@@ -19,7 +19,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "jsobjmanipulator.h"
+#include "mongo/db/jsobjmanipulator.h"
 
 /**
  * this just has globals

@@ -15,7 +15,8 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
 #ifndef _WIN32
 #include <signal.h>
 #endif

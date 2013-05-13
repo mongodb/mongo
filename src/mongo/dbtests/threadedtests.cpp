@@ -17,21 +17,23 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../server.h"
-#include "../bson/util/atomic_int.h"
-#include "../util/concurrency/mvar.h"
-#include "../util/concurrency/thread_pool.h"
-#include "../util/concurrency/list.h"
-#include "../util/timer.h"
-#include <boost/thread.hpp>
+#include "mongo/pch.h"
+
 #include <boost/bind.hpp>
-#include "../db/d_concurrency.h"
-#include "../util/concurrency/synchronization.h"
-#include "../util/concurrency/qlock.h"
-#include "dbtests.h"
-#include "mongo/util/concurrency/ticketholder.h"
+#include <boost/thread.hpp>
+
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/mvar.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/list.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/concurrency/qlock.h"
+#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/server.h"
 
 namespace mongo { 
     void testNonGreedy();

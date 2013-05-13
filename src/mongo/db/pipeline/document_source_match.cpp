@@ -14,14 +14,13 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "db/pipeline/document_source.h"
-
-#include "db/jsobj.h"
-#include "db/matcher.h"
-#include "db/pipeline/document.h"
-#include "db/pipeline/expression.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression.h"
 
 namespace mongo {
 

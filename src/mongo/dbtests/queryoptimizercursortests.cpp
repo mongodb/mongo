@@ -17,18 +17,18 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "../db/queryoptimizercursorimpl.h"
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_optimizer_internal.h"
+#include "mongo/db/queryoptimizercursorimpl.h"
 #include "mongo/db/queryutil.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {

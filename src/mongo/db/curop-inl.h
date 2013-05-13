@@ -14,4 +14,4 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "curop.h"
+#include "mongo/db/curop.h"

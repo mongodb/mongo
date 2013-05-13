@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "hash_index_cursor.h"
+#include "mongo/db/index/hash_index_cursor.h"
 
 #include <boost/scoped_ptr.hpp>
 #include <vector>

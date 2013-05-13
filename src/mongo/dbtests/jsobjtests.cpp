@@ -17,16 +17,17 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../bson/util/builder.h"
-#include "../db/jsobj.h"
-#include "../db/jsobjmanipulator.h"
-#include "../db/json.h"
-#include "dbtests.h"
-#include "../util/stringutils.h"
-#include "../util/mongoutils/checksum.h"
-#include "../db/key.h"
+#include "mongo/pch.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/jsobjmanipulator.h"
+#include "mongo/db/json.h"
+#include "mongo/db/key.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/float_utils.h"
+#include "mongo/util/mongoutils/checksum.h"
+#include "mongo/util/stringutils.h"
 
 namespace JsobjTests {
 

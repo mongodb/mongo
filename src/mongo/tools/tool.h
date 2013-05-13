@@ -18,16 +18,15 @@
 
 #pragma once
 
-#include <string>
-
 #include <boost/program_options.hpp>
+#include <string>
 
 #if defined(_WIN32)
 #include <io.h>
 #endif
 
-#include "db/instance.h"
-#include "db/matcher.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/matcher.h"
 
 using std::string;
 

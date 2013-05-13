@@ -16,12 +16,13 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../pch.h"
+#include "mongo/pch.h"
+
 #include <boost/thread/thread.hpp>
 
-#include "dbtests.h"
-#include "../util/time_support.h"
-#include "../util/background.h"
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/util/background.h"
+#include "mongo/util/time_support.h"
 
 namespace BackgroundJobTests {
 

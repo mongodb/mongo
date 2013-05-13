@@ -16,7 +16,7 @@
 
 // strategy_simple.cpp
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"

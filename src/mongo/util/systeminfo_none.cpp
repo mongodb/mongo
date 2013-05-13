@@ -14,8 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "util/systeminfo.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/systeminfo.h"
 
 namespace mongo {
 

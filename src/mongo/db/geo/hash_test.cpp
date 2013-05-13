@@ -24,7 +24,7 @@
 #include "mongo/db/geo/hash.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
-#include "util/assert_util.h"
+#include "mongo/util/assert_util.h"
 
 using mongo::GeoHash;
 using std::string;

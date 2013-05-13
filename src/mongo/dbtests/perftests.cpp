@@ -22,26 +22,26 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include <boost/thread/thread.hpp>
-
-#include <fstream>
-#include "../db/db.h"
-#include "../db/instance.h"
-#include "../db/json.h"
-#include "../db/lasterror.h"
-#include "../db/taskqueue.h"
-#include "../util/timer.h"
-#include "dbtests.h"
-#include "../db/dur_stats.h"
-#include "../util/checksum.h"
-#include "../util/version.h"
-#include "../db/key.h"
-#include "../util/compress.h"
-#include "../util/concurrency/qlock.h"
-#include "../util/fail_point.h"
 #include <boost/filesystem/operations.hpp>
+#include <boost/thread/thread.hpp>
+#include <fstream>
+
+#include "mongo/db/db.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/key.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/db/taskqueue.h"
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/util/checksum.h"
+#include "mongo/util/compress.h"
+#include "mongo/util/concurrency/qlock.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/version.h"
 
 #if (__cplusplus >= 201103L)
 #include <mutex>

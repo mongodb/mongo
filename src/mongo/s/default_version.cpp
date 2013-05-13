@@ -16,9 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "s/version_manager.h"
+#include "mongo/s/version_manager.h"
 
 namespace mongo {
 

@@ -15,13 +15,13 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "distlock.h"
+#include "mongo/client/distlock.h"
 
-#include <vector>
-#include <iostream>
 #include <boost/thread/thread.hpp>
+#include <iostream>
+#include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"

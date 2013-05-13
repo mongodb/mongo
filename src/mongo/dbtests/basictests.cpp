@@ -17,18 +17,18 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "dbtests.h"
-#include "../util/base64.h"
-#include "../util/array.h"
-#include "../util/text.h"
-#include "../util/queue.h"
-#include "../util/paths.h"
-#include "../util/stringutils.h"
-#include "../util/compress.h"
-#include "../util/time_support.h"
-#include "../db/db.h"
+#include "mongo/db/db.h"
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/util/array.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/compress.h"
+#include "mongo/util/paths.h"
+#include "mongo/util/queue.h"
+#include "mongo/util/stringutils.h"
+#include "mongo/util/text.h"
+#include "mongo/util/time_support.h"
 
 namespace BasicTests {
 

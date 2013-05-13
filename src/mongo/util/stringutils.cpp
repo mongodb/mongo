@@ -15,9 +15,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "stringutils.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 

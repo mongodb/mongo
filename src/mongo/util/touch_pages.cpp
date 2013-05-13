@@ -14,7 +14,7 @@
  */
 
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/util/touch_pages.h"
 

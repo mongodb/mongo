@@ -16,8 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
+#include <boost/algorithm/string.hpp>
 #include <string>
 #include <vector>
 
@@ -26,13 +27,11 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/security_key.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "../../util/net/listen.h"
-#include "../commands.h"
+#include "mongo/util/net/listen.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/client/dbclientinterface.h"
-
-#include <boost/algorithm/string.hpp>
 
 #ifndef _WIN32
 # ifndef __sunos__

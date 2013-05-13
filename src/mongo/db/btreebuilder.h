@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "btree.h"
+#include "mongo/db/btree.h"
 
 namespace mongo {
 

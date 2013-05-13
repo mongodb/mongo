@@ -17,17 +17,16 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/pch.h"
 
+#include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_internal.h"
-
-#include "dbtests.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace UpdateTests {
 

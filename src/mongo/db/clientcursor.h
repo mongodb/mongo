@@ -28,17 +28,17 @@
 
 #include <boost/thread/recursive_mutex.hpp>
 
-#include "cursor.h"
-#include "jsobj.h"
-#include "../util/net/message.h"
-#include "../util/background.h"
-#include "cc_by_loc.h"
-#include "diskloc.h"
-#include "dbhelpers.h"
-#include "matcher.h"
-#include "projection.h"
+#include "mongo/db/cc_by_loc.h"
+#include "mongo/db/cursor.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/projection.h"
 #include "mongo/s/collection_metadata.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/background.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {

@@ -16,8 +16,8 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../jsobj.h"
-#include "../diskloc.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
     

@@ -16,12 +16,12 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-#include <boost/static_assert.hpp>
-
 #include "mongo/pch.h"
 
 #include "mongo/db/storage/namespace.h"
+
+#include <boost/static_assert.hpp>
+
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
