@@ -217,7 +217,7 @@ configuration to the wiredtiger_open call should be configured to the
 correct value.
 
 Direct I/O is based on the non-standard \c O_DIRECT flag to the POSIX
-1003.1 open system call and may not available on all platforms.
+1003.1 open system call and may not be available on all platforms.
 
 @subsection tuning_system_buffer_cache_os_cache_dirty_max os_cache_dirty_max
 
