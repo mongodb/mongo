@@ -41,7 +41,7 @@ namespace mutablebson {
         ASSERT_EQUALS(primaryResult, doc.compareWithBSONObj(exp));
 
         // Check that mutables serialized result matches against its origin.
-        ASSERT_EQUALS(primaryResult, doc.compareWithBSONObj(fromDoc));
+        ASSERT_EQUALS(0, doc.compareWithBSONObj(fromDoc));
 
         return (primaryResult == 0);
     }
