@@ -196,7 +196,8 @@ map a file which is configured for direct I/O.
 - If \c O_DIRECT is configured for data files on Linux systems, any
 system utilities used to copy database files for the purposes of hot
 backup should also specify \c O_DIRECT when configuring their file
-access.
+access.  A standard Linux system utility that supports \c O_DIRECT is
+the \c dd utility, when using the \c iflag=direct command-line option.
 
 Additionally, many Linux systems require specific alignment for buffers
 used for I/O when direct I/O is configured, and using the wrong
