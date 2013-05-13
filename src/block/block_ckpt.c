@@ -160,6 +160,11 @@ __wt_block_checkpoint_unload(
 	if (block->verify)
 		WT_TRET(__wt_verify_ckpt_unload(session, block));
 
+	/* If it's the live system, truncate to discard any extended blocks. */
+	if (!checkpoint)
+		WT_TRET(__wt_ftruncate(session, block->fh, block->fh->size));
+
+	/* If it's the live system, discard the active extent lists. */
 	if (!checkpoint)
 		__wt_block_ckpt_destroy(session, &block->live);
 
