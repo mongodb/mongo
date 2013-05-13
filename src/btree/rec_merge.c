@@ -84,9 +84,6 @@ __merge_count(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 	WT_UNUSED(parent);
 
 	if (ref->state == WT_REF_LOCKED) {
-		/* Prevent eviction until it is hooked into the new tree. */
-		__wt_evict_list_clr_page(state->session, ref->page);
-
 		if (!state->seen_live) {
 			state->first_live = state->refcnt;
 			state->seen_live = 1;
