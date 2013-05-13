@@ -29,7 +29,18 @@ var fullShard = st.getShard( coll, { _id : 1 } )
 var emptyShard = st.getShard( coll, { _id : -1 } )
 
 var admin = st.s.getDB( "admin" )
-printjson( admin.runCommand({ moveChunk : "" + coll, find : { _id : -1 }, to : fullShard.shardName, _waitForDelete : true }) )
+assert.soon(
+    function () {
+        var result = admin.runCommand( { moveChunk: "" + coll,
+                                         find: { _id: -1 },
+                                         to: fullShard.shardName,
+                                         _waitForDelete: true } );
+        jsTestLog('moveChunk result = ' + tojson(result));
+        return result.ok;
+    },
+    "Setup FAILURE:  Unable to move chunk from " + emptyShard.shardName +
+            " to " + fullShard.shardName
+);
 
 jsTestLog( "Resetting shard version via first mongos..." )
 
@@ -48,4 +59,5 @@ st.printShardingStatus()
 
 assert.eq( 0, emptyColl.find().itcount() )
 
-
+jsTestLog("DONE!");
+st.stop();
