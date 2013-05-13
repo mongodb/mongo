@@ -337,17 +337,12 @@ namespace mongo {
             if ( !meminfo.empty() && ( lineOff = meminfo.find( "MemTotal" ) ) != string::npos ) {
                 // found MemTotal line.  capture everything between 'MemTotal:' and ' kB'.
                 lineOff = meminfo.substr( lineOff ).find( ':' ) + 1;
-                meminfo = meminfo.substr( lineOff, meminfo.substr( lineOff ).find( "kB" ) - 1);
-                lineOff = 0;
-
-                // trim whitespace and append 000 to replace kB.
-                while ( isspace( meminfo.at( lineOff ) ) ) lineOff++;
                 meminfo = meminfo.substr( lineOff );
             }
             else {
                 meminfo = "";
             }
-            return atoll(meminfo.c_str()) * 1024;   // convert from kB to bytes
+            return strtoll(meminfo.c_str(), 0, 10) * 1024;   // convert from kB to bytes
         }
 
     };
