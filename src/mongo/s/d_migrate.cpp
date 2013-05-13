@@ -1518,6 +1518,13 @@ namespace mongo {
                 timing.done(2);
             }
 
+            if (state == FAIL || state == ABORT) {
+                string errMsg;
+                if (!getDeleter()->queueDelete(ns, min, max, shardKeyPattern, secondaryThrottle,
+                                               NULL /* notifier */, &errMsg)) {
+                    warning() << "Failed to queue delete for migrate abort: " << errMsg << endl;
+                }
+            }
 
             {
                 // 3. initial bulk clone
