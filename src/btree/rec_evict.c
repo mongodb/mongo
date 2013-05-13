@@ -302,7 +302,6 @@ __rec_review(WT_SESSION_IMPL *session,
 		__wt_evict_list_clr_page(session, page);
 	}
 
-
 	/*
 	 * Recurse through the page's subtree: this happens first because we
 	 * have to write pages in depth-first order, otherwise we'll dirty
