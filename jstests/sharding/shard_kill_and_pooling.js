@@ -4,18 +4,6 @@
 
 // Run through the same test twice, once with a hard -9 kill, once with a regular shutdown
 
-// Test is not valid for Win32
-var is32Bits = ( db.serverBuildInfo().bits == 32 );
-if ( is32Bits && _isWindows() ) {
-
-    // Win32 doesn't provide the polling interface we need to implement the check tested here
-    jsTest.log( "Test is not valid on Win32 platform." );
-
-}
-else {
-
-// Non-Win32 platform
-
 for ( var test = 0; test < 2; test++ ) {
 
 var killWith = (test == 0 ? 15 : 9);
@@ -90,5 +78,3 @@ jsTest.log("DONE test " + test);
 } // End test loop
 
 jsTest.log("DONE!");
-
-} // End Win32 check
