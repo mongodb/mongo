@@ -742,13 +742,21 @@ namespace mongo {
     void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) { 
         uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
         {
-            // check no $ modifiers.  note we only check top level.  (scanning deep would be quite expensive)
             BSONObjIterator i( js );
             while ( i.more() ) {
                 BSONElement e = i.next();
-                uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
+
+                // check no $ modifiers.  note we only check top level.  
+                // (scanning deep would be quite expensive)
+                uassert( 13511, "document to insert can't have $ fields", e.fieldName()[0] != '$' );
+                
+                // check no regexp for _id (SERVER-9502)
+                if (str::equals(e.fieldName(), "_id")) {
+                    uassert(16814, "can't use a regex for _id", e.type() != RegEx);
+                }
             }
         }
+
         theDataFileMgr.insertWithObjMod(ns,
                                         // May be modified in the call to add an _id field.
                                         js,
