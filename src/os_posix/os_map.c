@@ -81,8 +81,8 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size)
 }
 
 /*
- * __wt_mmap_read --
- *	Cause a section of a memory map to be faulted in.
+ * __wt_mmap_discard --
+ *	Discard a chunk of the memory map.
  */
 int
 __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
