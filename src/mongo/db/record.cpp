@@ -480,7 +480,7 @@ namespace mongo {
         
 #ifdef _DEBUG
             if ( blockSupported && ! ProcessInfo::blockInMemory(data) ) {
-                warning() << "we think data is in ram but system says no"  << endl;
+                RARELY warning() << "we think data is in ram but system says no"  << endl;
             }
 #endif
             return true;
