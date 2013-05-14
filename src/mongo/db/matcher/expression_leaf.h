@@ -270,6 +270,7 @@ namespace mongo {
 
         bool hasNull() const { return _hasNull; }
         bool singleNull() const { return size() == 1 && _hasNull; }
+        bool hasEmptyArray() const { return _hasEmptyArray; }
         int size() const { return _equalities.size() + _regexes.size(); }
 
         bool equivalent( const ArrayFilterEntries& other ) const;
@@ -277,6 +278,7 @@ namespace mongo {
         void copyTo( ArrayFilterEntries& toFillIn ) const;
     private:
         bool _hasNull; // if _equalities has a jstNULL element in it
+        bool _hasEmptyArray;
         BSONElementSet _equalities;
         std::vector<RegexMatchExpression*> _regexes;
     };

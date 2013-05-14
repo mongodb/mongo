@@ -52,7 +52,9 @@ namespace mongo {
             else if ( x.isABSONObj() ) {
                 string rest = _fieldRef.dottedField( idxPath+1 );
                 BSONElement y = x.Obj().getFieldDotted( rest );
-                found = matchesSingleElement( y );
+
+                if ( !y.eoo() )
+                    found = matchesSingleElement( y );
 
                 if ( !found && y.type() == Array ) {
                     // we iterate this array as well it seems
@@ -412,6 +414,7 @@ namespace mongo {
 
     ArrayFilterEntries::ArrayFilterEntries(){
         _hasNull = false;
+        _hasEmptyArray = false;
     }
 
     ArrayFilterEntries::~ArrayFilterEntries() {
@@ -432,6 +435,9 @@ namespace mongo {
         if ( e.type() == jstNULL ) {
             _hasNull = true;
         }
+
+        if ( e.type() == Array && e.Obj().isEmpty() )
+            _hasEmptyArray = true;
 
         _equalities.insert( e );
         return Status::OK();
@@ -457,6 +463,7 @@ namespace mongo {
 
     void ArrayFilterEntries::copyTo( ArrayFilterEntries& toFillIn ) const {
         toFillIn._hasNull = _hasNull;
+        toFillIn._hasEmptyArray = _hasEmptyArray;
         toFillIn._equalities = _equalities;
         for ( unsigned i = 0; i < _regexes.size(); i++ )
             toFillIn._regexes.push_back( static_cast<RegexMatchExpression*>(_regexes[i]->shallowClone()) );
