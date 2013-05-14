@@ -123,7 +123,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 * saw when taking the snapshot should be invisible, even if the
 	 * snapshot is empty.
 	 */
-	if (TXNID_LT(txn->snap_max, id))
+	if (TXNID_LE(txn->snap_max, id))
 		return (0);
 	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
 		return (1);

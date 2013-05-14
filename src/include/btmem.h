@@ -139,6 +139,9 @@ struct __wt_page_modify {
 	 * times if a snapshot is keeping old versions pinned (e.g., in a
 	 * checkpoint).
 	 */
+	wt_txnid_t disk_snap_min;
+
+	/* The largest transaction ID written to disk, for clean pages. */
 	wt_txnid_t disk_txn;
 
 	union {
