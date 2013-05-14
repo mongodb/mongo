@@ -240,10 +240,15 @@ __evict_worker(WT_SESSION_IMPL *session)
 			clean = 1;
 
 		/*
-		 * Track whether pages are being evicted.  This will be cleared
-		 * by the next thread to successfully evict a page.
+		 * When the cache is full, track whether pages are being
+		 * evicted.  This will be cleared by the next thread to
+		 * successfully evict a page.
 		 */
-		F_SET(cache, WT_EVICT_NO_PROGRESS);
+		if (bytes_inuse > bytes_max)
+			F_SET(cache, WT_EVICT_NO_PROGRESS);
+		else
+			F_CLR(cache, WT_EVICT_NO_PROGRESS);
+
 		WT_RET(__evict_lru(session, clean));
 
 		/*
