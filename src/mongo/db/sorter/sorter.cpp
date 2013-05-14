@@ -49,6 +49,14 @@ namespace mongo {
     namespace sorter {
         using namespace mongoutils;
 
+        // We need to use the "real" errno everywhere, not GetLastError() on Windows
+        inline std::string myErrnoWithDescription() {
+            int errnoCopy = errno;
+            StringBuilder sb;
+            sb << "errno:" << errnoCopy << ' ' << strerror(errnoCopy);
+            return sb.str();
+        }
+
         template<typename Data, typename Comparator>
         void compIsntSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
             PRINT(typeid(comp).name());
@@ -139,7 +147,7 @@ namespace mongo {
                 , _file(_fileName.c_str(), std::ios::in | std::ios::binary)
             {
                 massert(16814, str::stream() << "error opening file \"" << _fileName << "\": "
-                                             << errnoWithDescription(),
+                                             << myErrnoWithDescription(),
                         _file.good());
 
                 massert(16815, str::stream() << "unexpected empty file: " << _fileName,
@@ -193,7 +201,7 @@ namespace mongo {
 
                     msgasserted(16817, str::stream() << "error reading file \""
                                                      << _fileName << "\": "
-                                                     << errnoWithDescription());
+                                                     << myErrnoWithDescription());
                 }
                 verify(_file.gcount() == static_cast<std::streamsize>(size));
             }
@@ -627,7 +635,7 @@ namespace mongo {
 
         _file.open(_fileName.c_str(), ios::binary | ios::out);
         massert(16818, str::stream() << "error opening file \"" << _fileName << "\": "
-                                     << errnoWithDescription(),
+                                     << sorter::myErrnoWithDescription(),
                 _file.good());
 
         _fileDeleter = boost::make_shared<sorter::FileDeleter>(_fileName);
@@ -656,7 +664,7 @@ namespace mongo {
             _file.write(_buffer.buf(), size);
         } catch (const std::exception&) {
             msgasserted(16821, str::stream() << "error writing to file \"" << _fileName << "\": "
-                                             << errnoWithDescription());
+                                             << sorter::myErrnoWithDescription());
         }
 
         _buffer.reset();
