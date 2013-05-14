@@ -23,6 +23,7 @@
 #include <fstream>
 
 #include "mongo/base/initializer.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"

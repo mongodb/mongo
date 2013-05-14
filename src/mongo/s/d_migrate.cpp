@@ -36,6 +36,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/clientcursor.h"
@@ -1879,7 +1880,7 @@ namespace mongo {
         Client::initThread( "migrateThread" );
         if (AuthorizationManager::isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
-            cc().getAuthorizationManager()->grantInternalAuthorization("_migrateThread");
+            cc().getAuthorizationSession()->grantInternalAuthorization("_migrateThread");
         }
         migrateStatus.go();
         cc().shutdown();

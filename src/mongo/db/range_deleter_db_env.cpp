@@ -17,6 +17,7 @@
 #include "mongo/db/range_deleter_db_env.h"
 
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/dbhelpers.h"
@@ -49,7 +50,7 @@ namespace mongo {
         }
 
         if (AuthorizationManager::isAuthEnabled()) {
-            cc().getAuthorizationManager()->grantInternalAuthorization("_cleanupOldData");
+            cc().getAuthorizationSession()->grantInternalAuthorization("_cleanupOldData");
         }
 
         ShardForceVersionOkModeBlock forceVersion;

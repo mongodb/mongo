@@ -25,7 +25,7 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
@@ -283,8 +283,8 @@ namespace mongo {
         uassert( 13287 , "too many cursors to kill" , n < 30000 );
 
         long long * cursors = (long long *)x;
-        AuthorizationManager* authManager =
-                ClientBasic::getCurrent()->getAuthorizationManager();
+        AuthorizationSession* authSession =
+                ClientBasic::getCurrent()->getAuthorizationSession();
         for ( int i=0; i<n; i++ ) {
             long long id = cursors[i];
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
@@ -300,7 +300,7 @@ namespace mongo {
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
-                    if (authManager->checkAuthorization(i->second->getNS(),
+                    if (authSession->checkAuthorization(i->second->getNS(),
                                                         ActionType::killCursors)) {
                         _cursors.erase( i );
                     }
@@ -314,7 +314,7 @@ namespace mongo {
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());
-                if (!authManager->checkAuthorization(refsNSIt->second, ActionType::killCursors)) {
+                if (!authSession->checkAuthorization(refsNSIt->second, ActionType::killCursors)) {
                     continue;
                 }
                 server = refsIt->second;

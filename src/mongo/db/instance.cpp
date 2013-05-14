@@ -30,7 +30,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/background.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands/fsync.h"
@@ -128,7 +128,7 @@ namespace mongo {
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObjBuilder b;
 
-        if (!cc().getAuthorizationManager()->checkAuthorization(
+        if (!cc().getAuthorizationSession()->checkAuthorization(
                 AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::inprog)) {
             b.append("err", "unauthorized");
         }
@@ -182,7 +182,7 @@ namespace mongo {
 
     void killOp( Message &m, DbResponse &dbresponse ) {
         BSONObj obj;
-        if (!cc().getAuthorizationManager()->checkAuthorization(
+        if (!cc().getAuthorizationSession()->checkAuthorization(
                 AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::killop)) {
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
@@ -208,7 +208,7 @@ namespace mongo {
     bool _unlockFsync();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
-        if (!cc().getAuthorizationManager()->checkAuthorization(
+        if (!cc().getAuthorizationSession()->checkAuthorization(
                 AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::unlock)) {
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
@@ -242,7 +242,7 @@ namespace mongo {
         try {
             if (!NamespaceString(d.getns()).isCommand()) {
                 // Auth checking for Commands happens later.
-                Status status = cc().getAuthorizationManager()->checkAuthForQuery(d.getns());
+                Status status = cc().getAuthorizationSession()->checkAuthForQuery(d.getns());
                 uassert(16550, status.reason(), status.isOK());
             }
             dbresponse.exhaustNS = runQuery(m, q, op, *resp);
@@ -360,7 +360,7 @@ namespace mongo {
         globalOpCounters.gotOp( op , isCommand );
 
         Client& c = cc();
-        c.getAuthorizationManager()->startRequest();
+        c.getAuthorizationSession()->startRequest();
         
         auto_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();
@@ -546,7 +546,7 @@ namespace mongo {
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
 
-        Status status = cc().getAuthorizationManager()->checkAuthForUpdate(ns, upsert);
+        Status status = cc().getAuthorizationSession()->checkAuthForUpdate(ns, upsert);
         uassert(16538, status.reason(), status.isOK());
 
         op.debug().query = query;
@@ -581,7 +581,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
 
-        Status status = cc().getAuthorizationManager()->checkAuthForDelete(ns);
+        Status status = cc().getAuthorizationSession()->checkAuthForDelete(ns);
         uassert(16542, status.reason(), status.isOK());
 
         op.debug().ns = ns;
@@ -647,7 +647,7 @@ namespace mongo {
                 const NamespaceString nsString( ns );
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                Status status = cc().getAuthorizationManager()->checkAuthForGetMore(ns);
+                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(ns);
                 uassert(16543, status.reason(), status.isOK());
 
                 if (str::startsWith(ns, "local.oplog.")){
@@ -810,7 +810,7 @@ namespace mongo {
 
         // Auth checking for index writes happens further down in this function.
         if (!isIndexWrite) {
-            Status status = cc().getAuthorizationManager()->checkAuthForInsert(ns);
+            Status status = cc().getAuthorizationSession()->checkAuthForInsert(ns);
             uassert(16544, status.reason(), status.isOK());
         }
 
@@ -828,7 +828,7 @@ namespace mongo {
                 uassert(16548,
                         mongoutils::str::stream() << "not authorized to create index on "
                                 << indexNS,
-                        cc().getAuthorizationManager()->checkAuthorization(
+                        cc().getAuthorizationSession()->checkAuthorization(
                                 indexNS, ActionType::ensureIndex));
             }
         }

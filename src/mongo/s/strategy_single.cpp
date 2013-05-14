@@ -20,6 +20,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/request.h"
 #include "mongo/s/cursors.h"
@@ -127,13 +128,13 @@ namespace mongo {
             BSONObjBuilder b;
             vector<Shard> shards;
 
-            AuthorizationManager* authManager =
-                    ClientBasic::getCurrent()->getAuthorizationManager();
+            AuthorizationSession* authSession =
+                    ClientBasic::getCurrent()->getAuthorizationSession();
 
             if ( strcmp( ns , "inprog" ) == 0 ) {
                 uassert(16545,
                         "not authorized to run inprog",
-                        authManager->checkAuthorization(AuthorizationManager::SERVER_RESOURCE_NAME,
+                        authSession->checkAuthorization(AuthorizationManager::SERVER_RESOURCE_NAME,
                                                         ActionType::inprog));
 
                 Shard::getAllShards( shards );
@@ -175,7 +176,7 @@ namespace mongo {
             else if ( strcmp( ns , "killop" ) == 0 ) {
                 uassert(16546,
                         "not authorized to run killop",
-                        authManager->checkAuthorization(AuthorizationManager::SERVER_RESOURCE_NAME,
+                        authSession->checkAuthorization(AuthorizationManager::SERVER_RESOURCE_NAME,
                                                         ActionType::killop));
 
                 BSONElement e = q.query["op"];

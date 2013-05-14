@@ -14,12 +14,13 @@
  */
 
 /**
- * Unit tests of the AuthorizationManager type.
+ * Unit tests of the AuthorizationSession type.
  */
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/auth_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/unittest/unittest.h"
@@ -31,38 +32,38 @@
 namespace mongo {
 namespace {
 
-    TEST(AuthorizationManagerTest, AcquirePrivilegeAndCheckAuthorization) {
+    TEST(AuthorizationSessionTest, AcquirePrivilegeAndCheckAuthorization) {
         Principal* principal = new Principal(PrincipalName("Spencer", "test"));
         ActionSet actions;
         actions.addAction(ActionType::insert);
         Privilege writePrivilege("test", actions);
         Privilege allDBsWritePrivilege("*", actions);
         AuthExternalStateMock* externalState = new AuthExternalStateMock();
-        AuthorizationManager authManager(externalState);
+        AuthorizationSession authzSession(externalState);
 
-        ASSERT_FALSE(authManager.checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authzSession.checkAuthorization("test", ActionType::insert));
         externalState->setReturnValueForShouldIgnoreAuthChecks(true);
-        ASSERT_TRUE(authManager.checkAuthorization("test", ActionType::insert));
+        ASSERT_TRUE(authzSession.checkAuthorization("test", ActionType::insert));
         externalState->setReturnValueForShouldIgnoreAuthChecks(false);
-        ASSERT_FALSE(authManager.checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authzSession.checkAuthorization("test", ActionType::insert));
 
         ASSERT_EQUALS(ErrorCodes::UserNotFound,
-                      authManager.acquirePrivilege(writePrivilege, principal->getName()));
-        authManager.addAuthorizedPrincipal(principal);
-        ASSERT_OK(authManager.acquirePrivilege(writePrivilege, principal->getName()));
-        ASSERT_TRUE(authManager.checkAuthorization("test", ActionType::insert));
+                      authzSession.acquirePrivilege(writePrivilege, principal->getName()));
+        authzSession.addAuthorizedPrincipal(principal);
+        ASSERT_OK(authzSession.acquirePrivilege(writePrivilege, principal->getName()));
+        ASSERT_TRUE(authzSession.checkAuthorization("test", ActionType::insert));
 
-        ASSERT_FALSE(authManager.checkAuthorization("otherDb", ActionType::insert));
-        ASSERT_OK(authManager.acquirePrivilege(allDBsWritePrivilege, principal->getName()));
-        ASSERT_TRUE(authManager.checkAuthorization("otherDb", ActionType::insert));
+        ASSERT_FALSE(authzSession.checkAuthorization("otherDb", ActionType::insert));
+        ASSERT_OK(authzSession.acquirePrivilege(allDBsWritePrivilege, principal->getName()));
+        ASSERT_TRUE(authzSession.checkAuthorization("otherDb", ActionType::insert));
         // Auth checks on a collection should be applied to the database name.
-        ASSERT_TRUE(authManager.checkAuthorization("otherDb.collectionName", ActionType::insert));
+        ASSERT_TRUE(authzSession.checkAuthorization("otherDb.collectionName", ActionType::insert));
 
-        authManager.logoutDatabase("test");
-        ASSERT_FALSE(authManager.checkAuthorization("test", ActionType::insert));
+        authzSession.logoutDatabase("test");
+        ASSERT_FALSE(authzSession.checkAuthorization("test", ActionType::insert));
     }
 
-    TEST(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocumentCompatible) {
+    TEST(AuthorizationSessionTest, GetPrivilegesFromPrivilegeDocumentCompatible) {
         PrincipalName principal ("Spencer", "test");
         BSONObj invalid;
         BSONObj readWrite = BSON("user" << "Spencer" << "pwd" << "passwordHash");
@@ -71,22 +72,22 @@ namespace {
 
         PrivilegeSet privilegeSet;
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat,
-                      AuthorizationManager::buildPrivilegeSet("test",
-                                                               principal,
-                                                               invalid,
-                                                               &privilegeSet).code());
+                      AuthorizationSession::buildPrivilegeSet("test",
+                                                              principal,
+                                                              invalid,
+                                                              &privilegeSet).code());
 
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet("test",
-                                                           principal,
-                                                           readOnly,
-                                                           &privilegeSet));
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet("test",
+                                                          principal,
+                                                          readOnly,
+                                                          &privilegeSet));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::insert)));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
 
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet("test",
-                                                           principal,
-                                                           readWrite,
-                                                           &privilegeSet));
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet("test",
+                                                          principal,
+                                                          readWrite,
+                                                          &privilegeSet));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::insert)));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::userAdmin)));
@@ -96,20 +97,20 @@ namespace {
         ASSERT(!privilegeSet.hasPrivilege(Privilege("admin", ActionType::find)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("*", ActionType::find)));
 
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet("admin",
-                                                           principal,
-                                                           readOnly,
-                                                           &privilegeSet));
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet("admin",
+                                                          principal,
+                                                          readOnly,
+                                                          &privilegeSet));
         // Should grant privileges on *.
         ASSERT(privilegeSet.hasPrivilege(Privilege("*", ActionType::find)));
 
         ASSERT(!privilegeSet.hasPrivilege(Privilege("admin", ActionType::insert)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("*", ActionType::insert)));
 
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet("admin",
-                                                           principal,
-                                                           readWrite,
-                                                           &privilegeSet));
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet("admin",
+                                                          principal,
+                                                          readWrite,
+                                                          &privilegeSet));
         ASSERT(privilegeSet.hasPrivilege(Privilege("*", ActionType::insert)));
     }
 
@@ -122,7 +123,7 @@ namespace {
     };
 
     TEST_F(PrivilegeDocumentParsing, VerifyRolesFieldMustBeAnArray) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_NOT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -132,7 +133,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyInvalidRoleGrantsNoPrivileges) {
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -142,7 +143,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyInvalidRoleStillAllowsOtherRoles) {
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -152,7 +153,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterAdminRoleFromNonAdminDatabase) {
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -164,7 +165,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterReadFromNonAdminDatabase) {
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -175,7 +176,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterReadWriteFromNonAdminDatabase) {
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -187,7 +188,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterUserAdminFromNonAdminDatabase) {
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -199,7 +200,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterDBAdminFromNonAdminDatabase) {
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -211,7 +212,7 @@ namespace {
     }
 
     TEST_F(PrivilegeDocumentParsing, VerifyOtherDBRolesMustBeAnObjectOfArraysOfStrings) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_NOT_OK(AuthorizationSession::buildPrivilegeSet(
                               "admin",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -222,7 +223,7 @@ namespace {
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test2", ActionType::find)));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("admin", ActionType::find)));
 
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_NOT_OK(AuthorizationSession::buildPrivilegeSet(
                               "admin",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -236,7 +237,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantPrivilegesOnOtherDatabasesNormally) {
         // Cannot grant privileges on other databases, except from admin database.
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_NOT_OK(AuthorizationSession::buildPrivilegeSet(
                               "test",
                               user,
                               BSON("user" << "spencer" << "pwd" << "" <<
@@ -249,7 +250,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, SuccessfulSimpleReadGrant) {
         // Grant read on test.
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                           "test",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" << "roles" << BSON_ARRAY("read")),
@@ -262,7 +263,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, SuccessfulSimpleUserAdminTest) {
         // Grant userAdmin on "test" database.
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                           "test",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
@@ -275,7 +276,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, GrantUserAdminOnAdmin) {
         // Grant userAdmin on admin.
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                           "admin",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
@@ -288,7 +289,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, GrantUserAdminOnTestViaAdmin) {
         // Grant userAdmin on test via admin.
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                           "admin",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
@@ -302,7 +303,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, SuccessfulClusterAdminTest) {
         // Grant userAdminAnyDatabase.
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                           "admin",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
@@ -316,7 +317,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, GrantClusterReadWrite) {
         // Grant readWrite on everything via the admin database.
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                           "admin",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
@@ -332,7 +333,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, ProhibitGrantOnWildcard) {
         // Cannot grant readWrite to everythign using "otherDBRoles".
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_NOT_OK(AuthorizationSession::buildPrivilegeSet(
                           "admin",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
@@ -349,7 +350,7 @@ namespace {
 
     TEST_F(PrivilegeDocumentParsing, GrantClusterAdmin) {
         // Grant cluster admin
-        ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_OK(AuthorizationSession::buildPrivilegeSet(
                           "admin",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
@@ -362,7 +363,7 @@ namespace {
         ASSERT(privilegeSet.hasPrivilege(Privilege("$CLUSTER", ActionType::moveChunk)));
     }
 
-    TEST(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocumentInvalid) {
+    TEST(AuthorizationSessionTest, GetPrivilegesFromPrivilegeDocumentInvalid) {
         BSONObj oldAndNewMixed = BSON("user" << "spencer" <<
                                       "pwd" << "passwordHash" <<
                                       "readOnly" << false <<
@@ -370,13 +371,13 @@ namespace {
 
         PrincipalName principal("spencer", "anydb");
         PrivilegeSet result;
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
+        ASSERT_NOT_OK(AuthorizationSession::buildPrivilegeSet(
                               "anydb", principal, oldAndNewMixed, &result));
     }
 
-    TEST(AuthorizationManagerTest, DocumentValidationCompatibility) {
+    TEST(AuthorizationSessionTest, DocumentValidationCompatibility) {
         Status (*check)(const StringData&, const BSONObj&) =
-            &AuthorizationManager::checkValidPrivilegeDocument;
+            &AuthorizationSession::checkValidPrivilegeDocument;
 
         // Good documents, with and without "readOnly" fields.
         ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a")));
@@ -414,9 +415,9 @@ namespace {
         }
     };
 
-    TEST(AuthorizationManagerTest, DisableCompatibilityMode) {
+    TEST(AuthorizationSessionTest, DisableCompatibilityMode) {
         Status (*check)(const StringData&, const BSONObj&) =
-            &AuthorizationManager::checkValidPrivilegeDocument;
+            &AuthorizationSession::checkValidPrivilegeDocument;
 
         CompatibilityModeDisabler disabler;
 
@@ -429,9 +430,9 @@ namespace {
                                      "roles" << BSON_ARRAY("dbAdmin" << "read"))));
     }
 
-    TEST(AuthorizationManagerTest, DocumentValidationExtended) {
+    TEST(AuthorizationSessionTest, DocumentValidationExtended) {
         Status (*check)(const StringData&, const BSONObj&) =
-            &AuthorizationManager::checkValidPrivilegeDocument;
+            &AuthorizationSession::checkValidPrivilegeDocument;
 
         // Document describing new-style user on "test".
         ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
@@ -536,11 +537,11 @@ namespace {
     class ImplicitPriviligesTest : public ::mongo::unittest::Test {
     public:
         AuthExternalStateImplictPriv* state;
-        scoped_ptr<AuthorizationManager> authman;
+        scoped_ptr<AuthorizationSession> authman;
 
         void setUp() {
             state = new AuthExternalStateImplictPriv;
-            authman.reset(new AuthorizationManager(state));
+            authman.reset(new AuthorizationSession(state));
         }
     };
 

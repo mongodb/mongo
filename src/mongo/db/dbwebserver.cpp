@@ -26,7 +26,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <pcrecpp.h>
 
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
@@ -79,12 +79,12 @@ namespace mongo {
 
         void _authorizePrincipal(const std::string& principalName, bool readOnly) {
             Principal* principal = new Principal(PrincipalName(principalName, "local"));
-            ActionSet actions = AuthorizationManager::getActionsForOldStyleUser(
+            ActionSet actions = AuthorizationSession::getActionsForOldStyleUser(
                     "admin", readOnly);
 
-            AuthorizationManager* authorizationManager = cc().getAuthorizationManager();
-            authorizationManager->addAuthorizedPrincipal(principal);
-            Status status = authorizationManager->acquirePrivilege(
+            AuthorizationSession* authorizationSession = cc().getAuthorizationSession();
+            authorizationSession->addAuthorizedPrincipal(principal);
+            Status status = authorizationSession->acquirePrivilege(
                     Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal->getName());
             verify (status == Status::OK());
         }
