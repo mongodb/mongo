@@ -7,10 +7,12 @@ doTest = function( signal ) {
 
     replTest.startSet();
     replTest.initiate({"_id" : "testSet",
-                "members" : [
-                             {"_id" : 0, "host" : nodes[0], "priority" : 1},
-                             {"_id" : 1, "host" : nodes[1], "priority" : 2},
-                             {"_id" : 2, "host" : nodes[2], "priority" : 3}]});
+                       "members" : [
+                           {"_id" : 0, "host" : nodes[0], "priority" : 1},
+                           {"_id" : 1, "host" : nodes[1], "priority" : 2},
+                           {"_id" : 2, "host" : nodes[2], "priority" : 3}]},
+                      'replSetInitiate',
+                      80000);
 
     // 2 should be master (give this a while to happen, as 0 will be elected, then demoted)
     assert.soon(function() {

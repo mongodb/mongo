@@ -380,7 +380,7 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
 }
 
 ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
-  this.getMaster(); // Wait for a primary to be selected.
+  this.getMaster(timeout); // Wait for a primary to be selected.
   var tmo = timeout || 60000;
   var replTest = this;
   assert.soon(
@@ -469,17 +469,17 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 30000;
+    var tmo     = timeout || 30000;
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    jsTest.attempt({context:this, timeout: timeout, desc: "Initiate replica set"}, function() {
+    jsTest.attempt({context:this, timeout: tmo, desc: "Initiate replica set"}, function() {
         var result = master.runCommand(cmd);
         printjson(result);
         return result['ok'] == 1;
     });
 
-    this.awaitSecondaryNodes();
+    this.awaitSecondaryNodes(timeout);
 
     // Setup authentication if running test with authentication
     if (jsTestOptions().keyFile && !this.keyFile) {
