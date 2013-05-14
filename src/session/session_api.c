@@ -795,7 +795,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->dhandles);
 
-	/* Initialize transaction support. */
+	/* Initialize transaction support: default to read-committed. */
+	session_ret->isolation = TXN_ISO_READ_COMMITTED;
 	WT_ERR(__wt_txn_init(session_ret));
 
 	/*
