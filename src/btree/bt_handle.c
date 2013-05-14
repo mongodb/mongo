@@ -503,7 +503,7 @@ __btree_warm_cache(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	bm = btree->bm;
 
-	if (bm->map == NULL)
+	if (bm->map == NULL || btree->compressor != NULL)
 		return (0);
 
 	/*

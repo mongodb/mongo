@@ -77,7 +77,7 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
 	txn_global = &conn->txn_global;
 
 	oldest_snap_min =
-	    (txn->id != WT_TXN_NONE) ? txn->id : txn_global->current;
+	    (txn->id != WT_TXN_NONE) ? txn->id : txn_global->current + 1;
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states;
@@ -122,7 +122,7 @@ __wt_txn_get_snapshot(
 		/* Take a copy of the current session ID. */
 		txn->last_gen = txn_global->gen;
 		txn->last_id = oldest_snap_min = current_id =
-		    txn_global->current;
+		    txn_global->current + 1;
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -146,7 +146,7 @@ __wt_txn_get_snapshot(
 		 * the global current ID.
 		 */
 		WT_READ_BARRIER();
-	} while (current_id != txn_global->current);
+	} while (current_id != txn_global->current + 1);
 
 	__txn_sort_snapshot(session, n,
 	    (max_id != WT_TXN_NONE) ? max_id : current_id,
@@ -168,9 +168,14 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
+	/*
+	 * The oldest active snapshot ID in the system should *not* be visible
+	 * to eviction.  Create a snapshot containing that ID.
+	 */
 	__wt_txn_get_oldest(session);
+	txn->snapshot[0] = txn->oldest_snap_min;
 	__txn_sort_snapshot(
-	    session, 0, txn->oldest_snap_min, txn->oldest_snap_min);
+	    session, 1, txn->oldest_snap_min, txn->oldest_snap_min);
 
 	/*
 	 * Note that we carefully don't update the global table with this
@@ -397,9 +402,7 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	txn->mod = NULL;
 	txn->modref = NULL;
 
-	/* The default isolation level is read-committed. */
-	txn->isolation = session->isolation = TXN_ISO_READ_COMMITTED;
-
+	txn->isolation = session->isolation;
 	return (0);
 }
 

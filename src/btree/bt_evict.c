@@ -240,10 +240,15 @@ __evict_worker(WT_SESSION_IMPL *session)
 			clean = 1;
 
 		/*
-		 * Track whether pages are being evicted.  This will be cleared
-		 * by the next thread to successfully evict a page.
+		 * When the cache is full, track whether pages are being
+		 * evicted.  This will be cleared by the next thread to
+		 * successfully evict a page.
 		 */
-		F_SET(cache, WT_EVICT_NO_PROGRESS);
+		if (bytes_inuse > bytes_max)
+			F_SET(cache, WT_EVICT_NO_PROGRESS);
+		else
+			F_CLR(cache, WT_EVICT_NO_PROGRESS);
+
 		WT_RET(__evict_lru(session, clean));
 
 		/*
@@ -333,6 +338,14 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	__wt_txn_get_evict_snapshot(session);
 	txn->isolation = TXN_ISO_READ_COMMITTED;
+
+	/*
+	 * Sanity check: if a transaction is running, its updates should not
+	 * be visible to eviction.
+	 */
+	WT_ASSERT(session, !was_running ||
+	    !__wt_txn_visible(session, saved_txn.id));
+
 	ret = __wt_rec_evict(session, page, 0);
 
 	if (was_running) {
