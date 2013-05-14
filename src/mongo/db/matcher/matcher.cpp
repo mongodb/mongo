@@ -18,6 +18,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
@@ -122,7 +123,8 @@ namespace mongo {
         : _indexKey( constrainIndexKey ) {
 
         MatchExpression* indexExpression = spliceForIndex( constrainIndexKey,
-                                                          docMatcher._expression.get() );
+                                                           docMatcher._expression.get(),
+                                                           &_spliceInfo );
         if ( indexExpression )
             _expression.reset( indexExpression );
     }
@@ -217,34 +219,53 @@ namespace mongo {
             return docMatcher._expression.get() == NULL;
         if ( !docMatcher._expression )
             return false;
-
+        if ( _spliceInfo.hasNullEquality )
+            return false;
         return _expression->equivalent( docMatcher._expression.get() );
     }
 
     MatchExpression* Matcher2::spliceForIndex( const BSONObj& key,
-                                               const MatchExpression* full ) {
+                                               const MatchExpression* full,
+                                               Matcher2::IndexSpliceInfo* spliceInfo ) {
         set<string> keys;
         for ( BSONObjIterator i(key); i.more(); ) {
             BSONElement e = i.next();
             keys.insert( e.fieldName() );
         }
-        return _spliceForIndex( keys, full );
+        return _spliceForIndex( keys, full, spliceInfo );
     }
 
+    namespace {
+        BSONObj myUndefinedObj;
+        BSONElement myUndefinedElement;
+
+        MONGO_INITIALIZER( MatcherUndefined )( ::mongo::InitializerContext* context ) {
+            BSONObjBuilder b;
+            b.appendUndefined( "a" );
+            myUndefinedObj = b.obj();
+            myUndefinedElement = myUndefinedObj["a"];
+            return Status::OK();
+        }
+
+    }
+
+
+
     MatchExpression* Matcher2::_spliceForIndex( const set<string>& keys,
-                                                const MatchExpression* full ) {
+                                                const MatchExpression* full,
+                                                Matcher2::IndexSpliceInfo* spliceInfo  ) {
 
         switch ( full->matchType() ) {
         case MatchExpression::NOT:
         case MatchExpression::NOR:
-        case MatchExpression::OR:
             // maybe?
             return NULL;
 
+        case MatchExpression::OR:
         case MatchExpression::AND: {
             auto_ptr<ListOfMatchExpression> dup;
             for ( unsigned i = 0; i < full->numChildren(); i++ ) {
-                MatchExpression* sub = _spliceForIndex( keys, full->getChild( i ) );
+                MatchExpression* sub = _spliceForIndex( keys, full->getChild( i ), spliceInfo );
                 if ( !sub )
                     continue;
                 if ( !dup.get() ) {
@@ -263,6 +284,7 @@ namespace mongo {
         case MatchExpression::EQ: {
             const ComparisonMatchExpression* cmp =
                 static_cast<const ComparisonMatchExpression*>( full );
+
             if ( cmp->getRHS().type() == Array ) {
                 // need to convert array to an $in
 
@@ -272,13 +294,23 @@ namespace mongo {
                 auto_ptr<InMatchExpression> newIn( new InMatchExpression() );
                 newIn->init( cmp->path() );
 
+                if ( newIn->getArrayFilterEntries()->addEquality( cmp->getRHS() ).isOK() )
+                    return NULL;
+
+                if ( cmp->getRHS().Obj().isEmpty() )
+                    newIn->getArrayFilterEntries()->addEquality( myUndefinedElement );
+
                 BSONObjIterator i( cmp->getRHS().Obj() );
                 while ( i.more() ) {
                     Status s = newIn->getArrayFilterEntries()->addEquality( i.next() );
                     if ( !s.isOK() )
                         return NULL;
                 }
+
                 return newIn.release();
+            }
+            else if ( cmp->getRHS().type() == jstNULL ) {
+                spliceInfo->hasNullEquality = true;
             }
         }
 
@@ -288,12 +320,21 @@ namespace mongo {
         case MatchExpression::GTE:
         case MatchExpression::NE:
         case MatchExpression::REGEX:
-        case MatchExpression::MOD:
-        case MatchExpression::MATCH_IN: {
+        case MatchExpression::MOD: {
             const LeafMatchExpression* lme = static_cast<const LeafMatchExpression*>( full );
             if ( !keys.count( lme->path().toString() ) )
                 return NULL;
             return lme->shallowClone();
+        }
+
+        case MatchExpression::MATCH_IN: {
+            const LeafMatchExpression* lme = static_cast<const LeafMatchExpression*>( full );
+            if ( !keys.count( lme->path().toString() ) )
+                return NULL;
+            InMatchExpression* cloned = static_cast<InMatchExpression*>(lme->shallowClone());
+            if ( cloned->getArrayFilterEntries()->hasEmptyArray() )
+                cloned->getArrayFilterEntries()->addEquality( myUndefinedElement );
+            return cloned;
         }
 
         case MatchExpression::ALL:

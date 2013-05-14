@@ -31,6 +31,14 @@ namespace mongo {
     class Matcher2 {
         MONGO_DISALLOW_COPYING( Matcher2 );
 
+        struct IndexSpliceInfo {
+            IndexSpliceInfo() {
+                hasNullEquality = false;
+            }
+
+            bool hasNullEquality;
+        };
+
     public:
         explicit Matcher2( const BSONObj& pattern, bool nested=false /* do not use */ );
 
@@ -64,17 +72,20 @@ namespace mongo {
         bool keyMatch( const Matcher2 &docMatcher ) const;
 
         static MatchExpression* spliceForIndex( const BSONObj& key,
-                                                const MatchExpression* full );
+                                                const MatchExpression* full,
+                                                IndexSpliceInfo* spliceInfo );
 
     private:
         BSONObj _pattern;
-
         BSONObj _indexKey;
 
         boost::scoped_ptr<MatchExpression> _expression;
 
+        IndexSpliceInfo _spliceInfo;
+
         static MatchExpression* _spliceForIndex( const set<std::string>& keys,
-                                                 const MatchExpression* full );
+                                                 const MatchExpression* full,
+                                                 IndexSpliceInfo* spliceInfo );
 
     };
 
