@@ -961,17 +961,21 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 			goto err;
 	}
 
-	WT_ERR(__wt_config_gets(session, cfg, "file_extend.type", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "file_extend", &cval));
 	for (ft = file_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
 		if (ret == 0) {
-			if (sval.val)
-				FLD_SET(conn->file_extend, ft->flag);
+			switch (ft->flag) {
+			case WT_FILE_TYPE_DATA:
+				conn->data_extend_len = sval.val;
+				break;
+			case WT_FILE_TYPE_LOG:
+				conn->log_extend_len = sval.val;
+				break;
+			}
 		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
-	WT_ERR(__wt_config_gets(session, cfg, "file_extend.size", &cval));
-	conn->file_extend_len = cval.val;
 
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val == 0 ? 0 : 1;

@@ -82,6 +82,10 @@ static CONFIG c[] = {
 	  "type of compression (none | bzip | lzo | raw | snappy)",
 	  0, C_IGNORE|C_STRING, 1, 5, NULL, &g.c_compression },
 
+	{ "data_extend",
+	  "if data files are extended",			/* 5% */
+	  0, C_BOOL, 5, 0, &g.c_data_extend, NULL },
+
 	{ "data_source",
 	  "type of data source to create (file | kvs | lsm | table)",
 	  0, C_IGNORE | C_STRING, 0, 0, NULL, &g.c_data_source },

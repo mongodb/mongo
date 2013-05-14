@@ -161,10 +161,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_filesize(session, fh, &fh->size));
 
 	/* Configure file extension. */
-	if (is_tree && FLD_ISSET(conn->file_extend, WT_FILE_TYPE_DATA)) {
-		fh->extend_size = fh->size;
-		fh->extend_len = conn->file_extend_len;
-	}
+	if (is_tree)
+		fh->extend_len = conn->data_extend_len;
 
 	/* Link onto the environment's list of files. */
 	__wt_spin_lock(session, &conn->fh_lock);

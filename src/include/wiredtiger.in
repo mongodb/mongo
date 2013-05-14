@@ -1357,16 +1357,11 @@ struct __wt_connection {
  * WT_CONNECTION::load_extension.  For example\,
  * <code>extensions=(/path/ext.so={entry=my_entry})</code>., a list of strings;
  * default empty.}
- * @config{file_extend = (, file extension configuration.  If set\, extend files
- * a chunk at a time instead instead of a block at a time as each new block is
- * written., a set of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, granularity (in bytes) for file
- * extension., an integer greater than or equal to 1MB; default \c 8MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, types of files to extend.  Options are
- * given as a list\, such as <code>"file_extend=(type=[data])"</code>., a list\,
- * with values chosen from the following options: \c "data"\, \c "log"; default
- * empty.}
- * @config{ ),,}
+ * @config{file_extend, file extension configuration.  If set\, extend files of
+ * the set type in allocations of the set size\, instead of a block at a time as
+ * each new block is written.  For example\,
+ * <code>file_extend=(data=16MB)</code>., a list\, with values chosen from the
+ * following options: \c "data"\, \c "log"; default empty.}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
  * @config{logging, enable logging., a boolean flag; default \c false.}
