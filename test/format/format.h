@@ -122,6 +122,7 @@ typedef struct {
 	u_int c_cache;
 	char *c_compression;
 	char *c_config_open;
+	u_int c_data_extend;
 	char *c_data_source;
 	u_int c_delete_pct;
 	u_int c_dictionary;

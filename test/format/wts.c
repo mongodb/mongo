@@ -75,13 +75,16 @@ wts_open(void)
 	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,sync=false,cache_size=%" PRIu32 "MB,"
+	    "create,"
+	    "sync=false,cache_size=%" PRIu32 "MB,"
 	    "error_prefix=\"%s\","
+	    "%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
+	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
 	    REVERSE_PATH,
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",

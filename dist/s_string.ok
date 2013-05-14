@@ -402,6 +402,7 @@ extern
 extlist
 extlists
 fadvise
+fallocate
 fblocks
 fclose
 fcntl

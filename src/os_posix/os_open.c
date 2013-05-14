@@ -114,12 +114,11 @@ __wt_open(WT_SESSION_IMPL *session,
 		mode = 0;
 
 #ifdef O_DIRECT
-	if (is_tree && FLD_ISSET(conn->direct_io, WT_DIRECTIO_DATA)) {
+	if (is_tree && FLD_ISSET(conn->direct_io, WT_FILE_TYPE_DATA)) {
 		f |= O_DIRECT;
 		direct_io = 1;
 	}
 #endif
-
 	WT_SYSCALL_RETRY(((fd = open(path, f, mode)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret,
@@ -160,6 +159,10 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(session, fh, &fh->size));
+
+	/* Configure file extension. */
+	if (is_tree)
+		fh->extend_len = conn->data_extend_len;
 
 	/* Link onto the environment's list of files. */
 	__wt_spin_lock(session, &conn->fh_lock);

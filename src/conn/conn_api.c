@@ -850,9 +850,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	static const struct {
 		const char *name;
 		uint32_t flag;
-	} *ft, directio_types[] = {
-		{ "data",	WT_DIRECTIO_DATA },
-		{ "log",	WT_DIRECTIO_LOG },
+	} *ft, file_types[] = {
+		{ "data",	WT_FILE_TYPE_DATA },
+		{ "log",	WT_FILE_TYPE_LOG },
 		{ NULL, 0 }
 	};
 	WT_CONFIG subconfig;
@@ -949,10 +949,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 #endif
 
 	/*
-	 * Configuration: direct_io, mmap, statistics.
+	 * Configuration: direct_io, file_extend, mmap, statistics.
 	 */
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
-	for (ft = directio_types; ft->name != NULL; ft++) {
+	for (ft = file_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
 		if (ret == 0) {
 			if (sval.val)
@@ -960,6 +960,23 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
+
+	WT_ERR(__wt_config_gets(session, cfg, "file_extend", &cval));
+	for (ft = file_types; ft->name != NULL; ft++) {
+		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
+		if (ret == 0) {
+			switch (ft->flag) {
+			case WT_FILE_TYPE_DATA:
+				conn->data_extend_len = sval.val;
+				break;
+			case WT_FILE_TYPE_LOG:
+				conn->log_extend_len = sval.val;
+				break;
+			}
+		} else if (ret != WT_NOTFOUND)
+			goto err;
+	}
+
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val == 0 ? 0 : 1;
 	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
