@@ -91,7 +91,7 @@ function f(variant, quickCommits, paranoid) {
 
 // Skip this test on 32-bit Windows (unfixable failures in MapViewOfFileEx)
 //
-if (_isWIndows() && getBuildInfo().bits == 32 ) {
+if (_isWindows() && getBuildInfo().bits == 32 ) {
     print("Skipping closeall.js on 32-bit Windows");
 }
 else {
