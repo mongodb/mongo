@@ -840,7 +840,7 @@ namespace ExtSortTests {
             virtual boost::shared_ptr<IWIterator> correctReverse() {
                 return make_shared<LimitIterator>(Limit, Parent::correctReverse());
             }
-            enum { MEM_LIMIT = 256*1024 };
+            enum { MEM_LIMIT = 512*1024 };
         };
     }
 
