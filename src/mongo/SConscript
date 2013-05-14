@@ -644,6 +644,27 @@ env.StaticLibrary("geoquery", [ "db/geo/geoquery.cpp", ],
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
 env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], LIBDEPS = ["geoparser"])
 
+env.StaticLibrary('range_deleter',
+                  [ 'db/range_deleter.cpp',
+                    'db/range_deleter_mock_env.cpp',
+                    'db/range_deleter_stats.cpp'
+                  ],
+                  LIBDEPS = [
+                      '$BUILD_DIR/mongo/s/base', # range_arithmetic.cpp
+                      'base/base',
+                      'bson',
+                      'synchronization'
+                  ])
+
+env.CppUnitTest('range_deleter_test',
+                [ 'db/range_deleter_test.cpp' ],
+                LIBDEPS = [ 'range_deleter' ]);
+
+env.CppUnitTest('range_deleter_stat_test',
+                [ 'db/range_deleter_stat_test.cpp' ],
+                LIBDEPS = [ 'range_deleter' ]);
+
+
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "db/auth/authmongod",
@@ -654,7 +675,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "geoparser",
                            "geoquery",
                            "index_set",
-                           '$BUILD_DIR/mongo/s/range_deleter',
+                           'range_deleter',
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.

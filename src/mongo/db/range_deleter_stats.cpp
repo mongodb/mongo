@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/s/range_deleter_stats.h"
+#include "mongo/db/range_deleter_stats.h"
 
 namespace mongo {
     const BSONField<int> RangeDeleterStats::TotalDeletesField("totalDeletes");

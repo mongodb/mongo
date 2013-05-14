@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "mongo/s/range_deleter.h"
+#include "mongo/db/range_deleter.h"
 
 namespace mongo {
 

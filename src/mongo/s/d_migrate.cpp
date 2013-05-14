@@ -57,7 +57,6 @@
 #include "mongo/s/config.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/field_parser.h"
-#include "mongo/s/range_deleter_stats.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/assert_util.h"

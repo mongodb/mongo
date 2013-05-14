@@ -14,13 +14,13 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/s/range_deleter.h"
+#include "mongo/db/range_deleter.h"
 
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <memory>
 
 #include "mongo/s/range_arithmetic.h"
-#include "mongo/s/range_deleter_stats.h"
+#include "mongo/db/range_deleter_stats.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"

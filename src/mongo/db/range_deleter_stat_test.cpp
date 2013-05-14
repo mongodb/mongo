@@ -19,9 +19,9 @@
 #include <string>
 
 #include "mongo/s/field_parser.h"
-#include "mongo/s/range_deleter.h"
-#include "mongo/s/range_deleter_mock_env.h"
-#include "mongo/s/range_deleter_stats.h"
+#include "mongo/db/range_deleter.h"
+#include "mongo/db/range_deleter_mock_env.h"
+#include "mongo/db/range_deleter_stats.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
