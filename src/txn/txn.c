@@ -168,9 +168,14 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
+	/*
+	 * The oldest active snapshot ID in the system should *not* be visible
+	 * to eviction.  Create a snapshot containing that ID.
+	 */
 	__wt_txn_get_oldest(session);
+	txn->snapshot[0] = txn->oldest_snap_min;
 	__txn_sort_snapshot(
-	    session, 0, txn->oldest_snap_min, txn->oldest_snap_min);
+	    session, 1, txn->oldest_snap_min, txn->oldest_snap_min);
 
 	/*
 	 * Note that we carefully don't update the global table with this
@@ -397,9 +402,7 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	txn->mod = NULL;
 	txn->modref = NULL;
 
-	/* The default isolation level is read-committed. */
-	txn->isolation = session->isolation = TXN_ISO_READ_COMMITTED;
-
+	txn->isolation = session->isolation;
 	return (0);
 }
 
