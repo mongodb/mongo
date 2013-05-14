@@ -54,6 +54,7 @@ namespace mongo {
          * e is $gt : 5
          */
         static StatusWithMatchExpression _parseSubField( const BSONObj& context,
+                                                         const AndMatchExpression* andSoFar,
                                                          const char* name,
                                                          const BSONElement& e,
                                                          int position,

@@ -44,6 +44,7 @@ namespace mongo {
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseSubField( const BSONObj& context,
+                                                                     const AndMatchExpression* andSoFar,
                                                                      const char* name,
                                                                      const BSONElement& e,
                                                                      int position,
@@ -159,14 +160,19 @@ namespace mongo {
         case BSONObj::opMOD:
             return _parseMOD( name, e );
 
-        case BSONObj::opOPTIONS:
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "$options has to be after a $regex" );
+        case BSONObj::opOPTIONS: {
+            for ( size_t i = 0; i < andSoFar->numChildren(); i++ ) {
+                if ( andSoFar->getChild( i )->matchType() == MatchExpression::REGEX )
+                    return StatusWithMatchExpression( NULL );
+            }
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "$options must follow a $regex" );
+        }
 
         case BSONObj::opREGEX: {
             if ( position != 0 )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$regex has to be first" );
 
-            *stop = true;
+            //*stop = true;
             return _parseRegexDocument( name, context );
         }
 
@@ -300,7 +306,7 @@ namespace mongo {
             BSONElement deep = j.next();
 
             bool stop = false;
-            StatusWithMatchExpression s = _parseSubField( sub, name, deep, position, &stop );
+            StatusWithMatchExpression s = _parseSubField( sub, root, name, deep, position, &stop );
             if ( !s.isOK() )
                 return s.getStatus();
 
@@ -381,9 +387,7 @@ namespace mongo {
                 regexOptions = e.String();
                 break;
             default:
-                return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                             mongoutils::str::stream()
-                                             << "bad $regex doc option: " << e.fieldName() );
+                break;
             }
 
         }
