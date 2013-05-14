@@ -137,12 +137,12 @@ __wt_txn_get_snapshot(
 		for (i = n = 0, s = txn_global->states;
 		    i < session_cnt;
 		    i++, s++) {
-			/* Ignore the session's own transaction. */
-			if (i == session->id)
-				continue;
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_snap_min))
 				oldest_snap_min = id;
+			/* Ignore the session's own transaction. */
+			if (i == session->id)
+				continue;
 			if ((id = s->id) != WT_TXN_NONE &&
 			    (max_id == WT_TXN_NONE || TXNID_LT(id, max_id)))
 				txn->snapshot[n++] = id;
