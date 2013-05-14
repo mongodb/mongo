@@ -3332,9 +3332,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 */
 			if (val_cell == NULL) {
 				val->buf.data = NULL;
-				val->buf.size = 0;
-				val->cell_len = 0;
-				val->len = val->buf.size;
+				val->cell_len = val->len = val->buf.size = 0;
 			} else if (unpack->raw == WT_CELL_VALUE_COPY) {
 				/* If the item is Huffman encoded, decode it. */
 				if (btree->huffman_value == NULL) {
@@ -3416,9 +3414,10 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * build the value's WT_CELL chunk from the most recent
 			 * update value.
 			 */
-			if (upd->size == 0)
+			if (upd->size == 0) {
+				val->buf.data = NULL;
 				val->cell_len = val->len = val->buf.size = 0;
-			else {
+			} else {
 				WT_ERR(__rec_cell_build_val(session, r,
 				    WT_UPDATE_DATA(upd), upd->size,
 				    (uint64_t)0));
