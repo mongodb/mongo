@@ -496,6 +496,7 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 static int
 __btree_warm_cache(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_BTREE *btree;
 	WT_BM *bm;
 	WT_PAGE *page;
@@ -503,7 +504,7 @@ __btree_warm_cache(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	bm = btree->bm;
 
-	if (bm->map == NULL || btree->compressor != NULL)
+	if (bm->map == NULL)
 		return (0);
 
 	/*
@@ -513,14 +514,12 @@ __btree_warm_cache(WT_SESSION_IMPL *session)
 	 * child, ending with the root.
 	 */
 	page = NULL;
-	WT_RET(__wt_tree_walk(session, &page, 0));
+	F_SET(session, WT_SESSION_PRELOAD_PAGES);
+	ret = __wt_tree_walk(session, &page, 0);
+	F_CLR(session, WT_SESSION_PRELOAD_PAGES);
+	WT_RET(ret);
 	if (page == NULL)
 		return (WT_NOTFOUND);
-
-	if (page->parent->dsk < btree->root_page->dsk)
-		WT_RET(__wt_mmap_preload(
-		    session, page->parent->dsk,
-		    WT_PTRDIFF(btree->root_page->dsk, page->parent->dsk)));
 
 	return (__wt_page_release(session, page));
 }

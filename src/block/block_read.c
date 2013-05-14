@@ -16,9 +16,10 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
     WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
-	off_t offset;
-	uint32_t size, cksum;
 	int mapped;
+	off_t offset;
+	uint32_t cksum, size;
+	size_t preload_size;
 
 	WT_UNUSED(addr_size);
 	block = bm->block;
@@ -49,7 +50,9 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		buf->size = size;
 		F_SET(buf, WT_ITEM_MAPPED);
 
-		WT_RET(__wt_mmap_preload(session, buf->mem, buf->size));
+		preload_size = F_ISSET(session, WT_SESSION_PRELOAD_PAGES) ?
+		    bm->maplen - offset : buf->size;
+		WT_RET(__wt_mmap_preload(session, buf->mem, preload_size));
 
 		WT_CSTAT_INCR(session, block_map_read);
 		WT_CSTAT_INCRV(session, block_byte_map_read, size);
