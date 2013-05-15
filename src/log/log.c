@@ -15,17 +15,20 @@ __log_record_size(WT_SESSION_IMPL *session,
 }
 
 int
-__wt_log_file_name(WT_SESSION_IMPL *session, WT_LOG *log, WT_ITEM *buf)
+__wt_log_filename(WT_SESSION_IMPL *session, WT_LOG *log, WT_ITEM *buf)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_ITEM path;
 
 	conn = S2C(session);
-	WT_ERR(__wt_buf_init(session, &path,
+	WT_RET(__wt_buf_initsize(session, buf,
 	    strlen(conn->log_path) + ENTRY_SIZE));
-	WT_RET(__wt_buf_fmt(session, buf, "log:%s.%10" PRIu32,
-	    conn->log_path, WT_ATOMIC_ADD(log->fileid, 1)));
+	WT_ERR(__wt_buf_fmt(session, buf, "%s/%s.%10" PRIu32,
+	    conn->log_path, WT_LOG_FILENAME, log->fileid));
+	return (0);
+
+err:	__wt_buf_free(session, buf);
+	return (ret);
 }
 
 #ifdef	NOTDEF
@@ -64,7 +67,7 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	conn = S2C(session);
 
-	if (conn->log_fh == NULL)
+	if (!conn->logging)
 		return (0);
 
 	buf = &session->logprint_buf;
@@ -81,15 +84,17 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	 * For now, just dump the text into the file.  Later, we will use
 	 * __wt_logput_debug to wrap this in a log header.
 	 */
-#if 1
+#if 0
 	strcpy((char *)buf->mem + len - 2, "\n");
 	return ((write(conn->log_fh->fd, buf->mem, len - 1) ==
 	    (ssize_t)len - 1) ? 0 : WT_ERROR);
-#else
 	return (__wt_logput_debug(session, (char *)buf->mem));
 #endif
+	WT_VERBOSE_RET(session, log, "log record: %s\n", (char *)buf->mem);
+	return (0);
 }
 
+#if 0
 int
 __wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
@@ -103,69 +108,138 @@ __wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
 
 	return (ret);
 }
+#endif
 
+/*
+ * __wt_log_open --
+ *	Open the log file.
+ */
 int
 __wt_log_open(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
 	WT_CONNECTION_IMPL *conn;
-	WT_ITEM path;
+	WT_DECL_ITEM(path);
+	WT_DECL_RET;
 	WT_LOG *log;
-	char
 
 	conn = S2C(session);
 	log = conn->log;
-	/*
-	 * Create name.
-	 * Open last log file.
-	 */
-	WT_RET(__wt_open());
+	WT_RET(__wt_scr_alloc(session, 0, &path));
+	WT_ERR(__wt_log_filename(session, log, path));
+	WT_VERBOSE_ERR(session, log, "opening log %s",
+	    (const char *)path->data);
+	WT_ERR(__wt_open(session, path->data, 1, 0, 0, &log->log_fh));
+err:	__wt_scr_free(&path);
+	return (ret);
 }
 
+/*
+ * __wt_log_close --
+ *	Close the log file.
+ */
 int
 __wt_log_close(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 
 	conn = S2C(session);
 	log = conn->log;
 	/*
-	 * Close fh
+	 * If we don't have a log open, there's nothing to do.
 	 */
+	if (log->log_fh == NULL)
+		return (0);
+	WT_VERBOSE_RET(session, log, "closing log %s", log->log_fh->name);
+	WT_RET(__wt_close(session, log->log_fh));
+	log->log_fh = NULL;
+	return (0);
 }
 
 static int
-__log_acquire()
+__log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t size)
 {
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+	return (lsn->offset + size < conn->log_file_max);
+
+}
+
+static int
+__log_newfile(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	/*
+	 * Set aside the log file handle to be closed later.  Other threads
+	 * may still be using it to write to the log.
+	 */
+	log->log_close_fh = log->log_fh;
+	log->fileid++;
+	WT_RET(__wt_log_open(session));
+	/*
+	xxx - need to write log file header record then update lsns.
+	*/
+
+	return (0);
+}
+
+static int
+__log_acquire(WT_SESSION_IMPL *session, uint32_t size, WT_LOGSLOT *slot)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LSN *base_lsn, *tmp_lsn;
+
+	conn = S2C(session);
+	log = conn->log;
 	/*
 	 * Called locked.  Add size to alloc_lsn.  Update some lsns.
 	 * Return base lsn.
 	 */
+	if (!__log_size_fit(session, log->alloc_lsn, size)) {
+		FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
+		base_lsn = __log_newfile(session);
+	}
+	slot->slot_lsn = log->alloc_lsn;
+	log->alloc_lsn->offset += size;
+	slot->slot_fh = log->log_fh;
+	return (0);
+
 }
 
 static int
-__log_fill()
+__log_fill(WT_SESSION_IMPL *session, WT_ITEM *record)
 {
 	/*
 	 * Call __wt_write.
 	 */
+	return (0);
 }
 
 static int
-__log_release()
+__log_release(WT_SESSION_IMPL *session, uint32_t size, WT_LOGSLOT *slot)
 {
 	/*
 	 * Take flags.  While current write lsn != my end lsn wait my turn.
 	 * Set my lsn.  If sync, call __wt_fsync.  Update lsns.
+	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC))
 	 */
+
+	return (0);
 }
 
 int
 __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
+	return (0);
 }
 
 int
@@ -173,6 +247,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_ITEM *record, uint32_t flags,
     int (*func)(WT_SESSION_IMPL *session, WT_ITEM *record, void *cookie),
     void *cookie)
 {
+	return (0);
 }
 
 int
@@ -186,8 +261,9 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * else wait for slot leader
 	 * fill
 	 * if my_release is last one
-	 * else if I'm sync, wait 
+	 * else if I'm sync, wait
 	 * release buffer
 	 * free slot
 	 */
+	return (0);
 }

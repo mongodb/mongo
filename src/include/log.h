@@ -68,10 +68,11 @@ typedef struct {
 			WT_FH	*fh;		/* File handle for this group */
 #undef	slot_cond
 #define	slot_cond		u.slot.cond
-			WT_CONDVAR	*cond;	/* File handle for this group */
+			WT_CONDVAR	*cond;	/* condvar for this group */
 #undef	slot_flags
 #define	slot_flags		u.slot.flags
-#define	SLOT_SYNC	0x01
+#define	SLOT_CLOSEFH	0x01			/* Close old fh on release */
+#define	SLOT_SYNC	0x02			/* Needs sync on release */
 			uint32_t flags;		/* Flags */
 		} slot;
 		uint8_t align[128];
@@ -81,11 +82,12 @@ typedef struct {
 typedef struct {
 	WT_LOGSLOT	*slot;
 	off_t		 offset;
-}; WT_MYSLOT;
+} WT_MYSLOT;
 
 typedef struct {
 	uint32_t	 fileid;	/* Current log file number */
-	WT_FH           *log_fh;        /* Logging file handle */
+	WT_FH           *log_fh;	/* Logging file handle */
+	WT_FH           *log_close_fh;	/* Logging file handle to close */
 
 	/*
 	 * System LSNs

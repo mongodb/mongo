@@ -571,15 +571,15 @@ methods = {
 		maximum number of simultaneous hazard pointers per session
 		handle''',
 		min='15'),
-	Config('log', 'false', r'''
+	Config('log', '', r'''
 		enable logging''',
 		type='category', subconfig=[
 		Config('archive', 'true"', r'''
 		automatically archive unneeded log files''',
                 type='boolean'),
-		Config('file_max', '100MB', r'''
-		maximum log file size''',
-		min='1MB', max='512GB'),
+		Config('enabled', 'true"', r'''
+		enable logging subsystem''',
+                type='boolean'),
 		Config('path', '"WiredTigerLog"', r'''
 		the pathname to a file into which the log records are written.
                 It will have log numbers appended to it the file name.  If the

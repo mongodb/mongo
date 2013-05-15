@@ -77,9 +77,6 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	if (conn->lock_fh != NULL)
 		WT_TRET(__wt_close(session, conn->lock_fh));
 
-	if (conn->log_fh != NULL)
-		WT_TRET(__wt_close(session, conn->log_fh));
-
 	/* Remove from the list of connections. */
 	__wt_spin_lock(session, &__wt_process.spinlock);
 	TAILQ_REMOVE(&__wt_process.connqh, conn, q);

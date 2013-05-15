@@ -59,6 +59,7 @@ src/conn/conn_cache.c
 src/conn/conn_cache_pool.c
 src/conn/conn_ckpt.c
 src/conn/conn_handle.c
+src/conn/conn_log.c
 src/conn/conn_open.c
 src/conn/conn_stat.c
 src/cursor/cur_backup.c
@@ -73,6 +74,7 @@ src/cursor/cur_std.c
 src/cursor/cur_table.c
 src/log/log.c
 src/log/log_desc.c
+src/log/log_slot.c
 src/lsm/lsm_cursor.c
 src/lsm/lsm_merge.c
 src/lsm/lsm_meta.c

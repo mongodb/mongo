@@ -828,6 +828,19 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
+	 * Print something to the log file
+	 *
+	 * The database must be configured for logging when this
+	 * method is called.
+	 *
+	 * @param session the session handle
+	 * @param session the session handle
+	 * @configempty{session.log_printf, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
+
+	/*!
 	 * Rename an object.
 	 *
 	 * @snippet ex_all.c Rename a table
@@ -1367,12 +1380,13 @@ struct __wt_connection {
  * defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
  * archive unneeded log files., a boolean flag; default \c true".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, maximum log file size., an integer
- * between 1MB and 512GB; default \c 100MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into which the
- * log records are written.  It will have log numbers appended to it the file
- * name.  If the value is not an absolute path name\, the file is created
- * relative to the database home., a string; default \c "WiredTigerLog".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a boolean
+ * flag; default \c true".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname
+ * to a file into which the log records are written.  It will have log numbers
+ * appended to it the file name.  If the value is not an absolute path name\,
+ * the file is created relative to the database home., a string; default \c
+ * "WiredTigerLog".}
  * @config{ ),,}
  * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
  * \c true.}

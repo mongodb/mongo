@@ -53,7 +53,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	conn->cache_evict_tid_set = 1;
 
 	/* Start the optional checkpoint thread. */
-	WT_RET(__wt_log_create(conn, cfg));
+	WT_RET(__wt_logger_create(conn, cfg));
 
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_checkpoint_create(conn, cfg));
@@ -90,7 +90,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * exit before files are closed.
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
-	WT_TRET(__wt_log_destroy(conn));
+	WT_TRET(__wt_logger_destroy(conn));
 	WT_TRET(__wt_checkpoint_destroy(conn));
 	WT_TRET(__wt_statlog_destroy(conn));
 
@@ -113,11 +113,15 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_conn_remove_data_source(conn, ndsrc));
 
 	/*
-	 * Complain if files weren't closed (ignoring the lock and logging
+	 * Complain if files weren't closed, ignoring the lock and logging
 	 * files, we'll close them in a minute.
 	 */
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
+#if 0
 		if (fh == conn->lock_fh || fh == conn->log_fh)
+#else
+		if (fh == conn->lock_fh)
+#endif
 			continue;
 
 		__wt_errx(session,

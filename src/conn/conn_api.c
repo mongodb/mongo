@@ -798,6 +798,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "evictserver",WT_VERB_evictserver },
 		{ "fileops",	WT_VERB_fileops },
 		{ "hazard",	WT_VERB_hazard },
+		{ "log",	WT_VERB_log },
 		{ "lsm",	WT_VERB_lsm },
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
@@ -931,10 +932,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 
+#if 0
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
 		WT_ERR(__wt_open(
 		   session, WT_LOG_FILENAME, 1, 0, 0, &conn->log_fh));
+#endif
 
 	/* Configure direct I/O and buffer alignment. */
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
