@@ -61,7 +61,7 @@ namespace ExpressionTests {
     /** Create a Value from a BSONObj. */
     Value valueFromBson( BSONObj obj ) {
         BSONElement element = obj.firstElement();
-        return Value::createFromBsonElement( &element );
+        return Value( element );
     }
     
     namespace Add {
@@ -85,7 +85,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<ExpressionNary> expression = ExpressionAdd::create();
-                expression->addOperand( ExpressionConstant::create( Value::createInt( 2 ) ) );
+                expression->addOperand( ExpressionConstant::create( Value( 2 ) ) );
                 ASSERT_EQUALS( BSON( "" << 2 ), toBson( expression->evaluate( Document() ) ) );
             }
         };
@@ -101,7 +101,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<ExpressionNary> expression = ExpressionAdd::create();
-                expression->addOperand( ExpressionConstant::create( Value::createString( "a" ) ) );
+                expression->addOperand( ExpressionConstant::create( Value( "a" ) ) );
                 ASSERT_THROWS( expression->evaluate( Document() ), UserException );
             }
         };
@@ -458,7 +458,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> nested =
-                        ExpressionConstant::create( Value::createInt( 5 ) );
+                        ExpressionConstant::create( Value( 5 ) );
                 intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create( nested );
                 ASSERT( expression->evaluate( Document() ).getBool() );
             }
@@ -469,7 +469,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> nested =
-                        ExpressionConstant::create( Value::createInt( 0 ) );
+                        ExpressionConstant::create( Value( 0 ) );
                 intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create( nested );
                 ASSERT( !expression->evaluate( Document() ).getBool() );
             }
@@ -853,7 +853,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression =
-                        ExpressionConstant::create( Value::createInt( 5 ) );
+                        ExpressionConstant::create( Value( 5 ) );
                 assertBinaryEqual( BSON( "" << 5 ),
                                    toBson( expression->evaluate( Document() ) ) );
             }
@@ -877,7 +877,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression =
-                        ExpressionConstant::create( Value::createInt( 5 ) );
+                        ExpressionConstant::create( Value( 5 ) );
                 // An attempt to optimize returns the Expression itself.
                 ASSERT_EQUALS( expression, expression->optimize() );
             }
@@ -888,7 +888,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression =
-                        ExpressionConstant::create( Value::createInt( 5 ) );
+                        ExpressionConstant::create( Value( 5 ) );
                 set<string> dependencies;
                 expression->addDependencies( dependencies );
                 ASSERT_EQUALS( 0U, dependencies.size() );
@@ -900,7 +900,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression =
-                        ExpressionConstant::create( Value::createInt( 5 ) );
+                        ExpressionConstant::create( Value( 5 ) );
                 // The constant is copied out as is.
                 assertBinaryEqual( BSON( "field" << 5 ), toBsonObj( expression, false ) );
                 // The constant is replaced with a $ expression.
@@ -921,7 +921,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression =
-                        ExpressionConstant::create( Value::createInt( 5 ) );
+                        ExpressionConstant::create( Value( 5 ) );
                 // The constant is copied out as is.
                 assertBinaryEqual( BSON_ARRAY( 5 ), toBsonArray( expression ) );
             }
@@ -1351,7 +1351,7 @@ namespace ExpressionTests {
                      ++i ) {
                     values.push_back( (*i)->evaluate( pDocument ) );
                 }
-                return Value::createArray( values );
+                return Value( values );
             }
             virtual const char* getOpName() const { return "$testable"; }
             virtual intrusive_ptr<ExpressionNary> (*getFactory() const)() {
@@ -1394,7 +1394,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Testable> testable = Testable::create();
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 9 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 9 ) ) );
                 testable->assertContents( BSON_ARRAY( 9 ) );
                 testable->addOperand( ExpressionFieldPath::create( "ab.c" ) );
                 testable->assertContents( BSON_ARRAY( 9 << "$ab.c" ) );
@@ -1411,12 +1411,12 @@ namespace ExpressionTests {
                 testable->checkArgLimit( 1 ); // No assertion.
 
                 // One argument.
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 1 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 1 ) ) );
                 ASSERT_THROWS( testable->checkArgLimit( 1 ), UserException );
                 testable->checkArgLimit( 2 ); // No assertion.
 
                 // Two arguments.
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 2 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 2 ) ) );
                 ASSERT_THROWS( testable->checkArgLimit( 1 ), UserException );
                 ASSERT_THROWS( testable->checkArgLimit( 2 ), UserException );
                 testable->checkArgLimit( 3 ); // No assertion.                
@@ -1434,13 +1434,13 @@ namespace ExpressionTests {
                 ASSERT_THROWS( testable->checkArgCount( 1 ), UserException );
                 
                 // One argument.
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 1 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 1 ) ) );
                 ASSERT_THROWS( testable->checkArgCount( 0 ), UserException );
                 testable->checkArgCount( 1 ); // No assertion.
                 ASSERT_THROWS( testable->checkArgCount( 2 ), UserException );
                 
                 // Two arguments.
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 2 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 2 ) ) );
                 ASSERT_THROWS( testable->checkArgCount( 1 ), UserException );
                 testable->checkArgCount( 2 ); // No assertion.                
                 ASSERT_THROWS( testable->checkArgCount( 3 ), UserException );
@@ -1457,7 +1457,7 @@ namespace ExpressionTests {
                 assertDependencies( BSONArray(), testable );
 
                 // Add a constant argument.
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 1 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 1 ) ) );
                 assertDependencies( BSONArray(), testable );
 
                 // Add a field path argument.
@@ -1490,7 +1490,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Testable> testable = Testable::create();
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 5 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 5 ) ) );
                 // requireExpression == false
                 {
                     BSONObjBuilder bob;
@@ -1514,7 +1514,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Testable> testable = Testable::create();
-                testable->addOperand( ExpressionConstant::create( Value::createInt( 5 ) ) );
+                testable->addOperand( ExpressionConstant::create( Value( 5 ) ) );
                 BSONArrayBuilder bab;
                 testable->addToBsonArray( &bab );
                 ASSERT_EQUALS( BSON_ARRAY( BSON( "$testable" << BSON_ARRAY( 5 ) ) ), bab.arr() );
@@ -1885,7 +1885,7 @@ namespace ExpressionTests {
             }
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a" ),
-                                        ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                        ExpressionConstant::create( Value( 5 ) ) );
             }
             BSONObj expected() { return BSON( "_id" << 0 << "a" << 5 ); }
             BSONArray expectedDependencies() { return BSON_ARRAY( "_id" ); }
@@ -1951,7 +1951,7 @@ namespace ExpressionTests {
             virtual BSONObj source() { return BSON( "_id" << 0 ); }
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a.b" ),
-                                        ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                        ExpressionConstant::create( Value( 5 ) ) );
             }
             BSONObj expected() { return BSON( "_id" << 0 << "a" << BSON( "b" << 5 ) ); }
             BSONArray expectedDependencies() { return BSON_ARRAY( "_id" ); }
@@ -2020,7 +2020,7 @@ namespace ExpressionTests {
                 // Create a sub expression returning an empty object.
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 subExpression->addField( mongo::FieldPath( "b" ),
-                                         ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                         ExpressionConstant::create( Value( 6 ) ) );
                 expression()->addField( mongo::FieldPath( "a" ), subExpression );
             }
             BSONObj expected() { return BSON( "_id" << 0 << "a" << BSON( "b" << 6 ) ); }
@@ -2039,9 +2039,9 @@ namespace ExpressionTests {
             }
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a.b" ),
-                                        ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                        ExpressionConstant::create( Value( 6 ) ) );
                 expression()->addField( mongo::FieldPath( "a.c" ),
-                                        ExpressionConstant::create( Value::createInt( 7 ) ) );
+                                        ExpressionConstant::create( Value( 7 ) ) );
             }
             BSONObj expected() { return BSON( "_id" << 0 << "a" << BSON( "b" << 6 << "c" << 7 ) ); }
             BSONArray expectedDependencies() { return BSON_ARRAY( "_id" ); }
@@ -2055,10 +2055,10 @@ namespace ExpressionTests {
         class AdjacentDottedAndNestedComputedFields : public AdjacentDottedComputedFields {
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a.b" ),
-                                        ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                        ExpressionConstant::create( Value( 6 ) ) );
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 subExpression->addField( mongo::FieldPath( "c" ),
-                                         ExpressionConstant::create( Value::createInt( 7 ) ) );
+                                         ExpressionConstant::create( Value( 7 ) ) );
                 expression()->addField( mongo::FieldPath( "a" ), subExpression );
             }
         };
@@ -2068,10 +2068,10 @@ namespace ExpressionTests {
             void prepareExpression() {
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 subExpression->addField( mongo::FieldPath( "b" ),
-                                         ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                         ExpressionConstant::create( Value( 6 ) ) );
                 expression()->addField( mongo::FieldPath( "a" ), subExpression );
                 expression()->addField( mongo::FieldPath( "a.c" ),
-                                        ExpressionConstant::create( Value::createInt( 7 ) ) );
+                                        ExpressionConstant::create( Value( 7 ) ) );
             }
         };
 
@@ -2080,12 +2080,12 @@ namespace ExpressionTests {
             void prepareExpression() {
                 intrusive_ptr<ExpressionObject> firstSubExpression = ExpressionObject::create();
                 firstSubExpression->addField( mongo::FieldPath( "b" ),
-                                              ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                              ExpressionConstant::create( Value( 6 ) ) );
                 expression()->addField( mongo::FieldPath( "a" ), firstSubExpression );
                 intrusive_ptr<ExpressionObject> secondSubExpression = ExpressionObject::create();
                 secondSubExpression->addField( mongo::FieldPath( "c" ),
                                                ExpressionConstant::create
-                                                ( Value::createInt( 7 ) ) );
+                                                ( Value( 7 ) ) );
                 expression()->addField( mongo::FieldPath( "a" ), secondSubExpression );
             }            
         };
@@ -2098,13 +2098,13 @@ namespace ExpressionTests {
             }
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a.b" ),
-                                        ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                        ExpressionConstant::create( Value( 6 ) ) );
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 // Add field 'd' then 'c'.  Expect the same field ordering in the result doc.
                 subExpression->addField( mongo::FieldPath( "d" ),
-                                         ExpressionConstant::create( Value::createInt( 7 ) ) );
+                                         ExpressionConstant::create( Value( 7 ) ) );
                 subExpression->addField( mongo::FieldPath( "c" ),
-                                         ExpressionConstant::create( Value::createInt( 8 ) ) );
+                                         ExpressionConstant::create( Value( 8 ) ) );
                 expression()->addField( mongo::FieldPath( "a" ), subExpression );
             }
             BSONObj expected() {
@@ -2125,10 +2125,10 @@ namespace ExpressionTests {
             }
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a.b.c" ),
-                                        ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                        ExpressionConstant::create( Value( 6 ) ) );
                 intrusive_ptr<ExpressionObject> bSubExpression = ExpressionObject::create();
                 bSubExpression->addField( mongo::FieldPath( "d" ),
-                                          ExpressionConstant::create( Value::createInt( 7 ) ) );
+                                          ExpressionConstant::create( Value( 7 ) ) );
                 intrusive_ptr<ExpressionObject> aSubExpression = ExpressionObject::create();
                 aSubExpression->addField( mongo::FieldPath( "b" ), bSubExpression );
                 expression()->addField( mongo::FieldPath( "a" ), aSubExpression );
@@ -2149,10 +2149,10 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a" ), // Duplicate field.
                                                      ExpressionConstant::create
-                                                      ( Value::createInt( 6 ) ) ),
+                                                      ( Value( 6 ) ) ),
                                UserException );
             }
         };        
@@ -2165,7 +2165,7 @@ namespace ExpressionTests {
                 expression->includePath( "a" );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a" ),
                                                      ExpressionConstant::create
-                                                      ( Value::createInt( 6 ) ) ),
+                                                      ( Value( 6 ) ) ),
                                UserException );
             }
         };        
@@ -2176,7 +2176,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_THROWS( expression->includePath( "a" ),
                                UserException );
             }
@@ -2192,7 +2192,7 @@ namespace ExpressionTests {
                 expression->addField( mongo::FieldPath( "a" ), subExpression );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a.b" ),
                                                      ExpressionConstant::create
-                                                      ( Value::createInt( 6 ) ) ),
+                                                      ( Value( 6 ) ) ),
                                UserException );
             }
         };        
@@ -2203,7 +2203,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a.b" ),
-                                      ExpressionConstant::create( Value::createInt( 6 ) ) );
+                                      ExpressionConstant::create( Value( 6 ) ) );
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 subExpression->includePath( "b" );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a" ), subExpression ),
@@ -2217,10 +2217,10 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a.b" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a.b" ), // Duplicate field.
                                                      ExpressionConstant::create
-                                                      ( Value::createInt( 6 ) ) ),
+                                                      ( Value( 6 ) ) ),
                                UserException );
             }
         };        
@@ -2231,10 +2231,10 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a.b" ),
                                                      ExpressionConstant::create
-                                                      ( Value::createInt( 5 ) ) ),
+                                                      ( Value( 5 ) ) ),
                                UserException );
             }
         };
@@ -2245,10 +2245,10 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 subExpression->addField( mongo::FieldPath( "b" ),
-                                         ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                         ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a" ), subExpression ),
                                UserException );
             }
@@ -2260,10 +2260,10 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a.b" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a" ),
                                                      ExpressionConstant::create
-                                                      ( Value::createInt( 5 ) ) ),
+                                                      ( Value( 5 ) ) ),
                                UserException );
             }
         };
@@ -2275,11 +2275,11 @@ namespace ExpressionTests {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 subExpression->addField( mongo::FieldPath( "b" ),
-                                         ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                         ExpressionConstant::create( Value( 5 ) ) );
                 expression->addField( mongo::FieldPath( "a" ), subExpression );
                 ASSERT_THROWS( expression->addField( mongo::FieldPath( "a" ),
                                                      ExpressionConstant::create
-                                                      ( Value::createInt( 5 ) ) ),
+                                                      ( Value( 5 ) ) ),
                                UserException );
             }
         };
@@ -2290,7 +2290,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 assertDependencies( BSON_ARRAY( "_id" ), expression, true );
                 assertDependencies( BSONArray(), expression, false );
                 expression->addField( mongo::FieldPath( "b" ),
@@ -2336,7 +2336,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 BSONObjBuilder bob;
                 expression->addToBsonObj( &bob, "foo", false );
                 ASSERT_EQUALS( BSON( "foo" << BSON( "a" << 5 ) ), bob.obj() );
@@ -2349,7 +2349,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 BSONObjBuilder bob;
                 expression->addToBsonObj( &bob, "foo", true );
                 ASSERT_EQUALS( BSON( "foo" << BSON( "a" << BSON( "$const" << 5 ) ) ), bob.obj() );
@@ -2362,7 +2362,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 BSONArrayBuilder bab;
                 expression->addToBsonArray( &bab );
                 ASSERT_EQUALS( BSON_ARRAY( BSON( "a" << 5 ) ), bab.arr() );
@@ -2380,7 +2380,7 @@ namespace ExpressionTests {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->includePath( "a" );
                 expression->addField( mongo::FieldPath( "b" ),
-                                      ExpressionConstant::create( Value::createInt( 5 ) ) );
+                                      ExpressionConstant::create( Value( 5 ) ) );
                 expression->addField( mongo::FieldPath( "c" ),
                                       ExpressionFieldPath::create( "a" ) );
                 ASSERT_EQUALS( BSON( "b" << 5 << "c" << 1 ),

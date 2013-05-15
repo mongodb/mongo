@@ -47,7 +47,7 @@ namespace mongo {
     }
 
     Value AccumulatorPush::getValue() const {
-        return Value::createArray(vpValue);
+        return Value(vpValue);
     }
 
     AccumulatorPush::AccumulatorPush(

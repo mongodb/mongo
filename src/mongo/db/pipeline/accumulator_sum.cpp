@@ -59,10 +59,10 @@ namespace mongo {
 
     Value AccumulatorSum::getValue() const {
         if (totalType == NumberLong) {
-            return Value::createLong(longTotal);
+            return Value(longTotal);
         }
         else if (totalType == NumberDouble) {
-            return Value::createDouble(doubleTotal);
+            return Value(doubleTotal);
         }
         else if (totalType == NumberInt) {
             return Value::createIntOrLong(longTotal);

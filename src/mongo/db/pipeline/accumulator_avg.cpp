@@ -63,14 +63,14 @@ namespace mongo {
             if (count)
                 avg = doubleTotal / static_cast<double>(count);
 
-            return Value::createDouble(avg);
+            return Value(avg);
         }
 
         MutableDocument out;
-        out.addField(subTotalName, Value::createDouble(doubleTotal));
-        out.addField(countName, Value::createLong(count));
+        out.addField(subTotalName, Value(doubleTotal));
+        out.addField(countName, Value(count));
 
-        return Value::createDocument(out.freeze());
+        return Value(out.freeze());
     }
 
     AccumulatorAvg::AccumulatorAvg(

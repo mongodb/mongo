@@ -123,10 +123,6 @@ namespace mongo {
     }
 
 
-    Value Value::createFromBsonElement(const BSONElement* pBsonElement) {
-        return Value(*pBsonElement);
-    }
-
     Value::Value(const BSONElement& elem) : _storage(elem.type()) {
         switch(elem.type()) {
         // These are all type-only, no data
@@ -212,21 +208,15 @@ namespace mongo {
         }
     }
 
-    Value Value::createIntOrLong(long long value) {
-        if (value > numeric_limits<int>::max() || value < numeric_limits<int>::min()) {
+    Value Value::createIntOrLong(long long longValue) {
+        int intValue = longValue;
+        if (intValue != longValue) {
             // it is too large to be an int and should remain a long
-            return Value(value);
+            return Value(longValue);
         }
 
         // should be an int since all arguments were int and it fits
-        return createInt(value);
-    }
-
-    Value Value::createDate(const long long value) {
-        // Can't directly construct because constructor would clash with createLong
-        Value val (Date);
-        val._storage.dateValue = value;
-        return val;
+        return Value(intValue);
     }
 
     double Value::getDouble() const {

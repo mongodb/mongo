@@ -224,17 +224,6 @@ namespace mongo {
         /// Call this after memcpying to update ref counts if needed
         void memcpyed() const { _storage.memcpyed(); }
 
-        // LEGACY creation functions
-        static Value createFromBsonElement(const BSONElement* pBsonElement);
-        static Value createInt(int value) { return Value(value); }
-        static Value createLong(long long value) { return Value(value); }
-        static Value createDouble(double value) { return Value(value); }
-        static Value createTimestamp(const OpTime& value) { return Value(value); }
-        static Value createString(const string& value) { return Value(value); }
-        static Value createDocument(const Document& doc) { return Value(doc); }
-        static Value createArray(const vector<Value>& vec) { return Value(vec); }
-        static Value createDate(const long long value);
-
     private:
         /** This is a "honeypot" to prevent unexpected implicit conversions to the accepted argument
          *  types. bool is especially bad since without this it will accept any pointer.

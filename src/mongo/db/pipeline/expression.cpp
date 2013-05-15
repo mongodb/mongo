@@ -373,13 +373,13 @@ namespace mongo {
         if (haveDate) {
             if (totalType == NumberDouble)
                 longTotal = static_cast<long long>(doubleTotal);
-            return Value::createDate(longTotal);
+            return Value(Date_t(longTotal));
         }
         else if (totalType == NumberLong) {
-            return Value::createLong(longTotal);
+            return Value(longTotal);
         }
         else if (totalType == NumberDouble) {
-            return Value::createDouble(doubleTotal);
+            return Value(doubleTotal);
         }
         else if (totalType == NumberInt) {
             return Value::createIntOrLong(longTotal);
@@ -751,7 +751,7 @@ namespace mongo {
             result << val.coerceToString();
         }
 
-        return Value::createString(result.str());
+        return Value(result.str());
     }
 
     const char *ExpressionConcat::getOpName() const {
@@ -802,7 +802,7 @@ namespace mongo {
     }
 
     ExpressionConstant::ExpressionConstant(BSONElement *pBsonElement):
-        pValue(Value::createFromBsonElement(pBsonElement)) {
+        pValue(Value(*pBsonElement)) {
     }
 
     intrusive_ptr<ExpressionConstant> ExpressionConstant::create(const Value& pValue) {
@@ -897,7 +897,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_mday); 
+        return Value(date.tm_mday);
     }
 
     const char *ExpressionDayOfMonth::getOpName() const {
@@ -927,7 +927,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
+        return Value(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
     }
 
     const char *ExpressionDayOfWeek::getOpName() const {
@@ -957,7 +957,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
+        return Value(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
     }
 
     const char *ExpressionDayOfYear::getOpName() const {
@@ -995,7 +995,7 @@ namespace mongo {
             uassert(16608, "can't $divide by zero",
                     denom != 0);
 
-            return Value::createDouble(numer / denom);
+            return Value(numer / denom);
         }
         else if (lhs.nullish() || rhs.nullish()) {
             return Value(BSONNULL);
@@ -1227,7 +1227,7 @@ namespace mongo {
     }
 
     Value ExpressionObject::evaluate(const Document& pDocument) const {
-        return Value::createDocument(evaluateDocument(pDocument));
+        return Value(evaluateDocument(pDocument));
     }
 
     void ExpressionObject::addField(const FieldPath &fieldPath,
@@ -1365,7 +1365,7 @@ namespace mongo {
                 result.push_back(nested);
         }
 
-        return Value::createArray(result);
+        return Value(result);
     }
     Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) const {
         // Note this function is very hot so it is important that is is well optimized.
@@ -1741,7 +1741,8 @@ namespace mongo {
         checkArgCount(1);
         Value date(vpOperand[0]->evaluate(document));
         const int ms = date.coerceToDate() % 1000LL;
-        return Value::createInt( ms >= 0 ? ms : 1000 + ms );
+        // adding 1000 since dates before 1970 would have negative ms
+        return Value(ms >= 0 ? ms : 1000 + ms);
     }
 
     const char *ExpressionMillisecond::getOpName() const {
@@ -1772,7 +1773,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_min);
+        return Value(date.tm_min);
     }
 
     const char *ExpressionMinute::getOpName() const {
@@ -1821,19 +1822,19 @@ namespace mongo {
                 // Integer-valued double case is handled below
 
                 double left = lhs.coerceToDouble();
-                return Value::createDouble(fmod(left, right));
+                return Value(fmod(left, right));
             }
             else if (leftType == NumberLong || rightType == NumberLong) {
                 // if either is long, return long
                 long long left = lhs.coerceToLong();
                 long long rightLong = rhs.coerceToLong();
-                return Value::createLong(left % rightLong);
+                return Value(left % rightLong);
             }
 
             // lastly they must both be ints, return int
             int left = lhs.coerceToInt();
             int rightInt = rhs.coerceToInt();
-            return Value::createInt(left % rightInt);
+            return Value(left % rightInt);
         }
         else if (lhs.nullish() || rhs.nullish()) {
             return Value(BSONNULL);
@@ -1873,7 +1874,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
+        return Value(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
     }
 
     const char *ExpressionMonth::getOpName() const {
@@ -1925,9 +1926,9 @@ namespace mongo {
         }
 
         if (productType == NumberDouble)
-            return Value::createDouble(doubleProduct);
+            return Value(doubleProduct);
         else if (productType == NumberLong)
-            return Value::createLong(longProduct);
+            return Value(longProduct);
         else if (productType == NumberInt)
             return Value::createIntOrLong(longProduct);
         else
@@ -1965,7 +1966,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_hour);
+        return Value(date.tm_hour);
     }
 
     const char *ExpressionHour::getOpName() const {
@@ -2348,7 +2349,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_sec);
+        return Value(date.tm_sec);
     }
 
     const char *ExpressionSecond::getOpName() const {
@@ -2441,9 +2442,9 @@ namespace mongo {
         if ( lower >= str.length() ) {
             // If lower > str.length() then string::substr() will throw out_of_range, so return an
             // empty string if lower is not a valid string index.
-            return Value::createString( "" );
+            return Value("");
         }
-        return Value::createString( str.substr(lower, length) );
+        return Value(str.substr(lower, length));
     }
 
     const char *ExpressionSubstr::getOpName() const {
@@ -2480,12 +2481,12 @@ namespace mongo {
         if (diffType == NumberDouble) {
             double right = rhs.coerceToDouble();
             double left = lhs.coerceToDouble();
-            return Value::createDouble(left - right);
+            return Value(left - right);
         } 
         else if (diffType == NumberLong) {
             long long right = rhs.coerceToLong();
             long long left = lhs.coerceToLong();
-            return Value::createLong(left - right);
+            return Value(left - right);
         }
         else if (diffType == NumberInt) {
             long long right = rhs.coerceToLong();
@@ -2546,7 +2547,7 @@ namespace mongo {
         Value pString(vpOperand[0]->evaluate(pDocument));
         string str = pString.coerceToString();
         boost::to_lower(str);
-        return Value::createString(str);
+        return Value(str);
     }
 
     const char *ExpressionToLower::getOpName() const {
@@ -2578,7 +2579,7 @@ namespace mongo {
         Value pString(vpOperand[0]->evaluate(pDocument));
         string str(pString.coerceToString());
         boost::to_upper(str);
-        return Value::createString(str);
+        return Value(str);
     }
 
     const char *ExpressionToUpper::getOpName() const {
@@ -2624,7 +2625,7 @@ namespace mongo {
             verify(int(str::toUnsigned(buf))==nextSundayWeek);
         }
 
-        return Value::createInt(nextSundayWeek);
+        return Value(nextSundayWeek);
     }
 
     const char *ExpressionWeek::getOpName() const {
@@ -2655,7 +2656,7 @@ namespace mongo {
         checkArgCount(1);
         Value pDate(vpOperand[0]->evaluate(pDocument));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_year + 1900); // tm_year is years since 1900
+        return Value(date.tm_year + 1900); // tm_year is years since 1900
     }
 
     const char *ExpressionYear::getOpName() const {

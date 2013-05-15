@@ -51,8 +51,8 @@ namespace mongo {
         for (itr = set.begin(); itr != set.end(); ++itr) {
             valVec.push_back(*itr);
         }
-        /* there is no issue of scope since createArray copy constructs */
-        return Value::createArray(valVec);
+
+        return Value(valVec);
     }
 
     AccumulatorAddToSet::AccumulatorAddToSet(
