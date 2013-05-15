@@ -56,7 +56,8 @@ static const WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 #define	WT_LSM_NEEDVALUE(c) do {					\
 	WT_CURSOR_NEEDVALUE(c);						\
 	if (__clsm_deleted((WT_CURSOR_LSM *)(c), &(c)->value))		\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
+		WT_ERR_MSG((WT_SESSION_IMPL *)cursor->session, EINVAL,	\
+		    "LSM does not yet support zero-length data items");	\
 } while (0)
 
 /*
