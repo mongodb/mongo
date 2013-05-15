@@ -1019,12 +1019,16 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	DATA_SOURCE *ds;
 	DB_ENV *dbenv;
 	WT_EXTENSION_API *wtext;
+	size_t len;
 	int ret = 0;
+	const char *home;
+	char *path;
 
 	(void)config;				/* Unused parameters */
 
 	ds = NULL;
 	dbenv = NULL;
+	path = NULL;
 						/* Acquire the extension API */
 	wtext = connection->get_extension_api(connection);
 
@@ -1046,7 +1050,13 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	}
 	dbenv->set_errpfx(dbenv, "bdb");
 	dbenv->set_errfile(dbenv, stderr);
-	if ((ret = dbenv->open(dbenv, "RUNDIR/KVS",
+
+	home = connection->get_home(connection);
+	len = strlen(home) + 10;
+	if ((path = malloc(len)) == NULL)
+		goto err;
+	(void)snprintf(path, len, "%s/KVS", home);
+	if ((ret = dbenv->open(dbenv, path,
 	    DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_PRIVATE, 0)) != 0) {
 		ESET(wtext, NULL, WT_ERROR, "DbEnv.open: %s", db_strerror(ret));
 		goto err;
@@ -1059,11 +1069,13 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		ESET(wtext, NULL, ret, "WT_CONNECTION.add_data_source");
 		goto err;
 	}
-	return (0);
 
-err:	if (dbenv != NULL)
-		(void)dbenv->close(dbenv, 0);
-	free(ds);
+	if (0) {
+err:		if (dbenv != NULL)
+			(void)dbenv->close(dbenv, 0);
+		free(ds);
+	}
+	free(path);
 	return (ret);
 }
 
