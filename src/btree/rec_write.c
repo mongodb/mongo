@@ -604,6 +604,13 @@ __rec_txn_read(
 
 	*updp = __wt_txn_read_skip(session, upd, &skip);
 	if (!skip) {
+		/*
+		 * Track the largest transaction ID written to disk for this
+		 * page.  We store this in the page at the end of
+		 * reconciliation if no updates are skipped.  It is used to
+		 * avoid evicting a clean page from memory with changes that
+		 * are required to satisfy a snapshot read.
+		 */
 		if (*updp != NULL) {
 			txnid = (*updp)->txnid;
 			if (TXNID_LT(r->max_txn, txnid))
