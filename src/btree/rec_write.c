@@ -26,6 +26,7 @@ typedef struct {
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
 	/* Track whether all changes to the page are written. */
+	wt_txnid_t max_txn;
 	uint32_t orig_write_gen;
 	int upd_skipped;		/* Skipped a page's update */
 
@@ -598,11 +599,25 @@ static inline int
 __rec_txn_read(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
 {
+	wt_txnid_t txnid;
 	int skip;
 
 	*updp = __wt_txn_read_skip(session, upd, &skip);
-	if (skip == 0)
+	if (!skip) {
+		/*
+		 * Track the largest transaction ID written to disk for this
+		 * page.  We store this in the page at the end of
+		 * reconciliation if no updates are skipped.  It is used to
+		 * avoid evicting a clean page from memory with changes that
+		 * are required to satisfy a snapshot read.
+		 */
+		if (*updp != NULL) {
+			txnid = (*updp)->txnid;
+			if (TXNID_LT(r->max_txn, txnid))
+				r->max_txn = txnid;
+		}
 		return (0);
+	}
 
 	return (__rec_txn_skip_chk(session, r));
 }
@@ -3947,12 +3962,13 @@ err:			__wt_scr_free(&tkey);
 		was_modified = __wt_page_is_modified(page);
 		WT_ORDERED_READ(size, page->memory_footprint);
 		mod->disk_gen = r->orig_write_gen;
+		mod->disk_txn = r->max_txn;
 		if (was_modified && !__wt_page_is_modified(page))
 			__wt_cache_dirty_decr(session, size);
 	}
 
-	/* Record the most recent transaction ID we could have written. */
-	mod->disk_txn = session->txn.snap_min;
+	/* Record the most recent transaction ID we have *not* written. */
+	mod->disk_snap_min = session->txn.snap_min;
 
 	return (0);
 }

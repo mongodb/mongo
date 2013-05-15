@@ -40,8 +40,10 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
 	txn->snap_max = id;
 	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
-	txn->oldest_snap_min = TXNID_LT(oldest_snap_min, txn->snap_min) ?
-	    oldest_snap_min : txn->snap_min;
+	if (TXNID_LT(txn->snap_min, oldest_snap_min))
+		oldest_snap_min = txn->snap_min;
+
+	txn->oldest_snap_min = oldest_snap_min;
 }
 
 /*
@@ -59,8 +61,8 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 
 /*
  * __wt_txn_get_oldest --
- *	Update the current transaction's cached copy of the oldest snap_min
- *	value.
+ *	Update the current transaction's cached copy of the oldest possible
+ *	snap_min value.
  */
 void
 __wt_txn_get_oldest(WT_SESSION_IMPL *session)
@@ -69,24 +71,42 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	wt_txnid_t id, oldest_snap_min;
+	wt_txnid_t current_id, id, oldest_snap_min;
 	uint32_t i, session_cnt;
 
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
-	oldest_snap_min =
-	    (txn->id != WT_TXN_NONE) ? txn->id : txn_global->current + 1;
+	do {
+		current_id = txn_global->current;
+		oldest_snap_min =
+		    (txn->id != WT_TXN_NONE) ? txn->id : current_id + 1;
 
-	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (i = 0, s = txn_global->states;
-	    i < session_cnt;
-	    i++, s++) {
-		if ((id = s->snap_min) != WT_TXN_NONE &&
-		    TXNID_LT(id, oldest_snap_min))
-			oldest_snap_min = id;
-	}
+		WT_ORDERED_READ(session_cnt, conn->session_cnt);
+		for (i = 0, s = txn_global->states;
+		    i < session_cnt;
+		    i++, s++) {
+			if ((id = s->snap_min) != WT_TXN_NONE &&
+			    TXNID_LT(id, oldest_snap_min))
+				oldest_snap_min = id;
+			/*
+			 * It is possible that there is no snapshot active,
+			 * even though there are transactions running (at
+			 * isolation levels lower than snapshot isolation).  If
+			 * a new snapshot is taken, it will have a snap_min
+			 * value of the lowest running transaction.
+			 *
+			 * We need to make sure that the oldest snap_min we
+			 * calculate won't be made invalid in that case, so
+			 * make sure it is at least as old as the oldest
+			 * running transaction.
+			 */
+			if ((id = s->id) != WT_TXN_NONE &&
+			    TXNID_LT(id, oldest_snap_min))
+				oldest_snap_min = id;
+		}
+	} while (current_id != txn_global->current);
 
 	txn->oldest_snap_min = oldest_snap_min;
 }
@@ -114,6 +134,8 @@ __wt_txn_get_snapshot(
 	/* If nothing has changed since last time, we're done. */
 	if (!force && txn->last_id == txn_global->current &&
 	    txn->last_gen == txn_global->gen) {
+		WT_ASSERT(session,
+		    TXNID_LE(txn->oldest_snap_min, txn->snap_min));
 		txn_state->snap_min = txn->snap_min;
 		return;
 	}
@@ -121,24 +143,30 @@ __wt_txn_get_snapshot(
 	do {
 		/* Take a copy of the current session ID. */
 		txn->last_gen = txn_global->gen;
-		txn->last_id = oldest_snap_min = current_id =
-		    txn_global->current + 1;
+		txn->last_id = current_id = txn_global->current;
+		oldest_snap_min = current_id + 1;
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = n = 0, s = txn_global->states;
 		    i < session_cnt;
 		    i++, s++) {
-			/* Ignore the session's own transaction. */
+			if ((id = s->id) != WT_TXN_NONE &&
+			    TXNID_LT(id, oldest_snap_min))
+				oldest_snap_min = id;
+			/*
+			 * Ignore everything else about the session's own
+			 * transaction: we are in the process of updating it.
+			 */
 			if (i == session->id)
 				continue;
-			if ((id = s->snap_min) != WT_TXN_NONE)
-				if (TXNID_LT(id, oldest_snap_min))
-					oldest_snap_min = id;
-			if ((id = s->id) == WT_TXN_NONE)
-				continue;
-			else if (max_id == WT_TXN_NONE || TXNID_LT(id, max_id))
+			if (id != WT_TXN_NONE &&
+			    (max_id == WT_TXN_NONE || TXNID_LT(id, max_id)))
 				txn->snapshot[n++] = id;
+			/* Ignore the session's own transaction. */
+			if ((id = s->snap_min) != WT_TXN_NONE &&
+			    TXNID_LT(id, oldest_snap_min))
+				oldest_snap_min = id;
 		}
 
 		/*
@@ -146,14 +174,16 @@ __wt_txn_get_snapshot(
 		 * the global current ID.
 		 */
 		WT_READ_BARRIER();
-	} while (current_id != txn_global->current + 1);
+	} while (current_id != txn_global->current ||
+	    txn->last_gen != txn_global->gen);
 
 	__txn_sort_snapshot(session, n,
-	    (max_id != WT_TXN_NONE) ? max_id : current_id,
+	    (max_id != WT_TXN_NONE) ? max_id : current_id + 1,
 	    oldest_snap_min);
-	txn_state->snap_min =
-	    (my_id == WT_TXN_NONE || TXNID_LT(txn->snap_min, my_id)) ?
+	id = (my_id == WT_TXN_NONE || TXNID_LT(txn->snap_min, my_id)) ?
 	    txn->snap_min : my_id;
+	WT_ASSERT(session, TXNID_LE(oldest_snap_min, id));
+	txn_state->snap_min = id;
 }
 
 /*
@@ -173,9 +203,8 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 	 * to eviction.  Create a snapshot containing that ID.
 	 */
 	__wt_txn_get_oldest(session);
-	txn->snapshot[0] = txn->oldest_snap_min;
 	__txn_sort_snapshot(
-	    session, 1, txn->oldest_snap_min, txn->oldest_snap_min);
+	    session, 0, txn->oldest_snap_min, txn->oldest_snap_min);
 
 	/*
 	 * Note that we carefully don't update the global table with this
@@ -258,12 +287,10 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 			for (i = n = 0, s = txn_global->states;
 			    i < session_cnt;
 			    i++, s++) {
-				if ((id = s->snap_min) != WT_TXN_NONE)
-					if (TXNID_LT(id, oldest_snap_min))
-						oldest_snap_min = id;
-				if ((id = s->id) == WT_TXN_NONE)
-					continue;
-				else
+				if ((id = s->snap_min) != WT_TXN_NONE &&
+				    TXNID_LT(id, oldest_snap_min))
+					oldest_snap_min = id;
+				if ((id = s->id) != WT_TXN_NONE)
 					txn->snapshot[n++] = id;
 			}
 

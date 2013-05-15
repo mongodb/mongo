@@ -452,8 +452,17 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		}
 		WT_RET(ret);
 
-		WT_ASSERT(session, __wt_page_is_modified(page) == 0);
+		WT_ASSERT(session, !__wt_page_is_modified(page));
 	}
+
+	/*
+	 * If the page is clean, but was ever modified, make sure all of the
+	 * updates on the page are old enough that they can be discarded from
+	 * cache.
+	 */
+	if (!exclusive && mod != NULL &&
+	    !__wt_txn_visible_all(session, mod->disk_txn))
+		return (EBUSY);
 
 	/*
 	 * Repeat the test: fail if any page in the top-level page's subtree

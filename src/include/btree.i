@@ -255,7 +255,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * running transaction.
 		 */
 		if (F_ISSET(&session->txn, TXN_RUNNING))
-			page->modify->disk_txn = session->txn.snap_min - 1;
+			page->modify->disk_snap_min = session->txn.snap_min;
 	}
 
 	/*
