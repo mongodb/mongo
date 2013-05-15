@@ -11,9 +11,9 @@ assert(gle.err === null);
 
 mdb.foo.insert({ _id: /^A/ });
 var gle = master.getDB("test").runCommand({getLastError : 1, w : 2, wtimeout : 60000});
-assert(gle.code === 16814);
+assert(gle.code === 16824);
 
 // _id doesn't have to be first; still disallowed
 mdb.foo.insert({ xxx: "ABCDEF", _id: /ABCDEF/ });
 var gle = master.getDB("test").runCommand({getLastError : 1, w : 2, wtimeout : 60000});
-assert(gle.code === 16814);
+assert(gle.code === 16824);
