@@ -97,12 +97,14 @@ config_setup(void)
 		exit(EXIT_FAILURE);
 	}
 
-	/* Build the object name. */
-	if ((g.uri = malloc(
-	    strlen(g.c_data_source) + strlen(WT_NAME) + 2)) == NULL)
+	/*
+	 * Build the top-level object name: we're overloading data_source in
+	 * our configuration, LSM or KVS devices are "tables", but files are
+	 * tested as well.
+	 */
+	if ((g.uri = malloc(strlen("table:") + strlen(WT_NAME) + 1)) == NULL)
 		syserr("malloc");
-	strcpy(g.uri, g.c_data_source);
-	strcat(g.uri, ":");
+	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
 	strcat(g.uri, WT_NAME);
 
 	/* Default single-threaded half of the time. */

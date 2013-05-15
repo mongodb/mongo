@@ -87,7 +87,7 @@ static CONFIG c[] = {
 	  0, C_BOOL, 5, 0, &g.c_data_extend, NULL },
 
 	{ "data_source",
-	  "type of data source to create (file | kvs | lsm | table)",
+	  "data source (file | kvsbdb | lsm | memrata | table)",
 	  0, C_IGNORE | C_STRING, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
@@ -99,7 +99,7 @@ static CONFIG c[] = {
 	  C_ROW | C_VAR, C_BOOL, 20, 0, &g.c_dictionary, NULL },
 
 	{ "file_type",
-	  "type of file to create (fix | var | row)",
+	  "type of store to create (fix | var | row)",
 	  0, C_IGNORE|C_STRING, 1, 3, NULL, &g.c_file_type },
 
 	{ "huffman_key",

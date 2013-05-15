@@ -210,10 +210,21 @@ wts_open(void)
 	/* Configure Btree split page percentage. */
 	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
-	/* Configure KVS devices. */
-	if (DATASOURCE("memrata"))
+	/* Configure data types. */
+	if (DATASOURCE("lsm"))
+		p += snprintf(p, (size_t)(end - p), ",type=lsm");
+
+	/* Configure data sources. */
+	if (DATASOURCE("kvsbdb"))
 		p += snprintf(
-		    p, (size_t)(end - p), ",kvs_devices=[\"/dev/loop0\"]");
+		    p, (size_t)(end - p), ",source=\"kvsbdb:%s\"", WT_NAME);
+
+#define	MEMRATA_DEVICE		"/dev/loop0"
+#define	MEMRATA_DEVICE_FAKE	"RUNDIR/KVS"
+	if (DATASOURCE("memrata"))
+		p += snprintf(p, (size_t)(end - p),
+		    ",source=\"memrata:%s\",kvs_devices=[%s]",
+		    WT_NAME, MEMRATA_DEVICE);
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
