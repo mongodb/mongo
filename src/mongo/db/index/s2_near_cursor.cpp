@@ -51,7 +51,13 @@ namespace mongo {
         BSONObjIterator specIt(_descriptor->keyPattern());
         while (specIt.more()) {
             BSONElement e = specIt.next();
-            specBuilder.append(e.fieldName(), 1);
+            // Checked in AccessMethod already, so we know this spec has only numbers and 2dsphere
+            if ( e.type() == String ) {
+                specBuilder.append( e.fieldName(), 1 );
+            }
+            else {
+                specBuilder.append( e.fieldName(), e.numberInt() );
+            }
         }
         _specForFRV = specBuilder.obj();
 

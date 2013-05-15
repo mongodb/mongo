@@ -73,12 +73,19 @@ namespace mongo {
                 _params.finestIndexedLevel >= _params.coarsestIndexedLevel);
 
         int geoFields = 0;
+
         // Categorize the fields we're indexing and make sure we have a geo field.
         BSONObjIterator i(descriptor->keyPattern());
         while (i.more()) {
             BSONElement e = i.next();
-            if (e.type() == String && IndexNames::GEO_2DSPHERE == e.valuestr()) {
+            if (e.type() == String && IndexNames::GEO_2DSPHERE == e.String() ) {
                 ++geoFields;
+            }
+            else {
+                // We check for numeric in 2d, so that's the check here
+                uassert( 16823, (string)"Cannot use " + IndexNames::GEO_2DSPHERE +
+                                    " index with other special index types: " + e.toString(),
+                         e.isNumber() );
             }
         }
         uassert(16750, "Expect at least one geo field, spec=" + descriptor->keyPattern().toString(),
