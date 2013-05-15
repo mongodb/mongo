@@ -25,9 +25,12 @@ print("stepdown");
 var command = "sleep(4000); tojson(rs.stepDown());"
 var waitfunc = startParallelShell(command, master.port);
 
-print("getlasterror; should assert");
+print("getlasterror; should assert or return an error, depending on timing");
 var gleFunction = function() { 
     var result = master.getDB("test").runCommand({getLastError : 1, w: 2 , wtimeout :30000 });
+    if (result.errmsg === "not master") {
+        throw new Error("satisfy assert.throws()");
+    }
     print("failed to throw exception; GLE returned: ");
     printjson(result);
 };
