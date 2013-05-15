@@ -39,6 +39,7 @@ env.CppUnitTest(
 env.StaticLibrary(
     target='update',
     source=[
+        'modifier_add_to_set.cpp',
         'modifier_bit.cpp',
         'modifier_inc.cpp',
         'modifier_push.cpp',
@@ -47,6 +48,15 @@ env.StaticLibrary(
     ],
     LIBDEPS=[
         'update-common',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_add_to_set_test',
+    source='modifier_add_to_set_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update',
     ],
 )
 

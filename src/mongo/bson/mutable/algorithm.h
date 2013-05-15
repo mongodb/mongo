@@ -173,6 +173,23 @@ namespace mutablebson {
         const bool _considerFieldName;
     };
 
+    /** An equality predicate for elements that compares based on woCompare */
+    class woEqualTo {
+        // TODO: This should possibly derive from std::binary_function.
+    public:
+        woEqualTo(const ConstElement& value, bool considerFieldName = true)
+            : _value(value)
+            , _considerFieldName(considerFieldName) {
+        }
+
+        inline bool operator()(const ConstElement& elt) const {
+            return _value.compareWithElement(elt, _considerFieldName) == 0;
+        }
+    private:
+        const ConstElement& _value;
+        const bool _considerFieldName;
+    };
+
     /** Return the element that is 'n' Elements to the left in the sibling chain of 'element'. */
     template<typename ElementType>
     ElementType getNthLeftSibling(ElementType element, std::size_t n) {
