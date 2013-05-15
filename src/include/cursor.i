@@ -69,12 +69,12 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	/* The key and value may be gone, clear the flags here. */
 	F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
-        /*
-         * If the cursor was active, decrement the count of active cursors in
-         * the session.  When that goes to zero, there are no active cursors,
-         * and we can release any snapshot we're holding for read committed
-         * isolation.
-         /
+	/*
+	 * If the cursor was active, decrement the count of active cursors in
+	 * the session.  When that goes to zero, there are no active cursors,
+	 * and we can release any snapshot we're holding for read committed
+	 * isolation.
+	 */
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		WT_ASSERT(session, session->ncursors > 0);
 		if (--session->ncursors == 0)
@@ -83,10 +83,10 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	}
 
 	/*
-         * Release any page references we're holding.  This can trigger
-         * eviction (e.g., forced eviction of big pages), so it is important to
-         * do it after releasing our snapshot above.
-         */
+	 * Release any page references we're holding.  This can trigger
+	 * eviction (e.g., forced eviction of big pages), so it is important to
+	 * do it after releasing our snapshot above.
+	 */
 	WT_RET(__wt_page_release(session, cbt->page));
 	cbt->page = NULL;
 
