@@ -752,7 +752,7 @@ namespace mongo {
                 
                 // check no regexp for _id (SERVER-9502)
                 if (str::equals(e.fieldName(), "_id")) {
-                    uassert(16814, "can't use a regex for _id", e.type() != RegEx);
+                    uassert(16824, "can't use a regex for _id", e.type() != RegEx);
                 }
             }
         }
