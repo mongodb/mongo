@@ -21,3 +21,6 @@ coll.drop();
 assert.neq(undefined, coll.ensureIndex({geo : "2dsphere", other : "2d"}).err);
 
 jsTest.log("Success!");
+
+// Ensure the empty collection is gone, so that small_oplog passes.
+coll.drop();
