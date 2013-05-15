@@ -22,7 +22,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"

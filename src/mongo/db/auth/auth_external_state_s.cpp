@@ -20,7 +20,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/grid.h"
 
