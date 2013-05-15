@@ -1136,7 +1136,7 @@ extern int __wt_nfilename(WT_SESSION_IMPL *session,
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
-extern uint64_t __wt_hash_city64(const void *string, uint32_t len);
+extern uint64_t __wt_hash_city64(const void *string, size_t len);
 extern uint64_t __wt_hash_fnv64(const void *string, uint32_t len);
 extern int
 __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
