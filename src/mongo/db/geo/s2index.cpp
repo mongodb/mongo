@@ -365,6 +365,26 @@ namespace mongo {
             uassert(16688, "finestIndexedLevel must be <= 30", params.finestIndexedLevel <= 30);
             uassert(16689, "finestIndexedLevel must be >= coarsestIndexedLevel",
                     params.finestIndexedLevel >= params.coarsestIndexedLevel);
+
+            // Categorize the fields we're indexing and make sure we have a geo field.
+            int geoFields = 0;
+            BSONObjIterator i( spec->keyPattern );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                if ( e.type() == String && SPHERE_2D_NAME == e.String() ) {
+                    ++geoFields;
+                }
+                else {
+                    // We check for numeric in 2d, so that's the check here
+                    uassert( 16823, (string)"Cannot use " + SPHERE_2D_NAME +
+                            " index with other special index types: " + e.toString(),
+                            e.isNumber() );
+                }
+            }
+            uassert(16750, (string)"Expect at least one geo field, spec="
+                    + spec->keyPattern.toString(),
+                    geoFields >= 1);
+
             return new S2IndexType(SPHERE_2D_NAME, this, spec, params);
         }
 
