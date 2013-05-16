@@ -148,12 +148,15 @@ __log_newfile(WT_SESSION_IMPL *session)
 	 * Set aside the log file handle to be closed later.  Other threads
 	 * may still be using it to write to the log.
 	 */
+	WT_ASSERT(session, log->log_close_fh == NULL);
 	log->log_close_fh = log->log_fh;
 	log->fileid++;
 	WT_RET(__wt_log_open(session));
 	/*
 	xxx - need to write log file header record then update lsns.
 	*/
+	log->alloc_lsn.file = log->fileid;
+	log->alloc_lsn.offset = 0;
 
 	return (0);
 }
@@ -163,27 +166,30 @@ __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
-	WT_LSN *base_lsn;
 
 	conn = S2C(session);
 	log = conn->log;
 fprintf(stderr, "log_acquire: called\n");
 	/*
-	 * Called locked.  Add recsize to alloc_lsn.  Update some lsns.
-	 * Return base lsn.
+	 * Called locked.  Add recsize to alloc_lsn.  Save our starting LSN
+	 * as where the previous allocation finished.  That way when log files
+	 * switch, we're waiting for the correct LSN from outstanding writes.
 	 */
+	slot->slot_start_lsn = log->alloc_lsn;
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
-fprintf(stderr, "log_acquire: size %d doesn't fit. Call newfile\n",recsize);
-		FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
-		base_lsn = __log_newfile(session);
+fprintf(stderr, "log_acquire: slot 0x%x size %d doesn't fit. Call newfile\n",slot,recsize);
+		WT_RET(__log_newfile(session));
+		if (log->log_close_fh != NULL)
+			FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
 	}
 	/*
 	 * Need to minimally fill in slot info here.
 	 */
 fprintf(stderr, "log_acquire: slot 0x%x allocate at %d,%d, recsize %d\n",slot,log->alloc_lsn.file,log->alloc_lsn.offset,recsize);
-	slot->slot_lsn = log->alloc_lsn;
+	slot->slot_start_offset = log->alloc_lsn.offset;
 	log->alloc_lsn.offset += recsize;
-	slot->slot_start_offset = slot->slot_lsn.offset;
+	slot->slot_end_lsn = log->alloc_lsn;
+fprintf(stderr, "log_acquire: slot 0x%x endlsn %d,%d\n",slot,slot->slot_end_lsn.file,slot->slot_end_lsn.offset,recsize);
 	slot->slot_fh = log->log_fh;
 	return (0);
 }
@@ -212,12 +218,34 @@ fprintf(stderr, "log_fill: slot 0x%x from address 0x%x\n",myslot->slot, logrec);
 static int
 __log_release(WT_SESSION_IMPL *session, uint32_t size, WT_LOGSLOT *slot)
 {
-	/*
-	 * Take flags.  While current write lsn != my end lsn wait my turn.
-	 * Set my lsn.  If sync, call __wt_fsync.  Update lsns.
-	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC))
-	 */
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
 
+	conn = S2C(session);
+	log = conn->log;
+fprintf(stderr, "log_release: wait for write_lsn %d,%d, to be LSN %d,%d\n",
+log->write_lsn.file,log->write_lsn.offset,slot->slot_start_lsn.file,slot->slot_start_lsn.offset);
+	/*
+	 * Wait for earlier groups to finish.  Slot_lsn is my beginning LSN.
+	 */
+	while (LOG_CMP(&log->write_lsn, &slot->slot_start_lsn) != 0) {
+		__wt_yield();
+	}
+	log->write_lsn = slot->slot_end_lsn;
+	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
+fprintf(stderr, "log_release: slot 0x%x closing old fh %x\n",slot,log->log_close_fh);
+		WT_RET(__wt_close(session, log->log_close_fh));
+		log->log_close_fh = NULL;
+		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
+	}
+	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
+		WT_RET(__wt_fsync(session, log->log_fh));
+		FLD_CLR(slot->slot_flags, SLOT_SYNC);
+		log->sync_lsn = log->write_lsn;
+fprintf(stderr, "log_release: slot 0x%x synced to lsn %d,%d\n",slot,log->write_lsn.file,log->write_lsn.offset);
+	}
+fprintf(stderr, "log_release: slot 0x%x after write_lsn %d,%d\n",slot,
+log->write_lsn.file,log->write_lsn.offset);
 	return (0);
 }
 
@@ -275,8 +303,8 @@ fprintf(stderr, "log_write: myself call log_acquire\n");
 		WT_ERR(__log_acquire(session, logrec->total_len, &tmp));
 		__wt_spin_unlock(session, &log->log_slot_lock);
 		locked = 0;
-fprintf(stderr, "log_write: myself writing at LSN %d,%d, offset %d\n",
-tmp.slot_lsn.file,tmp.slot_lsn.offset, myslot.offset);
+fprintf(stderr, "log_write: myself writing to LSN %d,%d, offset %d\n",
+tmp.slot_start_lsn.file,tmp.slot_start_lsn.offset, myslot.offset);
 		WT_ERR(__log_fill(session, &myslot, record));
 		WT_ERR(__log_release(session, record, &tmp));
 		return (0);

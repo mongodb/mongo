@@ -9,7 +9,7 @@
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN	128
-#define	LOG_FILE_SIZE	(100*1024*1024)		/* 100Mb */
+#define	LOG_FILE_SIZE	(5*1024*1024)		/* 100Mb */
 
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
@@ -35,6 +35,16 @@ typedef struct {
 	(l)->file = 1;							\
 	(l)->offset = 0;						\
 } while (0)
+
+/*
+ * Compare 2 LSNs, return -1 if lsn0 < lsn1, 0 if lsn0 == lsn1
+ * and 1 if lsn0 > lsn1.
+ */
+#define	LOG_CMP(lsn1, lsn2)						\
+	((lsn1)->file != (lsn2)->file ?                                 \
+	((lsn1)->file < (lsn2)->file ? -1 : 1) :                        \
+	((lsn1)->offset != (lsn2)->offset ?                             \
+	((lsn1)->offset < (lsn2)->offset ? -1 : 1) : 0))
 
 /*
  * Possible values for the consolidation array slot states:
@@ -68,9 +78,12 @@ typedef struct {
 #undef	slot_start_offset
 #define	slot_start_offset	u.slot.start_offset
 			off_t	 start_offset;	/* Starting file offset */
-#undef	slot_lsn
-#define	slot_lsn		u.slot.lsn
-			WT_LSN	lsn;		/* Slot LSN */
+#undef	slot_start_lsn
+#define	slot_start_lsn		u.slot.start_lsn
+			WT_LSN	start_lsn;	/* Slot starting LSN */
+#undef	slot_end_lsn
+#define	slot_end_lsn		u.slot.end_lsn
+			WT_LSN	end_lsn;	/* Slot ending LSN */
 #undef	slot_fh
 #define	slot_fh			u.slot.fh
 			WT_FH	*fh;		/* File handle for this group */
