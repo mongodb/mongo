@@ -89,6 +89,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	uint64_t hash;
 
 	conn = S2C(session);
 
@@ -96,8 +97,10 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Increment the reference count if we already have the btree open. */
+	hash = __wt_hash_city64(name, strlen(name));
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-		if (strcmp(name, dhandle->name) == 0 &&
+		if ((hash == dhandle->name_hash &&
+		     strcmp(name, dhandle->name) == 0) &&
 		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
 		    (ckpt != NULL && dhandle->checkpoint != NULL &&
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
@@ -125,6 +128,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	    (ret = __wt_writelock(session, dhandle->rwlock)) == 0) {
 		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 
+		dhandle->name_hash = hash;
 		/*
 		 * Add the handle to the connection list.
 		 *
