@@ -27,6 +27,8 @@
 namespace mongo {
 namespace mutablebson {
 
+    // TODO: We should really update this to be an ASSERT_ something, so that we can print out
+    // the expected and actual documents.
     bool checkDoc(const Document& doc, const BSONObj& exp) {
 
         // Get the fundamental result via BSONObj's woCompare path. This is the best starting
@@ -36,9 +38,15 @@ namespace mutablebson {
         const int primaryResult = fromDoc.woCompare(exp);
 
         // Validate primary result via other comparison paths.
+        const int secondaryResult = doc.compareWithBSONObj(exp);
 
-        // Check that the serialized doc compares against the expected value.
-        ASSERT_EQUALS(primaryResult, doc.compareWithBSONObj(exp));
+        if (primaryResult == 0) {
+            ASSERT_EQUALS(secondaryResult, 0);
+        } else if (primaryResult < 0) {
+            ASSERT_LESS_THAN(secondaryResult, 0);
+        } else {
+            ASSERT_GREATER_THAN(secondaryResult, 0);
+        }
 
         // Check that mutables serialized result matches against its origin.
         ASSERT_EQUALS(0, doc.compareWithBSONObj(fromDoc));
