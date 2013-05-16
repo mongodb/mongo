@@ -161,18 +161,20 @@ namespace mongo {
             return _parseMOD( name, e );
 
         case BSONObj::opOPTIONS: {
-            for ( size_t i = 0; i < andSoFar->numChildren(); i++ ) {
-                if ( andSoFar->getChild( i )->matchType() == MatchExpression::REGEX )
+            // TODO: try to optimize this
+            // we have to do this since $options can be before or after a $regex
+            // but we validate here
+            BSONObjIterator i( context );
+            while ( i.more() ) {
+                BSONElement temp = i.next();
+                if ( temp.getGtLtOp( -1 ) == BSONObj::opREGEX )
                     return StatusWithMatchExpression( NULL );
             }
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "$options must follow a $regex" );
+
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "$options needs a $regex" );
         }
 
         case BSONObj::opREGEX: {
-            if ( position != 0 )
-                return StatusWithMatchExpression( ErrorCodes::BadValue, "$regex has to be first" );
-
-            //*stop = true;
             return _parseRegexDocument( name, context );
         }
 
@@ -185,10 +187,10 @@ namespace mongo {
         case BSONObj::opWITHIN:
             return expressionParserGeoCallback( name, context );
 
-        default:
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "not done" );
         }
 
+        return StatusWithMatchExpression( ErrorCodes::BadValue,
+                                          mongoutils::str::stream() << "not handled: " << e.fieldName() );
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parse( const BSONObj& obj, bool topLevel ) {
@@ -296,26 +298,19 @@ namespace mongo {
     }
 
     Status MatchExpressionParser::_parseSub( const char* name,
-                                        const BSONObj& sub,
-                                        AndMatchExpression* root ) {
-
-        int position = 0;
+                                             const BSONObj& sub,
+                                             AndMatchExpression* root ) {
 
         BSONObjIterator j( sub );
         while ( j.more() ) {
             BSONElement deep = j.next();
 
-            bool stop = false;
-            StatusWithMatchExpression s = _parseSubField( sub, root, name, deep, position, &stop );
+            StatusWithMatchExpression s = _parseSubField( sub, root, name, deep );
             if ( !s.isOK() )
                 return s.getStatus();
 
             if ( s.getValue() )
                 root->add( s.getValue() );
-
-            if ( stop )
-                break;
-            position++;
         }
 
         return Status::OK();
@@ -375,15 +370,22 @@ namespace mongo {
             BSONElement e = i.next();
             switch ( e.getGtLtOp() ) {
             case BSONObj::opREGEX:
-                if ( e.type() != String )
+                if ( e.type() == String ) {
+                    regex = e.String();
+                }
+                else if ( e.type() == RegEx ) {
+                    regex = e.regex();
+                }
+                else {
                     return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                 "$regex has to be a string" );
-                regex = e.String();
+                                                      "$regex has to be a string" );
+                }
+
                 break;
             case BSONObj::opOPTIONS:
                 if ( e.type() != String )
                     return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                 "$options has to be a string" );
+                                                      "$options has to be a string" );
                 regexOptions = e.String();
                 break;
             default:

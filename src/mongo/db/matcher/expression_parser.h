@@ -56,9 +56,7 @@ namespace mongo {
         static StatusWithMatchExpression _parseSubField( const BSONObj& context,
                                                          const AndMatchExpression* andSoFar,
                                                          const char* name,
-                                                         const BSONElement& e,
-                                                         int position,
-                                                         bool* stop );
+                                                         const BSONElement& e );
 
         static StatusWithMatchExpression _parseComparison( const char* name,
                                                            ComparisonMatchExpression* cmp,

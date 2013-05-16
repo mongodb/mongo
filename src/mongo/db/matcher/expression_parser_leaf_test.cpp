@@ -243,6 +243,18 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
     }
 
+    TEST( MatchExpressionParserLeafTest, Regex3 ) {
+        BSONObj query = BSON( "x" << BSON( "$options" << "i" << "$regex" << "abc" ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        log() << "result: " << result << endl;
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "AC" ) ) );
+    }
+
+
     TEST( MatchExpressionParserLeafTest, RegexBad ) {
         BSONObj query = BSON( "x" << BSON( "$regex" << "abc" << "$optionas" << "i" ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
@@ -255,16 +267,6 @@ namespace mongo {
         query = BSON( "x" << BSON( "$options" << "i" ) );
         result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
-
-        // has to be in the other order
-        query = BSON( "x" << BSON( "$options" << "i" << "$regex" << "abc" ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        query = BSON( "x" << BSON( "$gt" << "i" << "$regex" << "abc" ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
     }
 
     TEST( MatchExpressionParserLeafTest, ExistsYes1 ) {
