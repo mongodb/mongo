@@ -580,7 +580,7 @@ methods = {
 		Config('enabled', 'true"', r'''
 		enable logging subsystem''',
                 type='boolean'),
-		Config('path', '"WiredTigerLog"', r'''
+		Config('path', '""', r'''
 		the pathname to a file into which the log records are written.
                 It will have log numbers appended to it the file name.  If the
 		value is not an absolute path name, the file is created

@@ -1385,8 +1385,7 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname
  * to a file into which the log records are written.  It will have log numbers
  * appended to it the file name.  If the value is not an absolute path name\,
- * the file is created relative to the database home., a string; default \c
- * "WiredTigerLog".}
+ * the file is created relative to the database home., a string; default \c "".}
  * @config{ ),,}
  * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
  * \c true.}

@@ -655,9 +655,6 @@ extern int __wt_log_filename(WT_SESSION_IMPL *session,
     WT_LOG *log,
     WT_ITEM *buf);
 extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
-extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
-    const char *fmt,
-    va_list ap);
 extern int __wt_log_printf(WT_SESSION_IMPL *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
@@ -680,12 +677,16 @@ extern int __wt_log_write(WT_SESSION_IMPL *session,
     WT_ITEM *record,
     WT_LSN *lsnp,
     uint32_t flags);
+extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
+    const char *fmt,
+    va_list ap);
 extern WT_LOGREC_DESC __wt_logdesc_debug;
+extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
     int32_t mysize,
     WT_MYSLOT *myslotp);
 extern int __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
-extern int __wt_log_slot_notify(WT_LOGSLOT *slot, WT_LSN *lsnp);
+extern int __wt_log_slot_notify(WT_LOGSLOT *slot);
 extern int __wt_log_slot_wait(WT_LOGSLOT *slot);
 extern int32_t __wt_log_slot_release(WT_LOGSLOT *slot, int32_t size);
 extern int __wt_log_slot_free(WT_LOGSLOT *slot);
@@ -1209,7 +1210,9 @@ extern int __wt_huffman_decode(WT_SESSION_IMPL *session,
     WT_ITEM *to_buf);
 extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
+extern uint32_t __wt_log2_int(uint32_t n);
 extern int __wt_ispo2(uint32_t v);
+extern uint32_t __wt_rduppo2(uint32_t n, uint32_t po2);
 extern uint32_t __wt_random(void);
 extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);

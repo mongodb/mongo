@@ -8,6 +8,9 @@
 #define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
 
 /* Logging subsystem declarations. */
+#define	LOG_ALIGN	128
+#define	LOG_FILE_SIZE	(100*1024*1024)		/* 100Mb */
+
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
 	uint32_t	offset;		/* 128 byte offset */
@@ -27,6 +30,11 @@ typedef struct {
 	const char *fmt;
 	const char *fields[];
 } WT_LOGREC_DESC;
+
+#define	INIT_LSN(l)	do {						\
+	(l)->file = 1;							\
+	(l)->offset = 0;						\
+} while (0)
 
 /*
  * Possible values for the consolidation array slot states:
@@ -62,7 +70,7 @@ typedef struct {
 			off_t	 start_offset;	/* Starting file offset */
 #undef	slot_lsn
 #define	slot_lsn		u.slot.lsn
-			WT_LSN	*lsn;		/* Slot LSN */
+			WT_LSN	lsn;		/* Slot LSN */
 #undef	slot_fh
 #define	slot_fh			u.slot.fh
 			WT_FH	*fh;		/* File handle for this group */
@@ -75,7 +83,7 @@ typedef struct {
 #define	SLOT_SYNC	0x02			/* Needs sync on release */
 			uint32_t flags;		/* Flags */
 		} slot;
-		uint8_t align[128];
+		uint8_t align[LOG_ALIGN];
 	} u;
 } WT_LOGSLOT;
 
@@ -92,10 +100,10 @@ typedef struct {
 	/*
 	 * System LSNs
 	 */
-	WT_LSN		*alloc_lsn;	/* Next LSN for allocation */
-	WT_LSN		*ckpt_lsn;	/* Last checkpoint LSN */
-	WT_LSN		*sync_lsn;	/* LSN of the last sync */
-	WT_LSN		*write_lsn;	/* Last LSN written to log file */
+	WT_LSN		alloc_lsn;	/* Next LSN for allocation */
+	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
+	WT_LSN		sync_lsn;	/* LSN of the last sync */
+	WT_LSN		write_lsn;	/* Last LSN written to log file */
 
 	/*
 	 * Synchronization resources
@@ -106,6 +114,7 @@ typedef struct {
 
 	/*
 	 * Consolidation array information
+	 * SLOT_ACTIVE must be less than SLOT_POOL.
 	 */
 #define	SLOT_ACTIVE	4
 #define	SLOT_POOL	16
@@ -119,8 +128,11 @@ typedef struct {
 } WT_LOG;
 
 typedef struct {
-
-} WT_LOG_HDR;
+	uint32_t	total_len;	/* Length of record rounded up  */
+	uint32_t	real_len;	/* Length of record including hdr */
+	uint64_t	checksum;	/* Checksum of just the record */
+	uint8_t		record[0];	/* Beginning of actual data */
+} WT_LOG_RECORD;
 
 #define	WT_LOG_MAGIC	0x101064
 typedef struct {

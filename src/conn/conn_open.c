@@ -52,6 +52,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 	conn->cache_evict_tid_set = 1;
 
+fprintf(stderr, "Calling wt_logger_create\n");
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_logger_create(conn, cfg));
 
