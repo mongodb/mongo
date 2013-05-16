@@ -225,6 +225,14 @@ namespace mongo {
         ASSERT( !lt.matchesBSON( BSON( "a" << 6 ), NULL ) );
     }
 
+    TEST( LtOp, MatchesScalarEmptyKey ) {
+        BSONObj operand = BSON( "$lt" << 5 );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "", operand[ "$lt" ] ).isOK() );
+        ASSERT( lt.matchesBSON( BSON( "" << 4.5 ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "" << 6 ), NULL ) );
+    }
+
     TEST( LtOp, MatchesArrayValue ) {
         BSONObj operand = BSON( "$lt" << 5 );
         LTMatchExpression lt;

@@ -32,6 +32,9 @@ namespace mongo {
                                        const FieldRef& path,
                                        size_t* idxPath,
                                        bool* inArray )  {
+        if ( path.numParts() == 0 )
+            return doc.getField( "" );
+
         BSONElement res;
 
         BSONObj curr = doc;
