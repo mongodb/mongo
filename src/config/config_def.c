@@ -5,7 +5,7 @@
 static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 	{ "columns", "list", NULL, NULL},
 	{ "source", "string", NULL, NULL},
-	{ "type", "string", "choices=[\"file\",\"lsm\"]", NULL},
+	{ "type", "string", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -83,7 +83,7 @@ static const WT_CONFIG_CHECK confchk_index_meta[] = {
 	{ "columns", "list", NULL, NULL},
 	{ "key_format", "format", NULL, NULL},
 	{ "source", "string", NULL, NULL},
-	{ "type", "string", "choices=[\"file\",\"lsm\"]", NULL},
+	{ "type", "string", NULL, NULL},
 	{ "value_format", "format", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -151,7 +151,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "source", "string", NULL, NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
-	{ "type", "string", "choices=[\"file\",\"lsm\"]", NULL},
+	{ "type", "string", NULL, NULL},
 	{ "value_format", "format", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };

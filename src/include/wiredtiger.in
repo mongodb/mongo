@@ -774,10 +774,8 @@ struct __wt_session {
 	 * @config{type, set the type of data source used to store a column
 	 * group\, index or simple table.  By default\, a \c "file:" URI is
 	 * derived from the object name.  The \c type configuration can be used
-	 * to switch to a different storage format\, such as LSM. Ignored if an
-	 * explicit URI is supplied with a \c source configuration., a string\,
-	 * chosen from the following options: \c "file"\, \c "lsm"; default \c
-	 * file.}
+	 * to switch to a different data source\, such as LSM or an extension
+	 * configured by the application.., a string; default \c file.}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * value_format is \c 'u' and applications use a WT_ITEM structure to

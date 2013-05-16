@@ -69,9 +69,8 @@ source_meta = [
 		set the type of data source used to store a column group, index
 		or simple table.  By default, a \c "file:" URI is derived from
 		the object name.  The \c type configuration can be used to
-		switch to a different storage format, such as LSM.  Ignored if
-		an explicit URI is supplied with a \c source configuration''',
-		choices=['file', 'lsm']),
+		switch to a different data source, such as LSM or an extension
+		configured by the application.'''),
 ]
 
 format_meta = column_meta + [
