@@ -271,6 +271,7 @@ __wt_session_create_strip(WT_SESSION *wt_session,
 static int
 __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -280,6 +281,27 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_schema_name_check(session, uri));
+
+	/*
+	 * Source and type configuration only apply to tables, column groups
+	 * and indexes.  We don't want applications to attempt to layer LSM
+	 * on top of their extended data-sources, and the fact we allow LSM
+	 * as a valid URI is an invitation to that mistake: nip it in the bud.
+	 */
+	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+	    !WT_PREFIX_MATCH(uri, "index:") &&
+	    !WT_PREFIX_MATCH(uri, "table:")) {
+		if ((ret =
+		    __wt_config_getones(session, config, "source", &cval)) == 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "source configuration not allowed for %s URI", uri);
+		WT_ERR_NOTFOUND_OK(ret);
+		if ((ret =
+		    __wt_config_getones(session, config, "type", &cval)) == 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "type configuration not allowed for %s URI", uri);
+		WT_ERR_NOTFOUND_OK(ret);
+	}
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_create(session, uri, config));
