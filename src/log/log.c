@@ -262,7 +262,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->checksum = __wt_hash_fnv64(logrec, record->size);
 
 fprintf(stderr, "log_write: log real_len: %d, total_len %d, chksum 0x%X\n",logrec->real_len, logrec->total_len, logrec->checksum);
-#if 0
 	if (__wt_spin_trylock(session, &log->log_slot_lock) == 0) {
 fprintf(stderr, "log_write: got lock\n");
 		/*
@@ -272,17 +271,16 @@ fprintf(stderr, "log_write: got lock\n");
 		locked = 1;
 		myslot.slot = &tmp;
 		myslot.offset = 0;
-fprintf(stderr, "log_write: call log_acquire\n");
+fprintf(stderr, "log_write: myself call log_acquire\n");
 		WT_ERR(__log_acquire(session, logrec->total_len, &tmp));
 		__wt_spin_unlock(session, &log->log_slot_lock);
 		locked = 0;
-fprintf(stderr, "log_write: writing at LSN %d,%d, offset %d\n",
+fprintf(stderr, "log_write: myself writing at LSN %d,%d, offset %d\n",
 tmp.slot_lsn.file,tmp.slot_lsn.offset, myslot.offset);
 		WT_ERR(__log_fill(session, &myslot, record));
 		WT_ERR(__log_release(session, record, &tmp));
 		return (0);
 	}
-#endif
 fprintf(stderr, "log_write: did not get lock\n");
 	WT_ERR(__wt_log_slot_join(session, logrec->total_len, &myslot));
 	if (myslot.offset == 0) {
