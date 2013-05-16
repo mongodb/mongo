@@ -27,39 +27,6 @@ namespace mongo {
 
 namespace {
     PrivilegeVector emptyPrivilegeVector;
-
-    class RoleNameSetIterator : public RoleNameIterator::Impl {
-        MONGO_DISALLOW_COPYING(RoleNameSetIterator);
-
-    public:
-        RoleNameSetIterator(unordered_set<RoleName>::const_iterator begin,
-                            unordered_set<RoleName>::const_iterator end) :
-                                _begin(begin), _end(end) {}
-
-        virtual ~RoleNameSetIterator() {};
-
-        virtual bool more() const {
-            return _begin != _end;
-        }
-
-        virtual const RoleName& next() {
-            const RoleName& toReturn = get();
-            ++_begin;
-            return toReturn;
-        }
-
-        virtual const RoleName& get() const {
-            return *_begin;
-        }
-
-    private:
-        virtual Impl* doClone() const {
-            return new RoleNameSetIterator(_begin, _end);
-        }
-
-        unordered_set<RoleName>::const_iterator _begin;
-        unordered_set<RoleName>::const_iterator _end;
-    };
 } // namespace
 
     RoleGraph::RoleGraph() {};

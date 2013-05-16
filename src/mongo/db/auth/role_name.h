@@ -23,6 +23,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/hash_namespace.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -118,7 +119,7 @@ namespace mongo {
         boost::scoped_ptr<Impl> _impl;
     };
 
-}  // namespace mongo
+} // namespace mongo
 
 // Define hash function for RoleNames so they can be keys in std::unordered_map
 MONGO_HASH_NAMESPACE_START
@@ -128,3 +129,30 @@ MONGO_HASH_NAMESPACE_START
         }
     };
 MONGO_HASH_NAMESPACE_END
+
+namespace mongo {
+
+    // RoleNameIterator for iterating over an unordered_set of RoleNames.
+    class RoleNameSetIterator : public RoleNameIterator::Impl {
+        MONGO_DISALLOW_COPYING(RoleNameSetIterator);
+
+    public:
+        RoleNameSetIterator(const unordered_set<RoleName>::const_iterator& begin,
+                            const unordered_set<RoleName>::const_iterator& end);
+
+        virtual ~RoleNameSetIterator();
+
+        virtual bool more() const;
+
+        virtual const RoleName& next();
+
+        virtual const RoleName& get() const;
+
+    private:
+        virtual Impl* doClone() const;
+
+        unordered_set<RoleName>::const_iterator _begin;
+        unordered_set<RoleName>::const_iterator _end;
+    };
+
+}  // namespace mongo
