@@ -283,23 +283,25 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_ERR(__wt_schema_name_check(session, uri));
 
 	/*
-	 * Source and type configuration only apply to tables, column groups
-	 * and indexes.  We don't want applications to attempt to layer LSM
-	 * on top of their extended data-sources, and the fact we allow LSM
-	 * as a valid URI is an invitation to that mistake: nip it in the bud.
+	 * Type configuration only applies to tables, column groups and indexes.
+	 * We don't want applications to attempt to layer LSM on top of their
+	 * extended data-sources, and the fact we allow LSM as a valid URI is an
+	 * invitation to that mistake: nip it in the bud.
 	 */
 	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
 	    !WT_PREFIX_MATCH(uri, "index:") &&
 	    !WT_PREFIX_MATCH(uri, "table:")) {
+		/*
+		 * We can't disallow type entirely, a configuration string might
+		 * innocently include it, for example, a dump/load pair.  If the
+		 * URI type prefix and the and type are the same, let it go.
+		 */
 		if ((ret =
-		    __wt_config_getones(session, config, "source", &cval)) == 0)
+		    __wt_config_getones(session, config, "type", &cval)) == 0 &&
+		    (strncmp(uri, cval.str, cval.len) != 0 ||
+		    uri[cval.len] != ':'))
 			WT_ERR_MSG(session, EINVAL,
-			    "source configuration not allowed for %s URI", uri);
-		WT_ERR_NOTFOUND_OK(ret);
-		if ((ret =
-		    __wt_config_getones(session, config, "type", &cval)) == 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "type configuration not allowed for %s URI", uri);
+			    "%s: unsupported type configuration", uri);
 		WT_ERR_NOTFOUND_OK(ret);
 	}
 
