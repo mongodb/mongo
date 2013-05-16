@@ -48,6 +48,8 @@ namespace mongo {
     protected:
         void initPath( const StringData& path );
 
+        bool _matchesElementExpandArray( const BSONElement& e ) const;
+
         bool _allHaveToMatch;
 
     private:
@@ -304,6 +306,7 @@ namespace mongo {
         void copyTo( InMatchExpression* toFillIn ) const;
 
     private:
+        bool _matchesRealElement( const BSONElement& e ) const;
         ArrayFilterEntries _arrayEntries;
     };
 

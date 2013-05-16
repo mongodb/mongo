@@ -477,11 +477,7 @@ namespace mongo {
         _allHaveToMatch = false;
     }
 
-
-    bool InMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        if ( _arrayEntries.hasNull() && e.eoo() )
-            return true;
-
+    bool InMatchExpression::_matchesRealElement( const BSONElement& e ) const {
         if ( _arrayEntries.contains( e ) )
             return true;
 
@@ -489,6 +485,27 @@ namespace mongo {
             if ( _arrayEntries.regex(i)->matchesSingleElement( e ) )
                 return true;
         }
+
+        return false;
+    }
+
+    bool InMatchExpression::matchesSingleElement( const BSONElement& e ) const {
+        if ( _arrayEntries.hasNull() && e.eoo() )
+            return true;
+
+        if ( _matchesRealElement( e ) )
+            return true;
+
+        /*
+        if ( e.type() == Array ) {
+            BSONObjIterator i( e.Obj() );
+            while ( i.more() ) {
+                BSONElement sub = i.next();
+                if ( _matchesRealElement( sub ) )
+                    return true;
+            }
+        }
+        */
 
         return false;
     }
