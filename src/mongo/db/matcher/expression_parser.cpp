@@ -95,12 +95,18 @@ namespace mongo {
         case BSONObj::NIN: {
             if ( e.type() != Array )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$nin needs an array" );
-            std::auto_ptr<NinMatchExpression> temp( new NinMatchExpression() );
+            std::auto_ptr<InMatchExpression> temp( new InMatchExpression() );
             temp->init( name );
             Status s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), e.Obj() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( temp.release() );
+
+            std::auto_ptr<NotMatchExpression> temp2( new NotMatchExpression() );
+            s = temp2->init( temp.release() );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+
+            return StatusWithMatchExpression( temp2.release() );
         }
 
         case BSONObj::opSIZE: {

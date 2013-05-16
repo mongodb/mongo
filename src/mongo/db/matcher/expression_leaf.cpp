@@ -518,43 +518,6 @@ namespace mongo {
         _arrayEntries.copyTo( toFillIn->_arrayEntries );
     }
 
-
-
-    // ----------
-
-    void NinMatchExpression::init( const StringData& path ) {
-        initPath( path );
-        _allHaveToMatch = true;
-        _in.init( path );
-    }
-
-
-    bool NinMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        return !_in.matchesSingleElement( e );
-    }
-
-
-    void NinMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << path() << " $nin: TODO\n";
-    }
-
-    bool NinMatchExpression::equivalent( const MatchExpression* other ) const {
-        if ( matchType() != other->matchType() )
-            return false;
-
-        return _in.equivalent( &(static_cast<const NinMatchExpression*>(other)->_in) );
-
-    }
-
-    LeafMatchExpression* NinMatchExpression::shallowClone() const {
-        NinMatchExpression* next = new NinMatchExpression();
-        next->init( path() );
-        _in.copyTo( &next->_in );
-        return next;
-    }
-
-
 }
 
 

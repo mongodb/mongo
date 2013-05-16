@@ -307,25 +307,5 @@ namespace mongo {
         ArrayFilterEntries _arrayEntries;
     };
 
-    class NinMatchExpression : public LeafMatchExpression {
-    public:
-        NinMatchExpression() : LeafMatchExpression( NIN ){}
-        void init( const StringData& path );
-
-        virtual LeafMatchExpression* shallowClone() const;
-
-        ArrayFilterEntries* getArrayFilterEntries() { return _in.getArrayFilterEntries(); }
-
-        virtual bool matchesSingleElement( const BSONElement& e ) const;
-
-        virtual void debugString( StringBuilder& debug, int level ) const;
-
-        virtual bool equivalent( const MatchExpression* other ) const;
-
-    private:
-        InMatchExpression _in;
-    };
-
-
 
 }
