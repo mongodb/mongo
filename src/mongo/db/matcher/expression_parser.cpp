@@ -46,11 +46,7 @@ namespace mongo {
     StatusWithMatchExpression MatchExpressionParser::_parseSubField( const BSONObj& context,
                                                                      const AndMatchExpression* andSoFar,
                                                                      const char* name,
-                                                                     const BSONElement& e,
-                                                                     int position,
-                                                                     bool* stop ) {
-
-        *stop = false;
+                                                                     const BSONElement& e ) {
 
         // TODO: these should move to getGtLtOp, or its replacement
 
@@ -61,13 +57,16 @@ namespace mongo {
             return _parseNot( name, e );
         }
 
+        if ( mongoutils::str::equals( "$geoIntersects", e.fieldName() ) ) {
+            return expressionParserGeoCallback( name, context );
+        }
 
         int x = e.getGtLtOp(-1);
         switch ( x ) {
         case -1:
             return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                         mongoutils::str::stream() << "unknown operator: "
-                                         << e.fieldName() );
+                                              mongoutils::str::stream() << "unknown operator: "
+                                              << e.fieldName() );
         case BSONObj::LT:
             return _parseComparison( name, new LTMatchExpression(), e );
         case BSONObj::LTE:
@@ -271,7 +270,7 @@ namespace mongo {
                 continue;
             }
 
-            if ( e.type() == Object && e.Obj().firstElement().fieldName()[0] == '$' ) {
+            if ( _isExpressionDocument( e ) ) {
                 Status s = _parseSub( e.fieldName(), e.Obj(), root.get() );
                 if ( !s.isOK() )
                     return StatusWithMatchExpression( s );
@@ -306,7 +305,6 @@ namespace mongo {
     Status MatchExpressionParser::_parseSub( const char* name,
                                              const BSONObj& sub,
                                              AndMatchExpression* root ) {
-
         BSONObjIterator j( sub );
         while ( j.more() ) {
             BSONElement deep = j.next();
@@ -320,6 +318,24 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    bool MatchExpressionParser::_isExpressionDocument( const BSONElement& e ) {
+        if ( e.type() != Object )
+            return false;
+
+        BSONObj o = e.Obj();
+        if ( o.isEmpty() )
+            return false;
+
+        const char* name = o.firstElement().fieldName();
+        if ( name[0] != '$' )
+            return false;
+
+        if ( mongoutils::str::equals( "$ref", name ) )
+            return false;
+
+        return true;
     }
 
 
@@ -409,8 +425,7 @@ namespace mongo {
     }
 
     Status MatchExpressionParser::_parseArrayFilterEntries( ArrayFilterEntries* entries,
-                                                       const BSONObj& theArray ) {
-
+                                                            const BSONObj& theArray ) {
 
         BSONObjIterator i( theArray );
         while ( i.more() ) {
@@ -441,7 +456,7 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$elemMatch needs an Object" );
 
         BSONObj obj = e.Obj();
-        if ( obj.firstElement().fieldName()[0] == '$' ) {
+        if ( _isExpressionDocument( e ) ) {
             // value case
 
             AndMatchExpression theAnd;

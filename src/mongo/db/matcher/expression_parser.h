@@ -37,6 +37,15 @@ namespace mongo {
         }
 
     private:
+
+        /**
+         * 5 = false
+         { a : 5 } = false
+         { $lt : 5 } = true
+         { $ref : "s" } = false
+         */
+        static bool _isExpressionDocument( const BSONElement& e );
+
         static StatusWithMatchExpression _parse( const BSONObj& obj, bool topLevel );
 
         /**
