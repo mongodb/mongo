@@ -26,6 +26,29 @@
 
 namespace ExpressionTests {
 
+    /** Convert BSONObj to a BSONObj with our $const wrappings. */
+    static BSONObj constify(const BSONObj& obj, bool parentIsArray=false) {
+        BSONObjBuilder bob;
+        for (BSONObjIterator itr(obj); itr.more(); itr.next()) {
+            BSONElement elem = *itr;
+            if (elem.type() == Object) {
+                bob << elem.fieldName() << constify(elem.Obj(), false);
+            }
+            else if (elem.type() == Array && !parentIsArray) {
+                // arrays within arrays are treated as constant values by the real parser
+                bob << elem.fieldName() << BSONArray(constify(elem.Obj(), true));
+            }
+            else if (str::equals(elem.fieldName(), "$const") ||
+                     (elem.type() == mongo::String && elem.valuestrsafe()[0] == '$')) {
+                bob.append(elem);
+            }
+            else {
+                bob.append(elem.fieldName(), BSON("$const" << elem));
+            }
+        }
+        return bob.obj();
+    }
+
     /** Check binary equality, ensuring use of the same numeric types. */
     static void assertBinaryEqual( const BSONObj& expected, const BSONObj& actual ) {
         ASSERT_EQUALS( expected, actual );
@@ -41,9 +64,7 @@ namespace ExpressionTests {
 
     /** Convert Expression to BSON. */
     static BSONObj expressionToBson( const intrusive_ptr<Expression>& expression ) {
-        BSONObjBuilder bob;
-        expression->addToBsonObj( &bob, "", true );
-        return bob.obj().firstElement().embeddedObject().getOwned();
+        return BSON("" << expression->serialize()).firstElement().embeddedObject().getOwned();
     }
 
     /** Convert Document to BSON. */
@@ -270,7 +291,7 @@ namespace ExpressionTests {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
                 intrusive_ptr<Expression> optimized = expression->optimize();
@@ -290,7 +311,7 @@ namespace ExpressionTests {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 intrusive_ptr<Expression> optimized = expression->optimize();
                 ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
             }
@@ -300,7 +321,7 @@ namespace ExpressionTests {
         };
 
         class NoOptimizeBase : public OptimizeBase {
-            BSONObj expectedOptimized() { return spec(); }
+            BSONObj expectedOptimized() { return constify( spec() ); }
         };
 
         /** $and without operands. */
@@ -500,10 +521,7 @@ namespace ExpressionTests {
             }
         private:
             static BSONObj toBsonObj(const intrusive_ptr<Expression>& expression) {
-
-                BSONObjBuilder bob;
-                expression->addToBsonObj(&bob, "field", false);
-                return bob.obj();
+                return BSON("field" << expression->serialize());
             }
         };
 
@@ -520,7 +538,7 @@ namespace ExpressionTests {
         private:
             static BSONArray toBsonArray(const intrusive_ptr<Expression>& expression) {
                 BSONArrayBuilder bab;
-                expression->addToBsonArray(&bab);
+                bab << expression->serialize();
                 return bab.arr();
             }
         };
@@ -543,7 +561,7 @@ namespace ExpressionTests {
                 intrusive_ptr<Expression> optimized = expression->optimize();
                 ASSERT_EQUALS( expectedFieldRange(),
                                (bool)dynamic_pointer_cast<ExpressionFieldRange>( optimized ) );
-                ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
+                ASSERT_EQUALS( constify( expectedOptimized() ), expressionToBson( optimized ) );
             }
         protected:
             virtual BSONObj spec() = 0;
@@ -570,7 +588,7 @@ namespace ExpressionTests {
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
                 // Check expression spec round trip.
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 // Check evaluation result.
                 ASSERT_EQUALS( expectedResult(),
                                toBson( expression->evaluate( Document() ) ) );
@@ -901,18 +919,13 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Expression> expression =
                         ExpressionConstant::create( Value( 5 ) );
-                // The constant is copied out as is.
-                assertBinaryEqual( BSON( "field" << 5 ), toBsonObj( expression, false ) );
                 // The constant is replaced with a $ expression.
                 assertBinaryEqual( BSON( "field" << BSON( "$const" << 5 ) ),
-                                   toBsonObj( expression, true ) );
+                                   toBsonObj( expression ) );
             }
         private:
-            static BSONObj toBsonObj( const intrusive_ptr<Expression>& expression,
-                                      bool requireExpression ) {
-                BSONObjBuilder bob;
-                expression->addToBsonObj( &bob, "field", requireExpression );
-                return bob.obj();
+            static BSONObj toBsonObj( const intrusive_ptr<Expression>& expression ) {
+                return BSON("field" << expression->serialize());
             }
         };
 
@@ -923,12 +936,12 @@ namespace ExpressionTests {
                 intrusive_ptr<Expression> expression =
                         ExpressionConstant::create( Value( 5 ) );
                 // The constant is copied out as is.
-                assertBinaryEqual( BSON_ARRAY( 5 ), toBsonArray( expression ) );
+                assertBinaryEqual( constify( BSON_ARRAY( 5 ) ), toBsonArray( expression ) );
             }
         private:
             static BSONObj toBsonArray( const intrusive_ptr<Expression>& expression ) {
                 BSONArrayBuilder bab;
-                expression->addToBsonArray( &bab );
+                bab << expression->serialize();
                 return bab.obj();
             }            
         };
@@ -1144,9 +1157,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b.c" );
-                BSONObjBuilder bob;
-                expression->addToBsonObj( &bob, "foo", false );
-                assertBinaryEqual( BSON( "foo" << "$a.b.c" ), bob.obj() );
+                assertBinaryEqual(BSON("foo" << "$a.b.c"), BSON("foo" << expression->serialize()));
             }
         };
 
@@ -1156,7 +1167,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b.c" );
                 BSONArrayBuilder bab;
-                expression->addToBsonArray( &bab );
+                bab << expression->serialize();
                 assertBinaryEqual( BSON_ARRAY( "$a.b.c" ), bab.arr() );
             }
         };
@@ -1177,7 +1188,7 @@ namespace ExpressionTests {
                 intrusive_ptr<ExpressionFieldRange> expression =
                         ExpressionFieldRange::create( mongo::ExpressionFieldPath::create( "a" ),
                                                       compareOp(), valueFromBson( value() ) );
-                ASSERT_EQUALS( expectedSpec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( expectedSpec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( toBson( expectedResult() ? Value(true) : Value(false) ),
                                toBson( expression->evaluate( fromBson( sourceDocument() ) ) ) );
             }
@@ -1374,7 +1385,7 @@ namespace ExpressionTests {
                 return testable;
             }
             void assertContents( const BSONArray& expectedContents ) {
-                ASSERT_EQUALS( BSON( "$testable" << expectedContents ), expressionToBson( this ) );
+                ASSERT_EQUALS( constify( BSON( "$testable" << expectedContents ) ), expressionToBson( this ) );
             }
             void checkArgLimit( unsigned maxArgs ) const {
                 return ExpressionNary::checkArgLimit( maxArgs );
@@ -1491,21 +1502,8 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Testable> testable = Testable::create();
                 testable->addOperand( ExpressionConstant::create( Value( 5 ) ) );
-                // requireExpression == false
-                {
-                    BSONObjBuilder bob;
-                    testable->addToBsonObj( &bob, "foo", false );
-                    ASSERT_EQUALS( BSON( "foo" << BSON( "$testable" << BSON_ARRAY( 5 ) ) ),
-                                   bob.obj() );
-                }
-                // requireExpression == true
-                if ( 0 ) { // SERVER-6769
-                    BSONObjBuilder bob;
-                    testable->addToBsonObj( &bob, "foo", true );
-                    ASSERT_EQUALS( BSON( "foo" << BSON( "$testable" << BSON_ARRAY
-                                                        ( BSON( "$const" << 5 ) ) ) ),
-                                   bob.obj() );
-                }
+                ASSERT_EQUALS(BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5)))),
+                              BSON("foo" << testable->serialize()));
             }
         };
 
@@ -1515,9 +1513,8 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Testable> testable = Testable::create();
                 testable->addOperand( ExpressionConstant::create( Value( 5 ) ) );
-                BSONArrayBuilder bab;
-                testable->addToBsonArray( &bab );
-                ASSERT_EQUALS( BSON_ARRAY( BSON( "$testable" << BSON_ARRAY( 5 ) ) ), bab.arr() );
+                ASSERT_EQUALS(constify(BSON_ARRAY(BSON("$testable" << BSON_ARRAY(5)))),
+                               BSON_ARRAY(testable->serialize()));
             }
         };
 
@@ -1592,8 +1589,8 @@ namespace ExpressionTests {
                 // Optimization generates a new expression.
                 ASSERT( testable != optimized );
                 // The constant expressions are evaluated separately and placed at the end.
-                ASSERT_EQUALS( BSON( "$testable"
-                                     << BSON_ARRAY( "$path" << BSON_ARRAY( 55 << 66 ) ) ),
+                ASSERT_EQUALS( constify( BSON( "$testable"
+                                         << BSON_ARRAY( "$path" << BSON_ARRAY( 55 << 66 ) ) ) ),
                                expressionToBson( optimized ) );
             }
         };
@@ -1617,13 +1614,13 @@ namespace ExpressionTests {
                 intrusive_ptr<Expression> optimized = testable->optimize();
                 ASSERT( testable != optimized );
                 ASSERT_EQUALS
-                        ( BSON( "$testable" <<
+                        ( constify( BSON( "$testable" <<
                                 BSON_ARRAY( // non constant parts
                                             "$path" <<
                                             BSON( "$add" << BSON_ARRAY( "$q" << 11 ) ) <<
                                             "$another_path" <<
                                             // constant part last
-                                            BSON_ARRAY( 55 << 66 << BSON_ARRAY( 99 << 100 ) ) ) ),
+                                            BSON_ARRAY( 55 << 66 << BSON_ARRAY( 99 << 100 ) ) ) ) ),
                           expressionToBson( optimized ) );
             }
         };
@@ -1642,11 +1639,11 @@ namespace ExpressionTests {
                 intrusive_ptr<Expression> optimized = top->optimize();
                 ASSERT( top != optimized );
                 ASSERT_EQUALS
-                        ( BSON( "$testable" <<
+                        ( constify( BSON( "$testable" <<
                                 BSON_ARRAY( "$a" << "$b" << "$c" <<
                                             BSON_ARRAY( 1 << 2 <<
                                                         BSON_ARRAY( 3 << 4 <<
-                                                                    BSON_ARRAY( 5 << 6 ) ) ) ) ),
+                                                                    BSON_ARRAY( 5 << 6 ) ) ) ) ) ),
                            expressionToBson( optimized ) );
             }
         };
@@ -2337,9 +2334,8 @@ namespace ExpressionTests {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
                                       ExpressionConstant::create( Value( 5 ) ) );
-                BSONObjBuilder bob;
-                expression->addToBsonObj( &bob, "foo", false );
-                ASSERT_EQUALS( BSON( "foo" << BSON( "a" << 5 ) ), bob.obj() );
+                ASSERT_EQUALS(constify(BSON("foo" << BSON("a" << 5))),
+                              BSON("foo" << expression->serialize()));
             }
         };
 
@@ -2350,9 +2346,8 @@ namespace ExpressionTests {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::create();
                 expression->addField( mongo::FieldPath( "a" ),
                                       ExpressionConstant::create( Value( 5 ) ) );
-                BSONObjBuilder bob;
-                expression->addToBsonObj( &bob, "foo", true );
-                ASSERT_EQUALS( BSON( "foo" << BSON( "a" << BSON( "$const" << 5 ) ) ), bob.obj() );
+                ASSERT_EQUALS(BSON("foo" << BSON("a" << BSON("$const" << 5))),
+                              BSON("foo" << expression->serialize()));
             }
         };
         
@@ -2364,8 +2359,8 @@ namespace ExpressionTests {
                 expression->addField( mongo::FieldPath( "a" ),
                                       ExpressionConstant::create( Value( 5 ) ) );
                 BSONArrayBuilder bab;
-                expression->addToBsonArray( &bab );
-                ASSERT_EQUALS( BSON_ARRAY( BSON( "a" << 5 ) ), bab.arr() );
+                bab << expression->serialize();
+                ASSERT_EQUALS( constify( BSON_ARRAY( BSON( "a" << 5 ) ) ), bab.arr() );
             }
         };
 
@@ -2402,7 +2397,7 @@ namespace ExpressionTests {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
                 intrusive_ptr<Expression> optimized = expression->optimize();
@@ -2422,7 +2417,7 @@ namespace ExpressionTests {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 intrusive_ptr<Expression> optimized = expression->optimize();
                 ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
             }
@@ -2432,7 +2427,7 @@ namespace ExpressionTests {
         };
         
         class NoOptimizeBase : public OptimizeBase {
-            BSONObj expectedOptimized() { return spec(); }
+            BSONObj expectedOptimized() { return constify( spec() ); }
         };
         
         /** $or without operands. */
@@ -2603,7 +2598,7 @@ namespace ExpressionTests {
                 virtual Expression::ObjectCtx objectCtx() {
                     return Expression::ObjectCtx( Expression::ObjectCtx::DOCUMENT_OK );
                 }
-                virtual BSONObj expectedBson() { return spec(); }
+                virtual BSONObj expectedBson() { return constify( spec() ); }
             };
 
             class ParseError {
@@ -2801,11 +2796,11 @@ namespace ExpressionTests {
                     BSONElement specElement = specObject.firstElement();
                     intrusive_ptr<Expression> expression =
                             Expression::parseExpression( specElement.fieldName(), &specElement );
-                    ASSERT_EQUALS( expectedBson(), expressionToBson( expression ) );
+                    ASSERT_EQUALS( constify( expectedBson() ), expressionToBson( expression ) );
                 }
             protected:
                 virtual BSONObj spec() = 0;
-                virtual BSONObj expectedBson() { return spec(); }
+                virtual BSONObj expectedBson() { return constify( spec() ); }
             };
             
             class ParseError {
@@ -2901,7 +2896,7 @@ namespace ExpressionTests {
                 }
             protected:
                 virtual BSONObj spec() = 0;
-                virtual BSONObj expectedBson() { return spec(); }
+                virtual BSONObj expectedBson() { return constify( spec() ); }
             };
 
             class ParseError {
@@ -2924,9 +2919,7 @@ namespace ExpressionTests {
                     BSONElement specElement = specObject.firstElement();
                     intrusive_ptr<mongo::Expression> expression =
                             mongo::Expression::parseOperand( &specElement );
-                    BSONObjBuilder bob;
-                    expression->addToBsonObj( &bob, "", true );
-                    ASSERT_EQUALS( specObject, bob.obj() );
+                    ASSERT_EQUALS(specObject, BSON("" << expression->serialize()));
                 }
             };
 
@@ -2978,7 +2971,7 @@ namespace ExpressionTests {
                 BSONObj specObj = BSON( "" << spec );
                 BSONElement specElement = specObj.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec, expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult ),
                                toBson( expression->evaluate( Document() ) ) );                
             }
@@ -3026,7 +3019,7 @@ namespace ExpressionTests {
                 BSONObj specObj = BSON( "" << spec() );
                 BSONElement specElement = specObj.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( Document() ) ) );
             }
@@ -3093,7 +3086,7 @@ namespace ExpressionTests {
                 BSONObj specObj = BSON( "" << spec() );
                 BSONElement specElement = specObj.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( Document() ) ) );
             }
@@ -3136,7 +3129,7 @@ namespace ExpressionTests {
                 BSONObj specObj = BSON( "" << spec() );
                 BSONElement specElement = specObj.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( Document() ) ) );
             }

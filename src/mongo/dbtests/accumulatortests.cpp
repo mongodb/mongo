@@ -67,7 +67,7 @@ namespace AccumulatorTests {
         void assertBsonRepresentation( const BSONObj& expected,
                                        const intrusive_ptr<Accumulator>& accumulator ) const {
             BSONObjBuilder bob;
-            accumulator->addToBsonObj( &bob, "", true );
+            bob << "" << accumulator->serialize();
             assertBinaryEqual( expected, bob.obj().firstElement().Obj().getOwned() );
         }
         intrusive_ptr<ExpressionContext> standalone() const { return _standalone; }

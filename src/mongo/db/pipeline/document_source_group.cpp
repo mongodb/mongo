@@ -73,22 +73,21 @@ namespace mongo {
         pSource->dispose();
     }
 
-    void DocumentSourceGroup::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-        BSONObjBuilder insides;
+    void DocumentSourceGroup::sourceToBson(BSONObjBuilder* pBuilder, bool explain) const {
+        MutableDocument insides;
 
         /* add the _id */
-        pIdExpression->addToBsonObj(&insides, "_id", true);
+        insides["_id"] = pIdExpression->serialize();
 
         /* add the remaining fields */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
             intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pExpCtx));
             pA->addOperand(vpExpression[i]);
-            pA->addToBsonObj(&insides, vFieldName[i], true);
+            insides[vFieldName[i]] = pA->serialize();
         }
 
-        pBuilder->append(groupName, insides.done());
+        *pBuilder << groupName << insides.freeze();
     }
 
     DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(set<string>& deps) const {

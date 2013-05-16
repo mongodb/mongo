@@ -28,6 +28,13 @@
 namespace mongo {
     using namespace mongoutils;
 
+    /// Helper function to easily wrap constants with $const.
+    static Value serializeConstant(Value val) {
+        MutableDocument valBuilder;
+        valBuilder["$const"] = val;
+        return valBuilder.freezeToValue();
+    }
+
     /* --------------------------- Expression ------------------------------ */
 
     void Expression::toMatcherBson(BSONObjBuilder *pBuilder) const {
@@ -545,25 +552,13 @@ namespace mongo {
         return Value(false);
     }
 
-    void ExpressionCoerceToBool::addToBsonObj(BSONObjBuilder *pBuilder,
-                                              StringData fieldName,
-                                              bool requireExpression) const {
+    Value ExpressionCoerceToBool::serialize() const {
+        MutableDocument valBuilder;
         // Serializing as an $and expression which will become a CoerceToBool
-        BSONObjBuilder sub (pBuilder->subobjStart(fieldName));
-        BSONArrayBuilder arr (sub.subarrayStart("$and"));
-        pExpression->addToBsonArray(&arr);
-        arr.doneFast();
-        sub.doneFast();
-    }
-
-    void ExpressionCoerceToBool::addToBsonArray(
-            BSONArrayBuilder *pBuilder) const {
-        // Serializing as an $and expression which will become a CoerceToBool
-        BSONObjBuilder sub (pBuilder->subobjStart());
-        BSONArrayBuilder arr (sub.subarrayStart("$and"));
-        pExpression->addToBsonArray(&arr);
-        arr.doneFast();
-        sub.doneFast();
+        vector<Value> arrayMaker;
+        arrayMaker.push_back(pExpression->serialize());
+        valBuilder["$and"] = Value(arrayMaker);
+        return valBuilder.freezeToValue();
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -826,47 +821,8 @@ namespace mongo {
         return pValue;
     }
 
-    void ExpressionConstant::addToBsonObj(BSONObjBuilder *pBuilder,
-                                          StringData fieldName,
-                                          bool requireExpression) const {
-        /*
-          If we don't need an expression, but can use a naked scalar,
-          do the regular thing.
-
-          This is geared to handle $project, which uses expressions as a cue
-          that the field is a new virtual field rather than just an
-          inclusion (or exclusion):
-          { $project : {
-              x : true, // include
-              y : { $const: true }
-          }}
-
-          This can happen as a result of optimizations.  For example, the
-          above may have originally been
-          { $project : {
-              x : true, // include
-              y : { $eq:["foo", "foo"] }
-          }}
-          When this is optimized, the $eq will be replaced with true.  However,
-          if the pipeline is rematerialized (as happens for a split for
-          sharding) and sent to another node, it will now have
-              y : true
-          which will look like an inclusion rather than a computed field.
-        */
-        if (!requireExpression) {
-            pValue.addToBsonObj(pBuilder, fieldName);
-            return;
-        }
-
-        // We require an expression, so build one here, and use that.
-        BSONObjBuilder constBuilder (pBuilder->subobjStart(fieldName));
-        pValue.addToBsonObj(&constBuilder, getOpName());
-        constBuilder.done();
-    }
-
-    void ExpressionConstant::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        pValue.addToBsonArray(pBuilder);
+    Value ExpressionConstant::serialize() const {
+        return serializeConstant(pValue);
     }
 
     const char *ExpressionConstant::getOpName() const {
@@ -1148,7 +1104,7 @@ namespace mongo {
             if (valueType == Object) {
                 MutableDocument sub (exprObj->getSizeHint());
                 exprObj->addToDocument(sub, field.second.getDocument(), rootDoc);
-                out.addField(field.first, Value(sub.freeze()));
+                out.addField(field.first, sub.freezeToValue());
             }
             else if (valueType == Array) {
                 /*
@@ -1165,7 +1121,7 @@ namespace mongo {
 
                     MutableDocument doc (exprObj->getSizeHint());
                     exprObj->addToDocument(doc, input[i].getDocument(), rootDoc);
-                    result.push_back(Value(doc.freeze()));
+                    result.push_back(doc.freezeToValue());
                 }
 
                 out.addField(field.first, Value(result));
@@ -1288,40 +1244,25 @@ namespace mongo {
         addField(theFieldPath, NULL);
     }
 
-    void ExpressionObject::documentToBson(BSONObjBuilder *pBuilder, bool requireExpression) const {
+    Value ExpressionObject::serialize() const {
+        MutableDocument valBuilder;
         if (_excludeId)
-            pBuilder->appendBool("_id", false);
+            valBuilder["_id"] = Value(false);
 
         for (vector<string>::const_iterator it(_order.begin()); it!=_order.end(); ++it) {
             string fieldName = *it;
             verify(_expressions.find(fieldName) != _expressions.end());
             intrusive_ptr<Expression> expr = _expressions.find(fieldName)->second;
-            
+
             if (!expr) {
                 // this is inclusion, not an expression
-                pBuilder->appendBool(fieldName, true);
+                valBuilder[fieldName] = Value(true);
             }
             else {
-                expr->addToBsonObj(pBuilder, fieldName, requireExpression);
+                valBuilder[fieldName] = expr->serialize();
             }
         }
-    }
-
-    void ExpressionObject::addToBsonObj(BSONObjBuilder *pBuilder,
-                                        StringData fieldName,
-                                        bool requireExpression) const {
-
-        BSONObjBuilder objBuilder (pBuilder->subobjStart(fieldName));
-        documentToBson(&objBuilder, requireExpression);
-        objBuilder.done();
-    }
-
-    void ExpressionObject::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-
-        BSONObjBuilder objBuilder (pBuilder->subobjStart());
-        documentToBson(&objBuilder, false);
-        objBuilder.done();
+        return valBuilder.freezeToValue();
     }
 
     /* --------------------- ExpressionFieldPath --------------------------- */
@@ -1393,15 +1334,8 @@ namespace mongo {
         return evaluatePath(0, pDocument);
     }
 
-    void ExpressionFieldPath::addToBsonObj(BSONObjBuilder *pBuilder,
-                                           StringData fieldName,
-                                           bool requireExpression) const {
-        pBuilder->append(fieldName, fieldPath.getPath(true));
-    }
-
-    void ExpressionFieldPath::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        pBuilder->append(getFieldPath(true));
+    Value ExpressionFieldPath::serialize() const {
+        return Value(fieldPath.getPath(true));
     }
 
     /* --------------------- ExpressionFieldRange -------------------------- */
@@ -1449,82 +1383,64 @@ namespace mongo {
         return Value(false);
     }
 
-    void ExpressionFieldRange::addToBson(Builder *pBuilder) const {
+    Value ExpressionFieldRange::serialize() const {
+        // serializing results in an unoptimized form that will be reoptimized at parse time
+
         if (!pRange.get()) {
             /* nothing will satisfy this predicate */
-            pBuilder->append(false);
-            return;
+            return serializeConstant(Value(false));
         }
 
         if (pRange->pTop.missing() && pRange->pBottom.missing()) {
             /* any value will satisfy this predicate */
-            pBuilder->append(true);
-            return;
+            return serializeConstant(Value(true));
         }
 
         // FIXME Append constant values using the $const operator.  SERVER-6769
 
         // FIXME This checks pointer equality not value equality.
         if (pRange->pTop == pRange->pBottom) {
-            BSONArrayBuilder operands;
-            pFieldPath->addToBsonArray(&operands);
-            pRange->pTop.addToBsonArray(&operands);
-            
-            BSONObjBuilder equals;
-            equals.append("$eq", operands.arr());
-            pBuilder->append(&equals);
-            return;
+            vector<Value> array;
+            MutableDocument valBuilder;
+            array.push_back(pFieldPath->serialize());
+            array.push_back(serializeConstant(pRange->pTop));
+
+            valBuilder["$eq"] = Value(array);
+            return valBuilder.freezeToValue();
         }
 
-        BSONObjBuilder leftOperator;
+        MutableDocument gtDoc;
         if (!pRange->pBottom.missing()) {
-            BSONArrayBuilder leftOperands;
-            pFieldPath->addToBsonArray(&leftOperands);
-            pRange->pBottom.addToBsonArray(&leftOperands);
-            leftOperator.append(
-                (pRange->bottomOpen ? "$gt" : "$gte"),
-                leftOperands.arr());
+            vector<Value> array;
+            array.push_back(pFieldPath->serialize());
+            array.push_back(serializeConstant(pRange->pBottom));
+
+            gtDoc[(pRange->bottomOpen ? "$gt" : "$gte")] = Value(array);
 
             if (pRange->pTop.missing()) {
-                pBuilder->append(&leftOperator);
-                return;
+                return gtDoc.freezeToValue();
             }
         }
 
-        BSONObjBuilder rightOperator;
+        MutableDocument ltDoc;
         if (!pRange->pTop.missing()) {
-            BSONArrayBuilder rightOperands;
-            pFieldPath->addToBsonArray(&rightOperands);
-            pRange->pTop.addToBsonArray(&rightOperands);
-            rightOperator.append(
-                (pRange->topOpen ? "$lt" : "$lte"),
-                rightOperands.arr());
+            vector<Value> array;
+            array.push_back(pFieldPath->serialize());
+            array.push_back(serializeConstant(pRange->pTop));
+            ltDoc[(pRange->topOpen ? "$lt" : "$lte")] = Value(array);
 
             if (pRange->pBottom.missing()) {
-                pBuilder->append(&rightOperator);
-                return;
+                return ltDoc.freezeToValue();
             }
         }
 
-        BSONArrayBuilder andOperands;
-        andOperands.append(leftOperator.done());
-        andOperands.append(rightOperator.done());
-        BSONObjBuilder andOperator;
-        andOperator.append("$and", andOperands.arr());
-        pBuilder->append(&andOperator);
-    }
+        vector<Value> array;
+        MutableDocument valBuilder;
+        array.push_back(gtDoc.freezeToValue());
+        array.push_back(ltDoc.freezeToValue());
+        valBuilder["$and"] = Value(array);
 
-    void ExpressionFieldRange::addToBsonObj(BSONObjBuilder *pBuilder,
-                                            StringData fieldName,
-                                            bool requireExpression) const {
-        BuilderObj builder(pBuilder, fieldName);
-        addToBson(&builder);
-    }
-
-    void ExpressionFieldRange::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        BuilderArray builder(pBuilder);
-        addToBson(&builder);
+        return valBuilder.freezeToValue();
     }
 
     void ExpressionFieldRange::toMatcherBson(
@@ -2160,29 +2076,17 @@ namespace mongo {
         return NULL;
     }
 
-    void ExpressionNary::toBson(BSONObjBuilder *pBuilder, const char *pOpName) const {
+    Value ExpressionNary::serialize() const {
+        MutableDocument valBuilder;
+
         const size_t nOperand = vpOperand.size();
-
+        vector<Value> array;
         /* build up the array */
-        BSONArrayBuilder arrBuilder (pBuilder->subarrayStart(pOpName));
-        for(size_t i = 0; i < nOperand; ++i)
-            vpOperand[i]->addToBsonArray(&arrBuilder);
-        arrBuilder.doneFast();
-    }
+        for(size_t i = 0; i < nOperand; i++)
+            array.push_back(vpOperand[i]->serialize());
 
-    void ExpressionNary::addToBsonObj(BSONObjBuilder *pBuilder,
-                                      StringData fieldName,
-                                      bool requireExpression) const {
-        BSONObjBuilder exprBuilder;
-        toBson(&exprBuilder, getOpName());
-        pBuilder->append(fieldName, exprBuilder.done());
-    }
-
-    void ExpressionNary::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        BSONObjBuilder exprBuilder;
-        toBson(&exprBuilder, getOpName());
-        pBuilder->append(exprBuilder.done());
+        valBuilder[getOpName()] = Value(array);
+        return valBuilder.freezeToValue();
     }
 
     void ExpressionNary::checkArgLimit(unsigned maxArgs) const {

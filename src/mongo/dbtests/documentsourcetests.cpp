@@ -983,7 +983,7 @@ namespace DocumentSourceTests {
         class Optimize : public Base {
         public:
             void run() {
-                createProject( BSON( "a" << BSON( "$and" << BSON_ARRAY( true ) ) ) );
+                createProject(BSON("a" << BSON("$and" << BSON_ARRAY(BSON("$const" << true)))));
                 project()->optimize();
                 // Optimizing the DocumentSourceProject optimizes the Expressions that comprise it,
                 // in this case replacing an expression depending on constants with a constant.

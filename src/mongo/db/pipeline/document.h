@@ -316,6 +316,11 @@ namespace mongo {
             return ret;
         }
 
+        /// Used to simplify the common pattern of creating a value of the document.
+        Value freezeToValue() {
+            return Value(freeze());
+        }
+
         /** Borrow a readable reference to this Document.
          *
          *  Note that unlike freeze(), this indicates intention to continue

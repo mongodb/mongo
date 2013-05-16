@@ -14,11 +14,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "db/pipeline/accumulator.h"
+#include "mongo/pch.h"
 
-#include "db/jsobj.h"
-#include "util/mongoutils/str.h"
+#include "mongo/db/pipeline/accumulator.h"
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/document.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
     using namespace mongoutils;
@@ -36,22 +38,12 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void Accumulator::opToBson(BSONObjBuilder *pBuilder, StringData opName,
-                               StringData fieldName, bool requireExpression) const {
+    Value Accumulator::serialize() const {
         verify(vpOperand.size() == 1);
-        BSONObjBuilder builder;
-        vpOperand[0]->addToBsonObj(&builder, opName, requireExpression);
-        pBuilder->append(fieldName, builder.done());
-    }
 
-    void Accumulator::addToBsonObj(BSONObjBuilder *pBuilder,
-                                   StringData fieldName,
-                                   bool requireExpression) const {
-        opToBson(pBuilder, getOpName(), fieldName, requireExpression);
-    }
-
-    void Accumulator::addToBsonArray(BSONArrayBuilder *pBuilder) const {
-        verify(false); // these can't appear in arrays
+        MutableDocument valBuilder;
+        valBuilder[getOpName()] = vpOperand[0]->serialize();
+        return valBuilder.freezeToValue();
     }
 
     void agg_framework_reservedErrors() {

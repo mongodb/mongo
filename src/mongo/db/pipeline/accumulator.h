@@ -31,10 +31,7 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual Value serialize() const;
 
         /*
           Get the accumulated value.

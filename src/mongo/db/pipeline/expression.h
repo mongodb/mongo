@@ -34,7 +34,6 @@ namespace mongo {
     class ExpressionContext;
     class Value;
 
-
     class Expression :
         public IntrusiveCounterUnsigned {
     public:
@@ -79,36 +78,11 @@ namespace mongo {
         */
         virtual Value evaluate(const Document& pDocument) const = 0;
 
-        /*
-          Add the Expression (and any descendant Expressions) into a BSON
-          object that is under construction.
-
-          Unevaluated Expressions always materialize as objects.  Evaluation
-          may produce a scalar or another object, either of which will be
-          substituted inline.
-
-          @param pBuilder the builder to add the expression to
-          @param fieldName the name the object should be given
-          @param requireExpression specify true if the value must appear
-            as an expression; this is used by DocumentSources like
-            $project which distinguish between field inclusion and virtual
-            field specification;  See ExpressionConstant.
+        /**
+         * Serialize the Expression tree (recursively) and results in a Value
+         * parsable by parseOperand().
          */
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const = 0;
-
-        /*
-          Add the Expression (and any descendant Expressions) into a BSON
-          array that is under construction.
-
-          Unevaluated Expressions always materialize as objects.  Evaluation
-          may produce a scalar or another object, either of which will be
-          substituted inline.
-
-          @param pBuilder the builder to add the expression to
-         */
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const = 0;
+        virtual Value serialize() const = 0;
 
         /*
           Convert the expression into a BSONObj that corresponds to the
@@ -223,10 +197,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual Value serialize() const;
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
 
         /*
@@ -267,19 +238,6 @@ namespace mongo {
         ExpressionNary();
 
         ExpressionVector vpOperand;
-
-        /*
-          Add the expression to the builder.
-
-          If there is only one operand (a unary operator), then the operand
-          is added directly, without an array.  For more than one operand,
-          a named array is created.  In both cases, the result is an object.
-
-          @param pBuilder the (blank) builder to add the expression to
-          @param pOpName the name of the operator
-         */
-        virtual void toBson(BSONObjBuilder *pBuilder,
-                            const char *pOpName) const;
 
         /*
           Checks the current size of vpOperand; if the size equal to or
@@ -365,10 +323,7 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluate(const Document& pDocument) const;
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual Value serialize() const;
 
         static intrusive_ptr<ExpressionCoerceToBool> create(
             const intrusive_ptr<Expression> &pExpression);
@@ -449,10 +404,7 @@ namespace mongo {
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluate(const Document& pDocument) const;
         virtual const char *getOpName() const;
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual Value serialize() const;
 
         static intrusive_ptr<ExpressionConstant> createFromBsonElement(
             BSONElement *pBsonElement);
@@ -545,10 +497,7 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluate(const Document& pDocument) const;
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual Value serialize() const;
 
         /*
           Create a field path expression.
@@ -614,10 +563,7 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluate(const Document& pDocument) const;
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual Value serialize() const;
         virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
         /*
@@ -684,17 +630,6 @@ namespace mongo {
         };
 
         scoped_ptr<Range> pRange;
-
-        /*
-          Add to a generic Builder.
-
-          The methods to append items to an object and an array differ by
-          their inclusion of a field name.  For more complicated objects,
-          it makes sense to abstract that out and use a generic builder that
-          always looks the same, and then implement addToBsonObj() and
-          addToBsonArray() by using the common method.
-         */
-        void addToBson(Builder *pBuilder) const;
     };
 
 
@@ -843,10 +778,7 @@ namespace mongo {
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         /** Only evaluates non inclusion expressions.  For inclusions, use addToDocument(). */
         virtual Value evaluate(const Document& pDocument) const;
-        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
-                                  StringData fieldName,
-                                  bool requireExpression) const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual Value serialize() const;
 
         /*
           evaluate(), but return a Document instead of a Value-wrapped
