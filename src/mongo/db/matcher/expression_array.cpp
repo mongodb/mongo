@@ -138,6 +138,7 @@ namespace mongo {
         BSONElement e = doc->getFieldDottedOrArray( path, &idxPath, &traversedArray );
 
         string rest = path.dottedField( idxPath+1 );
+        bool restIsNumber = isAllDigits( rest );
 
         if ( rest.size() == 0 ) {
             if ( e.type() == Array )
@@ -153,6 +154,16 @@ namespace mongo {
             BSONElement x = i.next();
             if ( ! x.isABSONObj() )
                 continue;
+
+            if ( restIsNumber && rest == x.fieldName() ) {
+                if ( matchesArray( x.Obj(), NULL ) ) {
+                    if ( details && details->needRecord() ) {
+                        // trying to match crazy semantics??
+                        details->setElemMatchKey( x.fieldName() );
+                    }
+                    return true;
+                }
+            }
 
             BSONElement sub = x.Obj().getFieldDotted( rest );
             if ( sub.type() != Array )
