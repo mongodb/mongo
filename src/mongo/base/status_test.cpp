@@ -67,6 +67,125 @@ namespace {
         ASSERT_EQUALS(orig.refCount(), 2U);
     }
 
+#if __cplusplus >= 201103L
+    TEST(Cloning, MoveCopyOK) {
+        Status orig = Status::OK();
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        Status dest(std::move(orig));
+
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        ASSERT_TRUE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 0U);
+    }
+
+    TEST(Cloning, MoveCopyError) {
+        Status orig(ErrorCodes::MaxError, "error");
+        ASSERT_FALSE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 1U);
+
+        Status dest(std::move(orig));
+
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        ASSERT_FALSE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 1U);
+        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+        ASSERT_EQUALS(dest.reason(), "error");
+    }
+
+    TEST(Cloning, MoveAssignOKToOK) {
+        Status orig = Status::OK();
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        Status dest = Status::OK();
+        ASSERT_TRUE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 0U);
+
+        dest = std::move(orig);
+
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        ASSERT_TRUE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 0U);
+    }
+
+    TEST(Cloning, MoveAssignErrorToError) {
+        Status orig = Status(ErrorCodes::MaxError, "error");
+        ASSERT_FALSE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 1U);
+        ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
+        ASSERT_EQUALS(orig.reason(), "error");
+
+        Status dest = Status(ErrorCodes::InternalError, "error2");
+        ASSERT_FALSE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 1U);
+        ASSERT_EQUALS(dest.code(), ErrorCodes::InternalError);
+        ASSERT_EQUALS(dest.reason(), "error2");
+
+        dest = std::move(orig);
+
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        ASSERT_FALSE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 1U);
+        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+        ASSERT_EQUALS(dest.reason(), "error");
+    }
+
+    TEST(Cloning, MoveAssignErrorToOK) {
+        Status orig = Status(ErrorCodes::MaxError, "error");
+        ASSERT_FALSE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 1U);
+        ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
+        ASSERT_EQUALS(orig.reason(), "error");
+
+        Status dest = Status::OK();
+        ASSERT_TRUE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 0U);
+
+        dest = std::move(orig);
+
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        ASSERT_FALSE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 1U);
+        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+        ASSERT_EQUALS(dest.reason(), "error");
+    }
+
+    TEST(Cloning, MoveAssignOKToError) {
+        Status orig = Status::OK();
+        ASSERT_TRUE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 0U);
+
+        Status dest = Status(ErrorCodes::MaxError, "error");
+        ASSERT_FALSE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 1U);
+        ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
+        ASSERT_EQUALS(dest.reason(), "error");
+
+        orig = std::move(dest);
+
+        ASSERT_FALSE(orig.isOK());
+        ASSERT_EQUALS(orig.refCount(), 1U);
+        ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
+        ASSERT_EQUALS(orig.reason(), "error");
+
+        ASSERT_TRUE(dest.isOK());
+        ASSERT_EQUALS(dest.refCount(), 0U);
+    }
+
+#endif // __cplusplus >= 201103L
+
     TEST(Cloning, OKIsNotRefCounted) {
         ASSERT_EQUALS(Status::OK().refCount(), 0U);
 
