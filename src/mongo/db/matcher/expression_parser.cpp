@@ -75,8 +75,16 @@ namespace mongo {
             return _parseComparison( name, new GTMatchExpression(), e );
         case BSONObj::GTE:
             return _parseComparison( name, new GTEMatchExpression(), e );
-        case BSONObj::NE:
-            return _parseComparison( name, new NEMatchExpression(), e );
+        case BSONObj::NE: {
+            StatusWithMatchExpression s = _parseComparison( name, new EqualityMatchExpression(), e );
+            if ( !s.isOK() )
+                return s;
+            std::auto_ptr<NotMatchExpression> n( new NotMatchExpression() );
+            Status s2 = n->init( s.getValue() );
+            if ( !s2.isOK() )
+                return StatusWithMatchExpression( s2 );
+            return StatusWithMatchExpression( n.release() );
+        }
         case BSONObj::Equality:
             return _parseComparison( name, new EqualityMatchExpression(), e );
 
