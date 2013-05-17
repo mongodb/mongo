@@ -17,6 +17,10 @@
 
 namespace mongo {
 
+    inline Status Status::OK() {
+        return Status();
+    }
+
     inline Status::Status(const Status& other)
         : _error(other._error) {
         ref(_error);
@@ -33,6 +37,30 @@ namespace mongo {
         unref(_error);
     }
 
+    inline bool Status::isOK() const {
+        return code() == ErrorCodes::OK;
+    }
+
+    inline ErrorCodes::Error Status::code() const {
+        return _error ? _error->code : ErrorCodes::OK;
+    }
+
+    inline const char* Status::codeString() const {
+        return ErrorCodes::errorString(code());
+    }
+
+    inline std::string Status::reason() const {
+        return _error ? _error->reason : std::string();
+    }
+
+    inline int Status::location() const {
+        return _error ? _error->location : 0;
+    }
+
+    inline AtomicUInt32::WordType Status::refCount() const {
+        return _error ? _error->refs.load() : 0;
+    }
+
     inline Status::Status()
         : _error(NULL) {
     }
@@ -45,6 +73,14 @@ namespace mongo {
     inline void Status::unref(ErrorInfo* error) {
         if (error && (error->refs.subtractAndFetch(1) == 0))
             delete error;
+    }
+
+    inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
+        return rhs == lhs;
+    }
+
+    inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
+        return rhs != lhs;
     }
 
 } // namespace mongo

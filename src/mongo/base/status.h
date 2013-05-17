@@ -49,9 +49,7 @@ namespace mongo {
     class Status {
     public:
         // Short-hand for returning an OK status.
-        static Status OK() {
-            return Status();
-        }
+        static inline Status OK();
 
         /**
          * Builds an error status given the error code, a textual description of what
@@ -60,9 +58,11 @@ namespace mongo {
          */
         Status(ErrorCodes::Error code, const std::string& reason, int location = 0);
         Status(ErrorCodes::Error code, const char* reason, int location = 0);
-        Status(const Status& other);
-        Status& operator=(const Status& other);
-        ~Status();
+
+        inline Status(const Status& other);
+        inline Status& operator=(const Status& other);
+
+        inline ~Status();
 
         /**
          * Returns true if 'other's error code and location are equal/different to this
@@ -84,25 +84,15 @@ namespace mongo {
         // accessors
         //
 
-        bool isOK() const {
-            return code() == ErrorCodes::OK;
-        }
+        inline bool isOK() const;
 
-        ErrorCodes::Error code() const {
-            return _error ? _error->code : ErrorCodes::OK;
-        }
+        inline ErrorCodes::Error code() const;
 
-        const char* codeString() const {
-            return ErrorCodes::errorString(code());
-        }
+        inline const char* codeString() const;
 
-        std::string reason() const {
-            return _error ? _error->reason : std::string();
-        }
+        inline std::string reason() const;
 
-        int location() const {
-            return _error ? _error->location : 0;
-        }
+        inline int location() const;
 
         std::string toString() const;
 
@@ -110,12 +100,10 @@ namespace mongo {
         // Below interface used for testing code only.
         //
 
-        AtomicUInt32::WordType refCount() const {
-            return _error ? _error->refs.load() : 0;
-        }
+        inline AtomicUInt32::WordType refCount() const;
 
     private:
-        Status();
+        inline Status();
 
         struct ErrorInfo {
             AtomicUInt32 refs;             // reference counter
@@ -136,17 +124,13 @@ namespace mongo {
          *
          * @param error  ErrorInfo to be incremented
          */
-        static void ref(ErrorInfo* error);
-        static void unref(ErrorInfo* error);
+        static inline void ref(ErrorInfo* error);
+        static inline void unref(ErrorInfo* error);
     };
 
-    inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
-        return rhs == lhs;
-    }
+    inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
 
-    inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
-        return rhs != lhs;
-    }
+    inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
 
     //
     // Convenience method for unittest code. Please use accessors otherwise.
@@ -158,4 +142,3 @@ namespace mongo {
 }  // namespace mongo
 
 #include "mongo/base/status-inl.h"
-
