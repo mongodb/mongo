@@ -1144,61 +1144,38 @@ namespace mongo {
         BSONObj existsNull = BSON( "a" << BSONNULL );
         BSONObj doesntExist = BSONObj();
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "", true ).isOK() );
+        ASSERT( exists.init( "" ).isOK() );
         ASSERT( exists.matchesSingleElement( existsInt.firstElement() ) );
         ASSERT( exists.matchesSingleElement( existsNull.firstElement() ) );
         ASSERT( !exists.matchesSingleElement( doesntExist.firstElement() ) );
-    }
-
-    TEST( ExistsMatchExpression, MatchesElementExistsFalse ) {
-        BSONObj existsInt = BSON( "a" << 5 );
-        BSONObj existsNull = BSON( "a" << BSONNULL );
-        BSONObj doesntExist = BSONObj();
-        ExistsMatchExpression exists;
-        ASSERT( exists.init( "", false ).isOK() );
-        ASSERT( !exists.matchesSingleElement( existsInt.firstElement() ) );
-        ASSERT( !exists.matchesSingleElement( existsNull.firstElement() ) );
-        ASSERT( exists.matchesSingleElement( doesntExist.firstElement() ) );
     }
 
     TEST( ExistsMatchExpression, MatchesElementExistsTrueValue ) {
         BSONObj exists = BSON( "a" << 5 );
         BSONObj missing = BSONObj();
         ExistsMatchExpression existsTrueValue;
-        ExistsMatchExpression existsFalseValue;
-        ASSERT( existsTrueValue.init( "", true ).isOK() );
-        ASSERT( existsFalseValue.init( "", false ).isOK() );
+        ASSERT( existsTrueValue.init( "" ).isOK() );
         ASSERT( existsTrueValue.matchesSingleElement( exists.firstElement() ) );
-        ASSERT( !existsFalseValue.matchesSingleElement( exists.firstElement() ) );
         ASSERT( !existsTrueValue.matchesSingleElement( missing.firstElement() ) );
-        ASSERT( existsFalseValue.matchesSingleElement( missing.firstElement() ) );
     }
 
     TEST( ExistsMatchExpression, MatchesScalar ) {
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "a", true ).isOK() );
+        ASSERT( exists.init( "a" ).isOK() );
         ASSERT( exists.matchesBSON( BSON( "a" << 1 ), NULL ) );
         ASSERT( exists.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
         ASSERT( !exists.matchesBSON( BSON( "b" << 1 ), NULL ) );
     }
 
-    TEST( ExistsMatchExpression, MatchesScalarFalse ) {
-        ExistsMatchExpression exists;
-        ASSERT( exists.init( "a", false ).isOK() );
-        ASSERT( !exists.matchesBSON( BSON( "a" << 1 ), NULL ) );
-        ASSERT( !exists.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
-        ASSERT( exists.matchesBSON( BSON( "b" << 1 ), NULL ) );
-    }
-
     TEST( ExistsMatchExpression, MatchesArray ) {
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "a", true ).isOK() );
+        ASSERT( exists.init( "a" ).isOK() );
         ASSERT( exists.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5.5 ) ), NULL ) );
     }
 
     TEST( ExistsMatchExpression, ElemMatchKey ) {
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "a.b", true ).isOK() );
+        ASSERT( exists.init( "a.b" ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !exists.matchesBSON( BSON( "a" << 1 ), &details ) );
@@ -1213,14 +1190,11 @@ namespace mongo {
     TEST( ExistsMatchExpression, Equivalent ) {
         ExistsMatchExpression e1;
         ExistsMatchExpression e2;
-        ExistsMatchExpression e3;
-        e1.init( "a" , false );
-        e2.init( "a" , true );
-        e3.init( "b" , false );
+        e1.init( "a" );
+        e2.init( "b" );
 
         ASSERT( e1.equivalent( &e1 ) );
         ASSERT( !e1.equivalent( &e2 ) );
-        ASSERT( !e1.equivalent( &e3 ) );
     }
 
     /**

@@ -142,10 +142,16 @@ namespace mongo {
             if ( e.eoo() )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$exists can't be eoo" );
             std::auto_ptr<ExistsMatchExpression> temp( new ExistsMatchExpression() );
-            Status s = temp->init( name, e.trueValue() );
+            Status s = temp->init( name );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( temp.release() );
+            if ( e.trueValue() )
+                return StatusWithMatchExpression( temp.release() );
+            std::auto_ptr<NotMatchExpression> temp2( new NotMatchExpression() );
+            s = temp2->init( temp.release() );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( temp2.release() );
         }
 
         case BSONObj::opTYPE: {

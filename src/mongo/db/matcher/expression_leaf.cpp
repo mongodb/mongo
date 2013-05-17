@@ -310,22 +310,18 @@ namespace mongo {
 
     // ------------------
 
-    Status ExistsMatchExpression::init( const StringData& path, bool exists ) {
+    Status ExistsMatchExpression::init( const StringData& path ) {
         initPath( path );
-        _exists = exists;
         return Status::OK();
     }
 
     bool ExistsMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        if ( e.eoo() ) {
-            return !_exists;
-        }
-        return _exists;
+        return !e.eoo();
     }
 
     void ExistsMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << " exists: " << _exists << "\n";
+        debug << path() << " exists\n";
     }
 
     bool ExistsMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -333,7 +329,7 @@ namespace mongo {
             return false;
 
         const ExistsMatchExpression* realOther = static_cast<const ExistsMatchExpression*>( other );
-        return path() == realOther->path() && _exists == realOther->_exists;
+        return path() == realOther->path();
     }
 
 

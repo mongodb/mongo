@@ -206,11 +206,11 @@ namespace mongo {
     public:
         ExistsMatchExpression() : LeafMatchExpression( EXISTS ){}
 
-        Status init( const StringData& path, bool exists );
+        Status init( const StringData& path );
 
         virtual LeafMatchExpression* shallowClone() const {
             ExistsMatchExpression* e = new ExistsMatchExpression();
-            e->init( path(), _exists );
+            e->init( path() );
             return e;
         }
 
@@ -219,12 +219,6 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
-
-        // this is a terrible name, but trying not to use anythign we may really want
-        bool rightSideBool() const { return _exists; }
-
-    private:
-        bool _exists;
     };
 
     class TypeMatchExpression : public MatchExpression {
