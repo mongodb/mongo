@@ -912,21 +912,27 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Read the environment variable configuration. */
 	WT_ERR(__conn_config_env(session, cfg));
 
+	/*
+	 * Configuration ...
+	 */
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_max = (uint32_t)cval.val;
+
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
+
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_LSM_MERGE);
+
 	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_SYNC);
+
 	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_TRANSACTIONAL);
 
-	/* Configure verbose flags. */
 	WT_ERR(__conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
@@ -936,7 +942,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(__wt_open(
 		   session, WT_LOG_FILENAME, 1, 0, 0, &conn->log_fh));
 
-	/* Configure direct I/O and buffer alignment. */
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
 		conn->buffer_alignment = WT_BUFFER_ALIGNMENT_DEFAULT;
@@ -948,9 +953,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		    "buffer_alignment requires posix_memalign");
 #endif
 
-	/*
-	 * Configuration: direct_io, file_extend, mmap, statistics.
-	 */
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
 	for (ft = file_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
@@ -979,6 +981,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val == 0 ? 0 : 1;
+
 	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
 	conn->statistics = cval.val == 0 ? 0 : 1;
 
