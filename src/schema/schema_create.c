@@ -93,13 +93,14 @@ __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
 	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
-	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0) {
+	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
+	    !WT_STRING_MATCH("file", cval.str, cval.len)) {
 		prefix = cval.str;
 		len = cval.len;
 		suffix = "";
 	} else {
 		prefix = "file";
-		len = strlen("file");
+		len = strlen(prefix);
 		suffix = ".wt";
 	}
 	WT_RET_NOTFOUND_OK(ret);
@@ -225,21 +226,24 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	size_t len;
 	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
-	prefix = "file:";
-	suffix = ".wti";
 	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-	    WT_STRING_MATCH("lsm", cval.str, cval.len)) {
-		prefix = "lsm:";
+	    !WT_STRING_MATCH("file", cval.str, cval.len)) {
+		prefix = cval.str;
+		len = cval.len;
 		suffix = "_idx";
+	} else {
+		prefix = "file";
+		len = strlen(prefix);
+		suffix = ".wti";
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	tablename = table->name + strlen("table:");
-	WT_RET(__wt_buf_fmt(session, buf, "%s%s_%s%s",
-	    prefix, tablename, idxname, suffix));
+	WT_RET(__wt_buf_fmt(session, buf, "%.*s:%s_%s%s",
+	    (int)len, prefix, tablename, idxname, suffix));
 
 	return (0);
 }
