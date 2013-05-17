@@ -1,9 +1,16 @@
 // Test validation of connection strings passed to the JavaScript "connect()" function.
 // Related to SERVER-8030.
 
+port = "27017"
+
+if ( db.getMongo().host.indexOf( ":" ) >= 0 ) {
+    var idx = db.getMongo().host.indexOf( ":" );
+    port = db.getMongo().host.substring( idx + 1 );
+}
+
 var goodStrings = [
-        "localhost:27999/test",
-        "127.0.0.1:27999/test"
+        "localhost:" + port + "/test",
+        "127.0.0.1:" + port + "/test"
     ];
 
 var badStrings = [
@@ -16,8 +23,8 @@ var badStrings = [
         { s: "/",                       r: /^Missing host name/ },
         { s: ":/",                      r: /^Missing host name/ },
         { s: ":/test",                  r: /^Missing host name/ },
-        { s: ":27999/",                 r: /^Missing host name/ },
-        { s: ":27999/test",             r: /^Missing host name/ },
+        { s: ":" + port + "/",                 r: /^Missing host name/ },
+        { s: ":" + port + "/test",             r: /^Missing host name/ },
         { s: "/test",                   r: /^Missing host name/ },
         { s: "localhost:/test",         r: /^Missing port number/ },
         { s: "127.0.0.1:/test",         r: /^Missing port number/ },
@@ -26,8 +33,8 @@ var badStrings = [
         { s: "127.0.0.1:123456/test",   r: /^Invalid port number/ },
         { s: "127.0.0.1:65536/test",    r: /^Invalid port number/ },
         { s: "::1:65536/test",          r: /^Invalid port number/ },
-        { s: "127.0.0.1:27999/",        r: /^Missing database name/ },
-        { s: "::1:27999/",              r: /^Missing database name/ }
+        { s: "127.0.0.1:" + port + "/",        r: /^Missing database name/ },
+        { s: "::1:" + port + "/",              r: /^Missing database name/ }
     ];
 
 function testGood(i, connectionString) {
