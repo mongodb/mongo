@@ -307,19 +307,24 @@ namespace mongo {
                             state->now = out.getOwned();
                         }
                         else {
+                            str::stream errorStream;
+                            errorStream << "serverStatus failed";
+                            BSONElement errorField = out["errmsg"];
+                            if (errorField.type() == String)
+                                errorStream << ": " << errorField.str();
                             scoped_lock lk( state->lock );
-                            state->error = "serverStatus failed";
+                            state->error = errorStream;
                             state->lastUpdate = time(0);
                         }
 
                         if ( out["shardCursorType"].type() == Object ||
-                             out["process"].String() == "mongos" ) {
+                             out["process"].str() == "mongos" ) {
                             state->mongos = true;
                             if ( cycleNumber % 10 == 1 ) {
                                 auto_ptr<DBClientCursor> c = conn.query( ShardType::ConfigNS , BSONObj() );
                                 vector<BSONObj> shards;
                                 while ( c->more() ) {
-                                    shards.push_back( c->next().getOwned() );
+                                    shards.push_back( c->nextSafe().getOwned() );
                                 }
                                 scoped_lock lk( state->lock );
                                 state->shards = shards;
