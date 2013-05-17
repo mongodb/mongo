@@ -57,9 +57,9 @@ namespace mongo {
 
             case Array:
                 if ( partNum+1 < path.numParts() && isAllDigits( path.getPart( partNum+1 ) ) ) {
-                    *inArray = true;
+                    //*inArray = true;
                     curr = res.Obj();
-                    ++partNum;
+                    stop = true;
                 }
                 else {
                     stop = true;
