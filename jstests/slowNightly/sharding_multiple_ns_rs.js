@@ -29,7 +29,11 @@ s._rs[0].test.awaitReplication();
 
 s._rs[0].test.stopMaster( 15 , true )
 
-sleep( (20 + 10 + 5) * 1000 ); // Need to sleep ~20s for replica set failover in worst case, then ~10s for mongos to detect
+// Wait for the primary to come back online...
+var primary = s._rs[0].test.getPrimary();
+
+// Wait for the mongos to recognize the new primary...
+ReplSetTest.awaitRSClientHosts( db.getMongo(), primary, { ismaster : true } );
 
 assert.eq( 5 , db.foo.findOne( { _id : 5 } ).x );
 assert.eq( 5 , db.bar.findOne( { _id : 5 } ).x );
