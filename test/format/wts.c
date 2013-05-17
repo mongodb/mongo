@@ -249,7 +249,7 @@ wts_dump(const char *tag, int dump_bdb)
 	int offset, ret;
 	char cmd[256];
 
-	/* Data-sources that don't support dump comparisons. */
+	/* Data-sources that don't support dump through the wt utility. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		return;
 
@@ -277,8 +277,14 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	/* Data-sources that don't support salvage. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	/*
+	 * Data-sources that don't support salvage.
+	 *
+	 * XXX
+	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
+	 * don't do that for now.
+	 */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("lsm") || DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;
@@ -310,8 +316,14 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
-	/* Data-sources that don't support dump comparisons. */
-	if (DATASOURCE("memrata"))
+	/*
+	 * Data-sources that don't support verify.
+	 *
+	 * XXX
+	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
+	 * don't do that for now.
+	 */
+	if (DATASOURCE("lsm") || DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;
