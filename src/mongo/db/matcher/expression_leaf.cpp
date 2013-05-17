@@ -114,9 +114,6 @@ namespace mongo {
         }
 
         switch ( matchType() ) {
-        case NE:
-            _allHaveToMatch = true;
-            break;
         case LT:
         case LTE:
         case EQ:
@@ -147,11 +144,11 @@ namespace mongo {
                 return matchType() != EQ;
             }
 
-            return _invertForNE( false );
+            return false;
         }
 
         if ( _rhs.type() == Array ) {
-            if ( matchType() != EQ && matchType() != NE ) {
+            if ( matchType() != EQ ) {
                 return false;
             }
         }
@@ -171,18 +168,10 @@ namespace mongo {
             return x > 0;
         case GTE:
             return x >= 0;
-        case NE:
-            return x != 0;
         default:
             throw 1;
         }
         throw 1;
-    }
-
-    bool ComparisonMatchExpression::_invertForNE( bool normal ) const {
-        if ( matchType() == NE )
-            return !normal;
-        return normal;
     }
 
     void ComparisonMatchExpression::debugString( StringBuilder& debug, int level ) const {
@@ -194,7 +183,6 @@ namespace mongo {
         case EQ: debug << "=="; break;
         case GT: debug << "$gt"; break;
         case GTE: debug << "$gte"; break;
-        case NE: debug << "$ne"; break;
         default: debug << " UNKNOWN - should be impossible"; break;
         }
         debug << " " << _rhs.toString( false ) << "\n";

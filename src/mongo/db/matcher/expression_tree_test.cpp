@@ -127,8 +127,10 @@ namespace mongo {
 
     TEST( AndOp, MatchesSingleClause ) {
         BSONObj baseOperand = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonMatchExpression> ne( new NEMatchExpression() );
-        ASSERT( ne->init( "a", baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "a", baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<NotMatchExpression> ne( new NotMatchExpression() );
+        ASSERT( ne->init( eq.release() ).isOK() );
 
         AndMatchExpression andOp;
         andOp.add( ne.release() );
@@ -290,8 +292,10 @@ namespace mongo {
     */
     TEST( OrOp, MatchesSingleClause ) {
         BSONObj baseOperand = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonMatchExpression> ne( new NEMatchExpression() );
-        ASSERT( ne->init( "a", baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "a", baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<NotMatchExpression> ne( new NotMatchExpression() );
+        ASSERT( ne->init( eq.release() ).isOK() );
 
         OrMatchExpression orOp;
         orOp.add( ne.release() );
@@ -451,8 +455,10 @@ namespace mongo {
 
     TEST( NorOp, MatchesSingleClause ) {
         BSONObj baseOperand = BSON( "$ne" << 5 );
-        auto_ptr<ComparisonMatchExpression> ne( new NEMatchExpression() );
-        ASSERT( ne->init( "a", baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+        ASSERT( eq->init( "a", baseOperand[ "$ne" ] ).isOK() );
+        auto_ptr<NotMatchExpression> ne( new NotMatchExpression() );
+        ASSERT( ne->init( eq.release() ).isOK() );
 
         NorMatchExpression norOp;
         norOp.add( ne.release() );

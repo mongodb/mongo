@@ -306,15 +306,24 @@ namespace mongo {
                 return newIn.release();
             }
             else if ( cmp->getRHS().type() == jstNULL ) {
-                spliceInfo->hasNullEquality = true;
+                //spliceInfo->hasNullEquality = true;
+                return NULL;
             }
         }
 
         case MatchExpression::LTE:
         case MatchExpression::LT:
         case MatchExpression::GT:
-        case MatchExpression::GTE:
-        case MatchExpression::NE:
+        case MatchExpression::GTE: {
+            const ComparisonMatchExpression* cmp =
+                static_cast<const ComparisonMatchExpression*>( full );
+
+            if ( cmp->getRHS().type() == jstNULL ) {
+                // null and indexes don't play nice
+                //spliceInfo->hasNullEquality = true;
+                return NULL;
+            }
+        }
         case MatchExpression::REGEX:
         case MatchExpression::MOD: {
             const LeafMatchExpression* lme = static_cast<const LeafMatchExpression*>( full );
