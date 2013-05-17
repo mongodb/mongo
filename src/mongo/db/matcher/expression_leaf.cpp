@@ -32,41 +32,76 @@ namespace mongo {
         _fieldRef.parse( _path );
     }
 
+    bool LeafMatchExpression::_matchesElementExpandArray( const BSONElement& e ) const {
+        if ( e.eoo() )
+            return false;
+
+        if ( matchesSingleElement( e ) )
+            return true;
+
+        if ( e.type() == Array ) {
+            BSONObjIterator i( e.Obj() );
+            while ( i.more() ){
+                BSONElement sub = i.next();
+                if ( matchesSingleElement( sub ) )
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     bool LeafMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
+        return _matches( _fieldRef, doc, details );
+    }
+
+    bool LeafMatchExpression::_matches( const FieldRef& fieldRef,
+                                        const MatchableDocument* doc,
+                                        MatchDetails* details ) const {
+
         bool traversedArray = false;
         size_t idxPath = 0;
-        BSONElement e = doc->getFieldDottedOrArray( _fieldRef, &idxPath, &traversedArray );
+        BSONElement e = doc->getFieldDottedOrArray( fieldRef, &idxPath, &traversedArray );
 
         if ( e.type() != Array || traversedArray ) {
             return matchesSingleElement( e );
         }
 
+        string rest = fieldRef.dottedField( idxPath + 1 );
+        StringData next = fieldRef.getPart( idxPath + 1 );
+        bool nextIsNumber = isAllDigits( next );
+
         BSONObjIterator i( e.Obj() );
         while ( i.more() ) {
             BSONElement x = i.next();
+
             bool found = false;
-            if ( idxPath + 1 == _fieldRef.numParts() ) {
+            if ( rest.size() == 0 ) {
                 found = matchesSingleElement( x );
             }
-            else if ( x.isABSONObj() ) {
-                string rest = _fieldRef.dottedField( idxPath+1 );
-                BSONElement y = x.Obj().getFieldDotted( rest );
+            else if ( x.type() == Object ) {
+                FieldRef myFieldRef;
+                myFieldRef.parse( rest );
+                BSONMatchableDocument myDoc( x.Obj() );
+                found = _matches( myFieldRef, &myDoc, NULL );
+            }
 
-                if ( !y.eoo() )
-                    found = matchesSingleElement( y );
 
-                if ( !found && y.type() == Array ) {
-                    // we iterate this array as well it seems
-                    BSONObjIterator j( y.Obj() );
-                    while( j.more() ) {
-                        BSONElement sub = j.next();
-                        found = matchesSingleElement( sub );
-                        if ( found )
-                            break;
-                    }
+            if ( !found && nextIsNumber && next == x.fieldName() ) {
+                string reallyNext = fieldRef.dottedField( idxPath + 2 );
+                if ( reallyNext.size() == 0 ) {
+                    found = matchesSingleElement( x );
                 }
-
+                else if ( x.isABSONObj() ) {
+                    // TODO: this is slow
+                    FieldRef myFieldRef;
+                    myFieldRef.parse( "x." + reallyNext );
+                    BSONObjBuilder b;
+                    b.appendAs( x, "x" );
+                    BSONObj temp = b.obj();
+                    BSONMatchableDocument myDoc( temp );
+                    found = _matches( myFieldRef, &myDoc, NULL );
+                }
             }
 
             if ( found ) {
@@ -82,6 +117,11 @@ namespace mongo {
             else if ( _allHaveToMatch ) {
                 return false;
             }
+        }
+
+        if ( rest.size() > 0 ) {
+            // we're supposed to have gone further down
+            return false;
         }
 
         return matchesSingleElement( e );

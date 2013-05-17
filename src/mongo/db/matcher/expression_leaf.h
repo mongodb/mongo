@@ -47,12 +47,18 @@ namespace mongo {
 
     protected:
         void initPath( const StringData& path );
-
-        bool _matchesElementExpandArray( const BSONElement& e ) const;
-
         bool _allHaveToMatch;
 
     private:
+        bool _matches( const FieldRef& fieldRef,
+                       const MatchableDocument* doc,
+                       MatchDetails* details ) const;
+
+
+
+
+        bool _matchesElementExpandArray( const BSONElement& e ) const;
+
         StringData _path;
         FieldRef _fieldRef;
     };
