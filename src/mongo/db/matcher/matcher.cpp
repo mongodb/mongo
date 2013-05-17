@@ -91,7 +91,7 @@ namespace mongo {
                                                      BSONElementSet &ret,
                                                      bool expandLastArray ) const {
         BSONObjIterator patternIterator( _pattern );
-        BSONObjIterator docIterator( _pattern );
+        BSONObjIterator docIterator( _doc );
 
         while ( patternIterator.more() ) {
             BSONElement patternElement = patternIterator.next();
@@ -125,8 +125,9 @@ namespace mongo {
         MatchExpression* indexExpression = spliceForIndex( constrainIndexKey,
                                                            docMatcher._expression.get(),
                                                            &_spliceInfo );
-        if ( indexExpression )
+        if ( indexExpression ) {
             _expression.reset( indexExpression );
+        }
     }
 
     bool Matcher2::matches(const BSONObj& doc, MatchDetails* details ) const {
@@ -162,34 +163,47 @@ namespace mongo {
 
     namespace {
         bool _isExistsFalse( const MatchExpression* e, bool negated, int depth ) {
-            if ( e->matchType() == MatchExpression::EXISTS ){
+            switch( e->matchType() ) {
+            case MatchExpression::EXISTS: {
                 if ( depth > 0 )
                     return true;
+                // i'm "good" unless i'm negated
                 return negated;
             }
 
-            if ( e->matchType() == MatchExpression::AND ||
-                 e->matchType() == MatchExpression::NOR ||
-                 e->matchType() == MatchExpression::OR ) {
+            case MatchExpression::NOT: {
+                if ( e->getChild(0)->matchType() == MatchExpression::AND )
+                    depth--;
+                return _isExistsFalse( e->getChild(0), !negated, depth );
+            }
 
+            case MatchExpression::EQ: {
+                const ComparisonMatchExpression* cmp =
+                    static_cast<const ComparisonMatchExpression*>( e );
+                if ( cmp->getRHS().type() == jstNULL ) {
+                    // i'm "bad" unless i'm negated
+                    return !negated;
+                }
+            }
+
+            default:
                 for ( unsigned i = 0; i < e->numChildren(); i++  ) {
                     if ( _isExistsFalse( e->getChild(i), negated, depth + 1 ) )
                         return true;
                 }
                 return false;
             }
-
-            if ( e->matchType() == MatchExpression::NOT ) {
-                if ( e->getChild(0)->matchType() == MatchExpression::AND )
-                    depth--;
-                return _isExistsFalse( e->getChild(0), !negated, depth );
-            }
-
             return false;
         }
     }
 
     bool Matcher2::hasExistsFalse() const {
+        if ( _spliceInfo.hasNullEquality ) {
+            // { a : NULL } is very dangerous as it may not got indexed in some cases
+            // so we just totally ignore
+            return true;
+        }
+
         return _isExistsFalse( _expression.get(), false,
                                _expression->matchType() == MatchExpression::AND ? -1 : 0 );
     }
@@ -339,6 +353,20 @@ namespace mongo {
             InMatchExpression* cloned = static_cast<InMatchExpression*>(lme->shallowClone());
             if ( cloned->getArrayFilterEntries()->hasEmptyArray() )
                 cloned->getArrayFilterEntries()->addEquality( myUndefinedElement );
+
+            // since { $in : [[1]] } matches [1], need to explode
+            for ( BSONElementSet::const_iterator i = cloned->getArrayFilterEntries()->equalities().begin();
+                  i != cloned->getArrayFilterEntries()->equalities().end();
+                  ++i ) {
+                const BSONElement& x = *i;
+                if ( x.type() == Array ) {
+                    BSONObjIterator j( x.Obj() );
+                    while ( j.more() ) {
+                        cloned->getArrayFilterEntries()->addEquality( j.next() );
+                    }
+                }
+            }
+
             return cloned;
         }
 
