@@ -495,6 +495,8 @@ __wt_struct_sizev(
 	WT_PACK_VALUE pv;
 	size_t total;
 
+	WT_CLEAR(pv);
+
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
 		WT_PACK_GET(session, pv, ap);
