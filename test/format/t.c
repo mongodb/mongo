@@ -167,8 +167,8 @@ main(int argc, char *argv[])
 		/* Overwrite the progress line with a completion line. */
 		if (g.track)
 			printf("\r%78s\r", " ");
-		printf("%4d: %s %s\n",
-		    g.run_cnt, g.c_file_type, g.c_data_source);
+		printf("%4d: %s, %s\n",
+		    g.run_cnt, g.c_data_source, g.c_file_type);
 	}
 
 	/* Flush/close any logging information. */

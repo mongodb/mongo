@@ -211,20 +211,18 @@ wts_open(void)
 	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
 	/* Configure data types. */
+	if (DATASOURCE("kvsbdb"))
+		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
+
 	if (DATASOURCE("lsm"))
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
-
-	/* Configure data sources. */
-	if (DATASOURCE("kvsbdb"))
-		p += snprintf(
-		    p, (size_t)(end - p), ",source=\"kvsbdb:%s\"", WT_NAME);
 
 #define	MEMRATA_DEVICE		"/dev/loop0"
 #define	MEMRATA_DEVICE_FAKE	"RUNDIR/KVS"
 	if (DATASOURCE("memrata"))
-		p += snprintf(p, (size_t)(end - p),
-		    ",source=\"memrata:%s\",kvs_devices=[%s]",
-		    WT_NAME, MEMRATA_DEVICE);
+		p += snprintf(
+		    p, (size_t)(end - p), ",type=memrata,kvs_devices=[%s]",
+		    MEMRATA_DEVICE);
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
