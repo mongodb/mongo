@@ -7,11 +7,50 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_config_allocation_size --
+ *	Return the allocation size, corrected for direct I/O.
+ */
+int
+__wt_config_allocation_size(
+    WT_SESSION_IMPL *session, const char **cfg, uint32_t *allocsizep)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	int64_t align;
+
+	*allocsizep = 0;
+
+	conn = S2C(session);
+
+	WT_RET(__wt_config_gets(session, cfg, "allocation_size", &cval));
+
+	/*
+	 * This function exists as a place to hang this comment: if direct I/O
+	 * is configured, correct the allocation size to be at least as large
+	 * as the buffer alignment, and if not a multiple of the alignment,
+	 * increase it to the next largest multiple of the alignment.  Linux
+	 * gets unhappy if you configure direct I/O and then don't do I/O in
+	 * alignments and units of its happy place.
+	 */
+	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_DATA)) {
+		align = (int64_t)conn->buffer_alignment;
+		if (cval.val < align)
+			cval.val = align;
+		else if (cval.val % align != 0) {
+			cval.val += align - 1;
+			cval.val /= align;
+			cval.val *= align;
+		}
+	}
+	*allocsizep = (uint32_t)cval.val;
+	return (0);
+}
+
 static int
 __create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
 	uint32_t allocsize;
@@ -36,8 +75,7 @@ __create_file(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
-	WT_RET(__wt_config_gets(session, filecfg, "allocation_size", &cval));
-	allocsize = (uint32_t)cval.val;
+	WT_RET(__wt_config_allocation_size(session, filecfg, &allocsize));
 
 	/* Create the file. */
 	WT_ERR(__wt_block_manager_create(session, filename, allocsize));

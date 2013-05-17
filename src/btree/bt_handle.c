@@ -69,8 +69,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
 
-	WT_ERR(__wt_block_manager_open(
-	    session, filename, dhandle->cfg, forced_salvage, &btree->bm));
+	WT_ERR(__wt_block_manager_open(session, filename,
+	    dhandle->cfg, forced_salvage, btree->allocsize, &btree->bm));
 	bm = btree->bm;
 
 	/*
@@ -562,8 +562,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 
-	WT_RET(__wt_config_gets(session, cfg, "allocation_size", &cval));
-	btree->allocsize = (uint32_t)cval.val;
+	WT_RET(__wt_config_allocation_size(session, cfg, &btree->allocsize));
 	WT_RET(__wt_config_gets(session, cfg, "internal_page_max", &cval));
 	btree->maxintlpage = (uint32_t)cval.val;
 	WT_RET(__wt_config_gets(session, cfg, "internal_item_max", &cval));
