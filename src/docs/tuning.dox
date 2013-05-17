@@ -217,8 +217,9 @@ configuration to the wiredtiger_open call should be configured to the
 correct value.
 
 Finally, if direct I/O is configured on any system, WiredTiger will
-silently change all file allocation sizes to be at least as large as
-the \c buffer_alignment value as well as a multiple of that value.
+silently change the file unit allocation size and the maximum leaf and
+internal page sizes to be at least as large as the \c buffer_alignment
+value as well as a multiple of that value.
 
 Direct I/O is based on the non-standard \c O_DIRECT flag to the POSIX
 1003.1 open system call and may not be available on all platforms.
