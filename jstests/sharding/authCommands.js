@@ -71,7 +71,7 @@ assert.soon( function() {
     var x = st.chunkDiff( "foo", "test" );
     print( "chunk diff: " + x );
     return x < 2 && configDB.locks.findOne({ _id : 'test.foo' }).state == 0;
-}, "no balance happened", 60000 );
+}, "no balance happened", 5 * 60 * 1000 );
 
 assert.soon( function(){
     print( "Waiting for migration cleanup to occur..." )
