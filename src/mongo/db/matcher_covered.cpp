@@ -91,13 +91,14 @@ namespace mongo {
             }
         }
 
-        if ( details )
-            details->setLoadedRecord( true );
-
         BSONObj obj = recLoc.obj();
         bool res =
             _docMatcher->matches( obj, details ) &&
             !isOrClauseDup( obj );
+
+        if ( details )
+            details->setLoadedRecord( true );
+
         LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;
         return res;
     }
