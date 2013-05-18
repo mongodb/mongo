@@ -68,8 +68,12 @@ namespace mongo {
         }
 
         string rest = fieldRef.dottedField( idxPath + 1 );
-        StringData next = fieldRef.getPart( idxPath + 1 );
-        bool nextIsNumber = isAllDigits( next );
+        StringData next;
+        bool nextIsNumber = false;
+        if ( rest.size() > 0 ){
+            next = fieldRef.getPart( idxPath + 1 );
+            nextIsNumber = isAllDigits( next );
+        }
 
         BSONObjIterator i( e.Obj() );
         while ( i.more() ) {
