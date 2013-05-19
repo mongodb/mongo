@@ -92,6 +92,7 @@ namespace mongo {
     class NotMatchExpression : public MatchExpression {
     public:
         NotMatchExpression() : MatchExpression( NOT ){}
+        NotMatchExpression( MatchExpression* e ) : MatchExpression( NOT ), _exp( e ){}
         /**
          * @param exp - I own it, and will delete
          */
