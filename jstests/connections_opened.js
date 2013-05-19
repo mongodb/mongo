@@ -1,5 +1,14 @@
 // Tests serverStatus tracking of connections opened
 
+var numPerTypeToCreate = 100;
+
+var availableConnections = db.serverStatus().connections.available;
+if ( availableConnections < ( numPerTypeToCreate * 10 ) ) {
+    numPerTypeToCreate = Math.floor( availableConnections / 10 );
+}
+
+print( "numPerTypeToCreate: " + numPerTypeToCreate );
+
 var testDB = 'connectionsOpenedTest';
 var signalCollection = 'keepRunning';
 
@@ -38,24 +47,26 @@ assert.gt(originalConnInfo.totalCreated, 0);
 
 jsTestLog("Creating persistent connections");
 var permConns = [];
-for (var i = 0; i < 100; i++) {
+for (var i = 0; i < numPerTypeToCreate; i++) {
     permConns.push(createPersistentConnection());
 }
 
 jsTestLog("Testing that persistent connections increased the current and totalCreated counters");
-waitForConnections(originalConnInfo.current + 100, originalConnInfo.totalCreated + 100);
+waitForConnections(originalConnInfo.current + numPerTypeToCreate,
+                   originalConnInfo.totalCreated + numPerTypeToCreate);
 
 jsTestLog("Creating temporary connections");
 db.getSiblingDB(testDB).dropDatabase();
 db.getSiblingDB(testDB).getCollection(signalCollection).insert({stop:false});
 
 var tempConns = [];
-for (var i = 0; i < 100; i++) {
+for (var i = 0; i < numPerTypeToCreate; i++) {
     tempConns.push(createTemporaryConnection());
 }
 
 jsTestLog("Testing that temporary connections increased the current and totalCreated counters");
-waitForConnections(originalConnInfo.current + 200, originalConnInfo.totalCreated + 200);
+waitForConnections(originalConnInfo.current + numPerTypeToCreate*2,
+                   originalConnInfo.totalCreated + numPerTypeToCreate*2);
 
 jsTestLog("Waiting for all temporary connections to be closed");
 // Notify waiting parallel shells to terminate, causing the connection count to go back down.
@@ -65,4 +76,8 @@ for (var i = 0; i < tempConns.length; i++) {
 }
 
 jsTestLog("Testing that current connections counter went down after temporary connections closed");
-waitForConnections(originalConnInfo.current + 100, originalConnInfo.totalCreated + 200);
+waitForConnections(originalConnInfo.current + numPerTypeToCreate,
+                   originalConnInfo.totalCreated + numPerTypeToCreate*2);
+
+persistent = null;
+gc();
