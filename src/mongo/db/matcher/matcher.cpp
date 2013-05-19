@@ -273,7 +273,6 @@ namespace mongo {
 
         case MatchExpression::OR:
 
-
         case MatchExpression::AND: {
             auto_ptr<ListOfMatchExpression> dup;
             for ( unsigned i = 0; i < full->numChildren(); i++ ) {
@@ -291,6 +290,8 @@ namespace mongo {
             if ( dup.get() ) {
                 if ( full->matchType() == MatchExpression::OR &&
                      dup->numChildren() != full->numChildren() ) {
+                    // TODO: I think this should actuall get a list of all the fields
+                    // and make sure that's the same
                     // with an $or, have to make sure its all or nothing
                     return NULL;
                 }
