@@ -272,6 +272,8 @@ namespace mongo {
             return NULL;
 
         case MatchExpression::OR:
+
+
         case MatchExpression::AND: {
             auto_ptr<ListOfMatchExpression> dup;
             for ( unsigned i = 0; i < full->numChildren(); i++ ) {
@@ -286,8 +288,14 @@ namespace mongo {
                 }
                 dup->add( sub );
             }
-            if ( dup.get() )
+            if ( dup.get() ) {
+                if ( full->matchType() == MatchExpression::OR &&
+                     dup->numChildren() != full->numChildren() ) {
+                    // with an $or, have to make sure its all or nothing
+                    return NULL;
+                }
                 return dup.release();
+            }
             return NULL;
         }
 
