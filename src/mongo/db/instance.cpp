@@ -138,9 +138,22 @@ namespace mongo {
             bool all = q.query["$all"].trueValue();
             vector<BSONObj> vals;
             {
+                BSONObj filter;
+                {
+                    BSONObjBuilder b;
+                    BSONObjIterator i( q.query );
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        if ( str::equals( "$all", e.fieldName() ) )
+                            continue;
+                        b.append( e );
+                    }
+                    filter = b.obj();
+                }
+
                 Client& me = cc();
                 scoped_lock bl(Client::clientsMutex);
-                scoped_ptr<Matcher> m(new Matcher(q.query));
+                scoped_ptr<Matcher> m(new Matcher(filter));
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
                     Client *c = *i;
                     verify( c );
