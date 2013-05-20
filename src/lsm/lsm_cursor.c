@@ -33,6 +33,13 @@
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 1))
 
+#define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
+	CURSOR_UPDATE_API_END(session, ret);				\
+	if (clsm->primary_chunk != NULL) {				\
+		WT_ASSERT(session, clsm->primary_chunk->ncursor > 0);	\
+		(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);	\
+	}
+
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_search(WT_CURSOR *);
 
@@ -43,6 +50,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 	    (clsm->dsk_gen != clsm->lsm_tree->dsk_gen ||
 	    (!update && !F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 		WT_RET(__clsm_open_cursors(clsm, update, 0, 0));
+	if (update && clsm->primary_chunk != NULL)
+		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
 	return (0);
 }
@@ -85,10 +94,8 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
 		return (0);
 
 	/* Detach from our old primary. */
-	if (clsm->primary_chunk != NULL) {
-		(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
+	if (clsm->primary_chunk != NULL)
 		clsm->primary_chunk = NULL;
-	}
 
 	if (skip_chunks < clsm->nchunks)
 		WT_FORALL_CURSORS(clsm, c, i) {
@@ -260,7 +267,6 @@ __clsm_open_cursors(
 	/* The last chunk is our new primary. */
 	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
-		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
 		__wt_btree_evictable(session, 0);
 	}
@@ -947,7 +953,7 @@ __clsm_insert(WT_CURSOR *cursor)
 
 	ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 
@@ -970,7 +976,7 @@ __clsm_update(WT_CURSOR *cursor)
 	    (ret = __clsm_search(cursor)) == 0)
 		ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 
@@ -992,7 +998,7 @@ __clsm_remove(WT_CURSOR *cursor)
 	    (ret = __clsm_search(cursor)) == 0)
 		ret = __clsm_put(session, clsm, &cursor->key, &__lsm_tombstone);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 
