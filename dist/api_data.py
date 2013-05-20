@@ -580,6 +580,9 @@ methods = {
 		Config('enabled', 'true"', r'''
 		enable logging subsystem''',
                 type='boolean'),
+                Config('file_max', '100MB', r''',
+		the maximum size of the log file''',
+		min='1MB', max='2GB'),
 		Config('path', '""', r'''
 		the pathname to a file into which the log records are written.
                 It will have log numbers appended to it the file name.  If the

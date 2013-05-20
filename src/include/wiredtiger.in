@@ -1382,11 +1382,15 @@ struct __wt_connection {
  * archive unneeded log files., a boolean flag; default \c true".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a boolean
  * flag; default \c true".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname
- * to a file into which the log records are written.  It will have log numbers
- * appended to it the file name.  If the value is not an absolute path name\,
- * the file is created relative to the database home., a string; default \c "".}
- * @config{ ),,}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, \, the
+ * maximum size of the log file., an integer between 1MB and 2GB; default \c
+ * 100MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
+ * which the log records are written.  It will have log numbers appended to it
+ * the file name.  If the value is not an absolute path name\, the file is
+ * created relative to the database home., a string; default \c "".}
+ * @config{
+ * ),,}
  * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
  * \c true.}
  * @config{mmap, Use memory mapping to access files when possible., a boolean
@@ -2355,42 +2359,44 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		44
 /*! log: total log sync operations */
 #define	WT_STAT_CONN_LOG_SYNC				45
+/*! log: total log write operations */
+#define	WT_STAT_CONN_LOG_WRITES				46
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			46
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			47
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			47
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			48
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			48
+#define	WT_STAT_CONN_MEMORY_FREE			49
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			49
+#define	WT_STAT_CONN_MEMORY_GROW			50
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				50
+#define	WT_STAT_CONN_READ_IO				51
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				51
+#define	WT_STAT_CONN_REC_PAGES				52
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			52
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			53
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			53
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			54
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			54
+#define	WT_STAT_CONN_RWLOCK_READ			55
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			55
+#define	WT_STAT_CONN_RWLOCK_WRITE			56
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		56
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		57
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			57
+#define	WT_STAT_CONN_TXN_ANCIENT			58
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				58
+#define	WT_STAT_CONN_TXN_BEGIN				59
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			59
+#define	WT_STAT_CONN_TXN_CHECKPOINT			60
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				60
+#define	WT_STAT_CONN_TXN_COMMIT				61
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			61
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			62
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			62
+#define	WT_STAT_CONN_TXN_ROLLBACK			63
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				63
+#define	WT_STAT_CONN_WRITE_IO				64
 
 /*!
  * @}

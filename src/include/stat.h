@@ -242,6 +242,7 @@ struct __wt_connection_stats {
 	WT_STATS log_slot_toobig;
 	WT_STATS log_slot_transitions;
 	WT_STATS log_sync;
+	WT_STATS log_writes;
 	WT_STATS lsm_rows_merged;
 	WT_STATS memory_allocation;
 	WT_STATS memory_free;

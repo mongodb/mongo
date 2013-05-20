@@ -213,6 +213,7 @@ static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
 static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ "archive", "boolean", NULL, NULL },
 	{ "enabled", "boolean", NULL, NULL },
+	{ "file_max", "int", "min=1MB,max=2GB", NULL },
 	{ "path", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -401,9 +402,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),create=0,"
 	  "direct_io=,error_prefix=,eviction_dirty_target=80,eviction_target=80"
 	  ",eviction_trigger=95,extensions=,hazard_max=1000,log=(archive=true\""
-	  ",enabled=true\",path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
-	  "session_max=50,shared_cache=(chunk=10MB,name=pool,reserve=0,"
-	  "size=500MB),statistics=0,statistics_log=(clear=,"
+	  ",enabled=true\",file_max=100MB,path=\"\"),lsm_merge=,mmap=,"
+	  "multiprocess=0,session_max=50,shared_cache=(chunk=10MB,name=pool,"
+	  "reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
 	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\","
 	  "wait=0),sync=,transactional=,use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open

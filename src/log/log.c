@@ -210,6 +210,11 @@ myslot->slot, logrec->real_len,
 myslot->offset + myslot->slot->slot_start_offset,
 myslot->offset + myslot->slot->slot_start_offset);
 fprintf(stderr, "log_fill: slot 0x%x from address 0x%x\n",myslot->slot, logrec);
+	/*
+	 * Although we're writing the real length, record the total length of
+	 * the rounded record in the stats.  Don't do atomically.
+	 */
+	WT_CSTAT_INCRV(session, log_bytes_written, logrec->total_len);
 	return (__wt_write(session, myslot->slot->slot_fh,
 	    myslot->offset + myslot->slot->slot_start_offset,
 	    logrec->real_len, (void *)logrec));
@@ -239,6 +244,7 @@ fprintf(stderr, "log_release: slot 0x%x closing old fh %x\n",slot,log->log_close
 		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
 	}
 	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
+		WT_CSTAT_INCR(session, log_sync);
 		WT_RET(__wt_fsync(session, log->log_fh));
 		FLD_CLR(slot->slot_flags, SLOT_SYNC);
 		log->sync_lsn = log->write_lsn;
@@ -289,8 +295,9 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->checksum = 0;
 	logrec->checksum = __wt_hash_fnv64(logrec, record->size);
 
-	memset(tmp, 0, sizeof(tmp));
+	memset(&tmp, 0, sizeof(tmp));
 fprintf(stderr, "log_write: log real_len: %d, total_len %d, chksum 0x%X\n",logrec->real_len, logrec->total_len, logrec->checksum);
+	WT_CSTAT_INCR(session, log_writes);
 	if (__wt_spin_trylock(session, &log->log_slot_lock) == 0) {
 fprintf(stderr, "log_write: got lock\n");
 		/*

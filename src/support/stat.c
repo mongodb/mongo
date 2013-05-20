@@ -350,6 +350,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_slot_transitions.desc =
 	    "log: total consolidated slot join transitions";
 	stats->log_sync.desc = "log: total log sync operations";
+	stats->log_writes.desc = "log: total log write operations";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
@@ -421,6 +422,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->log_slot_toobig.v = 0;
 	stats->log_slot_transitions.v = 0;
 	stats->log_sync.v = 0;
+	stats->log_writes.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;

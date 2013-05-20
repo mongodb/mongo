@@ -99,6 +99,7 @@ connection_stats = [
 	Stat('log_slot_toobig', 'log: record size exceeded maximum'),
 	Stat('log_slot_transitions',
             'log: total consolidated slot join transitions'),
+	Stat('log_writes', 'log: total log write operations'),
 
 	##########################################
 	# Reconciliation statistics

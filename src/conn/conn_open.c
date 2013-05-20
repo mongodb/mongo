@@ -52,15 +52,19 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 	conn->cache_evict_tid_set = 1;
 
+	/*
+	 * Start the optional statistics thread.  Start statistics first
+	 * so that other optional threads can know whether statistics are
+	 * enabled or not.
+	 */
+	WT_RET(__wt_statlog_create(conn, cfg));
+
 fprintf(stderr, "Calling wt_logger_create\n");
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_logger_create(conn, cfg));
 
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_checkpoint_create(conn, cfg));
-
-	/* Start the optional statistics thread. */
-	WT_RET(__wt_statlog_create(conn, cfg));
 
 	return (0);
 }
