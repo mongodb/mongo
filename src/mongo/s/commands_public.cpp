@@ -396,6 +396,7 @@ namespace mongo {
                 log() << "DROP: " << fullns << endl;
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                    log() << "\tdrop going to do passthrough" << endl;
                     return passthrough( conf , cmdObj , result );
                 }
 
@@ -407,7 +408,10 @@ namespace mongo {
                 ShardPtr primary;
                 conf->getChunkManagerOrPrimary( fullns, cm, primary );
 
-                if( ! cm ) return passthrough( conf , cmdObj , result );
+                if( ! cm ) {
+                    log() << "\tdrop going to do passthrough after re-check" << endl;
+                    return passthrough( conf , cmdObj , result );
+                }
 
                 cm->drop( cm );
 
