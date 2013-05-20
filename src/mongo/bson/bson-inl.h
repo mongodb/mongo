@@ -272,17 +272,17 @@ dodouble:
         return BSONElement();
     }
 
-    inline int BSONObj::getIntField(const char *name) const {
+    inline int BSONObj::getIntField(const StringData& name) const {
         BSONElement e = getField(name);
         return e.isNumber() ? (int) e.number() : std::numeric_limits< int >::min();
     }
 
-    inline bool BSONObj::getBoolField(const char *name) const {
+    inline bool BSONObj::getBoolField(const StringData& name) const {
         BSONElement e = getField(name);
         return e.type() == Bool ? e.boolean() : false;
     }
 
-    inline const char * BSONObj::getStringField(const char *name) const {
+    inline const char * BSONObj::getStringField(const StringData& name) const {
         BSONElement e = getField(name);
         return e.type() == String ? e.valuestr() : "";
     }
@@ -810,7 +810,7 @@ dodouble:
         return e;
     }
 
-    inline BSONObj BSONObj::getObjectField(const char *name) const {
+    inline BSONObj BSONObj::getObjectField(const StringData& name) const {
         BSONElement e = getField(name);
         BSONType t = e.type();
         return t == Object || t == Array ? e.embeddedObject() : BSONObj();

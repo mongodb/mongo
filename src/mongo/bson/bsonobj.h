@@ -209,11 +209,7 @@ namespace mongo {
         /** Get the field of the specified name. eoo() is true on the returned
             element if not found.
         */
-        BSONElement operator[] (const char *field) const {
-            return getField(field);
-        }
-
-        BSONElement operator[] (const std::string& field) const {
+        BSONElement operator[] (const StringData& field) const {
             return getField(field);
         }
 
@@ -230,18 +226,18 @@ namespace mongo {
         bool hasElement(const StringData& name) const { return hasField(name); }
 
         /** @return "" if DNE or wrong type */
-        const char * getStringField(const char *name) const;
+        const char * getStringField(const StringData& name) const;
 
         /** @return subobject of the given name */
-        BSONObj getObjectField(const char *name) const;
+        BSONObj getObjectField(const StringData& name) const;
 
         /** @return INT_MIN if not present - does some type conversions */
-        int getIntField(const char *name) const;
+        int getIntField(const StringData& name) const;
 
         /** @return false if not present 
             @see BSONElement::trueValue()
          */
-        bool getBoolField(const char *name) const;
+        bool getBoolField(const StringData& name) const;
 
         /** @param pattern a BSON obj indicating a set of (un-dotted) field
          *  names.  Element values are ignored.
@@ -266,7 +262,8 @@ namespace mongo {
 
         BSONObj filterFieldsUndotted(const BSONObj &filter, bool inFilter) const;
 
-        BSONElement getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const;
+        BSONElement getFieldUsingIndexNames(const StringData& fieldName,
+                                            const BSONObj &indexKey) const;
 
         /** arrays are bson objects with numeric and increasing field names
             @return true if field names are numeric and increasing

@@ -742,14 +742,15 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONElement BSONObj::getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const {
+    BSONElement BSONObj::getFieldUsingIndexNames(const StringData& fieldName,
+                                                 const BSONObj &indexKey) const {
         BSONObjIterator i( indexKey );
         int j = 0;
         while( i.moreWithEOO() ) {
             BSONElement f = i.next();
             if ( f.eoo() )
                 return BSONElement();
-            if ( strcmp( f.fieldName(), fieldName ) == 0 )
+            if ( f.fieldName() == fieldName )
                 break;
             ++j;
         }
