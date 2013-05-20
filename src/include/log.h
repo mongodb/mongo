@@ -8,7 +8,8 @@
 #define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
 
 /* Logging subsystem declarations. */
-#define	LOG_ALIGN	128
+#define	LOG_ALIGN		128
+#define	LOG_ALIGN_DIRECTIO	4096
 #define	LOG_FILE_SIZE	(5*1024*1024)		/* 100Mb */
 
 struct __wt_lsn {
@@ -106,6 +107,10 @@ typedef struct {
 } WT_MYSLOT;
 
 typedef struct {
+	uint32_t	allocsize;	/* Allocation alignment size */
+	/*
+	 * Log file information
+	 */
 	uint32_t	 fileid;	/* Current log file number */
 	WT_FH           *log_fh;	/* Logging file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
@@ -141,13 +146,25 @@ typedef struct {
 } WT_LOG;
 
 typedef struct {
-	uint32_t	total_len;	/* Length of record rounded up  */
-	uint32_t	real_len;	/* Length of record including hdr */
-	uint64_t	checksum;	/* Checksum of just the record */
+	uint32_t	total_len;	/* 00-03: Record length, rounded up  */
+	uint32_t	real_len;	/* 04-07: Record length including hdr */
+	uint32_t	checksum;	/* 08-11: Checksum of the record */
+	uint32_t	unused;		/* 12-15: Padding */
 	uint8_t		record[0];	/* Beginning of actual data */
 } WT_LOG_RECORD;
 
-#define	WT_LOG_MAGIC	0x101064
-typedef struct {
-	uint32_t	log_magic;
-} WT_LOGFILE_HDR;
+/*
+ * WT_LOG_DESC --
+ *	The log file's description.
+ */
+struct __wt_log_desc {
+#define	WT_LOG_MAGIC		0x101064
+	uint32_t	log_magic;	/* 00-03: Magic number */
+#define	WT_BLOCK_MAJOR_VERSION	1
+	uint16_t	majorv;		/* 04-05: Major version */
+#define	WT_BLOCK_MINOR_VERSION	0
+	uint16_t	minorv;		/* 06-07: Minor version */
+
+	uint32_t	cksum;		/* 08-11: Log description checksum */
+	uint32_t	unused;		/* 12-15: Padding */
+};

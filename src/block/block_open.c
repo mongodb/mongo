@@ -20,7 +20,7 @@ __wt_block_manager_truncate(WT_SESSION_IMPL *session, const char *filename)
 	WT_FH *fh;
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 0, 0, 1, &fh));
+	WT_RET(__wt_open(session, filename, 0, 0, WT_DIRECTIO_DATA, &fh));
 
 	/* Truncate the file. */
 	WT_ERR(__wt_ftruncate(session, fh, (off_t)0));
@@ -45,7 +45,7 @@ __wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename)
 	WT_FH *fh;
 
 	/* Create the underlying file and open a handle. */
-	WT_RET(__wt_open(session, filename, 1, 1, 1, &fh));
+	WT_RET(__wt_open(session, filename, 1, 1, WT_DIRECTIO_DATA, &fh));
 
 	/* Write out the file's meta-data. */
 	ret = __wt_desc_init(session, fh);
@@ -157,7 +157,8 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 #endif
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
+	WT_ERR(__wt_open(
+	    session, filename, 0, 0, WT_DIRECTIO_DATA, &block->fh));
 
 	/* Initialize the live checkpoint's lock. */
 	__wt_spin_init(session, &block->live_lock);

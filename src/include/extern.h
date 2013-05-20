@@ -887,7 +887,7 @@ extern int __wt_open(WT_SESSION_IMPL *session,
     const char *name,
     int ok_create,
     int exclusive,
-    int is_tree,
+    int dio_type,
     WT_FH **fhp);
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_has_priv(void);

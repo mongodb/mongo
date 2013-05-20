@@ -95,7 +95,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	WT_VERBOSE_ERR(session, log, "opening log %s",
 	    (const char *)path->data);
 fprintf(stderr,"opening log %s\n", (const char *)path->data);
-	WT_ERR(__wt_open(session, path->data, 1, 0, 0, &log->log_fh));
+	WT_ERR(__wt_open(
+	    session, path->data, 1, 0, WT_DIRECTIO_LOG, &log->log_fh));
 err:	__wt_scr_free(&path);
 	return (ret);
 }
@@ -129,8 +130,6 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t recsize)
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-fprintf(stderr, "log_size_fit: size %d + offset %d = %d ; max %d\n",
-recsize, lsn->offset, lsn->offset+recsize,conn->log_file_max);
 	return (lsn->offset + recsize < conn->log_file_max);
 
 }
@@ -169,7 +168,6 @@ __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
 
 	conn = S2C(session);
 	log = conn->log;
-fprintf(stderr, "log_acquire: called\n");
 	/*
 	 * Called locked.  Add recsize to alloc_lsn.  Save our starting LSN
 	 * as where the previous allocation finished.  That way when log files
@@ -210,11 +208,8 @@ myslot->slot, logrec->real_len,
 myslot->offset + myslot->slot->slot_start_offset,
 myslot->offset + myslot->slot->slot_start_offset);
 fprintf(stderr, "log_fill: slot 0x%x from address 0x%x\n",myslot->slot, logrec);
-	/*
-	 * Although we're writing the real length, record the total length of
-	 * the rounded record in the stats.  Don't do atomically.
-	 */
-	WT_CSTAT_INCRV(session, log_bytes_written, logrec->total_len);
+	WT_CSTAT_INCRV(session, log_bytes_total_written, logrec->total_len);
+	WT_CSTAT_INCRV(session, log_bytes_written, logrec->real_len);
 	return (__wt_write(session, myslot->slot->slot_fh,
 	    myslot->offset + myslot->slot->slot_start_offset,
 	    logrec->real_len, (void *)logrec));
@@ -291,7 +286,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 */
 	logrec = (WT_LOG_RECORD *)record->mem;
 	logrec->real_len = record->size;
-	logrec->total_len = __wt_rduppo2(record->size, LOG_ALIGN);
+	logrec->total_len = __wt_rduppo2(record->size, log->allocsize);
 	logrec->checksum = 0;
 	logrec->checksum = __wt_hash_fnv64(logrec, record->size);
 
@@ -317,7 +312,6 @@ tmp.slot_start_lsn.file,tmp.slot_start_lsn.offset, myslot.offset);
 		WT_ERR(__log_release(session, record, &tmp));
 		return (0);
 	}
-fprintf(stderr, "log_write: did not get lock\n");
 	WT_ERR(__wt_log_slot_join(session, logrec->total_len, &myslot));
 	if (myslot.offset == 0) {
 		__wt_spin_lock(session, &log->log_slot_lock);
@@ -364,9 +358,7 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	WT_RET(__wt_buf_initsize(session, buf, len));
 
-	fprintf(stderr, "log_printf: need record len: %d\n",len);
 	logrec = (WT_LOG_RECORD *)buf->mem;
-	fprintf(stderr, "log_printf: mem at 0x%x, record at 0x%x\n",buf->mem,&logrec->record);
 	(void)vsnprintf(&logrec->record, len, fmt, ap);
 
 	WT_VERBOSE_RET(session, log, "log record: %s\n", (char *)&logrec->record);

@@ -339,6 +339,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
 	stats->file_open.desc = "files currently open";
+	stats->log_bytes_total_written.desc =
+	    "log: total log file bytes written";
 	stats->log_bytes_written.desc = "log: total log bytes written";
 	stats->log_max_filesize.desc = "log: maximum log file size";
 	stats->log_slot_closes.desc = "log: total consolidated slot closures";
@@ -414,6 +416,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->log_bytes_total_written.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_slot_closes.v = 0;
 	stats->log_slot_consolidated.v = 0;

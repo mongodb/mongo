@@ -233,6 +233,7 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
 	WT_STATS file_open;
+	WT_STATS log_bytes_total_written;
 	WT_STATS log_bytes_written;
 	WT_STATS log_max_filesize;
 	WT_STATS log_slot_closes;

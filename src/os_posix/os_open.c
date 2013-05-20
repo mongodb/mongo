@@ -53,7 +53,7 @@ err:	WT_SYSCALL_RETRY(close(fd), ret);
  */
 int
 __wt_open(WT_SESSION_IMPL *session,
-    const char *name, int ok_create, int exclusive, int is_tree, WT_FH **fhp)
+    const char *name, int ok_create, int exclusive, int dio_type, WT_FH **fhp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -114,7 +114,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		mode = 0;
 
 #ifdef O_DIRECT
-	if (is_tree && FLD_ISSET(conn->direct_io, WT_DIRECTIO_DATA)) {
+	if (dio_type && FLD_ISSET(conn->direct_io, dio_type)) {
 		f |= O_DIRECT;
 		direct_io = 1;
 	}
@@ -141,7 +141,7 @@ __wt_open(WT_SESSION_IMPL *session,
 
 #if defined(HAVE_POSIX_FADVISE)
 	/* Disable read-ahead on trees: it slows down random read workloads. */
-	if (is_tree)
+	if (dio_type == WT_DIRECTIO_DATA)
 		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
 #endif
 
@@ -180,7 +180,7 @@ err:		if (fh != NULL) {
 
 	__wt_free(session, path);
 
-	WT_UNUSED(is_tree);			/* Only used in #ifdef's. */
+	WT_UNUSED(dio_type);			/* Only used in #ifdef's. */
 	return (ret);
 }
 
