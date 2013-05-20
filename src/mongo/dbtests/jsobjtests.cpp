@@ -846,6 +846,16 @@ namespace JsobjTests {
                 ASSERT_EQUALS( 2 , o.getFieldDotted( "b.a" ).numberInt() );
                 ASSERT_EQUALS( 3 , o.getFieldDotted( "c.0.a" ).numberInt() );
                 ASSERT_EQUALS( 4 , o.getFieldDotted( "c.1.a" ).numberInt() );
+                ASSERT( o.getFieldDotted( "x" ).eoo() );
+                ASSERT( o.getFieldDotted( "a.x" ).eoo() );
+                ASSERT( o.getFieldDotted( "x.y" ).eoo() );
+                ASSERT( o.getFieldDotted( "" ).eoo() );
+                ASSERT( o.getFieldDotted( "." ).eoo() );
+                ASSERT( o.getFieldDotted( ".." ).eoo() );
+                ASSERT( o.getFieldDotted( "..." ).eoo() );
+                ASSERT( o.getFieldDotted( "a." ).eoo() );
+                ASSERT( o.getFieldDotted( ".a" ).eoo() );
+                ASSERT( o.getFieldDotted( "b.a." ).eoo() );
                 keyTest(o);
             }
         };

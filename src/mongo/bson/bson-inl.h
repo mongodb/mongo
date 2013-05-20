@@ -796,14 +796,15 @@ dodouble:
     /* return has eoo() true if no match
        supports "." notation to reach into embedded objects
     */
-    inline BSONElement BSONObj::getFieldDotted(const char *name) const {
-        BSONElement e = getField( name );
-        if ( e.eoo() ) {
-            const char *p = strchr(name, '.');
-            if ( p ) {
-                std::string left(name, p-name);
-                BSONObj sub = getObjectField(left.c_str());
-                return sub.isEmpty() ? BSONElement() : sub.getFieldDotted(p+1);
+    inline BSONElement BSONObj::getFieldDotted(const StringData& name) const {
+        BSONElement e = getField(name);
+        if (e.eoo()) {
+            size_t dot_offset = name.find('.');
+            if (dot_offset != string::npos) {
+                StringData left = name.substr(0, dot_offset);
+                StringData right = name.substr(dot_offset + 1);
+                BSONObj sub = getObjectField(left);
+                return sub.isEmpty() ? BSONElement() : sub.getFieldDotted(right);
             }
         }
 

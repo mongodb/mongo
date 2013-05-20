@@ -172,14 +172,7 @@ namespace mongo {
             @param name field to find. supports dot (".") notation to reach into embedded objects.
              for example "x.y" means "in the nested object in field x, retrieve field y"
         */
-        BSONElement getFieldDotted(const char *name) const;
-        /** @return the specified element.  element.eoo() will be true if not found.
-            @param name field to find. supports dot (".") notation to reach into embedded objects.
-             for example "x.y" means "in the nested object in field x, retrieve field y"
-        */
-        BSONElement getFieldDotted(const std::string& name) const {
-            return getFieldDotted( name.c_str() );
-        }
+        BSONElement getFieldDotted(const StringData &name) const;
 
         /** Like getFieldDotted(), but expands arrays and returns all matching objects.
          *  Turning off expandLastArray allows you to retrieve nested array objects instead of
