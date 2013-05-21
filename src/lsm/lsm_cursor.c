@@ -46,12 +46,12 @@ static int __clsm_search(WT_CURSOR *);
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 {
+	if (update && clsm->primary_chunk != NULL)
+		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 	    (clsm->dsk_gen != clsm->lsm_tree->dsk_gen ||
 	    (!update && !F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 		WT_RET(__clsm_open_cursors(clsm, update, 0, 0));
-	if (update && clsm->primary_chunk != NULL)
-		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
 	return (0);
 }
@@ -84,7 +84,7 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
  *	Close all of the btree cursors currently open.
  */
 static int
-__clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
+__clsm_close_cursors(WT_CURSOR_LSM *clsm, int update, u_int skip_chunks)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
@@ -94,8 +94,11 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
 		return (0);
 
 	/* Detach from our old primary. */
-	if (clsm->primary_chunk != NULL)
+	if (clsm->primary_chunk != NULL) {
+		if (update)
+			(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
 		clsm->primary_chunk = NULL;
+	}
 
 	if (skip_chunks < clsm->nchunks)
 		WT_FORALL_CURSORS(clsm, c, i) {
@@ -185,7 +188,7 @@ __clsm_open_cursors(
 			clsm->dsk_gen = lsm_tree->dsk_gen;
 			goto err;
 		}
-		WT_RET(__clsm_close_cursors(clsm, skip_chunks));
+		WT_RET(__clsm_close_cursors(clsm, update, skip_chunks));
 	}
 
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
@@ -267,6 +270,8 @@ __clsm_open_cursors(
 	/* The last chunk is our new primary. */
 	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
+		if (update)
+			(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
 		__wt_btree_evictable(session, 0);
 	}
@@ -1019,7 +1024,7 @@ __clsm_close(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
-	WT_TRET(__clsm_close_cursors(clsm, 0));
+	WT_TRET(__clsm_close_cursors(clsm, 0, 0));
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */
