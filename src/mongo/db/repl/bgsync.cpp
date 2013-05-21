@@ -339,13 +339,7 @@ namespace replset {
                         // "caught up".
                         //
                         dassert( !Lock::isLocked() );
-                        if( getSyncTarget() == theReplSet->box.getPrimary() ) { 
-                            DEV ONCE log() << "bgsync SleepToAllowBatching batch size:" << bs << endl;
-                            sleepmillis(SleepToAllowBatchingMillis);
-                        }
-                        else { 
-                            DEV ONCE log() << "bgsync skipping SleepToAllowBatching as we are not pulling from the primary" << endl;
-                        }
+                        sleepmillis(SleepToAllowBatchingMillis);
                     }
   
                     if (theReplSet->gotForceSync()) {
