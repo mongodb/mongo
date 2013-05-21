@@ -52,6 +52,22 @@ namespace mongo {
         return jsTime() - downSince;
     }
 
+    void HeartbeatInfo::updateFromLastPoll(const HeartbeatInfo& newInfo) {
+        hbstate = newInfo.hbstate;
+        health = newInfo.health;
+        upSince = newInfo.upSince;
+        downSince = newInfo.downSince;
+        lastHeartbeat = newInfo.lastHeartbeat;
+        lastHeartbeatMsg = newInfo.lastHeartbeatMsg;
+        // Note: lastHeartbeatRecv is updated through CmdReplSetHeartbeat::run().
+
+        syncingTo = newInfo.syncingTo;
+        opTime = newInfo.opTime;
+        skew = newInfo.skew;
+        authIssue = newInfo.authIssue;
+        ping = newInfo.ping;
+    }
+
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {
     public:
@@ -151,7 +167,9 @@ namespace mongo {
             }
 
             // note that we got a heartbeat from this node
-            from->get_hbinfo().recvHeartbeat();
+            theReplSet->mgr->send(boost::bind(&ReplSet::msgUpdateHBRecv,
+                                              theReplSet, from->hbinfo().id(), time(0)));
+
 
             return true;
         }
@@ -461,10 +479,6 @@ namespace mongo {
         // Heartbeat timeout
         time_t _timeout;
     };
-
-    void HeartbeatInfo::recvHeartbeat() {
-        lastHeartbeatRecv = time(0);
-    }
 
     int ReplSetHealthPollTask::s_try_offset = 0;
 

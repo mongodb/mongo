@@ -246,7 +246,16 @@ namespace mongo {
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) {
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
-                m->_hbinfo = h;
+                m->_hbinfo.updateFromLastPoll(h);
+                return;
+            }
+        }
+    }
+
+    void ReplSetImpl::msgUpdateHBRecv(unsigned id, time_t newTime) {
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->id() == id) {
+                m->_hbinfo.lastHeartbeatRecv = newTime;
                 return;
             }
         }
