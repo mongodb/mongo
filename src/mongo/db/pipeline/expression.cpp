@@ -30,9 +30,7 @@ namespace mongo {
 
     /// Helper function to easily wrap constants with $const.
     static Value serializeConstant(Value val) {
-        MutableDocument valBuilder;
-        valBuilder["$const"] = val;
-        return valBuilder.freezeToValue();
+        return Value(DOC("$const" << val));
     }
 
     /* --------------------------- Expression ------------------------------ */
@@ -553,12 +551,8 @@ namespace mongo {
     }
 
     Value ExpressionCoerceToBool::serialize() const {
-        MutableDocument valBuilder;
         // Serializing as an $and expression which will become a CoerceToBool
-        vector<Value> arrayMaker;
-        arrayMaker.push_back(pExpression->serialize());
-        valBuilder["$and"] = Value(arrayMaker);
-        return valBuilder.freezeToValue();
+        return Value(DOC("$and" << DOC_ARRAY(pExpression->serialize())));
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -1400,47 +1394,36 @@ namespace mongo {
 
         // FIXME This checks pointer equality not value equality.
         if (pRange->pTop == pRange->pBottom) {
-            vector<Value> array;
-            MutableDocument valBuilder;
-            array.push_back(pFieldPath->serialize());
-            array.push_back(serializeConstant(pRange->pTop));
-
-            valBuilder["$eq"] = Value(array);
-            return valBuilder.freezeToValue();
+            return Value(DOC("$eq" << DOC_ARRAY(pFieldPath->serialize()
+                                             << serializeConstant(pRange->pTop)
+                                             )));
         }
 
-        MutableDocument gtDoc;
+        Document gtDoc;
         if (!pRange->pBottom.missing()) {
-            vector<Value> array;
-            array.push_back(pFieldPath->serialize());
-            array.push_back(serializeConstant(pRange->pBottom));
-
-            gtDoc[(pRange->bottomOpen ? "$gt" : "$gte")] = Value(array);
+            const StringData& op = (pRange->bottomOpen ? "$gt" : "$gte");
+            gtDoc = DOC(op << DOC_ARRAY(pFieldPath->serialize()
+                                     << serializeConstant(pRange->pBottom)
+                                     ));
 
             if (pRange->pTop.missing()) {
-                return gtDoc.freezeToValue();
+                return Value(gtDoc);
             }
         }
 
-        MutableDocument ltDoc;
+        Document ltDoc;
         if (!pRange->pTop.missing()) {
-            vector<Value> array;
-            array.push_back(pFieldPath->serialize());
-            array.push_back(serializeConstant(pRange->pTop));
-            ltDoc[(pRange->topOpen ? "$lt" : "$lte")] = Value(array);
+            const StringData& op = (pRange->topOpen ? "$lt" : "$lte");
+            ltDoc = DOC(op << DOC_ARRAY(pFieldPath->serialize()
+                                     << serializeConstant(pRange->pTop)
+                                     ));
 
             if (pRange->pBottom.missing()) {
-                return ltDoc.freezeToValue();
+                return Value(ltDoc);
             }
         }
 
-        vector<Value> array;
-        MutableDocument valBuilder;
-        array.push_back(gtDoc.freezeToValue());
-        array.push_back(ltDoc.freezeToValue());
-        valBuilder["$and"] = Value(array);
-
-        return valBuilder.freezeToValue();
+        return Value(DOC("$and" << DOC_ARRAY(gtDoc << ltDoc)));
     }
 
     void ExpressionFieldRange::toMatcherBson(
@@ -2077,16 +2060,13 @@ namespace mongo {
     }
 
     Value ExpressionNary::serialize() const {
-        MutableDocument valBuilder;
-
         const size_t nOperand = vpOperand.size();
         vector<Value> array;
         /* build up the array */
         for(size_t i = 0; i < nOperand; i++)
             array.push_back(vpOperand[i]->serialize());
 
-        valBuilder[getOpName()] = Value(array);
-        return valBuilder.freezeToValue();
+        return Value(DOC(getOpName() << array));
     }
 
     void ExpressionNary::checkArgLimit(unsigned maxArgs) const {
