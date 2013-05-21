@@ -187,6 +187,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
 	slot->slot_start_offset = log->alloc_lsn.offset;
 	log->alloc_lsn.offset += recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
+	slot->slot_error = 0;
 	fprintf(stderr, "[%d] log_acquire: slot 0x%x startlsn %d,%d endlsn %d,%d recsize %d\n",pthread_self(),slot,
 slot->slot_start_lsn.file,slot->slot_start_lsn.offset,
 slot->slot_end_lsn.file,slot->slot_end_lsn.offset,recsize);
@@ -198,6 +199,7 @@ static int
 __log_fill(WT_SESSION_IMPL *session,
     WT_MYSLOT *myslot, WT_ITEM *record, WT_LSN *lsnp)
 {
+	WT_DECL_RET;
 	WT_LOG_RECORD *logrec;
 
 	logrec = (WT_LOG_RECORD *)record->mem;
@@ -211,7 +213,7 @@ myslot->slot, logrec->real_len,
 myslot->offset + myslot->slot->slot_start_offset,
 myslot->offset + myslot->slot->slot_start_offset);
 	fprintf(stderr, "[%d] log_fill: slot 0x%x from address 0x%x\n",pthread_self(),myslot->slot, logrec);
-	WT_RET(__wt_write(session, myslot->slot->slot_fh,
+	WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 	    myslot->offset + myslot->slot->slot_start_offset,
 	    logrec->real_len, (void *)logrec));
 	WT_CSTAT_INCRV(session, log_bytes_total_written, logrec->total_len);
@@ -220,13 +222,17 @@ myslot->offset + myslot->slot->slot_start_offset);
 		*lsnp = myslot->slot->slot_start_lsn;
 		lsnp->offset += myslot->offset;
 	}
-	return (0);
+err:
+	if (ret != 0 && myslot->slot->slot_error == 0)
+		myslot->slot->slot_error = ret;
+	return (ret);
 }
 
 static int
 __log_release(WT_SESSION_IMPL *session, uint32_t size, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LOG *log;
 
 	conn = S2C(session);
@@ -247,14 +253,18 @@ log->write_lsn.file,log->write_lsn.offset,slot->slot_start_lsn.file,slot->slot_s
 	}
 	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
 		WT_CSTAT_INCR(session, log_sync);
-		WT_RET(__wt_fsync(session, log->log_fh));
+		WT_ERR(__wt_fsync(session, log->log_fh));
 		FLD_CLR(slot->slot_flags, SLOT_SYNC);
 		log->sync_lsn = log->write_lsn;
 	fprintf(stderr, "[%d] log_release: slot 0x%x synced to lsn %d,%d\n",pthread_self(),slot,log->write_lsn.file,log->write_lsn.offset);
 	}
 	fprintf(stderr, "[%d] log_release: slot 0x%x after write_lsn %d,%d\n",pthread_self(),slot,
 log->write_lsn.file,log->write_lsn.offset);
-	return (0);
+
+err:
+	if (ret != 0 && slot->slot_error == 0)
+		slot->slot_error = ret;
+	return (ret);
 }
 
 int
@@ -355,12 +365,23 @@ tmp.slot_start_lsn.file,tmp.slot_start_lsn.offset, myslot.offset);
 	    WT_LOG_SLOT_DONE) {
 		WT_ERR(__log_release(session, record, myslot.slot));
 		WT_ERR(__wt_log_slot_free(myslot.slot));
-	} else if (LF_ISSET(WT_LOG_SYNC))
-		while (LOG_CMP(&log->sync_lsn, &tmp_lsn) <= 0)
+	} else if (LF_ISSET(WT_LOG_SYNC)) {
+		while (LOG_CMP(&log->sync_lsn, &tmp_lsn) <= 0 &&
+		    myslot.slot->slot_error == 0)
 			__wt_yield();
+	}
 err:
 	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
+	/*
+	 * If we're synchronous and some thread had an error, we don't know
+	 * if our write made it out to the file or not.  The error could be
+	 * before or after us.  So, if anyone got an error, we report it.
+	 * If we're not synchronous, only report if our own operation got
+	 * an error.
+	 */
+	if (LF_ISSET(WT_LOG_SYNC) && ret == 0)
+		ret = myslot.slot->slot_error;
 	return (ret);
 }
 
