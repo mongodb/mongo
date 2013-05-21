@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/auth_external_state_server_common.h"
+#include "mongo/db/auth/auth_session_external_state_server_common.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -31,10 +31,11 @@ namespace {
     // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost
     // will always be called before any calls to shouldIgnoreAuthChecks.  If this is not the case,
     // it could cause a security hole.
-    AuthExternalStateServerCommon::AuthExternalStateServerCommon() : _allowLocalhost(true) {}
-    AuthExternalStateServerCommon::~AuthExternalStateServerCommon() {}
+    AuthSessionExternalStateServerCommon::AuthSessionExternalStateServerCommon() :
+            _allowLocalhost(true) {}
+    AuthSessionExternalStateServerCommon::~AuthSessionExternalStateServerCommon() {}
 
-    void AuthExternalStateServerCommon::_checkShouldAllowLocalhost() {
+    void AuthSessionExternalStateServerCommon::_checkShouldAllowLocalhost() {
         if (!AuthorizationManager::isAuthEnabled())
             return;
         // If we know that an admin user exists, don't re-check.
@@ -55,7 +56,7 @@ namespace {
         }
     }
 
-    bool AuthExternalStateServerCommon::shouldIgnoreAuthChecks() const {
+    bool AuthSessionExternalStateServerCommon::shouldIgnoreAuthChecks() const {
         ClientBasic* client = ClientBasic::getCurrent();
         return !AuthorizationManager::isAuthEnabled() ||
                 (enableLocalhostAuthBypass &&client->getIsLocalHostConnection() && _allowLocalhost);

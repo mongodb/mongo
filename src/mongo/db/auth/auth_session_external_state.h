@@ -33,12 +33,12 @@ namespace mongo {
      * to test.  There are two classes that implement this interface, AuthExternalStateImpl, which
      * is what's used for the actual system, and AuthExternalStateMock, which is used in the tests.
      */
-    class AuthExternalState {
-        MONGO_DISALLOW_COPYING(AuthExternalState);
+    class AuthSessionExternalState {
+        MONGO_DISALLOW_COPYING(AuthSessionExternalState);
 
     public:
 
-        virtual ~AuthExternalState();
+        virtual ~AuthSessionExternalState();
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
@@ -69,7 +69,7 @@ namespace mongo {
         virtual void onLogoutDatabase(const std::string& dbname) = 0;
 
     protected:
-        AuthExternalState(); // This class should never be instantiated directly.
+        AuthSessionExternalState(); // This class should never be instantiated directly.
 
         // Queries the userNamespace with the given query and returns the privilegeDocument found
         // in *result.  Returns true if it finds a document matching the query, or false if not.

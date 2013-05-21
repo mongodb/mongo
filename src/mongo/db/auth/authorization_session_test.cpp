@@ -18,7 +18,7 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/auth_external_state_mock.h"
+#include "mongo/db/auth/auth_session_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
@@ -38,7 +38,7 @@ namespace {
         actions.addAction(ActionType::insert);
         Privilege writePrivilege("test", actions);
         Privilege allDBsWritePrivilege("*", actions);
-        AuthExternalStateMock* externalState = new AuthExternalStateMock();
+        AuthSessionExternalStateMock* externalState = new AuthSessionExternalStateMock();
         AuthorizationSession authzSession(externalState);
 
         ASSERT_FALSE(authzSession.checkAuthorization("test", ActionType::insert));
@@ -500,7 +500,7 @@ namespace {
                                      "roles" << BSONArrayBuilder().arr())));
     }
 
-    class AuthExternalStateImplictPriv : public AuthExternalStateMock {
+    class AuthExternalStateImplictPriv : public AuthSessionExternalStateMock {
     public:
         virtual bool _findUser(const string& usersNamespace,
                                const BSONObj& query,

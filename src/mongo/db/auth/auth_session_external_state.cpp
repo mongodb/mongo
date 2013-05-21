@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/auth_external_state.h"
+#include "mongo/db/auth/auth_session_external_state.h"
 
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
@@ -23,12 +23,12 @@
 
 namespace mongo {
 
-    AuthExternalState::AuthExternalState() {}
-    AuthExternalState::~AuthExternalState() {}
+    AuthSessionExternalState::AuthSessionExternalState() {}
+    AuthSessionExternalState::~AuthSessionExternalState() {}
 
-    Status AuthExternalState::getPrivilegeDocument(const std::string& dbname,
-                                                   const PrincipalName& principalName,
-                                                   BSONObj* result) {
+    Status AuthSessionExternalState::getPrivilegeDocument(const std::string& dbname,
+                                                          const PrincipalName& principalName,
+                                                          BSONObj* result) {
 
         if (dbname == StringData("$external", StringData::LiteralTag()) ||
             dbname == AuthorizationManager::SERVER_RESOURCE_NAME ||
@@ -82,7 +82,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthExternalState::_hasPrivilegeDocument(const std::string& dbname) const {
+    bool AuthSessionExternalState::_hasPrivilegeDocument(const std::string& dbname) const {
         std::string usersNamespace = dbname + ".system.users";
 
         BSONObj userBSONObj;

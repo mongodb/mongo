@@ -23,7 +23,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/auth_external_state.h"
+#include "mongo/db/auth/auth_session_external_state.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/principal_name.h"
 #include "mongo/db/auth/principal_set.h"
@@ -50,7 +50,7 @@ namespace mongo {
         static Status checkValidPrivilegeDocument(const StringData& dbname, const BSONObj& doc);
 
         // Takes ownership of the externalState.
-        explicit AuthorizationSession(AuthExternalState* externalState);
+        explicit AuthorizationSession(AuthSessionExternalState* externalState);
         ~AuthorizationSession();
 
         // Should be called at the beginning of every new request.  This performs the checks
@@ -183,7 +183,7 @@ namespace mongo {
         Privilege _modifyPrivilegeForSpecialCases(const Privilege& privilege);
 
 
-        scoped_ptr<AuthExternalState> _externalState;
+        scoped_ptr<AuthSessionExternalState> _externalState;
 
         // All the privileges that have been acquired by the authenticated principals.
         PrivilegeSet _acquiredPrivileges;

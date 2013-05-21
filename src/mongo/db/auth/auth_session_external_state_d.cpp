@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/auth_external_state_d.h"
+#include "mongo/db/auth/auth_session_external_state_d.h"
 
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
@@ -27,35 +27,35 @@
 
 namespace mongo {
 
-    AuthExternalStateMongod::AuthExternalStateMongod() {}
-    AuthExternalStateMongod::~AuthExternalStateMongod() {}
+    AuthSessionExternalStateMongod::AuthSessionExternalStateMongod() {}
+    AuthSessionExternalStateMongod::~AuthSessionExternalStateMongod() {}
 
-    void AuthExternalStateMongod::startRequest() {
+    void AuthSessionExternalStateMongod::startRequest() {
         if (!Lock::isLocked()) {
             _checkShouldAllowLocalhost();
         }
     }
 
-    bool AuthExternalStateMongod::_findUser(const string& usersNamespace,
-                                            const BSONObj& query,
-                                            BSONObj* result) const {
+    bool AuthSessionExternalStateMongod::_findUser(const string& usersNamespace,
+                                                   const BSONObj& query,
+                                                   BSONObj* result) const {
         Client::GodScope gs;
         Client::ReadContext ctx(usersNamespace);
 
         return Helpers::findOne(usersNamespace, query, *result);
     }
 
-    bool AuthExternalStateMongod::shouldIgnoreAuthChecks() const {
-        return cc().isGod() || AuthExternalStateServerCommon::shouldIgnoreAuthChecks();
+    bool AuthSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
+        return cc().isGod() || AuthSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
     }
 
-    void AuthExternalStateMongod::onAddAuthorizedPrincipal(Principal*) {
+    void AuthSessionExternalStateMongod::onAddAuthorizedPrincipal(Principal*) {
         // invalidate all thread-local JS scopes due to new user authentication
         if (globalScriptEngine)
             globalScriptEngine->threadDone();
     }
 
-    void AuthExternalStateMongod::onLogoutDatabase(const std::string&) {
+    void AuthSessionExternalStateMongod::onLogoutDatabase(const std::string&) {
         // invalidate all thread-local JS scopes due to logout
         if (globalScriptEngine)
             globalScriptEngine->threadDone();

@@ -18,30 +18,33 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/auth_external_state_server_common.h"
+#include "mongo/db/auth/auth_session_external_state.h"
 
 namespace mongo {
 
     /**
-     * The implementation of AuthExternalState functionality for mongos.
+     * The implementation of AuthExternalState functionality common to mongod and mongos.
      */
-    class AuthExternalStateMongos : public AuthExternalStateServerCommon {
-        MONGO_DISALLOW_COPYING(AuthExternalStateMongos);
+    class AuthSessionExternalStateServerCommon : public AuthSessionExternalState {
+        MONGO_DISALLOW_COPYING(AuthSessionExternalStateServerCommon);
 
     public:
-        AuthExternalStateMongos();
-        virtual ~AuthExternalStateMongos();
+        virtual ~AuthSessionExternalStateServerCommon();
 
-        virtual void startRequest();
-
-        virtual void onAddAuthorizedPrincipal(Principal*);
-
-        virtual void onLogoutDatabase(const std::string&);
+        virtual bool shouldIgnoreAuthChecks() const;
 
     protected:
-        virtual bool _findUser(const string& usersNamespace,
-                               const BSONObj& query,
-                               BSONObj* result) const;
+        AuthSessionExternalStateServerCommon();
+
+        // Checks whether or not localhost connections should be given full access and stores the
+        // result in _allowLocalhost.  Currently localhost connections are only given full access
+        // if there are no users in the admin database.
+        virtual void _checkShouldAllowLocalhost();
+
+    private:
+
+        bool _allowLocalhost;
+
     };
 
 } // namespace mongo

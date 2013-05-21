@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/auth_external_state_s.h"
+#include "mongo/db/auth/auth_session_external_state_s.h"
 
 #include <string>
 
@@ -25,14 +25,14 @@
 
 namespace mongo {
 
-    AuthExternalStateMongos::AuthExternalStateMongos() {}
-    AuthExternalStateMongos::~AuthExternalStateMongos() {}
+    AuthSessionExternalStateMongos::AuthSessionExternalStateMongos() {}
+    AuthSessionExternalStateMongos::~AuthSessionExternalStateMongos() {}
 
-    void AuthExternalStateMongos::onAddAuthorizedPrincipal(Principal*) { }
+    void AuthSessionExternalStateMongos::onAddAuthorizedPrincipal(Principal*) { }
 
-    void AuthExternalStateMongos::onLogoutDatabase(const std::string&) { }
+    void AuthSessionExternalStateMongos::onLogoutDatabase(const std::string&) { }
 
-    void AuthExternalStateMongos::startRequest() {
+    void AuthSessionExternalStateMongos::startRequest() {
         _checkShouldAllowLocalhost();
     }
 
@@ -51,9 +51,9 @@ namespace mongo {
         }
     }
 
-    bool AuthExternalStateMongos::_findUser(const string& usersNamespace,
-                                            const BSONObj& query,
-                                            BSONObj* result) const {
+    bool AuthSessionExternalStateMongos::_findUser(const string& usersNamespace,
+                                                   const BSONObj& query,
+                                                   BSONObj* result) const {
         scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
         *result = conn->get()->findOne(usersNamespace, query).getOwned();
         conn->done();
