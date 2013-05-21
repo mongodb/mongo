@@ -102,6 +102,9 @@ env.CppUnitTest('string_map_test', ['util/string_map_test.cpp'],
 env.CppUnitTest('bson_field_test', ['bson/bson_field_test.cpp'],
                 LIBDEPS=['bson'])
 
+env.CppUnitTest('bson_obj_test', ['bson/bson_obj_test.cpp'],
+                LIBDEPS=['bson'])
+
 env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
                 LIBDEPS=['bson'])
 

@@ -452,14 +452,14 @@ dodouble:
     }
 
     inline std::string BSONObj::toString( bool isArray, bool full ) const {
-        if ( isEmpty() ) return "{}";
+        if ( isEmpty() ) return (isArray ? "[]" : "{}");
         StringBuilder s;
         toString(s, isArray, full);
         return s.str();
     }
     inline void BSONObj::toString( StringBuilder& s,  bool isArray, bool full, int depth ) const {
         if ( isEmpty() ) {
-            s << "{}";
+            s << (isArray ? "[]" : "{}");
             return;
         }
 
