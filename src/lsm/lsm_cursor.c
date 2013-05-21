@@ -644,8 +644,10 @@ err:	API_END(session);
 	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	} else
+	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		clsm->current = NULL;
+	}
 
 	return (ret);
 }
@@ -808,8 +810,10 @@ err:	API_END(session);
 	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	} else
+	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		clsm->current = NULL;
+	}
 
 	return (ret);
 }
@@ -848,7 +852,13 @@ __clsm_put(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, clsm->primary_chunk != NULL);
 	}
 
-	primary = clsm->cursors[clsm->nchunks - 1];
+	/*
+	 * Set the position for future scans.  If we were already positioned in
+	 * a non-primary chunk, we may now have multiple cursors matching the
+	 * key.
+	 */
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+	clsm->current = primary = clsm->cursors[clsm->nchunks - 1];
 	primary->set_key(primary, key);
 	primary->set_value(primary, value);
 	WT_RET(primary->insert(primary));
@@ -860,14 +870,6 @@ __clsm_put(WT_SESSION_IMPL *session,
 	if (++clsm->primary_chunk->count % 100 == 0 &&
 	    lsm_tree->throttle_sleep > 0)
 		__wt_sleep(0, lsm_tree->throttle_sleep);
-
-	/*
-	 * Set the position for future scans.  If we were already positioned in
-	 * a non-primary chunk, we may now have multiple cursors matching the
-	 * key.
-	 */
-	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
-	clsm->current = primary;
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree
