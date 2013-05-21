@@ -288,7 +288,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->real_len = record->size;
 	logrec->total_len = __wt_rduppo2(record->size, log->allocsize);
 	logrec->checksum = 0;
-	logrec->checksum = __wt_hash_fnv64(logrec, record->size);
+	logrec->checksum = __wt_cksum(logrec, record->size);
 
 	memset(&tmp, 0, sizeof(tmp));
 fprintf(stderr, "log_write: log real_len: %d, total_len %d, chksum 0x%X\n",logrec->real_len, logrec->total_len, logrec->checksum);
