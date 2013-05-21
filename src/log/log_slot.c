@@ -1,0 +1,201 @@
+/*-
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
+#include "wt_internal.h"
+
+/*
+ * __wt_log_slot_init --
+ *	Initialize the slot array.
+ */
+int
+__wt_log_slot_init(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	uint32_t i;
+
+	conn = S2C(session);
+	log = conn->log;
+	for (i = 0; i < SLOT_POOL; i++)
+		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
+
+	/*
+	 * Set up the available slots from the pool the first time.
+	 */
+	for (i = 0; i < SLOT_ACTIVE; i++) {
+		slot = &log->slot_pool[i];
+		slot->slot_index = i;
+		slot->slot_state = WT_LOG_SLOT_READY;
+		log->slot_array[i] = slot;
+	}
+	return (0);
+}
+
+/*
+ * __wt_log_slot_join --
+ *	Join a consolidated logging slot.
+ */
+int
+__wt_log_slot_join(WT_SESSION_IMPL *session, int32_t mysize,
+    uint32_t flags, WT_MYSLOT *myslotp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	int32_t cur_state, new_state, old_state;
+	uint32_t i;
+
+	conn = S2C(session);
+	log = conn->log;
+find_slot:
+	i = __wt_random() % SLOT_ACTIVE;
+	slot = log->slot_array[i];
+	old_state = slot->slot_state;
+join_slot:
+	/*
+	 * WT_LOG_SLOT_READY and higher means the slot is available for
+	 * joining.  Any other state means it is in use and transitioning
+	 * from the active array.
+	 */
+	if (old_state < WT_LOG_SLOT_READY) {
+		WT_CSTAT_INCR(session, log_slot_transitions);
+		goto find_slot;
+	}
+	/*
+	 * Add in our size to the state and then atomically swap that
+	 * into place if it is still the same value.
+	 */
+	new_state = old_state + mysize;
+	if (new_state < old_state) {
+		/* Our size doesn't fit here. */
+		WT_CSTAT_INCR(session, log_slot_toobig);
+		goto find_slot;
+	}
+	cur_state = WT_ATOMIC_CAS_VAL(slot->slot_state, old_state, new_state);
+	/*
+	 * We lost a race to add our size into this slot.  Check the state
+	 * and try again.
+	 */
+	if (cur_state != old_state) {
+		old_state = cur_state;
+		WT_CSTAT_INCR(session, log_slot_races);
+		goto join_slot;
+	}
+	WT_ASSERT(session, myslotp != NULL);
+	/*
+	 * We joined this slot.  Fill in our information to return to
+	 * the caller.
+	 */
+	WT_CSTAT_INCR(session, log_slot_joins);
+	if (LF_ISSET(WT_LOG_SYNC))
+		FLD_SET(slot->slot_flags, SLOT_SYNC);
+	myslotp->slot = slot;
+	myslotp->offset = (off_t)old_state - WT_LOG_SLOT_READY;
+	fprintf(stderr, "[%d] slot_join: joined slot %d, 0x%x.  My offset 0x%x\n",pthread_self(),i,slot,myslotp->offset);
+	return (0);
+}
+
+/*
+ * __wt_log_slot_close --
+ *	Close a slot and do not allow any other threads to join this slot.
+ *	Remove this from the active slot array and move a new slot from
+ *	the pool into its place.  Set up the size of this group;
+ *	Must be called with the logging spinlock held.
+ */
+int
+__wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_LOGSLOT *newslot;
+	int32_t old_state;
+	uint32_t pool_i;
+
+	conn = S2C(session);
+	log = conn->log;
+retry:
+	/*
+	 * Find an unused slot in the pool.
+	 */
+	pool_i = log->pool_index;
+	newslot = &log->slot_pool[pool_i];
+	if (++log->pool_index > SLOT_POOL)
+		log->pool_index = 0;
+	if (newslot->slot_state != WT_LOG_SLOT_FREE)
+		goto retry;
+	/*
+	 * Swap out the slot we're going to use and put a free one in the
+	 * slot array in its place so that threads can use it right away.
+	 */
+	WT_CSTAT_INCR(session, log_slot_closes);
+	newslot->slot_state = WT_LOG_SLOT_READY;
+	newslot->slot_index = slot->slot_index;
+	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
+	old_state = WT_ATOMIC_STORE(slot->slot_state, WT_LOG_SLOT_PENDING);
+	slot->slot_group_size = old_state - WT_LOG_SLOT_READY;
+	WT_CSTAT_INCRV(session, log_slot_consolidated, slot->slot_group_size);
+	fprintf(stderr, "[%d] slot_close: closed slot 0x%x at index %d.  New slot %d.  Group size %d\n",pthread_self(),slot,slot->slot_index, pool_i, slot->slot_group_size);
+	return (0);
+}
+
+/*
+ * __wt_log_slot_notify --
+ *	Notify all threads waiting for the state to be < WT_LOG_SLOT_DONE.
+ */
+int
+__wt_log_slot_notify(WT_LOGSLOT *slot)
+{
+	slot->slot_state = WT_LOG_SLOT_DONE - slot->slot_group_size;
+	fprintf(stderr, "[%d] slot_notify: slot 0x%x state 0x%x %d\n",pthread_self(),slot, slot->slot_state,slot->slot_state);
+	return (0);
+}
+
+/*
+ * __wt_log_slot_wait --
+ *	Wait for slot leader to allocate log area and tell us our log offset.
+ */
+int
+__wt_log_slot_wait(WT_LOGSLOT *slot)
+{
+	fprintf(stderr, "[%d] slot_wait: slot 0x%x waiting for leader\n",pthread_self(), slot);
+	while (slot->slot_state > WT_LOG_SLOT_DONE)
+		__wt_yield();
+	fprintf(stderr, "[%d] slot_wait: slot 0x%x done\n",pthread_self(),slot);
+	return (0);
+}
+
+/*
+ * _wt_log_slot_release --
+ *	Each thread in a consolidated group releases its portion to
+ *	signal it has completed writing its piece of the log.
+ */
+int32_t
+__wt_log_slot_release(WT_LOGSLOT *slot, int32_t size)
+{
+	int32_t newsize;
+
+	/*
+	 * Add my size into the state.  When it reaches WT_LOG_SLOT_DONE
+	 * all participatory threads have completed copying their piece.
+	 */
+	newsize = WT_ATOMIC_ADD(slot->slot_state, size);
+	fprintf(stderr, "[%d] slot_release: slot 0x%x mysize %d newsize %d\n",pthread_self(),slot, size, newsize);
+	return (newsize);
+}
+
+/*
+ * __wt_log_slot_free --
+ *	Free a slot back into the pool.
+ */
+int
+__wt_log_slot_free(WT_LOGSLOT *slot)
+{
+	fprintf(stderr, "[%d] slot_free: slot 0x%x FREE\n",pthread_self(),slot);
+	slot->slot_state = WT_LOG_SLOT_FREE;
+	return (0);
+}
