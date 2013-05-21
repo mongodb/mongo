@@ -12,6 +12,17 @@
 #define	LOG_ALIGN_DIRECTIO	4096
 #define	LOG_FILE_SIZE	(5*1024*1024)		/* 100Mb */
 
+/*
+ * Logging subsystem flags available for internal calls.
+ */
+/* For __wt_log_write */
+#define	WT_LOG_SYNC	0x01		/* This write needs to be synced */
+
+/* For __wt_log_scan */
+#define	WT_LOGSCAN_FIRST	0x01	/* Scan from beginning of log */
+#define	WT_LOGSCAN_FROM_CKP	0x02	/* Scan from beginning of last ckp */
+#define	WT_LOGSCAN_ONE		0x04	/* Scan only one record */
+
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
 	uint32_t	offset;		/* 128 byte offset */

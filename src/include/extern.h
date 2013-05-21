@@ -684,6 +684,7 @@ extern WT_LOGREC_DESC __wt_logdesc_debug;
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
     int32_t mysize,
+    uint32_t flags,
     WT_MYSLOT *myslotp);
 extern int __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
 extern int __wt_log_slot_notify(WT_LOGSLOT *slot);
