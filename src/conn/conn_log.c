@@ -212,9 +212,11 @@ fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
 		log->allocsize = LOG_ALIGN;
 	WT_RET(__wt_cond_alloc(
 	    session, "log slot sync", 0, &log->slot_sync_cond));
+#if 0
 	for (i = 0; i < SLOT_POOL; i++)
 		WT_RET(__wt_cond_alloc(
 		    session, "log slot", 0, &log->slot_pool[i].slot_cond));
+#endif
 	WT_RET(__wt_log_open(session));
 	INIT_LSN(&log->alloc_lsn);
 	INIT_LSN(&log->ckpt_lsn);
@@ -277,9 +279,11 @@ __wt_logger_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(wt_session->close(wt_session, NULL));
 		__wt_free(session, conn->arch_session->hazard);
 	}
+#if 0
 	for (i = 0; i < SLOT_POOL; i++)
 		WT_TRET(__wt_cond_destroy(
 		    session, &log->slot_pool[i].slot_cond));
+#endif
 	__wt_spin_destroy(session, &log->log_lock);
 	__wt_spin_destroy(session, &log->log_slot_lock);
 	__wt_free(session, conn->log);
