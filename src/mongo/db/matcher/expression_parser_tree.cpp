@@ -68,10 +68,20 @@ namespace mongo {
         if ( e.type() != Object )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$not needs a regex or a document" );
 
+        BSONObj notObject = e.Obj();
+        if ( notObject.isEmpty() )
+            return StatusWithMatchExpression( ErrorCodes::BadValue, "$not cannot be empty" );
+
         std::auto_ptr<AndMatchExpression> theAnd( new AndMatchExpression() );
-        Status s = _parseSub( name, e.Obj(), theAnd.get() );
+        Status s = _parseSub( name, notObject, theAnd.get() );
         if ( !s.isOK() )
             return StatusWithMatchExpression( s );
+
+        // TODO: this seems arbitrary?
+        // tested in jstests/not2.js
+        for ( unsigned i = 0; i < theAnd->numChildren(); i++ )
+            if ( theAnd->getChild(i)->matchType() == MatchExpression::REGEX )
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "$not cannot have a regex" );
 
         std::auto_ptr<NotMatchExpression> theNot( new NotMatchExpression() );
         s = theNot->init( theAnd.release() );

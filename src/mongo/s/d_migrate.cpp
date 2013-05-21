@@ -1791,7 +1791,15 @@ namespace mongo {
                 // 5. wait for commit
 
                 state = STEADY;
+                bool transferAfterCommit = false;
                 while ( state == STEADY || state == COMMIT_START ) {
+
+                    // Make sure we do at least one transfer after recv'ing the commit message
+                    // If we aren't sure that at least one transfer happens *after* our state
+                    // changes to COMMIT_START, there could be mods still on the FROM shard that
+                    // got logged *after* our _transferMods but *before* the critical section.
+                    if ( state == COMMIT_START ) transferAfterCommit = true;
+
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ) {
                         log() << "_transferMods failed in STEADY state: " << res << migrateLog;
@@ -1809,12 +1817,16 @@ namespace mongo {
                         return;
                     }
                     
-                    if ( state == COMMIT_START ) {
+                    // We know we're finished when:
+                    // 1) The from side has told us that it has locked writes (COMMIT_START)
+                    // 2) We've checked at least one more time for un-transmitted mods
+                    if ( state == COMMIT_START && transferAfterCommit == true ) {
                         if ( flushPendingWrites( lastOpApplied ) )
                             break;
                     }
                     
-                    sleepmillis( 10 );
+                    // Only sleep if we aren't committing
+                    if ( state == STEADY ) sleepmillis( 10 );
                 }
 
                 if ( state == FAIL ) {

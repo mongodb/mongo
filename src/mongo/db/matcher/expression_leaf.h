@@ -47,10 +47,18 @@ namespace mongo {
 
     protected:
         void initPath( const StringData& path );
-
         bool _allHaveToMatch;
 
     private:
+        bool _matches( const FieldRef& fieldRef,
+                       const MatchableDocument* doc,
+                       MatchDetails* details ) const;
+
+
+
+
+        bool _matchesElementExpandArray( const BSONElement& e ) const;
+
         StringData _path;
         FieldRef _fieldRef;
     };
@@ -74,8 +82,6 @@ namespace mongo {
         virtual bool equivalent( const MatchExpression* other ) const;
 
     protected:
-        bool _invertForNE( bool normal ) const;
-
         BSONElement _rhs;
     };
 
@@ -132,18 +138,6 @@ namespace mongo {
         }
 
     };
-
-    class NEMatchExpression : public ComparisonMatchExpression {
-    public:
-        NEMatchExpression() : ComparisonMatchExpression( NE ){}
-        virtual LeafMatchExpression* shallowClone() const {
-            ComparisonMatchExpression* e = new NEMatchExpression();
-            e->init( path(), _rhs  );
-            return e;
-        }
-
-    };
-
 
     class RegexMatchExpression : public LeafMatchExpression {
     public:
@@ -204,11 +198,11 @@ namespace mongo {
     public:
         ExistsMatchExpression() : LeafMatchExpression( EXISTS ){}
 
-        Status init( const StringData& path, bool exists );
+        Status init( const StringData& path );
 
         virtual LeafMatchExpression* shallowClone() const {
             ExistsMatchExpression* e = new ExistsMatchExpression();
-            e->init( path(), _exists );
+            e->init( path() );
             return e;
         }
 
@@ -217,12 +211,6 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
-
-        // this is a terrible name, but trying not to use anythign we may really want
-        bool rightSideBool() const { return _exists; }
-
-    private:
-        bool _exists;
     };
 
     class TypeMatchExpression : public MatchExpression {
@@ -270,6 +258,7 @@ namespace mongo {
 
         bool hasNull() const { return _hasNull; }
         bool singleNull() const { return size() == 1 && _hasNull; }
+        bool hasEmptyArray() const { return _hasEmptyArray; }
         int size() const { return _equalities.size() + _regexes.size(); }
 
         bool equivalent( const ArrayFilterEntries& other ) const;
@@ -277,6 +266,7 @@ namespace mongo {
         void copyTo( ArrayFilterEntries& toFillIn ) const;
     private:
         bool _hasNull; // if _equalities has a jstNULL element in it
+        bool _hasEmptyArray;
         BSONElementSet _equalities;
         std::vector<RegexMatchExpression*> _regexes;
     };
@@ -302,28 +292,9 @@ namespace mongo {
         void copyTo( InMatchExpression* toFillIn ) const;
 
     private:
+        bool _matchesRealElement( const BSONElement& e ) const;
         ArrayFilterEntries _arrayEntries;
     };
-
-    class NinMatchExpression : public LeafMatchExpression {
-    public:
-        NinMatchExpression() : LeafMatchExpression( NIN ){}
-        void init( const StringData& path );
-
-        virtual LeafMatchExpression* shallowClone() const;
-
-        ArrayFilterEntries* getArrayFilterEntries() { return _in.getArrayFilterEntries(); }
-
-        virtual bool matchesSingleElement( const BSONElement& e ) const;
-
-        virtual void debugString( StringBuilder& debug, int level ) const;
-
-        virtual bool equivalent( const MatchExpression* other ) const;
-
-    private:
-        InMatchExpression _in;
-    };
-
 
 
 }

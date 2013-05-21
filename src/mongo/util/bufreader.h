@@ -51,13 +51,29 @@ namespace mongo {
             _pos = next;
         }
 
-        /** verify we can look at t, but do not advance */
+        /** read in and return an object of the specified type, and advance buffer pointer */
         template <typename T>
-        void peek(T &t) {
+        T read() {
+            T out;
+            read(out);
+            return out;
+        }
+
+        /** read in the object specified, but do not advance buffer pointer */
+        template <typename T>
+        void peek(T &t) const {
             T* cur = (T*) _pos;
             T *next = cur + 1;
             if( _end < next ) throw eof();
             t = *cur;
+        }
+
+        /** read in and return an object of the specified type, but do not advance buffer pointer */
+        template <typename T>
+        T peek() const {
+            T out;
+            peek(out);
+            return out;
         }
 
         /** return current offset into buffer */

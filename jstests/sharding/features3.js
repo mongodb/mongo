@@ -103,8 +103,8 @@ assert.soon(function() {
     // mine = getMine(curOpState == 0 && i > 20);
     i++;
 
-    // Wait for the queries to start
-    if (curOpState == 0 && mine.length > 0) {
+    // Wait for the queries to start (one per shard, so 2 total)
+    if (curOpState == 0 && mine.length == 2) {
         // queries started
         curOpState = 1;
         // kill all $where

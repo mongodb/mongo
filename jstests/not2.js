@@ -53,8 +53,6 @@ check( {i:{$type:2}}, "a", 2 );
 check( {i:{$not:{$type:1}}}, "a", 2 );
 check( {i:{$not:{$type:2}}}, "", 0 );
 
-check( {i:{$not:{$gt:"c",$lt:"b"}}}, "b" );
-
 t.remove( {} );
 t.save( {i:1} );
 check( {i:{$not:{$mod:[5,1]}}}, null, 0 );

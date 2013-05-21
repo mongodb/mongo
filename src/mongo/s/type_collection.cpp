@@ -73,8 +73,11 @@ namespace mongo {
             return false;
         }
 
-        // Sharding related fields may only be set if the sharding key pattern is present.
-        if ((_unique || _noBalance) && (_keyPattern.nFields() == 0)) {
+        // Sharding related fields may only be set if the sharding key pattern is present, unless
+        // we're dropped.
+        if ( ( _unique || _noBalance ) && ( !_isDroppedSet || !_dropped )
+            && ( _keyPattern.nFields() == 0 ) )
+        {
             *errMsg = stream() << "missing " << keyPattern.name() << " field";
             return false;
         }

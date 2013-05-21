@@ -26,6 +26,12 @@
 #include "mongo/db/curop-inl.h"
 #include "mongo/util/array.h"
 
+#define MONGO_USE_NEW_SORTER 1
+
+#if MONGO_USE_NEW_SORTER
+#   include "mongo/db/sorter/sorter.h"
+#endif
+
 namespace mongo {
 
     typedef pair<BSONObj, DiskLoc> ExternalSortDatum;
@@ -40,6 +46,32 @@ namespace mongo {
         virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const = 0;
     };
 
+#if MONGO_USE_NEW_SORTER
+    // TODO This class will probably disappear in the future or be replaced with a typedef
+    class BSONObjExternalSorter : boost::noncopyable {
+    public:
+        typedef pair<BSONObj, DiskLoc> Data;
+        typedef SortIteratorInterface<BSONObj, DiskLoc> Iterator;
+
+        BSONObjExternalSorter(const ExternalSortComparison* comp, long maxFileSize=100*1024*1024);
+
+        void add( const BSONObj& o, const DiskLoc& loc, bool mayInterrupt ) {
+            *_mayInterrupt = mayInterrupt;
+            _sorter->add(o.getOwned(), loc);
+        }
+
+        auto_ptr<Iterator> iterator() { return auto_ptr<Iterator>(_sorter->done()); }
+
+        void sort( bool mayInterrupt ) { *_mayInterrupt = mayInterrupt; }
+        int numFiles() { return _sorter->numFiles(); }
+        long getCurSizeSoFar() { return _sorter->memUsed(); }
+        void hintNumObjects(long long) {} // unused
+
+    private:
+        shared_ptr<bool> _mayInterrupt;
+        scoped_ptr<Sorter<BSONObj, DiskLoc> > _sorter;
+    };
+#else
     /**
        for external (disk) sorting by BSONObj and attaching a value
      */
@@ -147,4 +179,5 @@ namespace mongo {
         static unsigned long long _compares;
         static unsigned long long _uniqueNumber;
     };
+#endif
 }

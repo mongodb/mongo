@@ -43,7 +43,7 @@ namespace mongo {
 
 namespace mongo {
 
-    typedef MatcherOld Matcher;
-    //typedef Matcher2 Matcher;
+    //typedef MatcherOld Matcher;
+    typedef Matcher2 Matcher;
 }
 

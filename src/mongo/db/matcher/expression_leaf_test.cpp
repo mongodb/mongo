@@ -225,6 +225,14 @@ namespace mongo {
         ASSERT( !lt.matchesBSON( BSON( "a" << 6 ), NULL ) );
     }
 
+    TEST( LtOp, MatchesScalarEmptyKey ) {
+        BSONObj operand = BSON( "$lt" << 5 );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "", operand[ "$lt" ] ).isOK() );
+        ASSERT( lt.matchesBSON( BSON( "" << 4.5 ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "" << 6 ), NULL ) );
+    }
+
     TEST( LtOp, MatchesArrayValue ) {
         BSONObj operand = BSON( "$lt" << 5 );
         LTMatchExpression lt;
@@ -745,73 +753,6 @@ namespace mongo {
        }
     */
 
-    TEST( NeOp, MatchesElement ) {
-        BSONObj operand = BSON( "$ne" << 5 );
-        BSONObj match = BSON( "a" << 6 );
-        BSONObj notMatch = BSON( "a" << 5 );
-        NEMatchExpression ne;
-        ASSERT( ne.init( "", operand[ "$ne" ] ).isOK() );
-        ASSERT( ne.matchesSingleElement( match.firstElement() ) );
-        ASSERT( !ne.matchesSingleElement( notMatch.firstElement() ) );
-    }
-
-    TEST( NeOp, InvalidEooOperand ) {
-        BSONObj operand;
-        NEMatchExpression ne;
-        ASSERT( !ne.init( "", operand.firstElement() ).isOK() );
-    }
-
-    TEST( NeOp, MatchesScalar ) {
-        BSONObj operand = BSON( "$ne" << 5 );
-        NEMatchExpression ne;
-        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
-        ASSERT( ne.matchesBSON( BSON( "a" << 4 ), NULL ) );
-        ASSERT( !ne.matchesBSON( BSON( "a" << 5 ), NULL ) );
-    }
-
-    TEST( NeOp, MatchesArrayValue ) {
-        BSONObj operand = BSON( "$ne" << 5 );
-        NEMatchExpression ne;
-        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
-        ASSERT( ne.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 6 ) ), NULL ) );
-        ASSERT( !ne.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5 ) ), NULL ) );
-        ASSERT( !ne.matchesBSON( BSON( "a" << BSON_ARRAY( 5 << 5 ) ), NULL ) );
-    }
-
-    TEST( NeOp, MatchesNull ) {
-        BSONObj operand = BSON( "$ne" << BSONNULL );
-        NEMatchExpression ne;
-        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
-        ASSERT( ne.matchesBSON( BSON( "a" << 4 ), NULL ) );
-        ASSERT( !ne.matchesBSON( BSONObj(), NULL ) );
-        ASSERT( !ne.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
-    }
-
-    TEST( NeOp, ElemMatchKey ) {
-        BSONObj operand = BSON( "$ne" << 5 );
-        NEMatchExpression ne;
-        ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
-        MatchDetails details;
-        details.requestElemMatchKey();
-        ASSERT( !ne.matchesBSON( BSON( "a" << BSON_ARRAY( 2 << 6 << 5 ) ), &details ) );
-        ASSERT( !details.hasElemMatchKey() );
-        ASSERT( ne.matchesBSON( BSON( "a" << BSON_ARRAY( 2 << 6 ) ), &details ) );
-        // The elemMatchKey feature is not implemented for $ne.
-        ASSERT( !details.hasElemMatchKey() );
-    }
-
-    /**
-       TEST( NeOp, MatchesIndexKey ) {
-       BSONObj operand = BSON( "$ne" << 5 );
-       NeOp ne;
-       ASSERT( ne.init( "a", operand[ "$ne" ] ).isOK() );
-       IndexSpec indexSpec( BSON( "a" << 1 ) );
-       BSONObj indexKey = BSON( "" << 1 );
-       ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-       ne.matchesIndexKey( indexKey, indexSpec ) );
-       }
-    */
-
     TEST( RegexMatchExpression, MatchesElementExact ) {
         BSONObj match = BSON( "a" << "b" );
         BSONObj notMatch = BSON( "a" << "c" );
@@ -1136,61 +1077,38 @@ namespace mongo {
         BSONObj existsNull = BSON( "a" << BSONNULL );
         BSONObj doesntExist = BSONObj();
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "", true ).isOK() );
+        ASSERT( exists.init( "" ).isOK() );
         ASSERT( exists.matchesSingleElement( existsInt.firstElement() ) );
         ASSERT( exists.matchesSingleElement( existsNull.firstElement() ) );
         ASSERT( !exists.matchesSingleElement( doesntExist.firstElement() ) );
-    }
-
-    TEST( ExistsMatchExpression, MatchesElementExistsFalse ) {
-        BSONObj existsInt = BSON( "a" << 5 );
-        BSONObj existsNull = BSON( "a" << BSONNULL );
-        BSONObj doesntExist = BSONObj();
-        ExistsMatchExpression exists;
-        ASSERT( exists.init( "", false ).isOK() );
-        ASSERT( !exists.matchesSingleElement( existsInt.firstElement() ) );
-        ASSERT( !exists.matchesSingleElement( existsNull.firstElement() ) );
-        ASSERT( exists.matchesSingleElement( doesntExist.firstElement() ) );
     }
 
     TEST( ExistsMatchExpression, MatchesElementExistsTrueValue ) {
         BSONObj exists = BSON( "a" << 5 );
         BSONObj missing = BSONObj();
         ExistsMatchExpression existsTrueValue;
-        ExistsMatchExpression existsFalseValue;
-        ASSERT( existsTrueValue.init( "", true ).isOK() );
-        ASSERT( existsFalseValue.init( "", false ).isOK() );
+        ASSERT( existsTrueValue.init( "" ).isOK() );
         ASSERT( existsTrueValue.matchesSingleElement( exists.firstElement() ) );
-        ASSERT( !existsFalseValue.matchesSingleElement( exists.firstElement() ) );
         ASSERT( !existsTrueValue.matchesSingleElement( missing.firstElement() ) );
-        ASSERT( existsFalseValue.matchesSingleElement( missing.firstElement() ) );
     }
 
     TEST( ExistsMatchExpression, MatchesScalar ) {
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "a", true ).isOK() );
+        ASSERT( exists.init( "a" ).isOK() );
         ASSERT( exists.matchesBSON( BSON( "a" << 1 ), NULL ) );
         ASSERT( exists.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
         ASSERT( !exists.matchesBSON( BSON( "b" << 1 ), NULL ) );
     }
 
-    TEST( ExistsMatchExpression, MatchesScalarFalse ) {
-        ExistsMatchExpression exists;
-        ASSERT( exists.init( "a", false ).isOK() );
-        ASSERT( !exists.matchesBSON( BSON( "a" << 1 ), NULL ) );
-        ASSERT( !exists.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
-        ASSERT( exists.matchesBSON( BSON( "b" << 1 ), NULL ) );
-    }
-
     TEST( ExistsMatchExpression, MatchesArray ) {
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "a", true ).isOK() );
+        ASSERT( exists.init( "a" ).isOK() );
         ASSERT( exists.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << 5.5 ) ), NULL ) );
     }
 
     TEST( ExistsMatchExpression, ElemMatchKey ) {
         ExistsMatchExpression exists;
-        ASSERT( exists.init( "a.b", true ).isOK() );
+        ASSERT( exists.init( "a.b" ).isOK() );
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT( !exists.matchesBSON( BSON( "a" << 1 ), &details ) );
@@ -1205,14 +1123,11 @@ namespace mongo {
     TEST( ExistsMatchExpression, Equivalent ) {
         ExistsMatchExpression e1;
         ExistsMatchExpression e2;
-        ExistsMatchExpression e3;
-        e1.init( "a" , false );
-        e2.init( "a" , true );
-        e3.init( "b" , false );
+        e1.init( "a" );
+        e2.init( "b" );
 
         ASSERT( e1.equivalent( &e1 ) );
         ASSERT( !e1.equivalent( &e2 ) );
-        ASSERT( !e1.equivalent( &e3 ) );
     }
 
     /**
@@ -1538,133 +1453,6 @@ namespace mongo {
         ASSERT( MatchMatchExpression::PartialMatchResult_False ==
                 in.matchesIndexKey( BSON( "" << "dummygeohash" <<
                                           "" << BSON_ARRAY( 8 << "ac" ) ), indexSpec ) );
-    }
-    */
-
-    TEST( NinMatchExpression, MatchesElementSingle ) {
-        BSONObj operands = BSON_ARRAY( 1 );
-        BSONObj match = BSON( "a" << 2 );
-        BSONObj notMatch = BSON( "a" << 1 );
-        NinMatchExpression nin;
-        nin.getArrayFilterEntries()->addEquality( operands.firstElement() );
-        ASSERT( nin.matchesSingleElement( match[ "a" ] ) );
-        ASSERT( !nin.matchesSingleElement( notMatch[ "a" ] ) );
-    }
-
-    TEST( NinMatchExpression, MatchesElementMultiple ) {
-        BSONArray operand = BSON_ARRAY( 1 << "r" << true << 1 );
-        BSONObj match = BSON( "a" << false );
-        BSONObj notMatchFirst = BSON( "a" << 1 );
-        BSONObj notMatchSecond = BSON( "a" << "r" );
-        BSONObj notMatchThird = BSON( "a" << true );
-        NinMatchExpression nin;
-        nin.getArrayFilterEntries()->addEquality( operand[0] );
-        nin.getArrayFilterEntries()->addEquality( operand[1] );
-        nin.getArrayFilterEntries()->addEquality( operand[2] );
-        nin.getArrayFilterEntries()->addEquality( operand[3] );
-        ASSERT( nin.matchesSingleElement( match[ "a" ] ) );
-        ASSERT( !nin.matchesSingleElement( notMatchFirst[ "a" ] ) );
-        ASSERT( !nin.matchesSingleElement( notMatchSecond[ "a" ] ) );
-        ASSERT( !nin.matchesSingleElement( notMatchThird[ "a" ] ) );
-    }
-
-    TEST( NinMatchExpression, MatchesScalar ) {
-        BSONObj operand = BSON_ARRAY( 5 );
-        NinMatchExpression nin;
-        nin.init( "a" );
-        nin.getArrayFilterEntries()->addEquality( operand.firstElement() );
-        ASSERT( nin.matchesBSON( BSON( "a" << 4 ), NULL ) );
-        ASSERT( !nin.matchesBSON( BSON( "a" << 5 ), NULL ) );
-        ASSERT( !nin.matchesBSON( BSON( "a" << 5.0 ), NULL ) );
-    }
-
-    TEST( NinMatchExpression, MatchesArrayValue ) {
-        BSONObj operand = BSON_ARRAY( 5 );
-        NinMatchExpression nin;
-        nin.init( "a" );
-        nin.getArrayFilterEntries()->addEquality( operand.firstElement() );
-        ASSERT( !nin.matchesBSON( BSON( "a" << BSON_ARRAY( 5.0 << 6 ) ), NULL ) );
-        ASSERT( nin.matchesBSON( BSON( "a" << BSON_ARRAY( 6 << 7 ) ), NULL ) );
-        ASSERT( nin.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
-    }
-
-    TEST( NinMatchExpression, MatchesNull ) {
-        BSONObjBuilder ninArray;
-        ninArray.appendNull( "0" );
-        BSONObj operand = ninArray.obj();
-        NinMatchExpression nin;
-        nin.init( "a" );
-        nin.getArrayFilterEntries()->addEquality( operand.firstElement() );
-        ASSERT( !nin.matchesBSON( BSONObj(), NULL ) );
-        ASSERT( !nin.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
-        ASSERT( nin.matchesBSON( BSON( "a" << 4 ), NULL ) );
-    }
-
-    TEST( NinMatchExpression, MatchesFullArray ) {
-        BSONArray operand = BSON_ARRAY( BSON_ARRAY( 1 << 2 ) << 4 << 5 );
-        NinMatchExpression nin;
-        nin.init( "a" );
-        nin.getArrayFilterEntries()->addEquality( operand[0] );
-        nin.getArrayFilterEntries()->addEquality( operand[1] );
-        nin.getArrayFilterEntries()->addEquality( operand[2] );
-        ASSERT( !nin.matchesBSON( BSON( "a" << BSON_ARRAY( 1 << 2 ) ), NULL ) );
-        ASSERT( nin.matchesBSON( BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) ), NULL ) );
-        ASSERT( nin.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) ), NULL ) );
-        ASSERT( nin.matchesBSON( BSON( "a" << 1 ), NULL ) );
-    }
-
-    TEST( NinMatchExpression, ElemMatchKey ) {
-        BSONArray operand = BSON_ARRAY( 5 << 2 );
-        NinMatchExpression nin;
-        nin.init( "a" );
-        nin.getArrayFilterEntries()->addEquality( operand[0] );
-        nin.getArrayFilterEntries()->addEquality( operand[1] );
-
-        MatchDetails details;
-        details.requestElemMatchKey();
-        ASSERT( !nin.matchesBSON( BSON( "a" << 2 ), &details ) );
-        ASSERT( !details.hasElemMatchKey() );
-        ASSERT( nin.matchesBSON( BSON( "a" << 3 ), &details ) );
-        ASSERT( !details.hasElemMatchKey() );
-        ASSERT( nin.matchesBSON( BSON( "a" << BSON_ARRAY( 1 << 3 << 6 ) ), &details ) );
-        // The elemMatchKey feature is not implemented for $nin.
-        ASSERT( !details.hasElemMatchKey() );
-    }
-
-    TEST( NinMatchExpression, Equivalent ) {
-        BSONArray operand = BSON_ARRAY( 5 << 2 );
-
-        NinMatchExpression e1;
-        NinMatchExpression e2;
-        NinMatchExpression e3;
-
-        e1.init( "a" );
-        e2.init( "a" );
-        e3.init( "b" );
-
-        e1.getArrayFilterEntries()->addEquality( operand[0] );
-        e1.getArrayFilterEntries()->addEquality( operand[1] );
-
-        e2.getArrayFilterEntries()->addEquality( operand[0] );
-
-        e3.getArrayFilterEntries()->addEquality( operand[0] );
-        e3.getArrayFilterEntries()->addEquality( operand[1] );
-
-        ASSERT( e1.equivalent( &e1 ) );
-        ASSERT( !e1.equivalent( &e2 ) );
-        ASSERT( !e1.equivalent( &e3 ) );
-    }
-
-
-    /**
-    TEST( NinMatchExpression, MatchesIndexKey ) {
-        BSONObj operand = BSON( "$nin" << BSON_ARRAY( 5 ) );
-        NinMatchExpression nin;
-        ASSERT( nin.init( "a", operand[ "$nin" ] ).isOK() );
-        IndexSpec indexSpec( BSON( "a" << 1 ) );
-        BSONObj indexKey = BSON( "" << "7" );
-        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-                nin.matchesIndexKey( indexKey, indexSpec ) );
     }
     */
 

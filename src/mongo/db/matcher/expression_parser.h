@@ -37,6 +37,15 @@ namespace mongo {
         }
 
     private:
+
+        /**
+         * 5 = false
+         { a : 5 } = false
+         { $lt : 5 } = true
+         { $ref : "s" } = false
+         */
+        static bool _isExpressionDocument( const BSONElement& e );
+
         static StatusWithMatchExpression _parse( const BSONObj& obj, bool topLevel );
 
         /**
@@ -54,10 +63,9 @@ namespace mongo {
          * e is $gt : 5
          */
         static StatusWithMatchExpression _parseSubField( const BSONObj& context,
+                                                         const AndMatchExpression* andSoFar,
                                                          const char* name,
-                                                         const BSONElement& e,
-                                                         int position,
-                                                         bool* stop );
+                                                         const BSONElement& e );
 
         static StatusWithMatchExpression _parseComparison( const char* name,
                                                            ComparisonMatchExpression* cmp,

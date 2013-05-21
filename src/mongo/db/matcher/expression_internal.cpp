@@ -32,6 +32,9 @@ namespace mongo {
                                        const FieldRef& path,
                                        size_t* idxPath,
                                        bool* inArray )  {
+        if ( path.numParts() == 0 )
+            return doc.getField( "" );
+
         BSONElement res;
 
         BSONObj curr = doc;
@@ -54,9 +57,9 @@ namespace mongo {
 
             case Array:
                 if ( partNum+1 < path.numParts() && isAllDigits( path.getPart( partNum+1 ) ) ) {
-                    *inArray = true;
+                    //*inArray = true;
                     curr = res.Obj();
-                    ++partNum;
+                    stop = true;
                 }
                 else {
                     stop = true;

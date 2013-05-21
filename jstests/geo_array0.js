@@ -23,5 +23,5 @@ function test(index) {
     assert.eq( 4, t.find( { loc : { $within : { $box : [ [ 45, 45 ], [ 50, 50 ] ] } } } ).count() );
 }
 
-test(false)
+//test(false); // this was removed as part of SERVER-6400
 test(true)

@@ -27,7 +27,8 @@ for ( j=0; j<30; j++ ){
     
 }
 assert.eq( i , j * 100 , "setup" );
-s.adminCommand( "connpoolsync" );
+// Until SERVER-9715 is fixed, the sync command must be run on a diff connection
+new Mongo( s.s.host ).adminCommand( "connpoolsync" );
 db.getLastError();
 
 print( "done inserting data" );

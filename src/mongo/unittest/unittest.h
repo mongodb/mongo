@@ -348,7 +348,11 @@ namespace mongo {
         class TestAssertion : private boost::noncopyable {
 
         public:
-            TestAssertion( const std::string& file, unsigned line );
+            /**
+             * file string must stay in scope and remain unchanged for the lifetime
+             * of the TestAssertion object.
+             */
+            TestAssertion( const char* file, unsigned line );
             ~TestAssertion();
 
             MONGO_COMPILER_NORETURN void fail( const std::string& message) const;
@@ -357,7 +361,7 @@ namespace mongo {
             }
 
         private:
-            const std::string _file;
+            const char* _file;
             const unsigned _line;
         };
 
@@ -366,8 +370,12 @@ namespace mongo {
          */
         class ComparisonAssertion : private TestAssertion {
         public:
-            ComparisonAssertion( const std::string& aexp , const std::string& bexp ,
-                                 const std::string& file , unsigned line );
+            /**
+             * All char* arguments must stay in scope and remain unchanged for the lifetime
+             * of the ComparisonAssertion object.
+             */
+            ComparisonAssertion( const char* aexp , const char* bexp ,
+                                 const char* file , unsigned line );
 
             template<typename A,typename B>
             void assertEqual( const A& a , const B& b ) {
@@ -416,17 +424,17 @@ namespace mongo {
             std::string getComparisonFailureMessage(const std::string &theOperator,
                                                     const A& a, const B& b);
 
-            std::string _aexp;
-            std::string _bexp;
+            const char* _aexp;
+            const char* _bexp;
         };
 
         /**
          * Helper for ASSERT_APPROX_EQUAL to ensure that the arguments are evaluated only once.
          */
         template < typename A, typename B, typename ABSOLUTE_ERR >
-        inline void assertApproxEqual(const std::string& aexp, const std::string& bexp,
+        inline void assertApproxEqual(const char* aexp, const char* bexp,
                                       const A& a, const B& b, const ABSOLUTE_ERR& absoluteErr,
-                                      const std::string& file , unsigned line) {
+                                      const char* file , unsigned line) {
             if (std::abs(a - b) <= absoluteErr)
                 return;
             TestAssertion(file, line).fail(mongoutils::str::stream()

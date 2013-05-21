@@ -742,14 +742,15 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONElement BSONObj::getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const {
+    BSONElement BSONObj::getFieldUsingIndexNames(const StringData& fieldName,
+                                                 const BSONObj &indexKey) const {
         BSONObjIterator i( indexKey );
         int j = 0;
         while( i.moreWithEOO() ) {
             BSONElement f = i.next();
             if ( f.eoo() )
                 return BSONElement();
-            if ( strcmp( f.fieldName(), fieldName ) == 0 )
+            if ( f.fieldName() == fieldName )
                 break;
             ++j;
         }
@@ -891,6 +892,13 @@ namespace mongo {
                     strcmp( name , "$ref" ) == 0 ||
                     strcmp( name , "$id" ) == 0
                     ;
+            }
+
+            // check no regexp for _id (SERVER-9502)
+            if (mongoutils::str::equals(e.fieldName(), "_id")) {
+                if (e.type() == RegEx) {
+                    return false;
+                }
             }
 
             if ( e.mayEncapsulate() ) {

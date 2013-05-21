@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    bool isAllDigits( const StringData& str );
+
     // XXX document me
     // Replaces getFieldDottedOrArray without recursion nor string manipulation
     BSONElement getFieldDottedOrArray( const BSONObj& doc,

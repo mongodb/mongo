@@ -20,6 +20,8 @@
 // the value of __cplusplus.
 #if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
 
+#include <functional>
+
 #define MONGO_HASH_NAMESPACE_START namespace std {
 #define MONGO_HASH_NAMESPACE_END }
 
@@ -27,10 +29,14 @@
 
 #if _MSC_VER >= 1600  /* Visual Studio 2010+ */
 
+#include <functional>
+
 #define MONGO_HASH_NAMESPACE_START namespace std {
 #define MONGO_HASH_NAMESPACE_END }
 
 #else /* Older Visual Studio */
+
+#include <tr1/functional>
 
 #define MONGO_HASH_NAMESPACE_START namespace std { namespace tr1 {
 #define MONGO_HASH_NAMESPACE_END }}
@@ -38,6 +44,8 @@
 #endif
 
 #elif defined(__GNUC__)
+
+#include <tr1/functional>
 
 #define MONGO_HASH_NAMESPACE_START namespace std { namespace tr1 {
 #define MONGO_HASH_NAMESPACE_END }}

@@ -35,8 +35,49 @@
 #include "mongo/db/namespace-inl.h"
 #include "mongo/util/file.h"
 
+#if MONGO_USE_NEW_SORTER
 namespace mongo {
 
+    namespace {
+        class OldExtSortComparator {
+        public:
+            typedef pair<BSONObj, DiskLoc> Data;
+
+            OldExtSortComparator(const ExternalSortComparison* comp,
+                                 boost::shared_ptr<const bool> mayInterrupt)
+                : _comp(comp)
+                , _mayInterrupt(mayInterrupt)
+            {}
+
+            int operator() (const Data& l, const Data& r) const {
+                RARELY if (*_mayInterrupt) {
+                    killCurrentOp.checkForInterrupt(!*_mayInterrupt);
+                }
+
+                return _comp->compare(l, r);
+            }
+
+        private:
+            const ExternalSortComparison* _comp;
+            boost::shared_ptr<const bool> _mayInterrupt;
+        };
+    }
+
+    BSONObjExternalSorter::BSONObjExternalSorter(const ExternalSortComparison* comp,
+                                                 long maxFileSize)
+        : _mayInterrupt(boost::make_shared<bool>(false))
+        , _sorter(Sorter<BSONObj, DiskLoc>::make(
+                    SortOptions().ExtSortAllowed().MaxMemoryUsageBytes(maxFileSize),
+                    OldExtSortComparator(comp, _mayInterrupt)))
+    {}
+}
+
+#include "mongo/db/sorter/sorter.cpp"
+MONGO_CREATE_SORTER(mongo::BSONObj, mongo::DiskLoc, mongo::OldExtSortComparator);
+
+#else
+
+namespace mongo {
     HLMutex BSONObjExternalSorter::_extSortMutex("s");
     bool BSONObjExternalSorter::extSortMayInterrupt( false );
     unsigned long long BSONObjExternalSorter::_compares = 0;
@@ -346,3 +387,4 @@ namespace mongo {
         return ExternalSortDatum( BSONObj(h), l );
     }
 }
+#endif

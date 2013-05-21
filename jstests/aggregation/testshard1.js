@@ -64,6 +64,17 @@ for(i = 1; i <= nItems; ++i) {
 // wait for all writebacks to be applied
 assert.eq(db.getLastError(), null);
 
+// Turn on exception tracing in mongod to figure out exactly where the SCEs are coming from
+// TEMPORARY - REMOVE ONCE SERVER-9622 IS RESOLVED
+var config = db.getMongo().getDB("config");
+var shards = config.shards.find().toArray();
+
+jsTest.log( "Tracing all exceptions in mongod..." );
+for ( var i = 0; i < shards.length; i++ ) {
+    var shardConn = new Mongo( shards[i].host );
+    printjson(shardConn.getDB( "admin" ).runCommand({ setParameter : 1, traceExceptions : true }));
+}
+
 // a project and group in shards, result combined in mongos
 var a1 = db.ts1.aggregate(
     { $project: {
