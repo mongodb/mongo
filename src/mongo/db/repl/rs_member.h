@@ -101,7 +101,11 @@ namespace mongo {
         /* true if changed in a way of interest to the repl set manager. */
         bool changed(const HeartbeatInfo& old) const;
 
-        void recvHeartbeat();
+        /**
+         * Updates this with the info received from the command result we got from
+         * the last replSetHeartbeat.
+         */
+        void updateFromLastPoll(const HeartbeatInfo& newInfo);
     };
 
     inline HeartbeatInfo::HeartbeatInfo(unsigned id) :

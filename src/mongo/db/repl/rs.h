@@ -332,6 +332,11 @@ namespace mongo {
         /* todo thread */
         void msgUpdateHBInfo(HeartbeatInfo);
 
+        /**
+         * Updates the lastHeartbeatRecv of Member with the given id.
+         */
+        void msgUpdateHBRecv(unsigned id, time_t newTime);
+
         StateBox box;
 
         OpTime lastOpTimeWritten;
