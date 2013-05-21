@@ -837,7 +837,8 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
-        DocumentSourceProject(const intrusive_ptr<ExpressionContext> &pExpCtx);
+        DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                              const intrusive_ptr<ExpressionObject>& exprObj);
 
         // configuration state
         intrusive_ptr<ExpressionObject> pEO;

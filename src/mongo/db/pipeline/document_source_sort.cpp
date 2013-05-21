@@ -112,24 +112,23 @@ namespace mongo {
         }
     }
 
-    void DocumentSourceSort::addKey(const string &fieldPath, bool ascending) {
-        intrusive_ptr<ExpressionFieldPath> pE(
-            ExpressionFieldPath::create(fieldPath));
-        vSortKey.push_back(pE);
+    void DocumentSourceSort::addKey(const string& fieldPath, bool ascending) {
+        vSortKey.push_back(ExpressionFieldPath::parse("$$ROOT." + fieldPath));
         vAscending.push_back(ascending);
     }
 
-    void DocumentSourceSort::sortKeyToBson(
-        BSONObjBuilder *pBuilder, bool usePrefix) const {
+    void DocumentSourceSort::sortKeyToBson(BSONObjBuilder* pBuilder, bool usePrefix) const {
         /* add the key fields */
         const size_t n = vSortKey.size();
         for(size_t i = 0; i < n; ++i) {
-            /* create the "field name" */
-            stringstream ss;
-            vSortKey[i]->writeFieldPath(ss, usePrefix);
+            // get the field name out of each ExpressionFieldPath
+            const FieldPath& withVariable = vSortKey[i]->getFieldPath();
+            verify(withVariable.getPathLength() > 1);
+            verify(withVariable.getFieldName(0) == "ROOT");
+            const string fieldPath = withVariable.tail().getPath(false);
 
             /* append a named integer based on the sort order */
-            pBuilder->append(ss.str(), (vAscending[i] ? 1 : -1));
+            pBuilder->append(fieldPath, (vAscending[i] ? 1 : -1));
         }
     }
     DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(set<string>& deps) const {
@@ -281,10 +280,11 @@ namespace mongo {
             return;
         }
 
+        const Variables vars(d);
         vector<Value> keys;
         keys.reserve(sp.size());
         for (size_t i=0; i < sp.size(); i++) {
-            keys.push_back(sp[i]->evaluate(d));
+            keys.push_back(sp[i]->evaluate(vars));
         }
         key = Value::consume(keys);
     }

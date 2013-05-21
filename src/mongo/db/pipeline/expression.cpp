@@ -33,6 +33,64 @@ namespace mongo {
         return Value(DOC("$const" << val));
     }
 
+    void Variables::uassertValidNameForUserWrite(StringData varName) {
+        // System variables users allowed to write to (currently just one)
+        if (varName == "CURRENT") {
+            return;
+        }
+
+        uassert(16866, "empty variable names are not allowed",
+                !varName.empty());
+
+        const bool firstCharIsValid = (varName[0] >= 'a' &&  varName[0] <= 'z')
+                                   || (varName[0] & '\x80') // non-ascii
+                                   ;
+
+        uassert(16867, str::stream() <<
+                   "'" << varName << "' starts with an invalid character for a user variable name",
+                firstCharIsValid);
+
+        for (size_t i = 1; i < varName.size(); i++) {
+            const bool charIsValid = (varName[i] >= 'a' &&  varName[i] <= 'z')
+                                  || (varName[i] >= 'A' &&  varName[i] <= 'Z')
+                                  || (varName[i] >= '0' &&  varName[i] <= '9')
+                                  || (varName[i] == '_')
+                                  || (varName[i] & '\x80') // non-ascii
+                                  ;
+
+            uassert(16868, str::stream() << "'" << varName << "' contains an invalid character "
+                                         << "for a variable name: '" << varName[i] << "'",
+                    charIsValid);
+        }
+    }
+
+    void Variables::uassertValidNameForUserRead(StringData varName) {
+        uassert(16869, "empty variable names are not allowed",
+                !varName.empty());
+
+        const bool firstCharIsValid = (varName[0] >= 'a' &&  varName[0] <= 'z')
+                                   || (varName[0] >= 'A' &&  varName[0] <= 'Z')
+                                   || (varName[0] & '\x80') // non-ascii
+                                   ;
+
+        uassert(16870, str::stream() <<
+                   "'" << varName << "' starts with an invalid character for a variable name",
+                firstCharIsValid);
+
+        for (size_t i = 1; i < varName.size(); i++) {
+            const bool charIsValid = (varName[i] >= 'a' &&  varName[i] <= 'z')
+                                  || (varName[i] >= 'A' &&  varName[i] <= 'Z')
+                                  || (varName[i] >= '0' &&  varName[i] <= '9')
+                                  || (varName[i] == '_')
+                                  || (varName[i] & '\x80') // non-ascii
+                                  ;
+
+            uassert(16871, str::stream() << "'" << varName << "' contains an invalid character "
+                                         << "for a variable name: '" << varName[i] << "'",
+                    charIsValid);
+        }
+    }
+
     /* --------------------------- Expression ------------------------------ */
 
     void Expression::toMatcherBson(BSONObjBuilder *pBuilder) const {
@@ -116,7 +174,8 @@ namespace mongo {
                     verify(pCtx->documentOk());
                     // CW TODO error: document not allowed in this context
 
-                    pExpressionObject = ExpressionObject::create();
+                    pExpressionObject = pCtx->topLevel() ? ExpressionObject::createRoot()
+                                                         : ExpressionObject::create();
                     pExpression = pExpressionObject;
 
                     /* this "object" is not an operator expression */
@@ -139,10 +198,8 @@ namespace mongo {
                     case String: {
                         /* it's a renamed field */
                         // CW TODO could also be a constant
-                        intrusive_ptr<Expression> pPath(
-                            ExpressionFieldPath::create(
-                                removeFieldPrefix(fieldElement.str())));
-                        pExpressionObject->addField(fieldName, pPath);
+                        pExpressionObject->addField(fieldName,
+                                                    ExpressionFieldPath::parse(fieldElement.str()));
                         break;
                     }
                     case Bool:
@@ -211,6 +268,7 @@ namespace mongo {
         {"$gte", ExpressionCompare::createGte, OpDesc::FIXED_COUNT, 2},
         {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
         {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
+        // $let handled specially in parseExpression
         {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
         {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
         {"$millisecond", ExpressionMillisecond::create, OpDesc::FIXED_COUNT, 1},
@@ -239,6 +297,9 @@ namespace mongo {
 
         if (str::equals(pOpName, "$const")) {
             return ExpressionConstant::createFromBsonElement(pBsonElement);
+        }
+        else if (str::equals(pOpName, "$let")) {
+            return ExpressionLet::parse(*pBsonElement);
         }
 
         OpDesc key;
@@ -311,8 +372,7 @@ namespace mongo {
 
         if (type == String && pBsonElement->valuestr()[0] == '$') {
             /* if we got here, this is a field path expression */
-            string fieldPath = removeFieldPrefix(pBsonElement->str());
-            return ExpressionFieldPath::create(fieldPath);
+            return ExpressionFieldPath::parse(pBsonElement->str());
         }
         else if (type == Object) {
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
@@ -333,7 +393,7 @@ namespace mongo {
         return pExpression;
     }
 
-    Value ExpressionAdd::evaluate(const Document& pDocument) const {
+    Value ExpressionAdd::evaluateInternal(const Variables& vars) const {
 
         /*
           We'll try to return the narrowest possible result value.  To do that
@@ -348,7 +408,7 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for (size_t i = 0; i < n; ++i) {
-            Value val = vpOperand[i]->evaluate(pDocument);
+            Value val = vpOperand[i]->evaluateInternal(vars);
 
             if (val.numeric()) {
                 totalType = Value::getWidestNumeric(totalType, val.getType());
@@ -443,7 +503,7 @@ namespace mongo {
           Evaluate and coerce the last argument to a boolean.  If it's false,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluate(Document()).coerceToBool();
+        bool last = pLast->evaluateInternal(Variables()).coerceToBool();
         if (!last) {
             intrusive_ptr<ExpressionConstant> pFinal(
                 ExpressionConstant::create(Value(false)));
@@ -473,10 +533,10 @@ namespace mongo {
         return pE;
     }
 
-    Value ExpressionAnd::evaluate(const Document& pDocument) const {
+    Value ExpressionAnd::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            Value pValue(vpOperand[i]->evaluate(pDocument));
+            Value pValue(vpOperand[i]->evaluateInternal(vars));
             if (!pValue.coerceToBool())
                 return Value(false);
         }
@@ -542,8 +602,8 @@ namespace mongo {
         pExpression->addDependencies(deps);
     }
 
-    Value ExpressionCoerceToBool::evaluate(const Document& pDocument) const {
-        Value pResult(pExpression->evaluate(pDocument));
+    Value ExpressionCoerceToBool::evaluateInternal(const Variables& vars) const {
+        Value pResult(pExpression->evaluateInternal(vars));
         bool b = pResult.coerceToBool();
         if (b)
             return Value(true);
@@ -688,10 +748,10 @@ namespace mongo {
             pFieldPath, newOp, pConstant->getValue());
     }
 
-    Value ExpressionCompare::evaluate(const Document& pDocument) const {
+    Value ExpressionCompare::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
-        Value pRight(vpOperand[1]->evaluate(pDocument));
+        Value pLeft(vpOperand[0]->evaluateInternal(vars));
+        Value pRight(vpOperand[1]->evaluateInternal(vars));
 
         int cmp = signum(Value::compare(pLeft, pRight));
 
@@ -724,12 +784,12 @@ namespace mongo {
         return new ExpressionConcat();
     }
 
-    Value ExpressionConcat::evaluate(const Document& input) const {
+    Value ExpressionConcat::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
 
         StringBuilder result;
         for (size_t i = 0; i < n; ++i) {
-            Value val = vpOperand[i]->evaluate(input);
+            Value val = vpOperand[i]->evaluateInternal(vars);
             if (val.nullish())
                 return Value(BSONNULL);
 
@@ -767,11 +827,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionCond::evaluate(const Document& pDocument) const {
+    Value ExpressionCond::evaluateInternal(const Variables& vars) const {
         checkArgCount(3);
-        Value pCond(vpOperand[0]->evaluate(pDocument));
+        Value pCond(vpOperand[0]->evaluateInternal(vars));
         int idx = pCond.coerceToBool() ? 1 : 2;
-        return vpOperand[idx]->evaluate(pDocument);
+        return vpOperand[idx]->evaluateInternal(vars);
     }
 
     const char *ExpressionCond::getOpName() const {
@@ -811,7 +871,7 @@ namespace mongo {
         /* nothing to do */
     }
 
-    Value ExpressionConstant::evaluate(const Document& pDocument) const {
+    Value ExpressionConstant::evaluateInternal(const Variables& vars) const {
         return pValue;
     }
 
@@ -843,9 +903,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDayOfMonth::evaluate(const Document& pDocument) const {
+    Value ExpressionDayOfMonth::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_mday);
     }
@@ -873,9 +933,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDayOfWeek::evaluate(const Document& pDocument) const {
+    Value ExpressionDayOfWeek::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
     }
@@ -903,9 +963,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDayOfYear::evaluate(const Document& pDocument) const {
+    Value ExpressionDayOfYear::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
     }
@@ -934,10 +994,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDivide::evaluate(const Document& pDocument) const {
+    Value ExpressionDivide::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value lhs = vpOperand[0]->evaluate(pDocument);
-        Value rhs = vpOperand[1]->evaluate(pDocument);
+        Value lhs = vpOperand[0]->evaluateInternal(vars);
+        Value rhs = vpOperand[1]->evaluateInternal(vars);
 
         if (lhs.numeric() && rhs.numeric()) {
             double numer = lhs.coerceToDouble();
@@ -968,12 +1028,17 @@ namespace mongo {
     }
 
     intrusive_ptr<ExpressionObject> ExpressionObject::create() {
-        intrusive_ptr<ExpressionObject> pExpression(new ExpressionObject());
-        return pExpression;
+        return new ExpressionObject(false);
     }
 
-    ExpressionObject::ExpressionObject(): _excludeId(false) {
+    intrusive_ptr<ExpressionObject> ExpressionObject::createRoot() {
+        return new ExpressionObject(true);
     }
+
+    ExpressionObject::ExpressionObject(bool atRoot)
+        : _excludeId(false)
+        , _atRoot(atRoot)
+    {}
 
     intrusive_ptr<Expression> ExpressionObject::optimize() {
         for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
@@ -1028,18 +1093,16 @@ namespace mongo {
 
     void ExpressionObject::addToDocument(
         MutableDocument& out,
-        const Document& pDocument,
-        const Document& rootDoc
+        const Document& currentDoc,
+        const Variables& vars
         ) const
     {
-        const bool atRoot = (pDocument == rootDoc);
-
         ExpressionMap::const_iterator end = _expressions.end();
 
         // This is used to mark fields we've done so that we can add the ones we haven't
         set<string> doneFields;
 
-        FieldIterator fields(pDocument);
+        FieldIterator fields(currentDoc);
         while(fields.more()) {
             Document::FieldPair field (fields.next());
 
@@ -1049,7 +1112,7 @@ namespace mongo {
 
             // This field is not supposed to be in the output (unless it is _id)
             if (exprIter == end) {
-                if (!_excludeId && atRoot && field.first == "_id") {
+                if (!_excludeId && _atRoot && field.first == "_id") {
                     // _id from the root doc is always included (until exclusion is supported)
                     // not updating doneFields since "_id" isn't in _expressions
                     out.addField(field.first, field.second);
@@ -1073,7 +1136,7 @@ namespace mongo {
             if ((valueType != Object && valueType != Array) || !exprObj ) {
                 // This expression replace the whole field
                 
-                Value pValue(expr->evaluate(rootDoc));
+                Value pValue(expr->evaluateInternal(vars));
 
                 // don't add field if nothing was found in the subobject
                 if (exprObj && pValue.getDocument()->getFieldCount() == 0)
@@ -1097,7 +1160,7 @@ namespace mongo {
             */
             if (valueType == Object) {
                 MutableDocument sub (exprObj->getSizeHint());
-                exprObj->addToDocument(sub, field.second.getDocument(), rootDoc);
+                exprObj->addToDocument(sub, field.second.getDocument(), vars);
                 out.addField(field.first, sub.freezeToValue());
             }
             else if (valueType == Array) {
@@ -1114,7 +1177,7 @@ namespace mongo {
                         continue;
 
                     MutableDocument doc (exprObj->getSizeHint());
-                    exprObj->addToDocument(doc, input[i].getDocument(), rootDoc);
+                    exprObj->addToDocument(doc, input[i].getDocument(), vars);
                     result.push_back(doc.freezeToValue());
                 }
 
@@ -1141,7 +1204,7 @@ namespace mongo {
             if (!it->second)
                 continue;
 
-            Value pValue(it->second->evaluate(rootDoc));
+            Value pValue(it->second->evaluateInternal(vars));
 
             /*
               Don't add non-existent values (note:  different from NULL or Undefined);
@@ -1166,18 +1229,18 @@ namespace mongo {
         return _expressions.size() + (_excludeId ? 0 : 1);
     }
 
-    Document ExpressionObject::evaluateDocument(const Document& pDocument) const {
+    Document ExpressionObject::evaluateDocument(const Variables& vars) const {
         /* create and populate the result */
         MutableDocument out (getSizeHint());
         
         addToDocument(out,
                       Document(), // No inclusion field matching.
-                      pDocument);
+                      vars);
         return out.freeze();
     }
 
-    Value ExpressionObject::evaluate(const Document& pDocument) const {
-        return Value(evaluateDocument(pDocument));
+    Value ExpressionObject::evaluateInternal(const Variables& vars) const {
+        return Value(evaluateDocument(vars));
     }
 
     void ExpressionObject::addField(const FieldPath &fieldPath,
@@ -1264,17 +1327,38 @@ namespace mongo {
     ExpressionFieldPath::~ExpressionFieldPath() {
     }
 
-    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
-        const string &fieldPath) {
-        intrusive_ptr<ExpressionFieldPath> pExpression(
-            new ExpressionFieldPath(fieldPath));
-        return pExpression;
+    // this is the old deprecated version
+    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(const string& fieldPath) {
+        return new ExpressionFieldPath("CURRENT." + fieldPath);
     }
 
-    ExpressionFieldPath::ExpressionFieldPath(
-        const string &theFieldPath):
-        fieldPath(theFieldPath) {
+    // this is the new version that supports every syntax
+    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(const string& raw) {
+        uassert(16873, str::stream() << "FieldPath '" << raw << "' doesn't start with $",
+                raw.c_str()[0] == '$'); // c_str()[0] is always a valid reference.
+
+        uassert(16872, str::stream() << "'$' by itself is not a valid FieldPath",
+                raw.size() >= 2); // need at least "$" and either "$" or a field name
+
+        if (raw[1] == '$') {
+            const StringData rawSD = raw;
+            const StringData fieldPath = rawSD.substr(2); // strip off $$
+            const StringData varName = fieldPath.substr(0, fieldPath.find('.')-1);
+            Variables::uassertValidNameForUserRead(varName);
+            return new ExpressionFieldPath(fieldPath.toString());
+        }
+        else {
+            return new ExpressionFieldPath("CURRENT." + raw.substr(1)); // strip the "$" prefix
+        }
     }
+
+
+    ExpressionFieldPath::ExpressionFieldPath(const string& theFieldPath)
+        : _fieldPath(theFieldPath)
+        , _baseVar(_fieldPath.getFieldName(0) == "CURRENT" ? CURRENT :
+                   _fieldPath.getFieldName(0) == "ROOT" ?    ROOT :
+                                                             OTHER)
+    {}
 
     intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
         /* nothing can be done for these */
@@ -1282,7 +1366,10 @@ namespace mongo {
     }
 
     void ExpressionFieldPath::addDependencies(set<string>& deps, vector<string>* path) const {
-        deps.insert(fieldPath.getPath(false));
+        // TODO, consider state of variables
+        if (_baseVar == ROOT || _baseVar == CURRENT) {
+            deps.insert(_fieldPath.tail().getPath(false));
+        }
     }
 
     Value ExpressionFieldPath::evaluatePathArray(size_t index, const Value& input) const {
@@ -1307,11 +1394,11 @@ namespace mongo {
         // In particular, all return paths should support RVO.
 
         /* if we've hit the end of the path, stop */
-        if (index == fieldPath.getPathLength() - 1)
-            return input[fieldPath.getFieldName(index)];
+        if (index == _fieldPath.getPathLength() - 1)
+            return input[_fieldPath.getFieldName(index)];
 
         // Try to dive deeper
-        const Value val = input[fieldPath.getFieldName(index)];
+        const Value val = input[_fieldPath.getFieldName(index)];
         switch (val.getType()) {
         case Object:
             return evaluatePath(index+1, val.getDocument());
@@ -1324,12 +1411,32 @@ namespace mongo {
         }
     }
 
-    Value ExpressionFieldPath::evaluate(const Document& pDocument) const {
-        return evaluatePath(0, pDocument);
+    Value ExpressionFieldPath::evaluateInternal(const Variables& vars) const {
+        Value var;
+        switch (_baseVar) {
+        case CURRENT: var = vars.current; break;
+        case ROOT:    var = vars.root; break;
+        default:      var = vars.rest[_fieldPath.getFieldName(0)]; break;
+        }
+
+        if (_fieldPath.getPathLength() == 1)
+            return var;
+
+        switch (var.getType()) {
+        case Object: return evaluatePath(1, var.getDocument());
+        case Array: return evaluatePathArray(1, var);
+        default: return Value();
+        }
     }
 
     Value ExpressionFieldPath::serialize() const {
-        return Value(fieldPath.getPath(true));
+        if (_fieldPath.getFieldName(0) == "CURRENT" && _fieldPath.getPathLength() > 1) {
+            // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
+            return Value("$" + _fieldPath.tail().getPath(false));
+        }
+        else {
+            return Value("$$" + _fieldPath.getPath(false));
+        }
     }
 
     /* --------------------- ExpressionFieldRange -------------------------- */
@@ -1362,13 +1469,13 @@ namespace mongo {
         pFieldPath->addDependencies(deps);
     }
 
-    Value ExpressionFieldRange::evaluate(const Document& pDocument) const {
+    Value ExpressionFieldRange::evaluateInternal(const Variables& vars) const {
         /* if there's no range, there can't be a match */
         if (!pRange.get())
             return Value(false);
 
         /* get the value of the specified field */
-        Value pValue(pFieldPath->evaluate(pDocument));
+        Value pValue(pFieldPath->evaluateInternal(vars));
 
         /* see if it fits within any of the ranges */
         if (pRange->contains(pValue))
@@ -1435,7 +1542,8 @@ namespace mongo {
             return; // nothing to add to the predicate
 
         /* we're going to need the field path */
-        string fieldPath(pFieldPath->getFieldPath(false));
+        //TODO Fix for $$vars. This method isn't currently used so low-priority
+        string fieldPath(pFieldPath->getFieldPath().getPath(false));
 
         BSONObjBuilder range;
         if (!pRange->pBottom.missing()) {
@@ -1617,6 +1725,111 @@ namespace mongo {
         return true;
     }
 
+
+    /* ------------------------- ExpressionLet ----------------------------- */
+
+    ExpressionLet::~ExpressionLet() {}
+
+    intrusive_ptr<ExpressionLet> ExpressionLet::parse(BSONElement expr) {
+        verify(str::equals(expr.fieldName(), "$let"));
+
+        uassert(16874, "$let only supports an object as it's argument",
+                expr.type() == Object);
+        const BSONObj args = expr.embeddedObject();
+
+        // used for input validation
+        bool haveVars = false;
+        bool haveIn = false;
+
+        VariableMap vars;
+        intrusive_ptr<Expression> subExpression;
+        BSONForEach(arg, args) {
+            if (str::equals(arg.fieldName(), "vars")) {
+                haveVars = true;
+                BSONForEach(variable, arg.embeddedObjectUserCheck()) {
+                    Variables::uassertValidNameForUserWrite(variable.fieldName());
+                    vars[variable.fieldName()] = parseOperand(&variable);
+                }
+            } else if (str::equals(arg.fieldName(), "in")) {
+                haveIn = true;
+                subExpression = parseOperand(&arg);
+            } else {
+                uasserted(16875, str::stream()
+                        << "Unrecognized parameter to $let: " << arg.fieldName());
+            }
+        }
+
+        uassert(16876, "Missing 'vars' parameter to $let",
+                haveVars);
+        uassert(16877, "Missing 'in' parameter to $let",
+                haveIn);
+
+        return new ExpressionLet(vars, subExpression);
+    }
+
+    ExpressionLet::ExpressionLet(const VariableMap& vars, intrusive_ptr<Expression> subExpression)
+        : _variables(vars)
+        , _subExpression(subExpression)
+    {}
+
+    intrusive_ptr<Expression> ExpressionLet::optimize() {
+        if (_variables.empty()) {
+            // we aren't binding any variables so just return the subexpression
+            return _subExpression->optimize();
+        }
+
+        for (VariableMap::iterator it=_variables.begin(), end=_variables.end(); it != end; ++it) {
+            it->second = it->second->optimize();
+        }
+
+        // TODO be smarter with constant "variables"
+        _subExpression = _subExpression->optimize();
+
+        return this;
+    }
+
+    Value ExpressionLet::serialize() const {
+        MutableDocument vars;
+        for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
+                it != end; ++it) {
+            vars[it->first] = it->second->serialize();
+        }
+
+        return Value(DOC("$let" << DOC("vars" << vars.freeze()
+                                    << "in" << _subExpression->serialize())
+                                    ));
+    }
+
+    Value ExpressionLet::evaluateInternal(const Variables& originalVars) const {
+        Variables newVars = originalVars;
+        MutableDocument newRest(originalVars.rest);
+        for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
+                it != end; ++it) {
+
+            const Value newVar = it->second->evaluateInternal(originalVars);
+
+            // Can't set ROOT (checked in parse())
+            if (it->first == "CURRENT")
+                newVars.current = newVar;
+            else
+                newRest[it->first] = newVar;
+        }
+
+        newVars.rest = newRest.freeze();
+        return _subExpression->evaluateInternal(newVars);
+    }
+
+    void ExpressionLet::addDependencies(set<string>& deps, vector<string>* path) const {
+        for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
+                it != end; ++it) {
+            it->second->addDependencies(deps);
+        }
+
+        // TODO be smarter when CURRENT is a bound variable
+        _subExpression->addDependencies(deps);
+    }
+
+
     /* ------------------------- ExpressionMillisecond ----------------------------- */
 
     ExpressionMillisecond::~ExpressionMillisecond() {
@@ -1636,9 +1849,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMillisecond::evaluate(const Document& document) const {
+    Value ExpressionMillisecond::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value date(vpOperand[0]->evaluate(document));
+        Value date(vpOperand[0]->evaluateInternal(vars));
         const int ms = date.coerceToDate() % 1000LL;
         // adding 1000 since dates before 1970 would have negative ms
         return Value(ms >= 0 ? ms : 1000 + ms);
@@ -1668,9 +1881,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMinute::evaluate(const Document& pDocument) const {
+    Value ExpressionMinute::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_min);
     }
@@ -1699,10 +1912,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMod::evaluate(const Document& pDocument) const {
+    Value ExpressionMod::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value lhs = vpOperand[0]->evaluate(pDocument);
-        Value rhs = vpOperand[1]->evaluate(pDocument);
+        Value lhs = vpOperand[0]->evaluateInternal(vars);
+        Value rhs = vpOperand[1]->evaluateInternal(vars);
 
         BSONType leftType = lhs.getType();
         BSONType rightType = rhs.getType();
@@ -1769,9 +1982,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMonth::evaluate(const Document& pDocument) const {
+    Value ExpressionMonth::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
     }
@@ -1794,7 +2007,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    Value ExpressionMultiply::evaluate(const Document& pDocument) const {
+    Value ExpressionMultiply::evaluateInternal(const Variables& vars) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
           without creating intermediate Values, do the arithmetic for double
@@ -1807,7 +2020,7 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            Value val = vpOperand[i]->evaluate(pDocument);
+            Value val = vpOperand[i]->evaluateInternal(vars);
 
             if (val.numeric()) {
                 productType = Value::getWidestNumeric(productType, val.getType());
@@ -1861,9 +2074,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionHour::evaluate(const Document& pDocument) const {
+    Value ExpressionHour::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_hour);
     }
@@ -1892,14 +2105,14 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionIfNull::evaluate(const Document& pDocument) const {
+    Value ExpressionIfNull::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
 
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
+        Value pLeft(vpOperand[0]->evaluateInternal(vars));
         if (!pLeft.nullish())
             return pLeft;
 
-        Value pRight(vpOperand[1]->evaluate(pDocument));
+        Value pRight(vpOperand[1]->evaluateInternal(vars));
         return pRight;
     }
 
@@ -1940,7 +2153,7 @@ namespace mongo {
           ExpressionConstant never refers to the argument Document.
         */
         if (constCount == n) {
-            Value pResult(evaluate(Document()));
+            Value pResult(evaluateInternal(Variables()));
             intrusive_ptr<Expression> pReplacement(
                 ExpressionConstant::create(pResult));
             return pReplacement;
@@ -2036,7 +2249,7 @@ namespace mongo {
               together before adding the result to the end of the expression
               operand vector.
             */
-            Value pResult(pConst->evaluate(Document()));
+            Value pResult(pConst->evaluateInternal(Variables()));
             pNew->addOperand(ExpressionConstant::create(pResult));
         }
 
@@ -2102,9 +2315,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionNot::evaluate(const Document& pDocument) const {
+    Value ExpressionNot::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pOp(vpOperand[0]->evaluate(pDocument));
+        Value pOp(vpOperand[0]->evaluateInternal(vars));
 
         bool b = pOp.coerceToBool();
         return Value(!b);
@@ -2128,10 +2341,10 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    Value ExpressionOr::evaluate(const Document& pDocument) const {
+    Value ExpressionOr::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            Value pValue(vpOperand[i]->evaluate(pDocument));
+            Value pValue(vpOperand[i]->evaluateInternal(vars));
             if (pValue.coerceToBool())
                 return Value(true);
         }
@@ -2180,7 +2393,7 @@ namespace mongo {
           Evaluate and coerce the last argument to a boolean.  If it's true,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluate(Document()).coerceToBool();
+        bool last = pLast->evaluateInternal(Variables()).coerceToBool();
         if (last) {
             intrusive_ptr<ExpressionConstant> pFinal(
                 ExpressionConstant::create(Value(true)));
@@ -2229,9 +2442,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionSecond::evaluate(const Document& pDocument) const {
+    Value ExpressionSecond::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_sec);
     }
@@ -2260,10 +2473,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionStrcasecmp::evaluate(const Document& pDocument) const {
+    Value ExpressionStrcasecmp::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value pString1(vpOperand[0]->evaluate(pDocument));
-        Value pString2(vpOperand[1]->evaluate(pDocument));
+        Value pString1(vpOperand[0]->evaluateInternal(vars));
+        Value pString2(vpOperand[1]->evaluateInternal(vars));
 
         /* boost::iequals returns a bool not an int so strings must actually be allocated */
         string str1 = boost::to_upper_copy( pString1.coerceToString() );
@@ -2302,11 +2515,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionSubstr::evaluate(const Document& pDocument) const {
+    Value ExpressionSubstr::evaluateInternal(const Variables& vars) const {
         checkArgCount(3);
-        Value pString(vpOperand[0]->evaluate(pDocument));
-        Value pLower(vpOperand[1]->evaluate(pDocument));
-        Value pLength(vpOperand[2]->evaluate(pDocument));
+        Value pString(vpOperand[0]->evaluateInternal(vars));
+        Value pLower(vpOperand[1]->evaluateInternal(vars));
+        Value pLength(vpOperand[2]->evaluateInternal(vars));
 
         string str = pString.coerceToString();
         uassert(16034, str::stream() << getOpName() <<
@@ -2355,10 +2568,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionSubtract::evaluate(const Document& pDocument) const {
+    Value ExpressionSubtract::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value lhs = vpOperand[0]->evaluate(pDocument);
-        Value rhs = vpOperand[1]->evaluate(pDocument);
+        Value lhs = vpOperand[0]->evaluateInternal(vars);
+        Value rhs = vpOperand[1]->evaluateInternal(vars);
             
         BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
 
@@ -2426,9 +2639,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionToLower::evaluate(const Document& pDocument) const {
+    Value ExpressionToLower::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pString(vpOperand[0]->evaluate(pDocument));
+        Value pString(vpOperand[0]->evaluateInternal(vars));
         string str = pString.coerceToString();
         boost::to_lower(str);
         return Value(str);
@@ -2458,9 +2671,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionToUpper::evaluate(const Document& pDocument) const {
+    Value ExpressionToUpper::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pString(vpOperand[0]->evaluate(pDocument));
+        Value pString(vpOperand[0]->evaluateInternal(vars));
         string str(pString.coerceToString());
         boost::to_upper(str);
         return Value(str);
@@ -2489,9 +2702,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionWeek::evaluate(const Document& pDocument) const {
+    Value ExpressionWeek::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         int dayOfWeek = date.tm_wday;
         int dayOfYear = date.tm_yday;
@@ -2536,9 +2749,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionYear::evaluate(const Document& pDocument) const {
+    Value ExpressionYear::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_year + 1900); // tm_year is years since 1900
     }

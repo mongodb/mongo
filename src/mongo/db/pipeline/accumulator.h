@@ -33,7 +33,8 @@ namespace mongo {
 
         // TODO rename to process()
         /// Process input and update internal state.
-        void evaluate(const Document& input) { processInternal(_expr->evaluate(input)); }
+        void evaluate(const Document& input)  { processInternal(_expr->evaluate(input)); }
+        void evaluate(const Variables& input) { processInternal(_expr->evaluate(input)); }
 
         /// Add needed fields to the passed in set
         void addDependencies(set<string>& deps) const { _expr->addDependencies(deps); }

@@ -197,11 +197,9 @@ namespace mongo {
                     idSet = true;
                 }
                 else if (groupType == String) {
-                    string groupString(groupField.str());
-                    const char *pGroupString = groupString.c_str();
-                    if (pGroupString[0] == '$') {
-                        string pathString = Expression::removeFieldPrefix(groupString);
-                        pGroup->setIdExpression(ExpressionFieldPath::create(pathString));
+                    const string groupString = groupField.str();
+                    if (!groupString.empty() && groupString[0] == '$') {
+                        pGroup->setIdExpression(ExpressionFieldPath::parse(groupString));
                         idSet = true;
                     }
                 }
@@ -290,10 +288,11 @@ namespace mongo {
         dassert(numAccumulators == vpExpression.size());
 
         for (bool hasNext = !pSource->eof(); hasNext; hasNext = pSource->advance()) {
-            Document input  = pSource->getCurrent();
+            const Document input = pSource->getCurrent();
+            const Variables vars (input);
 
             /* get the _id value */
-            Value id = pIdExpression->evaluate(input);
+            Value id = pIdExpression->evaluate(vars);
 
             /* treat missing values the same as NULL SERVER-4674 */
             if (id.missing())
@@ -321,7 +320,7 @@ namespace mongo {
             /* tickle all the accumulators for the group we found */
             dassert(numAccumulators == group.size());
             for (size_t i = 0; i < numAccumulators; i++)
-                group[i]->evaluate(input);
+                group[i]->evaluate(vars);
         }
 
         /* start the group iterator */
@@ -363,7 +362,7 @@ namespace mongo {
         intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pMergerExpCtx));
 
         /* the merger will use the same grouping key */
-        pMerger->setIdExpression(ExpressionFieldPath::create("_id"));
+        pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id"));
 
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
@@ -377,7 +376,7 @@ namespace mongo {
             */
             pMerger->addAccumulator(
                 vFieldName[i], vpAccumulatorFactory[i],
-                ExpressionFieldPath::create(vFieldName[i]));
+                ExpressionFieldPath::parse("$$ROOT." + vFieldName[i]));
         }
 
         return pMerger;
