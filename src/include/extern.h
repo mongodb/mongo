@@ -654,12 +654,6 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session,
 extern int __wt_log_filename(WT_SESSION_IMPL *session,
     WT_LOG *log,
     WT_ITEM *buf);
-extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
-extern int __wt_log_printf(WT_SESSION_IMPL *session,
-    const char *fmt,
-    ...) WT_GCC_ATTRIBUTE((format (printf,
-    2,
-    3)));
 extern int __wt_log_open(WT_SESSION_IMPL *session);
 extern int __wt_log_close(WT_SESSION_IMPL *session);
 extern int __wt_log_read(WT_SESSION_IMPL *session,
@@ -680,6 +674,7 @@ extern int __wt_log_write(WT_SESSION_IMPL *session,
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     const char *fmt,
     va_list ap);
+extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
 extern WT_LOGREC_DESC __wt_logdesc_debug;
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,

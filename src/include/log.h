@@ -20,7 +20,7 @@
 
 /* For __wt_log_scan */
 #define	WT_LOGSCAN_FIRST	0x01	/* Scan from beginning of log */
-#define	WT_LOGSCAN_FROM_CKP	0x02	/* Scan from beginning of last ckp */
+#define	WT_LOGSCAN_FROM_CKP	0x02	/* Scan from last checkpoint */
 #define	WT_LOGSCAN_ONE		0x04	/* Scan only one record */
 
 struct __wt_lsn {
@@ -99,9 +99,12 @@ typedef struct {
 #undef	slot_fh
 #define	slot_fh			u.slot.fh
 			WT_FH	*fh;		/* File handle for this group */
+#if 0
+/* Do we need this?  Not used at the moment. */
 #undef	slot_cond
 #define	slot_cond		u.slot.cond
-			WT_CONDVAR	*cond;	/* condvar for this group */
+			WT_CONDVAR	*cond;	/* Condition variable */
+#endif
 #undef	slot_flags
 #define	slot_flags		u.slot.flags
 #define	SLOT_CLOSEFH	0x01			/* Close old fh on release */

@@ -96,7 +96,9 @@ join_slot:
 		FLD_SET(slot->slot_flags, SLOT_SYNC);
 	myslotp->slot = slot;
 	myslotp->offset = (off_t)old_state - WT_LOG_SLOT_READY;
-	fprintf(stderr, "[%d] slot_join: joined slot %d, 0x%x.  My offset 0x%x\n",pthread_self(),i,slot,myslotp->offset);
+	fprintf(stderr,
+	    "[%d] slot_join: joined slot %d, 0x%x.  My offset 0x%x\n",
+	    pthread_self(),i,slot,myslotp->offset);
 	return (0);
 }
 
@@ -139,7 +141,9 @@ retry:
 	old_state = WT_ATOMIC_STORE(slot->slot_state, WT_LOG_SLOT_PENDING);
 	slot->slot_group_size = old_state - WT_LOG_SLOT_READY;
 	WT_CSTAT_INCRV(session, log_slot_consolidated, slot->slot_group_size);
-	fprintf(stderr, "[%d] slot_close: closed slot 0x%x at index %d.  New slot %d.  Group size %d\n",pthread_self(),slot,slot->slot_index, pool_i, slot->slot_group_size);
+	fprintf(stderr,
+"[%d] slot_close: closed slot 0x%x at index %d.  New slot %d.  Group size %d\n",
+	   pthread_self(),slot,slot->slot_index, pool_i, slot->slot_group_size);
 	return (0);
 }
 
@@ -151,7 +155,6 @@ int
 __wt_log_slot_notify(WT_LOGSLOT *slot)
 {
 	slot->slot_state = WT_LOG_SLOT_DONE - slot->slot_group_size;
-	fprintf(stderr, "[%d] slot_notify: slot 0x%x state 0x%x %d\n",pthread_self(),slot, slot->slot_state,slot->slot_state);
 	return (0);
 }
 
@@ -162,10 +165,8 @@ __wt_log_slot_notify(WT_LOGSLOT *slot)
 int
 __wt_log_slot_wait(WT_LOGSLOT *slot)
 {
-	fprintf(stderr, "[%d] slot_wait: slot 0x%x waiting for leader\n",pthread_self(), slot);
 	while (slot->slot_state > WT_LOG_SLOT_DONE)
 		__wt_yield();
-	fprintf(stderr, "[%d] slot_wait: slot 0x%x done\n",pthread_self(),slot);
 	return (0);
 }
 
@@ -184,7 +185,6 @@ __wt_log_slot_release(WT_LOGSLOT *slot, int32_t size)
 	 * all participatory threads have completed copying their piece.
 	 */
 	newsize = WT_ATOMIC_ADD(slot->slot_state, size);
-	fprintf(stderr, "[%d] slot_release: slot 0x%x mysize %d newsize %d\n",pthread_self(),slot, size, newsize);
 	return (newsize);
 }
 
