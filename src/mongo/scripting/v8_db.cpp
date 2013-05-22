@@ -114,6 +114,10 @@ namespace mongo {
             strcpy(host, "127.0.0.1");
         }
 
+        // only allow function template to be used by a constructor
+        if (args.This()->Equals(scope->getGlobal()))
+            return v8::Undefined();
+
         string errmsg;
         ConnectionString cs = ConnectionString::parse(host, errmsg);
         if (!cs.isValid()) {
@@ -140,6 +144,10 @@ namespace mongo {
 
     v8::Handle<v8::Value> mongoConsLocal(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 0, "local Mongo constructor takes no args")
+
+        // only allow function template to be used by a constructor
+        if (args.This()->Equals(scope->getGlobal()))
+            return v8::Undefined();
 
         DBClientBase* conn = createDirectClient();
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
