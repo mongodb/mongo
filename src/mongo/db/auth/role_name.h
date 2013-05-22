@@ -124,7 +124,7 @@ namespace mongo {
 MONGO_HASH_NAMESPACE_START
     template <> struct hash<mongo::RoleName> {
         size_t operator()(const mongo::RoleName& rname) const {
-            return hash<const std::string&>()(rname.getFullName());
+            return hash<std::string>()(rname.getFullName());
         }
     };
 MONGO_HASH_NAMESPACE_END

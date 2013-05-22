@@ -76,7 +76,7 @@ namespace mongo {
 MONGO_HASH_NAMESPACE_START
     template <> struct hash<mongo::PrincipalName> {
         size_t operator()(const mongo::PrincipalName& pname) const {
-            return hash<const std::string&>()(pname.getFullName());
+            return hash<std::string>()(pname.getFullName());
         }
     };
 MONGO_HASH_NAMESPACE_END
