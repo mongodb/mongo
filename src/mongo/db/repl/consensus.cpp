@@ -234,16 +234,14 @@ namespace mongo {
             log() << "replSet electCmdReceived couldn't find member with id " << whoid << rsLog;
             vote = -10000;
         }
-        else if( primary && primary == rs._self && rs.lastOpTimeWritten >= hopeful->hbinfo().opTime ) {
-            // hbinfo is not updated, so we have to check the primary's last optime separately
+        else if( primary && primary == rs._self) {
             log() << "I am already primary, " << hopeful->fullName()
                   << " can try again once I've stepped down" << rsLog;
             vote = -10000;
         }
-        else if( primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime ) {
-            // other members might be aware of more up-to-date nodes
+        else if (primary) {
             log() << hopeful->fullName() << " is trying to elect itself but " <<
-                  primary->fullName() << " is already primary and more up-to-date" << rsLog;
+                  primary->fullName() << " is already primary" << rsLog;
             vote = -10000;
         }
         else if( highestPriority && highestPriority->config().priority > hopeful->config().priority) {
