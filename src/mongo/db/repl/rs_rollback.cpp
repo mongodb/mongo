@@ -68,7 +68,12 @@ namespace mongo {
 
     class rsfatal : public std::exception {
     public:
-        virtual const char* what() const throw() { return "replica set fatal exception"; }
+        rsfatal(const char* m = "replica set fatal exception") {
+            msg = m;
+        }
+        virtual const char* what() const throw() { return msg; }
+    private:
+        const char *msg;
     };
 
     struct DocID {
@@ -230,7 +235,7 @@ namespace mongo {
             log() << "replSet info rollback diff in end of log times: " << diff << " seconds" << rsLog;
             if( diff > 1800 ) {
                 log() << "replSet rollback too long a time period for a rollback." << rsLog;
-                throw "error not willing to roll back more than 30 minutes of data";
+                throw rsfatal("rollback error: not willing to roll back more than 30 minutes of data");
             }
         }
 
@@ -666,7 +671,8 @@ namespace mongo {
                 sethbmsg(string("rollback 2 error ") + p);
                 return 10;
             }
-            catch( rsfatal& ) {
+            catch( rsfatal& e ) {
+                sethbmsg(string(e.what()));
                 _fatal();
                 return 2;
             }

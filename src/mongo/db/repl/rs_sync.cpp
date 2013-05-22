@@ -603,8 +603,9 @@ namespace replset {
         lock rsLock( this );
         Lock::GlobalWrite writeLock;
 
-        // make sure we're not primary, secondary, or fatal already
-        if (box.getState().primary() || box.getState().secondary() || box.getState().fatal()) {
+        // make sure we're not primary, secondary, rollback, or fatal already
+        if (box.getState().primary() || box.getState().secondary() ||
+            box.getState().rollback() || box.getState().fatal()) {
             return false;
         }
 
