@@ -27,41 +27,6 @@
 #include "mongo/db/matcher/expression_leaf.h"
 
 namespace mongo {
-    /**
-     * this SHOULD extend from ArrayMatchingMatchExpression
-     * the only reason it can't is
-
-     > db.foo.insert( { x : 5 } )
-     > db.foo.insert( { x : [5] } )
-     > db.foo.find( { x : { $all : [ 5 ] } } )
-     { "_id" : ObjectId("5162b5c3f98a76ce1e70ed0c"), "x" : 5 }
-     { "_id" : ObjectId("5162b5c5f98a76ce1e70ed0d"), "x" : [ 5 ] }
-
-     * the { x : 5}  doc should NOT match
-     *
-     */
-    class AllMatchExpression : public MatchExpression {
-    public:
-        AllMatchExpression() : MatchExpression( ALL ){}
-        Status init( const StringData& path );
-        ArrayFilterEntries* getArrayFilterEntries() { return &_arrayEntries; }
-
-        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
-
-        virtual bool matchesSingleElement( const BSONElement& e ) const;
-
-        virtual void debugString( StringBuilder& debug, int level ) const;
-
-        bool equivalent( const MatchExpression* other ) const;
-
-    private:
-        bool _match( const BSONElementSet& all ) const;
-
-        StringData _path;
-        FieldRef _fieldRef;
-        ArrayFilterEntries _arrayEntries;
-    };
-
 
     class ArrayMatchingMatchExpression : public MatchExpression {
     public:

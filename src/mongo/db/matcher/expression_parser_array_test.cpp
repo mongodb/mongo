@@ -163,6 +163,18 @@ namespace mongo {
         ASSERT( result.getValue()->matchesSingleElement( matchesBoth[ "a" ] ) );
     }
 
+    TEST( MatchExpressionParserArrayTest, AllNonArray ) {
+        BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 5 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 4 ) ) ) );
+    }
+
+
     TEST( MatchExpressionParserArrayTest, AllElemMatch1 ) {
         BSONObj internal = BSON( "x" << 1 << "y" << 2 );
         BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( BSON( "$elemMatch" << internal ) ) ) );

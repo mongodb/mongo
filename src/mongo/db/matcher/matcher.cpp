@@ -266,6 +266,9 @@ namespace mongo {
                                                 Matcher2::IndexSpliceInfo* spliceInfo  ) {
 
         switch ( full->matchType() ) {
+        case MatchExpression::ALWAYS_FALSE:
+            return new FalseMatchExpression();
+
         case MatchExpression::NOT:
         case MatchExpression::NOR:
             // maybe?

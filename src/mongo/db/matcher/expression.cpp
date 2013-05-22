@@ -52,6 +52,11 @@ namespace mongo {
         debug << "$atomic\n";
     }
 
+    void FalseMatchExpression::debugString( StringBuilder& debug, int level ) const {
+        _debugAddSpace( debug, level );
+        debug << "$false\n";
+    }
+
 }
 
 

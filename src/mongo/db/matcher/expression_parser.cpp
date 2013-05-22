@@ -548,16 +548,35 @@ namespace mongo {
             return StatusWithMatchExpression( temp.release() );
         }
 
-        std::auto_ptr<AllMatchExpression> temp( new AllMatchExpression() );
-        Status s = temp->init( name );
-        if ( !s.isOK() )
-            return StatusWithMatchExpression( s );
+        std::auto_ptr<AndMatchExpression> myAnd( new AndMatchExpression() );
+        BSONObjIterator i( arr );
+        while ( i.more() ) {
+            BSONElement e = i.next();
 
-        s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), arr );
-        if ( !s.isOK() )
-            return StatusWithMatchExpression( s );
+            if ( e.type() == RegEx ) {
+                std::auto_ptr<RegexMatchExpression> r( new RegexMatchExpression() );
+                Status s = r->init( name, e );
+                if ( !s.isOK() )
+                    return StatusWithMatchExpression( s );
+                myAnd->add( r.release() );
+            }
+            else if ( e.type() == Object && e.Obj().firstElement().getGtLtOp(-1) != -1 ) {
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "no $ expressions in $all" );
+            }
+            else {
+                std::auto_ptr<EqualityMatchExpression> x( new EqualityMatchExpression() );
+                Status s = x->init( name, e );
+                if ( !s.isOK() )
+                    return StatusWithMatchExpression( s );
+                myAnd->add( x.release() );
+            }
+        }
 
-        return StatusWithMatchExpression( temp.release() );
+        if ( myAnd->numChildren() == 0 ) {
+            return StatusWithMatchExpression( new FalseMatchExpression() );
+        }
+
+        return StatusWithMatchExpression( myAnd.release() );
     }
 
     StatusWithMatchExpression expressionParserGeoCallbackDefault( const char* name,
