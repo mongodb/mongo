@@ -213,9 +213,8 @@ namespace mongo {
         case GTE:
             return x >= 0;
         default:
-            throw 1;
+            fassertFailed( 16828 );
         }
-        throw 1;
     }
 
     void ComparisonMatchExpression::debugString( StringBuilder& debug, int level ) const {
