@@ -343,6 +343,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "log: total log file bytes written";
 	stats->log_bytes_written.desc = "log: total log bytes written";
 	stats->log_max_filesize.desc = "log: maximum log file size";
+	stats->log_reads.desc = "log: total log read operations";
+	stats->log_scans.desc = "log: total log scan operations";
 	stats->log_slot_closes.desc = "log: total consolidated slot closures";
 	stats->log_slot_consolidated.desc =
 	    "log: total logging bytes consolidated";
@@ -418,6 +420,8 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_update.v = 0;
 	stats->log_bytes_total_written.v = 0;
 	stats->log_bytes_written.v = 0;
+	stats->log_reads.v = 0;
+	stats->log_scans.v = 0;
 	stats->log_slot_closes.v = 0;
 	stats->log_slot_consolidated.v = 0;
 	stats->log_slot_joins.v = 0;

@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 int
-__wt_log_filename(WT_SESSION_IMPL *session, WT_LOG *log, WT_ITEM *buf)
+__wt_log_filename(WT_SESSION_IMPL *session, uint32_t id, WT_ITEM *buf)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -17,10 +17,35 @@ __wt_log_filename(WT_SESSION_IMPL *session, WT_LOG *log, WT_ITEM *buf)
 	WT_RET(__wt_buf_initsize(session, buf,
 	    strlen(conn->log_path) + ENTRY_SIZE));
 	WT_ERR(__wt_buf_fmt(session, buf, "%s/%s.%010" PRIu32,
-	    conn->log_path, WT_LOG_FILENAME, log->fileid));
+	    conn->log_path, WT_LOG_FILENAME, id));
 	return (0);
 
 err:	__wt_buf_free(session, buf);
+	return (ret);
+}
+
+static int
+__log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(path);
+	WT_DECL_RET;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+	WT_RET(__wt_scr_alloc(session, 0, &path));
+	WT_ERR(__wt_log_filename(session, id, path));
+	WT_VERBOSE_ERR(session, log, "opening log %s",
+	    (const char *)path->data);
+	fprintf(stderr,"[%d] opening log %s\n",
+	    pthread_self(),(const char *)path->data);
+	WT_ERR(__wt_open(
+	    session, path->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
+	/*
+	 * Need to store new fileid in metadata.
+	 */
+err:	__wt_scr_free(&path);
 	return (ret);
 }
 
@@ -32,25 +57,11 @@ int
 __wt_log_open(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(path);
-	WT_DECL_RET;
 	WT_LOG *log;
 
 	conn = S2C(session);
 	log = conn->log;
-	WT_RET(__wt_scr_alloc(session, 0, &path));
-	WT_ERR(__wt_log_filename(session, log, path));
-	WT_VERBOSE_ERR(session, log, "opening log %s",
-	    (const char *)path->data);
-	fprintf(stderr,"[%d] opening log %s\n",
-	    pthread_self(),(const char *)path->data);
-	WT_ERR(__wt_open(
-	    session, path->data, 1, 0, WT_FILE_TYPE_LOG, &log->log_fh));
-	/*
-	 * Need to store new fileid in metadata.
-	 */
-err:	__wt_scr_free(&path);
-	return (ret);
+	return (__log_openfile(session, 1, &log->log_fh, log->fileid));
 }
 
 /*
@@ -275,18 +286,73 @@ err:
 	return (0);
 }
 
+/*
+ * __wt_log_read --
+ *	Read the log record at the given LSN.  Return the record (including
+ *	the log header) in the WT_ITEM.  Caller is responsible for freeing it.
+ */
 int
 __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
+	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
+	uint32_t cksum, reclen;
 
+	WT_UNUSED(flags);
+	/*
+	 * If the caller didn't give us an LSN or something to return,
+	 * there's nothing to do.
+	 */
+	if (lsnp == NULL || record == NULL)
+		return (0);
 	conn = S2C(session);
 	log = conn->log;
-	return (0);
+	/*
+	 * If the offset isn't on an allocation boundary it must be wrong.
+	 */
+	fprintf(stderr, "[%d] log_read: read from LSN %d,%d\n",
+	    pthread_self(), lsnp->file, lsnp->offset);
+	if (lsnp->offset % log->allocsize != 0 || lsnp->file > log->fileid)
+		return (WT_NOTFOUND);
+
+	WT_RET(__log_openfile(session, 0, &log_fh, lsnp->file));
+	/*
+	 * Read in 4 bytes that is the total size of the log record.
+	 * Check for out of bounds values.
+	 */
+	WT_ERR(__wt_read(
+	    session, log_fh, lsnp->offset, sizeof(uint32_t), (void *)&reclen));
+	if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
+		fprintf(stderr, "[%d] log_read: read bad reclen %d %d (%d)\n",
+		    pthread_self(), reclen, WT_MAX_LOG_OFFSET, reclen>WT_MAX_LOG_OFFSET);
+		ret = WT_NOTFOUND;
+		goto err;
+	}
+	WT_ERR(__wt_buf_init(session, record, reclen));
+	WT_ERR(__wt_read(session, log_fh, lsnp->offset, reclen, record->mem));
+	/*
+	 * We read in the record, verify checksum.
+	 */
+	logrec = (WT_LOG_RECORD *)record->mem;
+	cksum = logrec->checksum;
+	logrec->checksum = 0;
+	logrec->checksum = __wt_cksum(logrec, logrec->real_len);
+	if (logrec->checksum != cksum) {
+		fprintf(stderr, "[%d] log_read: bad cksum\n", pthread_self());
+		ret = WT_ERROR;
+		goto err;
+	}
+	record->size = logrec->real_len;
+	WT_CSTAT_INCR(session, log_reads);
+err:
+	WT_RET(__wt_close(session, log_fh));
+
+	return (ret);
 }
 
 int
@@ -301,6 +367,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_ITEM *record, uint32_t flags,
 
 	conn = S2C(session);
 	log = conn->log;
+	WT_CSTAT_INCR(session, log_scans);
 	return (0);
 }
 
@@ -382,6 +449,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 err:
 	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
+	if (ret == 0 && lsnp != NULL)
+		*lsnp = tmp_lsn;
 	/*
 	 * If we're synchronous and some thread had an error, we don't know
 	 * if our write made it out to the file or not.  The error could be
@@ -402,6 +471,10 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	WT_LOG_RECORD *logrec;
 	va_list ap_copy;
 	size_t len;
+WT_DECL_RET;
+WT_LSN lsn;
+WT_ITEM rdbuf;
+uint32_t sync;
 
 	conn = S2C(session);
 
@@ -419,10 +492,36 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	logrec = (WT_LOG_RECORD *)buf->mem;
 	(void)vsnprintf(&logrec->record, len, fmt, ap);
 
-	WT_VERBOSE_RET(session, log, "log record: %s\n", (char *)&logrec->record);
+	WT_VERBOSE_RET(session, log,
+	    "log record: %s\n", (char *)&logrec->record);
 	fprintf(stderr, "[%d] log_printf: log record: 0x%x: %s\n",
 	    pthread_self(),&logrec->record, (char *)&logrec->record);
+#if 0
 	return (__wt_log_write(session, buf, NULL, 0));
+#else
+	if (len % 2 == 0)
+		sync = WT_LOG_SYNC;
+	else
+		sync = 0;
+	ret = __wt_log_write(session, buf, &lsn, sync);
+	/*
+	 * Only read some records.  Randomize on sync.
+	 */
+	if (ret == 0 && sync) {
+		fprintf(stderr, "[%d] log_printf: read at %d,%d\n",
+		    pthread_self(),lsn.file,lsn.offset);
+		ret = __wt_log_read(session, &rdbuf, &lsn, 0);
+		if (ret == 0) {
+			logrec = (WT_LOG_RECORD *)rdbuf.mem;
+			fprintf(stderr,
+			    "[%d] log_printf: READ log record: 0x%x: %s\n",
+			    pthread_self(),
+			    logrec->record, (char *)&logrec->record);
+			__wt_buf_free(session, &rdbuf);
+		}
+	}
+	return (0);
+#endif
 }
 
 #if 0

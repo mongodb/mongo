@@ -656,7 +656,7 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_log_filename(WT_SESSION_IMPL *session,
-    WT_LOG *log,
+    uint32_t id,
     WT_ITEM *buf);
 extern int __wt_log_open(WT_SESSION_IMPL *session);
 extern int __wt_log_close(WT_SESSION_IMPL *session);
