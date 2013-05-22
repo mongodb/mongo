@@ -578,7 +578,11 @@ namespace mongo {
                     // This sleep helps reader threads yield to writer threads.
                     // Without this, the underlying reader/writer lock implementations
                     // are not sufficiently writer-greedy.
+#ifdef _WIN32
+                    SwitchToThread();
+#else
                     sleepmicros(1);
+#endif
                 }
                 else {
                     if ( micros == -1 )
