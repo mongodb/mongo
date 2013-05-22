@@ -23,7 +23,6 @@ p = startParallelShell( 'for( i = 0; i < 2500; ++i ) {                          
                         '        db.jstests_distinct3.save( { a:49, c:49, d:j } ); ' +
                         '    }                                                     ' +
                         '}                                                         ' +
-                        '// Wait for the above writes to complete.                 ' +
                         'db.getLastError();                                        ' );
 
 for( i = 0; i < 100; ++i ) {
