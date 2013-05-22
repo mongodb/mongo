@@ -64,7 +64,7 @@ namespace mongo {
                   FILE_SHARE_READ,
                   NULL,
                   OPEN_ALWAYS,
-                  FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
+                  FILE_FLAG_NO_BUFFERING,
                   NULL);
         if( _fd == INVALID_HANDLE_VALUE ) {
             DWORD e = GetLastError();
