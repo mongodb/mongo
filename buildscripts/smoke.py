@@ -692,6 +692,12 @@ def expand_suites(suites,expandUseDB=True):
             paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
             if os.sys.platform == "win32":
                 paths = [path + '.exe' for path in paths]
+
+            # Add any files of the same name from the sharedclient directory.
+            scpaths = ["sharedclient/" + path for path in paths]
+            scfiles = glob.glob("sharedclient/*")
+            paths += [scfile for scfile in scfiles if scfile in scpaths]
+
             # hack
             tests += [(test_path and path or os.path.join(mongo_repo, path), False) for path in paths]
         elif suite == 'mongosTest':

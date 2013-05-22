@@ -22,13 +22,27 @@ AddOption("--prefix",
           help="installation root")
 
 
+# Stub out has_option so that we can use it in SConscript.client
+def has_option(name):
+    return False
+
+# Stub out use_system_version_of_library so we can use it in SConscript.client
+def use_system_version_of_library(name):
+    return True
+
 env = Environment(BUILD_DIR='#build',
                   CLIENT_ARCHIVE='${CLIENT_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
                   CLIENT_DIST_BASENAME='mongo-cxx-driver',
                   CLIENT_LICENSE='#LICENSE.txt',
                   CLIENT_SCONSTRUCT='#SConstruct',
                   MSVS_ARCH=None,
-                  PYTHON=sys.executable)
+                  PYTHON=sys.executable,
+                  PYSYSPLATFORM=os.sys.platform)
+
+if env['PYSYSPLATFORM'] == 'linux3':
+    env['PYSYSPLATFORM'] = 'linux2'
+if 'freebsd' in env['PYSYSPLATFORM']:
+    env['PYSYSPLATFORM'] = 'freebsd'
 
 def addExtraLibs(s):
     for x in s.split(","):
@@ -44,18 +58,20 @@ env.Append(CPPDEFINES=[ "_SCONS", "MONGO_EXPOSE_MACROS" ])
 
 nix = False
 linux = False
-win = False
+windows = False
+darwin = False
 
 if "darwin" == sys.platform:
     addExtraLibs( "/opt/local/" )
     nix = True
+    darwin = True
 elif sys.platform in ("linux2", "linux3"):
     nix = True
     linux = True
 elif sys.platform == 'win32':
-    win = True
+    windows = True
 
-if win:
+if windows:
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
     env.Append(CCFLAGS=['/EHsc', '/O2'])
 else:
@@ -71,7 +87,7 @@ conf = Configure(env)
 for lib in boostLibs:
     if not conf.CheckLib(["boost_%s-mt" % lib, "boost_%s" % lib],
                          language="C++"):
-        if not win:
+        if not windows:
             Exit(1)
 
 env['MONGO_BUILD_SASL_CLIENT'] = conf.CheckLibWithHeader(
@@ -79,10 +95,14 @@ env['MONGO_BUILD_SASL_CLIENT'] = conf.CheckLibWithHeader(
 
 conf.Finish()
 
-clientEnv = env.Clone()
-clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
+class InstallSetup:
+    binaries = False
+    libraries = False
+    headers = False
+installSetup = InstallSetup()
 
-Export("env clientEnv")
+Export("env has_option use_system_version_of_library installSetup")
+Export("nix linux windows darwin")
 env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR', duplicate=False)
 
 mongoclient = env.Alias('mongoclient', ['${LIBPREFIX}mongoclient${LIBSUFFIX}'])

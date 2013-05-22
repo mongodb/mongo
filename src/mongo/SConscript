@@ -760,9 +760,6 @@ env.Library("clientandshell", ["client/clientAndShell.cpp"],
                                        "gridfs"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
-if has_option( "sharedclient" ):
-    sharedClientLibName = str( env.SharedLibrary( "mongoclient", [], LIBDEPS=["allclient"] )[0] )
-
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
 
@@ -900,20 +897,6 @@ if shellEnv is not None:
     installBinary( env, "mongo" )
 
 env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
-
-#headers
-if installSetup.headers:
-    for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/",
-                "db/stats/", "db/repl/", "db/ops/", "client/", "bson/", "bson/util/", "s/",
-                "scripting/", "base/", "platform/" ]:
-        env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.h" ) )
-        env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.hpp" ) )
-
-#lib
-if installSetup.libraries:
-    env.Install('$INSTALL_DIR/$NIX_LIB_DIR', '#${LIBPREFIX}mongoclient${LIBSUFFIX}')
-    if has_option( "sharedclient" ):
-        env.Install( "$INSTALL_DIR/$NIX_LIB_DIR",  '#${SHLIBPREFIX}mongoclient${SHLIBSUFFIX}')
 
 # Stage the top-level mongodb banners
 distsrc = env.Dir('#distsrc')

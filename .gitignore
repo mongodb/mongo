@@ -101,6 +101,7 @@ scratch
 /libmongoclient.*
 /libmongotestfiles.*
 /libmongoshellfiles.*
+/sharedclient
 
 /emr.jar
 *.class
