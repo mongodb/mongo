@@ -53,11 +53,11 @@ PREV_VERSION_MAJOR=`echo $prevrel | cut -d '.' -f 1`
 PREV_VERSION_MINOR=`echo $prevrel | cut -d '.' -f 2`
 PREV_VERSION_PATCH=`echo $prevrel | cut -d '.' -f 3`
 
-# Update the previous release on the landing page.
+# Update the release versions on the landing page.
+sed -e "s/$oldrel/$pkgver/" $DOCFILE > $tmp && mv $tmp $DOCFILE
 if [ $OLD_VERSION_MINOR != $WIREDTIGER_VERSION_MINOR ]; then
 	sed -e "s/$prevrel/$oldrel/" $DOCFILE > $tmp && mv $tmp $DOCFILE
 fi
-sed -e "s/$oldrel/$pkgver/" $DOCFILE > $tmp && mv $tmp $DOCFILE
 
 echo "Rebuild documentation root"
 (cd "$TOPDIR/dist" && sh s_docs -l > /dev/null)

@@ -83,9 +83,8 @@ AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS([\
-	clock_gettime fcntl gettimeofday \
-	posix_fadvise posix_madvise posix_memalign\
-	strtouq sync_file_range])
+	clock_gettime fcntl ftruncate gettimeofday posix_fadvise\
+	posix_fallocate posix_madvise posix_memalign strtouq sync_file_range])
 AC_SYS_LARGEFILE
 
 AC_MSG_CHECKING([if the adaptive mutex type is available])
@@ -100,13 +99,13 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <pthread.h>]],[[
 
 AC_C_BIGENDIAN
 
-# Linux requires _GNU_SOURCE to be defined and buffers aligned to 512 byte
+# Linux requires _GNU_SOURCE to be defined and buffers aligned to 4KB
 # boundaries for O_DIRECT to work.
 BUFFER_ALIGNMENT=0
 if test "$ac_cv_func_posix_memalign" = "yes" ; then
 	case "`uname -s`" in
 	Linux)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
-		BUFFER_ALIGNMENT=512
+		BUFFER_ALIGNMENT=4096
 		;;
 	esac
 fi

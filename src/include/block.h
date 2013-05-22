@@ -10,10 +10,9 @@
  */
 
 /*
- * The file's description is written into the first 512B of the file, which
+ * The file's description is written into the first block of the file, which
  * means we can use an offset of 0 as an invalid offset.
  */
-#define	WT_BLOCK_DESC_SECTOR		512
 #define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
@@ -250,8 +249,8 @@ struct __wt_block_desc {
 /*
  * WT_BLOCK_DESC_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (padding won't cause failure,
- * since we reserve the first sector of the file for this information, but it
- * would be worth investigation, regardless).
+ * we reserve the first allocation-size block of the file for this information,
+ * but it would be worth investigation, regardless).
  */
 #define	WT_BLOCK_DESC_SIZE		16
 

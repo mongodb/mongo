@@ -434,6 +434,7 @@ populate_thread(void *arg)
 	conn = cfg->conn;
 	session = NULL;
 	data_buf = key_buf = NULL;
+	ret = 0;
 
 	cfg->phase = WT_PERF_POP;
 

@@ -14,19 +14,20 @@ static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
  *	Truncate a file.
  */
 int
-__wt_block_manager_truncate(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_truncate(
+    WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 0, 0, WT_DIRECTIO_DATA, &fh));
+	WT_RET(__wt_open(session, filename, 0, 0, WT_FILE_TYPE_DATA, &fh));
 
 	/* Truncate the file. */
 	WT_ERR(__wt_ftruncate(session, fh, (off_t)0));
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh);
+	ret = __wt_desc_init(session, fh, allocsize);
 
 	/* Close the file handle. */
 err:	WT_TRET(__wt_close(session, fh));
@@ -39,16 +40,17 @@ err:	WT_TRET(__wt_close(session, fh));
  *	Create a file.
  */
 int
-__wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_create(
+    WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
 
 	/* Create the underlying file and open a handle. */
-	WT_RET(__wt_open(session, filename, 1, 1, WT_DIRECTIO_DATA, &fh));
+	WT_RET(__wt_open(session, filename, 1, 1, WT_FILE_TYPE_DATA, &fh));
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh);
+	ret = __wt_desc_init(session, fh, allocsize);
 
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, fh));
@@ -158,16 +160,16 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(
-	    session, filename, 0, 0, WT_DIRECTIO_DATA, &block->fh));
+	    session, filename, 0, 0, WT_FILE_TYPE_DATA, &block->fh));
 
 	/* Initialize the live checkpoint's lock. */
 	__wt_spin_init(session, &block->live_lock);
 
 	/*
-	 * Read the description sector.
+	 * Read the description information from the first block.
 	 *
-	 * Salvage is a special case -- if we're forcing the salvage, we don't
-	 * even look at the description sector.
+	 * Salvage is a special case: if we're forcing the salvage, we don't
+	 * look at anything, including the description information.
 	 */
 	if (!forced_salvage)
 		WT_ERR(__desc_read(session, block));
@@ -215,15 +217,15 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	Write a file's initial descriptor structure.
  */
 int
-__wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
+__wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 {
 	WT_BLOCK_DESC *desc;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
-	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
-	memset(buf->mem, 0, WT_BLOCK_DESC_SECTOR);
+	WT_RET(__wt_scr_alloc(session, allocsize, &buf));
+	memset(buf->mem, 0, allocsize);
 
 	desc = buf->mem;
 	desc->magic = WT_BLOCK_MAGIC;
@@ -232,9 +234,9 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/* Update the checksum. */
 	desc->cksum = 0;
-	desc->cksum = __wt_cksum(desc, WT_BLOCK_DESC_SECTOR);
+	desc->cksum = __wt_cksum(desc, allocsize);
 
-	ret = __wt_write(session, fh, (off_t)0, WT_BLOCK_DESC_SECTOR, desc);
+	ret = __wt_write(session, fh, (off_t)0, allocsize, desc);
 
 	__wt_scr_free(&buf);
 	return (ret);
@@ -253,18 +255,18 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	uint32_t cksum;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
-	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
+	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
 
-	/* Read the first sector and verify the file's format. */
+	/* Read the first allocation-sized block and verify the file format. */
 	WT_ERR(__wt_read(
-	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf->mem));
+	    session, block->fh, (off_t)0, block->allocsize, buf->mem));
 
 	desc = buf->mem;
 	WT_VERBOSE_ERR(session, block,
-	    "open: magic %" PRIu32
+	    "%s: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32,
-	    desc->magic,
+	    block->name, desc->magic,
 	    desc->majorv, desc->minorv,
 	    desc->cksum);
 
@@ -280,7 +282,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	cksum = desc->cksum;
 	desc->cksum = 0;
 	if (desc->magic != WT_BLOCK_MAGIC ||
-	    cksum != __wt_cksum(desc, WT_BLOCK_DESC_SECTOR))
+	    cksum != __wt_cksum(desc, block->allocsize))
 		WT_ERR_MSG(session, WT_ERROR,
 		    "%s does not appear to be a WiredTiger file", block->name);
 
@@ -318,6 +320,6 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	WT_STAT_SET(session, stats, block_magic, WT_BLOCK_MAGIC);
 	WT_STAT_SET(session, stats, block_major, WT_BLOCK_MAJOR_VERSION);
 	WT_STAT_SET(session, stats, block_minor, WT_BLOCK_MINOR_VERSION);
-	WT_STAT_SET(session, stats, block_size, block->fh->file_size);
+	WT_STAT_SET(session, stats, block_size, block->fh->size);
 	__wt_spin_unlock(session, &block->live_lock);
 }

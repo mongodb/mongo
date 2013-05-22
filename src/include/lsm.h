@@ -63,6 +63,7 @@ struct __wt_lsm_tree {
 	const char *bloom_config, *file_config;
 
 	WT_COLLATOR *collator;
+	const char *collator_name;
 
 	int refcnt;			/* Number of users of the tree */
 	WT_RWLOCK *rwlock;

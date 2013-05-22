@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
-static void __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
@@ -88,7 +87,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 			__rec_page_clean_update(session, page);
 
 		/* Discard the page. */
-		__rec_discard_page(session, page, exclusive);
+		__wt_page_out(session, &page);
 
 		WT_CSTAT_INCR(session, cache_eviction_clean);
 		WT_DSTAT_INCR(session, cache_eviction_clean);
@@ -258,24 +257,9 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		}
 		/* FALLTHROUGH */
 	default:
-		__rec_discard_page(session, page, exclusive);
+		__wt_page_out(session, &page);
 		break;
 	}
-}
-
-/*
- * __rec_discard_page --
- *	Discard the page.
- */
-static void
-__rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
-{
-	/* Make sure a page is not in the eviction request list. */
-	if (!exclusive)
-		__wt_evict_list_clr_page(session, page);
-
-	/* Discard the page. */
-	__wt_page_out(session, &page);
 }
 
 /*
@@ -305,8 +289,18 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
 	 */
-	if (!exclusive)
+	if (!exclusive) {
 		WT_RET(__hazard_exclusive(session, ref, top));
+
+		/*
+		 * Now that the page is locked, remove it from the LRU eviction
+		 * queue.  We have to do this before freeing the page memory or
+		 * otherwise touching the reference because eviction paths
+		 * assume that a non-NULL page pointer on the queue is pointing
+		 * at valid memory.
+		 */
+		__wt_evict_list_clr_page(session, page);
+	}
 
 	/*
 	 * Recurse through the page's subtree: this happens first because we
@@ -458,8 +452,17 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		}
 		WT_RET(ret);
 
-		WT_ASSERT(session, __wt_page_is_modified(page) == 0);
+		WT_ASSERT(session, !__wt_page_is_modified(page));
 	}
+
+	/*
+	 * If the page is clean, but was ever modified, make sure all of the
+	 * updates on the page are old enough that they can be discarded from
+	 * cache.
+	 */
+	if (!exclusive && mod != NULL &&
+	    !__wt_txn_visible_all(session, mod->disk_txn))
+		return (EBUSY);
 
 	/*
 	 * Repeat the test: fail if any page in the top-level page's subtree

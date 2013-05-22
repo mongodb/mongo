@@ -11,10 +11,14 @@ static int
 __create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
+	uint32_t allocsize;
 	int is_metadata;
-	const char *filecfg[4], *fileconf, *filename;
+	const char *fileconf, *filename;
+	const char *filecfg[] =
+	    { WT_CONFIG_BASE(session, file_meta), config, NULL, NULL };
 
 	fileconf = NULL;
 
@@ -32,8 +36,11 @@ __create_file(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
+	WT_RET(__wt_config_gets(session, filecfg, "allocation_size", &cval));
+	allocsize = (uint32_t)cval.val;
+
 	/* Create the file. */
-	WT_ERR(__wt_block_manager_create(session, filename));
+	WT_ERR(__wt_block_manager_create(session, filename, allocsize));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
@@ -46,10 +53,7 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_scr_alloc(session, 0, &val));
 		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
-		filecfg[0] = WT_CONFIG_BASE(session, file_meta);
-		filecfg[1] = config;
 		filecfg[2] = val->data;
-		filecfg[3] = NULL;
 		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
 		if ((ret = __wt_metadata_insert(session, uri, fileconf)) != 0) {
 			if (ret == WT_DUPLICATE_KEY)
@@ -67,7 +71,7 @@ __create_file(WT_SESSION_IMPL *session,
 	 * Keep the handle exclusive until it is released at the end of the
 	 * call, otherwise we could race with a drop.
 	 */
-	WT_ERR(__wt_conn_btree_get(
+	WT_ERR(__wt_session_get_btree(
 	    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_handle_lock(session, 1));
@@ -85,24 +89,28 @@ __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	size_t len;
 	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
-	prefix = "file:";
-	suffix = ".wt";
 	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-	    WT_STRING_MATCH("lsm", cval.str, cval.len)) {
-		prefix = "lsm:";
+	    !WT_STRING_MATCH("file", cval.str, cval.len)) {
+		prefix = cval.str;
+		len = cval.len;
 		suffix = "";
+	} else {
+		prefix = "file";
+		len = strlen(prefix);
+		suffix = ".wt";
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (cgname == NULL)
-		WT_RET(__wt_buf_fmt(session, buf, "%s%s%s",
-		    prefix, tablename, suffix));
+		WT_RET(__wt_buf_fmt(session, buf, "%.*s:%s%s",
+		    (int)len, prefix, tablename, suffix));
 	else
-		WT_RET(__wt_buf_fmt(session, buf, "%s%s_%s%s",
-		    prefix, tablename, cgname, suffix));
+		WT_RET(__wt_buf_fmt(session, buf, "%.*s:%s_%s%s",
+		    (int)len, prefix, tablename, cgname, suffix));
 
 	return (0);
 }
@@ -218,21 +226,24 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	size_t len;
 	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
-	prefix = "file:";
-	suffix = ".wti";
 	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-	    WT_STRING_MATCH("lsm", cval.str, cval.len)) {
-		prefix = "lsm:";
+	    !WT_STRING_MATCH("file", cval.str, cval.len)) {
+		prefix = cval.str;
+		len = cval.len;
 		suffix = "_idx";
+	} else {
+		prefix = "file";
+		len = strlen(prefix);
+		suffix = ".wti";
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	tablename = table->name + strlen("table:");
-	WT_RET(__wt_buf_fmt(session, buf, "%s%s_%s%s",
-	    prefix, tablename, idxname, suffix));
+	WT_RET(__wt_buf_fmt(session, buf, "%.*s:%s_%s%s",
+	    (int)len, prefix, tablename, idxname, suffix));
 
 	return (0);
 }

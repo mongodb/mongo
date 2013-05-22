@@ -31,6 +31,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_free(session, lsm_tree->config);
 	__wt_free(session, lsm_tree->key_format);
 	__wt_free(session, lsm_tree->value_format);
+	__wt_free(session, lsm_tree->collator_name);
 	__wt_free(session, lsm_tree->bloom_config);
 	__wt_free(session, lsm_tree->file_config);
 
@@ -350,6 +351,10 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_gets(session, cfg, "value_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
+
+	WT_ERR(__wt_config_gets(session, cfg, "collator", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len,
+	    &lsm_tree->collator_name));
 
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_auto_throttle", &cval));
 	if (cval.val)

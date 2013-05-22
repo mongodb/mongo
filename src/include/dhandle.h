@@ -36,6 +36,7 @@ struct __wt_data_handle {
 	uint32_t   refcnt;		/* Sessions using this handle */
 	TAILQ_ENTRY(__wt_data_handle) q;/* Linked list of handles */
 
+	uint64_t name_hash;		/* Hash of name */
 	const char *name;		/* Object name as a URI */
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char **cfg;		/* Configuration information */

@@ -16,7 +16,7 @@ test $cnt -eq 1 && exit 0
 cat << END_TEXT > $t
 $WIREDTIGER_VERSION_STRING
 
-This is version $WIREDTIGER_VERSION_MAJOR.$WIREDTIGER_VERSION_MINOR.$WIREDTIGER_VERSION_PATCH of WiredTiger.
+This is version $WIREDTIGER_VERSION of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
@@ -25,7 +25,7 @@ WiredTiger release packages and documentation can be found at:
 Information on configuring, building and installing WiredTiger can be
 found at:
 
-	http://source.wiredtiger.com/install.html
+	http://source.wiredtiger.com/$WIREDTIGER_VERSION/install.html
 
 WiredTiger licensing information can be found at:
 

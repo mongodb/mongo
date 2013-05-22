@@ -45,7 +45,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	fprintf(stderr,"[%d] opening log %s\n",
 	    pthread_self(),(const char *)path->data);
 	WT_ERR(__wt_open(
-	    session, path->data, 1, 0, WT_DIRECTIO_LOG, &log->log_fh));
+	    session, path->data, 1, 0, WT_FILE_TYPE_LOG, &log->log_fh));
 err:	__wt_scr_free(&path);
 	return (ret);
 }

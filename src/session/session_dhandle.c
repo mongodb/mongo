@@ -216,14 +216,17 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
+	uint64_t hash;
 	int candidate;
 
 	dhandle = NULL;
 	candidate = 0;
 
+	hash = __wt_hash_city64(uri, strlen(uri));
 	TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
 		dhandle = dhandle_cache->dhandle;
-		if (strcmp(uri, dhandle->name) != 0)
+		if (hash != dhandle->name_hash ||
+		    strcmp(uri, dhandle->name) != 0)
 			continue;
 		if (checkpoint == NULL && dhandle->checkpoint == NULL)
 			break;

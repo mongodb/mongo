@@ -774,10 +774,8 @@ struct __wt_session {
 	 * @config{type, set the type of data source used to store a column
 	 * group\, index or simple table.  By default\, a \c "file:" URI is
 	 * derived from the object name.  The \c type configuration can be used
-	 * to switch to a different storage format\, such as LSM. Ignored if an
-	 * explicit URI is supplied with a \c source configuration., a string\,
-	 * chosen from the following options: \c "file"\, \c "lsm"; default \c
-	 * file.}
+	 * to switch to a different data source\, such as LSM or an extension
+	 * configured by the application.., a string; default \c file.}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * value_format is \c 'u' and applications use a WT_ITEM structure to
@@ -1333,9 +1331,9 @@ struct __wt_connection {
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
- * I/O. The default value of -1 indicates that a platform-specific alignment
- * value should be used (512 bytes on Linux systems\, zero elsewhere)., an
- * integer between -1 and 1MB; default \c -1.}
+ * I/O. The default value of -1 indicates a platform-specific alignment value
+ * should be used (4KB on Linux systems\, zero elsewhere)., an integer between
+ * -1 and 1MB; default \c -1.}
  * @config{cache_size, maximum heap memory to allocate for the cache.  A
  * database should configure either a cache_size or a shared_cache not both., an
  * integer between 1MB and 10TB; default \c 100MB.}
@@ -1350,14 +1348,10 @@ struct __wt_connection {
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
- * list\, such as <code>"direct_io=[data]"</code>. Many Linux systems do not
- * support mixing \c O_DIRECT and memory mapping or normal I/O to the same file.
- * If \c O_DIRECT is configured for data files on Linux systems\, memory mapping
- * should probably be turned off using the \c mmap=false configuration string
- * and any utilities used to copy the database files for the purposes of hot
- * backup should probably also specify \c O_DIRECT when configuring their file
- * access., a list\, with values chosen from the following options: \c "data"\,
- * \c "log"; default empty.}
+ * list\, such as <code>"direct_io=[data]"</code>. Configuring \c direct_io
+ * requires care\, see @ref tuning_system_buffer_cache_direct_io for important
+ * warnings., a list\, with values chosen from the following options: \c
+ * "data"\, \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
@@ -1374,14 +1368,19 @@ struct __wt_connection {
  * WT_CONNECTION::load_extension.  For example\,
  * <code>extensions=(/path/ext.so={entry=my_entry})</code>., a list of strings;
  * default empty.}
+ * @config{file_extend, file extension configuration.  If set\, extend files of
+ * the set type in allocations of the set size\, instead of a block at a time as
+ * each new block is written.  For example\,
+ * <code>file_extend=(data=16MB)</code>., a list\, with values chosen from the
+ * following options: \c "data"\, \c "log"; default empty.}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
  * @config{log = (, enable logging., a set of related configuration options
  * defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
- * archive unneeded log files., a boolean flag; default \c true".}
+ * archive unneeded log files., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a boolean
- * flag; default \c true".}
+ * flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, \, the
  * maximum size of the log file., an integer between 1MB and 2GB; default \c
  * 100MB.}

@@ -271,6 +271,7 @@ __wt_session_create_strip(WT_SESSION *wt_session,
 static int
 __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -280,6 +281,29 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_schema_name_check(session, uri));
+
+	/*
+	 * Type configuration only applies to tables, column groups and indexes.
+	 * We don't want applications to attempt to layer LSM on top of their
+	 * extended data-sources, and the fact we allow LSM as a valid URI is an
+	 * invitation to that mistake: nip it in the bud.
+	 */
+	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+	    !WT_PREFIX_MATCH(uri, "index:") &&
+	    !WT_PREFIX_MATCH(uri, "table:")) {
+		/*
+		 * We can't disallow type entirely, a configuration string might
+		 * innocently include it, for example, a dump/load pair.  If the
+		 * URI type prefix and the and type are the same, let it go.
+		 */
+		if ((ret =
+		    __wt_config_getones(session, config, "type", &cval)) == 0 &&
+		    (strncmp(uri, cval.str, cval.len) != 0 ||
+		    uri[cval.len] != ':'))
+			WT_ERR_MSG(session, EINVAL,
+			    "%s: unsupported type configuration", uri);
+		WT_ERR_NOTFOUND_OK(ret);
+	}
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_create(session, uri, config));
@@ -817,7 +841,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->dhandles);
 
-	/* Initialize transaction support. */
+	/* Initialize transaction support: default to read-committed. */
+	session_ret->isolation = TXN_ISO_READ_COMMITTED;
 	WT_ERR(__wt_txn_init(session_ret));
 
 	/*

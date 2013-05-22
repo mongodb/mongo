@@ -17,9 +17,9 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	void *map;
 
 	WT_VERBOSE_RET(session, fileops,
-	    "%s: map %" PRIuMAX " bytes", fh->name, (uintmax_t)fh->file_size);
+	    "%s: map %" PRIuMAX " bytes", fh->name, (uintmax_t)fh->size);
 
-	if ((map = mmap(NULL, (size_t)fh->file_size,
+	if ((map = mmap(NULL, (size_t)fh->size,
 	    PROT_READ,
 #ifdef MAP_NOCORE
 	    MAP_NOCORE |
@@ -28,13 +28,15 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	    fh->fd, (off_t)0)) == MAP_FAILED) {
 		WT_RET_MSG(session, __wt_errno(),
 		    "%s map error: failed to map %" PRIuMAX " bytes",
-		    fh->name, (uintmax_t)fh->file_size);
+		    fh->name, (uintmax_t)fh->size);
 	}
 
 	*(void **)mapp = map;
-	*lenp = (size_t)fh->file_size;
+	*lenp = (size_t)fh->size;
 	return (0);
 }
+
+#define	WT_VM_PAGESIZE	4096
 
 /*
  * __wt_mmap_preload --
@@ -44,10 +46,10 @@ int
 __wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
-	/* Linux requires the address be aligned to 4096 bytes */
+	/* Linux requires the address be aligned to a 4KB boundary. */
 	WT_BM *bm = S2BT(session)->bm;
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)4095);
+	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(WT_VM_PAGESIZE - 1));
 	size += WT_PTRDIFF(p, blk);
 
 	/* XXX proxy for "am I doing a scan?" -- manual read-ahead */
@@ -60,7 +62,14 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size)
 		    WT_PTRDIFF((uint8_t *)bm->map + bm->maplen, blk));
 	}
 
-	if ((ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
+	/*
+	 * Manual pages aren't clear on whether alignment is required for the
+	 * size, so we will be conservative.
+	 */
+	size &= ~(size_t)(WT_VM_PAGESIZE - 1);
+
+	if (size > WT_VM_PAGESIZE &&
+	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
 		WT_RET_MSG(session, ret, "posix_madvise will need");
 #else
 	WT_UNUSED(session);
@@ -72,16 +81,16 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size)
 }
 
 /*
- * __wt_mmap_read --
- *	Cause a section of a memory map to be faulted in.
+ * __wt_mmap_discard --
+ *	Discard a chunk of the memory map.
  */
 int
 __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
-	/* Linux requires the address be aligned to 4096 bytes */
+	/* Linux requires the address be aligned to a 4KB boundary. */
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)4095);
+	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(WT_VM_PAGESIZE - 1));
 	size += WT_PTRDIFF(p, blk);
 
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)

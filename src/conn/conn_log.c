@@ -206,7 +206,7 @@ fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
 	WT_VERBOSE_RET(session, log, "logger_create: open the log");
 	__wt_spin_init(session, &log->log_lock);
 	__wt_spin_init(session, &log->log_slot_lock);
-	if (FLD_ISSET(conn->direct_io, WT_DIRECTIO_LOG))
+	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize = LOG_ALIGN_DIRECTIO;
 	else
 		log->allocsize = LOG_ALIGN;

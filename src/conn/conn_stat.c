@@ -8,12 +8,14 @@
 #include "wt_internal.h"
 
 #ifdef __GNUC__
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 1)
 /*
  * !!!
  * GCC with -Wformat-nonliteral complains about calls to strftime in this file.
  * There's nothing wrong, this makes the warning go away.
  */
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#endif
 #endif
 
 /*

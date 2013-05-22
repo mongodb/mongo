@@ -1,3 +1,39 @@
+WiredTiger release 1.6.0, 2013-05-16
+------------------------------------
+
+This release contains new features, bug fixes and performance improvements.
+The significant changes are highlighted below:
+
+* Fix a bug where configuring direct I/O could cause checksum errors at
+  runtime.  NOTE: database file format change.  [#526]
+
+* Fix a race that allowed checkpoints to be deleted while hot backups are
+  running.  [#515]
+
+* Scale to events per second in graphs generated from statistics log output.
+  [#518]
+
+* Changes to reduce the latency of LSM operations.
+
+* Add a new terminate callback to extension interfaces that is called when the
+  WiredTiger connection is closed.  [#530]
+
+* Various optimizations and bug fixes to cache management and eviction code.
+
+* Update various statistics.
+
+* Fix a bug where using a combination of read-committed and snapshot
+  transactions could result in inconsistent values being returned.  [#539]
+
+* Fix a bug where using LSM trees with compression enabled could result in an
+  invalid system call. [#535]
+
+* Enhance statistics logging so that it can dump "lsm:" statistics.
+
+See the upgrade documentation for information about database format changes
+in this release.
+
+
 WiredTiger release 1.5.3, 2013-04-26
 ------------------------------------
 

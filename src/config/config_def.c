@@ -5,7 +5,7 @@
 static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 	{ "columns", "list", NULL, NULL},
 	{ "source", "string", NULL, NULL},
-	{ "type", "string", "choices=[\"file\",\"lsm\"]", NULL},
+	{ "type", "string", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -84,7 +84,7 @@ static const WT_CONFIG_CHECK confchk_index_meta[] = {
 	{ "columns", "list", NULL, NULL},
 	{ "key_format", "format", NULL, NULL},
 	{ "source", "string", NULL, NULL},
-	{ "type", "string", "choices=[\"file\",\"lsm\"]", NULL},
+	{ "type", "string", NULL, NULL},
 	{ "value_format", "format", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -152,7 +152,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "source", "string", NULL, NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
-	{ "type", "string", "choices=[\"file\",\"lsm\"]", NULL},
+	{ "type", "string", NULL, NULL},
 	{ "value_format", "format", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -238,6 +238,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "eviction_target", "int", "min=10,max=99", NULL},
 	{ "eviction_trigger", "int", "min=10,max=99", NULL},
 	{ "extensions", "list", NULL, NULL},
+	{ "file_extend", "list", "choices=[\"data\",\"log\"]", NULL},
 	{ "hazard_max", "int", "min=15", NULL},
 	{ "log", "category", NULL, confchk_log_subconfigs},
 	{ "lsm_merge", "boolean", NULL, NULL},
@@ -401,8 +402,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "buffer_alignment=-1,cache_size=100MB,"
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),create=0,"
 	  "direct_io=,error_prefix=,eviction_dirty_target=80,eviction_target=80"
-	  ",eviction_trigger=95,extensions=,hazard_max=1000,log=(archive=true\""
-	  ",enabled=true\",file_max=100MB,path=\"\"),lsm_merge=,mmap=,"
+	  ",eviction_trigger=95,extensions=,file_extend=,hazard_max=1000,"
+	  "log=(archive=,enabled=,file_max=100MB,path=\"\"),lsm_merge=,mmap=,"
 	  "multiprocess=0,session_max=50,shared_cache=(chunk=10MB,name=pool,"
 	  "reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
 	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\","

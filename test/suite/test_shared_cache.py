@@ -91,7 +91,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
         self.sessions = [] # Implicitly closed when closing sessions.
 
     # Basic test of shared cache
-    def test_shared_cache(self):
+    def test_shared_cache01(self):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2'])
 
@@ -101,7 +101,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
         self.closeConnections()
 
     # Test of shared cache with more connections
-    def test_shared_cache2(self):
+    def test_shared_cache02(self):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2', 'WT_TEST3', 'WT_TEST4'])
 
@@ -110,8 +110,8 @@ class test_shared_cache(wttest.WiredTigerTestCase):
             self.add_records(sess, 0, nops)
         self.closeConnections()
 
-    # Do enough work, so that the shared cache gets used.
-    def test_shared_cache3(self):
+    # Do enough work for the shared cache to be fully allocated.
+    def test_shared_cache03(self):
         nops = 10000
         self.openConnections(['WT_TEST1', 'WT_TEST2'])
         for sess in self.sessions:
@@ -123,7 +123,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
         self.closeConnections()
 
     # Switch the work between connections, to test rebalancing.
-    def test_shared_cache4(self):
+    def test_shared_cache04(self):
         # About 100 MB of data with ~250 byte values.
         nops = 200000
         self.openConnections(['WT_TEST1', 'WT_TEST2'])
@@ -134,7 +134,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
         self.closeConnections()
 
     # Add a new connection once the shared cache is already established.
-    def test_shared_cache5(self):
+    def test_shared_cache05(self):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2'])
 
@@ -149,7 +149,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
         self.closeConnections()
 
     # Close a connection and keep using other connections.
-    def test_shared_cache6(self):
+    def test_shared_cache06(self):
         nops = 10000
         self.openConnections(['WT_TEST1', 'WT_TEST2', 'WT_TEST3'])
 
@@ -165,7 +165,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
 
     # Test verbose output
     @unittest.skip("Verbose output handling")
-    def test_shared_cache7(self):
+    def test_shared_cache07(self):
         nops = 1000
         self.openConnections(
                 ['WT_TEST1', 'WT_TEST2'], extra_opts="verbose=[shared_cache]")
@@ -176,7 +176,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
         self.closeConnections()
 
     # Test opening a connection outside of the shared cache
-    def test_shared_cache8(self):
+    def test_shared_cache08(self):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2'])
 
@@ -187,7 +187,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
         self.closeConnections()
 
     # Test default config values
-    def test_shared_cache9(self):
+    def test_shared_cache09(self):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts=',shared_cache=(name=pool,size=200M)')
 

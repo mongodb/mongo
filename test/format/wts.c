@@ -75,13 +75,16 @@ wts_open(void)
 	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,sync=false,cache_size=%" PRIu32 "MB,"
+	    "create,"
+	    "sync=false,cache_size=%" PRIu32 "MB,"
 	    "error_prefix=\"%s\","
+	    "%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
+	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
 	    REVERSE_PATH,
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
@@ -207,10 +210,19 @@ wts_open(void)
 	/* Configure Btree split page percentage. */
 	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
-	/* Configure KVS devices. */
+	/* Configure data types. */
+	if (DATASOURCE("kvsbdb"))
+		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
+
+	if (DATASOURCE("lsm"))
+		p += snprintf(p, (size_t)(end - p), ",type=lsm");
+
+#define	MEMRATA_DEVICE		"/dev/loop0"
+#define	MEMRATA_DEVICE_FAKE	"RUNDIR/KVS"
 	if (DATASOURCE("memrata"))
 		p += snprintf(
-		    p, (size_t)(end - p), ",kvs_devices=[\"/dev/loop0\"]");
+		    p, (size_t)(end - p), ",type=memrata,kvs_devices=[%s]",
+		    MEMRATA_DEVICE);
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
@@ -237,7 +249,7 @@ wts_dump(const char *tag, int dump_bdb)
 	int offset, ret;
 	char cmd[256];
 
-	/* Data-sources that don't support dump comparisons. */
+	/* Data-sources that don't support dump through the wt utility. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		return;
 
@@ -265,8 +277,14 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	/* Data-sources that don't support salvage. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	/*
+	 * Data-sources that don't support salvage.
+	 *
+	 * XXX
+	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
+	 * don't do that for now.
+	 */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("lsm") || DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;
@@ -298,8 +316,14 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
-	/* Data-sources that don't support dump comparisons. */
-	if (DATASOURCE("memrata"))
+	/*
+	 * Data-sources that don't support verify.
+	 *
+	 * XXX
+	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
+	 * don't do that for now.
+	 */
+	if (DATASOURCE("lsm") || DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;

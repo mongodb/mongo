@@ -69,9 +69,8 @@ source_meta = [
 		set the type of data source used to store a column group, index
 		or simple table.  By default, a \c "file:" URI is derived from
 		the object name.  The \c type configuration can be used to
-		switch to a different storage format, such as LSM.  Ignored if
-		an explicit URI is supplied with a \c source configuration''',
-		choices=['file', 'lsm']),
+		switch to a different data source, such as LSM or an extension
+		configured by the application.'''),
 ]
 
 format_meta = column_meta + [
@@ -272,21 +271,21 @@ table_meta = format_meta + table_only_meta
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
 	Config('shared_cache', '', r'''
-		shared cache configuration options. A database should configure either
-		a cache_size or a shared_cache not both''',
+		shared cache configuration options. A database should configure
+		either a cache_size or a shared_cache not both''',
 		type='category', subconfig=[
 		Config('chunk', '10MB', r'''
 			the granularity that a shared cache is redistributed''',
 			min='1MB', max='10TB'),
 		Config('reserve', '0', r'''
-			amount of cache this database is guaranteed to have available
-			from the shared cache. This setting is per database. Defaults
-			to the chunk size''', type='int'),
+			amount of cache this database is guaranteed to have
+			available from the shared cache. This setting is per
+			database. Defaults to the chunk size''', type='int'),
 		Config('name', 'pool', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''
-			maximum memory to allocate for the shared cache. Setting this
-			will update the value if one is already set''',
+			maximum memory to allocate for the shared cache. Setting
+			this will update the value if one is already set''',
 			min='1MB', max='10TB')
 		]),
 	Config('cache_size', '100MB', r'''
@@ -533,9 +532,8 @@ methods = {
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
 		in-memory alignment (in bytes) for buffers used for I/O.  The
-		default value of -1 indicates that a platform-specific
-		alignment value should be used (512 bytes on Linux systems,
-		zero elsewhere)''',
+		default value of -1 indicates a platform-specific alignment
+		value should be used (4KB on Linux systems, zero elsewhere)''',
 		min='-1', max='1MB'),
 	Config('checkpoint', '', r'''
 		periodically checkpoint the database''',
@@ -552,14 +550,9 @@ methods = {
 		type='boolean'),
 	Config('direct_io', '', r'''
 		Use \c O_DIRECT to access files.  Options are given as a list,
-		such as <code>"direct_io=[data]"</code>.  Many Linux systems do
-		not support mixing \c O_DIRECT and memory mapping or normal I/O
-		to the same file.   If \c O_DIRECT is configured for data files
-		on Linux systems, memory mapping should probably be turned off
-		using the \c mmap=false configuration string and any utilities
-		used to copy the database files for the purposes of hot backup
-		should probably also specify \c O_DIRECT when configuring their
-		file access''',
+		such as <code>"direct_io=[data]"</code>.  Configuring
+		\c direct_io requires care, see @ref
+		tuning_system_buffer_cache_direct_io for important warnings''',
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
 		list of shared library extensions to load (using dlopen).
@@ -567,6 +560,12 @@ methods = {
 		WT_CONNECTION::load_extension.  For example,
 		<code>extensions=(/path/ext.so={entry=my_entry})</code>''',
 		type='list'),
+	Config('file_extend', '', r'''
+		file extension configuration.  If set, extend files of the set
+		type in allocations of the set size, instead of a block at a
+		time as each new block is written.  For example,
+		<code>file_extend=(data=16MB)</code>''',
+		type='list', choices=['data', 'log']),
 	Config('hazard_max', '1000', r'''
 		maximum number of simultaneous hazard pointers per session
 		handle''',
@@ -574,10 +573,10 @@ methods = {
 	Config('log', '', r'''
 		enable logging''',
 		type='category', subconfig=[
-		Config('archive', 'true"', r'''
+		Config('archive', 'true', r'''
 		automatically archive unneeded log files''',
                 type='boolean'),
-		Config('enabled', 'true"', r'''
+		Config('enabled', 'true', r'''
 		enable logging subsystem''',
                 type='boolean'),
                 Config('file_max', '100MB', r''',
