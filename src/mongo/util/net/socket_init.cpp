@@ -25,8 +25,8 @@ namespace mongo {
     MONGO_INITIALIZER(WinsockInit)(InitializerContext* context) {
             WSADATA d;
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+                out() << "ERROR: wsastartup failed " << errnoWithDescription() << std::endl;
+                problem() << "ERROR: wsastartup failed " << errnoWithDescription() << std::endl;
                 return Status(ErrorCodes::UnknownError, "WSAStartup failed");
             }
             return Status::OK();
