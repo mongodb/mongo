@@ -290,6 +290,11 @@ namespace mongo {
          */
         v8::Persistent<v8::Context> getContext() { return _context; }
 
+        /**
+         * Get the global JS object
+         */
+        v8::Persistent<v8::Object> getGlobal() { return _global; }
+
         ObjTracker<BSONHolder> bsonHolderTracker;
         ObjTracker<DBClientWithCommands> dbClientWithCommandsTracker;
         ObjTracker<DBClientBase> dbClientBaseTracker;
