@@ -201,7 +201,6 @@ fprintf(stderr, "logger_create: logger_config returned %d\n", run);
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_LOG), &conn->log));
 	log = conn->log;
-	log->fileid = 1;
 fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
 	WT_VERBOSE_RET(session, log, "logger_create: open the log");
 	__wt_spin_init(session, &log->log_lock);
@@ -217,11 +216,15 @@ fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
 		WT_RET(__wt_cond_alloc(
 		    session, "log slot", 0, &log->slot_pool[i].slot_cond));
 #endif
-	WT_RET(__wt_log_open(session));
+	/*
+	 * Initialize fileid to 0 so that newfile moves to log file 1.
+	 */
 	INIT_LSN(&log->alloc_lsn);
 	INIT_LSN(&log->ckpt_lsn);
 	INIT_LSN(&log->sync_lsn);
 	INIT_LSN(&log->write_lsn);
+	log->fileid = 0;
+	WT_RET(__wt_log_newfile(session, 1));
 	/* xxx - need to initialize the LSNs from log_fh file_size */
 	WT_RET(__wt_log_slot_init(session));
 

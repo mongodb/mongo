@@ -174,11 +174,10 @@ typedef struct {
 struct __wt_log_desc {
 #define	WT_LOG_MAGIC		0x101064
 	uint32_t	log_magic;	/* 00-03: Magic number */
-#define	WT_BLOCK_MAJOR_VERSION	1
+#define	WT_LOG_MAJOR_VERSION	1
 	uint16_t	majorv;		/* 04-05: Major version */
-#define	WT_BLOCK_MINOR_VERSION	0
+#define	WT_LOG_MINOR_VERSION	0
 	uint16_t	minorv;		/* 06-07: Minor version */
-
-	uint32_t	cksum;		/* 08-11: Log description checksum */
+	uint32_t	log_size;	/* 08-11: Log file size */
 	uint32_t	unused;		/* 12-15: Padding */
 };

@@ -660,6 +660,7 @@ extern int __wt_log_filename(WT_SESSION_IMPL *session,
     WT_ITEM *buf);
 extern int __wt_log_open(WT_SESSION_IMPL *session);
 extern int __wt_log_close(WT_SESSION_IMPL *session);
+extern int __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create);
 extern int __wt_log_read(WT_SESSION_IMPL *session,
     WT_ITEM *record,
     WT_LSN *lsnp,

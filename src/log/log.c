@@ -46,6 +46,9 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	    pthread_self(),(const char *)path->data);
 	WT_ERR(__wt_open(
 	    session, path->data, 1, 0, WT_FILE_TYPE_LOG, &log->log_fh));
+	/*
+	 * Need to store new fileid in metadata.
+	 */
 err:	__wt_scr_free(&path);
 	return (ret);
 }
@@ -70,80 +73,6 @@ __wt_log_close(WT_SESSION_IMPL *session)
 	WT_VERBOSE_RET(session, log, "closing log %s", log->log_fh->name);
 	WT_RET(__wt_close(session, log->log_fh));
 	log->log_fh = NULL;
-	return (0);
-}
-
-static int
-__log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t recsize)
-{
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-	return (lsn->offset + recsize < conn->log_file_max);
-
-}
-
-static int
-__log_newfile(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_LOG *log;
-
-	conn = S2C(session);
-	log = conn->log;
-
-	/*
-	 * Set aside the log file handle to be closed later.  Other threads
-	 * may still be using it to write to the log.
-	 */
-	WT_ASSERT(session, log->log_close_fh == NULL);
-	log->log_close_fh = log->log_fh;
-	log->fileid++;
-	WT_RET(__wt_log_open(session));
-	/*
-	xxx - need to write log file header record then update lsns.
-	*/
-	log->alloc_lsn.file = log->fileid;
-	log->alloc_lsn.offset = 0;
-
-	return (0);
-}
-
-static int
-__log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_LOG *log;
-
-	conn = S2C(session);
-	log = conn->log;
-	/*
-	 * Called locked.  Add recsize to alloc_lsn.  Save our starting LSN
-	 * as where the previous allocation finished.  That way when log files
-	 * switch, we're waiting for the correct LSN from outstanding writes.
-	 */
-	slot->slot_start_lsn = log->alloc_lsn;
-	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
-	fprintf(stderr,
-	    "[%d] log_acquire: slot 0x%x size %d doesn't fit. Call newfile\n",
-	    pthread_self(),slot,recsize);
-		WT_RET(__log_newfile(session));
-		if (log->log_close_fh != NULL)
-			FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
-	}
-	/*
-	 * Need to minimally fill in slot info here.
-	 */
-	slot->slot_start_offset = log->alloc_lsn.offset;
-	log->alloc_lsn.offset += recsize;
-	slot->slot_end_lsn = log->alloc_lsn;
-	slot->slot_error = 0;
-	fprintf(stderr,
-"[%d] log_acquire: slot 0x%x recsize %d startlsn %d,%d endlsn %d,%d recsize %d\n",
-pthread_self(),slot,recsize,
-slot->slot_start_lsn.file,slot->slot_start_lsn.offset,
-slot->slot_end_lsn.file,slot->slot_end_lsn.offset,recsize);
-	slot->slot_fh = log->log_fh;
 	return (0);
 }
 
@@ -178,6 +107,59 @@ err:
 	if (ret != 0 && myslot->slot->slot_error == 0)
 		myslot->slot->slot_error = ret;
 	return (ret);
+}
+
+static int
+__log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t recsize)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+	return (lsn->offset + recsize < conn->log_file_max);
+
+}
+
+/*
+ * __log_acquire --
+ *	Called with the log slot lock held.  Can be called recursively
+ *	from __log_newfile when we change log files.
+ */
+static int
+__log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+	/*
+	 * Called locked.  Add recsize to alloc_lsn.  Save our starting LSN
+	 * as where the previous allocation finished.  That way when log files
+	 * switch, we're waiting for the correct LSN from outstanding writes.
+	 */
+	slot->slot_start_lsn = log->alloc_lsn;
+	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
+	fprintf(stderr,
+	    "[%d] log_acquire: slot 0x%x size %d doesn't fit. Call newfile\n",
+	    pthread_self(),slot,recsize);
+		WT_RET(__wt_log_newfile(session, 0));
+		if (log->log_close_fh != NULL)
+			FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
+	}
+	/*
+	 * Need to minimally fill in slot info here.
+	 */
+	slot->slot_start_offset = log->alloc_lsn.offset;
+	log->alloc_lsn.offset += recsize;
+	slot->slot_end_lsn = log->alloc_lsn;
+	slot->slot_error = 0;
+	fprintf(stderr,
+"[%d] log_acquire: slot 0x%x recsize %d startlsn %d,%d endlsn %d,%d recsize %d\n",
+pthread_self(),slot,recsize,
+slot->slot_start_lsn.file,slot->slot_start_lsn.offset,
+slot->slot_end_lsn.file,slot->slot_end_lsn.offset,recsize);
+	slot->slot_fh = log->log_fh;
+	return (0);
 }
 
 static int
@@ -222,6 +204,75 @@ err:
 	if (ret != 0 && slot->slot_error == 0)
 		slot->slot_error = ret;
 	return (ret);
+}
+
+int
+__wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LOG_DESC *desc;
+	WT_LOG_RECORD *logrec;
+	WT_LOGSLOT tmp;
+	WT_MYSLOT myslot;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	/*
+	 * Set aside the log file handle to be closed later.  Other threads
+	 * may still be using it to write to the log.
+	 */
+	WT_ASSERT(session, log->log_close_fh == NULL);
+	log->log_close_fh = log->log_fh;
+	log->fileid++;
+	WT_RET(__wt_log_open(session));
+	log->alloc_lsn.file = log->fileid;
+	log->alloc_lsn.offset = 0;
+
+	/*
+	 * Set up the log descriptor record.  Use a scratch buffer to
+	 * get correct alignment for direct I/O.
+	 */
+	WT_RET(__wt_scr_alloc(session, log->allocsize, &buf));
+	memset(buf->mem, 0, log->allocsize);
+	logrec = (WT_LOG_RECORD *)buf->mem;
+	desc = (WT_LOG_DESC *)&logrec->record;
+	desc->log_magic = WT_LOG_MAGIC;
+	desc->majorv = WT_LOG_MAJOR_VERSION;
+	desc->minorv = WT_LOG_MINOR_VERSION;
+	desc->log_size = conn->log_file_max;
+
+	/*
+	 * Now that the record is set up, initialize the record header.
+	 * We don't need to call __wt_rduppo2 because we're already using
+	 * log->allocsize.
+	 */
+	logrec->total_len = logrec->real_len = log->allocsize;
+	logrec->checksum = 0;
+	logrec->checksum = __wt_cksum(logrec, log->allocsize);
+	memset(&tmp, 0, sizeof(tmp));
+	myslot.slot = &tmp;
+	myslot.offset = 0;
+	/*
+	 * Recursively call __log_acquire to allocate log space for the
+	 * log descriptor record.  Call __log_fill to write it, but we
+	 * do not need to call __log_release because we're not waiting for
+	 * earlier operations to complete.
+	 */
+	WT_ERR(__log_acquire(session, logrec->total_len, &tmp));
+	WT_ERR(__log_fill(session, &myslot, buf, NULL));
+	/*
+	 * If we're called from connection creation code, we need to update
+	 * the write_lsn since we're the only write in progress.
+	 */
+	if (conn_create)
+		log->write_lsn = tmp.slot_end_lsn;
+err:
+	__wt_scr_free(&buf);
+	return (0);
 }
 
 int
