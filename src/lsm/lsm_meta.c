@@ -49,7 +49,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				}
 			}
 			if (lsm_tree->collator == NULL)
-				WT_RET_MSG(session, EINVAL,
+				WT_ERR_MSG(session, EINVAL,
 				    "unknown collator '%.*s'",
 				    (int)cv.len, cv.str);
 			WT_ERR(__wt_strndup(session,

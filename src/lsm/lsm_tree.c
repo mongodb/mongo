@@ -559,7 +559,7 @@ __wt_lsm_tree_switch(
 	uint32_t in_memory, new_id;
 
 	cache_sz = S2C(session)->cache_size;
-	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
+	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
 	    lsm_tree->chunk_alloc)
