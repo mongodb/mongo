@@ -562,13 +562,13 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 
-	WT_RET(__wt_config_allocation_size(
+	WT_RET(__wt_direct_io_size_check(
 	    session, cfg, "allocation_size", &btree->allocsize));
-	WT_RET(__wt_config_allocation_size(
+	WT_RET(__wt_direct_io_size_check(
 	    session, cfg, "internal_page_max", &btree->maxintlpage));
 	WT_RET(__wt_config_gets(session, cfg, "internal_item_max", &cval));
 	btree->maxintlitem = (uint32_t)cval.val;
-	WT_RET(__wt_config_allocation_size(
+	WT_RET(__wt_direct_io_size_check(
 	    session, cfg, "leaf_page_max", &btree->maxleafpage));
 	WT_RET(__wt_config_gets(session, cfg, "leaf_item_max", &cval));
 	btree->maxleafitem = (uint32_t)cval.val;

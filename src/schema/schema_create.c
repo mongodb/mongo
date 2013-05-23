@@ -8,18 +8,19 @@
 #include "wt_internal.h"
 
 /*
- * __wt_config_allocation_size --
- *	Return the allocation size, corrected for direct I/O.
+ * __wt_direct_io_size_check --
+ *	Return a size from the configuration, complaining if it's insufficient
+ * for direct I/O.
  */
 int
-__wt_config_allocation_size(WT_SESSION_IMPL *session,
-    const char **cfg, const char *config_name, uint32_t *allocsizep)
+__wt_direct_io_size_check(WT_SESSION_IMPL *session,
+    const char **cfg, const char *config_name, uint32_t *sizep)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	int64_t align;
 
-	*allocsizep = 0;
+	*sizep = 0;
 
 	conn = S2C(session);
 
@@ -27,25 +28,21 @@ __wt_config_allocation_size(WT_SESSION_IMPL *session,
 
 	/*
 	 * This function exists as a place to hang this comment: if direct I/O
-	 * is configured, correct the size to be at least as large as the buffer
-	 * alignment, and if not a multiple of the alignment, increase it to the
-	 * next largest multiple of the alignment.  Linux gets unhappy if you
-	 * configure direct I/O and then don't do I/O in alignments and units of
-	 * its happy place.
+	 * is configured, page sizes must be at least as large as any buffer
+	 * alignment as well as a multiple of the alignment.  Linux gets unhappy
+	 * if you configure direct I/O and then don't do I/O in alignments and
+	 * units of its happy place.
 	 */
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_DATA)) {
 		align = (int64_t)conn->buffer_alignment;
-		if (align != 0) {
-			if (cval.val < align)
-				cval.val = align;
-			else if (cval.val % align != 0) {
-				cval.val += align - 1;
-				cval.val /= align;
-				cval.val *= align;
-			}
-		}
+		if (align != 0 && (cval.val < align || cval.val % align != 0))
+			WT_RET_MSG(session, EINVAL,
+			    "when direct I/O is configured, the %s size must "
+			    "be at least as large as the buffer alignment as "
+			    "well as a multiple of the buffer alignment",
+			    config_name);
 	}
-	*allocsizep = (uint32_t)cval.val;
+	*sizep = (uint32_t)cval.val;
 	return (0);
 }
 
@@ -77,7 +74,8 @@ __create_file(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
-	WT_RET(__wt_config_allocation_size(
+	/* Sanity check the allocation size. */
+	WT_RET(__wt_direct_io_size_check(
 	    session, filecfg, "allocation_size", &allocsize));
 
 	/* Create the file. */

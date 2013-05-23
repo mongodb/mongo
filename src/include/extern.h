@@ -925,10 +925,10 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     size_t size,
     const char *fmt,
     ...);
-extern int __wt_config_allocation_size(WT_SESSION_IMPL *session,
+extern int __wt_direct_io_size_check(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *config_name,
-    uint32_t *allocsizep);
+    uint32_t *sizep);
 extern int __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
