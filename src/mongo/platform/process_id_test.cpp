@@ -13,6 +13,8 @@
  *    limitations under the License.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/platform/process_id.h"
 #include "mongo/unittest/unittest.h"
 

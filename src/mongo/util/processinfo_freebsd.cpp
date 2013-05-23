@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    ProcessInfo::ProcessInfo(pid_t pid) : _pid( pid ) {
+    ProcessInfo::ProcessInfo(ProcessId pid) : _pid( pid ) {
     }
 
     ProcessInfo::~ProcessInfo() {

@@ -55,6 +55,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/util/fail_point_service.h"
@@ -1133,7 +1134,7 @@ namespace mongo {
 #if !defined(__sunos__)
     void writePid(int fd) {
         stringstream ss;
-        ss << getpid() << endl;
+        ss << ProcessId::getCurrent() << endl;
         string s = ss.str();
         const char * data = s.c_str();
 #ifdef _WIN32

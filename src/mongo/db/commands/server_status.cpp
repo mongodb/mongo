@@ -28,6 +28,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
@@ -91,7 +92,7 @@ namespace mongo {
             result.append("host", prettyHostName() );
             result.append("version", versionString);
             result.append("process",cmdLine.binaryName);
-            result.append("pid", (int)getpid());
+            result.append("pid", ProcessId::getCurrent().asLongLong());
             result.append("uptime",(double) (time(0)-cmdLine.started));
             result.append("uptimeMillis", (long long)(curTimeMillis64()-_started));
             result.append("uptimeEstimate",(double) (start/1000));

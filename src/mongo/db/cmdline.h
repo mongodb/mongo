@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/util/net/listen.h"
 
 namespace boost {
@@ -127,8 +128,8 @@ namespace mongo {
         bool logWithSyslog;    // True if logging to syslog; must not be set if logpath is set.
 
 #ifndef _WIN32
-        pid_t parentProc;      // --fork pid of initial process
-        pid_t leaderProc;      // --fork pid of leader process
+        ProcessId parentProc;      // --fork pid of initial process
+        ProcessId leaderProc;      // --fork pid of leader process
 #endif
 
 #ifdef MONGO_SSL

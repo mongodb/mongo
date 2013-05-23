@@ -28,6 +28,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/cmdline.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/processinfo.h"
@@ -40,7 +41,7 @@ namespace mongo {
     // support for exit value propagation with fork
     void launchSignal( int sig ) {
         if ( sig == SIGUSR2 ) {
-            pid_t cur = getpid();
+            ProcessId cur = ProcessId::getCurrent();
             
             if ( cur == cmdLine.parentProc || cur == cmdLine.leaderProc ) {
                 // signal indicates successful start allowing us to exit
@@ -56,7 +57,7 @@ namespace mongo {
     void CmdLine::launchOk() {
         if ( cmdLine.doFork ) {
             // killing leader will propagate to parent
-            verify( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
+            verify( kill( cmdLine.leaderProc.toNative(), SIGUSR2 ) == 0 );
         }
     }
 #endif
@@ -77,7 +78,7 @@ namespace mongo {
             cout.flush();
             cerr.flush();
 
-            cmdLine.parentProc = getpid();
+            cmdLine.parentProc = ProcessId::getCurrent();
 
             // facilitate clean exit when child starts successfully
             setupLaunchSignals();
@@ -116,7 +117,7 @@ namespace mongo {
             }
             setsid();
 
-            cmdLine.leaderProc = getpid();
+            cmdLine.leaderProc = ProcessId::getCurrent();
 
             pid_t child2 = fork();
             if (child2 == -1) {

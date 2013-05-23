@@ -23,7 +23,7 @@ using namespace std;
 
 namespace mongo {
 
-    ProcessInfo::ProcessInfo( pid_t pid ) {
+    ProcessInfo::ProcessInfo( ProcessId pid ) {
     }
 
     ProcessInfo::~ProcessInfo() {

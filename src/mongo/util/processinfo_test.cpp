@@ -14,6 +14,8 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <vector>
 
 #include "mongo/util/processinfo.h"

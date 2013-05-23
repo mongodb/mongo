@@ -55,6 +55,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/ttl.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/s/d_writeback.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
@@ -257,7 +258,7 @@ namespace mongo {
         toLog.append( "startTimeLocal", buf );
 
         toLog.append( "cmdLine", CmdLine::getParsedOpts() );
-        toLog.append( "pid", getpid() );
+        toLog.append( "pid", ProcessId::getCurrent().asLongLong() );
 
 
         BSONObjBuilder buildinfo( toLog.subobjStart("buildinfo"));
@@ -581,11 +582,7 @@ namespace mongo {
         bool is32bit = sizeof(int*) == 4;
 
         {
-#if !defined(_WIN32)
-            pid_t pid = getpid();
-#else
-            DWORD pid=GetCurrentProcessId();
-#endif
+            ProcessId pid = ProcessId::getCurrent();
             Nullstream& l = log();
             l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
             if( replSettings.master ) l << " master=" << replSettings.master;

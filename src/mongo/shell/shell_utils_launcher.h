@@ -27,10 +27,7 @@
 #include <utility>
 
 #include "mongo/bson/bsonobj.h"
-
-#ifdef _WIN32
-typedef int pid_t;
-#endif
+#include "mongo/platform/process_id.h"
 
 namespace mongo {
 
@@ -52,7 +49,7 @@ namespace mongo {
         /** Record log lines from concurrent programs.  All public members are thread safe. */
         class ProgramOutputMultiplexer {
         public:
-            void appendLine( int port, int pid, const char *line );
+            void appendLine( int port, ProcessId pid, const char *line );
             /** @return up to 100000 characters of the most recent log output. */
             std::string str() const;
             void clear();
@@ -71,28 +68,28 @@ namespace mongo {
 
             bool isPortRegistered( int port ) const;
             /** @return pid for a registered port. */
-            pid_t pidForPort( int port ) const;
+            ProcessId pidForPort( int port ) const;
             /** @return port (-1 if doesn't exist) for a registered pid. */
-            int portForPid( pid_t pid ) const;
+            int portForPid( ProcessId pid ) const;
             /** Register an unregistered port. */
-            void registerPort( int port, pid_t pid, int output );
+            void registerPort( int port, ProcessId pid, int output );
             void deletePort( int port );
             void getRegisteredPorts( std::vector<int> &ports );
 
-            bool isPidRegistered( pid_t pid ) const;
+            bool isPidRegistered( ProcessId pid ) const;
             /** Register an unregistered pid. */
-            void registerPid( pid_t pid, int output );
-            void deletePid( pid_t pid );
-            void getRegisteredPids( vector<pid_t> &pids );
+            void registerPid( ProcessId pid, int output );
+            void deletePid( ProcessId pid );
+            void getRegisteredPids( vector<ProcessId> &pids );
 
         private:
-            std::map<int,std::pair<pid_t,int> > _ports;
-            std::map<pid_t,int> _pids;
+            std::map<int,std::pair<ProcessId,int> > _ports;
+            std::map<ProcessId,int> _pids;
             mutable boost::recursive_mutex _mutex;
 
 #ifdef _WIN32
         public:
-            std::map<pid_t,HANDLE> _handles;
+            std::map<ProcessId,HANDLE> _handles;
 #endif
         };
         
@@ -105,7 +102,7 @@ namespace mongo {
             void start();                        
             /** Continuously read the program's output, generally from a special purpose thread. */
             void operator()();
-            pid_t pid() const { return _pid; }
+            ProcessId pid() const { return _pid; }
             int port() const { return _port; }
 
         private:
@@ -115,7 +112,7 @@ namespace mongo {
             std::vector<std::string> _argv;
             int _port;
             int _pipe;
-            pid_t _pid;
+            ProcessId _pid;
         };
     }
 }

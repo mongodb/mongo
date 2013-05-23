@@ -20,6 +20,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -46,17 +47,9 @@ namespace mongo {
         return s;
     }
 
-    unsigned OID::ourPid() {
-#ifdef _WIN32
-        return static_cast<unsigned>( GetCurrentProcessId() );
-#else
-        return static_cast<unsigned>( getpid() );
-#endif
-    }
-
     void OID::foldInPid(OID::MachineAndPid& x) {
-        unsigned p = ourPid();
-        x._pid ^= (unsigned short) p;
+        unsigned p = ProcessId::getCurrent().asUInt32();
+        x._pid ^= static_cast<unsigned short>(p);
         // when the pid is greater than 16 bits, let the high bits modulate the machine id field.
         unsigned short& rest = (unsigned short &) x._machineNumber[1];
         rest ^= p >> 16;

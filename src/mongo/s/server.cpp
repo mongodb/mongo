@@ -30,6 +30,7 @@
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
@@ -247,15 +248,19 @@ namespace mongo {
 
     void printShardingVersionInfo( bool out ) {
         if ( out ) {
-            cout << "MongoS version " << versionString << " starting: pid=" << getpid() << " port=" << cmdLine.port <<
-                    ( sizeof(int*) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << " (--help for usage)" << endl;
+            cout << "MongoS version " << versionString << " starting: pid=" <<
+                ProcessId::getCurrent() << " port=" << cmdLine.port <<
+                ( sizeof(int*) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() <<
+                " (--help for usage)" << endl;
             DEV cout << "_DEBUG build" << endl;
             cout << "git version: " << gitVersion() << endl;
             cout <<  "build sys info: " << sysInfo() << endl;
         }
         else {
-            log() << "MongoS version " << versionString << " starting: pid=" << getpid() << " port=" << cmdLine.port <<
-                    ( sizeof( int* ) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << " (--help for usage)" << endl;
+            log() << "MongoS version " << versionString << " starting: pid=" <<
+                ProcessId::getCurrent() << " port=" << cmdLine.port <<
+                ( sizeof( int* ) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() <<
+                " (--help for usage)" << endl;
             DEV log() << "_DEBUG build" << endl;
             printGitVersion();
             printSysInfo();

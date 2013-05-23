@@ -38,7 +38,7 @@ using namespace std;
 
 namespace mongo {
 
-    ProcessInfo::ProcessInfo( pid_t pid ) : _pid( pid ) {
+    ProcessInfo::ProcessInfo( ProcessId pid ) : _pid( pid ) {
     }
 
     ProcessInfo::~ProcessInfo() {
@@ -53,7 +53,7 @@ namespace mongo {
 
         mach_port_t task;
 
-        if ( ( result = task_for_pid( mach_task_self() , _pid , &task) ) != KERN_SUCCESS ) {
+        if ((result = task_for_pid(mach_task_self(), _pid.toNative(), &task)) != KERN_SUCCESS) {
             cout << "error getting task\n";
             return 0;
         }
@@ -76,7 +76,7 @@ namespace mongo {
 
         mach_port_t task;
 
-        if ( ( result = task_for_pid( mach_task_self() , _pid , &task) ) != KERN_SUCCESS ) {
+        if ((result = task_for_pid(mach_task_self(), _pid.toNative(), &task)) != KERN_SUCCESS) {
             cout << "error getting task\n";
             return 0;
         }

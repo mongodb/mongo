@@ -22,10 +22,6 @@
 
 using namespace std;
 
-int getpid() {
-    return GetCurrentProcessId();
-}
-
 namespace mongo {
 
     // dynamically link to psapi.dll (in case this version of Windows
@@ -57,7 +53,7 @@ namespace mongo {
         return (int)( s / ( 1024 * 1024 ) );
     }
 
-    ProcessInfo::ProcessInfo( pid_t pid ) {
+    ProcessInfo::ProcessInfo( ProcessId pid ) {
     }
 
     ProcessInfo::~ProcessInfo() {

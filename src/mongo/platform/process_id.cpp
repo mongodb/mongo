@@ -19,6 +19,7 @@
 
 #include <boost/static_assert.hpp>
 #include <iostream>
+#include <sstream>
 #include <limits>
 
 namespace mongo {
@@ -49,8 +50,14 @@ namespace mongo {
         return static_cast<long long>(asInt64());
     }
 
+    std::string ProcessId::toString() const {
+        std::ostringstream os;
+        os << *this;
+        return os.str();
+    }
+
     std::ostream& operator<<(std::ostream& os, ProcessId pid) {
-        return os << pid.asInt64();
+        return os << pid.toNative();
     }
 
 }  // namespace mongo

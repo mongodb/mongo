@@ -36,9 +36,9 @@ namespace mongo {
 
     class LinuxProc {
     public:
-        LinuxProc( pid_t pid = getpid() ) {
+        LinuxProc( ProcessId pid ) {
             char name[128];
-            sprintf( name , "/proc/%d/stat"  , pid );
+            sprintf( name , "/proc/%d/stat"  , pid.asUInt32() );
 
             FILE * f = fopen( name , "r");
             if ( ! f ) {
@@ -353,7 +353,7 @@ namespace mongo {
     };
 
 
-    ProcessInfo::ProcessInfo( pid_t pid ) : _pid( pid ) {
+    ProcessInfo::ProcessInfo( ProcessId pid ) : _pid( pid ) {
     }
 
     ProcessInfo::~ProcessInfo() {

@@ -47,6 +47,7 @@ clientSourceBasic = [
     'mongo/db/namespace.cpp',
     'mongo/db/dbmessage.cpp',
     'mongo/pch.cpp',
+    'mongo/platform/process_id.cpp',
     'mongo/platform/random.cpp',
     'mongo/util/assert_util.cpp',
     'mongo/util/background.cpp',

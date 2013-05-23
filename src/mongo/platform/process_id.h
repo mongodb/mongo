@@ -16,6 +16,7 @@
 #pragma once
 
 #include <iosfwd>
+#include <string>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -79,6 +80,11 @@ namespace mongo {
          * serialize or format to text files meaningfully.
          */
         uint32_t asUInt32() const { return static_cast<uint32_t>(_npid); }
+
+        /**
+         * Provides a string representation of the pid.
+         */
+        std::string toString() const;
 
         bool operator==(const ProcessId other) const { return _npid == other._npid; }
         bool operator!=(const ProcessId other) const { return _npid != other._npid; }

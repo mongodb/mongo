@@ -17,23 +17,17 @@
 
 #pragma once
 
-#include <sys/types.h>
 #include <string>
 
-#ifndef _WIN32
-#include <unistd.h>
-#else
-typedef int pid_t;
-int getpid();
-#endif
-
-#include <db/jsobj.h>
+#include "mongo/platform/cstdint.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
     class ProcessInfo {
     public:
-        ProcessInfo( pid_t pid = getpid() );
+        ProcessInfo( ProcessId pid = ProcessId::getCurrent() );
         ~ProcessInfo();
 
         /**
@@ -159,7 +153,7 @@ namespace mongo {
             void collectSystemInfo();
         };
 
-        pid_t _pid;
+        ProcessId _pid;
         static mongo::mutex _sysInfoLock;
 
         static bool checkNumaEnabled();

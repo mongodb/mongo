@@ -37,7 +37,7 @@ namespace mongo {
         void write( const string& p ) {
             path = p;
             ofstream out( path.c_str() , ios_base::out );
-            out << getpid() << endl;
+            out << ProcessId::getCurrent() << endl;
             out.close();
         }
 

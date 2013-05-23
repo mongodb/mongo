@@ -66,15 +66,15 @@ namespace mongo {
             return _ports.count( port ) == 1;
         }
         
-        pid_t ProgramRegistry::pidForPort( int port ) const {
+        ProcessId ProgramRegistry::pidForPort( int port ) const {
             boost::recursive_mutex::scoped_lock lk( _mutex );
             verify( isPortRegistered( port ) );
             return _ports.find( port )->second.first;
         }
         
-        int ProgramRegistry::portForPid(pid_t pid) const {
+        int ProgramRegistry::portForPid(ProcessId pid) const {
             boost::recursive_mutex::scoped_lock lk(_mutex);
-            for (map<int, pair<pid_t, int> >::const_iterator it = _ports.begin();
+            for (map<int, pair<ProcessId, int> >::const_iterator it = _ports.begin();
                     it != _ports.end(); ++it)
             {
                 if (it->second.first == pid) return it->first;
@@ -83,7 +83,7 @@ namespace mongo {
             return -1;
         }
 
-        void ProgramRegistry::registerPort( int port, pid_t pid, int output ) {
+        void ProgramRegistry::registerPort( int port, ProcessId pid, int output ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
             verify( !isPortRegistered( port ) );
             _ports.insert( make_pair( port, make_pair( pid, output ) ) );
@@ -100,24 +100,24 @@ namespace mongo {
         
         void ProgramRegistry::getRegisteredPorts( vector<int> &ports ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            for( map<int,pair<pid_t,int> >::const_iterator i = _ports.begin(); i != _ports.end();
+            for( map<int,pair<ProcessId,int> >::const_iterator i = _ports.begin(); i != _ports.end();
                 ++i ) {
                 ports.push_back( i->first );
             }
         }
         
-        bool ProgramRegistry::isPidRegistered( pid_t pid ) const {
+        bool ProgramRegistry::isPidRegistered( ProcessId pid ) const {
             boost::recursive_mutex::scoped_lock lk( _mutex );
             return _pids.count( pid ) == 1;
         }
         
-        void ProgramRegistry::registerPid( pid_t pid, int output ) {
+        void ProgramRegistry::registerPid( ProcessId pid, int output ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
             verify( !isPidRegistered( pid ) );
             _pids.insert( make_pair( pid, output ) );
         }
         
-        void ProgramRegistry::deletePid(pid_t pid) {
+        void ProgramRegistry::deletePid(ProcessId pid) {
             boost::recursive_mutex::scoped_lock lk(_mutex);
             if (!isPidRegistered(pid)) {
                 int port = portForPid(pid);
@@ -129,9 +129,9 @@ namespace mongo {
             _pids.erase(pid);
         }
         
-        void ProgramRegistry::getRegisteredPids( vector<pid_t> &pids ) {
+        void ProgramRegistry::getRegisteredPids( vector<ProcessId> &pids ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            for( map<pid_t,int>::const_iterator i = _pids.begin(); i != _pids.end(); ++i ) {
+            for( map<ProcessId,int>::const_iterator i = _pids.begin(); i != _pids.end(); ++i ) {
                 pids.push_back( i->first );
             }
         }
@@ -143,7 +143,7 @@ namespace mongo {
             mongo::dbexitCalled = true;
         }
 
-        void ProgramOutputMultiplexer::appendLine( int port, int pid, const char *line ) {
+        void ProgramOutputMultiplexer::appendLine( int port, ProcessId pid, const char *line ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
             if( mongo::dbexitCalled ) throw "program is terminating";
             stringstream buf;
@@ -399,7 +399,7 @@ namespace mongo {
 
             CloseHandle(pi.hThread);
 
-            _pid = pi.dwProcessId;
+            _pid = ProcessId::fromNative(pi.dwProcessId);
             registry._handles.insert( make_pair( _pid, pi.hProcess ) );
 
 #else
@@ -417,14 +417,13 @@ namespace mongo {
             env[1] = NULL;
 
             bool isMongos = ( _argv[0].find( "mongos" ) != string::npos );
-            
-            _pid = fork();
+
+            pid_t nativePid = fork();
+            _pid = ProcessId::fromNative(nativePid);
             // Async signal unsafe functions should not be called in the child process.
 
-            if ( _pid == -1 ) {
-                verify( _pid != -1 );
-            }
-            else if ( _pid == 0 ) {
+            verify( nativePid != -1 );
+            if ( nativePid == 0 ) {
                 // DON'T ASSERT IN THIS BLOCK - very bad things will happen
 
                 if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
@@ -460,7 +459,7 @@ namespace mongo {
         }
 
         //returns true if process exited
-        bool wait_for_pid(pid_t pid, bool block=true, int* exit_code=NULL) {
+        bool wait_for_pid(ProcessId pid, bool block=true, int* exit_code=NULL) {
 #ifdef _WIN32
             verify(registry._handles.count(pid));
             HANDLE h = registry._handles[pid];
@@ -484,7 +483,7 @@ namespace mongo {
             }
 #else
             int tmp;
-            bool ret = (pid == waitpid(pid, &tmp, (block ? 0 : WNOHANG)));
+            bool ret = (pid.toNative() == waitpid(pid.toNative(), &tmp, (block ? 0 : WNOHANG)));
             if (exit_code)
                 *exit_code = WEXITSTATUS(tmp);
             return ret;
@@ -502,14 +501,14 @@ namespace mongo {
         }
 
         BSONObj CheckProgram(const BSONObj& args, void* data) {
-            int pid = singleArg(args).numberInt();
+            ProcessId pid = ProcessId::fromNative(singleArg(args).numberInt());
             bool isDead = wait_for_pid(pid, false);
             if (isDead) registry.deletePid(pid);
             return BSON( string( "" ) << (!isDead) );
         }
 
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
-            int pid = singleArg( a ).numberInt();
+            ProcessId pid = ProcessId::fromNative(singleArg( a ).numberInt());
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
             registry.deletePid( pid );
             return x;
@@ -520,7 +519,7 @@ namespace mongo {
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            return BSON( string( "" ) << int( r.pid() ) );
+            return BSON( string( "" ) << r.pid().asLongLong() );
         }
 
         BSONObj RunMongoProgram( const BSONObj &a, void* data ) {
@@ -600,7 +599,7 @@ namespace mongo {
             return undefinedReturn;
         }
 
-      inline void kill_wrapper( pid_t pid, int sig, int port, const BSONObj& opt ) {
+      inline void kill_wrapper( ProcessId pid, int sig, int port, const BSONObj& opt ) {
 #ifdef _WIN32
             if (sig == SIGKILL || port == 0) {
                 verify( registry._handles.count(pid) );
@@ -635,7 +634,7 @@ namespace mongo {
                 }
             }
 #else
-            int x = kill( pid, sig );
+            int x = kill( pid.toNative(), sig );
             if ( x ) {
                 if ( errno == ESRCH ) {
                 }
@@ -648,8 +647,8 @@ namespace mongo {
 #endif
         }
 
-       int killDb( int port, pid_t _pid, int signal, const BSONObj& opt ) {
-            pid_t pid;
+       int killDb( int port, ProcessId _pid, int signal, const BSONObj& opt ) {
+            ProcessId pid;
             int exitCode = 0;
             if ( port > 0 ) {
                 if( !registry.isPortRegistered( port ) ) {
@@ -700,7 +699,7 @@ namespace mongo {
             return exitCode;
         }
 
-       int killDb( int port, pid_t _pid, int signal ) {
+       int killDb( int port, ProcessId _pid, int signal ) {
            BSONObj dummyOpt;
            return killDb( port, _pid, signal, dummyOpt );
        }
@@ -738,7 +737,7 @@ namespace mongo {
             verify( nFields >= 1 && nFields <= 3 );
             uassert( 15853 , "stopMongo needs a number" , a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
-            int code = killDb( port, 0, getSignal( a ), getStopMongodOpts( a ));
+            int code = killDb( port, ProcessId::fromNative(0), getSignal( a ), getStopMongodOpts( a ));
             log() << "shell: stopped mongo program on port " << port << endl;
             return BSON( "" << (double)code );
         }
@@ -746,7 +745,7 @@ namespace mongo {
         BSONObj StopMongoProgramByPid( const BSONObj &a, void* data ) {
             verify( a.nFields() == 1 || a.nFields() == 2 );
             uassert( 15852 , "stopMongoByPid needs a number" , a.firstElement().isNumber() );
-            int pid = int( a.firstElement().number() );
+            ProcessId pid = ProcessId::fromNative(int( a.firstElement().number() ));
             int code = killDb( 0, pid, getSignal( a ) );
             log() << "shell: stopped mongo program on pid " << pid << endl;
             return BSON( "" << (double)code );
@@ -756,10 +755,10 @@ namespace mongo {
             vector< int > ports;
             registry.getRegisteredPorts( ports );
             for( vector< int >::iterator i = ports.begin(); i != ports.end(); ++i )
-                killDb( *i, 0, SIGTERM );
-            vector< pid_t > pids;
+                killDb( *i, ProcessId::fromNative(0), SIGTERM );
+            vector< ProcessId > pids;
             registry.getRegisteredPids( pids );
-            for( vector< pid_t >::iterator i = pids.begin(); i != pids.end(); ++i )
+            for( vector< ProcessId >::iterator i = pids.begin(); i != pids.end(); ++i )
                 killDb( 0, *i, SIGTERM );
         }
 
