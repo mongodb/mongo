@@ -31,7 +31,10 @@ namespace mongo {
 
     int TimerHolder::recordMillis() {
         _recorded = true;
-        return _stats->record( _t );
+        if ( _stats ) {
+            return _stats->record( _t );
+        }
+        return _t.millis();
     }
 
     void TimerStats::recordMillis( int millis ) {

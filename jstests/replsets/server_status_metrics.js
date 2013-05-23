@@ -63,4 +63,29 @@ testDB.getLastError(2);
 
 testSecondaryMetrics(secondary, 20000, secondaryBaseOplogInserts -1);
 
+
+// Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
+var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis
+var startNum = testDB.serverStatus().metrics.getLastError.wtime.num
+
+printjson(primary.getDB("test").serverStatus().metrics);
+
+testDB.getLastError(1, 50 );
+assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
+assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
+
+testDB.getLastError(-11, 50 );
+assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
+assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
+
+testDB.getLastError(2, 50 );
+assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis);
+assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
+
+testDB.getLastError(3, 50 );
+assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis + 50);
+assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
+
+printjson(primary.getDB("test").serverStatus().metrics);
+
 rt.stopSet();

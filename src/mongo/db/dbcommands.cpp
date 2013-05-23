@@ -198,7 +198,21 @@ namespace mongo {
                 }
 
                 int timeout = cmdObj["wtimeout"].numberInt();
-                TimerHolder timer( &gleWtimeStats );
+                scoped_ptr<TimerHolder> gleTimerHolder;
+                bool doTiming = false;
+                if ( e.isNumber() ) {
+                    doTiming = e.numberInt() > 1;
+                }
+                else if ( e.type() == String ) {
+                    doTiming = true;
+                }
+                TimerStats t;
+                if ( doTiming ) {
+                    gleTimerHolder.reset( new TimerHolder( &gleWtimeStats ) );
+                }
+                else {
+                    gleTimerHolder.reset( new TimerHolder( &t ) );
+                }
 
                 long long passes = 0;
                 char buf[32];
@@ -259,11 +273,11 @@ namespace mongo {
                     }
 
 
-                    if ( timeout > 0 && timer.millis() >= timeout ) {
+                    if ( timeout > 0 && gleTimerHolder->millis() >= timeout ) {
                         gleWtimeouts.increment();
                         result.append( "wtimeout" , true );
                         errmsg = "timed out waiting for slaves";
-                        result.append( "waited" , timer.millis() );
+                        result.append( "waited" , gleTimerHolder->millis() );
                         result.append("writtenTo", getHostsWrittenTo(op));
                         result.append( "err" , "timeout" );
                         return true;
@@ -275,9 +289,11 @@ namespace mongo {
                     killCurrentOp.checkForInterrupt();
                 }
 
-                result.append("writtenTo", getHostsWrittenTo(op));
-                int myMillis = timer.recordMillis();
-                result.appendNumber( "wtime" , myMillis );
+                if ( doTiming ) {
+                    result.append("writtenTo", getHostsWrittenTo(op));
+                    int myMillis = gleTimerHolder->recordMillis();
+                    result.appendNumber( "wtime" , myMillis );
+                }
             }
 
             result.appendNull( "err" );
