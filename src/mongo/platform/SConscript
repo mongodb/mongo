@@ -2,8 +2,12 @@
 
 Import("env")
 
-env.Library( "platform", "random.cpp" )
+env.Library('platform', [
+        'process_id.cpp',
+        'random.cpp',
+        ])
 
 env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
 env.CppUnitTest('bits_test', 'bits_test.cpp')
-env.CppUnitTest('random_test', 'random_test.cpp')
+env.CppUnitTest('process_id_test', 'process_id_test.cpp', LIBDEPS=['platform'])
+env.CppUnitTest('random_test', 'random_test.cpp', LIBDEPS=['platform'])
