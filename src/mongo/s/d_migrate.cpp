@@ -1600,11 +1600,10 @@ namespace mongo {
             verify( ! min.isEmpty() );
             verify( ! max.isEmpty() );
             
-            slaveCount = ( getSlaveCount() / 2 ) + 1;
+            replSetMajorityCount = theReplSet ? theReplSet->config().getMajority() : 0;
 
             log() << "starting receiving-end of migration of chunk " << min << " -> " << max <<
-                    " for collection " << ns << " from " << from <<
-                    " (" << getSlaveCount() << " slaves detected)" << endl;
+                    " for collection " << ns << " from " << from << endl;
 
             string errmsg;
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , errmsg );
@@ -1940,13 +1939,13 @@ namespace mongo {
             // if replication is on, try to force enough secondaries to catch up
             // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
             //      for now, we try to replicate to a sensible number of secondaries
-            return mongo::opReplicatedEnough( lastOpApplied , slaveCount );
+            return mongo::opReplicatedEnough( lastOpApplied , replSetMajorityCount );
         }
 
         bool flushPendingWrites( const ReplTime& lastOpApplied ) {
             if ( ! opReplicatedEnough( lastOpApplied ) ) {
                 OpTime op( lastOpApplied );
-                OCCASIONALLY warning() << "migrate commit waiting for " << slaveCount 
+                OCCASIONALLY warning() << "migrate commit waiting for " << replSetMajorityCount 
                                        << " slaves for '" << ns << "' " << min << " -> " << max 
                                        << " waiting for: " << op
                                        << migrateLog;
@@ -2024,7 +2023,7 @@ namespace mongo {
         long long numSteady;
         bool secondaryThrottle;
 
-        int slaveCount;
+        int replSetMajorityCount;
 
         enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL , ABORT } state;
         string errmsg;
