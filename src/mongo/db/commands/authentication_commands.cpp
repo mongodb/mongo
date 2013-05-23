@@ -153,7 +153,7 @@ namespace mongo {
         BSONObj userObj;
         string pwd;
         Status status = ClientBasic::getCurrent()->getAuthorizationSession()->getPrivilegeDocument(
-                dbname, PrincipalName(user, dbname), &userObj);
+                dbname, UserName(user, dbname), &userObj);
         if (!status.isOK()) {
             log() << status.reason() << std::endl;
             errmsg = "auth fails";
@@ -184,7 +184,7 @@ namespace mongo {
 
         AuthorizationSession* authorizationSession =
             ClientBasic::getCurrent()->getAuthorizationSession();
-        Principal* principal = new Principal(PrincipalName(user, dbname));
+        Principal* principal = new Principal(UserName(user, dbname));
         principal->setImplicitPrivilegeAcquisition(true);
         authorizationSession->addAuthorizedPrincipal(principal);
 

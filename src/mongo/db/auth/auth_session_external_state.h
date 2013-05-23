@@ -21,7 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/principal_name.h"
+#include "mongo/db/auth/user_name.h"
 
 namespace mongo {
 
@@ -52,12 +52,12 @@ namespace mongo {
         // necessary to determine if localhost connections should be given full access.
         virtual void startRequest() = 0;
 
-        // Gets the privilege information document for "principalName" on "dbname".
+        // Gets the privilege information document for "userName" on "dbname".
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
         Status getPrivilegeDocument(const std::string& dbname,
-                                    const PrincipalName& principalName,
+                                    const UserName& userName,
                                     BSONObj* result);
 
         // Authorization event hooks

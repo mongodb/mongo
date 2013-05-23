@@ -13,7 +13,7 @@
  *    limitations under the License.
  */
 
-#include "mongo/db/auth/principal_name.h"
+#include "mongo/db/auth/user_name.h"
 
 #include <algorithm>
 #include <string>
@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    PrincipalName::PrincipalName(const StringData& user, const StringData& dbname) {
+    UserName::UserName(const StringData& user, const StringData& dbname) {
         _fullName.resize(user.size() + dbname.size() + 1);
         std::string::iterator iter = std::copy(user.rawData(),
                                                user.rawData() + user.size(),

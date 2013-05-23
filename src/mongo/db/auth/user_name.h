@@ -27,24 +27,23 @@ namespace mongo {
      *
      * Consists of a "user name" part, and a "database name" part.
      */
-    class PrincipalName {
+    class UserName {
     public:
-        PrincipalName() : _splitPoint(0) {}
-        PrincipalName(const StringData& user, const StringData& dbname);
+        UserName() : _splitPoint(0) {}
+        UserName(const StringData& user, const StringData& dbname);
+
         /**
-         * Gets the user-name part of a principal name.
+         * Gets the user part of a UserName.
          */
         StringData getUser() const { return StringData(_fullName).substr(0, _splitPoint); }
 
         /**
-         * Gets the database name part of a principal name.
+         * Gets the database name part of a UserName.
          */
         StringData getDB() const { return StringData(_fullName).substr(_splitPoint + 1); }
 
         /**
-         * Gets the full name of a principal as a string, formatted as "user@db".
-         *
-         * Allowed for keys in non-persistent data structures, such as std::map.
+         * Gets the full unique name of a user as a string, formatted as "user@db".
          */
         const std::string& getFullName() const { return _fullName; }
 
@@ -58,24 +57,24 @@ namespace mongo {
         size_t _splitPoint;  // The index of the "@" separating the user and db name parts.
     };
 
-    static inline bool operator==(const PrincipalName& lhs, const PrincipalName& rhs) {
+    static inline bool operator==(const UserName& lhs, const UserName& rhs) {
         return lhs.getFullName() == rhs.getFullName();
     }
 
-    static inline bool operator!=(const PrincipalName& lhs, const PrincipalName& rhs) {
+    static inline bool operator!=(const UserName& lhs, const UserName& rhs) {
         return lhs.getFullName() != rhs.getFullName();
     }
 
-    static inline bool operator<(const PrincipalName& lhs, const PrincipalName& rhs) {
+    static inline bool operator<(const UserName& lhs, const UserName& rhs) {
         return lhs.getFullName() < rhs.getFullName();
     }
 
 }  // namespace mongo
 
-// Define hash function for PrincipalNames so they can be keys in std::unordered_map
+// Define hash function for UserNames so they can be keys in std::unordered_map
 MONGO_HASH_NAMESPACE_START
-    template <> struct hash<mongo::PrincipalName> {
-        size_t operator()(const mongo::PrincipalName& pname) const {
+    template <> struct hash<mongo::UserName> {
+        size_t operator()(const mongo::UserName& pname) const {
             return hash<std::string>()(pname.getFullName());
         }
     };

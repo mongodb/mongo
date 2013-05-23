@@ -33,7 +33,7 @@ namespace mongo {
 namespace {
 
     TEST(AuthorizationSessionTest, AcquirePrivilegeAndCheckAuthorization) {
-        Principal* principal = new Principal(PrincipalName("Spencer", "test"));
+        Principal* principal = new Principal(UserName("Spencer", "test"));
         ActionSet actions;
         actions.addAction(ActionType::insert);
         Privilege writePrivilege("test", actions);
@@ -64,7 +64,7 @@ namespace {
     }
 
     TEST(AuthorizationSessionTest, GetPrivilegesFromPrivilegeDocumentCompatible) {
-        PrincipalName principal ("Spencer", "test");
+        UserName user("Spencer", "test");
         BSONObj invalid;
         BSONObj readWrite = BSON("user" << "Spencer" << "pwd" << "passwordHash");
         BSONObj readOnly = BSON("user" << "Spencer" << "pwd" << "passwordHash" <<
@@ -73,19 +73,19 @@ namespace {
         PrivilegeSet privilegeSet;
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat,
                       AuthorizationSession::buildPrivilegeSet("test",
-                                                              principal,
+                                                              user,
                                                               invalid,
                                                               &privilegeSet).code());
 
         ASSERT_OK(AuthorizationSession::buildPrivilegeSet("test",
-                                                          principal,
+                                                          user,
                                                           readOnly,
                                                           &privilegeSet));
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::insert)));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
 
         ASSERT_OK(AuthorizationSession::buildPrivilegeSet("test",
-                                                          principal,
+                                                          user,
                                                           readWrite,
                                                           &privilegeSet));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
@@ -98,7 +98,7 @@ namespace {
         ASSERT(!privilegeSet.hasPrivilege(Privilege("*", ActionType::find)));
 
         ASSERT_OK(AuthorizationSession::buildPrivilegeSet("admin",
-                                                          principal,
+                                                          user,
                                                           readOnly,
                                                           &privilegeSet));
         // Should grant privileges on *.
@@ -108,7 +108,7 @@ namespace {
         ASSERT(!privilegeSet.hasPrivilege(Privilege("*", ActionType::insert)));
 
         ASSERT_OK(AuthorizationSession::buildPrivilegeSet("admin",
-                                                          principal,
+                                                          user,
                                                           readWrite,
                                                           &privilegeSet));
         ASSERT(privilegeSet.hasPrivilege(Privilege("*", ActionType::insert)));
@@ -118,7 +118,7 @@ namespace {
     public:
         PrivilegeDocumentParsing() : user("spencer", "test") {}
 
-        PrincipalName user;
+        UserName user;
         PrivilegeSet privilegeSet;
     };
 
@@ -369,10 +369,10 @@ namespace {
                                       "readOnly" << false <<
                                       "roles" << BSON_ARRAY("write" << "userAdmin"));
 
-        PrincipalName principal("spencer", "anydb");
+        UserName user("spencer", "anydb");
         PrivilegeSet result;
         ASSERT_NOT_OK(AuthorizationSession::buildPrivilegeSet(
-                              "anydb", principal, oldAndNewMixed, &result));
+                              "anydb", user, oldAndNewMixed, &result));
     }
 
     TEST(AuthorizationSessionTest, DocumentValidationCompatibility) {
@@ -517,13 +517,13 @@ namespace {
             }
             *result = mapFindWithDefault(_privilegeDocs,
                                          std::make_pair(nsstring.db,
-                                                        PrincipalName(user, userSource)),
+                                                        UserName(user, userSource)),
                                          BSON("invalid" << 1));
             return  !(*result)["invalid"].trueValue();
         }
 
         void addPrivilegeDocument(const string& dbname,
-                                  const PrincipalName& user,
+                                  const UserName& user,
                                   const BSONObj& doc) {
 
             ASSERT(_privilegeDocs.insert(std::make_pair(std::make_pair(dbname, user),
@@ -531,7 +531,7 @@ namespace {
         }
 
     private:
-        std::map<std::pair<std::string, PrincipalName>, BSONObj > _privilegeDocs;
+        std::map<std::pair<std::string, UserName>, BSONObj > _privilegeDocs;
     };
 
     class ImplicitPriviligesTest : public ::mongo::unittest::Test {
@@ -546,15 +546,15 @@ namespace {
     };
 
     TEST_F(ImplicitPriviligesTest, ImplicitAcquireFromSomeDatabases) {
-        state->addPrivilegeDocument("test", PrincipalName("andy", "test"),
+        state->addPrivilegeDocument("test", UserName("andy", "test"),
                                     BSON("user" << "andy" <<
                                          "pwd" << "a" <<
                                          "roles" << BSON_ARRAY("readWrite")));
-        state->addPrivilegeDocument("test2", PrincipalName("andy", "test"),
+        state->addPrivilegeDocument("test2", UserName("andy", "test"),
                                     BSON("user" << "andy" <<
                                          "userSource" << "test" <<
                                          "roles" <<  BSON_ARRAY("read")));
-        state->addPrivilegeDocument("admin", PrincipalName("andy", "test"),
+        state->addPrivilegeDocument("admin", UserName("andy", "test"),
                                     BSON("user" << "andy" <<
                                          "userSource" << "test" <<
                                          "roles" << BSON_ARRAY("clusterAdmin") <<
@@ -574,7 +574,7 @@ namespace {
         ASSERT(!authman->checkAuthorization("admin.foo", ActionType::collMod));
         ASSERT(!authman->checkAuthorization("$SERVER", ActionType::shutdown));
 
-        Principal* principal = new Principal(PrincipalName("andy", "test"));
+        Principal* principal = new Principal(UserName("andy", "test"));
         principal->setImplicitPrivilegeAcquisition(true);
         authman->addAuthorizedPrincipal(principal);
 

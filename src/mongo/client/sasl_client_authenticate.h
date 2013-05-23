@@ -40,9 +40,9 @@ namespace mongo {
      *     "autoAuthorize": Truthy values tell the server to automatically acquire privileges on
      *         all resources after successful authentication, which is the default.  Falsey values
      *         instruct the server to await separate privilege-acquisition commands.
-     *     "user": The string name of the principal to authenticate.
+     *     "user": The string name of the user to authenticate.
      *     "userSource": The database target of the auth command, which identifies the location
-     *         of the credential information for the principal.  May be "$external" if credential
+     *         of the credential information for the user.  May be "$external" if credential
      *         information is stored outside of the mongo cluster.
      *     "pwd": The password.
      *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
@@ -77,7 +77,7 @@ namespace mongo {
     extern const char* const saslContinueCommandName;
 
     /// Name of the saslStart parameter indicating that the server should automatically grant the
-    /// connection all privileges associated with the principal after successful authentication.
+    /// connection all privileges associated with the user after successful authentication.
     extern const char* const saslCommandAutoAuthorizeFieldName;
 
     /// Name of the field contain the status code in responses from the server.
@@ -107,13 +107,13 @@ namespace mongo {
     /// Field containing sasl payloads passed to and from the server.
     extern const char* const saslCommandPayloadFieldName;
 
-    /// Field containing the string identifier of the principal to authenticate in
+    /// Field containing the string identifier of the user to authenticate in
     /// saslClientAuthenticate().
-    extern const char* const saslCommandPrincipalFieldName;
+    extern const char* const saslCommandUserFieldName;
 
     /// Field containing the string identifier of the database containing credential information,
     /// or "$external" if the credential information is stored outside of the mongo cluster.
-    extern const char* const saslCommandPrincipalSourceFieldName;
+    extern const char* const saslCommandUserSourceFieldName;
 
     /// Field overriding the FQDN of the hostname hosting the mongodb srevice in
     /// saslClientAuthenticate().

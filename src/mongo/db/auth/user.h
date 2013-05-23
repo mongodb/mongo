@@ -18,16 +18,14 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/auth/principal_name.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
-
-    typedef PrincipalName UserName; // TODO: remove this and rename PrincipalName->UserName everywhere
 
     /**
      * Represents a MongoDB user.  Stores information about the user necessary for access control

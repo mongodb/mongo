@@ -886,7 +886,7 @@ int _main( int argc, char* argv[], char **envp ) {
                 "\");" << endl;
         }
         authStringStream << "authDb._authOrThrow({ " <<
-            saslCommandPrincipalFieldName << ": username, " <<
+            saslCommandUserFieldName << ": username, " <<
             saslCommandPasswordFieldName << ": password });" << endl;
     }
     authStringStream << "}())";

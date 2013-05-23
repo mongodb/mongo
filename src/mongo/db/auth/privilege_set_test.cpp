@@ -26,14 +26,14 @@
 namespace mongo {
 namespace {
 
-    // Convenience methods for outputing PrincipalName and construction ActionSets that make tests
+    // Convenience methods for outputting UserName and construction ActionSets that make tests
     // concise, but that we're reluctant to put into the types themselves.
 
-    std::ostream& operator<<(std::ostream& os, const PrincipalName& pname) {
-        return os << pname.toString();
+    std::ostream& operator<<(std::ostream& os, const UserName& uname) {
+        return os << uname.toString();
     }
 
-    std::ostream& operator<<(std::ostream&os, const std::vector<PrincipalName>& ps) {
+    std::ostream& operator<<(std::ostream&os, const std::vector<UserName>& ps) {
         os << "[ ";
         for (size_t i = 0; i < ps.size(); ++i)
             os << ps[i] << ' ';
@@ -64,8 +64,8 @@ namespace {
 
     TEST(PrivilegeSetTest, PrivilegeSet) {
         PrivilegeSet capSet;
-        PrincipalName user1("user1", "test");
-        PrincipalName user2("user2", "test2");
+        UserName user1("user1", "test");
+        UserName user2("user2", "test2");
 
         // Initially, the capability set contains no privileges at all.
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("foo", ActionType::find)));
@@ -92,14 +92,14 @@ namespace {
         ASSERT_TRUE(capSet.hasPrivilege(Privilege("foo", ActionType::find|ActionType::remove)));
 
         // Revoke user2's privileges.
-        capSet.revokePrivilegesFromPrincipal(user2);
+        capSet.revokePrivilegesFromUser(user2);
 
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("foo", ActionType::userAdmin)));
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("foo", ActionType::find|ActionType::remove)));
         ASSERT_TRUE(capSet.hasPrivilege(Privilege("foo", ActionType::update)));
 
         // Revoke user2's privileges again; should be a no-op.
-        capSet.revokePrivilegesFromPrincipal(user2);
+        capSet.revokePrivilegesFromUser(user2);
 
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("foo", ActionType::userAdmin)));
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("foo", ActionType::find|ActionType::remove)));
@@ -129,7 +129,7 @@ namespace {
                                        ActionType::find|ActionType::update|ActionType::remove)));
 
         // Revoke user1's privileges.
-        capSet.revokePrivilegesFromPrincipal(user1);
+        capSet.revokePrivilegesFromUser(user1);
 
         ASSERT_TRUE(capSet.hasPrivilege(Privilege("foo", ActionType::update)));
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("foo", ActionType::find)));
@@ -137,7 +137,7 @@ namespace {
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("bar", ActionType::update)));
 
         // Revoke user2's privileges.
-        capSet.revokePrivilegesFromPrincipal(user2);
+        capSet.revokePrivilegesFromUser(user2);
 
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("foo", ActionType::update)));
         ASSERT_FALSE(capSet.hasPrivilege(Privilege("bar", ActionType::find)));
@@ -148,7 +148,7 @@ namespace {
 
         PrivilegeSet privSet;
 
-        PrincipalName user("user", "db");
+        UserName user("user", "db");
         Privilege wildcardFind("*", ActionType::find);
         Privilege wildcardUpdate("*", ActionType::update);
         Privilege wildcardFindAndUpdate("*", ActionType::find|ActionType::update);
@@ -192,7 +192,7 @@ namespace {
         ASSERT_FALSE(privSet.hasPrivilege(barFindAndUpdate));
 
         // Revoke the granted privileges, and assert that hasPrivilege returns false.
-        privSet.revokePrivilegesFromPrincipal(user);
+        privSet.revokePrivilegesFromUser(user);
 
         ASSERT_FALSE(privSet.hasPrivilege(wildcardFind));
         ASSERT_FALSE(privSet.hasPrivilege(wildcardUpdate));

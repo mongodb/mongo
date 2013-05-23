@@ -384,20 +384,20 @@ namespace {
     }
 
     void AuthorizationSession::_acquirePrivilegesForPrincipalFromDatabase(
-            const std::string& dbname, const PrincipalName& principal) {
+            const std::string& dbname, const UserName& user) {
 
         BSONObj privilegeDocument;
-        Status status = getPrivilegeDocument(dbname, principal, &privilegeDocument);
+        Status status = getPrivilegeDocument(dbname, user, &privilegeDocument);
         if (status.isOK()) {
-            status = acquirePrivilegesFromPrivilegeDocument(dbname, principal, privilegeDocument);
+            status = acquirePrivilegesFromPrivilegeDocument(dbname, user, privilegeDocument);
         }
         if (!status.isOK() && status != ErrorCodes::UserNotFound) {
-            log() << "Privilege acquisition failed for " << principal << " in database " <<
+            log() << "Privilege acquisition failed for " << user << " in database " <<
                 dbname << ": " << status.reason() << " (" << status.codeString() << ")" << endl;
         }
     }
 
-    Principal* AuthorizationSession::lookupPrincipal(const PrincipalName& name) {
+    Principal* AuthorizationSession::lookupPrincipal(const UserName& name) {
         return _authenticatedPrincipals.lookup(name);
     }
 
@@ -405,7 +405,7 @@ namespace {
         Principal* principal = _authenticatedPrincipals.lookupByDBName(dbname);
         if (!principal)
             return;
-        _acquiredPrivileges.revokePrivilegesFromPrincipal(principal->getName());
+        _acquiredPrivileges.revokePrivilegesFromUser(principal->getName());
         _authenticatedPrincipals.removeByDBName(dbname);
         _externalState->onLogoutDatabase(dbname);
     }
@@ -415,22 +415,22 @@ namespace {
     }
 
     Status AuthorizationSession::acquirePrivilege(const Privilege& privilege,
-                                                  const PrincipalName& authorizingPrincipal) {
-        if (!_authenticatedPrincipals.lookup(authorizingPrincipal)) {
+                                                  const UserName& authorizingUser) {
+        if (!_authenticatedPrincipals.lookup(authorizingUser)) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream()
-                                  << "No authenticated principle found with name: "
-                                  << authorizingPrincipal.getUser()
+                                  << "No authenticated user found with name: "
+                                  << authorizingUser.getUser()
                                   << " from database "
-                                  << authorizingPrincipal.getDB(),
+                                  << authorizingUser.getDB(),
                           0);
         }
-        _acquiredPrivileges.grantPrivilege(privilege, authorizingPrincipal);
+        _acquiredPrivileges.grantPrivilege(privilege, authorizingUser);
         return Status::OK();
     }
 
-    void AuthorizationSession::grantInternalAuthorization(const std::string& principalName) {
-        Principal* principal = new Principal(PrincipalName(principalName, "local"));
+    void AuthorizationSession::grantInternalAuthorization(const std::string& userName) {
+        Principal* principal = new Principal(UserName(userName, "local"));
         ActionSet actions;
         actions.addAllActions();
 
@@ -464,35 +464,34 @@ namespace {
     }
 
     Status AuthorizationSession::acquirePrivilegesFromPrivilegeDocument(
-            const std::string& dbname, const PrincipalName& principal, const BSONObj& privilegeDocument) {
-        if (!_authenticatedPrincipals.lookup(principal)) {
+            const std::string& dbname, const UserName& user, const BSONObj& privilegeDocument) {
+        if (!_authenticatedPrincipals.lookup(user)) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream()
                                   << "No authenticated principle found with name: "
-                                  << principal.getUser()
+                                  << user.getUser()
                                   << " from database "
-                                  << principal.getDB(),
+                                  << user.getDB(),
                           0);
         }
-        if (principal.getUser() == internalSecurity.user) {
+        if (user.getUser() == internalSecurity.user) {
             // Grant full access to internal user
             ActionSet allActions;
             allActions.addAllActions();
-            return acquirePrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, allActions),
-                                    principal);
+            return acquirePrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, allActions), user);
         }
-        return buildPrivilegeSet(dbname, principal, privilegeDocument, &_acquiredPrivileges);
+        return buildPrivilegeSet(dbname, user, privilegeDocument, &_acquiredPrivileges);
     }
 
     Status AuthorizationSession::buildPrivilegeSet(const std::string& dbname,
-                                                   const PrincipalName& principal,
+                                                   const UserName& user,
                                                    const BSONObj& privilegeDocument,
                                                    PrivilegeSet* result) {
         if (!privilegeDocument.hasField(ROLES_FIELD_NAME)) {
             // Old-style (v2.2 and prior) privilege document
             if (AuthorizationManager::getSupportOldStylePrivilegeDocuments()) {
                 return _buildPrivilegeSetFromOldStylePrivilegeDocument(dbname,
-                                                                       principal,
+                                                                       user,
                                                                        privilegeDocument,
                                                                        result);
             }
@@ -502,13 +501,13 @@ namespace {
         }
         else {
             return _buildPrivilegeSetFromExtendedPrivilegeDocument(
-                    dbname, principal, privilegeDocument, result);
+                    dbname, user, privilegeDocument, result);
         }
     }
 
     Status AuthorizationSession::_buildPrivilegeSetFromOldStylePrivilegeDocument(
             const std::string& dbname,
-            const PrincipalName& principal,
+            const UserName& user,
             const BSONObj& privilegeDocument,
             PrivilegeSet* result) {
         if (!(privilegeDocument.hasField(AuthorizationManager::USER_NAME_FIELD_NAME) &&
@@ -521,12 +520,12 @@ namespace {
                           0);
         }
         std::string userName = privilegeDocument[AuthorizationManager::USER_NAME_FIELD_NAME].str();
-        if (userName != principal.getUser()) {
+        if (userName != user.getUser()) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "Principal name from privilege document \""
                                   << userName
                                   << "\" doesn't match name of provided Principal \""
-                                  << principal.getUser()
+                                  << user.getUser()
                                   << "\"",
                           0);
         }
@@ -535,7 +534,7 @@ namespace {
         ActionSet actions = getActionsForOldStyleUser(dbname, readOnly);
         std::string resourceName = (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) ?
             PrivilegeSet::WILDCARD_RESOURCE : dbname;
-        result->grantPrivilege(Privilege(resourceName, actions), principal);
+        result->grantPrivilege(Privilege(resourceName, actions), user);
 
         return Status::OK();
     }
@@ -619,7 +618,7 @@ namespace {
 
     Status AuthorizationSession::_buildPrivilegeSetFromExtendedPrivilegeDocument(
             const std::string& dbname,
-            const PrincipalName& principal,
+            const UserName& user,
             const BSONObj& privilegeDocument,
             PrivilegeSet* result) {
 
@@ -666,7 +665,7 @@ namespace {
                           "called \"otherDBRoles\"");
         }
 
-        result->grantPrivileges(acquiredPrivileges, principal);
+        result->grantPrivileges(acquiredPrivileges, user);
         return Status::OK();
     }
 

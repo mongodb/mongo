@@ -548,11 +548,11 @@ namespace mongo {
         if (mechanism == StringData("MONGODB-CR", StringData::LiteralTag())) {
             std::string userSource;
             uassertStatusOK(bsonExtractStringField(params,
-                                                   saslCommandPrincipalSourceFieldName,
+                                                   saslCommandUserSourceFieldName,
                                                    &userSource));
             std::string user;
             uassertStatusOK(bsonExtractStringField(params,
-                                                   saslCommandPrincipalFieldName,
+                                                   saslCommandUserFieldName,
                                                    &user));
             std::string password;
             uassertStatusOK(bsonExtractStringField(params,
@@ -588,8 +588,8 @@ namespace mongo {
                                     bool digestPassword) {
         try {
             _auth(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                       saslCommandPrincipalSourceFieldName << dbname <<
-                       saslCommandPrincipalFieldName << username <<
+                       saslCommandUserSourceFieldName << dbname <<
+                       saslCommandUserFieldName << username <<
                        saslCommandPasswordFieldName << password_text <<
                        saslCommandDigestPasswordFieldName << digestPassword));
             return true;
@@ -793,7 +793,7 @@ namespace mongo {
             /* note we remember the auth info before we attempt to auth -- if the connection is broken, we will
                then have it for the next autoreconnect attempt.
             */
-            authCache[params[saslCommandPrincipalSourceFieldName].str()] = params.getOwned();
+            authCache[params[saslCommandUserSourceFieldName].str()] = params.getOwned();
         }
 
         DBClientBase::_auth(params);
@@ -918,8 +918,8 @@ namespace mongo {
                 if (ex.getCode() != ErrorCodes::AuthenticationFailed)
                     throw;
                 LOG(_logLevel) << "reconnect: auth failed db:" <<
-                    i->second[saslCommandPrincipalSourceFieldName] <<
-                    " user:" << i->second[saslCommandPrincipalFieldName] << ' ' <<
+                    i->second[saslCommandUserSourceFieldName] <<
+                    " user:" << i->second[saslCommandUserFieldName] << ' ' <<
                     ex.what() << std::endl;
             }
         }

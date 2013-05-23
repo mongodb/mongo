@@ -41,7 +41,7 @@ namespace {
                          AuthorizationSession* authSession) {
         PrincipalSet::NameIterator nameIter = authSession->getAuthenticatedPrincipalNames();
 
-        PrincipalName bestUser;
+        UserName bestUser;
         if (nameIter.more())
             bestUser = *nameIter;
 

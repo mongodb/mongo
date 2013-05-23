@@ -441,8 +441,8 @@ namespace mongo {
             return;
         }
 
-        _conn->auth( BSON( saslCommandPrincipalSourceFieldName << getAuthenticationDatabase() <<
-                           saslCommandPrincipalFieldName << _username <<
+        _conn->auth( BSON( saslCommandUserSourceFieldName << getAuthenticationDatabase() <<
+                           saslCommandUserFieldName << _username <<
                            saslCommandPasswordFieldName << _password  <<
                            saslCommandMechanismFieldName << _authenticationMechanism ) );
     }

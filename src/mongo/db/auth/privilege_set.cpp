@@ -34,40 +34,40 @@ namespace mongo {
     PrivilegeSet::~PrivilegeSet() {}
 
     void PrivilegeSet::grantPrivilege(const Privilege& privilege,
-                                      const PrincipalName& authorizingPrincipal) {
-        grantPrivileges(std::vector<Privilege>(1, privilege), authorizingPrincipal);
+                                      const UserName& authorizingUser) {
+        grantPrivileges(std::vector<Privilege>(1, privilege), authorizingUser);
     }
 
     void PrivilegeSet::grantPrivileges(const std::vector<Privilege>& privileges,
-                                       const PrincipalName& authorizingPrincipal) {
-        StringMap<ActionSet>& byResourceForPrincipal = _byPrincipal[authorizingPrincipal];
+                                       const UserName& authorizingUser) {
+        StringMap<ActionSet>& byResourceForUser = _byUser[authorizingUser];
         for (std::vector<Privilege>::const_iterator iter = privileges.begin(),
                  end = privileges.end();
              iter != end; ++iter) {
 
-            byResourceForPrincipal[iter->getResource()].addAllActionsFromSet(iter->getActions());
+            byResourceForUser[iter->getResource()].addAllActionsFromSet(iter->getActions());
 
             ResourcePrivilegeCacheEntry* entry = _lookupOrInsertEntry(iter->getResource());
             entry->actions.addAllActionsFromSet(iter->getActions());
         }
     }
 
-    void PrivilegeSet::revokePrivilegesFromPrincipal(const PrincipalName& principal) {
-        PrincipalPrivilegeMap::iterator principalEntry = _byPrincipal.find(principal);
-        if (principalEntry == _byPrincipal.end())
+    void PrivilegeSet::revokePrivilegesFromUser(const UserName& user) {
+        UserPrivilegeMap::iterator userEntry = _byUser.find(user);
+        if (userEntry == _byUser.end())
             return;
 
-        // For every resource that "principal" authorizes, mark its entry in the _byResource table
+        // For every resource that "user" authorizes, mark its entry in the _byResource table
         // as dirty, so that it will be rebuilt on next consultation.
-        for (StringMap<ActionSet>::const_iterator resourceEntry = principalEntry->second.begin(),
-                 end = principalEntry->second.end();
+        for (StringMap<ActionSet>::const_iterator resourceEntry = userEntry->second.begin(),
+                 end = userEntry->second.end();
              resourceEntry != end; ++resourceEntry) {
 
             _lookupOrInsertEntry(resourceEntry->first)->dirty = true;
         }
 
-        // Remove the princiapl from the _byPrincipal table.
-        _byPrincipal.erase(principalEntry);
+        // Remove the user from the _byUser table.
+        _byUser.erase(userEntry);
     }
 
     bool PrivilegeSet::hasPrivilege(const Privilege& desiredPrivilege) {
@@ -108,8 +108,8 @@ namespace mongo {
         const ActionSet emptyActionSet;
         entry->actions.removeAllActions();
 
-        for (PrincipalPrivilegeMap::const_iterator iter = _byPrincipal.begin(),
-                 end = _byPrincipal.end();
+        for (UserPrivilegeMap::const_iterator iter = _byUser.begin(),
+                 end = _byUser.end();
              iter != end; ++iter) {
 
             entry->actions.addAllActionsFromSet(

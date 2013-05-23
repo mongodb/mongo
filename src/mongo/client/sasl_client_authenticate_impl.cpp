@@ -79,7 +79,7 @@ namespace {
         if (digestPassword) {
             std::string user;
             status = bsonExtractStringField(saslParameters,
-                                            saslCommandPrincipalFieldName,
+                                            saslCommandUserFieldName,
                                             &user);
             if (!status.isOK())
                 return status;
@@ -131,7 +131,7 @@ namespace {
         session->setParameter(SaslClientSession::parameterServiceHostname, value);
 
         status = bsonExtractStringField(saslParameters,
-                                        saslCommandPrincipalFieldName,
+                                        saslCommandUserFieldName,
                                         &value);
         if (!status.isOK())
             return status;
@@ -168,7 +168,7 @@ namespace {
         std::string targetDatabase;
         try {
             Status status = bsonExtractStringFieldWithDefault(saslParameters,
-                                                              saslCommandPrincipalSourceFieldName,
+                                                              saslCommandUserSourceFieldName,
                                                               saslDefaultDBName,
                                                               &targetDatabase);
             if (!status.isOK())

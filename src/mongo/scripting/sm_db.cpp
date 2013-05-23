@@ -347,8 +347,8 @@ namespace spidermonkey {
                 break;
             case 3:
                 params = BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                              saslCommandPrincipalSourceFieldName << c.toString(argv[0]) <<
-                              saslCommandPrincipalFieldName << c.toString(argv[1]) <<
+                              saslCommandUserSourceFieldName << c.toString(argv[0]) <<
+                              saslCommandUserFieldName << c.toString(argv[1]) <<
                               saslCommandPasswordFieldName << c.toString(argv[2]));
                 break;
             default:

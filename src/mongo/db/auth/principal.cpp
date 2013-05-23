@@ -22,7 +22,7 @@
 
 namespace mongo {
 
-    Principal::Principal(const PrincipalName& name) :
+    Principal::Principal(const UserName& name) :
         _name(name),
         _expirationTime(boost::posix_time::pos_infin),
         _enableImplicitPrivileges(false) {

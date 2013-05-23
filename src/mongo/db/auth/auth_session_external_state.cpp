@@ -27,7 +27,7 @@ namespace mongo {
     AuthSessionExternalState::~AuthSessionExternalState() {}
 
     Status AuthSessionExternalState::getPrivilegeDocument(const std::string& dbname,
-                                                          const PrincipalName& principalName,
+                                                          const UserName& userName,
                                                           BSONObj* result) {
 
         if (dbname == StringData("$external", StringData::LiteralTag()) ||
@@ -43,7 +43,7 @@ namespace mongo {
         }
 
         if (dbname == StringData("local", StringData::LiteralTag()) &&
-            principalName.getUser() == internalSecurity.user) {
+            userName.getUser() == internalSecurity.user) {
 
             if (internalSecurity.pwd.empty()) {
                 return Status(ErrorCodes::UserNotFound,
@@ -61,20 +61,20 @@ namespace mongo {
 
         BSONObj userBSONObj;
         BSONObjBuilder queryBuilder;
-        queryBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, principalName.getUser());
-        if (principalName.getDB() == dbname) {
+        queryBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, userName.getUser());
+        if (userName.getDB() == dbname) {
             queryBuilder.appendNull(AuthorizationManager::USER_SOURCE_FIELD_NAME);
         }
         else {
             queryBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME,
-                                principalName.getDB());
+                                userName.getDB());
         }
 
         bool found = _findUser(usersNamespace, queryBuilder.obj(), &userBSONObj);
         if (!found) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream() << "auth: couldn't find user " <<
-                          principalName.toString() << ", " << usersNamespace,
+                          userName.toString() << ", " << usersNamespace,
                           0);
         }
 

@@ -21,7 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/principal.h"
-#include "mongo/db/auth/principal_name.h"
+#include "mongo/db/auth/user_name.h"
 
 namespace mongo {
 
@@ -53,16 +53,16 @@ namespace mongo {
             NameIterator() {}
 
             bool more() { return _curr != _end; }
-            const PrincipalName& next() {
-                const PrincipalName& ret = get();
+            const UserName& next() {
+                const UserName& ret = get();
                 ++_curr;
                 return ret;
             }
 
-            const PrincipalName& get() const { return (*_curr)->getName(); }
+            const UserName& get() const { return (*_curr)->getName(); }
 
-            const PrincipalName& operator*() const { return get(); }
-            const PrincipalName* operator->() const { return &get(); }
+            const UserName& operator*() const { return get(); }
+            const UserName* operator->() const { return &get(); }
 
         private:
             std::vector<Principal*>::const_iterator _curr;
@@ -84,7 +84,7 @@ namespace mongo {
         // Ownership of the returned Principal remains with the PrincipalSet.  The pointer
         // returned is only guaranteed to remain valid until the next non-const method is called
         // on the PrincipalSet.
-        Principal* lookup(const PrincipalName& name) const;
+        Principal* lookup(const UserName& name) const;
 
         // Gets the principal whose authentication credentials came from dbname, or NULL if none
         // exist.  There should be at most one such principal.

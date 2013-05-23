@@ -615,9 +615,9 @@ namespace mongo {
          * are required depends on the mechanism, which is mandatory.
          *
          *     "mechanism": The string name of the sasl mechanism to use.  Mandatory.
-         *     "user": The string name of the principal to authenticate.  Mandatory.
+         *     "user": The string name of the user to authenticate.  Mandatory.
          *     "userSource": The database target of the auth command, which identifies the location
-         *         of the credential information for the principal.  May be "$external" if
+         *         of the credential information for the user.  May be "$external" if
          *         credential information is stored outside of the mongo cluster.  Mandatory.
          *     "pwd": The password data.
          *     "digestPassword": Boolean, set to true if the "pwd" is undigested (default).

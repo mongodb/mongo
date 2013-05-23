@@ -311,8 +311,8 @@ namespace mongo {
             break;
         case 3:
             params = BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                          saslCommandPrincipalSourceFieldName << toSTLString(args[0]) <<
-                          saslCommandPrincipalFieldName << toSTLString(args[1]) <<
+                          saslCommandUserSourceFieldName << toSTLString(args[0]) <<
+                          saslCommandUserFieldName << toSTLString(args[1]) <<
                           saslCommandPasswordFieldName << toSTLString(args[2]));
             break;
         default:
