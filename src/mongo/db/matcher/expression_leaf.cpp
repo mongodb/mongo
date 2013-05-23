@@ -109,17 +109,10 @@ namespace mongo {
             }
 
             if ( found ) {
-                if ( !_allHaveToMatch ) {
-                    if ( details && details->needRecord() ) {
-                        // this block doesn't have to be inside the _allHaveToMatch handler
-                        // but this matches the old semantics
-                        details->setElemMatchKey( x.fieldName() );
-                    }
-                    return true;
+                if ( details && details->needRecord() ) {
+                    details->setElemMatchKey( x.fieldName() );
                 }
-            }
-            else if ( _allHaveToMatch ) {
-                return false;
+                return true;
             }
         }
 
@@ -163,7 +156,6 @@ namespace mongo {
         case EQ:
         case GT:
         case GTE:
-            _allHaveToMatch = false;
             break;
         default:
             return Status( ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression" );
@@ -411,8 +403,6 @@ namespace mongo {
 
             if ( found ) {
                 if ( details && details->needRecord() ) {
-                    // this block doesn't have to be inside the _allHaveToMatch handler
-                    // but this matches the old semantics
                     details->setElemMatchKey( x.fieldName() );
                 }
                 return true;
@@ -501,7 +491,6 @@ namespace mongo {
 
     void InMatchExpression::init( const StringData& path ) {
         initPath( path );
-        _allHaveToMatch = false;
     }
 
     bool InMatchExpression::_matchesRealElement( const BSONElement& e ) const {

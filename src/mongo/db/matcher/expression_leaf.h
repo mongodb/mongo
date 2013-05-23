@@ -30,8 +30,8 @@ namespace mongo {
 
     class LeafMatchExpression : public MatchExpression {
     public:
-        LeafMatchExpression( MatchType matchType ) : MatchExpression( matchType ) {
-            _allHaveToMatch = false;
+        LeafMatchExpression( MatchType matchType )
+            : MatchExpression( matchType ) {
         }
 
         virtual ~LeafMatchExpression(){}
@@ -43,11 +43,9 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const = 0;
 
         const StringData path() const { return _path; }
-        bool allHaveToMatch() const { return _allHaveToMatch; }
 
     protected:
         void initPath( const StringData& path );
-        bool _allHaveToMatch;
 
     private:
         bool _matches( const FieldRef& fieldRef,
