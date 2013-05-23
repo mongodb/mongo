@@ -22,8 +22,7 @@ env.SConscript(['base/SConscript',
                 'db/SConscript',
                 'platform/SConscript',
                 's/SConscript',
-                'unittest/SConscript',
-                'util/net/SConscript'])
+                'unittest/SConscript'])
 
 def add_exe( v ):
     return "${PROGPREFIX}%s${PROGSUFFIX}" % v
@@ -167,6 +166,10 @@ env.CppUnitTest('descriptive_stats_test',
                 ['util/descriptive_stats_test.cpp'],
                 LIBDEPS=['foundation', 'bson']);
 
+env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
+                LIBDEPS=['mongocommon'],
+                NO_CRUTCH=True)
+
 env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
 
 env.StaticLibrary('synchronization', [ 'util/concurrency/synchronization.cpp' ])
@@ -191,6 +194,12 @@ commonFiles = [ "pch.cpp",
                 "util/concurrency/spin_lock.cpp",
                 "util/text_startuptest.cpp",
                 "util/stack_introspect.cpp",
+                "util/net/sock.cpp",
+                "util/net/ssl_manager.cpp",
+                "util/net/httpclient.cpp",
+                "util/net/message.cpp",
+                "util/net/message_port.cpp",
+                "util/net/listen.cpp",
                 "util/startup_test.cpp",
                 "util/version.cpp",
                 "client/connpool.cpp",
@@ -253,7 +262,6 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'mongohasher',
                            'md5',
                            'processinfo',
-                           '$BUILD_DIR/mongo/util/net/socket',
                            'synchronization',
                            'stacktrace',
                            'stringutils',
