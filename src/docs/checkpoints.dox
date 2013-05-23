@@ -35,13 +35,13 @@ Checkpoints share file blocks, and dropping a checkpoint may or may not
 make file blocks available for re-use, depending on whether the dropped
 checkpoint contained the last reference to a file block.
 
-Checkpoints may optionally be given names by the application.
-Checkpoints named by the application persist until explicitly dropped
-or the application creates a new checkpoint with the same name.
-Creating a new named checkpoint drops any previous checkpoint with the
-same name; if a previous checkpoint cannot be dropped (either because a
-cursor is reading from the previous checkpoint, or hot backups are in
-progress), the checkpoint will fail.
+Checkpoints that do not include LSM trees may optionally be given names
+by the application.  Checkpoints named by the application persist until
+explicitly dropped or the application creates a new checkpoint with the
+same name.  Creating a new named checkpoint drops any previous
+checkpoint with the same name; if a previous checkpoint cannot be
+dropped (either because a cursor is reading from the previous
+checkpoint, or hot backups are in progress), the checkpoint will fail.
 
 Internal checkpoints (that is, checkpoints not named by the application)
 use the reserved name "WiredTigerCheckpoint".  Applications can open the
