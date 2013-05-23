@@ -55,21 +55,10 @@ namespace mongo {
 
     Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
                                  const InitializerContext::EnvironmentMap& env) {
-
         return getGlobalInitializer().execute(args, env);
     }
 
-    void runGlobalInitializersOrDie(const InitializerContext::ArgumentVector& args,
-                                    const InitializerContext::EnvironmentMap& env) {
-
-        Status status =  runGlobalInitializers(args, env);
-        if (Status::OK() != status) {
-            std::cerr << "Failed global initialization: " << status << std::endl;
-            ::_exit(1);
-        }
-    }
-
-    void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp) {
+    Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp) {
         InitializerContext::ArgumentVector args(argc);
         std::copy(argv, argv + argc, args.begin());
 
@@ -79,14 +68,21 @@ namespace mongo {
             for(; *envp; ++envp) {
                 const char* firstEqualSign = strchr(*envp, '=');
                 if (!firstEqualSign) {
-                    std::cerr << "Failed global initialization: malformed environment block\n";
-                    ::_exit(1);
+                    return Status(ErrorCodes::BadValue, "malformed environment block");
                 }
                 env[std::string(*envp, firstEqualSign)] = std::string(firstEqualSign + 1);
             }
         }
 
-        runGlobalInitializersOrDie(args, env);
+        return runGlobalInitializers(args, env);
+    }
+
+    void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp) {
+        Status status = runGlobalInitializers(argc, argv, envp);
+        if (!status.isOK()) {
+            std::cerr << "Failed global initialization: " << status << std::endl;
+            ::_exit(1);
+        }
     }
 
 }  // namespace mongo
