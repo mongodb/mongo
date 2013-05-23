@@ -31,8 +31,8 @@ namespace mongo {
 
     /**
      * Represents a MongoDB user.  Stores information about the user necessary for access control
-     * checks and authentications, such as what privileges this user has as well as what roles
-     * he/she belongs to.
+     * checks and authentications, such as what privileges this user has, as well as what roles
+     * the user belongs to.
      *
      * Every User object is owned by an AuthorizationManager.  The AuthorizationManager is the only
      * one that should construct, modify, or delete a User object.  All other consumers of User must
