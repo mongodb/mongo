@@ -23,7 +23,7 @@
 namespace mongo {
 
     /**
-     * The implementation of AuthExternalState functionality for mongod.
+     * The implementation of AuthSessionExternalState functionality for mongod.
      */
     class AuthSessionExternalStateMongod : public AuthSessionExternalStateServerCommon {
         MONGO_DISALLOW_COPYING(AuthSessionExternalStateMongod);

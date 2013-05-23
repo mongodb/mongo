@@ -28,10 +28,9 @@ namespace mongo {
     class Principal;
 
     /**
-     * Public interface for a class that encapsulates all the information related to system state
-     * not stored in AuthorizationManager.  This is primarily to make AuthorizationManager easier
-     * to test.  There are two classes that implement this interface, AuthExternalStateImpl, which
-     * is what's used for the actual system, and AuthExternalStateMock, which is used in the tests.
+     * Public interface for a class that encapsulates all the session information related to system
+     * state not stored in AuthorizationasSession.  This is primarily to make AuthorizationSession
+     * easier to test as well as to allow different implementations in mongos and mongod.
      */
     class AuthSessionExternalState {
         MONGO_DISALLOW_COPYING(AuthSessionExternalState);
@@ -56,6 +55,7 @@ namespace mongo {
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
+        // TODO: remove this in favor of using the AuthGlobalExternalState
         Status getPrivilegeDocument(const std::string& dbname,
                                     const UserName& userName,
                                     BSONObj* result);
@@ -73,11 +73,13 @@ namespace mongo {
 
         // Queries the userNamespace with the given query and returns the privilegeDocument found
         // in *result.  Returns true if it finds a document matching the query, or false if not.
+        // TODO: remove this in favor of using the AuthGlobalExternalState
         virtual bool _findUser(const std::string& usersNamespace,
                                const BSONObj& query,
                                BSONObj* result) const = 0;
 
         // Returns true if there exists at least one privilege document in the given database.
+        // TODO: remove this in favor of using the AuthGlobalExternalState
         bool _hasPrivilegeDocument(const std::string& dbname) const;
     };
 

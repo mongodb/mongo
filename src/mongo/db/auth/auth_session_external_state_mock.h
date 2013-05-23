@@ -23,7 +23,7 @@
 namespace mongo {
 
     /**
-     * Mock of the AuthExternalState class used only for testing.
+     * Mock of the AuthSessionExternalState class used only for testing.
      */
     class AuthSessionExternalStateMock : public AuthSessionExternalState {
         MONGO_DISALLOW_COPYING(AuthSessionExternalStateMock);
