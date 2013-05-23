@@ -180,6 +180,10 @@ namespace mongo {
         // logical name of the index.  todo: get rid of the name, we don't need it!
         const char *name = io.getStringField("name");
         uassert(12523, "no index name specified", *name);
+        string indexNamespace = IndexDetails::indexNamespaceFromObj(io);
+        uassert(16829, str::stream() << "namespace name generated from index name \"" <<
+                                     indexNamespace << "\" is too long (128 char max)",
+                indexNamespace.length() <= 128);
 
         BSONObj key = io.getObjectField("key");
         uassert(12524, "index key pattern too large", key.objsize() <= 2048);

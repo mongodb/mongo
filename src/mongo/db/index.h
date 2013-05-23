@@ -84,10 +84,13 @@ namespace mongo {
         /* true if the specified key is in the index */
         bool hasKey(const BSONObj& key);
 
-        // returns name of this index's storage area
-        // database.table.$index
+        // returns name of this index's storage area (database.collection.$index)
         string indexNamespace() const {
-            BSONObj io = info.obj();
+            return indexNamespaceFromObj(info.obj());
+        }
+
+        // returns the name of an index's storage area (database.collection.$index) from a BSONObj
+        static string indexNamespaceFromObj(const BSONObj& io) {
             string s;
             s.reserve(Namespace::MaxNsLen);
             s = io.getStringField("ns");
@@ -96,6 +99,7 @@ namespace mongo {
             s += io.getStringField("name");
             return s;
         }
+
 
         string indexName() const { // e.g. "ts_1"
             BSONObj io = info.obj();
