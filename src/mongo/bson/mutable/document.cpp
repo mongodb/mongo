@@ -1327,7 +1327,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementDouble(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementDouble(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1335,7 +1336,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementString(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementString(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1343,7 +1345,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementObject(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementObject(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1351,7 +1354,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementArray(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementArray(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1360,8 +1364,9 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
         Element newValue = getDocument().makeElementBinary(
-            impl.getFieldName(thisRep), len, binType, data);
+            fieldNameCopy, len, binType, data);
         return setValue(&newValue);
     }
 
@@ -1369,7 +1374,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementUndefined(impl.getFieldName(thisRep));
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementUndefined(fieldNameCopy);
         return setValue(&newValue);
     }
 
@@ -1377,7 +1383,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementOID(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementOID(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1385,7 +1392,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementBool(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementBool(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1393,7 +1401,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementDate(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementDate(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1401,7 +1410,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementNull(impl.getFieldName(thisRep));
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementNull(fieldNameCopy);
         return setValue(&newValue);
     }
 
@@ -1409,7 +1419,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementRegex(impl.getFieldName(thisRep), re, flags);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementRegex(fieldNameCopy, re, flags);
         return setValue(&newValue);
     }
 
@@ -1417,7 +1428,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementDBRef(impl.getFieldName(thisRep), ns, oid);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementDBRef(fieldNameCopy, ns, oid);
         return setValue(&newValue);
     }
 
@@ -1425,7 +1437,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementCode(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementCode(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1433,7 +1446,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementSymbol(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementSymbol(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1441,8 +1455,9 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
         Element newValue = getDocument().makeElementCodeWithScope(
-            impl.getFieldName(thisRep), code, scope);
+            fieldNameCopy, code, scope);
         return setValue(&newValue);
     }
 
@@ -1450,7 +1465,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementInt(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementInt(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1458,7 +1474,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementTimestamp(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementTimestamp(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1466,7 +1483,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementLong(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementLong(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
@@ -1474,7 +1492,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementMinKey(impl.getFieldName(thisRep));
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementMinKey(fieldNameCopy);
         return setValue(&newValue);
     }
 
@@ -1482,7 +1501,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementMaxKey(impl.getFieldName(thisRep));
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementMaxKey(fieldNameCopy);
         return setValue(&newValue);
     }
 
@@ -1501,8 +1521,9 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
         Element newValue = getDocument().makeElementWithNewFieldName(
-            impl.getFieldName(thisRep),
+            fieldNameCopy,
             value);
         return setValue(&newValue);
     }
@@ -1511,7 +1532,8 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        Element newValue = getDocument().makeElementSafeNum(impl.getFieldName(thisRep), value);
+        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        Element newValue = getDocument().makeElementSafeNum(fieldNameCopy, value);
         return setValue(&newValue);
     }
 
