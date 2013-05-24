@@ -172,8 +172,6 @@ namespace mongo {
     }
 
     Status ModifierPullAll::apply() const {
-        dassert(!_preparedState->noOp);
-
         _preparedState->applyCalled = true;
 
         vector<mutablebson::Element>::const_iterator curr =
@@ -188,7 +186,7 @@ namespace mongo {
 
     Status ModifierPullAll::log(mutablebson::Element logRoot) const {
         //Make sure apply has been called.
-        dassert(*_applyCalled);
+        dassert(_preparedState->applyCalled);
 
         // log document
         mutablebson::Document& doc = logRoot.getDocument();

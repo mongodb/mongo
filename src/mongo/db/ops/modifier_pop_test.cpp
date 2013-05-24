@@ -195,22 +195,6 @@ namespace {
         ASSERT_TRUE(execInfo.noOp);
     }
 
-    TEST(EmptyArray, Log) {
-        Document doc(fromjson("{a: []}"));
-        Mod mod(fromjson("{$pop: {a: 1}}"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-
-        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_TRUE(execInfo.inPlace);
-        ASSERT_TRUE(execInfo.noOp);
-
-        Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: []}}")));
-    }
-
     TEST(SingleElemArray, ApplyLog) {
         Document doc(fromjson("{a: [1]}"));
         Mod mod(fromjson("{$pop: {a: 1}}"));
@@ -268,7 +252,7 @@ namespace {
         ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: { 'a.0': []}}")));
     }
 
-    TEST(PrepareApplyLog, MissingPath) {
+    TEST(Prepare, MissingPath) {
         Document doc(fromjson("{ a : [1, 2] }"));
         Mod mod(fromjson("{ $pop : { b : 1 } }"));
 
@@ -276,9 +260,5 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
-
-        Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $unset : { b : true } }")));
     }
 } // unnamed namespace
