@@ -26,42 +26,18 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_perf001.py
-#	   Regression tests.
+#	   Test performance when inserting into a table with an index.
 
 import wiredtiger, wttest
 import random
-import string
-from datetime import datetime
-from threading import Thread
-from time import gmtime, strftime, sleep, time
+from time import clock, time
 
-insert_count = 0
-running = 1
-
-def output_progress():
-	global insert_count
-	global running
-	last = 0
-	runtime = 0
-	print ''
-	print '|  Time   | ops | ops/sec | Interval ops | Interval ops/sec |'
-	while running:
-		sleep(5)
-		runtime += 5
-		print ('| ' + strftime("%H:%M:%S", gmtime()) +
-			' | ' + str(insert_count) +
-			' | ' + str(insert_count / runtime) +
-			' | ' + str(insert_count - last) +
-			' | ' + str((insert_count  - last) / 5) + ' |')
-		last = insert_count
-
-# Regression tests.
+# Test performance of inserting into a table with an index.
 class test_perf001(wttest.WiredTigerTestCase):
 	table_name = 'test_perf001'
 
 	def setUpConnectionOpen(self, dir):
 		wtopen_args = 'create,cache_size=512M,statistics_log=(wait=5)'
-		#wtopen_args += ',statistics_log=(wait=20)'
 		conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
 		self.pr(`conn`)
 		return conn
@@ -72,23 +48,23 @@ class test_perf001(wttest.WiredTigerTestCase):
 		self.assertEqual(c.insert(), 0)
 
 	def test_performance_of_indeces(self):
-		global insert_count
-		global running
-		thread = Thread(target = output_progress)
-		thread.start()
 		uri = 'table:' + self.table_name
 		create_args = 'key_format=i,value_format=ii,columns=(a,c,d)'
 		self.session.create(uri, create_args)
-		self.session.create('index:' + self.table_name + ':ia', 'columns=(d,c)')
+		self.session.create('index:' + self.table_name + ':ia',
+			'columns=(d,c)')
 
 		c = self.session.open_cursor('table:' + self.table_name, None, None)
-		for i in xrange(10000000):
+		start_time = clock()
+		for i in xrange(750000):
+			# 100 operations should never take 5 seconds, sometimes they take
+			# 2 seconds when a page is being force-evicted.
+			if i % 100 == 0 and i != 0:
+				end_time = clock()
+				self.assertTrue(end_time - start_time < 5)
+				start_time = end_time
 			self.insert_one(c, i, int(time()), random.randint(1,5))
-			insert_count += 1
 		c.close()
-		# Notify the monitoring thread to shut down.
-		running = 0
-		thread.join()
 
 if __name__ == '__main__':
 	wttest.run()
