@@ -611,6 +611,7 @@ extern int __wt_curfile_open(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session,
@@ -671,6 +672,7 @@ extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
     u_int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
