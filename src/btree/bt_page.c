@@ -30,7 +30,11 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
+	WT_TXN *txn;
 	int busy, oldgen;
+
+	txn = &session->txn;
 
 	for (oldgen = 0;;) {
 		switch (ref->state) {
@@ -79,9 +83,17 @@ __wt_page_in_func(
 			 * updates.  This should be extremely unlikely in real
 			 * applications, wait for eviction of the page to avoid
 			 * the issue.
+			 *
+			 * Also, make sure the page isn't too big.  Only do
+			 * this check once per transaction: it is not a common
+			 * case, and we don't want to get stuck if it isn't
+			 * possible to evict the page.
 			 */
-			if (page->modify != NULL &&
-			    __wt_txn_ancient(session, page->modify->first_id)) {
+			if ((mod = page->modify) != NULL &&
+			    (__wt_txn_ancient(session, mod->first_id) ||
+			    (!F_ISSET(txn, TXN_FORCE_EVICT) &&
+			    __wt_eviction_page_force(session, page)))) {
+				F_SET(txn, TXN_FORCE_EVICT);
 				page->read_gen = WT_READ_GEN_OLDEST;
 				WT_RET(__wt_page_release(session, page));
 				break;

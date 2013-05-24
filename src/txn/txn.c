@@ -116,8 +116,8 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
  *	Set up a snapshot in the current transaction, without allocating an ID.
  */
 void
-__wt_txn_get_snapshot(
-    WT_SESSION_IMPL *session, wt_txnid_t my_id, wt_txnid_t max_id, int force)
+__wt_txn_get_snapshot(WT_SESSION_IMPL *session,
+   wt_txnid_t my_id, wt_txnid_t max_id, int committing)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -132,7 +132,7 @@ __wt_txn_get_snapshot(
 	txn_state = &txn_global->states[session->id];
 
 	/* If nothing has changed since last time, we're done. */
-	if (!force && txn->last_id == txn_global->current &&
+	if (!committing && txn->last_id == txn_global->current &&
 	    txn->last_gen == txn_global->gen) {
 		WT_ASSERT(session,
 		    TXNID_LE(txn->oldest_snap_min, txn->snap_min));
@@ -151,7 +151,7 @@ __wt_txn_get_snapshot(
 		for (i = n = 0, s = txn_global->states;
 		    i < session_cnt;
 		    i++, s++) {
-			if ((id = s->id) != WT_TXN_NONE &&
+			if (!committing && (id = s->id) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_snap_min))
 				oldest_snap_min = id;
 			/*
@@ -182,7 +182,7 @@ __wt_txn_get_snapshot(
 	    oldest_snap_min);
 	id = (my_id == WT_TXN_NONE || TXNID_LT(txn->snap_min, my_id)) ?
 	    txn->snap_min : my_id;
-	WT_ASSERT(session, TXNID_LE(oldest_snap_min, id));
+	WT_ASSERT(session, committing || TXNID_LE(oldest_snap_min, id));
 	txn_state->snap_min = id;
 }
 
@@ -340,7 +340,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_OLDEST | TXN_RUNNING);
+	F_CLR(txn, TXN_ERROR | TXN_FORCE_EVICT | TXN_OLDEST | TXN_RUNNING);
 
 	/* Update the global generation number. */
 	++txn_global->gen;
