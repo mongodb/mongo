@@ -378,8 +378,8 @@ __bm_method_set(WT_BM *bm, int readonly)
  *	Open a file.
  */
 int
-__wt_block_manager_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *cfg[], int forced_salvage, WT_BM **bmp)
+__wt_block_manager_open(WT_SESSION_IMPL *session, const char *filename,
+    const char *cfg[], int forced_salvage, uint32_t allocsize, WT_BM **bmp)
 {
 	WT_BM *bm;
 	WT_DECL_RET;
@@ -390,7 +390,7 @@ __wt_block_manager_open(WT_SESSION_IMPL *session,
 	__bm_method_set(bm, 0);
 
 	WT_ERR(__wt_block_open(
-	    session, filename, cfg, forced_salvage, &bm->block));
+	    session, filename, cfg, forced_salvage, allocsize, &bm->block));
 
 	*bmp = bm;
 	return (0);

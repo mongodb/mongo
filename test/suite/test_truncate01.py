@@ -182,10 +182,13 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
     # The underlying table routines don't easily support 8t value types, limit
     # those tests to file objects.
     types = [
-        ('file', dict(type='file:',config='leaf_page_max=512,key_format=')),
+        ('file', dict(type='file:',\
+            config='allocation_size=512,leaf_page_max=512,key_format=')),
         ('file8t', dict(type='file:',\
-            config='leaf_page_max=512,value_format=8t,key_format=')),
-        ('table', dict(type='table:',config='leaf_page_max=512,key_format=')),
+            config='allocation_size=512,\
+            leaf_page_max=512,value_format=8t,key_format=')),
+        ('table', dict(type='table:',\
+            config='allocation_size=512,leaf_page_max=512,key_format=')),
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i')),

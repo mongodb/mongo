@@ -75,11 +75,13 @@ class test_cursor_random(wttest.WiredTigerTestCase):
     def test_cursor_random_multiple_records(self):
         uri = self.type + 'random'
         if self.type == 'file:':
-            simple_populate(
-                self, uri, 'leaf_page_max=512,key_format=' + self.fmt, 10000)
+            simple_populate(self, uri,
+                'allocation_size=512,leaf_page_max=512,key_format=' +\
+                self.fmt, 10000)
         else:
-            complex_populate(
-                self, uri, 'leaf_page_max=512,key_format=' + self.fmt, 10000)
+            complex_populate(self, uri,
+                'allocation_size=512,leaf_page_max=512,key_format=' +\
+                self.fmt, 10000)
 
         # Close the connection so everything is forced to disk (otherwise the
         # values are on an insert list and the underlying engine doesn't make
