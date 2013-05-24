@@ -1,6 +1,6 @@
 /**
  * Test getLastError with w parameter when writing directly to the config servers will
- * cause an error.
+ * not cause an error.
  */
 function writeToConfigTest(){
     var st = new ShardingTest({ shards: 2 });
@@ -10,7 +10,7 @@ function writeToConfigTest(){
     var gleObj = confDB.runCommand({ getLastError: 1, w: 'majority' });
 
     assert( gleObj.ok );
-    assert.eq("norepl", gleObj.err);
+    assert.eq(null, gleObj.err);
 
     // w:1 should still work
     confDB.settings.update({ _id: 'balancer' }, { $set: { stopped: true }});
