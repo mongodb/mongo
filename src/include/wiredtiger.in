@@ -630,9 +630,9 @@ struct __wt_session {
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, the file unit allocation size\, in bytes\,
 	 * must a power-of-two; smaller values decrease the file space required
-	 * by overflow items\, and the default value of 512B is a good choice
+	 * by overflow items\, and the default value of 4KB is a good choice
 	 * absent requirements from the operating system or storage device., an
-	 * integer between 512B and 128MB; default \c 512B.}
+	 * integer between 512B and 128MB; default \c 4KB.}
 	 * @config{block_compressor, configure a compressor for file blocks.
 	 * Permitted values are empty (off) or \c "bzip2"\, \c "snappy" or
 	 * custom compression engine \c "name" created with
@@ -697,7 +697,7 @@ struct __wt_session {
 	 * misses while searching the tree.  The page maximum is the bytes of
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
-	 * 2KB.}
+	 * 4KB.}
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * key_format is \c 'u' and applications use WT_ITEM structures to
@@ -1028,11 +1028,12 @@ struct __wt_session {
 	 * drop all checkpoints before and including the named checkpoint.
 	 * Checkpoints cannot be dropped while a hot backup is in progress or if
 	 * open in a cursor., a list of strings; default empty.}
-	 * @config{force, checkpoints may be skipped if the underlying object
-	 * has not been modified\, this option forces the checkpoint., a boolean
-	 * flag; default \c false.}
-	 * @config{name, if non-empty\, specify a name for the checkpoint., a
-	 * string; default empty.}
+	 * @config{force, by default\, checkpoints may be skipped if the
+	 * underlying object has not been modified\, this option forces the
+	 * checkpoint., a boolean flag; default \c false.}
+	 * @config{name, if non-empty\, specify a name for the checkpoint (note
+	 * that checkpoints including LSM trees may not be named)., a string;
+	 * default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects., a
 	 * list of strings; default empty.}
 	 * @configend

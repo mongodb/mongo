@@ -77,7 +77,7 @@ wts_open(void)
 	snprintf(config, sizeof(config),
 	    "create,"
 	    "sync=false,cache_size=%" PRIu32 "MB,"
-	    "error_prefix=\"%s\","
+	    "buffer_alignment=512,error_prefix=\"%s\","
 	    "%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
@@ -133,7 +133,7 @@ wts_open(void)
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
 	    "internal_page_max=%d,internal_item_max=%d,"
-	    "leaf_page_max=%d,leaf_item_max=%d",
+	    "allocation_size=512,leaf_page_max=%d,leaf_item_max=%d",
 	    (g.type == ROW) ? "u" : "r",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 

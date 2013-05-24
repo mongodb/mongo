@@ -128,6 +128,7 @@ extern int __wt_block_manager_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *cfg[],
     int forced_salvage,
+    uint32_t allocsize,
     WT_BM **bmp);
 extern int __wt_block_manager_truncate( WT_SESSION_IMPL *session,
     const char *filename,
@@ -139,6 +140,7 @@ extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *cfg[],
     int forced_salvage,
+    uint32_t allocsize,
     WT_BLOCK **blockp);
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_desc_init(WT_SESSION_IMPL *session,
@@ -609,6 +611,7 @@ extern int __wt_curfile_open(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session,
@@ -669,6 +672,7 @@ extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
     u_int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
@@ -923,6 +927,10 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     size_t size,
     const char *fmt,
     ...);
+extern int __wt_direct_io_size_check(WT_SESSION_IMPL *session,
+    const char **cfg,
+    const char *config_name,
+    uint32_t *sizep);
 extern int __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,

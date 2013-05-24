@@ -197,9 +197,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
-		ret = __wt_clsm_open(session, uri, cfg, cursorp);
+		ret = __wt_clsm_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __wt_curindex_open(session, uri, cfg, cursorp);
+		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
 		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))

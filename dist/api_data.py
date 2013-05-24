@@ -130,10 +130,10 @@ lsm_config = [
 
 # Per-file configuration
 file_config = format_meta + [
-	Config('allocation_size', '512B', r'''
+	Config('allocation_size', '4KB', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
-		items, and the default value of 512B is a good choice absent
+		items, and the default value of 4KB is a good choice absent
 		requirements from the operating system or storage device''',
 		min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
@@ -179,7 +179,7 @@ file_config = format_meta + [
 		trailing bytes on internal keys (ignored for custom
 		collators)''',
 		type='boolean'),
-	Config('internal_page_max', '2KB', r'''
+	Config('internal_page_max', '4KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size and is significant
 		for applications wanting to avoid excessive L2 cache misses
@@ -494,11 +494,12 @@ methods = {
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
 	Config('force', 'false', r'''
-		checkpoints may be skipped if the underlying object has not
-		been modified, this option forces the checkpoint''',
+		by default, checkpoints may be skipped if the underlying object
+		has not been modified, this option forces the checkpoint''',
 		type='boolean'),
 	Config('name', '', r'''
-		if non-empty, specify a name for the checkpoint'''),
+		if non-empty, specify a name for the checkpoint (note that
+		checkpoints including LSM trees may not be named)'''),
 	Config('target', '', r'''
 		if non-empty, checkpoint the list of objects''', type='list'),
 ]),
