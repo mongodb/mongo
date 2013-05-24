@@ -297,6 +297,7 @@ namespace mongo {
         const StateBox::SP sp = box.get();
         bool isp = sp.state.primary();
         b.append("setName", name());
+        b.append("setVersion", version());
         b.append("ismaster", isp);
         b.append("secondary", sp.state.secondary());
         {

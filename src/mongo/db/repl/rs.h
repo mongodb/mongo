@@ -437,6 +437,7 @@ namespace mongo {
         void _fillIsMasterHost(const Member*, vector<string>&, vector<string>&, vector<string>&);
         const ReplSetConfig& config() { return *_cfg; }
         string name() const { return _name; } /* @return replica set's logical name */
+        int version() const { return _cfg->version; } /* @return replica set's config version */
         MemberState state() const { return box.getState(); }
         void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
