@@ -43,7 +43,8 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 	if (TXNID_LT(txn->snap_min, oldest_snap_min))
 		oldest_snap_min = txn->snap_min;
 
-	txn->oldest_snap_min = oldest_snap_min;
+	if (TXNID_LT(txn->oldest_snap_min, oldest_snap_min))
+		txn->oldest_snap_min = oldest_snap_min;
 }
 
 /*
@@ -108,7 +109,8 @@ __wt_txn_get_oldest(WT_SESSION_IMPL *session)
 		}
 	} while (current_id != txn_global->current);
 
-	txn->oldest_snap_min = oldest_snap_min;
+	if (TXNID_LT(txn->oldest_snap_min, oldest_snap_min))
+		txn->oldest_snap_min = oldest_snap_min;
 }
 
 /*
@@ -372,7 +374,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * commit.
 	 */
 	if (session->ncursors > 0)
-		__wt_txn_get_snapshot(session, txn->id, WT_TXN_NONE, 1);
+		__wt_txn_get_snapshot(session, txn->id + 1, WT_TXN_NONE, 1);
 	__wt_txn_release(session);
 	return (0);
 }
