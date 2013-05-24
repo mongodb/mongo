@@ -50,7 +50,7 @@ __checkpoint_lsm_check(WT_SESSION_IMPL *session, const char *uri)
 		    "LSM trees do not support named checkpoints");
 
 err:	if (cursor != NULL)
-		WT_ERR(cursor->close(cursor));
+		WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 
