@@ -77,7 +77,7 @@ wts_open(void)
 	snprintf(config, sizeof(config),
 	    "create,"
 	    "sync=false,cache_size=%" PRIu32 "MB,"
-	    "error_prefix=\"%s\","
+	    "buffer_alignment=512,error_prefix=\"%s\","
 	    "%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
