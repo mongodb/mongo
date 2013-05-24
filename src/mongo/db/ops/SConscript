@@ -42,6 +42,7 @@ env.StaticLibrary(
         'modifier_add_to_set.cpp',
         'modifier_bit.cpp',
         'modifier_inc.cpp',
+        'modifier_pop.cpp',
         'modifier_pull.cpp',
         'modifier_pull_all.cpp',
         'modifier_push.cpp',
@@ -75,6 +76,15 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='modifier_inc_test',
     source='modifier_inc_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_pop_test',
+    source='modifier_pop_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/mutable_bson_test_utils',
         'update',
