@@ -494,11 +494,12 @@ methods = {
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
 	Config('force', 'false', r'''
-		checkpoints may be skipped if the underlying object has not
-		been modified, this option forces the checkpoint''',
+		by default, checkpoints may be skipped if the underlying object
+		has not been modified, this option forces the checkpoint''',
 		type='boolean'),
 	Config('name', '', r'''
-		if non-empty, specify a name for the checkpoint'''),
+		if non-empty, specify a name for the checkpoint (note that
+		checkpoints including LSM trees may not be named)'''),
 	Config('target', '', r'''
 		if non-empty, checkpoint the list of objects''', type='list'),
 ]),
