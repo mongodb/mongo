@@ -34,5 +34,7 @@ doTest = function() {
     s = rt.start( false, { only: "c" }, true );
     soonCount( "c", "c", 2 );
 }
-
-doTest();
+// skip racy test on Windows
+if (!_isWindows()) {
+    doTest();
+}
