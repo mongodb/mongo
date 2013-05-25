@@ -258,6 +258,7 @@ __backup_stop(WT_SESSION_IMPL *session)
 static int
 __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int cmp;
@@ -281,6 +282,22 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
 		WT_ERR(cursor->get_value(cursor, &value));
 		WT_ERR_TEST(
 		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
+
+		/*
+		 * While reading through the metadata file, check there are no
+		 * "types" which can't support hot backup.
+		 */
+		if ((ret =
+		    __wt_config_getones(session, value, "type", &cval)) != 0) {
+			WT_ERR_NOTFOUND_OK(ret);
+			continue;
+		}
+		if (strncmp(cval.str, "file", cval.len) == 0 ||
+		    strncmp(cval.str, "lsm", cval.len) == 0)
+			continue;
+		WT_ERR_MSG(session, EINVAL,
+		    "hot backup is not supported for objects of type %.*s",
+		    (int)cval.len, cval.str);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
