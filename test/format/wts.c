@@ -101,7 +101,9 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	/*
 	 * Direct I/O may not work with hot-backups, doing copies through the
 	 * buffer cache after configuring direct I/O in Linux won't work.  If
-	 * direct I/O is configured, turn off hot backups.
+	 * direct I/O is configured, turn off hot backups.   This isn't a great
+	 * place to do this check, but it's only here we have the configuration
+	 * string.
 	 */
 	g.c_hot_backups = strstr(config, "direct_io") == NULL;
 

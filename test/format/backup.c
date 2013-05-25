@@ -92,6 +92,14 @@ hot_backup(void *arg)
 
 	(void)arg;
 
+	/* If hot backups aren't configured, we're done. */
+	if (g.c_hot_backups)
+		return (NULL);
+
+	/* Hot backups aren't supported for non-standard data sources. */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+		return (NULL);
+
 	conn = g.wts_conn;
 
 	/* Open a session. */

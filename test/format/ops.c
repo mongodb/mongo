@@ -87,10 +87,9 @@ wts_ops(void)
 			    &tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
 				die(ret, "pthread_create");
 		}
-		if (g.c_hot_backups)
-			if ((ret = pthread_create(
-			    &backup_tid, NULL, hot_backup, NULL)) != 0)
-				die(ret, "pthread_create");
+		if ((ret =
+		    pthread_create(&backup_tid, NULL, hot_backup, NULL)) != 0)
+			die(ret, "pthread_create");
 
 		/* Wait for the threads. */
 		for (;;) {
@@ -122,8 +121,7 @@ wts_ops(void)
 
 		/* Wait for the backup thread. */
 		g.threads_finished = 1;
-		if (g.c_hot_backups)
-			(void)pthread_join(backup_tid, NULL);
+		(void)pthread_join(backup_tid, NULL);
 
 		if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
 			die(ret, "pthread_rwlock_destroy: hot-backup lock");
