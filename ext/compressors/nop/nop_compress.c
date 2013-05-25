@@ -25,12 +25,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
-
-static WT_EXTENSION_API *wt_api;
 
 static int
 nop_compress(WT_COMPRESSOR *, WT_SESSION *,
@@ -38,33 +38,48 @@ nop_compress(WT_COMPRESSOR *, WT_SESSION *,
 static int
 nop_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
-
-static WT_COMPRESSOR nop_compressor = {
-    nop_compress, NULL, nop_decompress, NULL, NULL };
+static int
+nop_terminate(WT_COMPRESSOR *, WT_SESSION *);
 
 /*! [WT_EXTENSION_API initialization] */
+/* Local compressor structure. */
+typedef struct {
+	WT_COMPRESSOR *compressor;		/* Must come first */
+
+	WT_EXTENSION_API *wt_api;		/* Extension API */
+} NOP_COMPRESSOR;
+
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
+	NOP_COMPRESSOR *nop_compressor;
+
 	(void)config;				/* Unused parameters */
 
-						/* Find the extension API */
-	wt_api = connection->get_extension_api(connection);
+	if ((nop_compressor = calloc(1, sizeof(NOP_COMPRESSOR))) == NULL)
+		return (errno);
+
+	nop_compressor->compressor->compress = nop_compress;
+	nop_compressor->compressor->compress_raw = NULL;
+	nop_compressor->compressor->decompress = nop_decompress;
+	nop_compressor->compressor->pre_size = NULL;
+	nop_compressor->compressor->terminate = nop_terminate;
+
+	nop_compressor->wt_api = connection->get_extension_api(connection);
 
 						/* Load the compressor */
 	return (connection->add_compressor(
-	    connection, "nop", &nop_compressor, NULL));
+	    connection, "nop", (WT_COMPRESSOR *)nop_compressor, NULL));
 }
 /*! [WT_EXTENSION_API initialization] */
 
-/* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 static int
 nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp, int *compression_failed)
 {
-	(void)compressor;				/* Unused */
+	(void)compressor;			/* Unused parameters */
 	(void)session;
 
 	*compression_failed = 0;
@@ -85,7 +100,7 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
-	(void)compressor;				/* Unused */
+	(void)compressor;			/* Unused parameters */
 	(void)session;
 	(void)src_len;
 
@@ -97,4 +112,12 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	*result_lenp = dst_len;
 	return (0);
 }
-/* End implementation of WT_COMPRESSOR. */
+
+static int
+nop_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
+{
+	(void)session;				/* Unused parameters */
+
+	free(compressor);
+	return (0);
+}
