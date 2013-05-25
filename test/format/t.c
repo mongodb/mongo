@@ -28,7 +28,6 @@
 #include "format.h"
 
 GLOBAL g;
-WT_EXTENSION_API *wt_api;
 
 static void onint(int);
 static void startup(void);
@@ -110,7 +109,8 @@ main(int argc, char *argv[])
 		track("starting up", 0ULL, NULL);
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
-		wts_open();
+		wts_open(RUNDIR, 1, &g.wts_conn);
+		wts_create();
 
 		wts_load();			/* Load initial records */
 		wts_verify("post-bulk verify");	/* Verify */
@@ -165,7 +165,7 @@ main(int argc, char *argv[])
 		 * against the Berkeley DB data set again, if possible).
 		 */
 		if (g.c_delete_pct == 0) {
-			wts_open();
+			wts_open(RUNDIR, 1, &g.wts_conn);
 			wts_salvage();
 			wts_verify("post-salvage verify");
 			wts_close();
