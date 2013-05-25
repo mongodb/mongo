@@ -763,7 +763,6 @@ extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern void __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
-extern int __wt_metadata_load_backup(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);
@@ -789,11 +788,11 @@ extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
 extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created);
-extern int __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp);
-extern int __wt_meta_turtle_read( WT_SESSION_IMPL *session,
+extern int __wt_turtle_init(WT_SESSION_IMPL *session);
+extern int __wt_turtle_read(WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
-extern int __wt_meta_turtle_update( WT_SESSION_IMPL *session,
+extern int __wt_turtle_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
 extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_ATTRIBUTE((noreturn));

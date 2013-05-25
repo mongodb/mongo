@@ -862,7 +862,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
 	const char *cfg[5];
-	int exist;
 
 	*wt_connp = NULL;
 	session = NULL;
@@ -1011,21 +1010,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * (which avoids application threads racing to create the metadata file
 	 * later).
 	 */
-	WT_ERR(__wt_meta_turtle_init(session, &exist));
-	if (!exist) {
-		/*
-		 * We're single-threaded, but acquire the schema lock
-		 * regardless: the lower level code checks that it is
-		 * appropriately synchronized.
-		 */
-		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_schema_create(session, WT_METADATA_URI, NULL));
-		WT_ERR(ret);
-	}
+	WT_ERR(__wt_turtle_init(session));
 	WT_ERR(__wt_metadata_open(session));
-
-	/* If there's a hot-backup file, load it. */
-	WT_ERR(__wt_metadata_load_backup(session));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
