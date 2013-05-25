@@ -46,7 +46,7 @@ nop_terminate(WT_COMPRESSOR *, WT_SESSION *);
 /*! [WT_COMPRESSOR initialization] */
 /* Local compressor structure. */
 typedef struct {
-	WT_COMPRESSOR *compressor;		/* Must come first */
+	WT_COMPRESSOR compressor;		/* Must come first */
 
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 } NOP_COMPRESSOR;
