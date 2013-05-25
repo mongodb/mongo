@@ -1265,7 +1265,7 @@ struct __wt_connection {
 	 * The application must first implement the WT_COMPRESSOR interface
 	 * and then register the implementation with WiredTiger:
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR register
+	 * @snippet nop_compress.c WT_COMPRESSOR initialization
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the compression function to be used in calls
@@ -1845,7 +1845,7 @@ struct __wt_collator {
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_compressor.
  *
- * @snippet ex_all.c WT_COMPRESSOR register
+ * @snippet nop_compress.c WT_COMPRESSOR initialization
  */
 struct __wt_compressor {
 	/*!
@@ -1877,7 +1877,7 @@ struct __wt_compressor {
 	 * decrease the length of the data (compression may not have completed)
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR compress
+	 * @snippet nop_compress.c WT_COMPRESSOR compress
 	 */
 	int (*compress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len,
@@ -2029,7 +2029,7 @@ struct __wt_compressor {
 	 * @param[out] result_lenp the length of the decompressed data
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR decompress
+	 * @snippet nop_compress.c WT_COMPRESSOR decompress
 	 */
 	int (*decompress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len,
@@ -2071,7 +2071,7 @@ struct __wt_compressor {
 	 * @param[out] result_lenp the required destination buffer size
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR presize
+	 * @snippet nop_compress.c WT_COMPRESSOR presize
 	 */
 	int (*pre_size)(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len, size_t *result_lenp);
@@ -2081,6 +2081,8 @@ struct __wt_compressor {
 	 *
 	 * The WT_COMPRESSOR::terminate callback is intended to allow cleanup,
 	 * the handle will not be subsequently accessed by WiredTiger.
+	 *
+	 * @snippet nop_compress.c WT_COMPRESSOR terminate
 	 */
 	int (*terminate)(WT_COMPRESSOR *compressor, WT_SESSION *session);
 };

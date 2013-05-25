@@ -43,7 +43,7 @@ extern "C" {
  * The following code is from the sample compression module, where compression
  * extension functions are configured in the extension's entry point:
  *
- * @snippet nop_compress.c WT_EXTENSION_API initialization
+ * @snippet nop_compress.c WT_COMPRESSOR initialization
  */
 struct __wt_extension_api {
 /* !!! To maintain backwards compatibility, this structure is append-only. */

@@ -39,9 +39,11 @@ static int
 nop_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 static int
+nop_pre_size(WT_COMPRESSOR *, WT_SESSION *, uint8_t *, size_t, size_t *);
+static int
 nop_terminate(WT_COMPRESSOR *, WT_SESSION *);
 
-/*! [WT_EXTENSION_API initialization] */
+/*! [WT_COMPRESSOR initialization] */
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR *compressor;		/* Must come first */
@@ -49,6 +51,9 @@ typedef struct {
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 } NOP_COMPRESSOR;
 
+/*
+ * A simple shared library compression example.
+ */
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
@@ -59,10 +64,22 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	if ((nop_compressor = calloc(1, sizeof(NOP_COMPRESSOR))) == NULL)
 		return (errno);
 
+	/*
+	 * Allocate a local compressor structure, with a WT_COMPRESSOR structure
+	 * as the first field, allowing us to treat references to either type of
+	 * structure as a reference to the other type.
+	 *
+	 * This could be simplified if only a single database is opened in the
+	 * application, we could use a static WT_COMPRESSOR structure, and a
+	 * static reference to the WT_EXTENSION_API methods, then we don't need
+	 * to allocate memory when the compressor is initialized or free it when
+	 * the compressor is terminated.  However, this approach is more general
+	 * purpose and supports multiple databases per application.
+	 */
 	nop_compressor->compressor->compress = nop_compress;
 	nop_compressor->compressor->compress_raw = NULL;
 	nop_compressor->compressor->decompress = nop_decompress;
-	nop_compressor->compressor->pre_size = NULL;
+	nop_compressor->compressor->pre_size = nop_pre_size;
 	nop_compressor->compressor->terminate = nop_terminate;
 
 	nop_compressor->wt_api = connection->get_extension_api(connection);
@@ -71,8 +88,12 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	return (connection->add_compressor(
 	    connection, "nop", (WT_COMPRESSOR *)nop_compressor, NULL));
 }
-/*! [WT_EXTENSION_API initialization] */
+/*! [WT_COMPRESSOR initialization] */
 
+/*! [WT_COMPRESSOR compress] */
+/*
+ * A simple compression example that passes data through unchanged.
+ */
 static int
 nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -93,7 +114,12 @@ nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	return (0);
 }
+/*! [WT_COMPRESSOR compress] */
 
+/*! [WT_COMPRESSOR decompress] */
+/*
+ * A simple compression example that passes data through unchanged.
+ */
 static int
 nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -112,7 +138,31 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	*result_lenp = dst_len;
 	return (0);
 }
+/*! [WT_COMPRESSOR decompress] */
 
+/*! [WT_COMPRESSOR presize] */
+/*
+ * A simple pre-size example that returns the source length.
+ */
+static int
+nop_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    uint8_t *src, size_t src_len,
+    size_t *result_lenp)
+{
+	/* Unused parameters */
+	(void)compressor;
+	(void)session;
+	(void)src;
+
+	*result_lenp = src_len;
+	return (0);
+}
+/*! [WT_COMPRESSOR presize] */
+
+/*! [WT_COMPRESSOR terminate] */
+/*
+ * A simple termination example that frees the allocated memory.
+ */
 static int
 nop_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
@@ -121,3 +171,4 @@ nop_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	free(compressor);
 	return (0);
 }
+/*! [WT_COMPRESSOR terminate] */
