@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import key_populate, complex_populate, simple_populate
+from helper import key_populate, complex_populate_lsm, simple_populate
 
 # test_checkpoint01.py
 #    Checkpoint tests
@@ -329,7 +329,7 @@ class test_checkpoint_last_name(wttest.WiredTigerTestCase):
 # Check we can't name checkpoints that include LSM tables.
 class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):
     def test_checkpoint_lsm_name(self):
-        complex_populate(self,
+        complex_populate_lsm(self,
             "table:checkpoint", 'type=lsm,key_format=S', 1000)
         msg = '/LSM trees do not support named checkpoints/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
