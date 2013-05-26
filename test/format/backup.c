@@ -93,7 +93,7 @@ hot_backup(void *arg)
 	(void)arg;
 
 	/* If hot backups aren't configured, we're done. */
-	if (g.c_hot_backups)
+	if (!g.c_hot_backups)
 		return (NULL);
 
 	/* Hot backups aren't supported for non-standard data sources. */
