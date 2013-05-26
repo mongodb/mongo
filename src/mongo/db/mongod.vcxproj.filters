@@ -2006,9 +2006,6 @@
     <ClCompile Include="auth\action_set_test.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="auth\principal_name.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="auth\principal_set_test.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
@@ -2122,6 +2119,21 @@
     </ClCompile>
     <ClCompile Include="auth\user.cpp">
       <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\user_name.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pop.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pop_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pull_all.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pull_all_test.cpp">
+      <Filter>db\ops</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -3587,9 +3599,6 @@
     <ClInclude Include="..\base\string_data-inl.h">
       <Filter>base</Filter>
     </ClInclude>
-    <ClInclude Include="auth\principal_name.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="client_basic.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
@@ -4364,6 +4373,15 @@
     </ClInclude>
     <ClInclude Include="auth\user.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\user_name.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_pop.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_pull_all.h">
+      <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

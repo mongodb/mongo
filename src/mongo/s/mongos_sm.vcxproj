@@ -1858,7 +1858,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\auth_session_external_state_server_common.cpp" />
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
-    <ClCompile Include="..\db\auth\principal_name.cpp" />
+    <ClCompile Include="..\db\auth\user_name.cpp" />
     <ClCompile Include="..\db\auth\principal_set.cpp" />
     <ClCompile Include="..\db\auth\principal_set_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -2970,7 +2970,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\auth_session_external_state_server_common.h" />
     <ClInclude Include="..\db\auth\mongo_authentication_session.h" />
     <ClInclude Include="..\db\auth\principal.h" />
-    <ClInclude Include="..\db\auth\principal_name.h" />
+    <ClInclude Include="..\db\auth\user_name.h" />
     <ClInclude Include="..\db\auth\principal_set.h" />
     <ClInclude Include="..\db\auth\privilege.h" />
     <ClInclude Include="..\db\auth\privilege_set.h" />
