@@ -31,7 +31,8 @@ import shutil
 import string
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
-from helper import compare_files, complex_populate, simple_populate
+from helper import compare_files,\
+    complex_populate, complex_populate_lsm, simple_populate
 
 # test_backup.py
 #    Utilities: wt backup
@@ -41,17 +42,22 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
 
     pfx = 'test_backup'
     objs = [
-        ( 'file:' + pfx + '.1', simple_populate),
-        ( 'file:' + pfx + '.2', simple_populate),
-        ('table:' + pfx + '.3', simple_populate),
-        ('table:' + pfx + '.4', simple_populate),
-        ('table:' + pfx + '.5', complex_populate),
-        ('table:' + pfx + '.6', complex_populate),
+        ( 'file:' + pfx + '.1',  simple_populate, 0),
+        ( 'file:' + pfx + '.2',  simple_populate, 0),
+        ('table:' + pfx + '.3',  simple_populate, 0),
+        ('table:' + pfx + '.4',  simple_populate, 0),
+        ('table:' + pfx + '.5', complex_populate, 0),
+        ('table:' + pfx + '.6', complex_populate, 0),
+        ('table:' + pfx + '.7', complex_populate_lsm, 1),
+        ('table:' + pfx + '.8', complex_populate_lsm, 1),
     ]
 
     # Populate a set of objects.
-    def populate(self):
+    def populate(self, skiplsm):
         for i in self.objs:
+            if i[2]:
+                if skiplsm:
+                        continue
             i[1](self, i[0], 'key_format=S', 100)
 
     # Compare the original and backed-up files using the wt dump command.
@@ -75,7 +81,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Test backup of a database using the wt backup command.
     def test_backup_database(self):
-        self.populate()
+        self.populate(0)
         os.mkdir(self.dir)
         self.runWt(['backup', self.dir])
 
@@ -127,23 +133,24 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Test backup of database subsets.
     def test_backup_table(self):
-        self.populate()
-        self.backup_table([0,2,4])
-        self.backup_table([1,3,5])
+        self.populate(0)
+        self.backup_table([0,2,4,6])
+        self.backup_table([1,3,5,7])
         self.backup_table([0,1,2])
         self.backup_table([3,4,5])
+        self.backup_table([5,6,7])
 
     # Test backup of random object types fails.
     def test_illegal_objects(self):
         for target in ('colgroup:xxx', 'index:xxx'):
-            msg = '/invalid backup target object/'
+            msg = '/unsupported backup target object/'
             config = 'target=("%s")' % target
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.open_cursor('backup:', None, config), msg)
 
     # Test cursor reset runs through the list twice.
     def test_cursor_reset(self):
-        self.populate()
+        self.populate(0)
         cursor = self.session.open_cursor('backup:', None, None)
         i = 0
         while True:
@@ -165,7 +172,8 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
     # Test that named checkpoints can't be deleted while backup cursors are
     # open, but that normal checkpoints continue to work.
     def test_checkpoint_delete(self):
-        self.populate()
+        # You cannot name checkpoints including LSM tables, skip those.
+        self.populate(1)
 
         # Confirm checkpoints are being deleted.
         self.session.checkpoint("name=one")
