@@ -268,13 +268,8 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
 	path = NULL;
 
 	/*
-	 * Open a cursor on the metadata file.
-	 *
-	 * Copy object references from the metadata to the hot backup file.
-	 *
-	 * We're copying everything, there's nothing in the metadata file we
-	 * don't want.   If that ever changes, we'll need to limit the copy to
-	 * specific object entries.
+	 * Open a cursor on the metadata file and copy all of the entries to
+	 * the hot backup file.
 	 */
 	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -284,20 +279,28 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
 		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
 
 		/*
-		 * While reading through the metadata file, check there are no
-		 * "types" which can't support hot backup.
+		 * While reading the metadata file, check there are no "sources"
+		 * or "types" which can't support hot backup.  This checks for
+		 * a data source that's non-standard, which can't be backed up,
+		 * but is also sanity checking: if there's an entry backed by
+		 * anything other than a file or lsm entry, we're confused.
 		 */
-		if ((ret =
-		    __wt_config_getones(session, value, "type", &cval)) != 0) {
-			WT_ERR_NOTFOUND_OK(ret);
-			continue;
-		}
-		if (strncmp(cval.str, "file", cval.len) == 0 ||
-		    strncmp(cval.str, "lsm", cval.len) == 0)
-			continue;
-		WT_ERR_MSG(session, EINVAL,
-		    "hot backup is not supported for objects of type %.*s",
-		    (int)cval.len, cval.str);
+		if ((ret = __wt_config_getones(
+		    session, value, "type", &cval)) == 0 &&
+		    !WT_PREFIX_MATCH_LEN(cval.str, cval.len, "file") &&
+		    !WT_PREFIX_MATCH_LEN(cval.str, cval.len, "lsm"))
+			WT_ERR_MSG(session, ENOTSUP,
+			    "hot backup is not supported for objects of "
+			    "type %.*s", (int)cval.len, cval.str);
+		WT_ERR_NOTFOUND_OK(ret);
+		if ((ret =__wt_config_getones(
+		    session, value, "source", &cval)) == 0 &&
+		    !WT_PREFIX_MATCH_LEN(cval.str, cval.len, "file:") &&
+		    !WT_PREFIX_MATCH_LEN(cval.str, cval.len, "lsm:"))
+			WT_ERR_MSG(session, ENOTSUP,
+			    "hot backup is not supported for objects of "
+			    "source %.*s", (int)cval.len, cval.str);
+		WT_ERR_NOTFOUND_OK(ret);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -380,16 +383,17 @@ __backup_uri(WT_SESSION_IMPL *session,
 			continue;
 		}
 		if (WT_PREFIX_MATCH(uri, "table:")) {
-			WT_ERR(__backup_table(session, cb, uri, bfp));
+			WT_ERR(__backup_table(
+			    session, cb, uri + strlen("table:"), bfp));
 			continue;
 		}
 
 		/*
-		 * It doesn't make sense to backup anything other than a file
-		 * or table.
+		 * We only support file and table targets (this is where we'll
+		 * fail if an LSM target is specified).
 		 */
-		WT_ERR_MSG(
-		    session, EINVAL, "%s: invalid backup target object", uri);
+		WT_ERR_MSG(session,
+		    ENOTSUP, "%s: unsupported backup target object", uri);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 	if (!target_list)
@@ -407,50 +411,32 @@ err:	if (path != NULL)
 
 /*
  * __backup_table --
- *	Squirrel around in the metadata table until we have enough information
- * to back up a table.
+ *	Back up all the elements associated with a table.
  */
 static int
 __backup_table(
-    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *uri, FILE *bfp)
+    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *name, FILE *bfp)
 {
 	WT_CURSOR *cursor;
-	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	size_t i;
-	const char *value;
 
 	cursor = NULL;
-	WT_RET(__wt_scr_alloc(session, 512, &tmp));
 
 	/* Open a cursor on the metadata file. */
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 
-	/* Copy the table's metadata entry to the hot backup file. */
-	cursor->set_key(cursor, uri);
-	WT_ERR(cursor->search(cursor));
-	WT_ERR(cursor->get_value(cursor, &value));
-	WT_ERR_TEST((fprintf(bfp, "%s\n%s\n", uri, value) < 0), __wt_errno());
-	uri += strlen("table:");
-
-	/* Copy the table's column groups and index entries... */
-	WT_ERR(
-	    __backup_table_element(session, cb, cursor, "colgroup:", uri, bfp));
-	WT_ERR(__backup_table_element(session, cb, cursor, "index:", uri, bfp));
-
-	/* Copy the table's file entries... */
-	for (i = 0; i < cb->list_next; ++i) {
-		WT_ERR(__wt_buf_fmt(session, tmp, "file:%s", cb->list[i]));
-		cursor->set_key(cursor, tmp->data);
-		WT_ERR(cursor->search(cursor));
-		WT_ERR(cursor->get_value(cursor, &value));
-		WT_ERR_TEST((fprintf(bfp,
-		    "file:%s\n%s\n", cb->list[i], value) < 0), __wt_errno());
-	}
+	/* Copy the table's entries... */
+	WT_ERR(__backup_table_element(
+	    session, NULL, cursor, "table", name, bfp));
+	WT_ERR(__backup_table_element(
+	    session, NULL, cursor, "colgroup", name, bfp));
+	WT_ERR(__backup_table_element(
+	    session, NULL, cursor, "index", name, bfp));
+	WT_ERR(__backup_table_element(session, NULL, cursor, "lsm", name, bfp));
+	WT_ERR(__backup_table_element(session, cb, cursor, "file", name, bfp));
 
 err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
-	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -462,7 +448,6 @@ static int
 __backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
     WT_CURSOR *cursor, const char *elem, const char *table, FILE *bfp)
 {
-	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
 	int cmp;
@@ -470,38 +455,36 @@ __backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
 
 	WT_RET(__wt_scr_alloc(session, 512, &tmp));
 
-	WT_ERR(__wt_buf_fmt(session, tmp, "%s%s", elem, table));
+	WT_ERR(__wt_buf_fmt(session, tmp, "%s:%s", elem, table));
 	cursor->set_key(cursor, tmp->data);
 	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
 		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
-		/* Check for a match with the specified table name. */
 		WT_ERR(cursor->get_key(cursor, &key));
-		if (!WT_PREFIX_MATCH(key, elem) ||
-		    !WT_PREFIX_MATCH(key + strlen(elem), table) ||
-		    (key[strlen(elem) + strlen(table)] != ':' &&
-		    key[strlen(elem) + strlen(table)] != '\0'))
+		if (strncmp(tmp->data, key, strlen(tmp->data)) != 0)
 			break;
+
+		/*
+		 * XXX
+		 * This is wrong: we could match non-unique table names, so for
+		 * example, a target of "table_X" will match both "table_X" and
+		 * "table_XX".
+		 */
 
 		/* Dump the metadata entry. */
 		WT_ERR(cursor->get_value(cursor, &value));
 		WT_ERR_TEST(
 		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
 
-		/* Save the source URI, if it is a file. */
-		WT_ERR(__wt_config_getones(session, value, "source", &cval));
-		if (cval.len > strlen("file:") &&
-		    WT_PREFIX_MATCH(cval.str, "file:")) {
-			WT_ERR(__wt_buf_fmt(session, tmp, "%.*s",
-			    (int)(cval.len - strlen("file:")),
-			    cval.str + strlen("file:")));
+		/*
+		 * If it's a physical object (file:), add it to our list of
+		 * objects to copy.
+		 */
+		if (cb != NULL)
 			WT_ERR(__backup_list_append(
-			    session, cb, (const char *)tmp->data));
-		} else
-			WT_ERR_MSG(session, EINVAL,
-			    "%s: unknown data source '%.*s'",
-			    (const char *)tmp->data, (int)cval.len, cval.str);
+			    session, cb, key + strlen(elem) + 1));
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
