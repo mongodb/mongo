@@ -210,6 +210,10 @@ __backup_start(
 	if (!target_list)
 		WT_ERR(__backup_all(session, cb));
 
+	/* Add the hot backup and single-threading file to the list. */
+	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
+	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
+
 	/* Close the hot backup file. */
 	ret = fclose(cb->bfp);
 	cb->bfp = NULL;
@@ -258,10 +262,9 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int cmp;
-	const char *key, *path, *uri, *value;
+	const char *key, *uri, *value;
 
 	cursor = NULL;
-	path = NULL;
 
 	/*
 	 * Open a cursor on the metadata file and copy all of the entries to
@@ -315,15 +318,8 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	/* Add the hot backup and single-threading file to the list. */
-	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
-	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
-
-err:
-	if (cursor != NULL)
+err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
-	if (path != NULL)
-		__wt_free(session, path);
 	return (ret);
 }
 
@@ -368,12 +364,6 @@ __backup_uri(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_worker(session, uri, NULL, cfg, 0));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
-	if (!target_list)
-		return (0);
-
-	/* Add the hot backup and single-threading file to the list. */
-	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
-	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -420,12 +410,12 @@ __wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
 
 	cb = session->bkp_cursor;
 
-	/* Add the entry to the backup file. */
+	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_read(session, name, &value));
 	WT_RET_TEST(
 	    (fprintf(cb->bfp, "%s\n%s\n", name, value) < 0), __wt_errno());
 
-	/* Add to the list of files returned by the cursor. */
+	/* Add to the list of files needing to be copied. */
 	if (WT_PREFIX_MATCH(name, "file:"))
 		WT_RET(
 		    __backup_list_append(session, cb, name + strlen("file:")));
