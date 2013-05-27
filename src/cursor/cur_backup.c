@@ -340,12 +340,9 @@ __backup_uri(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	int target_list;
-	const char *path, *uri;
+	const char *uri;
 
-	*foundp = 0;
-
-	path = NULL;
-	target_list = 0;
+	*foundp = target_list = 0;
 
 	/*
 	 * If we find a non-empty target configuration string, we have a job,
@@ -368,7 +365,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    "%s: invalid backup target: URIs may need quoting",
 			    uri);
 
-		WT_RET(__wt_schema_worker(
+		WT_ERR(__wt_schema_worker(
 		    session, uri, __wt_backup_list_append, cfg, 0));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
@@ -379,9 +376,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
 	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
 
-err:	if (path != NULL)
-		__wt_free(session, path);
-	__wt_scr_free(&tmp);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
