@@ -7,20 +7,16 @@
 
 #include "wt_internal.h"
 
-static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, FILE *);
-static int __backup_file_create(WT_SESSION_IMPL *, FILE **);
+static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
+static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_file_remove(WT_SESSION_IMPL *);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
 static int __backup_start(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[]);
 static int __backup_stop(WT_SESSION_IMPL *);
-static int __backup_table(
-    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *, FILE *);
-static int __backup_table_element(WT_SESSION_IMPL *,
-    WT_CURSOR_BACKUP *, WT_CURSOR *, const char *, const char *, FILE *);
 static int __backup_uri(
-    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[], FILE *, int *);
+    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[], int *);
 
 /*
  * __curbackup_next --
@@ -96,6 +92,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	}
 
 	ret = __wt_cursor_close(cursor);
+	session->bkp_cursor = NULL;
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    tret = __backup_stop(session));		/* Stop the backup. */
@@ -138,6 +135,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	cursor = &cb->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
+	session->bkp_cursor = cb;
 
 	cursor->key_format = "S";	/* Return the file names as the key. */
 	cursor->value_format = "";	/* No value. */
@@ -168,14 +166,12 @@ static int
 __backup_start(
     WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[])
 {
-	FILE *bfp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	int target_list;
 
 	conn = S2C(session);
 
-	bfp = NULL;
 	cb->next = 0;
 	cb->list = NULL;
 
@@ -203,24 +199,24 @@ __backup_start(
 	__wt_spin_unlock(session, &conn->hot_backup_lock);
 
 	/* Create the hot backup file. */
-	WT_ERR(__backup_file_create(session, &bfp));
+	WT_ERR(__backup_file_create(session, cb));
 
 	/*
 	 * If a list of targets was specified, work our way through them.
 	 * Else, generate a list of all database objects.
 	 */
 	target_list = 0;
-	WT_ERR(__backup_uri(session, cb, cfg, bfp, &target_list));
+	WT_ERR(__backup_uri(session, cb, cfg, &target_list));
 	if (!target_list)
-		WT_ERR(__backup_all(session, cb, bfp));
+		WT_ERR(__backup_all(session, cb));
 
 	/* Close the hot backup file. */
-	ret = fclose(bfp);
-	bfp = NULL;
+	ret = fclose(cb->bfp);
+	cb->bfp = NULL;
 	WT_ERR_TEST(ret == EOF, __wt_errno());
 
-err:	if (bfp != NULL)
-		WT_TRET(fclose(bfp) == 0 ? 0 : __wt_errno());
+err:	if (cb->bfp != NULL)
+		WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
 
 	if (ret != 0)
 		WT_TRET(__backup_stop(session));
@@ -256,7 +252,7 @@ __backup_stop(WT_SESSION_IMPL *session)
  *	Backup all objects in the database.
  */
 static int
-__backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
+__backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
@@ -275,8 +271,8 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_ERR(cursor->get_key(cursor, &key));
 		WT_ERR(cursor->get_value(cursor, &value));
-		WT_ERR_TEST(
-		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
+		WT_ERR_TEST((fprintf(
+		    cb->bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
 
 		/*
 		 * While reading the metadata file, check there are no "sources"
@@ -337,14 +333,14 @@ err:
  */
 static int
 __backup_uri(WT_SESSION_IMPL *session,
-    WT_CURSOR_BACKUP *cb, const char *cfg[], FILE *bfp, int *foundp)
+    WT_CURSOR_BACKUP *cb, const char *cfg[], int *foundp)
 {
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	int target_list;
-	const char *path, *uri, *value;
+	const char *path, *uri;
 
 	*foundp = 0;
 
@@ -372,28 +368,8 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    "%s: invalid backup target: URIs may need quoting",
 			    uri);
 
-		if (WT_PREFIX_MATCH(uri, "file:")) {
-			/* Copy metadata file information to the backup file. */
-			WT_ERR(__wt_metadata_read(session, uri, &value));
-			WT_ERR_TEST((fprintf(bfp,
-				"%s\n%s\n", uri, value) < 0), __wt_errno());
-
-			WT_ERR(__backup_list_append(
-			    session, cb, uri + strlen("file:")));
-			continue;
-		}
-		if (WT_PREFIX_MATCH(uri, "table:")) {
-			WT_ERR(__backup_table(
-			    session, cb, uri + strlen("table:"), bfp));
-			continue;
-		}
-
-		/*
-		 * We only support file and table targets (this is where we'll
-		 * fail if an LSM target is specified).
-		 */
-		WT_ERR_MSG(session,
-		    ENOTSUP, "%s: unsupported backup target object", uri);
+		WT_RET(__wt_schema_worker(
+		    session, uri, __wt_backup_list_append, cfg, 0));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 	if (!target_list)
@@ -410,101 +386,18 @@ err:	if (path != NULL)
 }
 
 /*
- * __backup_table --
- *	Back up all the elements associated with a table.
- */
-static int
-__backup_table(
-    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *name, FILE *bfp)
-{
-	WT_CURSOR *cursor;
-	WT_DECL_RET;
-
-	cursor = NULL;
-
-	/* Open a cursor on the metadata file. */
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
-
-	/* Copy the table's entries... */
-	WT_ERR(__backup_table_element(
-	    session, NULL, cursor, "table", name, bfp));
-	WT_ERR(__backup_table_element(
-	    session, NULL, cursor, "colgroup", name, bfp));
-	WT_ERR(__backup_table_element(
-	    session, NULL, cursor, "index", name, bfp));
-	WT_ERR(__backup_table_element(session, NULL, cursor, "lsm", name, bfp));
-	WT_ERR(__backup_table_element(session, cb, cursor, "file", name, bfp));
-
-err:	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
-	return (ret);
-}
-
-/*
- * __backup_table_element --
- *	Backup the column groups or indices.
- */
-static int
-__backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
-    WT_CURSOR *cursor, const char *elem, const char *table, FILE *bfp)
-{
-	WT_DECL_RET;
-	WT_DECL_ITEM(tmp);
-	int cmp;
-	const char *key, *value;
-
-	WT_RET(__wt_scr_alloc(session, 512, &tmp));
-
-	WT_ERR(__wt_buf_fmt(session, tmp, "%s:%s", elem, table));
-	cursor->set_key(cursor, tmp->data);
-	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
-		ret = cursor->next(cursor);
-	for (; ret == 0; ret = cursor->next(cursor)) {
-		WT_ERR(cursor->get_key(cursor, &key));
-		if (strncmp(tmp->data, key, strlen(tmp->data)) != 0)
-			break;
-
-		/*
-		 * XXX
-		 * This is wrong: we could match non-unique table names, so for
-		 * example, a target of "table_X" will match both "table_X" and
-		 * "table_XX".
-		 */
-
-		/* Dump the metadata entry. */
-		WT_ERR(cursor->get_value(cursor, &value));
-		WT_ERR_TEST(
-		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
-
-		/*
-		 * If it's a physical object (file:), add it to our list of
-		 * objects to copy.
-		 */
-		if (cb != NULL)
-			WT_ERR(__backup_list_append(
-			    session, cb, key + strlen(elem) + 1));
-	}
-	WT_ERR_NOTFOUND_OK(ret);
-
-err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-
-/*
  * __backup_file_create --
  *	Create the meta-data backup file.
  */
 static int
-__backup_file_create(WT_SESSION_IMPL *session, FILE **fpp)
+__backup_file_create(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
 	WT_DECL_RET;
 	const char *path;
 
-	*fpp = NULL;
-
 	/* Open the hot backup file. */
 	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
-	WT_ERR_TEST((*fpp = fopen(path, "w")) == NULL, __wt_errno());
+	WT_ERR_TEST((cb->bfp = fopen(path, "w")) == NULL, __wt_errno());
 
 err:	__wt_free(session, path);
 	return (ret);
@@ -518,6 +411,35 @@ static int
 __backup_file_remove(WT_SESSION_IMPL *session)
 {
 	return (__wt_remove(session, WT_METADATA_BACKUP));
+}
+
+/*
+ * __wt_backup_list_append --
+ *	Append a new file name to the list, allocated space as necessary.
+ *	Called via the schema_worker function.
+ */
+int
+__wt_backup_list_append(
+    WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CURSOR_BACKUP *cb;
+	WT_DECL_RET;
+	const char *name, *value;
+
+	WT_UNUSED(cfg);
+	name = session->dhandle->name;
+	cb = session->bkp_cursor;
+
+	WT_ASSERT(session, WT_PREFIX_MATCH(name, "file:"));
+
+	/* Add the entry to the backup file. */
+	WT_RET(__wt_metadata_read(session, name, &value));
+	WT_RET_TEST((fprintf(cb->bfp, "%.*s\n%s\n",
+	    (int)strlen(name) - 3, name, value) < 0), __wt_errno());
+
+	/* Add to the list of files returned by the cursor. */
+	WT_RET(__backup_list_append(session, cb, name + strlen("file:")));
+	return (ret);
 }
 
 /*
@@ -542,7 +464,8 @@ __backup_list_append(
 	 * that for now, that block manager might not even support physical
 	 * copying of files by applications.
 	 */
-	WT_RET(__wt_strdup(session, name, &cb->list[cb->list_next++]));
+	WT_RET(__wt_strdup(
+	    session, name, &cb->list[cb->list_next++]));
 	cb->list[cb->list_next] = NULL;
 
 	return (0);
