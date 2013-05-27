@@ -71,7 +71,7 @@ namespace mongo {
     string mongosCommand;
     bool dbexitCalled = false;
     static bool scriptingEnabled = true;
-    static bool noHttpInterface = false;
+    static bool httpInterface = false;
     static vector<string> configdbs;
 
     bool inShutdown() {
@@ -328,7 +328,7 @@ static bool runMongosServer( bool doUpgrade ) {
     CmdLine::launchOk();
 #endif
 
-    if ( !noHttpInterface )
+    if ( httpInterface )
         boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
     MessageServer::Options opts;
@@ -357,9 +357,6 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     po::positional_options_description positional_options;
 
     CmdLine::addGlobalOptions( general_options, hidden_options, ssl_options );
-
-    general_options.add_options()
-    ("nohttpinterface", "disable http interface");
 
     hidden_options.add_options()
     ("noAutoSplit", "do not send split commands with writes");
@@ -454,8 +451,12 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         scriptingEnabled = false;
     }
 
-    if (params.count("nohttpinterface")) {
-        noHttpInterface = true;
+    if (params.count("httpinterface")) {
+        if (params.count("nohttpinterface")) {
+            out() << "can't have both --httpinterface and --nohttpinterface" << endl;
+            ::_exit(EXIT_FAILURE);
+        }
+        httpInterface = true;
     }
 
     if (params.count("noAutoSplit")) {

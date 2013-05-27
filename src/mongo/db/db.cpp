@@ -97,7 +97,7 @@ namespace mongo {
 
     CmdLine cmdLine;
     static bool scriptingEnabled = true;
-    static bool noHttpInterface = false;
+    static bool httpInterface = false;
     bool shouldRepairDatabases = 0;
     static bool forceRepair = 0;
     Timer startupSrandTimer;
@@ -281,7 +281,7 @@ namespace mongo {
 
         logStartup();
         startReplication();
-        if ( !noHttpInterface )
+        if ( httpInterface )
             boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
 
 #if(TESTEXHAUST)
@@ -784,7 +784,6 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
-    ("nohttpinterface", "disable http interface")
     ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
     ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
@@ -985,8 +984,12 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("nopreallocj")) {
             cmdLine.preallocj = false;
         }
-        if (params.count("nohttpinterface")) {
-            noHttpInterface = true;
+        if (params.count("httpinterface")) {
+            if (params.count("nohttpinterface")) {
+                log() << "can't have both --httpinterface and --nohttpinterface" << endl;
+                ::_exit( EXIT_BADOPTIONS );
+            }
+            httpInterface = true;
         }
         if (params.count("rest")) {
             cmdLine.rest = true;

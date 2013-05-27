@@ -174,8 +174,8 @@ again:
 
                 if ( len == 542393671 ) {
                     // an http GET
-                    LOG( psock->getLogLevel() ) << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
-                    string msg = "You are trying to access MongoDB on the native driver port. For http diagnostic access, add 1000 to the port number\n";
+                    string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
+                    LOG( psock->getLogLevel() ) << msg << endl;
                     stringstream ss;
                     ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
                     string s = ss.str();
