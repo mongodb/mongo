@@ -80,24 +80,28 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         shutil.rmtree(self.dir, True)
         os.mkdir(self.dir)
 
+        # Build the target list.
+        config = 'target=('
         for i in range(0, len(self.objs)):
             if i in l:
-                config = 'target=("%s")' % self.objs[i][0]
-                cursor = self.session.open_cursor('backup:', None, config)
-                while True:
-                    ret = cursor.next()
-                    if ret != 0:
-                        break
-                    #print 'Copy from: ' + cursor.get_key() + ' to ' + self.dir
-                    shutil.copy(cursor.get_key(), self.dir)
-                self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-                cursor.close()
+                config += '"' + self.objs[i][0] + '",'
+        config += ')'
+
+        # Open up the backup cursor, and copy the files.
+        cursor = self.session.open_cursor('backup:', None, config)
+        while True:
+            ret = cursor.next()
+            if ret != 0:
+                break
+            #print 'Copy from: ' + cursor.get_key() + ' to ' + self.dir
+            shutil.copy(cursor.get_key(), self.dir)
+        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        cursor.close()
 
         # Confirm the objects we backed up exist, with correct contents.
-        # TODO: Why aren't the objects valid?
-        #for i in range(0, len(self.objs)):
-        #    if i in l:
-        #        self.compare(self.objs[i][0])
+        for i in range(0, len(self.objs)):
+            if i in l:
+                self.compare(self.objs[i][0])
 
         # Confirm the other objects don't exist.
         for i in range(0, len(self.objs)):
@@ -118,6 +122,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.backup_table_cursor([1])
         self.backup_table_cursor([2])
         self.backup_table_cursor([3])
+
 
 if __name__ == '__main__':
     wttest.run()
