@@ -32,29 +32,45 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_ERR(__wt_session_get_btree_ckpt(
-		    session, uri, cfg, open_flags));
-		ret = func(session, cfg);
-		WT_TRET(__wt_session_release_btree(session));
+		if (func == NULL)
+			WT_ERR(__wt_backup_list_append(session, uri));
+		else {
+			WT_ERR(__wt_session_get_btree_ckpt(
+			    session, uri, cfg, open_flags));
+			ret = func(session, cfg);
+			WT_TRET(__wt_session_release_btree(session));
+		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 		WT_ERR(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
-		WT_ERR(__wt_schema_worker(
-		    session, colgroup->source, func, cfg, open_flags));
+		if (func == NULL)
+			WT_ERR(
+			    __wt_backup_list_append(session, colgroup->name));
+		WT_ERR(__wt_schema_worker(session,
+		    colgroup->source, func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
 		idx = NULL;
 		WT_ERR(__wt_schema_get_index(session, uri, NULL, &idx));
+		if (func == NULL)
+			WT_ERR(__wt_backup_list_append(session, idx->name));
 		WT_ERR(__wt_schema_worker(
 		    session, idx->source, func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
+		if (func == NULL)
+			WT_ERR(__wt_backup_list_append(session, uri));
 		WT_ERR(__wt_lsm_tree_worker(
 		    session, uri, func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_ERR(__wt_schema_get_table(session,
 		    tablename, strlen(tablename), 0, &table));
+		if (func == NULL)
+			WT_ERR(__wt_backup_list_append(session, uri));
 		WT_ASSERT(session, session->dhandle == NULL);
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
+			if (func == NULL)
+				WT_ERR(__wt_backup_list_append(
+				    session, colgroup->name));
 			WT_ERR(__wt_schema_worker(
 			    session, colgroup->source, func, cfg, open_flags));
 		}
@@ -62,6 +78,9 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_open_indices(session, table));
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
+			if (func == NULL)
+				WT_ERR(__wt_backup_list_append(
+				    session, idx->name));
 			WT_ERR(__wt_schema_worker(
 			    session, idx->source, func, cfg, open_flags));
 		}

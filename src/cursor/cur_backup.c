@@ -365,8 +365,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    "%s: invalid backup target: URIs may need quoting",
 			    uri);
 
-		WT_ERR(__wt_schema_worker(
-		    session, uri, __wt_backup_list_append, cfg, 0));
+		WT_ERR(__wt_schema_worker(session, uri, NULL, cfg, 0));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 	if (!target_list)
@@ -414,27 +413,24 @@ __backup_file_remove(WT_SESSION_IMPL *session)
  *	Called via the schema_worker function.
  */
 int
-__wt_backup_list_append(
-    WT_SESSION_IMPL *session, const char *cfg[])
+__wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_CURSOR_BACKUP *cb;
-	WT_DECL_RET;
-	const char *name, *value;
+	const char *value;
 
-	WT_UNUSED(cfg);
-	name = session->dhandle->name;
 	cb = session->bkp_cursor;
-
-	WT_ASSERT(session, WT_PREFIX_MATCH(name, "file:"));
 
 	/* Add the entry to the backup file. */
 	WT_RET(__wt_metadata_read(session, name, &value));
-	WT_RET_TEST((fprintf(cb->bfp, "%.*s\n%s\n",
-	    (int)strlen(name) - 3, name, value) < 0), __wt_errno());
+	WT_RET_TEST(
+	    (fprintf(cb->bfp, "%s\n%s\n", name, value) < 0), __wt_errno());
 
 	/* Add to the list of files returned by the cursor. */
-	WT_RET(__backup_list_append(session, cb, name + strlen("file:")));
-	return (ret);
+	if (WT_PREFIX_MATCH(name, "file:"))
+		WT_RET(
+		    __backup_list_append(session, cb, name + strlen("file:")));
+
+	return (0);
 }
 
 /*
