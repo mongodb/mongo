@@ -140,14 +140,6 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.backup_table([3,4,5])
         self.backup_table([5,6,7])
 
-    # Test backup of random object types fails.
-    def test_illegal_objects(self):
-        for target in ('colgroup:xxx', 'index:xxx'):
-            msg = '/unsupported backup target object/'
-            config = 'target=("%s")' % target
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: self.session.open_cursor('backup:', None, config), msg)
-
     # Test cursor reset runs through the list twice.
     def test_cursor_reset(self):
         self.populate(0)
