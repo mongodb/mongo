@@ -441,7 +441,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 
 	conn = S2C(session);
 	hot_backup_locked = 0;
-	/* Give up if a hotbackup is in progress. */
+	/* Give up if a hot backup is in progress. */
 	if (conn->hot_backup != 0)
 		return (EBUSY);
 
