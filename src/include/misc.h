@@ -160,13 +160,6 @@
 #define	WT_DECL_RET	int ret = 0
 
 /*
- * Skip the default configuration string in an list of configurations. The
- * default config is always the first entry in the array, and the array always
- * has an explicit NULL terminator, so this is safe.
- */
-#define	WT_SKIP_DEFAULT_CONFIG(c) &(c)[1]
-
-/*
  * In diagnostic mode we track the locations from which hazard pointers and
  * scratch buffers were acquired.
  */

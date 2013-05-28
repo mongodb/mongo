@@ -165,19 +165,11 @@ __ovfl_cache_row_visible(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
 	first = WT_ROW_UPDATE(page, rip);
 	WT_ASSERT(session, first != NULL);
 
-	/*
-	 * Check to see if there's a globally visible update.  If there's no
-	 * globally visible update using our cached copy of the oldest ID
-	 * required in the system, refresh that ID and rescan, it's better
-	 * than doing I/O and caching copies of an overflow record.
-	 */
+	/* Check to see if there's a globally visible update. */
 	for (upd = first; upd != NULL; upd = upd->next)
 		if (__wt_txn_visible_all(session, upd->txnid))
 			return (1);
-	__wt_txn_get_oldest(session);
-	for (upd = first; upd != NULL; upd = upd->next)
-		if (__wt_txn_visible_all(session, upd->txnid))
-			return (1);
+
 	return (0);
 }
 

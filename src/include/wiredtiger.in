@@ -1096,6 +1096,8 @@ struct __wt_connection {
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enable, whether the connection is
+	 * using a shared cache., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
 	 * cache is redistributed., an integer between 1MB and 10TB; default \c
 	 * 10MB.}
@@ -1377,6 +1379,8 @@ struct __wt_connection {
  * @config{shared_cache = (, shared cache configuration options.  A database
  * should configure either a cache_size or a shared_cache not both., a set of
  * related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enable, whether the connection is using a
+ * shared cache., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is
  * redistributed., an integer between 1MB and 10TB; default \c 10MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database is
