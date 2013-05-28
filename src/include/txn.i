@@ -140,10 +140,12 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 static inline int
 __wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
 {
-	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	wt_txnid_t oldest_id;
 
-	txn = &session->txn;
-	return (TXNID_LT(id, txn->oldest_snap_min));
+	txn_global = &S2C(session)->txn_global;
+	oldest_id = txn_global->oldest_id;
+	return (TXNID_LT(id, oldest_id));
 }
 
 /*
@@ -276,7 +278,7 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
-		__wt_txn_get_snapshot(session, WT_TXN_NONE, WT_TXN_NONE, 0);
+		__wt_txn_refresh(session, WT_TXN_NONE, 0, 1);
 	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = txn_global->current;
 }
