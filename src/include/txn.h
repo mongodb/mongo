@@ -57,6 +57,7 @@ struct __wt_txn_global {
 	volatile wt_txnid_t oldest_id;
 
 	volatile uint32_t gen;		/* Completed transaction generation */
+	volatile uint32_t scan_gen;	/* Snapshot scan generation */
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
@@ -85,6 +86,7 @@ struct __wt_txn {
 	/* Saved global state, to avoid repeating scans. */
 	wt_txnid_t last_id;
 	uint32_t last_gen;
+	uint32_t last_scan_gen;
 
 	/*
 	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or

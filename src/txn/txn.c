@@ -27,34 +27,19 @@ __wt_txnid_cmp(const void *v1, const void *v2)
  *	Sort a snapshot for faster searching and set the min/max bounds.
  */
 static void
-__txn_sort_snapshot(WT_SESSION_IMPL *session,
-    uint32_t n, wt_txnid_t id, wt_txnid_t oldest_id)
+__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, wt_txnid_t id)
 {
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t id_copy;
 
 	txn = &session->txn;
-	txn_global = &S2C(session)->txn_global;
 
 	if (n > 1)
 		qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
-	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
 	txn->snap_max = id;
+	txn->snap_min = (n == 0 || TXNID_LT(id, txn->snapshot[0])) ?
+	    id : txn->snapshot[0];
 	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
-	if (TXNID_LT(txn->snap_min, oldest_id))
-		oldest_id = txn->snap_min;
-
-	/*
-	 * Update the oldest snapshot if we have a newer value.  We're not
-	 * holding a lock, so copy then swap into place if our oldest version
-	 * is newer.
-	 */
-	do {
-		id_copy = txn_global->oldest_id;
-	} while (TXNID_LT(id_copy, oldest_id) &&
-	    !WT_ATOMIC_CAS(txn_global->oldest_id, id_copy, oldest_id));
 }
 
 /*
@@ -82,70 +67,69 @@ __wt_txn_refresh(
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
-	wt_txnid_t current_id, id, oldest_id;
+	wt_txnid_t current_id, id, snap_min, oldest_id;
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
-	oldest_id = txn_global->oldest_id;
 
-	/* If nothing has changed since last time, we're done. */
-	if (!alloc_id &&
-	    txn->id == max_id &&
-	    txn->last_id == txn_global->current &&
-	    txn->last_gen == txn_global->gen &&
-	    TXNID_LE(oldest_id, txn->snap_min))
-		goto done;
-
-	do {
-		/* Take a copy of the current transaction generation. */
-		txn->last_gen = txn_global->gen;
-
-		if (alloc_id) {
-			/*
-			 * Allocate a transaction ID.
-			 *
-			 * We use an atomic compare and swap to ensure that we
-			 * get a unique ID that is published before the global
-			 * counter is updated.
-			 *
-			 * If two threads race to allocate an ID, only the
-			 * latest ID will proceed.  The winning thread can be
-			 * sure its snapshot contains all of the earlier active
-			 * IDs.  Threads that race and get an earlier ID may
-			 * not appear in the snapshot, but they will loop and
-			 * allocate a new ID before proceeding to make any
-			 * updates.
-			 *
-			 * This potentially wastes transaction IDs when threads
-			 * race to begin transactions: that is the price we pay
-			 * to keep this path latch free.
-			 */
-			do {
-				current_id = txn_global->current;
-				txn_state->id = txn->id = current_id + 1;
-			} while (!WT_ATOMIC_CAS(txn_global->current,
-			    current_id, txn->id) ||
-			    txn->id == WT_TXN_NONE ||
-			    txn->id == WT_TXN_ABORTED);
-			txn->last_id = oldest_id = max_id = txn->id;
-		} else {
-			txn->last_id = current_id = txn_global->current;
-			oldest_id =
-			    (max_id != WT_TXN_NONE) ? max_id : current_id + 1;
-		}
+	if (alloc_id) {
+		/*
+		 * Allocate a transaction ID.
+		 *
+		 * We use an atomic compare and swap to ensure that we get a
+		 * unique ID that is published before the global counter is
+		 * updated.
+		 *
+		 * If two threads race to allocate an ID, only the latest ID
+		 * will proceed.  The winning thread can be sure its snapshot
+		 * contains all of the earlier active IDs.  Threads that race
+		 * and get an earlier ID may not appear in the snapshot, but
+		 * they will loop and allocate a new ID before proceeding to
+		 * make any updates.
+		 *
+		 * This potentially wastes transaction IDs when threads race to
+		 * begin transactions: that is the price we pay to keep this
+		 * path latch free.
+		 */
+		do {
+			current_id = txn_global->current;
+			txn_state->id = txn->id = current_id + 1;
+		} while (!WT_ATOMIC_CAS(txn_global->current,
+		    current_id, txn->id) ||
+		    txn->id == WT_TXN_NONE ||
+		    txn->id == WT_TXN_ABORTED);
 
 		if (!get_snapshot)
 			return;
+	} else if (!alloc_id && get_snapshot &&
+	    txn->id == max_id &&
+	    txn->last_id == txn_global->current &&
+	    txn->last_gen == txn_global->gen &&
+	    TXNID_LE(txn_global->oldest_id, txn->snap_min)) {
+		/* If nothing has changed since last time, we're done. */
+		txn_state->snap_min = txn->snap_min;
+		return;
+	}
+
+	do {
+		/* Take a copy of the current generation numbers. */
+		txn->last_scan_gen = txn_global->scan_gen;
+		txn->last_gen = txn_global->gen;
+		txn->last_id = current_id = txn_global->current;
+
+		if (alloc_id)
+			snap_min = txn->id;
+		else
+			snap_min = current_id + 1;
 
 		/*
-		 * Publish a new snap_min value that we refine below.  This
-		 * prevents the global oldest value from moving forward
-		 * underneath us.
+		 * Constrain the oldest ID we calculate to be less than the
+		 * specified value.
 		 */
-		txn_state->snap_min = txn_global->oldest_id;
+		oldest_id = (max_id != WT_TXN_NONE) ? max_id : snap_min;
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -154,34 +138,57 @@ __wt_txn_refresh(
 		    i++, s++) {
 			/*
 			 * Ignore everything about the session's own
-			 * transaction: we are in the process of updating it.
+			 * transaction if we are in the process of updating it.
 			 */
-			if (s == txn_state)
+			if (get_snapshot && s == txn_state)
 				continue;
 			if ((id = s->id) != WT_TXN_NONE) {
 				txn->snapshot[n++] = id;
-				if (TXNID_LT(id, oldest_id))
-					oldest_id = id;
+				if (TXNID_LT(id, snap_min))
+					snap_min = id;
 			}
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
 
-		__txn_sort_snapshot(session, n, current_id + 1, oldest_id);
+		if (TXNID_LT(snap_min, oldest_id))
+			oldest_id = snap_min;
 
 		/*
 		 * Ensure the snapshot reads are scheduled before re-checking
-		 * the global current ID.
+		 * the global generation.
 		 */
 		WT_READ_BARRIER();
-	} while (txn->last_id != txn_global->current ||
-	    txn->last_gen != txn_global->gen ||
-	    TXNID_LT(txn->snap_min, txn_global->oldest_id));
 
-done:	WT_ASSERT(session,
-	    TXNID_LE(txn_global->oldest_id, txn->snap_min));
-	txn_state->snap_min = txn->snap_min;
+		/*
+		 * When getting an ordinary snapshot, it is sufficient to
+		 * unconditionally bump the scan generation.  Otherwise, we're
+		 * trying to update the oldest ID, so require that the scan
+		 * generation has not changed while we have been scanning.
+		 */
+		if (get_snapshot) {
+			txn_state->snap_min = snap_min;
+			WT_ATOMIC_ADD(txn_global->scan_gen, 1);
+		}
+	} while (txn->last_gen != txn_global->gen ||
+	    (!get_snapshot && !WT_ATOMIC_CAS(txn_global->scan_gen,
+		txn->last_scan_gen, txn->last_scan_gen + 1)));
+
+	++txn->last_scan_gen;
+
+	/* Update the oldest ID if another thread hasn't beat us to it. */
+	do {
+		id = txn_global->oldest_id;
+	} while ((!get_snapshot ||
+	    txn->last_scan_gen == txn_global->scan_gen) &&
+	    TXNID_LT(id, oldest_id) &&
+	    !WT_ATOMIC_CAS(txn_global->oldest_id, id, oldest_id));
+
+	if (get_snapshot) {
+		__txn_sort_snapshot(session, n, current_id + 1);
+		WT_ASSERT(session, n == 0 || snap_min == txn->snap_min);
+	}
 }
 
 /*
@@ -198,15 +205,16 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 	txn_global = &S2C(session)->txn_global;
 
 	/*
-	 * The oldest active snapshot ID in the system should *not* be visible
-	 * to eviction.  Create a snapshot containing that ID.
+	 * The oldest active snapshot ID in the system that should *not* be
+	 * visible to eviction.  Create a snapshot containing that ID.
 	 */
+	__wt_txn_refresh(session, WT_TXN_NONE, 0, 0);
 	oldest_id = txn_global->oldest_id;
-	__txn_sort_snapshot(session, 0, oldest_id, oldest_id);
+	__txn_sort_snapshot(session, 0, oldest_id);
 
 	/*
 	 * Note that we carefully don't update the global table with this
-	 * snap_min value: there is already a running transaction in this
+	 * snap_min value: there may already be a running transaction in this
 	 * session with its own value in the global table.
 	 */
 }
