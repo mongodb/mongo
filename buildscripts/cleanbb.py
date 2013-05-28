@@ -27,7 +27,7 @@ def shouldKill( c ):
     if c.find( cwd ) >= 0:
         return True
 
-    if ( c.find( "buildbot" ) >= 0 or c.find( "slave" ) ) and c.find( "/mongo/" ) >= 0:
+    if ( c.find( "buildbot" ) >= 0 or c.find( "slave" ) >= 0 ) and c.find( "/mongo/" ) >= 0:
         return True
 
     if c.find( "xml-data/build-dir" ) >= 0: # for bamboo
