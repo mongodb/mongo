@@ -185,10 +185,8 @@ __wt_txn_refresh(
 	    TXNID_LT(id, oldest_id) &&
 	    !WT_ATOMIC_CAS(txn_global->oldest_id, id, oldest_id));
 
-	if (get_snapshot) {
+	if (get_snapshot)
 		__txn_sort_snapshot(session, n, current_id + 1);
-		WT_ASSERT(session, n == 0 || snap_min == txn->snap_min);
-	}
 }
 
 /*
