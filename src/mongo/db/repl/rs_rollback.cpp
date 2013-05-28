@@ -550,7 +550,32 @@ namespace mongo {
                     // todo faster...
                     OpDebug debug;
                     updates++;
-                    _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug, rs.get() );
+                    if (isNewUpdateFrameworkEnabled()) {
+
+                        _updateObjectsNEW(/*god*/true,
+                                          d.ns,
+                                          i->second,
+                                          pattern,
+                                          /*upsert=*/true,
+                                          /*multi=*/false,
+                                          /*logtheop=*/false,
+                                          debug,
+                                          rs.get());
+
+                    }
+                    else {
+
+                        _updateObjects(/*god*/true,
+                                       d.ns,
+                                       i->second,
+                                       pattern,
+                                       /*upsert=*/true,
+                                       /*multi=*/false,
+                                       /*logtheop=*/false,
+                                       debug,
+                                       rs.get());
+
+                    }
                 }
             }
             catch(DBException& e) {

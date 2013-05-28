@@ -44,6 +44,9 @@ namespace mongo {
 
     class RemoveSaver;
 
+    /** Returns true if updates are supposed to be handle by the new update framework */
+    bool isNewUpdateFrameworkEnabled();
+
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set
        su - allow access to system namespaces (super user)
@@ -85,9 +88,23 @@ namespace mongo {
                                 OpDebug& debug,
                                 RemoveSaver* rs = 0,
                                 bool fromMigrate = false,
-                                const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any(),
+                                const QueryPlanSelectionPolicy& planPolicy
+                                    = QueryPlanSelectionPolicy::any(),
                                 bool forReplication = false);
 
+    UpdateResult _updateObjectsNEW(bool su,
+                                   const char* ns,
+                                   const BSONObj& updateobj,
+                                   const BSONObj& pattern,
+                                   bool upsert,
+                                   bool multi,
+                                   bool logop,
+                                   OpDebug& debug,
+                                   RemoveSaver* rs = 0,
+                                   bool fromMigrate = false,
+                                   const QueryPlanSelectionPolicy& planPolicy
+                                       = QueryPlanSelectionPolicy::any(),
+                                   bool forReplication = false);
 
     /**
      * takes the from document and returns a new document

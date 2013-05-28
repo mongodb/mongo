@@ -213,7 +213,32 @@ namespace mongo {
     void Helpers::putSingletonGod(const char *ns, BSONObj obj, bool logTheOp) {
         OpDebug debug;
         Client::Context context(ns);
-        _updateObjects(/*god=*/true, ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , logTheOp , debug );
+
+        if (isNewUpdateFrameworkEnabled()) {
+
+            _updateObjectsNEW(/*god=*/true,
+                              ns,
+                              obj,
+                              /*pattern=*/BSONObj(),
+                              /*upsert=*/true,
+                              /*multi=*/false,
+                              logTheOp,
+                              debug );
+
+        }
+        else {
+
+            _updateObjects(/*god=*/true,
+                           ns,
+                           obj,
+                           /*pattern=*/BSONObj(),
+                           /*upsert=*/true,
+                           /*multi=*/false,
+                           logTheOp,
+                           debug );
+
+        }
+
         context.getClient()->curop()->done();
     }
 
