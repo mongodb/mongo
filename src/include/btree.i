@@ -255,7 +255,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * running transaction.
 		 */
 		if (F_ISSET(&session->txn, TXN_RUNNING))
-			page->modify->disk_txn = session->txn.snap_min - 1;
+			page->modify->disk_snap_min = session->txn.snap_min;
 	}
 
 	/*
@@ -445,11 +445,10 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 
 	/*
-	 * Try to immediately evict pages if they require forced eviction or
-	 * have the special "oldest" read generation.
+	 * Try to immediately evict pages if they have the special "oldest"
+	 * read generation.
 	 */
-	if ((page->read_gen == WT_READ_GEN_OLDEST ||
-	    __wt_eviction_page_force(session, page)) &&
+	if (page->read_gen == WT_READ_GEN_OLDEST &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
 			page->ref->state = WT_REF_MEM;

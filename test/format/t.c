@@ -107,6 +107,7 @@ main(int argc, char *argv[])
 		config_print(0);		/* Dump run configuration */
 		key_len_setup();		/* Setup keys */
 
+		track("starting up", 0ULL, NULL);
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
 		wts_open();
@@ -121,7 +122,13 @@ main(int argc, char *argv[])
 			if (g.c_ops != 0)	/* Random operations */
 				wts_ops();
 
-						/* Statistics */
+			/*
+			 * Statistics.
+			 *
+			 * XXX
+			 * Verify closes the underlying handle and discards the
+			 * statistics, read them first.
+			 */
 			if (g.c_ops == 0 || reps == 2)
 				wts_stats();
 
@@ -136,39 +143,41 @@ main(int argc, char *argv[])
 				break;
 		}
 
-		if (SINGLETHREADED) {
-			track("shutting down BDB", 0ULL, NULL);
+		track("shutting down", 0ULL, NULL);
+		if (SINGLETHREADED)
 			bdb_close();
-
-			wts_close();			/* Dump the file */
-			wts_dump("standard", 1);
-			wts_open();
-		}
+		wts_close();
 
 		/*
-		 * If we don't delete any records, we can salvage the file.  The
-		 * problem with deleting records is that salvage will restore
-		 * deleted records if a page fragments leaving a deleted record
-		 * on one side of the split.
+		 * If single-threaded, we can dump and compare the WiredTiger
+		 * and Berkeley DB data sets.
+		 */
+		if (SINGLETHREADED)
+			wts_dump("standard", 1);
+
+		/*
+		 * If no records are deleted, we can salvage the file and test
+		 * the result.  (The problem with deleting records is salvage
+		 * restores deleted records if a page splits leaving a deleted
+		 * record on one side of the split.)
 		 *
-		 * Save a copy, salvage, verify, dump.
+		 * Salvage, verify the salvaged files, then dump (comparing
+		 * against the Berkeley DB data set again, if possible).
 		 */
 		if (g.c_delete_pct == 0) {
-			wts_salvage();			/* Salvage & verify */
-			wts_verify("post-salvage verify");
-
-			wts_close();			/* Dump the file */
-			wts_dump("salvage", 0);
 			wts_open();
-		}
+			wts_salvage();
+			wts_verify("post-salvage verify");
+			wts_close();
 
-		wts_close();			/* Close */
+			wts_dump("salvage", SINGLETHREADED);
+		}
 
 		/* Overwrite the progress line with a completion line. */
 		if (g.track)
 			printf("\r%78s\r", " ");
-		printf("%4d: %s %s\n",
-		    g.run_cnt, g.c_file_type, g.c_data_source);
+		printf("%4d: %s, %s\n",
+		    g.run_cnt, g.c_data_source, g.c_file_type);
 	}
 
 	/* Flush/close any logging information. */

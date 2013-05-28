@@ -1,11 +1,32 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_154 Upgrading to Version 1.5.4
+@section version_161 Upgrading to Version 1.6.1
+<dl>
+
+<dt>Default page sizes</dt>
+<dd>
+In the 1.6.1 release, the default for the WT_SESSION::create configuration
+string \c allocation_size changed from 512B to 4KB, and the default for the
+configuration string \c internal_page_max changed from 2KB to 4KB.
+Applications wanting to create files with smaller allocation or internal
+page sizes will need to set those configuration values explicitly.
+</dd>
+<dt>Shared cache configuration</dt>
+<dd>
+In the 1.6.1 release, an explicit shared_cache=(enable=boolean) option was
+added to the wiredtiger_open configuration options. Existing applications that
+use shared cache functionality will need to add the enable option to the
+configuration string. The default value for the option is false.
+</dd>
+
+</dl>
+<hr>
+@section version_160 Upgrading to Version 1.6.0
 <dl>
 
 <dt>File format changes</dt>
 <dd>
-The underlying file formats changed in the 1.5.4 release; tables and files
+The underlying file formats changed in the 1.6.0 release; tables and files
 should be dumped and re-loaded into a new database.
 </dd>
 

@@ -120,11 +120,8 @@ obj_checkpoint(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	/*
-	 * Name the checkpoint so the checkpoint has to be taken, don't specify
-	 * a target, it might not exist.
-	 */
-	if ((ret = session->checkpoint(session, "name=fops")) != 0)
+	/* Force the checkpoint so it has to be taken. */
+	if ((ret = session->checkpoint(session, "force")) != 0)
 		if (ret != ENOENT)
 			die("session.checkpoint", ret);
 

@@ -49,7 +49,16 @@ struct __wt_txn_state {
 
 struct __wt_txn_global {
 	volatile wt_txnid_t current;	/* Current transaction ID. */
+
+	/*
+	 * The oldest transaction ID that is not yet visible to some
+	 * transaction in the system.
+	 */
+	volatile wt_txnid_t oldest_id;
+
 	volatile uint32_t gen;		/* Completed transaction generation */
+	volatile uint32_t scan_gen;	/* Snapshot scan generation */
+
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
 
@@ -74,15 +83,10 @@ struct __wt_txn {
 	wt_txnid_t *snapshot;
 	uint32_t snapshot_count;
 
-	/*
-	 * When this transaction started, the oldest transaction ID that was
-	 * not yet visible to some transaction in the system.
-	 */
-	wt_txnid_t oldest_snap_min;
-
 	/* Saved global state, to avoid repeating scans. */
 	wt_txnid_t last_id;
 	uint32_t last_gen;
+	uint32_t last_scan_gen;
 
 	/*
 	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
@@ -98,7 +102,8 @@ struct __wt_txn {
 
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
-#define	TXN_OLDEST	0x04
-#define	TXN_RUNNING	0x08
+#define	TXN_FORCE_EVICT	0x04
+#define	TXN_OLDEST	0x08
+#define	TXN_RUNNING	0x10
 	uint32_t flags;
 };

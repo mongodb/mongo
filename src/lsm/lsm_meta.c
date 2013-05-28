@@ -19,6 +19,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_ITEM buf;
 	WT_LSM_CHUNK *chunk;
+	WT_NAMED_COLLATOR *ncoll;
 	const char *lsmconfig;
 	size_t chunk_sz;
 	u_int nchunks;
@@ -29,7 +30,31 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_RET(__wt_metadata_read(session, lsm_tree->name, &lsmconfig));
 	WT_ERR(__wt_config_init(session, &cparser, lsmconfig));
 	while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
-		if (WT_STRING_MATCH("bloom_config", ck.str, ck.len)) {
+		if (WT_STRING_MATCH("key_format", ck.str, ck.len)) {
+			__wt_free(session, lsm_tree->key_format);
+			WT_ERR(__wt_strndup(session,
+			    cv.str, cv.len, &lsm_tree->key_format));
+		} else if (WT_STRING_MATCH("value_format", ck.str, ck.len)) {
+			__wt_free(session, lsm_tree->value_format);
+			WT_ERR(__wt_strndup(session,
+			    cv.str, cv.len, &lsm_tree->value_format));
+		} else if (WT_STRING_MATCH("collator", ck.str, ck.len)) {
+			if (cv.len == 0)
+				continue;
+			TAILQ_FOREACH(ncoll, &S2C(session)->collqh, q) {
+				if (WT_STRING_MATCH(
+				    ncoll->name, cv.str, cv.len)) {
+					lsm_tree->collator = ncoll->collator;
+					break;
+				}
+			}
+			if (lsm_tree->collator == NULL)
+				WT_ERR_MSG(session, EINVAL,
+				    "unknown collator '%.*s'",
+				    (int)cv.len, cv.str);
+			WT_ERR(__wt_strndup(session,
+			    cv.str, cv.len, &lsm_tree->collator_name));
+		} else if (WT_STRING_MATCH("bloom_config", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->bloom_config);
 			/* Don't include the brackets. */
 			WT_ERR(__wt_strndup(session,
@@ -39,14 +64,6 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			/* Don't include the brackets. */
 			WT_ERR(__wt_strndup(session,
 			    cv.str + 1, cv.len - 2, &lsm_tree->file_config));
-		} else if (WT_STRING_MATCH("key_format", ck.str, ck.len)) {
-			__wt_free(session, lsm_tree->key_format);
-			WT_ERR(__wt_strndup(session,
-			    cv.str, cv.len, &lsm_tree->key_format));
-		} else if (WT_STRING_MATCH("value_format", ck.str, ck.len)) {
-			__wt_free(session, lsm_tree->value_format);
-			WT_ERR(__wt_strndup(session,
-			    cv.str, cv.len, &lsm_tree->value_format));
 		} else if (WT_STRING_MATCH(
 		    "lsm_auto_throttle", ck.str, ck.len)) {
 			if (cv.val)
@@ -147,7 +164,6 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		} else
 			WT_ERR(__wt_illegal_value(session, "LSM metadata"));
 
-		/* TODO: collator */
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -170,9 +186,12 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "bloom_config=(%s),file_config=(%s),key_format=%s,value_format=%s",
-	    lsm_tree->bloom_config, lsm_tree->file_config,
-	    lsm_tree->key_format, lsm_tree->value_format));
+	    "key_format=%s,value_format=%s,bloom_config=(%s),file_config=(%s)",
+	    lsm_tree->key_format, lsm_tree->value_format,
+	    lsm_tree->bloom_config, lsm_tree->file_config));
+	if (lsm_tree->collator_name != NULL)
+		WT_ERR(__wt_buf_catfmt(
+		    session, buf, ",collator=%s", lsm_tree->collator_name));
 	WT_ERR(__wt_buf_catfmt(session, buf,
 	    ",last=%" PRIu32 ",lsm_chunk_size=%" PRIu64
 	    ",lsm_auto_throttle=%" PRIu32

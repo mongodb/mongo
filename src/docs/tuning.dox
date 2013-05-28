@@ -161,6 +161,15 @@ An example of configuring page sizes:
 
 @snippet ex_file.c file create
 
+@section tuning_system_file_growth File growth
+
+It's faster on some filesystems to grow a file in chunks rather than to
+extend it a block at a time as new blocks are written.  By configuring
+the wiredtiger_open functions \c file_extend value, applications can
+grow files ahead of the blocks being written.
+
+@snippet ex_all.c Configure file_extend
+
 @section tuning_system_buffer_cache System buffer cache
 
 @subsection tuning_system_buffer_cache_direct_io Direct I/O
@@ -206,6 +215,11 @@ configured on Linux systems, WiredTiger aligns I/O buffers to 4KB; if
 different alignment is required by your system, the \c buffer_alignment
 configuration to the wiredtiger_open call should be configured to the
 correct value.
+
+Finally, if direct I/O is configured on any system, WiredTiger will
+silently change the file unit allocation size and the maximum leaf and
+internal page sizes to be at least as large as the \c buffer_alignment
+value as well as a multiple of that value.
 
 Direct I/O is based on the non-standard \c O_DIRECT flag to the POSIX
 1003.1 open system call and may not be available on all platforms.

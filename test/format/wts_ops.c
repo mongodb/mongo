@@ -196,8 +196,11 @@ ops(void *arg)
 			track("read/write ops", 0ULL, tinfo);
 
 		if (cnt == ckpt_op) {
-			/* Half the time we name the checkpoint. */
-			if (MMRAND(1, 2) == 1)
+			/*
+			 * LSM trees don't support named checkpoints, else half
+			 * the time we name the checkpoint.
+			 */
+			if (DATASOURCE("lsm") || MMRAND(1, 2) == 1)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(buf, sizeof(buf),

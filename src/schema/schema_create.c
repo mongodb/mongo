@@ -7,11 +7,49 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_direct_io_size_check --
+ *	Return a size from the configuration, complaining if it's insufficient
+ * for direct I/O.
+ */
+int
+__wt_direct_io_size_check(WT_SESSION_IMPL *session,
+    const char **cfg, const char *config_name, uint32_t *sizep)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	int64_t align;
+
+	*sizep = 0;
+
+	conn = S2C(session);
+
+	WT_RET(__wt_config_gets(session, cfg, config_name, &cval));
+
+	/*
+	 * This function exists as a place to hang this comment: if direct I/O
+	 * is configured, page sizes must be at least as large as any buffer
+	 * alignment as well as a multiple of the alignment.  Linux gets unhappy
+	 * if you configure direct I/O and then don't do I/O in alignments and
+	 * units of its happy place.
+	 */
+	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_DATA)) {
+		align = (int64_t)conn->buffer_alignment;
+		if (align != 0 && (cval.val < align || cval.val % align != 0))
+			WT_RET_MSG(session, EINVAL,
+			    "when direct I/O is configured, the %s size must "
+			    "be at least as large as the buffer alignment as "
+			    "well as a multiple of the buffer alignment",
+			    config_name);
+	}
+	*sizep = (uint32_t)cval.val;
+	return (0);
+}
+
 static int
 __create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
 	uint32_t allocsize;
@@ -36,8 +74,9 @@ __create_file(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
-	WT_RET(__wt_config_gets(session, filecfg, "allocation_size", &cval));
-	allocsize = (uint32_t)cval.val;
+	/* Sanity check the allocation size. */
+	WT_RET(__wt_direct_io_size_check(
+	    session, filecfg, "allocation_size", &allocsize));
 
 	/* Create the file. */
 	WT_ERR(__wt_block_manager_create(session, filename, allocsize));
@@ -71,7 +110,7 @@ __create_file(WT_SESSION_IMPL *session,
 	 * Keep the handle exclusive until it is released at the end of the
 	 * call, otherwise we could race with a drop.
 	 */
-	WT_ERR(__wt_conn_btree_get(
+	WT_ERR(__wt_session_get_btree(
 	    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_handle_lock(session, 1));
@@ -89,24 +128,28 @@ __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	size_t len;
 	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
-	prefix = "file:";
-	suffix = ".wt";
 	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-	    WT_STRING_MATCH("lsm", cval.str, cval.len)) {
-		prefix = "lsm:";
+	    !WT_STRING_MATCH("file", cval.str, cval.len)) {
+		prefix = cval.str;
+		len = cval.len;
 		suffix = "";
+	} else {
+		prefix = "file";
+		len = strlen(prefix);
+		suffix = ".wt";
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (cgname == NULL)
-		WT_RET(__wt_buf_fmt(session, buf, "%s%s%s",
-		    prefix, tablename, suffix));
+		WT_RET(__wt_buf_fmt(session, buf, "%.*s:%s%s",
+		    (int)len, prefix, tablename, suffix));
 	else
-		WT_RET(__wt_buf_fmt(session, buf, "%s%s_%s%s",
-		    prefix, tablename, cgname, suffix));
+		WT_RET(__wt_buf_fmt(session, buf, "%.*s:%s_%s%s",
+		    (int)len, prefix, tablename, cgname, suffix));
 
 	return (0);
 }
@@ -222,21 +265,24 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	size_t len;
 	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
-	prefix = "file:";
-	suffix = ".wti";
 	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
-	    WT_STRING_MATCH("lsm", cval.str, cval.len)) {
-		prefix = "lsm:";
+	    !WT_STRING_MATCH("file", cval.str, cval.len)) {
+		prefix = cval.str;
+		len = cval.len;
 		suffix = "_idx";
+	} else {
+		prefix = "file";
+		len = strlen(prefix);
+		suffix = ".wti";
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	tablename = table->name + strlen("table:");
-	WT_RET(__wt_buf_fmt(session, buf, "%s%s_%s%s",
-	    prefix, tablename, idxname, suffix));
+	WT_RET(__wt_buf_fmt(session, buf, "%.*s:%s_%s%s",
+	    (int)len, prefix, tablename, idxname, suffix));
 
 	return (0);
 }

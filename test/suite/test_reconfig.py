@@ -32,7 +32,7 @@ import wiredtiger, wttest
 class test_reconfig(wttest.WiredTigerTestCase):
 
     def test_reconfig_shared_cache(self):
-        self.conn.reconfigure("shared_cache=(size=300M)")
+        self.conn.reconfigure("shared_cache=(enable=true,size=300M)")
 
     def test_reconfig_statistics(self):
         self.conn.reconfigure("statistics=true")

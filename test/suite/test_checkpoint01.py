@@ -113,7 +113,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Build a file with a set of checkpoints, and confirm they all have
         # the correct key/value pairs.
         self.session.create(self.uri,
-            "key_format=" + self.fmt + ",value_format=S,leaf_page_max=512")
+            "key_format=" + self.fmt +\
+                ",value_format=S,allocation_size=512,leaf_page_max=512")
         self.build_file_with_checkpoints()
         self.check()
 

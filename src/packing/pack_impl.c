@@ -23,6 +23,7 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 
 	WT_RET(__pack_initn(session, &pack, fmt, len));
 
+	WT_CLEAR(pv);
 	for (fields = 0; (ret = __pack_next(&pack, &pv)) == 0; fields++)
 		;
 

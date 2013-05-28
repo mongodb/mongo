@@ -69,9 +69,8 @@ source_meta = [
 		set the type of data source used to store a column group, index
 		or simple table.  By default, a \c "file:" URI is derived from
 		the object name.  The \c type configuration can be used to
-		switch to a different storage format, such as LSM.  Ignored if
-		an explicit URI is supplied with a \c source configuration''',
-		choices=['file', 'lsm']),
+		switch to a different data source, such as LSM or an extension
+		configured by the application.'''),
 ]
 
 format_meta = column_meta + [
@@ -131,10 +130,10 @@ lsm_config = [
 
 # Per-file configuration
 file_config = format_meta + [
-	Config('allocation_size', '512B', r'''
+	Config('allocation_size', '4KB', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
-		items, and the default value of 512B is a good choice absent
+		items, and the default value of 4KB is a good choice absent
 		requirements from the operating system or storage device''',
 		min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
@@ -180,7 +179,7 @@ file_config = format_meta + [
 		trailing bytes on internal keys (ignored for custom
 		collators)''',
 		type='boolean'),
-	Config('internal_page_max', '2KB', r'''
+	Config('internal_page_max', '4KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size and is significant
 		for applications wanting to avoid excessive L2 cache misses
@@ -275,6 +274,9 @@ connection_runtime_config = [
 		shared cache configuration options. A database should configure
 		either a cache_size or a shared_cache not both''',
 		type='category', subconfig=[
+		Config('enable', 'false', r'''
+			whether the connection is using a shared cache''',
+			type='boolean'),
 		Config('chunk', '10MB', r'''
 			the granularity that a shared cache is redistributed''',
 			min='1MB', max='10TB'),
@@ -495,11 +497,12 @@ methods = {
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
 	Config('force', 'false', r'''
-		checkpoints may be skipped if the underlying object has not
-		been modified, this option forces the checkpoint''',
+		by default, checkpoints may be skipped if the underlying object
+		has not been modified, this option forces the checkpoint''',
 		type='boolean'),
 	Config('name', '', r'''
-		if non-empty, specify a name for the checkpoint'''),
+		if non-empty, specify a name for the checkpoint (note that
+		checkpoints including LSM trees may not be named)'''),
 	Config('target', '', r'''
 		if non-empty, checkpoint the list of objects''', type='list'),
 ]),
@@ -560,6 +563,12 @@ methods = {
 		WT_CONNECTION::load_extension.  For example,
 		<code>extensions=(/path/ext.so={entry=my_entry})</code>''',
 		type='list'),
+	Config('file_extend', '', r'''
+		file extension configuration.  If set, extend files of the set
+		type in allocations of the set size, instead of a block at a
+		time as each new block is written.  For example,
+		<code>file_extend=(data=16MB)</code>''',
+		type='list', choices=['data', 'log']),
 	Config('hazard_max', '1000', r'''
 		maximum number of simultaneous hazard pointers per session
 		handle''',

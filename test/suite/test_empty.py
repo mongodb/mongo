@@ -49,7 +49,7 @@ class test_empty(wttest.WiredTigerTestCase):
         name = self.name
         if self.type == "table:":
             name = name + '.wt'
-        self.assertEquals(os.stat(name).st_size, 512)
+        self.assertEquals(os.stat(name).st_size, 4*1024)
 
     # Open a new sesssion, add a few rows to an object and then remove them,
     # then close the object.  We open/close the object so it's flushed from
@@ -81,7 +81,7 @@ class test_empty(wttest.WiredTigerTestCase):
         name = self.name
         if self.type == "table:":
             name = name + '.wt'
-        self.assertEquals(os.stat(name).st_size, 512)
+        self.assertEquals(os.stat(name).st_size, 4*1024)
 
     # Creating an object, inserting and removing records (that is, building an
     # empty, dirty tree), shouldn't write any blocks.  This doesn't work for

@@ -57,7 +57,7 @@ __wt_open(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *fh;
+	WT_FH *fh, *tfh;
 	mode_t mode;
 	int direct_io, f, fd, matched;
 	const char *path;
@@ -65,21 +65,20 @@ __wt_open(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 	fh = NULL;
 	fd = -1;
-	direct_io = 0;
+	path = NULL;
 
 	WT_VERBOSE_RET(session, fileops, "%s: open", name);
 
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_FOREACH(fh, &conn->fhqh, q) {
-		if (strcmp(name, fh->name) == 0) {
-			++fh->refcnt;
-			*fhp = fh;
+	TAILQ_FOREACH(tfh, &conn->fhqh, q)
+		if (strcmp(name, tfh->name) == 0) {
+			++tfh->refcnt;
+			*fhp = tfh;
 			matched = 1;
 			break;
 		}
-	}
 	__wt_spin_unlock(session, &conn->fh_lock);
 	if (matched)
 		return (0);
@@ -113,13 +112,13 @@ __wt_open(WT_SESSION_IMPL *session,
 	} else
 		mode = 0;
 
+	direct_io = 0;
 #ifdef O_DIRECT
-	if (is_tree && FLD_ISSET(conn->direct_io, WT_DIRECTIO_DATA)) {
+	if (is_tree && FLD_ISSET(conn->direct_io, WT_FILE_TYPE_DATA)) {
 		f |= O_DIRECT;
 		direct_io = 1;
 	}
 #endif
-
 	WT_SYSCALL_RETRY(((fd = open(path, f, mode)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret,
@@ -145,31 +144,43 @@ __wt_open(WT_SESSION_IMPL *session,
 		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
 #endif
 
-	if (F_ISSET(S2C(session), WT_CONN_SYNC))
+	if (F_ISSET(conn, WT_CONN_SYNC))
 		WT_ERR(__open_directory_sync(session));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->fd = fd;
 	fh->refcnt = 1;
-
-#ifdef O_DIRECT
-	if (f & O_DIRECT)
-		fh->direct_io = 1;
-#endif
+	fh->direct_io = direct_io;
 
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(session, fh, &fh->size));
 
-	/* Link onto the environment's list of files. */
+	/* Configure file extension. */
+	if (is_tree)
+		fh->extend_len = conn->data_extend_len;
+
+	/*
+	 * Repeat the check for a match, but then link onto the database's list
+	 * of files.
+	 */
+	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
-	WT_CSTAT_INCR(session, file_open);
+	TAILQ_FOREACH(tfh, &conn->fhqh, q)
+		if (strcmp(name, tfh->name) == 0) {
+			++tfh->refcnt;
+			*fhp = tfh;
+			matched = 1;
+			break;
+		}
+	if (!matched) {
+		TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
+		WT_CSTAT_INCR(session, file_open);
+
+		*fhp = fh;
+	}
 	__wt_spin_unlock(session, &conn->fh_lock);
-
-	*fhp = fh;
-
-	if (0) {
+	if (matched) {
 err:		if (fh != NULL) {
 			__wt_free(session, fh->name);
 			__wt_free(session, fh);
@@ -180,7 +191,6 @@ err:		if (fh != NULL) {
 
 	__wt_free(session, path);
 
-	WT_UNUSED(is_tree);			/* Only used in #ifdef's. */
 	return (ret);
 }
 
@@ -196,15 +206,19 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	conn = S2C(session);
 
-	if (fh == NULL || fh->refcnt == 0 || --fh->refcnt > 0)
-		return (0);
-
-	/* Remove from the list and discard the memory. */
 	__wt_spin_lock(session, &conn->fh_lock);
+	if (fh == NULL || fh->refcnt == 0 || --fh->refcnt > 0) {
+		__wt_spin_unlock(session, &conn->fh_lock);
+		return (0);
+	}
+
+	/* Remove from the list. */
 	TAILQ_REMOVE(&conn->fhqh, fh, q);
 	WT_CSTAT_DECR(session, file_open);
+
 	__wt_spin_unlock(session, &conn->fh_lock);
 
+	/* Discard the memory. */
 	if (close(fh->fd) != 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "%s", fh->name);

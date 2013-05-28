@@ -850,9 +850,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	static const struct {
 		const char *name;
 		uint32_t flag;
-	} *ft, directio_types[] = {
-		{ "data",	WT_DIRECTIO_DATA },
-		{ "log",	WT_DIRECTIO_LOG },
+	} *ft, file_types[] = {
+		{ "data",	WT_FILE_TYPE_DATA },
+		{ "log",	WT_FILE_TYPE_LOG },
 		{ NULL, 0 }
 	};
 	WT_CONFIG subconfig;
@@ -862,7 +862,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
 	const char *cfg[5];
-	int exist;
 
 	*wt_connp = NULL;
 	session = NULL;
@@ -912,21 +911,27 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Read the environment variable configuration. */
 	WT_ERR(__conn_config_env(session, cfg));
 
+	/*
+	 * Configuration ...
+	 */
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_max = (uint32_t)cval.val;
+
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
+
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_LSM_MERGE);
+
 	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_SYNC);
+
 	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_TRANSACTIONAL);
 
-	/* Configure verbose flags. */
 	WT_ERR(__conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
@@ -936,7 +941,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(__wt_open(
 		   session, WT_LOG_FILENAME, 1, 0, 0, &conn->log_fh));
 
-	/* Configure direct I/O and buffer alignment. */
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
 		conn->buffer_alignment = WT_BUFFER_ALIGNMENT_DEFAULT;
@@ -948,11 +952,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		    "buffer_alignment requires posix_memalign");
 #endif
 
-	/*
-	 * Configuration: direct_io, mmap, statistics.
-	 */
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
-	for (ft = directio_types; ft->name != NULL; ft++) {
+	for (ft = file_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
 		if (ret == 0) {
 			if (sval.val)
@@ -960,8 +961,26 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
+
+	WT_ERR(__wt_config_gets(session, cfg, "file_extend", &cval));
+	for (ft = file_types; ft->name != NULL; ft++) {
+		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
+		if (ret == 0) {
+			switch (ft->flag) {
+			case WT_FILE_TYPE_DATA:
+				conn->data_extend_len = sval.val;
+				break;
+			case WT_FILE_TYPE_LOG:
+				conn->log_extend_len = sval.val;
+				break;
+			}
+		} else if (ret != WT_NOTFOUND)
+			goto err;
+	}
+
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val == 0 ? 0 : 1;
+
 	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
 	conn->statistics = cval.val == 0 ? 0 : 1;
 
@@ -991,21 +1010,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * (which avoids application threads racing to create the metadata file
 	 * later).
 	 */
-	WT_ERR(__wt_meta_turtle_init(session, &exist));
-	if (!exist) {
-		/*
-		 * We're single-threaded, but acquire the schema lock
-		 * regardless: the lower level code checks that it is
-		 * appropriately synchronized.
-		 */
-		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_schema_create(session, WT_METADATA_URI, NULL));
-		WT_ERR(ret);
-	}
+	WT_ERR(__wt_turtle_init(session));
 	WT_ERR(__wt_metadata_open(session));
-
-	/* If there's a hot-backup file, load it. */
-	WT_ERR(__wt_metadata_load_backup(session));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

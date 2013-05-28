@@ -185,7 +185,10 @@ struct __wt_connection_impl {
 
 	uint32_t schema_gen;		/* Schema generation number */
 
-	uint32_t direct_io;		/* O_DIRECT configuration */
+	off_t	 data_extend_len;	/* file_extend data length */
+	off_t	 log_extend_len;	/* file_extend log length */
+
+	uint32_t direct_io;		/* O_DIRECT file type flags */
 	int	 mmap;			/* mmap configuration */
 	uint32_t verbose;
 

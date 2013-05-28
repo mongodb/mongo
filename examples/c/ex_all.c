@@ -1013,6 +1013,13 @@ main(void)
 		(void)conn->close(conn, NULL);
 #endif
 
+	/*! [Configure file_extend] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,file_extend=(type=[data],size=16MB)", &conn);
+	/*! [Configure file_extend] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
 	/*! [Statistics configuration] */
 	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
 	/*! [Statistics configuration] */

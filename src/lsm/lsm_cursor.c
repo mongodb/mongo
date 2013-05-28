@@ -33,12 +33,21 @@
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 1))
 
+#define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
+	CURSOR_UPDATE_API_END(session, ret);				\
+	if (clsm->primary_chunk != NULL) {				\
+		WT_ASSERT(session, clsm->primary_chunk->ncursor > 0);	\
+		(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);	\
+	}
+
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_search(WT_CURSOR *);
 
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 {
+	if (update && clsm->primary_chunk != NULL)
+		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 	    (clsm->dsk_gen != clsm->lsm_tree->dsk_gen ||
 	    (!update && !F_ISSET(clsm, WT_CLSM_OPEN_READ))))
@@ -56,7 +65,8 @@ static const WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 #define	WT_LSM_NEEDVALUE(c) do {					\
 	WT_CURSOR_NEEDVALUE(c);						\
 	if (__clsm_deleted((WT_CURSOR_LSM *)(c), &(c)->value))		\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
+		WT_ERR_MSG((WT_SESSION_IMPL *)cursor->session, EINVAL,	\
+		    "LSM does not yet support zero-length data items");	\
 } while (0)
 
 /*
@@ -74,7 +84,7 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
  *	Close all of the btree cursors currently open.
  */
 static int
-__clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
+__clsm_close_cursors(WT_CURSOR_LSM *clsm, int update, u_int skip_chunks)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
@@ -85,7 +95,8 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
 
 	/* Detach from our old primary. */
 	if (clsm->primary_chunk != NULL) {
-		(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
+		if (update)
+			(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
 		clsm->primary_chunk = NULL;
 	}
 
@@ -177,7 +188,7 @@ __clsm_open_cursors(
 			clsm->dsk_gen = lsm_tree->dsk_gen;
 			goto err;
 		}
-		WT_RET(__clsm_close_cursors(clsm, skip_chunks));
+		WT_RET(__clsm_close_cursors(clsm, update, skip_chunks));
 	}
 
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
@@ -259,7 +270,8 @@ __clsm_open_cursors(
 	/* The last chunk is our new primary. */
 	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
-		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
+		if (update)
+			(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
 		__wt_btree_evictable(session, 0);
 	}
@@ -643,8 +655,10 @@ err:	API_END(session);
 	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	} else
+	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		clsm->current = NULL;
+	}
 
 	return (ret);
 }
@@ -807,8 +821,10 @@ err:	API_END(session);
 	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	} else
+	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		clsm->current = NULL;
+	}
 
 	return (ret);
 }
@@ -847,7 +863,13 @@ __clsm_put(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, clsm->primary_chunk != NULL);
 	}
 
-	primary = clsm->cursors[clsm->nchunks - 1];
+	/*
+	 * Set the position for future scans.  If we were already positioned in
+	 * a non-primary chunk, we may now have multiple cursors matching the
+	 * key.
+	 */
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+	clsm->current = primary = clsm->cursors[clsm->nchunks - 1];
 	primary->set_key(primary, key);
 	primary->set_value(primary, value);
 	WT_RET(primary->insert(primary));
@@ -859,14 +881,6 @@ __clsm_put(WT_SESSION_IMPL *session,
 	if (++clsm->primary_chunk->count % 100 == 0 &&
 	    lsm_tree->throttle_sleep > 0)
 		__wt_sleep(0, lsm_tree->throttle_sleep);
-
-	/*
-	 * Set the position for future scans.  If we were already positioned in
-	 * a non-primary chunk, we may now have multiple cursors matching the
-	 * key.
-	 */
-	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
-	clsm->current = primary;
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree
@@ -946,7 +960,7 @@ __clsm_insert(WT_CURSOR *cursor)
 
 	ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 
@@ -969,7 +983,7 @@ __clsm_update(WT_CURSOR *cursor)
 	    (ret = __clsm_search(cursor)) == 0)
 		ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 
@@ -991,7 +1005,7 @@ __clsm_remove(WT_CURSOR *cursor)
 	    (ret = __clsm_search(cursor)) == 0)
 		ret = __clsm_put(session, clsm, &cursor->key, &__lsm_tombstone);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 
@@ -1012,7 +1026,7 @@ __clsm_close(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
-	WT_TRET(__clsm_close_cursors(clsm, 0));
+	WT_TRET(__clsm_close_cursors(clsm, 0, 0));
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */
@@ -1031,7 +1045,7 @@ err:	API_END(session);
  */
 int
 __wt_clsm_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
 	    NULL,			/* get-key */
@@ -1083,7 +1097,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	clsm->dsk_gen = 0;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	/*
 	 * LSM cursors default to overwrite: if no setting was supplied, turn

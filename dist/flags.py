@@ -15,9 +15,9 @@ flags = {
 		'SYNC_DISCARD_NOWRITE',
 		'SYNC_WRITE_LEAVES',
 	],
-	'direct_io' : [
-		'DIRECTIO_DATA',
-		'DIRECTIO_LOG'
+	'file_types' : [
+		'FILE_TYPE_DATA',
+		'FILE_TYPE_LOG'
 	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',

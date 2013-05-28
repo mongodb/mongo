@@ -39,7 +39,7 @@ class test_bug004(wttest.WiredTigerTestCase):
     uri = 'file:test_ovfl_key'
 
     # Use a small page size because we want to create overflow items
-    config = 'leaf_page_max=512,value_format=S,key_format=S'
+    config = 'allocation_size=512,leaf_page_max=512,value_format=S,key_format=S'
 
     nentries = 30
 

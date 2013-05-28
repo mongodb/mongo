@@ -31,6 +31,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_free(session, lsm_tree->config);
 	__wt_free(session, lsm_tree->key_format);
 	__wt_free(session, lsm_tree->value_format);
+	__wt_free(session, lsm_tree->collator_name);
 	__wt_free(session, lsm_tree->bloom_config);
 	__wt_free(session, lsm_tree->file_config);
 
@@ -351,6 +352,10 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
+	WT_ERR(__wt_config_gets(session, cfg, "collator", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len,
+	    &lsm_tree->collator_name));
+
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_auto_throttle", &cval));
 	if (cval.val)
 		F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);
@@ -550,10 +555,11 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, **cp;
-	uint64_t record_count;
+	uint64_t cache_sz, cache_used, record_count;
 	uint32_t in_memory, new_id;
 
-	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
+	cache_sz = S2C(session)->cache_size;
+	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
 	    lsm_tree->chunk_alloc)
@@ -589,6 +595,20 @@ __wt_lsm_tree_switch(
 		lsm_tree->throttle_sleep = (long)((in_memory - 2) *
 		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
 		    (20 * record_count));
+		/*
+		 * Get more aggressive as the number of in memory chunks
+		 * consumes a large proportion of the cache. In memory chunks
+		 * are allowed to grow up to twice as large as the configured
+		 * value when checkpoints aren't keeping up. That worst case
+		 * is when this calculation is relevant.
+		 * There is nothing particularly special about the chosen
+		 * multipliers.
+		 */
+		cache_used = in_memory * lsm_tree->chunk_size * 2;
+		if (cache_used > cache_sz)
+			lsm_tree->throttle_sleep *= 8;
+		else if (cache_used > cache_sz * 0.8)
+			lsm_tree->throttle_sleep *= 4;
 	}
 
 	WT_VERBOSE_ERR(session, lsm, "Tree switch to: %d, throttle %d",
