@@ -60,6 +60,7 @@ struct __wt_cursor_backup {
 	size_t list_allocated;		/* List of files */
 	size_t list_next;
 	char **list;
+	FILE *bfp;
 };
 
 struct __wt_cursor_btree {

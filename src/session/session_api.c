@@ -350,7 +350,7 @@ __session_compact_worker(
 	SESSION_API_CALL(session, compact, config, cfg);
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_compact, cfg, 0));
+	    ret = __wt_schema_worker(session, uri, __wt_compact, NULL, cfg, 0));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -466,8 +466,8 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_salvage, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
+	    ret = __wt_schema_worker(session, uri, __wt_salvage,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -588,8 +588,8 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_upgrade, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
+	    ret = __wt_schema_worker(session, uri, __wt_upgrade,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -608,8 +608,8 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, verify, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_verify, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
+	    ret = __wt_schema_worker(session, uri, __wt_verify,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

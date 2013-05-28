@@ -95,7 +95,7 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 
 		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
 		if ((ret = __wt_schema_worker(
-		    session, tmp->data, op, cfg, 0)) != 0)
+		    session, tmp->data, op, NULL, cfg, 0)) != 0)
 			WT_ERR_MSG(session, ret, "%s", (const char *)tmp->data);
 	}
 	WT_ERR_NOTFOUND_OK(ret);

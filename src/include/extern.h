@@ -582,6 +582,7 @@ extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_backup_list_append(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
@@ -726,8 +727,10 @@ extern int __wt_lsm_tree_truncate( WT_SESSION_IMPL *session,
     const char *cfg[]);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,
-    int (*func)(WT_SESSION_IMPL *,
+    int (*file_func)(WT_SESSION_IMPL *,
     const char *[]),
+    int (*name_func)(WT_SESSION_IMPL *,
+    const char *),
     const char *cfg[],
     uint32_t open_flags);
 extern void *__wt_lsm_merge_worker(void *vargs);
@@ -763,7 +766,6 @@ extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern void __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
-extern int __wt_metadata_load_backup(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);
@@ -789,11 +791,11 @@ extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
 extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created);
-extern int __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp);
-extern int __wt_meta_turtle_read( WT_SESSION_IMPL *session,
+extern int __wt_turtle_init(WT_SESSION_IMPL *session);
+extern int __wt_turtle_read(WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
-extern int __wt_meta_turtle_update( WT_SESSION_IMPL *session,
+extern int __wt_turtle_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
 extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_ATTRIBUTE((noreturn));
@@ -1048,8 +1050,10 @@ extern int __wt_schema_get_source( WT_SESSION_IMPL *session,
 extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
-    int (*func)(WT_SESSION_IMPL *,
+    int (*file_func)(WT_SESSION_IMPL *,
     const char *[]),
+    int (*name_func)(WT_SESSION_IMPL *,
+    const char *),
     const char *cfg[],
     uint32_t open_flags);
 extern int __wt_open_cursor(WT_SESSION_IMPL *session,

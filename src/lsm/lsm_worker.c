@@ -279,7 +279,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			F_SET(lsm_tree, WT_LSM_TREE_LOCKED);
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, NULL, 0));
+			    __wt_checkpoint, NULL, NULL, 0));
 			F_CLR(lsm_tree, WT_LSM_TREE_LOCKED);
 
 			if (ret != 0) {
@@ -432,10 +432,18 @@ __lsm_discard_handle(
 static int
 __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	int hot_backup_locked;
 	const char *drop_cfg[] = {
 	    WT_CONFIG_BASE(session, session_drop), "remove_files=false", NULL
 	};
+
+	conn = S2C(session);
+	hot_backup_locked = 0;
+	/* Give up if a hot backup is in progress. */
+	if (conn->hot_backup != 0)
+		return (EBUSY);
 
 	/*
 	 * We need to grab the schema lock to drop the file, so first try to
@@ -445,12 +453,18 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	WT_RET(__lsm_discard_handle(session, uri, NULL));
 	WT_RET(__lsm_discard_handle(session, uri, "WiredTigerCheckpoint"));
 
+	__wt_spin_lock(session, &conn->hot_backup_lock);
+	hot_backup_locked = 1;
+	if (conn->hot_backup != 0)
+		goto done;
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_drop(session, uri, drop_cfg));
 
 	if (ret == 0)
 		ret = __wt_remove(session, uri + strlen("file:"));
 
+done:	if (hot_backup_locked)
+		__wt_spin_unlock(session, &conn->hot_backup_lock);
 	return (ret);
 }
 
