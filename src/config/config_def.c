@@ -25,6 +25,7 @@ static const WT_CONFIG_CHECK confchk_connection_open_session[] = {
 
 static const WT_CONFIG_CHECK confchk_shared_cache_subconfigs[] = {
 	{ "chunk", "int", "min=1MB,max=10TB", NULL },
+	{ "enable", "boolean", NULL, NULL },
 	{ "name", "string", NULL, NULL },
 	{ "reserve", "int", NULL, NULL },
 	{ "size", "int", "min=1MB,max=10TB", NULL },
@@ -289,7 +290,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "connection.reconfigure",
 	  "cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	  "name=pool,reserve=0,size=500MB),statistics=0,verbose=",
+	  "enable=0,name=pool,reserve=0,size=500MB),statistics=0,verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",
@@ -394,7 +395,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "direct_io=,error_prefix=,eviction_dirty_target=80,eviction_target=80"
 	  ",eviction_trigger=95,extensions=,file_extend=,hazard_max=1000,"
 	  "logging=0,lsm_merge=,mmap=,multiprocess=0,session_max=50,"
-	  "shared_cache=(chunk=10MB,name=pool,reserve=0,size=500MB),"
+	  "shared_cache=(chunk=10MB,enable=0,name=pool,reserve=0,size=500MB),"
 	  "statistics=0,statistics_log=(clear=,path=\"WiredTigerStat.%H\","
 	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,transactional=,"
 	  "use_environment_priv=0,verbose=",

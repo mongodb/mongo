@@ -66,7 +66,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
     def openConnections(
             self,
             connections,
-            pool_opts = ',shared_cache=(name=pool,size=200M,chunk=10M,reserve=30M),',
+            pool_opts = ',shared_cache=(enable=true,name=pool,size=200M,chunk=10M,reserve=30M),',
             extra_opts = '',
             add=0):
         if add == 0:
@@ -189,7 +189,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
     # Test default config values
     def test_shared_cache09(self):
         nops = 1000
-        self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts=',shared_cache=(name=pool,size=200M)')
+        self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts=',shared_cache=(enable=true,name=pool,size=200M)')
 
         for sess in self.sessions:
             sess.create(self.uri, "key_format=S,value_format=S")
@@ -206,13 +206,13 @@ class test_shared_cache(wttest.WiredTigerTestCase):
             self.add_records(sess, 0, nops)
 
         connection = self.conns[0]
-        connection.reconfigure("shared_cache=(size=300M)")
+        connection.reconfigure("shared_cache=(enable=true,size=300M)")
         self.closeConnections()
 
     # Test default config values
     def test_shared_cache11(self):
         nops = 1000
-        self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts=',shared_cache=()')
+        self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts=',shared_cache=(enable=true)')
 
         for sess in self.sessions:
             sess.create(self.uri, "key_format=S,value_format=S")
