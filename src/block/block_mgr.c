@@ -328,6 +328,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		    (WT_BM *, WT_SESSION_IMPL *, int, int *))__bm_readonly;
 		bm->free = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, const uint8_t *, uint32_t))__bm_readonly;
+		bm->preload = __wt_bm_preload;
 		bm->read = __wt_bm_read;
 		bm->salvage_end = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
@@ -358,6 +359,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->compact_page_skip = __bm_compact_page_skip;
 		bm->compact_skip = __bm_compact_skip;
 		bm->free = __bm_free;
+		bm->preload = __wt_bm_preload;
 		bm->read = __wt_bm_read;
 		bm->salvage_end = __bm_salvage_end;
 		bm->salvage_next = __bm_salvage_next;
