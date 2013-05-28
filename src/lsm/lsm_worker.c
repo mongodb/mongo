@@ -279,7 +279,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			F_SET(lsm_tree, WT_LSM_TREE_LOCKED);
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, NULL, 0));
+			    __wt_checkpoint, NULL, NULL, 0));
 			F_CLR(lsm_tree, WT_LSM_TREE_LOCKED);
 
 			if (ret != 0) {

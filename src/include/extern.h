@@ -727,8 +727,10 @@ extern int __wt_lsm_tree_truncate( WT_SESSION_IMPL *session,
     const char *cfg[]);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,
-    int (*func)(WT_SESSION_IMPL *,
+    int (*file_func)(WT_SESSION_IMPL *,
     const char *[]),
+    int (*name_func)(WT_SESSION_IMPL *,
+    const char *),
     const char *cfg[],
     uint32_t open_flags);
 extern void *__wt_lsm_merge_worker(void *vargs);
@@ -1048,8 +1050,10 @@ extern int __wt_schema_get_source( WT_SESSION_IMPL *session,
 extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
-    int (*func)(WT_SESSION_IMPL *,
+    int (*file_func)(WT_SESSION_IMPL *,
     const char *[]),
+    int (*name_func)(WT_SESSION_IMPL *,
+    const char *),
     const char *cfg[],
     uint32_t open_flags);
 extern int __wt_open_cursor(WT_SESSION_IMPL *session,

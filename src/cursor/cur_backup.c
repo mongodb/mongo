@@ -361,7 +361,8 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    "%s: invalid backup target: URIs may need quoting",
 			    uri);
 
-		WT_ERR(__wt_schema_worker(session, uri, NULL, cfg, 0));
+		WT_ERR(__wt_schema_worker(
+		    session, uri, NULL, __wt_backup_list_append, cfg, 0));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 

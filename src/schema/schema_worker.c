@@ -15,7 +15,8 @@
 int
 __wt_schema_worker(WT_SESSION_IMPL *session,
    const char *uri,
-   int (*func)(WT_SESSION_IMPL *, const char *[]),
+   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
+   int (*name_func)(WT_SESSION_IMPL *, const char *),
    const char *cfg[], uint32_t open_flags)
 {
 	WT_COLGROUP *colgroup;
@@ -30,69 +31,65 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	table = NULL;
 	tablename = uri;
 
+	if (name_func != NULL)
+		WT_ERR(name_func(session, uri));
+
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		if (func == NULL)
-			WT_ERR(__wt_backup_list_append(session, uri));
-		else {
+		if (file_func != NULL) {
 			WT_ERR(__wt_session_get_btree_ckpt(
 			    session, uri, cfg, open_flags));
-			ret = func(session, cfg);
+			ret = file_func(session, cfg);
 			WT_TRET(__wt_session_release_btree(session));
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 		WT_ERR(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
-		if (func == NULL)
-			WT_ERR(
-			    __wt_backup_list_append(session, colgroup->name));
-		WT_ERR(__wt_schema_worker(session,
-		    colgroup->source, func, cfg, open_flags));
+		WT_ERR(__wt_schema_worker(session, colgroup->source,
+		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
 		idx = NULL;
 		WT_ERR(__wt_schema_get_index(session, uri, NULL, &idx));
-		if (func == NULL)
-			WT_ERR(__wt_backup_list_append(session, idx->name));
-		WT_ERR(__wt_schema_worker(
-		    session, idx->source, func, cfg, open_flags));
+		WT_ERR(__wt_schema_worker(session, idx->source,
+		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
-		if (func == NULL)
-			WT_ERR(__wt_backup_list_append(session, uri));
 		WT_ERR(__wt_lsm_tree_worker(
-		    session, uri, func, cfg, open_flags));
+		    session, uri, file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_ERR(__wt_schema_get_table(session,
 		    tablename, strlen(tablename), 0, &table));
-		if (func == NULL)
-			WT_ERR(__wt_backup_list_append(session, uri));
 		WT_ASSERT(session, session->dhandle == NULL);
 
+		/*
+		 * We could make a recursive call for each colgroup or index
+		 * URI, but since we have already opened the table, we can take
+		 * a short cut and skip straight to the sources.  If we have a
+		 * name function, it needs to know about the intermediate URIs.
+		 */
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
-			if (func == NULL)
-				WT_ERR(__wt_backup_list_append(
-				    session, colgroup->name));
-			WT_ERR(__wt_schema_worker(
-			    session, colgroup->source, func, cfg, open_flags));
+			if (name_func != NULL)
+				WT_ERR(name_func(session, colgroup->name));
+			WT_ERR(__wt_schema_worker(session, colgroup->source,
+			    file_func, name_func, cfg, open_flags));
 		}
 
 		WT_ERR(__wt_schema_open_indices(session, table));
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
-			if (func == NULL)
-				WT_ERR(__wt_backup_list_append(
-				    session, idx->name));
-			WT_ERR(__wt_schema_worker(
-			    session, idx->source, func, cfg, open_flags));
+			if (name_func != NULL)
+				WT_ERR(name_func(session, idx->name));
+			WT_ERR(__wt_schema_worker(session, idx->source,
+			    file_func, name_func, cfg, open_flags));
 		}
 	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0) {
 		wt_session = (WT_SESSION *)session;
-		if (func == __wt_compact && dsrc->compact != NULL)
+		if (file_func == __wt_compact && dsrc->compact != NULL)
 			WT_ERR(dsrc->compact(
 			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
-		else if (func == __wt_salvage && dsrc->salvage != NULL)
+		else if (file_func == __wt_salvage && dsrc->salvage != NULL)
 			WT_ERR(dsrc->salvage(
 			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
-		else if (func == __wt_verify && dsrc->verify != NULL)
+		else if (file_func == __wt_verify && dsrc->verify != NULL)
 			WT_ERR(dsrc->verify(
 			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else
