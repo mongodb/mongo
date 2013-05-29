@@ -22,8 +22,12 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/db/auth/auth_global_external_state_d.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
@@ -1267,6 +1271,11 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         }
 #endif
     }
+}
+
+MONGO_INITIALIZER(CreateAuthorizationManager)(InitializerContext* context) {
+    setGlobalAuthorizationManager(new AuthorizationManager(new AuthGlobalExternalStateMongod()));
+    return Status::OK();
 }
 
 static int mongoDbMain(int argc, char* argv[], char **envp) {

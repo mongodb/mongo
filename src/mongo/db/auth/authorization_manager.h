@@ -16,9 +16,11 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/auth/auth_global_external_state.h"
 
 namespace mongo {
 
@@ -39,12 +41,17 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(AuthorizationManager);
     public:
 
+        // The newly constructed AuthorizationManager takes ownership of "externalState"
+        explicit AuthorizationManager(AuthGlobalExternalState* externalState);
+
         static const std::string SERVER_RESOURCE_NAME;
         static const std::string CLUSTER_RESOURCE_NAME;
 
         static const std::string USER_NAME_FIELD_NAME;
         static const std::string USER_SOURCE_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
+
+        // TODO: Make the following functions no longer static.
 
         /**
          * Sets whether or not we allow old style (pre v2.4) privilege documents for this whole
@@ -67,6 +74,7 @@ namespace mongo {
          */
         static bool isAuthEnabled();
 
+        AuthGlobalExternalState* getGlobalExternalState() const;
 
     private:
 
@@ -76,6 +84,8 @@ namespace mongo {
         // --auth or --keyFile).
         // This is a config setting, set at startup and not changing after initialization.
         static bool _authEnabled;
+
+        scoped_ptr<AuthGlobalExternalState> _globalExternalState;
     };
 
 } // namespace mongo

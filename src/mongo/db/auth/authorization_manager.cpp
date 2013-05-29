@@ -34,6 +34,13 @@ namespace mongo {
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
     bool AuthorizationManager::_authEnabled = false;
 
+    AuthorizationManager::AuthorizationManager(AuthGlobalExternalState* globalExternalState) :
+            _globalExternalState(globalExternalState) {}
+
+    AuthGlobalExternalState* AuthorizationManager::getGlobalExternalState() const {
+        return _globalExternalState.get();
+    }
+
     void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
         _doesSupportOldStylePrivileges = enabled;
     }

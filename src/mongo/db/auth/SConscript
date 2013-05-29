@@ -29,6 +29,7 @@ env.StaticLibrary('authcore', ['action_set.cpp',
 env.StaticLibrary('authservercommon',
                   ['auth_session_external_state_server_common.cpp',
                    'auth_server_parameters.cpp',
+                   'authorization_manager_global.cpp',
                    'security_key.cpp'],
                   LIBDEPS=['authcore'])
 
