@@ -171,7 +171,7 @@ __wt_txn_refresh(
 			txn_state->snap_min = snap_min;
 			WT_ATOMIC_ADD(txn_global->scan_gen, 1);
 		}
-	} while (txn->last_gen != txn_global->gen ||
+	} while (TXNID_LT(snap_min, txn_global->oldest_id) ||
 	    (!get_snapshot && !WT_ATOMIC_CAS(txn_global->scan_gen,
 		txn->last_scan_gen, txn->last_scan_gen + 1)));
 
