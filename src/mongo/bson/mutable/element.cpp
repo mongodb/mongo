@@ -149,5 +149,23 @@ namespace mutablebson {
         return pushBack(getDocument().makeElementSafeNum(fieldName, value));
     }
 
+    std::string Element::toString() const {
+        if (hasValue()) {
+            return getValue().toString();
+        } else if (isType(mongo::Object)) {
+            BSONObjBuilder builder;
+            writeTo(&builder);
+            BSONObj obj = builder.obj();
+            return obj.firstElement().toString();
+        } else if (isType(mongo::Array)) {
+            BSONArrayBuilder builder;
+            writeArrayTo(&builder);
+            BSONArray arr = builder.arr();
+            return arr.firstElement().toString();
+        } else {
+            return "corrupted element";
+        }
+    }
+
 } // namespace mutablebson
 } // namespace mongo

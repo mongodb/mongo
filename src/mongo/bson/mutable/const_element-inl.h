@@ -172,6 +172,10 @@ namespace mutablebson {
         return _basis.getIdx();
     }
 
+    inline std::string ConstElement::toString() const {
+        return _basis.toString();
+    }
+
     inline bool operator==(const ConstElement& l, const ConstElement& r) {
         return l._basis == r._basis;
     }

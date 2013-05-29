@@ -551,6 +551,9 @@ namespace mutablebson {
          */
         Status appendSafeNum(const StringData& fieldName, SafeNum value);
 
+        /** Convert this element to its JSON representation */
+        std::string toString() const;
+
     private:
         friend class Document;
         friend bool operator==(const Element&, const Element&);

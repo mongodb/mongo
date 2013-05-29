@@ -47,5 +47,9 @@ namespace mutablebson {
         return _root;
     }
 
+    inline std::string Document::toString() const {
+        return getObject().toString();
+    }
+
 } // namespace mutablebson
 } // namespace mongo

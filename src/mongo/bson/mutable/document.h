@@ -384,6 +384,8 @@ namespace mutablebson {
         /** Returns an element that will compare equal to a non-ok element. */
         ConstElement end() const;
 
+        inline std::string toString() const;
+
     private:
         friend class Element;
 

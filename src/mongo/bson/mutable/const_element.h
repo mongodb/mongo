@@ -88,6 +88,8 @@ namespace mutablebson {
         inline StringData getFieldName() const;
         inline Element::RepIdx getIdx() const;
 
+        inline std::string toString() const;
+
         friend bool operator==(const ConstElement&, const ConstElement&);
 
     private:

@@ -458,6 +458,40 @@ namespace {
         ASSERT_EQUALS(mongo::String, t0.getType());
     }
 
+    TEST(Element, toString) {
+        mongo::BSONObj obj = mongo::fromjson("{ a : 1, b : [1, 2, 3], c : { x : 'x' } }");
+        mmb::Document doc(obj);
+
+        // Deserialize the 'c' but keep its value the same.
+        mmb::Element c = doc.root().rightChild();
+        ASSERT_TRUE(c.ok());
+        ASSERT_OK(c.appendString("y", "y"));
+        ASSERT_OK(c.popBack());
+
+        // 'a'
+        mongo::BSONObjIterator iter(obj);
+        mmb::Element docChild = doc.root().leftChild();
+        ASSERT_TRUE(docChild.ok());
+        ASSERT_EQUALS(iter.next().toString(), docChild.toString());
+
+        // 'b'
+        docChild = docChild.rightSibling();
+        ASSERT_TRUE(docChild.ok());
+        ASSERT_TRUE(iter.more());
+        ASSERT_EQUALS(iter.next().toString(), docChild.toString());
+
+        // 'c'
+        docChild = docChild.rightSibling();
+        ASSERT_TRUE(docChild.ok());
+        ASSERT_TRUE(iter.more());
+        ASSERT_EQUALS(iter.next().toString(), docChild.toString());
+
+        // eoo
+        docChild = docChild.rightSibling();
+        ASSERT_FALSE(iter.more());
+        ASSERT_FALSE(docChild.ok());
+    }
+
     TEST(TimestampType, createElement) {
         mmb::Document doc;
 
@@ -1158,6 +1192,18 @@ namespace {
         ASSERT_TRUE(newElem.ok());
         ASSERT_EQUALS(newElem.getType(), mongo::NumberInt);
         ASSERT_EQUALS(newElem.getValueInt(), 1);
+    }
+
+    TEST(Document, toStringEmpty) {
+        mongo::BSONObj obj;
+        mmb::Document doc;
+        ASSERT_EQUALS(obj.toString(), doc.toString());
+    }
+
+    TEST(Document, toStringComplex) {
+        mongo::BSONObj obj = mongo::fromjson("{a : 1, b : [1, 2, 3], c : 'c'}");
+        mmb::Document doc(obj);
+        ASSERT_EQUALS(obj.toString(), doc.toString());
     }
 
 } // namespace

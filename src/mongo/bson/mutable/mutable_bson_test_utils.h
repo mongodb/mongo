@@ -33,7 +33,23 @@ namespace mutablebson {
      * (a) 'doc's generated object, (b) 'exp', the expected object, and (c) 'doc(exp)', a
      * document created from 'exp'. Returns true if all three are equal, otherwise false.
      */
-    bool checkDoc(const Document& doc, const BSONObj& exp);
+    bool checkDoc(const Document& lhs, const BSONObj& rhs);
+    bool checkDoc(const Document& lhs, const Document& rhs);
+
+    inline bool operator==(const Document& lhs, const Document& rhs) {
+        return checkDoc(lhs, rhs);
+    }
+
+    inline bool operator==(const BSONObj& lhs, const Document& rhs) {
+        return checkDoc(rhs, lhs);
+    }
+
+    inline bool operator==(const Document& lhs, const BSONObj& rhs) {
+        return checkDoc(lhs, rhs);
+    }
+
+    /** Stream out a document; useful within ASSERT calls */
+    std::ostream& operator<<(std::ostream& stream, const Document& doc);
 
     /** Stream out an element; useful within ASSERT calls */
     std::ostream& operator<<(std::ostream& stream, const ConstElement& elt);
