@@ -151,6 +151,7 @@ struct __wt_bm {
 	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t, int *);
 	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int, int *);
 	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
+	int (*preload)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
 	int (*read)
 	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, uint32_t);
 	int (*salvage_end)(WT_BM *, WT_SESSION_IMPL *);

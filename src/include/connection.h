@@ -177,9 +177,6 @@ struct __wt_connection_impl {
 					/* Locked: data source list */
 	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
 
-	FILE *msgfile;
-	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
-
 	/* If non-zero, all buffers used for I/O will be aligned to this. */
 	size_t buffer_alignment;
 

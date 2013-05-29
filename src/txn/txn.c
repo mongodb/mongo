@@ -137,16 +137,20 @@ __wt_txn_refresh(
 		    i < session_cnt;
 		    i++, s++) {
 			/*
-			 * Ignore everything about the session's own
-			 * transaction if we are in the process of updating it.
+			 * Ignore the ID if we are committing (indicated by
+			 * max_id being set): it is about to be released.
 			 */
-			if (get_snapshot && s == txn_state)
-				continue;
-			if ((id = s->id) != WT_TXN_NONE) {
+			if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id) {
 				txn->snapshot[n++] = id;
 				if (TXNID_LT(id, snap_min))
 					snap_min = id;
 			}
+			/*
+			 * Ignore the session's own snap_min if we are in the
+			 * process of updating it.
+			 */
+			if (get_snapshot && s == txn_state)
+				continue;
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_id))
 				oldest_id = id;
@@ -171,7 +175,7 @@ __wt_txn_refresh(
 			txn_state->snap_min = snap_min;
 			WT_ATOMIC_ADD(txn_global->scan_gen, 1);
 		}
-	} while (txn->last_gen != txn_global->gen ||
+	} while (TXNID_LT(snap_min, txn_global->oldest_id) ||
 	    (!get_snapshot && !WT_ATOMIC_CAS(txn_global->scan_gen,
 		txn->last_scan_gen, txn->last_scan_gen + 1)));
 

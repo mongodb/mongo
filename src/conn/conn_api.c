@@ -469,7 +469,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  *	Read in any WiredTiger_config file in the home directory.
  */
 static int
-__conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
+__conn_config_file(
+    WT_SESSION_IMPL *session, WT_ITEM **cbufp, const char **cfgend)
 {
 	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
@@ -593,16 +594,7 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 	WT_ERR(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), cbuf->data, 0));
 
-	/*
-	 * The configuration file falls between the default configuration and
-	 * the wiredtiger_open() configuration, overriding the defaults but not
-	 * overriding the wiredtiger_open() configuration.
-	 */
-	while (cfg[1] != NULL)
-		++cfg;
-	cfg[1] = cfg[0];
-	cfg[0] = cbuf->data;
-
+	*cfgend = cbuf->data;
 	*cbufp = cbuf;
 
 	if (0) {
@@ -619,7 +611,8 @@ err:		if (cbuf != NULL)
  *	Read configuration from an environment variable, if set.
  */
 static int
-__conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
+__conn_config_env(
+    WT_SESSION_IMPL *session, const char *cfg[], const char **cfgend)
 {
 	WT_CONFIG_ITEM cval;
 	const char *env_config;
@@ -644,16 +637,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 	WT_RET(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
 
-	/*
-	 * The environment setting comes second-to-last: it overrides the
-	 * WiredTiger.config file (if any), but not the config passed by the
-	 * application.
-	 */
-	while (cfg[1] != NULL)
-		++cfg;
-	cfg[1] = cfg[0];
-	cfg[0] = env_config;
-
+	*cfgend = env_config;
 	return (0);
 }
 
@@ -662,7 +646,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
  *	Set the database home directory.
  */
 static int
-__conn_home(WT_SESSION_IMPL *session, const char *home, const char **cfg)
+__conn_home(WT_SESSION_IMPL *session, const char *home, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 
@@ -696,7 +680,7 @@ copy:	return (__wt_strdup(session, home, &S2C(session)->home));
  *	Confirm that no other thread of control is using this database.
  */
 static int
-__conn_single(WT_SESSION_IMPL *session, const char **cfg)
+__conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn, *t;
@@ -861,7 +845,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
-	const char *cfg[5];
+	const char *cfg[5], **cfgend;
 
 	*wt_connp = NULL;
 	session = NULL;
@@ -905,11 +889,26 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Make sure no other thread of control already owns this database. */
 	WT_ERR(__conn_single(session, cfg));
 
-	/* Read the database-home configuration file. */
-	WT_ERR(__conn_config_file(session, cfg, &cbuf));
+	/*
+	 * Build the configuration stack.
+	 *
+	 * The configuration file falls between the default configuration and
+	 * the wiredtiger_open() configuration, overriding the defaults but not
+	 * overriding the value passed by the application.  The environment
+	 * setting overrides the configuration file (if any), but not the
+	 * config passed by the application.
+	 *
+	 * Track the end of the stack, which always points to the config passed
+	 * by the application.
+	 */
+	cfgend = &cfg[1];
+	WT_ERR(__conn_config_file(session, &cbuf, cfgend));
+	if (*cfgend != config)
+		*++cfgend = config;
 
-	/* Read the environment variable configuration. */
-	WT_ERR(__conn_config_env(session, cfg));
+	WT_ERR(__conn_config_env(session, cfg, cfgend));
+	if (*cfgend != config)
+		*++cfgend = config;
 
 	/*
 	 * Configuration ...

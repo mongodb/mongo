@@ -149,6 +149,10 @@ extern int __wt_desc_init(WT_SESSION_IMPL *session,
 extern void __wt_block_stat(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_DSRC_STATS *stats);
+extern int __wt_bm_preload(WT_BM *bm,
+    WT_SESSION_IMPL *session,
+    const uint8_t *addr,
+    uint32_t addr_size);
 extern int __wt_bm_read(WT_BM *bm,
     WT_SESSION_IMPL *session,
     WT_ITEM *buf,
