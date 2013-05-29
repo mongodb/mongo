@@ -73,8 +73,8 @@ namespace mutablebson {
     }
 
     Status Element::appendBinary(const StringData& fieldName,
-                                        uint32_t len, mongo::BinDataType binType,
-                                        const void* data) {
+                                 uint32_t len, mongo::BinDataType binType,
+                                 const void* data) {
         return pushBack(getDocument().makeElementBinary(fieldName, len, binType, data));
     }
 
@@ -82,7 +82,7 @@ namespace mutablebson {
         return pushBack(getDocument().makeElementUndefined(fieldName));
     }
 
-    Status Element::appendOID(const StringData& fieldName, const OID& value) {
+    Status Element::appendOID(const StringData& fieldName, const OID value) {
         return pushBack(getDocument().makeElementOID(fieldName, value));
     }
 
@@ -99,12 +99,12 @@ namespace mutablebson {
     }
 
     Status Element::appendRegex(const StringData& fieldName,
-                                       const StringData& re, const StringData& flags) {
+                                const StringData& re, const StringData& flags) {
         return pushBack(getDocument().makeElementRegex(fieldName, re, flags));
     }
 
     Status Element::appendDBRef(const StringData& fieldName,
-                                       const StringData& ns, const OID& oid) {
+                                const StringData& ns, const OID oid) {
         return pushBack(getDocument().makeElementDBRef(fieldName, ns, oid));
     }
 
@@ -117,7 +117,7 @@ namespace mutablebson {
     }
 
     Status Element::appendCodeWithScope(const StringData& fieldName,
-                                               const StringData& code, const BSONObj& scope) {
+                                        const StringData& code, const BSONObj& scope) {
         return pushBack(getDocument().makeElementCodeWithScope(fieldName, code, scope));
     }
 

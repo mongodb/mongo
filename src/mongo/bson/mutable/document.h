@@ -303,7 +303,7 @@ namespace mutablebson {
         Element makeElementUndefined(const StringData& fieldName);
 
         /** Create a new OID Element with the given value and field name. */
-        Element makeElementOID(const StringData& fieldName, const mongo::OID& value);
+        Element makeElementOID(const StringData& fieldName, mongo::OID value);
 
         /** Create a new bool Element with the given value and field name. */
         Element makeElementBool(const StringData& fieldName, bool value);
@@ -320,7 +320,7 @@ namespace mutablebson {
 
         /** Create a new DBRef Element with the given data and field name. */
         Element makeElementDBRef(
-            const StringData& fieldName, const StringData& ns, const mongo::OID& oid);
+            const StringData& fieldName, const StringData& ns, mongo::OID oid);
 
         /** Create a new code Element with the given value and field name. */
         Element makeElementCode(const StringData& fieldName, const StringData& value);
@@ -365,7 +365,7 @@ namespace mutablebson {
         /** Create a new element of the appopriate type to hold the given value, with the given
          *  field name.
          */
-        Element makeElementSafeNum(const StringData& fieldName, const SafeNum& value);
+        Element makeElementSafeNum(const StringData& fieldName, SafeNum value);
 
 
         //
