@@ -80,6 +80,10 @@ namespace {
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $unset : { a : 1 } }"), logDoc);
     }
 
     TEST(SimpleMod, PrepareOKTargetFound) {
@@ -121,7 +125,7 @@ namespace {
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $unset : { a : 1 } }")));
+        ASSERT_EQUALS(fromjson("{ $unset : { a : 1 } }"), logDoc);
     }
 
     TEST(SimpleMod, PrepareAndLogMissingElementAfterFoundPath) {
@@ -136,7 +140,7 @@ namespace {
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $unset : { 'a.b.c.d' : 1 } }")));
+        ASSERT_EQUALS(fromjson("{ $unset : { 'a.b.c.d' : 1 } }"), logDoc);
     }
 
     TEST(SimpleMod, PrepareAndLogEmptyArray) {
@@ -151,7 +155,7 @@ namespace {
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
     }
 
     TEST(SimpleMod, PullMatchesNone) {
@@ -166,7 +170,7 @@ namespace {
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [2, 3, 4, 5] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [2, 3, 4, 5] } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogPullMatchesOne) {
@@ -180,11 +184,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 2, 3, 4, 5 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1, 2, 3, 4, 5 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [1, 2, 3, 4, 5] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [1, 2, 3, 4, 5] } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogPullMatchesSeveral) {
@@ -198,11 +202,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 2, 3, 4, 5 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1, 2, 3, 4, 5 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [1, 2, 3, 4, 5] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [1, 2, 3, 4, 5] } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogPullMatchesAll) {
@@ -216,11 +220,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [] }")));
+        ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
     }
 
 
@@ -256,11 +260,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(strings[2])));
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson(strings[3])));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
     }
 
     TEST(ComplexMod, ApplyAndLogComplexDocAndMatching2) {
@@ -290,11 +294,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(strings[2])));
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson(strings[3])));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
     }
 #endif
 
@@ -324,11 +328,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(strings[2])));
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson(strings[3])));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
     }
 
     TEST(ValueMod, ApplyAndLogScalarValueMod) {
@@ -357,11 +361,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(strings[2])));
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson(strings[3])));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
     }
 
     TEST(ValueMod, ApplyAndLogObjectValueMod) {
@@ -390,12 +394,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(strings[2])));
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson(strings[3])));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
     }
-
 
 } // namespace

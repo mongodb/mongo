@@ -135,6 +135,10 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
     }
 
     TEST(SimpleMod, PrepareSimpleNonNumericObject) {
@@ -172,11 +176,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 0 }")));
+        ASSERT_EQUALS(fromjson("{ a : 0 }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 0 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogEmptyDocumentOr) {
@@ -189,11 +193,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 1 }")));
+        ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 1 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogSimpleDocumentAnd) {
@@ -206,11 +210,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 4 }")));
+        ASSERT_EQUALS(fromjson("{ a : 4 }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 4 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 4 } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogSimpleDocumentOr) {
@@ -223,11 +227,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 7 }")));
+        ASSERT_EQUALS(fromjson("{ a : 7 }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 7 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 7 } }"), logDoc);
     }
 
     TEST(InPlace, IntToIntAndIsInPlace) {
@@ -238,6 +242,10 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(1))), logDoc);
     }
 
     TEST(InPlace, IntToIntOrIsInPlace) {
@@ -248,6 +256,10 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(1))), logDoc);
     }
 
     TEST(InPlace, LongToLongAndIsInPlace) {
@@ -258,6 +270,10 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<long long>(1))), logDoc);
     }
 
     TEST(InPlace, LongToLongOrIsInPlace) {
@@ -268,6 +284,10 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<long long>(1))), logDoc);
     }
 
     TEST(InPlace, IntToLongAndIsNotInPlace) {
@@ -298,6 +318,10 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(0xABCD1234U))), logDoc);
     }
 
     TEST(NoOp, IntOr) {
@@ -308,6 +332,10 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(0xABCD1234U))), logDoc);
     }
 
     TEST(NoOp, LongAnd) {
@@ -318,6 +346,11 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" <<
+                                          static_cast<long long>(0xABCD1234EF981234ULL))), logDoc);
     }
 
     TEST(NoOp, LongOr) {
@@ -328,6 +361,11 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" <<
+                                          static_cast<long long>(0xABCD1234EF981234ULL))), logDoc);
     }
 
     TEST(Upcasting, UpcastIntToLongAnd) {
@@ -340,7 +378,7 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 1 }")));
+        ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
 
@@ -354,7 +392,7 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 1 }")));
+        ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
 
@@ -368,7 +406,7 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 0 }")));
+        ASSERT_EQUALS(fromjson("{ a : 0 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
 
@@ -382,8 +420,111 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 3 }")));
+        ASSERT_EQUALS(fromjson("{ a : 3 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
+    }
+
+    // The following tests are re-created from the previous $bit tests in updatetests.cpp. They
+    // are probably redundant with the tests above in various ways.
+
+    TEST(DbUpdateTests, BitRewriteExistingField) {
+        Document doc(BSON("a" << static_cast<int>(0)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("or" << static_cast<int>(1)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+        ASSERT_TRUE(execInfo.inPlace);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_EQUALS(BSON("a" << static_cast<int>(1)), doc);
+        ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(1))), logDoc);
+    }
+
+    TEST(DbUpdateTests, BitRewriteNonExistingField) {
+        Document doc(BSON("a" << static_cast<int>(0)));
+        Mod mod(BSON("$bit" << BSON("b" << BSON("or" << static_cast<int>(1)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+        ASSERT_FALSE(execInfo.inPlace);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_EQUALS(BSON("a" << static_cast<int>(0) << "b" << static_cast<int>(1)), doc);
+        ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(BSON("$set" << BSON("b" << static_cast<int>(1))), logDoc);
+    }
+
+    TEST(DbUpdateTests, Bit1_1) {
+        Document doc(BSON("_id" << 1 << "x" << 3));
+        Mod mod(BSON("$bit" << BSON("x" << BSON("and" << 2))));
+        const BSONObj result(BSON("_id" << 1 << "x" << (3 & 2)));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        if (!execInfo.noOp)
+            ASSERT_OK(mod.apply());
+
+        ASSERT_EQUALS(result, doc);
+    }
+
+    TEST(DbUpdateTests, Bit1_2) {
+        Document doc(BSON("_id" << 1 << "x" << 1));
+        Mod mod(BSON("$bit" << BSON("x" << BSON("or" << 4))));
+        const BSONObj result(BSON("_id" << 1 << "x" << (1 | 4)));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        if (!execInfo.noOp)
+            ASSERT_OK(mod.apply());
+
+        ASSERT_EQUALS(result, doc);
+    }
+
+    TEST(DbUpdateTests, Bit1_3) {
+        Document doc(BSON("_id" << 1 << "x" << 3));
+        Mod mod1(BSON("$bit" << BSON("x" << BSON("and" << 2))));
+        Mod mod2(BSON("$bit" << BSON("x" << BSON("or" << 8))));
+        const BSONObj result(BSON("_id" << 1 << "x" << ((3 & 2) | 8)));
+
+        ModifierInterface::ExecInfo execInfo1;
+        ASSERT_OK(mod1.prepare(doc.root(), "", &execInfo1));
+        if (!execInfo1.noOp)
+            ASSERT_OK(mod1.apply());
+
+        ModifierInterface::ExecInfo execInfo2;
+        ASSERT_OK(mod2.prepare(doc.root(), "", &execInfo2));
+        if (!execInfo2.noOp)
+            ASSERT_OK(mod2.apply());
+
+        ASSERT_EQUALS(result, doc);
+    }
+
+    TEST(DbUpdateTests, Bit1_4) {
+        Document doc(BSON("_id" << 1 << "x" << 3));
+        Mod mod1(BSON("$bit" << BSON("x" << BSON("or" << 2))));
+        Mod mod2(BSON("$bit" << BSON("x" << BSON("and" << 8))));
+        const BSONObj result(BSON("_id" << 1 << "x" << ((3 | 2) & 8)));
+
+        ModifierInterface::ExecInfo execInfo1;
+        ASSERT_OK(mod1.prepare(doc.root(), "", &execInfo1));
+        if (!execInfo1.noOp)
+            ASSERT_OK(mod1.apply());
+
+        ModifierInterface::ExecInfo execInfo2;
+        ASSERT_OK(mod2.prepare(doc.root(), "", &execInfo2));
+        if (!execInfo2.noOp)
+            ASSERT_OK(mod2.apply());
+
+        ASSERT_EQUALS(result, doc);
     }
 
 } // namespace

@@ -136,6 +136,10 @@ namespace {
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1 ] } }"), logDoc);
     }
 
     TEST(SimpleMod, PrepareInvalidTargetNumber) {
@@ -165,11 +169,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1 ] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1 ] } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogEmptyArray) {
@@ -183,11 +187,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1 ] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1 ] } }"), logDoc);
     }
 
     TEST(SimpleEachMod, ApplyAndLogEmptyDocument) {
@@ -201,11 +205,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 2, 3 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1, 2, 3 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1, 2, 3 ] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
     TEST(SimpleEachMod, ApplyAndLogEmptyArray) {
@@ -219,11 +223,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 2, 3 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1, 2, 3 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1, 2, 3 ] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogPopulatedArray) {
@@ -237,11 +241,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 'x', 1 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 'x', 1 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 'x', 1 ] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 'x', 1 ] } }"), logDoc);
     }
 
     TEST(SimpleEachMod, ApplyAndLogPopulatedArray) {
@@ -255,11 +259,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 'x', 1, 2, 3 ] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 'x', 1, 2, 3 ] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 'x', 1, 2, 3 ] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 'x', 1, 2, 3 ] } }"), logDoc);
     }
 
     TEST(NoOp, AddOneExistingIsNoOp) {
@@ -270,6 +274,10 @@ namespace {
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
     TEST(NoOp, AddSeveralExistingIsNoOp) {
@@ -280,6 +288,10 @@ namespace {
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
     TEST(NoOp, AddAllExistingIsNoOp) {
@@ -290,6 +302,10 @@ namespace {
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
     TEST(Deduplication, ExistingDuplicatesArePreserved) {
@@ -303,11 +319,11 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 3] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 3] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 3] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 3] } }"), logDoc);
     }
 
     TEST(Deduplication, NewDuplicatesAreElided) {
@@ -321,11 +337,11 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 4, 3] }")));
+        ASSERT_EQUALS(fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 4, 3] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 4, 3] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 4, 3] } }"), logDoc);
     }
 
 } // namespace
