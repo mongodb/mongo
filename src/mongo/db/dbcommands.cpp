@@ -243,6 +243,7 @@ namespace mongo {
                         // this should be in the while loop in case we step down
                         errmsg = "not master";
                         result.append( "wnote", "no longer primary" );
+                        result.append( "code" , 10990 );
                         return false;
                     }
 
