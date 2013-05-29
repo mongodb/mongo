@@ -286,7 +286,7 @@ namespace mongo {
         for (size_t i=0; i < sp.size(); i++) {
             keys.push_back(sp[i]->evaluate(d));
         }
-        key = Value(keys);
+        key = Value::consume(keys);
     }
 
     int DocumentSourceSort::compare(const KeyAndDoc & lhs, const KeyAndDoc & rhs) const {

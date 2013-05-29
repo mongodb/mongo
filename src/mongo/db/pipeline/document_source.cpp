@@ -167,7 +167,7 @@ namespace mongo {
             }
         }
 
-        return Value(values);
+        return Value::consume(values);
     }
 
     Document DocumentSource::documentFromBsonWithDeps(const BSONObj& bson,

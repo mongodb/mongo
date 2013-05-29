@@ -97,6 +97,16 @@ namespace mongo {
         */
         static Value createIntOrLong(long long value);
 
+        /** Construct an Array-typed Value from consumed without copying the vector.
+         *  consumed is replaced with an empty vector.
+         *  In C++11 this would be spelled Value(std::move(consumed)).
+         */
+        static Value consume(vector<Value>& consumed) {
+            RCVector* vec = new RCVector();
+            std::swap(vec->vec, consumed);
+            return Value(ValueStorage(Array, vec));
+        }
+
         /** A "missing" value indicates the lack of a Value.
          *  This is similar to undefined/null but should not appear in output to BSON.
          *  Missing Values are returned by Document when accessing non-existent fields.
@@ -232,6 +242,8 @@ namespace mongo {
          */
         template <typename InvalidArgumentType>
         explicit Value(const InvalidArgumentType& invalidArgument);
+
+        explicit Value(const ValueStorage& storage) :_storage(storage) {}
 
         // does no type checking
         StringData getStringData() const; // May contain embedded NUL bytes

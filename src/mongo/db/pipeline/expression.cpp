@@ -1118,7 +1118,7 @@ namespace mongo {
                     result.push_back(doc.freezeToValue());
                 }
 
-                out.addField(field.first, Value(result));
+                out.addField(field.first, Value::consume(result));
             }
             else {
                 verify( false );
@@ -1300,7 +1300,7 @@ namespace mongo {
                 result.push_back(nested);
         }
 
-        return Value(result);
+        return Value::consume(result);
     }
     Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) const {
         // Note this function is very hot so it is important that is is well optimized.

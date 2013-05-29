@@ -467,7 +467,7 @@ namespace mongo {
             return *this << Value(val);
         }
 
-        Value done() { return Value(_array); }
+        Value done() { return Value::consume(_array); }
 
     private:
         vector<Value> _array;
