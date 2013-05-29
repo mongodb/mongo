@@ -29,17 +29,24 @@ namespace {
      * doesn't initialize the library for us.
      */
 
-    void* saslOurMalloc(unsigned long sz) {
+// Version 2.1.26 is the first version to use size_t in the allocator signatures
+#if (SASL_VERSION_FULL >= ((2 << 16) | (1 << 8) | 26))
+    typedef size_t SaslAllocSize;
+#else
+    typedef unsigned long SaslAllocSize;
+#endif
+
+    void* saslOurMalloc(SaslAllocSize sz) {
         return ourmalloc(sz);
     }
 
-    void* saslOurCalloc(unsigned long count, unsigned long size) {
+    void* saslOurCalloc(SaslAllocSize count, SaslAllocSize size) {
         void* ptr = calloc(count, size);
         if (!ptr) printStackAndExit(0);
         return ptr;
     }
 
-    void* saslOurRealloc(void* ptr, unsigned long sz) {
+    void* saslOurRealloc(void* ptr, SaslAllocSize sz) {
         return ourrealloc(ptr, sz);
     }
 
