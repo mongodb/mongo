@@ -12,17 +12,6 @@
 #define	LOG_ALIGN_DIRECTIO	4096
 
 /*
- * Logging subsystem flags available for internal calls.
- */
-/* For __wt_log_write */
-#define	WT_LOG_SYNC	0x01		/* This write needs to be synced */
-
-/* For __wt_log_scan */
-#define	WT_LOGSCAN_FIRST	0x01	/* Scan from beginning of log */
-#define	WT_LOGSCAN_FROM_CKP	0x02	/* Scan from last checkpoint */
-#define	WT_LOGSCAN_ONE		0x04	/* Scan only one record */
-
-/*
  * The slot algorithm uses negative values, so we lose a bit.
  */
 #define	WT_MAX_LOG_OFFSET	INT32_MAX
@@ -137,6 +126,7 @@ typedef struct {
 	 */
 	WT_LSN		alloc_lsn;	/* Next LSN for allocation */
 	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
+	WT_LSN		first_lsn;	/* First LSN */
 	WT_LSN		sync_lsn;	/* LSN of the last sync */
 	WT_LSN		write_lsn;	/* Last LSN written to log file */
 
@@ -163,8 +153,8 @@ typedef struct {
 } WT_LOG;
 
 typedef struct {
-	uint32_t	total_len;	/* 00-03: Record length, rounded up  */
-	uint32_t	real_len;	/* 04-07: Record length including hdr */
+	uint32_t	real_len;	/* 00-03: Record length including hdr */
+	uint32_t	total_len;	/* 04-07: Record length, rounded up */
 	uint32_t	checksum;	/* 08-11: Checksum of the record */
 	uint32_t	unused;		/* 12-15: Padding */
 	uint8_t		record[0];	/* Beginning of actual data */

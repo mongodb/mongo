@@ -8,6 +8,18 @@
 #include "wt_internal.h"
 
 /*
+ * This file implements the consolidated array algorithm as described in
+ * the paper:
+ * Scalability of write-ahead logging on multicore and multisocket hardware
+ * by Ryan Johnson, Ippokratis Pandis, Radu Stoica, Manos Athanassoulis
+ * and Anastasia Ailamaki.
+ *
+ * It appeared in The VLDB Journal, DOI 10.1007/s00778-011-0260-8 and can
+ * be found at:
+ * http://infoscience.epfl.ch/record/170505/files/aether-smpfulltext.pdf
+ */
+
+/*
  * __wt_log_slot_init --
  *	Initialize the slot array.
  */
@@ -126,7 +138,7 @@ retry:
 	 */
 	pool_i = log->pool_index;
 	newslot = &log->slot_pool[pool_i];
-	if (++log->pool_index > SLOT_POOL)
+	if (++log->pool_index >= SLOT_POOL)
 		log->pool_index = 0;
 	if (newslot->slot_state != WT_LOG_SLOT_FREE)
 		goto retry;
@@ -195,7 +207,6 @@ __wt_log_slot_release(WT_LOGSLOT *slot, int32_t size)
 int
 __wt_log_slot_free(WT_LOGSLOT *slot)
 {
-	fprintf(stderr, "[%d] slot_free: slot 0x%x FREE\n",pthread_self(),slot);
 	slot->slot_state = WT_LOG_SLOT_FREE;
 	return (0);
 }

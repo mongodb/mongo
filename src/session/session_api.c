@@ -326,7 +326,7 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	va_start(ap, fmt);
-	ret =__wt_log_vprintf(session, fmt, ap);
+	ret =__wt_log_vprintf(session, pthread_self(), fmt, ap);
 	va_end(ap);
 
 	return (ret);

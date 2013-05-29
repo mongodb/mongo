@@ -56,10 +56,13 @@ __log_archive_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ITEM path, tmp;
+	WT_LOG *log;
+	WT_LSN *lsn;
 	WT_SESSION_IMPL *session;
 
 	session = arg;
 	conn = S2C(session);
+	log = conn->log;
 
 	WT_CLEAR(path);
 	WT_CLEAR(tmp);
@@ -157,6 +160,10 @@ __log_archive_server(void *arg)
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
 
 #endif
+		/*
+		 * Indicate what is our earliest LSN.
+		 */
+		log->first_lsn = *lsn;
 		/* Wait until the next event. */
 		WT_ERR(
 		    __wt_cond_wait(session, conn->arch_cond, 0));
@@ -221,6 +228,7 @@ fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
 	 */
 	INIT_LSN(&log->alloc_lsn);
 	INIT_LSN(&log->ckpt_lsn);
+	INIT_LSN(&log->first_lsn);
 	INIT_LSN(&log->sync_lsn);
 	INIT_LSN(&log->write_lsn);
 	log->fileid = 0;

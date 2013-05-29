@@ -101,8 +101,9 @@ __log_fill(WT_SESSION_IMPL *session,
 	 * real file offset for write().  For now just use it as is.
 	 */
 	fprintf(stderr,
-	    "[%d] log_fill: slot 0x%x writing %d bytes, at offset %d 0x%x\n",
-	    pthread_self(), myslot->slot, logrec->real_len,
+	    "[%d] log_fill: slot 0x%x state %d writing %d bytes, at offset %d 0x%x\n",
+	    pthread_self(), myslot->slot, myslot->slot->slot_state,
+	    logrec->real_len,
 	    myslot->offset + myslot->slot->slot_start_offset,
 	    myslot->offset + myslot->slot->slot_start_offset);
 	WT_ERR(__wt_write(session, myslot->slot->slot_fh,
@@ -150,9 +151,9 @@ __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
 	 */
 	slot->slot_start_lsn = log->alloc_lsn;
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
-	fprintf(stderr,
+		fprintf(stderr,
 	    "[%d] log_acquire: slot 0x%x size %d doesn't fit. Call newfile\n",
-	    pthread_self(),slot,recsize);
+		    pthread_self(),slot,recsize);
 		WT_RET(__wt_log_newfile(session, 0));
 		if (log->log_close_fh != NULL)
 			FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
@@ -165,16 +166,16 @@ __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
 	slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_error = 0;
 	fprintf(stderr,
-"[%d] log_acquire: slot 0x%x recsize %d startlsn %d,%d endlsn %d,%d recsize %d\n",
-pthread_self(),slot,recsize,
-slot->slot_start_lsn.file,slot->slot_start_lsn.offset,
-slot->slot_end_lsn.file,slot->slot_end_lsn.offset,recsize);
+"[%d] log_acquire: slot 0x%x recsize %d startlsn %d,%d endlsn %d,%d\n",
+	    pthread_self(),slot,recsize,
+	    slot->slot_start_lsn.file,slot->slot_start_lsn.offset,
+	    slot->slot_end_lsn.file,slot->slot_end_lsn.offset,recsize);
 	slot->slot_fh = log->log_fh;
 	return (0);
 }
 
 static int
-__log_release(WT_SESSION_IMPL *session, uint32_t size, WT_LOGSLOT *slot)
+__log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -183,14 +184,25 @@ __log_release(WT_SESSION_IMPL *session, uint32_t size, WT_LOGSLOT *slot)
 	conn = S2C(session);
 	log = conn->log;
 	fprintf(stderr,
-	    "[%d] log_release: wait for write_lsn %d,%d, to be LSN %d,%d\n",
-	    pthread_self(), log->write_lsn.file,log->write_lsn.offset,
+    "[%d:0x%x] log_release: wait for write_lsn %d,%d, to be LSN %d,%d\n",
+	    pthread_self(), pthread_self(),
+	    log->write_lsn.file,log->write_lsn.offset,
 	    slot->slot_start_lsn.file,slot->slot_start_lsn.offset);
 	/*
 	 * Wait for earlier groups to finish.  Slot_lsn is my beginning LSN.
 	 */
 	while (LOG_CMP(&log->write_lsn, &slot->slot_start_lsn) != 0)
 		__wt_yield();
+	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
+		WT_CSTAT_INCR(session, log_sync);
+		WT_ERR(__wt_fsync(session, log->log_fh));
+		FLD_CLR(slot->slot_flags, SLOT_SYNC);
+		log->sync_lsn = slot->slot_end_lsn;
+		fprintf(stderr,
+		    "[%d] log_release: slot 0x%x synced to lsn %d,%d\n",
+		    pthread_self(),slot,log->write_lsn.file,
+		    log->write_lsn.offset);
+	}
 	log->write_lsn = slot->slot_end_lsn;
 	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
 		fprintf(stderr,
@@ -199,16 +211,6 @@ __log_release(WT_SESSION_IMPL *session, uint32_t size, WT_LOGSLOT *slot)
 		WT_RET(__wt_close(session, log->log_close_fh));
 		log->log_close_fh = NULL;
 		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
-	}
-	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
-		WT_CSTAT_INCR(session, log_sync);
-		WT_ERR(__wt_fsync(session, log->log_fh));
-		FLD_CLR(slot->slot_flags, SLOT_SYNC);
-		log->sync_lsn = log->write_lsn;
-		fprintf(stderr,
-		    "[%d] log_release: slot 0x%x synced to lsn %d,%d\n",
-		    pthread_self(),slot,log->write_lsn.file,
-		    log->write_lsn.offset);
 	}
 
 err:
@@ -296,7 +298,6 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_FH *log_fh;
 	WT_LOG *log;
@@ -333,7 +334,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		ret = WT_NOTFOUND;
 		goto err;
 	}
-	WT_ERR(__wt_buf_init(session, record, reclen));
+	WT_ERR(__wt_buf_init(session, record,
+	    __wt_rduppo2(reclen, log->allocsize)));
 	WT_ERR(__wt_read(session, log_fh, lsnp->offset, reclen, record->mem));
 	/*
 	 * We read in the record, verify checksum.
@@ -356,18 +358,127 @@ err:
 }
 
 int
-__wt_log_scan(WT_SESSION_IMPL *session, WT_ITEM *record, uint32_t flags,
-    int (*func)(WT_SESSION_IMPL *session, WT_ITEM *record, void *cookie),
-    void *cookie)
+__wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
+    void (*func)(WT_SESSION_IMPL *session,
+    WT_ITEM *record, WT_LSN *lsnp, void *cookie), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_ITEM buf;
 	WT_DECL_RET;
+	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
+	WT_LSN rd_lsn, start_lsn;
+	uint32_t cksum, reclen;
+	int done;
 
 	conn = S2C(session);
 	log = conn->log;
+	WT_CLEAR(buf);
+	/*
+	 * Check for correct usage.
+	 */
+	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
+		return (WT_ERROR);
+	/*
+	 * If the caller did not give us a callback function there is nothing
+	 * to do.
+	 */
+	if (func == NULL)
+		return (0);
+	/*
+	 * If the offset isn't on an allocation boundary it must be wrong.
+	 */
+	if (lsnp != NULL &&
+	    (lsnp->offset % log->allocsize != 0 || lsnp->file > log->fileid))
+		return (WT_NOTFOUND);
+
+	if (LF_ISSET(WT_LOGSCAN_FIRST))
+		start_lsn = log->first_lsn;
+	else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
+		start_lsn = log->ckpt_lsn;
+	else
+		start_lsn = *lsnp;
+	fprintf(stderr, "[%d] log_scan: start LSN %d,%d\n",
+	    pthread_self(), start_lsn.file, start_lsn.offset);
+	log_fh = NULL;
+	WT_RET(__log_openfile(session, 0, &log_fh, start_lsn.file));
+	if (LF_ISSET(WT_LOGSCAN_ONE))
+		done = 1;
+	else
+		done = 0;
+	rd_lsn = start_lsn;
+	WT_RET(__wt_buf_initsize(session, &buf, LOG_ALIGN));
+	do {
+		/*
+		 * Read in 4 bytes that is the total size of the log record.
+		 * Check for out of bounds values.
+		 */
+		reclen = 0;
+		if (__wt_read(session, log_fh, rd_lsn.offset,
+		    sizeof(uint32_t), (void *)&reclen) != 0) {
+			/*
+			 * If we read the last record, go to the next file.
+			 */
+			WT_ERR(__wt_close(session, log_fh));
+			log_fh = NULL;
+			rd_lsn.file++;
+			rd_lsn.offset = 0;
+			fprintf(stderr, "[%d] log_scan: switch to LSN %d,%d\n",
+			    pthread_self(), rd_lsn.file, rd_lsn.offset);
+			/*
+			 * If there is no next file, we're done.  WT_ERR will
+			 * break us out of this loop.
+			 */
+			WT_ERR(__log_openfile(
+			    session, 0, &log_fh, rd_lsn.file));
+			continue;
+		}
+		if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
+			fprintf(stderr,
+			    "[%d] log_scan: read bad reclen %d %d (%d)\n",
+			    pthread_self(), reclen,
+			    WT_MAX_LOG_OFFSET, reclen > WT_MAX_LOG_OFFSET);
+			ret = WT_NOTFOUND;
+			goto err;
+		}
+		if (reclen > buf.memsize)
+			WT_ERR(__wt_buf_grow(session, &buf,
+			     __wt_rduppo2(reclen, log->allocsize)));
+
+		WT_ERR(__wt_read(
+		    session, log_fh, rd_lsn.offset, reclen, buf.mem));
+		/*
+		 * We read in the record, verify checksum.
+		 */
+		logrec = (WT_LOG_RECORD *)buf.mem;
+		cksum = logrec->checksum;
+		logrec->checksum = 0;
+		logrec->checksum = __wt_cksum(logrec, logrec->real_len);
+		if (logrec->checksum != cksum) {
+			fprintf(stderr,
+			    "[%d] log_scan: bad cksum\n", pthread_self());
+			ret = WT_ERROR;
+			goto err;
+		}
+
+		/*
+		 * We have a valid log record.  Invoke the callback.
+		 */
+		(*func)(session, &buf, &rd_lsn, cookie);
+
+		WT_CSTAT_INCR(session, log_scan_records);
+		rd_lsn.offset += logrec->total_len;
+		fprintf(stderr, "[%d] log_scan: next read LSN %d,%d\n",
+		    pthread_self(), rd_lsn.file, rd_lsn.offset);
+	} while (!done);
 	WT_CSTAT_INCR(session, log_scans);
+err:
+	__wt_buf_free(session, &buf);
+	if (ret == ENOENT)
+		ret = 0;
+	if (log_fh != NULL)
+		WT_RET(__wt_close(session, log_fh));
 	return (0);
 }
 
@@ -399,7 +510,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	memset(&tmp, 0, sizeof(tmp));
 	fprintf(stderr,
-"[%d] log_write: log flags 0x%x lsnp 0x%x real_len: %d, total_len %d, chksum 0x%X\n",
+"[%d] log_write: flags 0x%x lsnp 0x%x real_len: %d total_len %d, chksum 0x%X\n",
 	    pthread_self(),flags, lsnp, logrec->real_len, logrec->total_len,
 	    logrec->checksum);
 	WT_CSTAT_INCR(session, log_writes);
@@ -421,7 +532,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		    pthread_self(), tmp.slot_start_lsn.file,
 		    tmp.slot_start_lsn.offset, myslot.offset);
 		WT_ERR(__log_fill(session, &myslot, record, lsnp));
-		WT_ERR(__log_release(session, record, &tmp));
+		WT_ERR(__log_release(session, &tmp));
 		return (0);
 	}
 	WT_ERR(__wt_log_slot_join(session, logrec->total_len, flags, &myslot));
@@ -434,12 +545,15 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		__wt_spin_unlock(session, &log->log_slot_lock);
 		locked = 0;
 		WT_ERR(__wt_log_slot_notify(myslot.slot));
+		fprintf(stderr,
+		    "[%d] log_write: leader notify slot 0x%x, state/size %d\n",
+		    pthread_self(), myslot.slot, myslot.slot->slot_state);
 	} else
 		WT_ERR(__wt_log_slot_wait(myslot.slot));
 	WT_ERR(__log_fill(session, &myslot, record, &tmp_lsn));
 	if (__wt_log_slot_release(myslot.slot, logrec->total_len) ==
 	    WT_LOG_SLOT_DONE) {
-		WT_ERR(__log_release(session, record, myslot.slot));
+		WT_ERR(__log_release(session, myslot.slot));
 		WT_ERR(__wt_log_slot_free(myslot.slot));
 	} else if (LF_ISSET(WT_LOG_SYNC)) {
 		while (LOG_CMP(&log->sync_lsn, &tmp_lsn) <= 0 &&
@@ -463,8 +577,26 @@ err:
 	return (ret);
 }
 
+static void
+__scan_call(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, void *cookie)
+{
+	WT_LOG_RECORD *logrec;
+
+	logrec = (WT_LOG_RECORD *)record->mem;
+	/*
+	 * Return if log file header record
+	 */
+	if (lsnp->offset == 0)
+		return;
+	fprintf(stderr,
+	    "[%d] scan_call: SCAN LSN %d,%d  record: 0x%x: %s\n",
+	    pthread_self(),
+	    lsnp->file,lsnp->offset,
+	    logrec->record, (char *)&logrec->record);
+}
+
 int
-__wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
+__wt_log_vprintf(WT_SESSION_IMPL *session, pthread_t tid, const char *fmt, va_list ap)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_ITEM *buf;
@@ -472,11 +604,14 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	va_list ap_copy;
 	size_t len;
 WT_DECL_RET;
+WT_LOG *log;
 WT_LSN lsn;
 WT_ITEM rdbuf;
 uint32_t sync;
 
 	conn = S2C(session);
+log = conn->log;
+WT_CLEAR(rdbuf);
 
 	if (!conn->logging)
 		return (0);
@@ -493,9 +628,9 @@ uint32_t sync;
 	(void)vsnprintf(&logrec->record, len, fmt, ap);
 
 	WT_VERBOSE_RET(session, log,
-	    "log record: %s\n", (char *)&logrec->record);
+	    "VERB: log record: %s\n", (char *)&logrec->record);
 	fprintf(stderr, "[%d] log_printf: log record: 0x%x: %s\n",
-	    pthread_self(),&logrec->record, (char *)&logrec->record);
+	    tid, &logrec->record, (char *)&logrec->record);
 #if 0
 	return (__wt_log_write(session, buf, NULL, 0));
 #else
@@ -508,16 +643,21 @@ uint32_t sync;
 	 * Only read some records.  Randomize on sync.
 	 */
 	if (ret == 0 && sync) {
-		fprintf(stderr, "[%d] log_printf: read at %d,%d\n",
-		    pthread_self(),lsn.file,lsn.offset);
-		ret = __wt_log_read(session, &rdbuf, &lsn, 0);
-		if (ret == 0) {
-			logrec = (WT_LOG_RECORD *)rdbuf.mem;
-			fprintf(stderr,
-			    "[%d] log_printf: READ log record: 0x%x: %s\n",
-			    pthread_self(),
-			    logrec->record, (char *)&logrec->record);
-			__wt_buf_free(session, &rdbuf);
+		if (lsn.file == 2 && !F_ISSET(log, LOG_AUTOREMOVE)) {
+			F_SET(log, LOG_AUTOREMOVE);
+			ret = __wt_log_scan(
+			    session, NULL, WT_LOGSCAN_FIRST, __scan_call, NULL);
+			ret = 0;
+		} else {
+			ret = __wt_log_read(session, &rdbuf, &lsn, 0);
+			if (ret == 0) {
+				logrec = (WT_LOG_RECORD *)rdbuf.mem;
+				fprintf(stderr,
+    "[%d] log_printf: READ log record %d,%d: 0x%x: %s\n",
+				    tid, lsn.file, lsn.offset,
+				    logrec->record, (char *)&logrec->record);
+				__wt_buf_free(session, &rdbuf);
+			}
 		}
 	}
 	return (0);

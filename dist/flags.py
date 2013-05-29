@@ -19,6 +19,14 @@ flags = {
 		'FILE_TYPE_DATA',
 		'FILE_TYPE_LOG'
 	],
+        'log_scan' : [
+		'LOGSCAN_FIRST',
+		'LOGSCAN_FROM_CKP',
+		'LOGSCAN_ONE'
+        ],
+        'log_write' : [
+		'LOG_SYNC'
+        ],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',

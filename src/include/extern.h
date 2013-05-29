@@ -666,10 +666,11 @@ extern int __wt_log_read(WT_SESSION_IMPL *session,
     WT_LSN *lsnp,
     uint32_t flags);
 extern int __wt_log_scan(WT_SESSION_IMPL *session,
-    WT_ITEM *record,
+    WT_LSN *lsnp,
     uint32_t flags,
-    int (*func)(WT_SESSION_IMPL *session,
+    void (*func)(WT_SESSION_IMPL *session,
     WT_ITEM *record,
+    WT_LSN *lsnp,
     void *cookie),
     void *cookie);
 extern int __wt_log_write(WT_SESSION_IMPL *session,
@@ -677,6 +678,7 @@ extern int __wt_log_write(WT_SESSION_IMPL *session,
     WT_LSN *lsnp,
     uint32_t flags);
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
+    pthread_t tid,
     const char *fmt,
     va_list ap);
 extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
