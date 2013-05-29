@@ -321,11 +321,11 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 3, 4] }")));
+        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 4, 3] }")));
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 3, 4] } }")));
+        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 4, 3] } }")));
     }
 
 } // namespace

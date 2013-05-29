@@ -25,6 +25,38 @@ namespace mongo {
 
     namespace mb = mutablebson;
 
+    namespace {
+
+        template<typename Ordering, typename Equality>
+        void deduplicate(mb::Element parent, Ordering comp, Equality equal) {
+
+            // First, build a vector of the children.
+            std::vector<mb::Element> children;
+            mb::Element current = parent.leftChild();
+            while (current.ok()) {
+                children.push_back(current);
+                current = current.rightSibling();
+            }
+
+            // Then, sort the child vector with our comparator.
+            std::sort(children.begin(), children.end(), comp);
+
+            // Next, remove duplicates by walking the vector.
+            std::vector<mb::Element>::iterator where = children.begin();
+            const std::vector<mb::Element>::iterator end = children.end();
+
+            while( where != end ) {
+                std::vector<mb::Element>::iterator next = where; ++next;
+                while (next != end && equal(*where, *next)) {
+                    next->remove();
+                    ++next;
+                }
+                where = next;
+            }
+        }
+
+    } // namespace
+
     struct ModifierAddToSet::PreparedState {
 
         PreparedState(mb::Document& doc)
@@ -102,9 +134,7 @@ namespace mongo {
 
                 _val = _valDoc.root().leftChild();
 
-                // Sort the values to be added, and remove duplicates.
-                mb::sortChildren(_val, mb::woLess(false));
-                mb::deduplicateChildren(_val, mb::woEqual(false));
+                deduplicate(_val, mb::woLess(false), mb::woEqual(false));
             }
         }
 
