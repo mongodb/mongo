@@ -10,8 +10,8 @@
 static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
+static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
-static int __btree_warm_cache(WT_SESSION_IMPL *);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
@@ -108,7 +108,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 			    session, root_addr, root_addr_size));
 
 			/* Warm the cache, if possible. */
-			WT_ERR(__btree_warm_cache(session));
+			WT_ERR(__btree_preload(session));
 
 			/* Get the last record number in a column-store file. */
 			if (btree->type != BTREE_ROW)
@@ -490,38 +490,27 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 }
 
 /*
- * __btree_warm_cache --
- *	Pre-load internal pages from a checkpoint.
+ * __btree_preload --
+ *	Pre-load internal pages.
  */
 static int
-__btree_warm_cache(WT_SESSION_IMPL *session)
+__btree_preload(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
-	WT_BTREE *btree;
 	WT_BM *bm;
-	WT_PAGE *page;
+	WT_BTREE *btree;
+	WT_REF *ref;
+	uint32_t addr_size, i;
+	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 
-	if (bm->map == NULL)
-		return (0);
-
-	/*
-	 * If the file is memory mapped, find the first leaf page.  Assuming
-	 * the file was created with a bulk load, the internal pages will be at
-	 * the end of the file, starting with the parent of the left-most
-	 * child, ending with the root.
-	 */
-	page = NULL;
-	F_SET(session, WT_SESSION_PRELOAD_PAGES);
-	ret = __wt_tree_walk(session, &page, 0);
-	F_CLR(session, WT_SESSION_PRELOAD_PAGES);
-	WT_RET(ret);
-	if (page == NULL)
-		return (WT_NOTFOUND);
-
-	return (__wt_page_release(session, page));
+	/* Pre-load the second-level internal pages. */
+	WT_REF_FOREACH(btree->root_page, ref, i) {
+		__wt_get_addr(btree->root_page, ref, &addr, &addr_size);
+		WT_RET(bm->preload(bm, session, addr, addr_size));
+	}
+	return (0);
 }
 
 /*
