@@ -296,6 +296,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->block_byte_read.desc = "bytes read by the block manager";
 	stats->block_byte_write.desc = "bytes written by the block manager";
 	stats->block_map_read.desc = "mapped blocks read by the block manager";
+	stats->block_preload.desc = "blocks pre-loaded by the block manager";
 	stats->block_read.desc = "blocks read by the block manager";
 	stats->block_write.desc = "blocks written by the block manager";
 	stats->cache_bytes_dirty.desc =
@@ -373,6 +374,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
 	stats->block_map_read.v = 0;
+	stats->block_preload.v = 0;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
 	stats->cache_bytes_dirty.v = 0;
