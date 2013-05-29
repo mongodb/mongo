@@ -50,21 +50,6 @@ err:	__wt_scr_free(&path);
 }
 
 /*
- * __wt_log_open --
- *	Open the log file.
- */
-int
-__wt_log_open(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_LOG *log;
-
-	conn = S2C(session);
-	log = conn->log;
-	return (__log_openfile(session, 1, &log->log_fh, log->fileid));
-}
-
-/*
  * __wt_log_close --
  *	Close the log file.
  */
@@ -239,9 +224,9 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	WT_ASSERT(session, log->log_close_fh == NULL);
 	log->log_close_fh = log->log_fh;
 	log->fileid++;
-	WT_RET(__wt_log_open(session));
+	WT_RET(__log_openfile(session, 1, &log->log_fh, log->fileid));
 	log->alloc_lsn.file = log->fileid;
-	log->alloc_lsn.offset = 0;
+	log->alloc_lsn.offset = log->log_fh->size;
 
 	/*
 	 * Set up the log descriptor record.  Use a scratch buffer to
@@ -641,6 +626,8 @@ WT_CLEAR(rdbuf);
 	if (ret == 0 && sync) {
 		if (lsn.file == 2 && !F_ISSET(log, LOG_AUTOREMOVE)) {
 			F_SET(log, LOG_AUTOREMOVE);
+			ret = __wt_log_scan(
+			    session, &lsn, WT_LOGSCAN_ONE, __scan_call, NULL);
 			ret = __wt_log_scan(
 			    session, NULL, WT_LOGSCAN_FIRST, __scan_call, NULL);
 			ret = 0;

@@ -272,6 +272,8 @@ __wt_logger_destroy(WT_CONNECTION_IMPL *conn)
 
 	session = conn->default_session;
 
+	if (!conn->logging)
+		return (0);
 	if (conn->log != NULL)
 		WT_TRET(__wt_log_close(session));
 	if (conn->arch_tid_set) {
