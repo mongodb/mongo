@@ -153,10 +153,9 @@ typedef struct {
 } WT_LOG;
 
 typedef struct {
-	uint32_t	real_len;	/* 00-03: Record length including hdr */
-	uint32_t	total_len;	/* 04-07: Record length, rounded up */
-	uint32_t	checksum;	/* 08-11: Checksum of the record */
-	uint32_t	unused;		/* 12-15: Padding */
+	uint32_t	len;		/* 00-03: Record length including hdr */
+	uint32_t	checksum;	/* 04-07: Checksum of the record */
+	uint32_t	unused[2];	/* 08-15: Padding */
 	uint8_t		record[0];	/* Beginning of actual data */
 } WT_LOG_RECORD;
 

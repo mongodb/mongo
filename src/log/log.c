@@ -103,14 +103,12 @@ __log_fill(WT_SESSION_IMPL *session,
 	fprintf(stderr,
 	    "[%d] log_fill: slot 0x%x state %d writing %d bytes, at offset %d 0x%x\n",
 	    pthread_self(), myslot->slot, myslot->slot->slot_state,
-	    logrec->real_len,
-	    myslot->offset + myslot->slot->slot_start_offset,
+	    logrec->len, myslot->offset + myslot->slot->slot_start_offset,
 	    myslot->offset + myslot->slot->slot_start_offset);
 	WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 	    myslot->offset + myslot->slot->slot_start_offset,
-	    logrec->real_len, (void *)logrec));
-	WT_CSTAT_INCRV(session, log_bytes_total_written, logrec->total_len);
-	WT_CSTAT_INCRV(session, log_bytes_written, logrec->real_len);
+	    logrec->len, (void *)logrec));
+	WT_CSTAT_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
 		lsnp->offset += myslot->offset;
@@ -260,10 +258,8 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 
 	/*
 	 * Now that the record is set up, initialize the record header.
-	 * We don't need to call __wt_rduppo2 because we're already using
-	 * log->allocsize.
 	 */
-	logrec->total_len = logrec->real_len = log->allocsize;
+	logrec->len = log->allocsize;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, log->allocsize);
 	memset(&tmp, 0, sizeof(tmp));
@@ -275,7 +271,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	 * do not need to call __log_release because we're not waiting for
 	 * earlier operations to complete.
 	 */
-	WT_ERR(__log_acquire(session, logrec->total_len, &tmp));
+	WT_ERR(__log_acquire(session, logrec->len, &tmp));
 	WT_ERR(__log_fill(session, &myslot, buf, NULL));
 	/*
 	 * If we're called from connection creation code, we need to update
@@ -343,13 +339,13 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec = (WT_LOG_RECORD *)record->mem;
 	cksum = logrec->checksum;
 	logrec->checksum = 0;
-	logrec->checksum = __wt_cksum(logrec, logrec->real_len);
+	logrec->checksum = __wt_cksum(logrec, logrec->len);
 	if (logrec->checksum != cksum) {
 		fprintf(stderr, "[%d] log_read: bad cksum\n", pthread_self());
 		ret = WT_ERROR;
 		goto err;
 	}
-	record->size = logrec->real_len;
+	record->size = logrec->len;
 	WT_CSTAT_INCR(session, log_reads);
 err:
 	WT_RET(__wt_close(session, log_fh));
@@ -369,7 +365,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN rd_lsn, start_lsn;
-	uint32_t cksum, reclen;
+	uint32_t cksum, rdup_len, reclen;
 	int done;
 
 	conn = S2C(session);
@@ -442,9 +438,9 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			ret = WT_NOTFOUND;
 			goto err;
 		}
+		rdup_len = __wt_rduppo2(reclen, log->allocsize);
 		if (reclen > buf.memsize)
-			WT_ERR(__wt_buf_grow(session, &buf,
-			     __wt_rduppo2(reclen, log->allocsize)));
+			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
 
 		WT_ERR(__wt_read(
 		    session, log_fh, rd_lsn.offset, reclen, buf.mem));
@@ -454,7 +450,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		logrec = (WT_LOG_RECORD *)buf.mem;
 		cksum = logrec->checksum;
 		logrec->checksum = 0;
-		logrec->checksum = __wt_cksum(logrec, logrec->real_len);
+		logrec->checksum = __wt_cksum(logrec, logrec->len);
 		if (logrec->checksum != cksum) {
 			fprintf(stderr,
 			    "[%d] log_scan: bad cksum\n", pthread_self());
@@ -468,12 +464,12 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		(*func)(session, &buf, &rd_lsn, cookie);
 
 		WT_CSTAT_INCR(session, log_scan_records);
-		rd_lsn.offset += logrec->total_len;
+		rd_lsn.offset += rdup_len;
 		fprintf(stderr, "[%d] log_scan: next read LSN %d,%d\n",
 		    pthread_self(), rd_lsn.file, rd_lsn.offset);
 	} while (!done);
-	WT_CSTAT_INCR(session, log_scans);
 err:
+	WT_CSTAT_INCR(session, log_scans);
 	__wt_buf_free(session, &buf);
 	if (ret == ENOENT)
 		ret = 0;
@@ -493,6 +489,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOGSLOT tmp;
 	WT_LSN tmp_lsn;
 	WT_MYSLOT myslot;
+	uint32_t rdup_len;
 	int locked;
 
 	conn = S2C(session);
@@ -503,16 +500,15 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * a header at the beginning for us to fill in.
 	 */
 	logrec = (WT_LOG_RECORD *)record->mem;
-	logrec->real_len = record->size;
-	logrec->total_len = __wt_rduppo2(record->size, log->allocsize);
+	logrec->len = record->size;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, record->size);
+	rdup_len = __wt_rduppo2(record->size, log->allocsize);
 
 	memset(&tmp, 0, sizeof(tmp));
 	fprintf(stderr,
-"[%d] log_write: flags 0x%x lsnp 0x%x real_len: %d total_len %d, chksum 0x%X\n",
-	    pthread_self(),flags, lsnp, logrec->real_len, logrec->total_len,
-	    logrec->checksum);
+"[%d] log_write: flags 0x%x lsnp 0x%x len: %d chksum 0x%X\n",
+	    pthread_self(),flags, lsnp, logrec->len, logrec->checksum);
 	WT_CSTAT_INCR(session, log_writes);
 	if (__wt_spin_trylock(session, &log->log_slot_lock) == 0) {
 		/*
@@ -524,7 +520,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		myslot.offset = 0;
 		if (LF_ISSET(WT_LOG_SYNC))
 			FLD_SET(tmp.slot_flags, SLOT_SYNC);
-		WT_ERR(__log_acquire(session, logrec->total_len, &tmp));
+		WT_ERR(__log_acquire(session, rdup_len, &tmp));
 		__wt_spin_unlock(session, &log->log_slot_lock);
 		locked = 0;
 		fprintf(stderr,
@@ -535,7 +531,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		WT_ERR(__log_release(session, &tmp));
 		return (0);
 	}
-	WT_ERR(__wt_log_slot_join(session, logrec->total_len, flags, &myslot));
+	WT_ERR(__wt_log_slot_join(session, rdup_len, flags, &myslot));
 	if (myslot.offset == 0) {
 		__wt_spin_lock(session, &log->log_slot_lock);
 		locked = 1;
@@ -551,7 +547,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	} else
 		WT_ERR(__wt_log_slot_wait(myslot.slot));
 	WT_ERR(__log_fill(session, &myslot, record, &tmp_lsn));
-	if (__wt_log_slot_release(myslot.slot, logrec->total_len) ==
+	if (__wt_log_slot_release(myslot.slot, rdup_len) ==
 	    WT_LOG_SLOT_DONE) {
 		WT_ERR(__log_release(session, myslot.slot));
 		WT_ERR(__wt_log_slot_free(myslot.slot));

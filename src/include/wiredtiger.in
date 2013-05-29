@@ -2340,70 +2340,68 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_UPDATE			35
 /*! files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				36
-/*! log: total log file bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_TOTAL_WRITTEN		37
 /*! log: total log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			38
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			37
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			39
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			38
 /*! log: total log read operations */
-#define	WT_STAT_CONN_LOG_READS				40
+#define	WT_STAT_CONN_LOG_READS				39
 /*! log: total records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			41
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			40
 /*! log: total log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				42
+#define	WT_STAT_CONN_LOG_SCANS				41
 /*! log: total consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			43
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			42
 /*! log: total logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		44
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		43
 /*! log: total consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			45
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			44
 /*! log: total consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			46
+#define	WT_STAT_CONN_LOG_SLOT_RACES			45
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			47
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			46
 /*! log: total consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		48
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		47
 /*! log: total log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				49
+#define	WT_STAT_CONN_LOG_SYNC				48
 /*! log: total log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				50
+#define	WT_STAT_CONN_LOG_WRITES				49
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			51
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			50
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			52
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			51
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			53
+#define	WT_STAT_CONN_MEMORY_FREE			52
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			54
+#define	WT_STAT_CONN_MEMORY_GROW			53
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				55
+#define	WT_STAT_CONN_READ_IO				54
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				56
+#define	WT_STAT_CONN_REC_PAGES				55
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			57
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			56
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			58
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			57
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			59
+#define	WT_STAT_CONN_RWLOCK_READ			58
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			60
+#define	WT_STAT_CONN_RWLOCK_WRITE			59
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		61
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		60
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			62
+#define	WT_STAT_CONN_TXN_ANCIENT			61
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				63
+#define	WT_STAT_CONN_TXN_BEGIN				62
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			64
+#define	WT_STAT_CONN_TXN_CHECKPOINT			63
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				65
+#define	WT_STAT_CONN_TXN_COMMIT				64
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			66
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			65
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			67
+#define	WT_STAT_CONN_TXN_ROLLBACK			66
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				68
+#define	WT_STAT_CONN_WRITE_IO				67
 
 /*!
  * @}
