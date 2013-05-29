@@ -73,7 +73,7 @@ namespace mongo {
             /** @return pid for a registered port. */
             pid_t pidForPort( int port ) const;
             /** @return port (-1 if doesn't exist) for a registered pid. */
-            int portForPid( int port ) const;
+            int portForPid( pid_t pid ) const;
             /** Register an unregistered port. */
             void registerPort( int port, pid_t pid, int output );
             void deletePort( int port );
