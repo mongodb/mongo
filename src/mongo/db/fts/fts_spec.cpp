@@ -301,7 +301,8 @@ namespace mongo {
                     BSONElement e = i.next();
                     if ( str::equals( e.fieldName(), "_fts" ) ||
                          str::equals( e.fieldName(), "_ftsx" ) ) {
-                        continue;
+                        addedFtsStuff = true;
+                        b.append( e );
                     }
                     else if ( e.type() == String &&
                               ( str::equals( "fts", e.valuestr() ) ||
