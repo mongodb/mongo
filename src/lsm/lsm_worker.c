@@ -468,7 +468,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	 * late to prevent our drop).
 	 */
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	F_SET(session, WT_SESSION_SCHEMA_LOCKED);	
+	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
 	__wt_spin_unlock(session, &conn->hot_backup_lock);
 	ret = __wt_schema_drop(session, uri, drop_cfg);
 	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
