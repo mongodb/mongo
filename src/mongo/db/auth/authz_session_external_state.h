@@ -29,15 +29,15 @@ namespace mongo {
 
     /**
      * Public interface for a class that encapsulates all the session information related to system
-     * state not stored in AuthorizationasSession.  This is primarily to make AuthorizationSession
+     * state not stored in AuthorizationSession.  This is primarily to make AuthorizationSession
      * easier to test as well as to allow different implementations in mongos and mongod.
      */
-    class AuthSessionExternalState {
-        MONGO_DISALLOW_COPYING(AuthSessionExternalState);
+    class AuthzSessionExternalState {
+        MONGO_DISALLOW_COPYING(AuthzSessionExternalState);
 
     public:
 
-        virtual ~AuthSessionExternalState();
+        virtual ~AuthzSessionExternalState();
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
@@ -55,7 +55,7 @@ namespace mongo {
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
-        // TODO: remove this in favor of using the AuthGlobalExternalState
+        // TODO: remove this in favor of using the AuthzManagerExternalState
         Status getPrivilegeDocument(const std::string& dbname,
                                     const UserName& userName,
                                     BSONObj* result);
@@ -69,17 +69,17 @@ namespace mongo {
         virtual void onLogoutDatabase(const std::string& dbname) = 0;
 
     protected:
-        AuthSessionExternalState(); // This class should never be instantiated directly.
+        AuthzSessionExternalState(); // This class should never be instantiated directly.
 
         // Queries the userNamespace with the given query and returns the privilegeDocument found
         // in *result.  Returns true if it finds a document matching the query, or false if not.
-        // TODO: remove this in favor of using the AuthGlobalExternalState
+        // TODO: remove this in favor of using the AuthzManagerExternalState
         virtual bool _findUser(const std::string& usersNamespace,
                                const BSONObj& query,
                                BSONObj* result) const = 0;
 
         // Returns true if there exists at least one privilege document in the given database.
-        // TODO: remove this in favor of using the AuthGlobalExternalState
+        // TODO: remove this in favor of using the AuthzManagerExternalState
         bool _hasPrivilegeDocument(const std::string& dbname) const;
     };
 

@@ -20,19 +20,19 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/auth_global_external_state.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 
 namespace mongo {
 
     /**
-     * The implementation of AuthGlobalExternalState functionality for mongod.
+     * The implementation of AuthzManagerExternalState functionality for mongos.
      */
-    class AuthGlobalExternalStateMongod : public AuthGlobalExternalState {
-        MONGO_DISALLOW_COPYING(AuthGlobalExternalStateMongod);
+    class AuthzManagerExternalStateMongos : public AuthzManagerExternalState{
+        MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongos);
 
     public:
-        AuthGlobalExternalStateMongod();
-        virtual ~AuthGlobalExternalStateMongod();
+        AuthzManagerExternalStateMongos();
+        virtual ~AuthzManagerExternalStateMongos();
 
     protected:
         virtual bool _findUser(const string& usersNamespace,

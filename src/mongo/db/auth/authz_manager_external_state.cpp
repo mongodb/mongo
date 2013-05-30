@@ -14,21 +14,22 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/auth_session_external_state.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 
 #include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    AuthSessionExternalState::AuthSessionExternalState() {}
-    AuthSessionExternalState::~AuthSessionExternalState() {}
+    AuthzManagerExternalState::AuthzManagerExternalState() {}
+    AuthzManagerExternalState::~AuthzManagerExternalState() {}
 
-    Status AuthSessionExternalState::getPrivilegeDocument(const std::string& dbname,
-                                                          const UserName& userName,
-                                                          BSONObj* result) {
+    Status AuthzManagerExternalState::getPrivilegeDocument(const std::string& dbname,
+                                                           const UserName& userName,
+                                                           BSONObj* result) {
 
         if (dbname == StringData("$external", StringData::LiteralTag()) ||
             dbname == AuthorizationManager::SERVER_RESOURCE_NAME ||
@@ -82,7 +83,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthSessionExternalState::_hasPrivilegeDocument(const std::string& dbname) const {
+    bool AuthzManagerExternalState::_hasPrivilegeDocument(const std::string& dbname) const {
         std::string usersNamespace = dbname + ".system.users";
 
         BSONObj userBSONObj;

@@ -23,7 +23,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/auth_session_external_state.h"
+#include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/principal_set.h"
@@ -347,7 +347,7 @@ namespace {
         return Status::OK();
     }
 
-    AuthorizationSession::AuthorizationSession(AuthSessionExternalState* externalState) {
+    AuthorizationSession::AuthorizationSession(AuthzSessionExternalState* externalState) {
         _externalState.reset(externalState);
     }
 

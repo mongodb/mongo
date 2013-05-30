@@ -10,16 +10,16 @@ env.Command(['action_type.h', 'action_type.cpp'], ['generate_action_types.py', '
 # Just the data structures used
 env.StaticLibrary('authcore', ['action_set.cpp',
                                'action_type.cpp',
-                               'auth_global_external_state.cpp',
-                               'auth_session_external_state.cpp',
                                'authorization_manager.cpp',
-                               'role_graph.cpp',
-                               'role_name.cpp',
                                'authorization_session.cpp',
+                               'authz_manager_external_state.cpp',
+                               'authz_session_external_state.cpp',
                                'principal.cpp',
                                'principal_set.cpp',
                                'privilege.cpp',
                                'privilege_set.cpp',
+                               'role_graph.cpp',
+                               'role_name.cpp',
                                'user.cpp',
                                'user_name.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
@@ -27,21 +27,21 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                            '$BUILD_DIR/mongo/stringutils'])
 
 env.StaticLibrary('authservercommon',
-                  ['auth_session_external_state_server_common.cpp',
-                   'auth_server_parameters.cpp',
+                  ['auth_server_parameters.cpp',
                    'authorization_manager_global.cpp',
+                   'authz_session_external_state_server_common.cpp',
                    'security_key.cpp'],
                   LIBDEPS=['authcore'])
 
 env.StaticLibrary('authmongod',
-                  ['auth_global_external_state_d.cpp',
-                   'auth_session_external_state_d.cpp',
+                  ['authz_manager_external_state_d.cpp',
+                   'authz_session_external_state_d.cpp',
                    'auth_index_d.cpp'],
                   LIBDEPS=['authservercommon'])
 
 env.StaticLibrary('authmongos',
-                  ['auth_global_external_state_s.cpp',
-                   'auth_session_external_state_s.cpp'],
+                  ['authz_manager_external_state_s.cpp',
+                   'authz_session_external_state_s.cpp'],
                   LIBDEPS=['authservercommon'])
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])

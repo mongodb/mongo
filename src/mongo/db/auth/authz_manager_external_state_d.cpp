@@ -14,30 +14,24 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
+#include "mongo/db/auth/authz_manager_external_state_d.h"
 
-#include <string>
-
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
-#include "mongo/db/auth/auth_global_external_state.h"
+#include "mongo/db/client.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    /**
-     * The implementation of AuthGlobalExternalState functionality for mongos.
-     */
-    class AuthGlobalExternalStateMongos : public AuthGlobalExternalState{
-        MONGO_DISALLOW_COPYING(AuthGlobalExternalStateMongos);
+    AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
+    AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
-    public:
-        AuthGlobalExternalStateMongos();
-        virtual ~AuthGlobalExternalStateMongos();
+    bool AuthzManagerExternalStateMongod::_findUser(const string& usersNamespace,
+                                                    const BSONObj& query,
+                                                    BSONObj* result) const {
+        Client::GodScope gs;
+        Client::ReadContext ctx(usersNamespace);
 
-    protected:
-        virtual bool _findUser(const string& usersNamespace,
-                               const BSONObj& query,
-                               BSONObj* result) const;
-    };
+        return Helpers::findOne(usersNamespace, query, *result);
+    }
 
 } // namespace mongo

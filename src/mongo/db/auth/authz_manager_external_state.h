@@ -30,12 +30,12 @@ namespace mongo {
      * state not stored in AuthorizationManager.  This is primarily to make AuthorizationManager
      * easier to test as well as to allow different implementations for mongos and mongod.
      */
-    class AuthGlobalExternalState {
-        MONGO_DISALLOW_COPYING(AuthGlobalExternalState);
+    class AuthzManagerExternalState {
+        MONGO_DISALLOW_COPYING(AuthzManagerExternalState);
 
     public:
 
-        virtual ~AuthGlobalExternalState();
+        virtual ~AuthzManagerExternalState();
 
         // Gets the privilege information document for "userName" on "dbname".
         //
@@ -46,7 +46,7 @@ namespace mongo {
                                     BSONObj* result);
 
     protected:
-        AuthGlobalExternalState(); // This class should never be instantiated directly.
+        AuthzManagerExternalState(); // This class should never be instantiated directly.
 
         // Queries the userNamespace with the given query and returns the privilegeDocument found
         // in *result.  Returns true if it finds a document matching the query, or false if not.

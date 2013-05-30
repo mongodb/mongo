@@ -25,7 +25,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/auth_global_external_state_d.h"
+#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
@@ -1274,7 +1274,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
 }
 
 MONGO_INITIALIZER(CreateAuthorizationManager)(InitializerContext* context) {
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthGlobalExternalStateMongod()));
+    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongod()));
     return Status::OK();
 }
 

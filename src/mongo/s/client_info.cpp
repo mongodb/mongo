@@ -19,7 +19,7 @@
 #include "pch.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/auth_session_external_state_s.h"
+#include "mongo/db/auth/authz_session_external_state_s.h"
 #include "server.h"
 #include "../util/scopeguard.h"
 #include "../db/commands.h"
@@ -85,7 +85,7 @@ namespace mongo {
         massert(16472, "A ClientInfo already exists for this thread", !info);
         info = new ClientInfo(messagingPort);
         info->setAuthorizationSession(new AuthorizationSession(
-                new AuthSessionExternalStateMongos()));
+                new AuthzSessionExternalStateMongos()));
         _tlInfo.reset( info );
         info->newRequest();
         return info;

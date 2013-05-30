@@ -16,29 +16,23 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/auth_session_external_state_server_common.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 
 namespace mongo {
 
     /**
-     * The implementation of AuthSessionExternalState functionality for mongod.
+     * The implementation of AuthzManagerExternalState functionality for mongod.
      */
-    class AuthSessionExternalStateMongod : public AuthSessionExternalStateServerCommon {
-        MONGO_DISALLOW_COPYING(AuthSessionExternalStateMongod);
+    class AuthzManagerExternalStateMongod : public AuthzManagerExternalState {
+        MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongod);
 
     public:
-        AuthSessionExternalStateMongod();
-        virtual ~AuthSessionExternalStateMongod();
-
-        virtual bool shouldIgnoreAuthChecks() const;
-
-        virtual void startRequest();
-
-        virtual void onAddAuthorizedPrincipal(Principal*);
-
-        virtual void onLogoutDatabase(const std::string&);
+        AuthzManagerExternalStateMongod();
+        virtual ~AuthzManagerExternalStateMongod();
 
     protected:
         virtual bool _findUser(const string& usersNamespace,

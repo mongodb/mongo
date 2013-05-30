@@ -18,18 +18,18 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/auth_session_external_state.h"
+#include "mongo/db/auth/authz_session_external_state.h"
 
 namespace mongo {
 
     /**
-     * Mock of the AuthSessionExternalState class used only for testing.
+     * Mock of the AuthzSessionExternalState class used only for testing.
      */
-    class AuthSessionExternalStateMock : public AuthSessionExternalState {
-        MONGO_DISALLOW_COPYING(AuthSessionExternalStateMock);
+    class AuthzSessionExternalStateMock : public AuthzSessionExternalState {
+        MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMock);
 
     public:
-        AuthSessionExternalStateMock() : _returnValue(false) {}
+        AuthzSessionExternalStateMock() : _returnValue(false) {}
 
         virtual bool shouldIgnoreAuthChecks() const {
             return _returnValue;

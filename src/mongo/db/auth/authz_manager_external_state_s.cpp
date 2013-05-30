@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/auth_global_external_state_s.h"
+#include "mongo/db/auth/authz_manager_external_state_s.h"
 
 #include <string>
 
@@ -24,8 +24,8 @@
 
 namespace mongo {
 
-    AuthGlobalExternalStateMongos::AuthGlobalExternalStateMongos() {}
-    AuthGlobalExternalStateMongos::~AuthGlobalExternalStateMongos() {}
+    AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() {}
+    AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
 
     namespace {
         ScopedDbConnection* getConnectionForUsersCollection(const std::string& ns) {
@@ -42,9 +42,9 @@ namespace mongo {
         }
     }
 
-    bool AuthGlobalExternalStateMongos::_findUser(const string& usersNamespace,
-                                                  const BSONObj& query,
-                                                  BSONObj* result) const {
+    bool AuthzManagerExternalStateMongos::_findUser(const string& usersNamespace,
+                                                    const BSONObj& query,
+                                                    BSONObj* result) const {
         scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
         *result = conn->get()->findOne(usersNamespace, query).getOwned();
         conn->done();

@@ -20,7 +20,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/auth/auth_global_external_state.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 
 namespace mongo {
 
@@ -42,7 +42,7 @@ namespace mongo {
     public:
 
         // The newly constructed AuthorizationManager takes ownership of "externalState"
-        explicit AuthorizationManager(AuthGlobalExternalState* externalState);
+        explicit AuthorizationManager(AuthzManagerExternalState* externalState);
 
         static const std::string SERVER_RESOURCE_NAME;
         static const std::string CLUSTER_RESOURCE_NAME;
@@ -74,7 +74,7 @@ namespace mongo {
          */
         static bool isAuthEnabled();
 
-        AuthGlobalExternalState* getGlobalExternalState() const;
+        AuthzManagerExternalState* getExternalState() const;
 
     private:
 
@@ -85,7 +85,7 @@ namespace mongo {
         // This is a config setting, set at startup and not changing after initialization.
         static bool _authEnabled;
 
-        scoped_ptr<AuthGlobalExternalState> _globalExternalState;
+        scoped_ptr<AuthzManagerExternalState> _globalExternalState;
     };
 
 } // namespace mongo

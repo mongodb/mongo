@@ -24,7 +24,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
-#include "mongo/db/auth/auth_global_external_state_s.h"
+#include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/dbwebserver.h"
@@ -547,7 +547,7 @@ namespace mongo {
 #endif
 
 MONGO_INITIALIZER(CreateAuthorizationManager)(InitializerContext* context) {
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthGlobalExternalStateMongos()));
+    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongos()));
     return Status::OK();
 }
 
