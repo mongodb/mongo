@@ -32,13 +32,13 @@ __curbackup_next(WT_CURSOR *cursor)
 	cb = (WT_CURSOR_BACKUP *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
-	if (cb->list == NULL || cb->list[cb->next] == NULL) {
+	if (cb->list == NULL || cb->list[cb->next].name == NULL) {
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
 		WT_ERR(WT_NOTFOUND);
 	}
 
-	cb->iface.key.data = cb->list[cb->next];
-	cb->iface.key.size = WT_STORE_SIZE(strlen(cb->list[cb->next]) + 1);
+	cb->iface.key.data = cb->list[cb->next].name;
+	cb->iface.key.size = WT_STORE_SIZE(strlen(cb->list[cb->next].name) + 1);
 	++cb->next;
 
 	F_SET(cursor, WT_CURSTD_KEY_RET);
@@ -76,22 +76,28 @@ static int
 __curbackup_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BACKUP *cb;
+	WT_CURSOR_BACKUP_ENTRY *p;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char **p;
 	int tret;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	/* Free the list of files. */
+	/* Release the handles, free the file names, free the list itself. */
 	if (cb->list != NULL) {
-		for (p = cb->list; *p != NULL; ++p)
-			__wt_free(session, *p);
+		for (p = cb->list; p->name != NULL; ++p) {
+			if (p->handle != NULL)
+				WT_WITH_DHANDLE(session, p->handle,
+				    WT_TRET(
+				    __wt_session_release_btree(session)));
+			__wt_free(session, p->name);
+		}
+
 		__wt_free(session, cb->list);
 	}
 
-	ret = __wt_cursor_close(cursor);
+	WT_TRET(__wt_cursor_close(cursor));
 	session->bkp_cursor = NULL;
 
 	WT_WITH_SCHEMA_LOCK(session,
@@ -313,8 +319,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 			break;
 		if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
-		WT_ERR(
-		    __backup_list_append(session, cb, uri + strlen("file:")));
+		WT_ERR(__backup_list_append(session, cb, uri));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -416,10 +421,9 @@ __wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
 	WT_RET_TEST(
 	    (fprintf(cb->bfp, "%s\n%s\n", name, value) < 0), __wt_errno());
 
-	/* Add to the list of files needing to be copied. */
+	/* Add file type objects to the list of files to be copied. */
 	if (WT_PREFIX_MATCH(name, "file:"))
-		WT_RET(
-		    __backup_list_append(session, cb, name + strlen("file:")));
+		WT_RET(__backup_list_append(session, cb, name));
 
 	return (0);
 }
@@ -430,12 +434,28 @@ __wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
  */
 static int
 __backup_list_append(
-    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *name)
+    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *uri)
 {
+	WT_CURSOR_BACKUP_ENTRY *p;
+	WT_DATA_HANDLE *old_dhandle;
+	WT_DECL_RET;
+	const char *name;
+	int need_handle;
+
 	/* Leave a NULL at the end to mark the end of the list. */
 	if (cb->list_next + 1 * sizeof(char *) >= cb->list_allocated)
 		WT_RET(__wt_realloc(session, &cb->list_allocated,
 		    (cb->list_next + 100) * sizeof(char *), &cb->list));
+	p = &cb->list[cb->list_next];
+	p[0].name = p[1].name = NULL;
+	p[0].handle = p[1].handle = NULL;
+
+	need_handle = 0;
+	name = uri;
+	if (WT_PREFIX_MATCH(uri, "file:")) {
+		need_handle = 1;
+		name += strlen("file:");
+	}
 
 	/*
 	 * !!!
@@ -446,9 +466,22 @@ __backup_list_append(
 	 * that for now, that block manager might not even support physical
 	 * copying of files by applications.
 	 */
-	WT_RET(__wt_strdup(
-	    session, name, &cb->list[cb->list_next++]));
-	cb->list[cb->list_next] = NULL;
+	WT_RET(__wt_strdup(session, name, &p->name));
 
+	/*
+	 * If it's a file in the database, get a handle for the underlying
+	 * object (this handle blocks schema level operations, for example
+	 * WT_SESSION.drop or an LSM file discard after level merging).
+	 */
+	if (need_handle) {
+		old_dhandle = session->dhandle;
+		if ((ret =
+		    __wt_session_get_btree(session, uri, NULL, NULL, 0)) == 0)
+			p->handle = session->dhandle;
+		session->dhandle = old_dhandle;
+		WT_RET(ret);
+	}
+
+	++cb->list_next;
 	return (0);
 }

@@ -432,16 +432,10 @@ __lsm_discard_handle(
 static int
 __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const char *drop_cfg[] = {
 	    WT_CONFIG_BASE(session, session_drop), "remove_files=false", NULL
 	};
-
-	conn = S2C(session);
-	/* Give up early if a hot backup is in progress. */
-	if (conn->hot_backup != 0)
-		return (EBUSY);
 
 	/*
 	 * We need to grab the schema lock to drop the file, so first try to
@@ -452,27 +446,13 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	WT_RET(__lsm_discard_handle(session, uri, "WiredTigerCheckpoint"));
 
 	/*
-	 * Take the hot backup lock to prevent new backups starting. Don't
-	 * proceed if a backup has started since we first checked.
-	 */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
-	if (conn->hot_backup != 0) {
-		__wt_spin_unlock(session, &conn->hot_backup_lock);
-		return (EBUSY);
-	}
-
-	/*
 	 * Take the schema lock for the drop operation. Play games with the
 	 * hot backup lock. Since __wt_schema_drop results in the hot backup
 	 * lock being taken when it updates the metadata (which would be too
 	 * late to prevent our drop).
 	 */
-	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
-	__wt_spin_unlock(session, &conn->hot_backup_lock);
-	ret = __wt_schema_drop(session, uri, drop_cfg);
-	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
-	__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_schema_drop(session, uri, drop_cfg));
 
 	if (ret == 0)
 		ret = __wt_remove(session, uri + strlen("file:"));
