@@ -21,18 +21,16 @@
 
 namespace mongo {
 
-    Value AccumulatorLast::evaluate(const Document& pDocument) const {
-        verify(vpOperand.size() == 1);
-
+    void AccumulatorLast::processInternal(const Value& input) {
         /* always remember the last value seen */
-        pValue = vpOperand[0]->evaluate(pDocument);
-
-        return pValue;
+        _last = input;
     }
 
-    AccumulatorLast::AccumulatorLast():
-        AccumulatorSingleValue() {
+    Value AccumulatorLast::getValue() const {
+        return _last;
     }
+
+    AccumulatorLast::AccumulatorLast() {}
 
     intrusive_ptr<Accumulator> AccumulatorLast::create(
         const intrusive_ptr<ExpressionContext> &pCtx) {

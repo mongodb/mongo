@@ -21,24 +21,21 @@
 
 namespace mongo {
 
-    Value AccumulatorSum::evaluate(const Document& pDocument) const {
-        verify(vpOperand.size() == 1);
-        Value rhs = vpOperand[0]->evaluate(pDocument);
-
+    void AccumulatorSum::processInternal(const Value& input) {
         // do nothing with non numeric types
-        if (!rhs.numeric())
-            return Value();
+        if (!input.numeric())
+            return;
 
         // upgrade to the widest type required to hold the result
-        totalType = Value::getWidestNumeric(totalType, rhs.getType());
+        totalType = Value::getWidestNumeric(totalType, input.getType());
 
         if (totalType == NumberInt || totalType == NumberLong) {
-            long long v = rhs.coerceToLong();
+            long long v = input.coerceToLong();
             longTotal += v;
             doubleTotal += v;
         }
         else if (totalType == NumberDouble) {
-            double v = rhs.coerceToDouble();
+            double v = input.coerceToDouble();
             doubleTotal += v;
         }
         else {
@@ -47,8 +44,6 @@ namespace mongo {
         }
 
         count++;
-
-        return Value();
     }
 
     intrusive_ptr<Accumulator> AccumulatorSum::create(

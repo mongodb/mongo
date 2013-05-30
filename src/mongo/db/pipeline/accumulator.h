@@ -26,44 +26,47 @@
 namespace mongo {
     class ExpressionContext;
 
-    class Accumulator :
-        public ExpressionNary {
+    class Accumulator : public RefCountable {
     public:
-        // virtuals from ExpressionNary
-        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
-        virtual Value serialize() const;
+        /// Serialize Accumulator and its input generating Expression.
+        Value serialize() const;
 
-        /*
-          Get the accumulated value.
+        // TODO rename to process()
+        /// Process input and update internal state.
+        void evaluate(const Document& input) { processInternal(_expr->evaluate(input)); }
 
-          @returns the accumulated value
-         */
+        /// Add needed fields to the passed in set
+        void addDependencies(set<string>& deps) const { _expr->addDependencies(deps); }
+
+        // TODO move into constructor
+        /// Sets the expression used to generate input to the accumulator.
+        void addOperand(const intrusive_ptr<Expression>& expr) {
+            verify(!_expr); // only takes one operand
+            _expr = expr;
+        }
+
+        /// Marks the end of the evaluate() phase and return accumulated result.
         virtual Value getValue() const = 0;
 
+        /// The name of the op as used in a serialization of the pipeline.
+        virtual const char* getOpName() const = 0;
+
     protected:
-        Accumulator();
+        Accumulator() {}
 
-        /*
-          Convenience method for doing this for accumulators.  The pattern
-          is always the same, so a common implementation works, but requires
-          knowing the operator name.
+        /// Update subclass's internal state based on input
+        virtual void processInternal(const Value& input) = 0;
 
-          @param pBuilder the builder to add to
-          @param fieldName the projected name
-          @param opName the operator name
-         */
-        void opToBson(BSONObjBuilder *pBuilder, StringData opName,
-                      StringData fieldName, bool requireExpression) const;
+    private:
+        intrusive_ptr<Expression> _expr;
     };
 
 
-    class AccumulatorAddToSet :
-        public Accumulator {
+    class AccumulatorAddToSet : public Accumulator {
     public:
-        // virtuals from Expression
-        virtual Value evaluate(const Document& pDocument) const;
+        virtual void processInternal(const Value& input);
         virtual Value getValue() const;
-        virtual const char *getOpName() const;
+        virtual const char* getOpName() const;
 
         /*
           Create an appending accumulator.
@@ -76,38 +79,17 @@ namespace mongo {
 
     private:
         AccumulatorAddToSet(const intrusive_ptr<ExpressionContext> &pTheCtx);
-        typedef boost::unordered_set<Value, Value::Hash > SetType;
-        mutable SetType set;
-        mutable SetType::iterator itr; 
+        typedef boost::unordered_set<Value, Value::Hash> SetType;
+        SetType set;
         intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
-    /*
-      This isn't a finished accumulator, but rather a convenient base class
-      for others such as $first, $last, $max, $min, and similar.  It just
-      provides a holder for a single Value, and the getter for that.  The
-      holder is protected so derived classes can manipulate it.
-     */
-    class AccumulatorSingleValue :
-        public Accumulator {
+    class AccumulatorFirst : public Accumulator {
     public:
-        // virtuals from Expression
+        virtual void processInternal(const Value& input);
         virtual Value getValue() const;
-
-    protected:
-        AccumulatorSingleValue();
-
-        mutable Value pValue; /* current min/max */
-    };
-
-
-    class AccumulatorFirst :
-        public AccumulatorSingleValue {
-    public:
-        // virtuals from Expression
-        virtual Value evaluate(const Document& pDocument) const;
-        virtual const char *getOpName() const;
+        virtual const char* getOpName() const;
 
         /*
           Create the accumulator.
@@ -118,17 +100,18 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
-        mutable bool _haveFirst;
         AccumulatorFirst();
+
+        bool _haveFirst;
+        Value _first;
     };
 
 
-    class AccumulatorLast :
-        public AccumulatorSingleValue {
+    class AccumulatorLast : public Accumulator {
     public:
-        // virtuals from Expression
-        virtual Value evaluate(const Document& pDocument) const;
-        virtual const char *getOpName() const;
+        virtual void processInternal(const Value& input);
+        virtual Value getValue() const;
+        virtual const char* getOpName() const;
 
         /*
           Create the accumulator.
@@ -140,16 +123,15 @@ namespace mongo {
 
     private:
         AccumulatorLast();
+        Value _last;
     };
 
 
-    class AccumulatorSum :
-        public Accumulator {
+    class AccumulatorSum : public Accumulator {
     public:
-        // virtuals from Accumulator
-        virtual Value evaluate(const Document& pDocument) const;
+        virtual void processInternal(const Value& input);
         virtual Value getValue() const;
-        virtual const char *getOpName() const;
+        virtual const char* getOpName() const;
 
         /*
           Create a summing accumulator.
@@ -163,20 +145,19 @@ namespace mongo {
     protected: /* reused by AccumulatorAvg */
         AccumulatorSum();
 
-        mutable BSONType totalType;
-        mutable long long longTotal;
-        mutable double doubleTotal;
+        BSONType totalType;
+        long long longTotal;
+        double doubleTotal;
         // count is only used by AccumulatorAvg, but lives here to avoid counting non-numeric values
-        mutable long long count;
+        long long count;
     };
 
 
-    class AccumulatorMinMax :
-        public AccumulatorSingleValue {
+    class AccumulatorMinMax : public Accumulator {
     public:
-        // virtuals from Expression
-        virtual Value evaluate(const Document& pDocument) const;
-        virtual const char *getOpName() const;
+        virtual void processInternal(const Value& input);
+        virtual Value getValue() const;
+        virtual const char* getOpName() const;
 
         /*
           Create either the max or min accumulator.
@@ -191,17 +172,16 @@ namespace mongo {
     private:
         AccumulatorMinMax(int theSense);
 
-        int sense; /* 1 for min, -1 for max; used to "scale" comparison */
+        Value _val;
+        const int _sense; /* 1 for min, -1 for max; used to "scale" comparison */
     };
 
 
-    class AccumulatorPush :
-        public Accumulator {
+    class AccumulatorPush : public Accumulator {
     public:
-        // virtuals from Expression
-        virtual Value evaluate(const Document& pDocument) const;
+        virtual void processInternal(const Value& input);
         virtual Value getValue() const;
-        virtual const char *getOpName() const;
+        virtual const char* getOpName() const;
 
         /*
           Create an appending accumulator.
@@ -215,19 +195,17 @@ namespace mongo {
     private:
         AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
 
-        mutable vector<Value> vpValue;
+        vector<Value> vpValue;
         intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
-    class AccumulatorAvg :
-        public AccumulatorSum {
+    class AccumulatorAvg : public AccumulatorSum {
         typedef AccumulatorSum Super;
     public:
-        // virtuals from Accumulator
-        virtual Value evaluate(const Document& pDocument) const;
+        virtual void processInternal(const Value& input);
         virtual Value getValue() const;
-        virtual const char *getOpName() const;
+        virtual const char* getOpName() const;
 
         /*
           Create an averaging accumulator.

@@ -21,13 +21,10 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    Value AccumulatorPush::evaluate(const Document& pDocument) const {
-        verify(vpOperand.size() == 1);
-        Value prhs(vpOperand[0]->evaluate(pDocument));
-
+    void AccumulatorPush::processInternal(const Value& input) {
         if (!pCtx->getDoingMerge()) {
-            if (!prhs.missing()) {
-                vpValue.push_back(prhs);
+            if (!input.missing()) {
+                vpValue.push_back(input);
             }
         }
         else {
@@ -37,13 +34,11 @@ namespace mongo {
               If we didn't, then we'd get an array of arrays, with one array
               from each shard that responds.
              */
-            verify(prhs.getType() == Array);
+            verify(input.getType() == Array);
             
-            const vector<Value>& vec = prhs.getArray();
+            const vector<Value>& vec = input.getArray();
             vpValue.insert(vpValue.end(), vec.begin(), vec.end());
         }
-
-        return Value();
     }
 
     Value AccumulatorPush::getValue() const {

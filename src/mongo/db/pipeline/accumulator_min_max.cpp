@@ -21,26 +21,23 @@
 
 namespace mongo {
 
-    Value AccumulatorMinMax::evaluate(const Document& pDocument) const {
-        verify(vpOperand.size() == 1);
-        Value prhs(vpOperand[0]->evaluate(pDocument));
-
+    void AccumulatorMinMax::processInternal(const Value& input) {
         // nullish values should have no impact on result
-        if (!prhs.nullish()) {
+        if (!input.nullish()) {
             /* compare with the current value; swap if appropriate */
-            int cmp = Value::compare(pValue, prhs) * sense;
-            if (cmp > 0 || pValue.missing()) // missing is lower than all other values
-                pValue = prhs;
+            int cmp = Value::compare(_val, input) * _sense;
+            if (cmp > 0 || _val.missing()) // missing is lower than all other values
+                _val = input;
         }
-
-        return Value();
     }
 
-    AccumulatorMinMax::AccumulatorMinMax(int theSense):
-        AccumulatorSingleValue(),
-        sense(theSense) {
-        verify((sense == 1) || (sense == -1));
+    Value AccumulatorMinMax::getValue() const {
+        return _val;
     }
+
+    AccumulatorMinMax::AccumulatorMinMax(int theSense)
+        :_sense(theSense)
+    { verify((_sense == 1) || (_sense == -1)); }
 
     intrusive_ptr<Accumulator> AccumulatorMinMax::createMin(
         const intrusive_ptr<ExpressionContext> &pCtx) {
@@ -57,7 +54,7 @@ namespace mongo {
     }
 
     const char *AccumulatorMinMax::getOpName() const {
-        if (sense == 1)
+        if (_sense == 1)
             return "$min";
         return "$max";
     }

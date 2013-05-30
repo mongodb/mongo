@@ -25,25 +25,8 @@
 namespace mongo {
     using namespace mongoutils;
 
-    void Accumulator::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        uassert(15943, str::stream() << "group accumulator " <<
-                getOpName() << " only accepts one operand",
-                vpOperand.size() < 1);
-        
-        ExpressionNary::addOperand(pExpression);
-    }
-
-    Accumulator::Accumulator():
-        ExpressionNary() {
-    }
-
     Value Accumulator::serialize() const {
-        verify(vpOperand.size() == 1);
-
-        MutableDocument valBuilder;
-        valBuilder[getOpName()] = vpOperand[0]->serialize();
-        return valBuilder.freezeToValue();
+        return Value(DOC(getOpName() << _expr->serialize()));
     }
 
     void agg_framework_reservedErrors() {

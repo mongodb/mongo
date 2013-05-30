@@ -26,9 +26,9 @@ namespace mongo {
     const char AccumulatorAvg::subTotalName[] = "subTotal";
     const char AccumulatorAvg::countName[] = "count";
 
-    Value AccumulatorAvg::evaluate(const Document& pDocument) const {
+    void AccumulatorAvg::processInternal(const Value& input) {
         if (!pCtx->getDoingMerge()) {
-            Super::evaluate(pDocument);
+            Super::processInternal(input);
         }
         else {
             /*
@@ -36,19 +36,16 @@ namespace mongo {
               both a subtotal and a count.  This is what getValue() produced
               below.
              */
-            Value shardOut = vpOperand[0]->evaluate(pDocument);
-            verify(shardOut.getType() == Object);
+            verify(input.getType() == Object);
 
-            Value subTotal = shardOut[subTotalName];
+            Value subTotal = input[subTotalName];
             verify(!subTotal.missing());
             doubleTotal += subTotal.getDouble();
                 
-            Value subCount = shardOut[countName];
+            Value subCount = input[countName];
             verify(!subCount.missing());
             count += subCount.getLong();
         }
-
-        return Value();
     }
 
     intrusive_ptr<Accumulator> AccumulatorAvg::create(
