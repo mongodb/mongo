@@ -734,6 +734,31 @@ namespace mutablebson {
             return rep->child.left;
         }
 
+        // Return the index of the right child of the Element with index 'index', resolving any
+        // opaque nodes. Note that this may require resolving all of the right siblings of the
+        // left child.
+        Element::RepIdx resolveRightChild(Element::RepIdx index) {
+            dassert(index != kInvalidRepIdx);
+            dassert(index != kOpaqueRepIdx);
+
+            Element::RepIdx current = getElementRep(index).child.right;
+            if (current == kOpaqueRepIdx) {
+                current = resolveLeftChild(index);
+                while (current != kInvalidRepIdx) {
+                    Element::RepIdx next = resolveRightSibling(current);
+                    if (next == kInvalidRepIdx)
+                        break;
+                    current = next;
+                }
+
+                // The resolveRightSibling calls should have eventually updated this nodes right
+                // child pointer to point to the node we are about to return.
+                dassert(getElementRep(index).child.right == current);
+            }
+
+            return current;
+        }
+
         // Return the index of the right sibling of the Element with index 'index', resolving
         // the right sibling to a realized Element if it is currently opaque.
         Element::RepIdx resolveRightSibling(Element::RepIdx index) {
@@ -1105,18 +1130,9 @@ namespace mutablebson {
         // created by our Impl so that we can let leftChild be lazily evaluated, even for a
         // const Element.
         Document::Impl& impl = _doc->getImpl();
-
-        // To get the right child, we need to resolve all the right siblings of any left child.
-        Element::RepIdx current = impl.resolveLeftChild(_repIdx);
-        dassert(current != kOpaqueRepIdx);
-        while (current != kInvalidRepIdx) {
-            Element::RepIdx next = impl.resolveRightSibling(current);
-            if (next == kInvalidRepIdx)
-                break;
-            current = next;
-        }
-        dassert(current != kOpaqueRepIdx);
-        return Element(_doc, current);
+        const Element::RepIdx rightChildIdx = impl.resolveRightChild(_repIdx);
+        dassert(rightChildIdx != kOpaqueRepIdx);
+        return Element(_doc, rightChildIdx);
     }
 
     bool Element::hasChildren() const {
