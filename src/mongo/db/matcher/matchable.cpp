@@ -18,7 +18,6 @@
 
 #include "mongo/pch.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_internal.h"
 #include "mongo/db/matcher/matchable.h"
 
 namespace mongo {
@@ -31,19 +30,6 @@ namespace mongo {
     }
 
     BSONMatchableDocument::~BSONMatchableDocument() {
-    }
-
-
-    BSONElement BSONMatchableDocument::getFieldDottedOrArray( const FieldRef& path,
-                                                              size_t* idxPath,
-                                                              bool* inArray ) const {
-        return mongo::getFieldDottedOrArray( _obj, path, idxPath, inArray );
-    }
-
-    void BSONMatchableDocument::getFieldsDotted( const StringData& name,
-                                                 BSONElementSet &ret,
-                                                 bool expandLastArray ) const {
-        return _obj.getFieldsDotted( name, ret, expandLastArray );
     }
 
 }

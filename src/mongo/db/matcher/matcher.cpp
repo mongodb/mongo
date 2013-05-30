@@ -40,13 +40,7 @@ namespace mongo {
             return _doc.replaceFieldNames( _pattern );
         }
 
-        virtual BSONElement getFieldDottedOrArray( const FieldRef& path,
-                                                   size_t* idxPath,
-                                                   bool* inArray ) const;
-
-        virtual void getFieldsDotted( const StringData& name,
-                                      BSONElementSet &ret,
-                                      bool expandLastArray = true ) const;
+        virtual ElementIterator* getIterator( const ElementPath& path ) const;
 
     private:
 
@@ -56,6 +50,14 @@ namespace mongo {
         BSONObj _doc;
 
     };
+
+    ElementIterator* IndexKeyMatchableDocument::getIterator( const ElementPath& path ) const {
+        BSONElement e = _getElement( path.fieldRef() );
+        if ( e.type() == Array )
+            return new SimpleArrayElementIterator( e, true );
+        return new SingleElementElementIterator( e );
+    }
+
 
     BSONElement IndexKeyMatchableDocument::_getElement( const FieldRef& path ) const {
         BSONObjIterator patternIterator( _pattern );
@@ -72,37 +74,6 @@ namespace mongo {
         }
 
         return BSONElement();
-    }
-
-
-    BSONElement IndexKeyMatchableDocument::getFieldDottedOrArray( const FieldRef& path,
-                                                                  size_t* idxPath,
-                                                                  bool* inArray ) const {
-        BSONElement res = _getElement( path );
-        if ( !res.eoo() ) {
-            *idxPath = path.numParts() - 1;
-            *inArray = false;
-        }
-
-        return res;
-    }
-
-    void IndexKeyMatchableDocument::getFieldsDotted( const StringData& name,
-                                                     BSONElementSet &ret,
-                                                     bool expandLastArray ) const {
-        BSONObjIterator patternIterator( _pattern );
-        BSONObjIterator docIterator( _doc );
-
-        while ( patternIterator.more() ) {
-            BSONElement patternElement = patternIterator.next();
-            verify( docIterator.more() );
-            BSONElement docElement = docIterator.next();
-
-            if ( name == patternElement.fieldName() ) {
-                ret.insert( docElement );
-            }
-        }
-
     }
 
 

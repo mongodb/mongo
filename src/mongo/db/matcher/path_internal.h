@@ -1,4 +1,4 @@
-// expression_internal.h
+// path_internal.h
 
 /**
  *    Copyright (C) 2013 10gen Inc.
@@ -31,7 +31,6 @@ namespace mongo {
     // Replaces getFieldDottedOrArray without recursion nor string manipulation
     BSONElement getFieldDottedOrArray( const BSONObj& doc,
                                        const FieldRef& path,
-                                       size_t* idxPath,
-                                       bool* inArray );
+                                       size_t* idxPath );
 
 }  // namespace mongo

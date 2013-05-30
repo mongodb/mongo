@@ -22,106 +22,30 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/matcher/expression_internal.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/path.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    void LeafMatchExpression::initPath( const StringData& path ) {
+    Status LeafMatchExpression::initPath( const StringData& path ) {
         _path = path;
-        _fieldRef.parse( _path );
+        return _elementPath.init( _path );
     }
 
-    bool LeafMatchExpression::_matchesElementExpandArray( const BSONElement& e ) const {
-        if ( e.eoo() )
-            return false;
-
-        if ( matchesSingleElement( e ) )
-            return true;
-
-        if ( e.type() == Array ) {
-            BSONObjIterator i( e.Obj() );
-            while ( i.more() ){
-                BSONElement sub = i.next();
-                if ( matchesSingleElement( sub ) )
-                    return true;
-            }
-        }
-
-        return false;
-    }
 
     bool LeafMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        return _matches( _fieldRef, doc, details );
-    }
-
-    bool LeafMatchExpression::_matches( const FieldRef& fieldRef,
-                                        const MatchableDocument* doc,
-                                        MatchDetails* details ) const {
-
-        bool traversedArray = false;
-        size_t idxPath = 0;
-        BSONElement e = doc->getFieldDottedOrArray( fieldRef, &idxPath, &traversedArray );
-
-        if ( e.type() != Array || traversedArray ) {
-            return matchesSingleElement( e );
-        }
-
-        string rest = fieldRef.dottedField( idxPath + 1 );
-        StringData next;
-        bool nextIsNumber = false;
-        if ( rest.size() > 0 ){
-            next = fieldRef.getPart( idxPath + 1 );
-            nextIsNumber = isAllDigits( next );
-        }
-
-        BSONObjIterator i( e.Obj() );
-        while ( i.more() ) {
-            BSONElement x = i.next();
-
-            bool found = false;
-            if ( rest.size() == 0 ) {
-                found = matchesSingleElement( x );
+        boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
+        while ( cursor->more() ) {
+            ElementIterator::Element e = cursor->next();
+            if ( !matchesSingleElement( e.element() ) )
+                continue;
+            if ( details && details->needRecord() && !e.arrayOffset().eoo() ) {
+                details->setElemMatchKey( e.arrayOffset().fieldName() );
             }
-            else if ( x.type() == Object ) {
-                FieldRef myFieldRef;
-                myFieldRef.parse( rest );
-                BSONMatchableDocument myDoc( x.Obj() );
-                found = _matches( myFieldRef, &myDoc, NULL );
-            }
-
-
-            if ( !found && nextIsNumber && next == x.fieldName() ) {
-                string reallyNext = fieldRef.dottedField( idxPath + 2 );
-                if ( reallyNext.size() == 0 ) {
-                    found = matchesSingleElement( x );
-                }
-                else if ( x.isABSONObj() ) {
-                    // TODO: this is slow
-                    FieldRef myFieldRef;
-                    myFieldRef.parse( "x." + reallyNext );
-                    BSONObjBuilder b;
-                    b.appendAs( x, "x" );
-                    BSONObj temp = b.obj();
-                    BSONMatchableDocument myDoc( temp );
-                    found = _matches( myFieldRef, &myDoc, NULL );
-                }
-            }
-
-            if ( found ) {
-                if ( details && details->needRecord() ) {
-                    details->setElemMatchKey( x.fieldName() );
-                }
-                return true;
-            }
+            return true;
         }
-
-        if ( rest.size() > 0 ) {
-            // we're supposed to have gone further down
-            return false;
-        }
-
-        return matchesSingleElement( e );
+        return false;
     }
 
     // -------------
@@ -139,7 +63,6 @@ namespace mongo {
 
 
     Status ComparisonMatchExpression::init( const StringData& path, const BSONElement& rhs ) {
-        initPath( path );
         _rhs = rhs;
 
         if ( rhs.eoo() ) {
@@ -161,7 +84,7 @@ namespace mongo {
             return Status( ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression" );
         }
 
-        return Status::OK();
+        return initPath( path );
     }
 
 
@@ -263,8 +186,6 @@ namespace mongo {
 
 
     Status RegexMatchExpression::init( const StringData& path, const StringData& regex, const StringData& options ) {
-        initPath( path );
-
         if ( regex.size() > MaxPatternSize ) {
             return Status( ErrorCodes::BadValue, "Regular expression is too long" );
         }
@@ -272,7 +193,8 @@ namespace mongo {
         _regex = regex.toString();
         _flags = options.toString();
         _re.reset( new pcrecpp::RE( _regex.c_str(), flags2options( _flags.c_str() ) ) );
-        return Status::OK();
+
+        return initPath( path );
     }
 
     bool RegexMatchExpression::matchesSingleElement( const BSONElement& e ) const {
@@ -300,12 +222,11 @@ namespace mongo {
     // ---------
 
     Status ModMatchExpression::init( const StringData& path, int divisor, int remainder ) {
-        initPath( path );
         if ( divisor == 0 )
             return Status( ErrorCodes::BadValue, "divisor cannot be 0" );
         _divisor = divisor;
         _remainder = remainder;
-        return Status::OK();
+        return initPath( path );
     }
 
     bool ModMatchExpression::matchesSingleElement( const BSONElement& e ) const {
@@ -334,8 +255,7 @@ namespace mongo {
     // ------------------
 
     Status ExistsMatchExpression::init( const StringData& path ) {
-        initPath( path );
-        return Status::OK();
+        return initPath( path );
     }
 
     bool ExistsMatchExpression::matchesSingleElement( const BSONElement& e ) const {
@@ -361,7 +281,7 @@ namespace mongo {
     Status TypeMatchExpression::init( const StringData& path, int type ) {
         _path = path;
         _type = type;
-        return Status::OK();
+        return _elementPath.init( _path );
     }
 
     bool TypeMatchExpression::matchesSingleElement( const BSONElement& e ) const {
@@ -369,46 +289,19 @@ namespace mongo {
     }
 
     bool TypeMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        return _matches( _path, doc, details );
-    }
+        boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
+        while ( cursor->more() ) {
+            ElementIterator::Element e = cursor->next();
+            if ( e.outerArray() )
+                continue;
 
-    bool TypeMatchExpression::_matches( const StringData& path,
-                                        const MatchableDocument* doc,
-                                        MatchDetails* details ) const {
-
-        FieldRef fieldRef;
-        fieldRef.parse( path );
-
-        bool traversedArray = false;
-        size_t idxPath = 0;
-        BSONElement e = doc->getFieldDottedOrArray( fieldRef, &idxPath, &traversedArray );
-
-        string rest = fieldRef.dottedField( idxPath + 1 );
-
-        if ( e.type() != Array ) {
-            return matchesSingleElement( e );
+            if ( !matchesSingleElement( e.element() ) )
+                continue;
+            if ( details && details->needRecord() && !e.arrayOffset().eoo() ) {
+                details->setElemMatchKey( e.arrayOffset().fieldName() );
+            }
+            return true;
         }
-
-        BSONObjIterator i( e.Obj() );
-        while ( i.more() ) {
-            BSONElement x = i.next();
-            bool found = false;
-            if ( rest.size() == 0 ) {
-                found = matchesSingleElement( x );
-            }
-            else if ( x.isABSONObj() ) {
-                BSONMatchableDocument doc( x.Obj() );
-                found = _matches( rest, &doc, details );
-            }
-
-            if ( found ) {
-                if ( details && details->needRecord() ) {
-                    details->setElemMatchKey( x.fieldName() );
-                }
-                return true;
-            }
-        }
-
         return false;
     }
 
@@ -489,8 +382,8 @@ namespace mongo {
 
     // -----------
 
-    void InMatchExpression::init( const StringData& path ) {
-        initPath( path );
+    Status InMatchExpression::init( const StringData& path ) {
+        return initPath( path );
     }
 
     bool InMatchExpression::_matchesRealElement( const BSONElement& e ) const {

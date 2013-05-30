@@ -33,6 +33,8 @@ namespace mongo {
         ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( matchType ){}
         virtual ~ArrayMatchingMatchExpression(){}
 
+        Status initPath( const StringData& path );
+
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
 
         /**
@@ -44,8 +46,10 @@ namespace mongo {
 
         bool equivalent( const MatchExpression* other ) const;
 
-    protected:
+        const StringData& path() const { return _path; }
+    private:
         StringData _path;
+        ElementPath _elementPath;
     };
 
 
@@ -114,6 +118,7 @@ namespace mongo {
         bool _allMatch( const BSONObj& anArray ) const;
 
         StringData _path;
+        ElementPath _elementPath;
         std::vector< const ArrayMatchingMatchExpression* > _list;
     };
 

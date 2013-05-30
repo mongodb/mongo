@@ -22,9 +22,8 @@
 namespace mongo {
 
     Status GeoMatchExpression::init( const StringData& path, const GeoQuery& query ) {
-        initPath( path );
         _query = query;
-        return Status::OK();
+        return initPath( path );
     }
 
     bool GeoMatchExpression::matchesSingleElement( const BSONElement& e ) const {

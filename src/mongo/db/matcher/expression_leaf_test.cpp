@@ -116,6 +116,14 @@ namespace mongo {
         ASSERT( !eq.matchesBSON( BSON( "a" << 1 ), NULL ) );
     }
 
+    TEST( EqOp, MatchesThroughNestedArray ) {
+        BSONObj operand = BSON( "a.b.c.d" << 3 );
+        EqualityMatchExpression eq;
+        eq.init( "a.b.c.d", operand["a.b.c.d"] );
+        BSONObj obj = fromjson("{a:{b:[{c:[{d:1},{d:2}]},{c:[{d:3}]}]}}");
+        ASSERT( eq.matchesBSON( obj, NULL ) );
+    }
+
     TEST( EqOp, ElemMatchKey ) {
         BSONObj operand = BSON( "a" << 5 );
         EqualityMatchExpression eq;

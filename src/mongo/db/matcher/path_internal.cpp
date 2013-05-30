@@ -1,4 +1,4 @@
-// expression_internal.h
+// path_internal.h
 
 /**
  *    Copyright (C) 2013 10gen Inc.
@@ -16,7 +16,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/matcher/expression_internal.h"
+#include "mongo/db/matcher/path_internal.h"
 
 namespace mongo {
 
@@ -30,8 +30,7 @@ namespace mongo {
 
     BSONElement getFieldDottedOrArray( const BSONObj& doc,
                                        const FieldRef& path,
-                                       size_t* idxPath,
-                                       bool* inArray )  {
+                                       size_t* idxPath ) {
         if ( path.numParts() == 0 )
             return doc.getField( "" );
 
@@ -56,14 +55,7 @@ namespace mongo {
                 break;
 
             case Array:
-                if ( partNum+1 < path.numParts() && isAllDigits( path.getPart( partNum+1 ) ) ) {
-                    //*inArray = true;
-                    curr = res.Obj();
-                    stop = true;
-                }
-                else {
-                    stop = true;
-                }
+                stop = true;
                 break;
 
             default:

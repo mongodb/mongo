@@ -113,12 +113,19 @@ env.CppUnitTest('namespacestring_test', ['db/namespacestring_test.cpp'],
 env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
                 LIBDEPS=['bson','index_set'])
 
+env.StaticLibrary('path',
+                  ['db/matcher/path.cpp',
+                   'db/matcher/path_internal.cpp'],
+                  LIBDEPS=['bson',
+                           '$BUILD_DIR/mongo/db/common'])
+
+env.CppUnitTest('path_test', ['db/matcher/path_test.cpp'],
+                LIBDEPS=['path'])
 
 
 env.StaticLibrary('expressions',
                   ['db/matcher/expression.cpp',
                    'db/matcher/expression_array.cpp',
-                   'db/matcher/expression_internal.cpp',
                    'db/matcher/expression_leaf.cpp',
                    'db/matcher/expression_tree.cpp',
                    'db/matcher/expression_parser.cpp',
@@ -126,6 +133,7 @@ env.StaticLibrary('expressions',
                    'db/matcher/matchable.cpp',
                    'db/matcher/match_details.cpp'],
                   LIBDEPS=['bson',
+                           'path',
                            '$BUILD_DIR/mongo/db/common',
                            '$BUILD_DIR/third_party/pcrecpp'
                            ] )
@@ -138,7 +146,6 @@ env.StaticLibrary('expressions_geo',
 env.StaticLibrary('expressions_where',
                   ['db/matcher/expression_where.cpp'],
                   LIBDEPS=['expressions'] )
-
 
 env.CppUnitTest('expression_test',
                 ['db/matcher/expression_test.cpp',

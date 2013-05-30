@@ -45,20 +45,11 @@ namespace mongo {
         const StringData path() const { return _path; }
 
     protected:
-        void initPath( const StringData& path );
+        Status initPath( const StringData& path );
 
     private:
-        bool _matches( const FieldRef& fieldRef,
-                       const MatchableDocument* doc,
-                       MatchDetails* details ) const;
-
-
-
-
-        bool _matchesElementExpandArray( const BSONElement& e ) const;
-
         StringData _path;
-        FieldRef _fieldRef;
+        ElementPath _elementPath;
     };
 
     // -----
@@ -230,6 +221,7 @@ namespace mongo {
                        MatchDetails* details = 0 ) const;
 
         StringData _path;
+        ElementPath _elementPath;
         int _type;
     };
 
@@ -275,7 +267,7 @@ namespace mongo {
     class InMatchExpression : public LeafMatchExpression {
     public:
         InMatchExpression() : LeafMatchExpression( MATCH_IN ){}
-        void init( const StringData& path );
+        Status init( const StringData& path );
 
         virtual LeafMatchExpression* shallowClone() const;
 

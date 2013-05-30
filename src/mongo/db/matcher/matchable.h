@@ -20,6 +20,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/matcher/path.h"
 
 namespace mongo {
 
@@ -29,13 +30,7 @@ namespace mongo {
 
         virtual BSONObj toBSON() const = 0;
 
-        virtual BSONElement getFieldDottedOrArray( const FieldRef& path,
-                                                   size_t* idxPath,
-                                                   bool* inArray ) const = 0;
-
-        virtual void getFieldsDotted( const StringData& name,
-                                      BSONElementSet &ret,
-                                      bool expandLastArray = true ) const = 0;
+        virtual ElementIterator* getIterator( const ElementPath& path ) const = 0;
 
     };
 
@@ -46,13 +41,9 @@ namespace mongo {
 
         virtual BSONObj toBSON() const { return _obj; }
 
-        virtual BSONElement getFieldDottedOrArray( const FieldRef& path,
-                                                   size_t* idxPath,
-                                                   bool* inArray ) const;
-
-        virtual void getFieldsDotted( const StringData& name,
-                                      BSONElementSet &ret,
-                                      bool expandLastArray = true ) const;
+        virtual ElementIterator* getIterator( const ElementPath& path ) const {
+            return new BSONElementIterator( path, _obj );
+        }
 
     private:
         BSONObj _obj;

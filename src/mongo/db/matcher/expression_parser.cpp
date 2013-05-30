@@ -92,8 +92,10 @@ namespace mongo {
             if ( e.type() != Array )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$in needs an array" );
             std::auto_ptr<InMatchExpression> temp( new InMatchExpression() );
-            temp->init( name );
-            Status s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), e.Obj() );
+            Status s = temp->init( name );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+            s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), e.Obj() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
             return StatusWithMatchExpression( temp.release() );
@@ -103,8 +105,10 @@ namespace mongo {
             if ( e.type() != Array )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$nin needs an array" );
             std::auto_ptr<InMatchExpression> temp( new InMatchExpression() );
-            temp->init( name );
-            Status s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), e.Obj() );
+            Status s = temp->init( name );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+            s = _parseArrayFilterEntries( temp->getArrayFilterEntries(), e.Obj() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
 
