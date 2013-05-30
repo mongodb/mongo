@@ -97,10 +97,14 @@ namespace mongo {
 
         TEST( FTSSpec, Extra2 ) {
             BSONObj user = BSON( "key" << BSON( "data" << "fts" << "x" << 1 ) );
-            FTSSpec spec( FTSSpec::fixSpec( user ) );
+            BSONObj fixed = FTSSpec::fixSpec( user );
+            FTSSpec spec( fixed );
             ASSERT_EQUALS( 0U, spec.numExtraBefore() );
             ASSERT_EQUALS( 1U, spec.numExtraAfter() );
             ASSERT_EQUALS( StringData("x"), spec.extraAfter(0) );
+
+            BSONObj fixed2 = FTSSpec::fixSpec( fixed );
+            ASSERT_EQUALS( fixed, fixed2 );
         }
 
         TEST( FTSSpec, Extra3 ) {
