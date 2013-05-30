@@ -25,6 +25,7 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/text.h"
 
@@ -97,16 +98,27 @@ namespace mongo {
 
         /** Set process wide current working directory. */
         BSONObj cd(const BSONObj& args, void* data) {
+            uassert(16830,
+                    "cd requires one argument -- cd(directory)",
+                    args.nFields() == 1);
+            uassert(16831,
+                    "cd requires a string argument -- cd(directory)",
+                    args.firstElement().type() == String);
 #if defined(_WIN32)
-            std::wstring dir = toWideString( args.firstElement().String().c_str() );
-            if( SetCurrentDirectory(dir.c_str()) )
+            std::wstring dir = toWideString(args.firstElement().String().c_str());
+            if (SetCurrentDirectoryW(dir.c_str())) {
                 return BSONObj();
+            }
 #else
-            string dir = args.firstElement().String();
-            if( chdir( dir.c_str() ) == 0 )
+            std::string dir = args.firstElement().String();
+            if (chdir(dir.c_str()) == 0) {
                 return BSONObj();
+            }
 #endif
-            return BSON( "" << "change directory failed" );
+            uasserted(16832,
+                      mongoutils::str::stream() << "cd command failed: "
+                                                << errnoWithDescription());
+            return BSONObj();
         }
 
         BSONObj pwd(const BSONObj&, void* data) {
@@ -161,6 +173,12 @@ namespace mongo {
         }
 
         BSONObj mkdir(const BSONObj& args, void* data) {
+            uassert(16833,
+                    "mkdir requires one argument -- mkdir(directory)",
+                    args.nFields() == 1);
+            uassert(16834,
+                    "mkdir requires a string argument -- mkdir(directory)",
+                    args.firstElement().type() == String);
             boost::filesystem::create_directories(args.firstElement().String());
             return BSON( "" << true );
         }
