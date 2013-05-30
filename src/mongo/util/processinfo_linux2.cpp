@@ -49,7 +49,7 @@ namespace mongo {
                 msgassertedNoTrace( 13538 , s.c_str() );
             }
             int found = fscanf(f,
-                               "%d %s %c "
+                               "%d %127s %c "
                                "%d %d %d %d %d "
                                "%lu %lu %lu %lu %lu "
                                "%lu %lu %ld %ld "  /* utime stime cutime cstime */

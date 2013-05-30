@@ -299,8 +299,10 @@ namespace mongo {
                         break;
                     }
                     if ( last != buf ) {
-                        strcpy( temp, last );
-                        strcpy( buf, temp );
+                        strncpy( temp, last, bufSize );
+                        temp[ bufSize-1 ] = '\0';
+                        strncpy( buf, temp, bufSize );
+                        buf[ bufSize-1 ] = '\0';
                     }
                     else {
                         verify( strlen( buf ) < bufSize );

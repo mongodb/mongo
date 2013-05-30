@@ -23,6 +23,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/platform/cstdint.h"
 #include "mongo/platform/float_utils.h"
 
 namespace mongo {
@@ -237,8 +238,8 @@ namespace mongo {
         }
 
         // for objects the size *includes* the size of the size field
-        int objsize() const {
-            return *reinterpret_cast< const int* >( value() );
+        size_t objsize() const {
+            return static_cast< const size_t >( *reinterpret_cast< const uint32_t* >( value() ) );
         }
 
         /** Get a string's value.  Also gives you start of the real data for an embedded object.

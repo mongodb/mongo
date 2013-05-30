@@ -121,8 +121,8 @@ namespace mongo {
 
         void set( const BSONObj& o ) {
             scoped_spinlock lk(_lock);
-            int sz = o.objsize();
-            if ( sz > (int) sizeof(_buf) ) {
+            size_t sz = o.objsize();
+            if ( sz > sizeof(_buf) ) {
                 _reset(TOO_BIG_SENTINEL);
             }
             else {
