@@ -556,6 +556,8 @@ namespace mutablebson {
 
     private:
         friend class Document;
+        friend class ConstElement;
+
         friend bool operator==(const Element&, const Element&);
 
         inline Element(Document* doc, RepIdx repIdx);
@@ -567,7 +569,7 @@ namespace mutablebson {
         Status setValue(Element* newValue);
 
         template<typename Builder>
-        inline void writeElement(Builder* builder) const;
+        inline void writeElement(Builder* builder, const StringData* fieldName = NULL) const;
 
         template<typename Builder>
         inline void writeChildren(Builder* builder) const;

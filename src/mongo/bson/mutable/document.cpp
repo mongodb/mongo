@@ -1104,11 +1104,8 @@ namespace mutablebson {
 
         if (thisRep->serialized) {
             // For leaf elements we just create a new Element with the current value and
-            // replace.
-            dassert(impl.hasValue(*thisRep));
-            Element replacement = getDocument().makeElementWithNewFieldName(
-                newName, impl.getSerializedElement(*thisRep));
-            // NOTE: This call will also invalidate thisRep.
+            // replace. Note that the 'setValue' call below will invalidate thisRep.
+            Element replacement = _doc->makeElementWithNewFieldName(newName, *this);
             setValue(&replacement);
         } else {
             // The easy case: just update what our field name offset refers to.
@@ -1756,7 +1753,7 @@ namespace mutablebson {
     } // namespace
 
     template<typename Builder>
-    void Element::writeElement(Builder* builder) const {
+    void Element::writeElement(Builder* builder, const StringData* fieldName) const {
         // No need to verify(ok()) since we are only called from methods that have done so.
         dassert(ok());
 
@@ -1764,10 +1761,15 @@ namespace mutablebson {
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
 
         if (thisRep.serialized) {
-            builder->append(impl.getSerializedElement(thisRep));
+            BSONElement element = impl.getSerializedElement(thisRep);
+            if (fieldName)
+                builder->appendAs(element, *fieldName);
+            else
+                builder->append(element);
         } else {
             const BSONType type = impl.getType(thisRep);
-            SubBuilder<Builder> subBuilder(builder, type, impl.getFieldName(thisRep));
+            const StringData subName = fieldName ? *fieldName : impl.getFieldName(thisRep);
+            SubBuilder<Builder> subBuilder(builder, type, subName);
             if (type == mongo::Array) {
                 BSONArrayBuilder child_builder(subBuilder.buffer);
                 writeChildren(&child_builder);
@@ -2092,7 +2094,7 @@ namespace mutablebson {
         case EOO:
             verify(false);
         case NumberDouble:
-            return makeElementDouble(fieldName,value._numberDouble());
+            return makeElementDouble(fieldName, value._numberDouble());
         case String:
             return makeElementString(fieldName,
                                      StringData(value.valuestr(), value.valuestrsize() - 1));
@@ -2157,6 +2159,40 @@ namespace mutablebson {
             return makeElementDouble(fieldName, value._value.doubleVal);
         default:
             verify(false);
+        }
+    }
+
+    Element Document::makeElement(ConstElement element) {
+        return makeElement(element, NULL);
+    }
+
+    Element Document::makeElementWithNewFieldName(const StringData& fieldName,
+                                                  ConstElement element) {
+        return makeElement(element, &fieldName);
+    }
+
+    Element Document::makeElement(ConstElement element, const StringData* fieldName) {
+        if (this == &element.getDocument()) {
+            // If the Element that we want to build from belongs to this Document, then we have
+            // to first copy it to the side, and then back in, since otherwise we might be
+            // attempting both read to and write from the underlying BufBuilder simultaneously,
+            // which will not work.
+            BSONObjBuilder builder;
+            element.writeElement(&builder, fieldName);
+            BSONObj built = builder.obj();
+            BSONElement newElement = built.firstElement();
+            return makeElement(newElement);
+        } else {
+            // If the Element belongs to another document, then we can just stream it into our
+            // builder. We still do need to dassert that the field name doesn't alias us
+            // somehow.
+            Impl& impl = getImpl();
+            if (fieldName)
+                dassert(impl.doesNotAlias(*fieldName));
+            BSONObjBuilder& builder = impl.leafBuilder();
+            const int leafRef = builder.len();
+            element.writeElement(&builder, fieldName);
+            return Element(this, impl.insertLeafElement(leafRef));
         }
     }
 

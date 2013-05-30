@@ -1206,5 +1206,129 @@ namespace {
         ASSERT_EQUALS(obj.toString(), doc.toString());
     }
 
-} // namespace
+    TEST(Document, ElementCloningToDifferentDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document source(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        source.root()["d"].pushBack(source.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Document target;
+
+        mmb::Element newElement = target.makeElement(source.root()["d"]);
+        ASSERT_TRUE(newElement.ok());
+        mongo::Status status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char* expected =
+            "{ d : [ 4, 5, 6, 7 ] }";
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+
+        newElement = target.makeElement(source.root()["b"]);
+        ASSERT_TRUE(newElement.ok());
+        status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ d : [ 4, 5, 6, 7 ], b : [ 1, 2, 3 ] }";
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+
+        newElement = target.makeElementWithNewFieldName("C", source.root()["c"]);
+        ASSERT_TRUE(newElement.ok());
+        status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ d : [ 4, 5, 6, 7 ], b : [ 1, 2, 3 ], C : { 'c' : 'c' } }";
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+    }
+
+    TEST(Document, ElementCloningToSameDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document doc(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Element newElement = doc.makeElement(doc.root()["d"]);
+        ASSERT_TRUE(newElement.ok());
+        mongo::Status status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char* expected =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            " d : [ 4, 5, 6, 7 ] "
+            "}";
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+
+        newElement = doc.makeElement(doc.root()["b"]);
+        ASSERT_TRUE(newElement.ok());
+        status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            " d : [ 4, 5, 6, 7 ], "
+            " b : [ 1, 2, 3 ] "
+            "}";
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+
+        newElement = doc.makeElementWithNewFieldName("C", doc.root()["c"]);
+        ASSERT_TRUE(newElement.ok());
+        status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            " d : [ 4, 5, 6, 7 ], "
+            " b : [ 1, 2, 3 ], "
+            " C : { 'c' : 'c' } "
+            "}";
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    }
+
+    TEST(Document, RootCloningToDifferentDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document source(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        source.root()["d"].pushBack(source.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Document target;
+
+        mmb::Element newElement = target.makeElementWithNewFieldName("X", source.root());
+        mongo::Status status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char expected[] =
+            "{ X : { a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ] } }";
+
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+    }
+
+    TEST(Document, RootCloningToSameDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document doc(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Element newElement = doc.makeElementWithNewFieldName("X", doc.root());
+        mongo::Status status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char expected[] =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            "X : { a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ] }"
+            "}";
+
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    }
+
+
+} // namespacem
 

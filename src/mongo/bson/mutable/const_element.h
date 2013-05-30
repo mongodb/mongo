@@ -93,6 +93,11 @@ namespace mutablebson {
         friend bool operator==(const ConstElement&, const ConstElement&);
 
     private:
+        friend class Document;
+
+        template<typename Builder>
+        inline void writeElement(Builder* builder, const StringData* fieldName = NULL) const;
+
         Element _basis;
     };
 

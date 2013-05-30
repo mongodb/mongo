@@ -367,6 +367,18 @@ namespace mutablebson {
          */
         Element makeElementSafeNum(const StringData& fieldName, SafeNum value);
 
+        /** Construct a new element with the same name, type, and value as the provided mutable
+         *  Element. The data is copied from the given Element. Unlike most methods in this
+         *  class the provided Element may be from a different Document.
+         */
+        Element makeElement(ConstElement elt);
+
+        /** Construct a new Element with the same type and value as the provided mutable
+         *  Element, but with a new field name. The data is copied from the given
+         *  Element. Unlike most methods in this class the provided Element may be from a
+         *  different Document.
+         */
+        Element makeElementWithNewFieldName(const StringData& fieldName, ConstElement elt);
 
         //
         // Accessors
@@ -393,6 +405,9 @@ namespace mutablebson {
         class Impl;
         inline Impl& getImpl();
         inline const Impl& getImpl() const;
+
+        Element makeElement(ConstElement element, const StringData* fieldName);
+
         const boost::scoped_ptr<Impl> _impl;
 
         // The root element of this document.
