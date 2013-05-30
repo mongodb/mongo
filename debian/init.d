@@ -68,9 +68,11 @@ fi
 NUMACTL_ARGS="--interleave=all"
 if which numactl >/dev/null 2>/dev/null && numactl $NUMACTL_ARGS ls / >/dev/null 2>/dev/null
 then
-    NUMACTL="numactl $NUMACTL_ARGS"
+    NUMACTL="`which numactl` -- $NUMACTL_ARGS"
+    DAEMON_OPTS=${DAEMON_OPTS:-"--config $CONF"}
 else
     NUMACTL=""
+    DAEMON_OPTS=${DAEMON_OPTS:-"-- --config $CONF"}
 fi
 
 if test ! -x $DAEMON; then
@@ -122,7 +124,7 @@ start_server() {
 # Start the process using the wrapper
             start-stop-daemon --background --start --quiet --pidfile $PIDFILE \
                         --make-pidfile --chuid $DAEMONUSER \
-                        --exec $NUMACTL $DAEMON -- $DAEMON_OPTS
+                        --exec $NUMACTL $DAEMON $DAEMON_OPTS
             errcode=$?
 	return $errcode
 }
