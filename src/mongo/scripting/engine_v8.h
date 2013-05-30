@@ -501,7 +501,7 @@ namespace mongo {
 
         if (try_catch.HasCaught() && try_catch.CanContinue()) {
             // normal JS exception
-            _error = string("JavaScript execution failed: ") + v8ExceptionToSTLString(&try_catch);
+            _error = v8ExceptionToSTLString(&try_catch);
             haveError = true;
         }
         else if (hasOutOfMemoryException()) {

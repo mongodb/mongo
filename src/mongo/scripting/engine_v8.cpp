@@ -892,7 +892,7 @@ namespace mongo {
             // script loaded from file
             ss << " at " << *resourceName;
             const int linenum = message->GetLineNumber();
-            if (linenum != 1) ss << ":L" << linenum;
+            if (linenum != 1) ss << ":" << linenum;
         }
         return ss.str();
     }
