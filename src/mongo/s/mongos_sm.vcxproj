@@ -2649,6 +2649,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\fail_point_service.cpp" />
     <ClCompile Include="..\util\file.cpp" />
+    <ClCompile Include="..\util\hex.cpp" />
     <ClCompile Include="..\util\intrusive_counter.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4291</DisableSpecificWarnings>

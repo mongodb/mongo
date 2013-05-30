@@ -1064,6 +1064,9 @@
     <ClCompile Include="..\bson\bson_validate_test.cpp">
       <Filter>bson</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\hex.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\v8\src\apinatives.js">

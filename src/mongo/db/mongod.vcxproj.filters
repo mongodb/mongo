@@ -2135,6 +2135,9 @@
     <ClCompile Include="ops\modifier_pull_all_test.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\hex.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">

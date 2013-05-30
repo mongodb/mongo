@@ -1321,6 +1321,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\fail_point_service.cpp" />
     <ClCompile Include="..\util\file.cpp" />
+    <ClCompile Include="..\util\hex.cpp" />
     <ClCompile Include="..\util\net\ssl_manager.cpp" />
     <ClCompile Include="..\util\platform_init.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />

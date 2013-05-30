@@ -1782,6 +1782,9 @@
     <ClCompile Include="..\db\auth\user.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\hex.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
