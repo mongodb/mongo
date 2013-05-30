@@ -44,7 +44,7 @@ static int
 bzip2_terminate(WT_COMPRESSOR *, WT_SESSION *);
 #ifdef WIREDTIGER_TEST_COMPRESS_RAW
 static int
-bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, u_int,
+bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
     size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
     size_t *, uint32_t *);
 #endif
@@ -264,7 +264,7 @@ __bzip2_compress_raw_random(void)
  */
 static int
 bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    size_t page_max, u_int split_pct, size_t extra,
+    size_t page_max, int split_pct, size_t extra,
     uint8_t *src, uint32_t *offsets, uint32_t slots,
     uint8_t *dst, size_t dst_len, int final,
     size_t *result_lenp, uint32_t *result_slotsp)
