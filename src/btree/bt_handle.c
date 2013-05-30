@@ -14,7 +14,7 @@ static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
-static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
+static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, int);
 
 /*
  * __wt_btree_open --
@@ -562,7 +562,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree->maxleafitem = (uint32_t)cval.val;
 
 	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
-	btree->split_pct = (u_int)cval.val;
+	btree->split_pct = (int)cval.val;
 
 	/*
 	 * When a page is forced to split, we want at least 50 entries on its
@@ -649,8 +649,8 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size =
-	    (uint32_t)WT_ALIGN((a * btree->split_pct) / 100, btree->allocsize);
+	split_size = (uint32_t)
+	    WT_ALIGN((a * (u_int)btree->split_pct) / 100, btree->allocsize);
 
 	/*
 	 * If the result of that calculation is the same as the allocation unit
@@ -658,7 +658,7 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * unit, use a percentage of the maximum page size).
 	 */
 	if (split_size == btree->allocsize)
-		split_size = (uint32_t)((a * btree->split_pct) / 100);
+		split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
 
 	return (split_size);
 }
@@ -674,11 +674,11 @@ pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 
 static int
 pse2(WT_SESSION_IMPL *session,
-    const char *type, uint32_t max, uint32_t ovfl, uint32_t pct)
+    const char *type, uint32_t max, uint32_t ovfl, int pct)
 {
 	WT_RET_MSG(session, EINVAL,
 	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
-	    "(%" PRIu32 "B), because of the split percentage (%" PRIu32
-	    "%%); a split page must be able to hold at least 2 items",
+	    "(%" PRIu32 "B), because of the split percentage (%d %%); a split "
+	    "page must be able to hold at least 2 items",
 	    type, max, ovfl, pct);
 }

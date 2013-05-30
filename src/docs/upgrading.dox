@@ -11,12 +11,20 @@ configuration string \c internal_page_max changed from 2KB to 4KB.
 Applications wanting to create files with smaller allocation or internal
 page sizes will need to set those configuration values explicitly.
 </dd>
+
 <dt>Shared cache configuration</dt>
 <dd>
 In the 1.6.1 release, an explicit shared_cache=(enable=boolean) option was
 added to the wiredtiger_open configuration options. Existing applications that
 use shared cache functionality will need to add the enable option to the
 configuration string. The default value for the option is false.
+</dd>
+
+<dt>WT_COMPRESSOR::compress_raw signature</dt>
+<dd>
+In the 1.6.1 release, the \c split_pct argument to the
+WT_COMPRESSOR::compress_raw function changed type from \c u_int to \c int,
+applications may require modification to avoid compiler warnings.
 </dd>
 
 </dl>

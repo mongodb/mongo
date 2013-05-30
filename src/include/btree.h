@@ -78,7 +78,7 @@ struct __wt_btree {
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */
 	int   maximum_depth;		/* Reconcile: maximum tree depth */
 	int   prefix_compression;	/* Reconcile: key prefix compression */
-	u_int split_pct;		/* Reconcile: split page percent */
+	int   split_pct;		/* Reconcile: split page percent */
 	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
 	WT_RWLOCK *val_ovfl_lock;	/* Reconcile: overflow value lock */
 

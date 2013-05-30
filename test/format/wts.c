@@ -58,23 +58,25 @@ static WT_EVENT_HANDLER event_handler = {
 	handle_progress
 };
 
+/*
+ * wts_open --
+ *	Open a connection to a WiredTiger database.
+ */
 void
-wts_open(void)
+wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	char config[2048], *end, *p;
+	char config[2048];
+
+	*connp = NULL;
 
 	/*
-	 * Open configuration.
-	 *
 	 * Put configuration file configuration options second to last. Put
 	 * command line configuration options at the end. Do this so they
 	 * override the standard configuration.
 	 */
-	snprintf(config, sizeof(config),
+	(void)snprintf(config, sizeof(config),
 	    "create,"
 	    "sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
@@ -85,7 +87,7 @@ wts_open(void)
 	    g.c_cache,
 	    g.progname,
 	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
-	    REVERSE_PATH,
+	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    (access(RAW_PATH, R_OK) == 0 &&
@@ -96,21 +98,48 @@ wts_open(void)
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
-	if ((ret =
-	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
-		die(ret, "wiredtiger_open");
-	g.wts_conn = conn;
-						/* Load extension functions. */
-	wt_api = conn->get_extension_api(conn);
+	/*
+	 * Direct I/O may not work with hot-backups, doing copies through the
+	 * buffer cache after configuring direct I/O in Linux won't work.  If
+	 * direct I/O is configured, turn off hot backups.   This isn't a great
+	 * place to do this check, but it's only here we have the configuration
+	 * string.
+	 */
+	g.c_hot_backups = strstr(config, "direct_io") == NULL;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	if ((ret =
+	    wiredtiger_open(home, &event_handler, config, &conn)) != 0)
+		die(ret, "wiredtiger_open: %s", home);
+
+	if (set_api)
+		g.wt_api = conn->get_extension_api(conn);
+
+	*connp = conn;
+}
+
+/*
+ * wts_create --
+ *	Create the underlying store.
+ */
+void
+wts_create(void)
+{
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
+	int ret;
+	char config[2048], *end, *p;
+
+	conn = g.wts_conn;
 
 	/*
-	 * Create the object.
+	 * Create the underlying store.
 	 *
 	 * Make sure at least 2 internal page per thread can fit in cache.
 	 */
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die(ret, "connection.open_session");
+
 	maxintlpage = 1U << g.c_intl_page_max;
 	while (maxintlpage > 512 &&
 	    2 * g.c_threads * maxintlpage > g.c_cache << 20)
@@ -332,12 +361,12 @@ wts_verify(const char *tag)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if (g.logging != 0)
-		(void)wt_api->msg_printf(wt_api, session,
+		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
 	if ((ret = session->verify(session, g.uri, NULL)) != 0)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if (g.logging != 0)
-		(void)wt_api->msg_printf(wt_api, session,
+		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify stop ===============");
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");

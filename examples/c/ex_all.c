@@ -44,7 +44,6 @@
 #include <wiredtiger.h>
 
 int add_collator(WT_CONNECTION *conn);
-int add_compressor(WT_CONNECTION *conn);
 int add_extractor(WT_CONNECTION *conn);
 int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
@@ -679,117 +678,6 @@ add_collator(WT_CONNECTION *conn)
 	static WT_COLLATOR my_collator = { my_compare, NULL };
 	ret = conn->add_collator(conn, "my_collator", &my_collator, NULL);
 	/*! [WT_COLLATOR register] */
-
-	return (ret);
-}
-
-/*! [WT_COMPRESSOR compress] */
-/*
- * A simple compression example that passes data through unchanged.
- */
-static int
-my_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    uint8_t *dst, size_t dst_len,
-    size_t *result_lenp, int *compression_failed)
-{
-	/* Unused parameters */
-	(void)compressor;
-	(void)session;
-
-	*compression_failed = 0;
-	if (dst_len < src_len) {
-		*compression_failed = 1;
-		return (0);
-	}
-	memcpy(dst, src, src_len);
-	*result_lenp = src_len;
-	return (0);
-}
-/*! [WT_COMPRESSOR compress] */
-
-/*! [WT_COMPRESSOR decompress] */
-/*
- * A simple decompression example that passes data through unchanged.
- */
-static int
-my_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    uint8_t *dst, size_t dst_len,
-    size_t *result_lenp)
-{
-	/* Unused parameters */
-	(void)compressor;
-	(void)session;
-
-	if (dst_len < src_len)
-		return (ENOMEM);
-
-	memcpy(dst, src, src_len);
-	*result_lenp = src_len;
-	return (0);
-}
-/*! [WT_COMPRESSOR decompress] */
-
-/*! [WT_COMPRESSOR presize] */
-/*
- * A simple pre-size example that returns the source length.
- */
-static int
-my_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
-{
-	/* Unused parameters */
-	(void)compressor;
-	(void)session;
-	(void)src;
-
-	*result_lenp = src_len;
-	return (0);
-}
-/*! [WT_COMPRESSOR presize] */
-
-static int
-my_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    size_t page_max, u_int split_pct, size_t extra,
-    uint8_t *src, uint32_t *offsets, uint32_t slots,
-    uint8_t *dst, size_t dst_len, int final,
-    size_t *result_lenp, uint32_t *result_slotsp)
-{
-	/* Unused parameters */
-	(void)compressor;
-	(void)session;
-	(void)page_max;
-	(void)split_pct;
-	(void)extra;
-	(void)src;
-	(void)offsets;
-	(void)slots;
-	(void)dst;
-	(void)dst_len;
-	(void)final;
-	(void)result_lenp;
-	(void)result_slotsp;
-
-	return (0);
-}
-
-int
-add_compressor(WT_CONNECTION *conn)
-{
-	int ret;
-
-	/*! [WT_COMPRESSOR register] */
-	static WT_COMPRESSOR my_compressor = {
-	    my_compress,
-	    my_compress_raw,		/* NULL, if no raw compression */
-	    my_decompress,
-	    my_pre_size,		/* NULL, if pre-sizing not needed */
-	    NULL			/* NULL, if no termination cleanup */
-	};
-	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
-	/*! [WT_COMPRESSOR register] */
 
 	return (ret);
 }

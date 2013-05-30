@@ -140,13 +140,16 @@
 	memset(&(s), 0, sizeof(s))
 
 /* Check if a string matches a prefix. */
-#define	WT_PREFIX_MATCH(str, pre)					\
-	(strncmp((str), (pre), strlen(pre)) == 0)
+#define	WT_PREFIX_MATCH(str, pfx)					\
+	(strncmp((str), (pfx), strlen(pfx)) == 0)
+
+#define	WT_PREFIX_MATCH_LEN(str, len, pfx)				\
+	((len) >= strlen(pfx) && WT_PREFIX_MATCH(str, pfx))
 
 /* Check if a string matches a prefix, and move past it. */
-#define	WT_PREFIX_SKIP(str, pre)					\
-	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
-	    ((str) += strlen(pre), 1) : 0)
+#define	WT_PREFIX_SKIP(str, pfx)					\
+	((strncmp((str), (pfx), strlen(pfx)) == 0) ?			\
+	    ((str) += strlen(pfx), 1) : 0)
 
 /* Check if a string matches a byte string of len bytes. */
 #define	WT_STRING_MATCH(str, bytes, len)				\
