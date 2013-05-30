@@ -443,9 +443,11 @@ __backup_list_append(
 	int need_handle;
 
 	/* Leave a NULL at the end to mark the end of the list. */
-	if (cb->list_next + 1 * sizeof(char *) >= cb->list_allocated)
+	if ((cb->list_next + 1) *
+	    sizeof(WT_CURSOR_BACKUP_ENTRY) >= cb->list_allocated)
 		WT_RET(__wt_realloc(session, &cb->list_allocated,
-		    (cb->list_next + 100) * sizeof(char *), &cb->list));
+		    (cb->list_next + 100) *
+		    sizeof(WT_CURSOR_BACKUP_ENTRY *), &cb->list));
 	p = &cb->list[cb->list_next];
 	p[0].name = p[1].name = NULL;
 	p[0].handle = p[1].handle = NULL;
