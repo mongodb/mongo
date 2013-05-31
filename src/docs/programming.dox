@@ -21,6 +21,7 @@ WiredTiger applications:
 - @subpage statistics
 - @subpage threads
 - @subpage tuning
+- @subpage custom_data_sources
 
 - @subpage home
 - @subpage database_config
