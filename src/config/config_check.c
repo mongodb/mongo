@@ -11,16 +11,15 @@ static int config_check(
     WT_SESSION_IMPL *, const WT_CONFIG_CHECK *, const char *, size_t);
 
 /*
- * __wt_conn_foc_add --
+ * __conn_foc_add --
  *	Add a new entry into the connection's free-on-close list.
  */
 static int
-__wt_conn_foc_add(WT_SESSION_IMPL *session, ...)
+__conn_foc_add(WT_SESSION_IMPL *session, const void *p)
 {
 	WT_CONNECTION_IMPL *conn;
 	va_list ap;
 	size_t cnt;
-	void *p;
 
 	conn = S2C(session);
 
@@ -38,21 +37,12 @@ __wt_conn_foc_add(WT_SESSION_IMPL *session, ...)
 	 *
 	 * Our caller is expected to be holding any locks we need.
 	 */
-	/* Count the slots. */
-	va_start(ap, session);
-	for (cnt = 0; va_arg(ap, void *) != NULL; ++cnt)
-		;
-	va_end(ap);
+	if ((conn->foc_cnt + 1) * sizeof(void *) > conn->foc_size)
+		WT_RET(__wt_realloc(session, &conn->foc_size,
+		    WT_MAX(20 * sizeof(void *), 2 * conn->foc_size),
+		    &conn->foc));
 
-	if (conn->foc_cnt + cnt >= conn->foc_size) {
-		WT_RET(__wt_realloc(session, NULL,
-		    (conn->foc_size + cnt + 20) * sizeof(void *), &conn->foc));
-		conn->foc_size += cnt + 20;
-	}
-	va_start(ap, session);
-	while ((p = va_arg(ap, void *)) != NULL)
-		conn->foc[conn->foc_cnt++] = p;
-	va_end(ap);
+	conn->foc[conn->foc_cnt++] = (void *)p;
 	return (0);
 }
 
@@ -191,11 +181,14 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	/*
 	 * The next time this configuration is updated, we don't want to figure
 	 * out which of these pieces of memory were allocated and will need to
-	 * be free'd on close, add them to the list now.
+	 * be free'd on close, add them all to the free-on-close list now.
 	 */
-	WT_ERR(__wt_conn_foc_add(session,
-	    entry, entry->base,
-	    checks, newcheck->name, newcheck->type, newcheck->checks, NULL));
+	WT_ERR(__conn_foc_add(session, entry));
+	WT_ERR(__conn_foc_add(session, entry->base));
+	WT_ERR(__conn_foc_add(session, checks));
+	WT_ERR(__conn_foc_add(session, newcheck->name));
+	WT_ERR(__conn_foc_add(session, newcheck->type));
+	WT_ERR(__conn_foc_add(session, newcheck->checks));
 
 	*epp = entry;
 
