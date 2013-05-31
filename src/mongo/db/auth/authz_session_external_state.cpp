@@ -23,7 +23,8 @@
 
 namespace mongo {
 
-    AuthzSessionExternalState::AuthzSessionExternalState() {}
+    AuthzSessionExternalState::AuthzSessionExternalState(AuthorizationManager* authzManager) :
+        _authzManager(authzManager) {}
     AuthzSessionExternalState::~AuthzSessionExternalState() {}
 
     Status AuthzSessionExternalState::getPrivilegeDocument(const std::string& dbname,

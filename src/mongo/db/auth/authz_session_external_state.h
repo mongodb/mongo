@@ -21,6 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_name.h"
 
 namespace mongo {
@@ -69,7 +70,8 @@ namespace mongo {
         virtual void onLogoutDatabase(const std::string& dbname) = 0;
 
     protected:
-        AuthzSessionExternalState(); // This class should never be instantiated directly.
+        // This class should never be instantiated directly.
+        AuthzSessionExternalState(AuthorizationManager* authzManager);
 
         // Queries the userNamespace with the given query and returns the privilegeDocument found
         // in *result.  Returns true if it finds a document matching the query, or false if not.
@@ -81,6 +83,8 @@ namespace mongo {
         // Returns true if there exists at least one privilege document in the given database.
         // TODO: remove this in favor of using the AuthzManagerExternalState
         bool _hasPrivilegeDocument(const std::string& dbname) const;
+
+        AuthorizationManager* _authzManager;
     };
 
 } // namespace mongo

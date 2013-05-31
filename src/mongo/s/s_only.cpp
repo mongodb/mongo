@@ -19,6 +19,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/s/shard.h"
@@ -77,7 +78,8 @@ namespace mongo {
         Client *c = new Client( fullDesc, mp );
         currentClient.reset(c);
         mongo::lastError.initThread();
-        c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos()));
+        c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos(
+                getGlobalAuthorizationManager())));
         return *c;
     }
 

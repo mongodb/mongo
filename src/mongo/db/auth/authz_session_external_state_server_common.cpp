@@ -31,8 +31,10 @@ namespace {
     // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost
     // will always be called before any calls to shouldIgnoreAuthChecks.  If this is not the case,
     // it could cause a security hole.
-    AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon() :
-            _allowLocalhost(true) {}
+    AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon(
+            AuthorizationManager* authzManager) :
+                    AuthzSessionExternalState(authzManager),
+                    _allowLocalhost(true) {}
     AuthzSessionExternalStateServerCommon::~AuthzSessionExternalStateServerCommon() {}
 
     void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost() {
