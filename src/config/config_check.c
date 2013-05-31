@@ -35,10 +35,8 @@ __conn_foc_add(WT_SESSION_IMPL *session, const void *p)
 	 *
 	 * Our caller is expected to be holding any locks we need.
 	 */
-	if ((conn->foc_cnt + 1) * sizeof(void *) > conn->foc_size)
-		WT_RET(__wt_realloc(session, &conn->foc_size,
-		    WT_MAX(20 * sizeof(void *), 2 * conn->foc_size),
-		    &conn->foc));
+	WT_RET(__wt_realloc_def(
+	    session, &conn->foc_size, conn->foc_cnt + 1, &conn->foc));
 
 	conn->foc[conn->foc_cnt++] = (void *)p;
 	return (0);

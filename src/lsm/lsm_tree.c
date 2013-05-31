@@ -561,13 +561,8 @@ __wt_lsm_tree_switch(
 	cache_sz = S2C(session)->cache_size;
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
-	    lsm_tree->chunk_alloc)
-		WT_ERR(__wt_realloc(session,
-		    &lsm_tree->chunk_alloc,
-		    WT_MAX(10 * sizeof(*lsm_tree->chunk),
-		    2 * lsm_tree->chunk_alloc),
-		    &lsm_tree->chunk));
+	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
+	    lsm_tree->nchunks + 1, &lsm_tree->chunk));
 
 	/*
 	 * In the steady state, we expect that the checkpoint worker thread

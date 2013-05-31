@@ -476,9 +476,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 	trk = NULL;
 
 	/* Re-allocate the array of pages, as necessary. */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
 
 	/* Allocate a WT_TRACK entry for this new page and fill it in. */
 	WT_RET(__slvg_trk_init(
@@ -585,9 +584,8 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session,
 	 * Reallocate the overflow page array as necessary, then save the
 	 * page's location information.
 	 */
-	if (ss->ovfl_next * sizeof(WT_TRACK *) == ss->ovfl_allocated)
-		WT_RET(__wt_realloc(session, &ss->ovfl_allocated,
-		   (ss->ovfl_next + 1000) * sizeof(WT_TRACK *), &ss->ovfl));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->ovfl_allocated, ss->ovfl_next + 1, &ss->ovfl));
 
 	WT_RET(__slvg_trk_init(
 	    session, addr, size, dsk->mem_size, dsk->write_gen, ss, &trk));
@@ -933,9 +931,8 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * the new element into the array after the existing element (that's
 	 * probably wrong, but we'll fix it up in a second).
 	 */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;
@@ -1503,9 +1500,8 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * the new element into the array after the existing element (that's
 	 * probably wrong, but we'll fix it up in a second).
 	 */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;

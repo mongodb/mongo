@@ -91,13 +91,9 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			for (nchunks = 0; (ret =
 			    __wt_config_next(&lparser, &lk, &lv)) == 0; ) {
 				if (WT_STRING_MATCH("id", lk.str, lk.len)) {
-					if ((nchunks + 1) * chunk_sz >
-					    lsm_tree->chunk_alloc)
-						WT_ERR(__wt_realloc(session,
-						    &lsm_tree->chunk_alloc,
-						    WT_MAX(10 * chunk_sz,
-						    2 * lsm_tree->chunk_alloc),
-						    &lsm_tree->chunk));
+					WT_ERR(__wt_realloc_def(session,
+					    &lsm_tree->chunk_alloc,
+					    nchunks + 1, &lsm_tree->chunk));
 					WT_ERR(__wt_calloc_def(
 					    session, 1, &chunk));
 					lsm_tree->chunk[nchunks++] = chunk;
@@ -139,25 +135,18 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 					continue;
 				}
-				if ((nchunks + 1) * chunk_sz >
-				    lsm_tree->old_avail * chunk_sz) {
-					WT_ERR(__wt_realloc(session,
-					    &lsm_tree->old_alloc,
-					    chunk_sz * WT_MAX(10,
-					    lsm_tree->nold_chunks +
-					    2 * nchunks),
-					    &lsm_tree->old_chunks));
-					lsm_tree->nold_chunks = (u_int)
-					    (lsm_tree->old_alloc / chunk_sz);
-					lsm_tree->old_avail =
-					    lsm_tree->nold_chunks - nchunks;
-				}
+				WT_ERR(__wt_realloc_def(session,
+				    &lsm_tree->old_alloc, nchunks + 1,
+				    &lsm_tree->old_chunks));
+				lsm_tree->nold_chunks =
+				    (u_int)(lsm_tree->old_alloc / chunk_sz);
 				WT_ERR(__wt_calloc_def(session, 1, &chunk));
 				lsm_tree->old_chunks[nchunks++] = chunk;
 				WT_ERR(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));
 				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-				--lsm_tree->old_avail;
+				lsm_tree->old_avail =
+				    lsm_tree->nold_chunks - nchunks;
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 			lsm_tree->nold_chunks = nchunks;

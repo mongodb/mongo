@@ -78,10 +78,21 @@
  */
 #define	__wt_calloc_def(session, number, addr)				\
 	__wt_calloc(session, (size_t)(number), sizeof(**(addr)), addr)
+
+/*
+ * __wt_realloc_def --
+ *	Common case allocate-and-grow function.
+ *	Starts by allocating the requested number of items (at least 10), then
+ *	doubles each time the list needs to grow.
+ */
+#define	__wt_realloc_def(session, sizep, number, addr)			\
+	(((number) * sizeof(**(addr)) <= *(sizep)) ? 0 :		\
+	    __wt_realloc(session, sizep, WT_MAX(*(sizep) * 2,		\
+		WT_MAX(10, (number)) * sizeof(**(addr))), addr))
 /*
  * Our internal free function clears the underlying address atomically so there
  * is a smaller chance of racing threads seeing intermediate results while a
- * structure is being free'd.   (That would be a bug, of course, but I'd rather
+ * structure is being free'd.	(That would be a bug, of course, but I'd rather
  * not drop core, just the same.)  That's a non-standard "free" API, and the
  * resulting bug is a mother to find -- make sure we get it right, don't make
  * the caller remember to put the & operator on the pointer.

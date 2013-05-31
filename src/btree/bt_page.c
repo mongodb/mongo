@@ -375,13 +375,13 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_PAGE_HEADER *dsk;
 	uint64_t recno, rle;
 	size_t bytes_allocated;
-	uint32_t i, indx, max_repeats, nrepeats;
+	uint32_t i, indx, nrepeats;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
 	repeats = NULL;
-	bytes_allocated = max_repeats = nrepeats = 0;
+	bytes_allocated = nrepeats = 0;
 	recno = page->u.col_var.recno;
 
 	/*
@@ -401,13 +401,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 		 */
 		rle = __wt_cell_rle(unpack);
 		if (rle > 1) {
-			if (nrepeats == max_repeats) {
-				max_repeats = (max_repeats == 0) ?
-				    10 : 2 * max_repeats;
-				WT_RET(__wt_realloc(session, &bytes_allocated,
-				    max_repeats * sizeof(WT_COL_RLE),
-				    &repeats));
-			}
+			WT_RET(__wt_realloc_def(session, &bytes_allocated,
+			    nrepeats + 1, &repeats));
 			repeats[nrepeats].indx = indx;
 			repeats[nrepeats].recno = recno;
 			repeats[nrepeats++].rle = rle;
