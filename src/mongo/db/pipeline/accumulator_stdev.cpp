@@ -62,12 +62,12 @@ namespace mongo {
     Value AccumulatorStdev::getValue() const {
         if (!pCtx->getInShard()) {
             double avg = 0;
-				double stdev = 0;
+            double stdev = 0;
             if (count) {
-					 double castCount = static_cast<double>(count);
+                double castCount = static_cast<double>(count);
                 avg = doubleTotal / castCount;
-					 stdev = sqrt(squareTotal / castCount - avg * avg);
-				}
+                stdev = sqrt(squareTotal / castCount - avg * avg);
+            }
 
             return Value::createDouble(stdev);
         }
