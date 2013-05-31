@@ -1901,9 +1901,6 @@
     <ClCompile Include="matcher\expression_array_test.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
-    <ClCompile Include="matcher\expression_internal.cpp">
-      <Filter>db\matcher</Filter>
-    </ClCompile>
     <ClCompile Include="matcher\expression_leaf.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
@@ -2136,6 +2133,84 @@
       <Filter>db\ops</Filter>
     </ClCompile>
     <ClCompile Include="..\util\hex.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\path_internal.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_global_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_global_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_global_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\path_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\path.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_object_replace.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_object_replace_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_table.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_table_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\update_driver.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\update_driver_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\descriptive_stats_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\lame_stacktrace_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\mmap_mm.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\mmap_posix.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\ntservice_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_darwin.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_freebsd.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_linux2.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_none.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\systeminfo_linux2.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\systeminfo_none.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\text_startuptest.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -4263,9 +4338,6 @@
     <ClInclude Include="matcher\expression_array.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
-    <ClInclude Include="matcher\expression_internal.h">
-      <Filter>db\matcher</Filter>
-    </ClInclude>
     <ClInclude Include="matcher\expression_leaf.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
@@ -4384,6 +4456,30 @@
       <Filter>db\ops</Filter>
     </ClInclude>
     <ClInclude Include="ops\modifier_pull_all.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\path_internal.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_global_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_global_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_global_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\path.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_object_replace.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_table.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\update_driver.h">
       <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1842,6 +1842,18 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\db\auth\auth_global_external_state.cpp" />
+    <ClCompile Include="..\db\auth\auth_global_external_state_d.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_global_external_state_s.cpp" />
     <ClCompile Include="..\db\auth\auth_server_parameters.cpp" />
     <ClCompile Include="..\db\auth\auth_session_external_state.cpp" />
     <ClCompile Include="..\db\auth\auth_session_external_state_d.cpp">
@@ -2394,7 +2406,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\db\matcher\expression_internal.cpp" />
+    <ClCompile Include="..\db\matcher\path.cpp">
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)matcher_path.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)matcher_path.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">$(IntDir)matcher_path.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">$(IntDir)matcher_path.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)matcher_path.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)matcher_path.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">$(IntDir)matcher_path.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">$(IntDir)matcher_path.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\path_internal.cpp" />
     <ClCompile Include="..\db\matcher\expression_leaf.cpp" />
     <ClCompile Include="..\db\matcher\expression_leaf_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -2493,6 +2515,16 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">$(IntDir)matcher2.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\db\matcher\match_details.cpp" />
+    <ClCompile Include="..\db\matcher\path_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\db\pipeline\document_source_geo_near.cpp" />
     <ClCompile Include="..\db\pipeline\pipeline.cpp" />
     <ClCompile Include="..\db\common.cpp" />
@@ -2964,6 +2996,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\authentication_session.h" />
     <ClInclude Include="..\db\auth\authorization_manager.h" />
     <ClInclude Include="..\db\auth\authorization_session.h" />
+    <ClInclude Include="..\db\auth\auth_global_external_state.h" />
+    <ClInclude Include="..\db\auth\auth_global_external_state_d.h" />
+    <ClInclude Include="..\db\auth\auth_global_external_state_s.h" />
     <ClInclude Include="..\db\auth\auth_session_external_state.h" />
     <ClInclude Include="..\db\auth\auth_session_external_state_d.h" />
     <ClInclude Include="..\db\auth\auth_session_external_state_mock.h" />
@@ -3011,7 +3046,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\matcher\expression.h" />
     <ClInclude Include="..\db\matcher\expression_array.h" />
     <ClInclude Include="..\db\matcher\expression_geo.h" />
-    <ClInclude Include="..\db\matcher\expression_internal.h" />
+    <ClInclude Include="..\db\matcher\path.h" />
+    <ClInclude Include="..\db\matcher\path_internal.h" />
     <ClInclude Include="..\db\matcher\expression_leaf.h" />
     <ClInclude Include="..\db\matcher\expression_parser.h" />
     <ClInclude Include="..\db\matcher\expression_tree.h" />
