@@ -21,16 +21,16 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/principal_name.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 
     /**
-     * A collection of privileges describing which authenticated principals bestow the client the
+     * A collection of privileges describing which authenticated users bestow the client the
      * ability to perform various actions on specific resources.  Since every privilege comes from
-     * an authenticated principal, removing that principal removes all privileges granted by that
-     * principal.
+     * an authenticated user, removing that user removes all privileges granted by that
+     * user.
      *
      * Resources are arranged hierarchically, with a wildcard resource,
      * PrivilegeSet::WILDCARD_RESOURCE, matching any resource.  In the current implementation, the
@@ -50,26 +50,26 @@ namespace mongo {
         ~PrivilegeSet();
 
         /**
-         * Adds the specified privilege to the set, associating it with the named principal.
+         * Adds the specified privilege to the set, associating it with the named user.
          *
          * The privilege should be on a specific resource, or on the WILDCARD_RESOURCE.
          */
-        void grantPrivilege(const Privilege& privilege, const PrincipalName& authorizingPrincipal);
+        void grantPrivilege(const Privilege& privilege, const UserName& authorizingUser);
 
         /**
-         * Adds the specified privileges to the set, associating them with the named principal.
+         * Adds the specified privileges to the set, associating them with the named user.
          */
         void grantPrivileges(const std::vector<Privilege>& privileges,
-                             const PrincipalName& authorizingPrincipal);
+                             const UserName& authorizingUser);
 
         /**
-         * Removes from the set all privileges associated with the given principal.
+         * Removes from the set all privileges associated with the given user.
          *
-         * If multiple princpals enable the same privilege, the set will continue to
-         * contain those privileges until all authorizing principals have had their
+         * If multiple users enable the same privilege, the set will continue to
+         * contain those privileges until all authorizing users have had their
          * privileges revoked from the set.
          */
-        void revokePrivilegesFromPrincipal(const PrincipalName& principal);
+        void revokePrivilegesFromUser(const UserName& user);
 
         /**
          * Returns true if the set authorizes "desiredPrivilege".
@@ -94,7 +94,7 @@ namespace mongo {
          * Information about privileges held on a resource.
          *
          * Instances are stored in the _byResource map, and accelerate the fast path of
-         * hasPrivilege().  Privilege revocations via revokePrivilegesFromPrincipal() can make these
+         * hasPrivilege().  Privilege revocations via revokePrivilegesFromUser() can make these
          * entries invalid, at which point they are marked "dirty".  Dirty entries are rebuilt via
          * _rebuildEntry(), below, during execution of hasPrivilege().
          */
@@ -106,7 +106,7 @@ namespace mongo {
             ActionSet actions;
 
             // False if this data is consistent with the full privilege information, stored in the
-            // _byPrincipal map.
+            // _byUser map.
             bool dirty;
         };
 
@@ -116,10 +116,10 @@ namespace mongo {
         typedef StringMap<ResourcePrivilegeCacheEntry> ResourcePrivilegeCache;
 
         /**
-         * Type of map from principal identity to information about the principal's privileges.  The
+         * Type of map from user identity to information about the user's privileges.  The
          * values in the map are themselves maps from resource names to associated actions.
          */
-        typedef std::map<PrincipalName, StringMap<ActionSet> > PrincipalPrivilegeMap;
+        typedef std::map<UserName, StringMap<ActionSet> > UserPrivilegeMap;
 
         void _rebuildEntry(const StringData& resource, ResourcePrivilegeCacheEntry* summary);
 
@@ -132,8 +132,8 @@ namespace mongo {
         // Cache of privilege information, by resource.
         ResourcePrivilegeCache _byResource;
 
-        // Directory of privilege information, by principal.
-        PrincipalPrivilegeMap _byPrincipal;
+        // Directory of privilege information, by user.
+        UserPrivilegeMap _byUser;
     };
 
 } // namespace mongo

@@ -22,18 +22,6 @@
 
 namespace mongo {
 
-    SafeNum::SafeNum() : _type(EOO) {
-    }
-
-    SafeNum::SafeNum(const SafeNum& rhs) : _type(rhs._type), _value(rhs._value) {
-    }
-
-    SafeNum& SafeNum::operator=(const SafeNum& rhs) {
-        _type = rhs._type;
-        _value = rhs._value;
-        return *this;
-    }
-
     SafeNum::SafeNum(const BSONElement& element) {
         switch (element.type()) {
         case NumberInt:
@@ -51,34 +39,6 @@ namespace mongo {
         default:
             _type = EOO;
         }
-    }
-
-    SafeNum::SafeNum(int num) : _type(NumberInt) {
-        _value.int32Val = num;
-    }
-
-    SafeNum::SafeNum(long long int num) : _type(NumberLong) {
-        _value.int64Val = num;
-    }
-
-    SafeNum::SafeNum(double num) : _type(NumberDouble) {
-        _value.doubleVal = num;
-    }
-
-    SafeNum SafeNum::operator+(const SafeNum& rhs) const {
-        return addInternal(*this, rhs);
-    }
-
-    SafeNum& SafeNum::operator+=(const SafeNum& rhs) {
-        return *this = addInternal(*this, rhs);
-    }
-
-    bool SafeNum::operator==(const SafeNum& rhs) const {
-        return isEquivalent(rhs);
-    }
-
-    bool SafeNum::operator!=(const SafeNum& rhs) const {
-        return ! isEquivalent(rhs);
     }
 
     std::string SafeNum::debugString() const {
@@ -244,6 +204,52 @@ namespace mongo {
         if ((lType == NumberInt || lType == NumberLong || lType == NumberDouble) &&
             (rType == NumberInt || rType == NumberLong || rType == NumberDouble)) {
             return addFloats(getDouble(lhs), getDouble(rhs));
+        }
+
+        return SafeNum();
+    }
+
+    SafeNum SafeNum::andInternal(const SafeNum& lhs, const SafeNum& rhs) {
+        const BSONType lType = lhs._type;
+        const BSONType rType = rhs._type;
+
+        if (lType == NumberInt && rType == NumberInt) {
+            return (lhs._value.int32Val & rhs._value.int32Val);
+        }
+
+        if (lType == NumberInt && rType == NumberLong) {
+            return (static_cast<long long int>(lhs._value.int32Val) & rhs._value.int64Val);
+        }
+
+        if (lType == NumberLong && rType == NumberInt) {
+            return (lhs._value.int64Val & static_cast<long long int>(rhs._value.int32Val));
+        }
+
+        if (lType == NumberLong && rType == NumberLong) {
+            return (lhs._value.int64Val & rhs._value.int64Val);
+        }
+
+        return SafeNum();
+    }
+
+    SafeNum SafeNum::orInternal(const SafeNum& lhs, const SafeNum& rhs) {
+        const BSONType lType = lhs._type;
+        const BSONType rType = rhs._type;
+
+        if (lType == NumberInt && rType == NumberInt) {
+            return (lhs._value.int32Val | rhs._value.int32Val);
+        }
+
+        if (lType == NumberInt && rType == NumberLong) {
+            return (static_cast<long long int>(lhs._value.int32Val) | rhs._value.int64Val);
+        }
+
+        if (lType == NumberLong && rType == NumberInt) {
+            return (lhs._value.int64Val | static_cast<long long int>(rhs._value.int32Val));
+        }
+
+        if (lType == NumberLong && rType == NumberLong) {
+            return (lhs._value.int64Val | rhs._value.int64Val);
         }
 
         return SafeNum();

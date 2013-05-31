@@ -28,23 +28,20 @@ namespace mongo {
             multi = false;
         }
         shared_ptr<BSONObjExternalSorter> sorter;
+        shared_ptr<ExternalSortComparison> sortCmp;
+
         unsigned long long n; // # of records
         unsigned long long nkeys;
         bool multi; // multikey index
 
-        void addKeys(const IndexSpec& spec, const BSONObj& o, DiskLoc loc, bool mayInterrupt) {
-            BSONObjSet keys;
-            spec.getKeys(o, keys);
-            int k = 0;
-            for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                if( ++k == 2 ) {
-                    multi = true;
-                }
-                sorter->add(*i, loc, mayInterrupt);
-                nkeys++;
+        void addKeys(const BSONObjSet& keys, const DiskLoc& loc, bool mayInterrupt) {
+            multi = multi || (keys.size() > 1);
+            for (BSONObjSet::iterator it = keys.begin(); it != keys.end(); ++it) {
+                sorter->add(*it, loc, mayInterrupt);
+                ++nkeys;
             }
-            n++;
+            ++n;
         }
     };
 
-}
+}  // namespace mongo

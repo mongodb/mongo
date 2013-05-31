@@ -141,11 +141,13 @@ namespace replset {
              it != ops.end();
              ++it) {
             try {
-                fassert(16359, st->syncApply(*it, convertUpdatesToUpserts));
-            } catch (DBException& e) {
-                error() << "writer worker caught exception: " << e.what() 
+                if (!st->syncApply(*it, convertUpdatesToUpserts)) {
+                    fassertFailedNoTrace(16359);
+                }
+            } catch (const DBException& e) {
+                error() << "writer worker caught exception: " << causedBy(e)
                         << " on: " << it->toString() << endl;
-                fassertFailed(16360);
+                fassertFailedNoTrace(16360);
             }
         }
     }
@@ -165,16 +167,18 @@ namespace replset {
                     }
                     if (status) {
                         // retry
-                        fassert(15915, st->syncApply(*it));
+                        if (!st->syncApply(*it)) {
+                            fassertFailedNoTrace(15915);
+                        }
                     }
                     // If shouldRetry() returns false, fall through.
                     // This can happen if the document that was moved and missed by Cloner
                     // subsequently got deleted and no longer exists on the Sync Target at all
                 }
             }
-            catch (DBException& e) {
-                error() << "exception: " << e.what() << " on: " << it->toString() << endl;
-                fassertFailed(16361);
+            catch (const DBException& e) {
+                error() << "exception: " << causedBy(e) << " on: " << it->toString() << endl;
+                fassertFailedNoTrace(16361);
             }
         }
     }
@@ -374,11 +378,7 @@ namespace replset {
             Timer batchTimer;
             int lastTimeChecked = 0;
 
-            // always fetch a few ops first
-            // tryPopAndWaitForMore returns true when we need to end a batch early
-            while (!tryPopAndWaitForMore(&ops) && 
-                   (ops.getSize() < replBatchLimitBytes)) {
-
+            do {
                 if (theReplSet->isPrimary()) {
                     massert(16620, "there are ops to sync, but I'm primary", ops.empty());
                     return;
@@ -394,6 +394,8 @@ namespace replset {
                         break;
                 }
                 // occasionally check some things
+                // (always checked in the first iteration of this do-while loop, because
+                // ops is empty)
                 if (ops.empty() || now > lastTimeChecked) {
                     lastTimeChecked = now;
                     // can we become secondary?
@@ -410,11 +412,14 @@ namespace replset {
                     if (theReplSet->config().members.size() == 1 &&
                         theReplSet->myConfig().potentiallyHot()) {
                         Manager* mgr = theReplSet->mgr;
-                        // When would mgr be null?  During replsettest'ing.
-                        if (mgr) mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
-                        sleepsecs(1);
-                        // There should never be ops to sync in a 1-member set, anyway
-                        return;
+                        // When would mgr be null?  During replsettest'ing, in which case we should
+                        // fall through and actually apply ops as if we were a real secondary.
+                        if (mgr) { 
+                            mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
+                            sleepsecs(1);
+                            // There should never be ops to sync in a 1-member set, anyway
+                            return;
+                        }
                     }
                 }
 
@@ -431,7 +436,10 @@ namespace replset {
                         break;
                     }
                 }
-            }
+                // keep fetching more ops as long as we haven't filled up a full batch yet
+            } while (!tryPopAndWaitForMore(&ops) && // tryPopAndWaitForMore returns true 
+                                                    // when we need to end a batch early
+                   (ops.getSize() < replBatchLimitBytes));
 
             // For pausing replication in tests
             while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
@@ -450,6 +458,14 @@ namespace replset {
             multiApply(ops.getDeque(), multiSyncApply);
 
             applyOpsToOplog(&ops.getDeque());
+
+            // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
+            if (!theReplSet->mgr) {
+                BSONObj op;
+                if (!peek(&op)) {
+                    return;
+                }
+            }
         }
     }
 
@@ -742,7 +758,7 @@ namespace replset {
             try {
                 _syncThread();
             }
-            catch(DBException& e) {
+            catch(const DBException& e) {
                 sethbmsg(str::stream() << "syncThread: " << e.toString());
                 sleepsecs(10);
             }
@@ -782,6 +798,11 @@ namespace replset {
             // RECOVERING until we unblock
             changeState(MemberState::RS_RECOVERING);
         }
+    }
+
+    void GhostSync::clearCache() {
+        rwlock lk(_lock, true);
+        _ghostCache.clear();
     }
 
     void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
@@ -827,7 +848,7 @@ namespace replset {
 
     void GhostSync::percolate(const BSONObj& id, const OpTime& last) {
         const OID rid = id["_id"].OID();
-        GhostSlave* slave;
+        shared_ptr<GhostSlave> slave;
         {
             rwlock lk( _lock , false );
 
@@ -837,13 +858,12 @@ namespace replset {
                 return;
             }
 
-            slave = i->second.get();
+            slave = i->second;
             if (!slave->init) {
                 OCCASIONALLY log() << "couldn't percolate slave " << rid << " not init" << rsLog;
                 return;
             }
         }
-
         verify(slave->slave);
 
         const Member *target = replset::BackgroundSync::get()->getSyncTarget();
@@ -857,6 +877,9 @@ namespace replset {
         }
 
         try {
+            // haveCursor() does not necessarily tell us if we have a non-dead cursor, so we check
+            // tailCheck() as well; see SERVER-8420
+            slave->reader.tailCheck();
             if (!slave->reader.haveCursor()) {
                 if (!slave->reader.connect(id, slave->slave->id(), target->fullName())) {
                     // error message logged in OplogReader::connect
@@ -886,7 +909,7 @@ namespace replset {
             }
             LOG(2) << "now last is " << slave->last.toString() << rsLog;
         }
-        catch (DBException& e) {
+        catch (const DBException& e) {
             // we'll be back
             LOG(2) << "replSet ghost sync error: " << e.what() << " for "
                    << slave->slave->fullName() << rsLog;

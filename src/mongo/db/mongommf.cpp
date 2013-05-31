@@ -20,15 +20,18 @@
    if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, not this.
 */
 
-#include "pch.h"
-#include "cmdline.h"
-#include "mongommf.h"
-#include "dur.h"
-#include "dur_journalformat.h"
-#include "../util/mongoutils/str.h"
-#include "d_globals.h"
-#include "memconcept.h"
-#include "d_concurrency.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/mongommf.h"
+
+#include "mongo/db/cmdline.h"
+
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/d_globals.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/dur_journalformat.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
 
@@ -222,10 +225,10 @@ namespace mongo {
             if( cmdLine.dur ) {
                 dur::closingFileNotification();
             }
-	    /* todo: is it ok to close files if we are not globally locked exclusively?
+            /* todo: is it ok to close files if we are not globally locked exclusively?
                      probably, but need to review. also note the lock assert below is
-		     rather vague and not checking if the right database is locked 
-	    */
+                     rather vague and not checking if the right database is locked 
+            */
             if( !Lock::somethingWriteLocked() ) { 
                 verify( inShutdown() );
                 DEV { 

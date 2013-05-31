@@ -21,6 +21,7 @@
 #include "writeback_listener.h"
 
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
@@ -297,7 +298,7 @@ namespace mongo {
 
                             ClientInfo * ci = r.getClientInfo();
                             if (AuthorizationManager::isAuthEnabled()) {
-                                ci->getAuthorizationManager()->grantInternalAuthorization(
+                                ci->getAuthorizationSession()->grantInternalAuthorization(
                                         "_writebackListener");
                             }
                             ci->noAutoSplit();

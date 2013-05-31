@@ -66,6 +66,17 @@ namespace {
         ASSERT_EQUALS(fieldRef.dottedField(), field);
     }
 
+    TEST(Normal, ParseTwice) {
+        string field = "a";
+        FieldRef fieldRef;
+        for (int i = 0; i < 2; i++) {
+            fieldRef.parse(field);
+            ASSERT_EQUALS(fieldRef.numParts(), 1U);
+            ASSERT_EQUALS(fieldRef.getPart(0), field);
+            ASSERT_EQUALS(fieldRef.dottedField(), field);
+        }
+    }
+
     TEST(Normal, MulitplePartsVariable) {
         const char* parts[] = {"a", "b", "c", "d", "e"};
         size_t size = sizeof(parts)/sizeof(char*);
@@ -126,6 +137,37 @@ namespace {
             ASSERT_EQUALS(fieldRef.dottedField(), prefix + parts[i]);
         }
         ASSERT_EQUALS(fieldRef.numReplaced(), 1U);
+    }
+
+    TEST(Equality, Simple1 ) {
+        FieldRef a;
+        a.parse( "a.b" );
+        ASSERT( a.equalsDottedField( "a.b" ) );
+        ASSERT( !a.equalsDottedField( "a" ) );
+        ASSERT( !a.equalsDottedField( "b" ) );
+        ASSERT( !a.equalsDottedField( "a.b.c" ) );
+    }
+
+    TEST(Equality, Simple2 ) {
+        FieldRef a;
+        a.parse( "a" );
+        ASSERT( !a.equalsDottedField( "a.b" ) );
+        ASSERT( a.equalsDottedField( "a" ) );
+        ASSERT( !a.equalsDottedField( "b" ) );
+        ASSERT( !a.equalsDottedField( "a.b.c" ) );
+    }
+
+    TEST( DottedField, Simple1 ) {
+        FieldRef a;
+        a.parse( "a.b.c.d.e" );
+        ASSERT_EQUALS( "a.b.c.d.e", a.dottedField() );
+        ASSERT_EQUALS( "a.b.c.d.e", a.dottedField(0) );
+        ASSERT_EQUALS( "b.c.d.e", a.dottedField(1) );
+        ASSERT_EQUALS( "c.d.e", a.dottedField(2) );
+        ASSERT_EQUALS( "d.e", a.dottedField(3) );
+        ASSERT_EQUALS( "e", a.dottedField(4) );
+        ASSERT_EQUALS( "", a.dottedField(5) );
+        ASSERT_EQUALS( "", a.dottedField(6) );
     }
 
 } // namespace mongo

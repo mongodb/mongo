@@ -24,6 +24,7 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/scripting/bench.h"
 #include "mongo/util/file.h"
 #include "mongo/util/text.h"
@@ -129,6 +130,10 @@ namespace mongo {
 
         File f;
         f.open(filename.c_str(), true);
+        
+        if (!f.is_open() || f.bad())
+            return false;
+        
         fileofs fo = f.len();
         if (fo > kMaxJsFileLength) {
             warning() << "attempted to execute javascript file larger than 2GB" << endl;
@@ -264,6 +269,7 @@ namespace mongo {
     }
 
     typedef map<string, list<Scope*> > PoolToScopes;
+    typedef unordered_set<Scope*> ActiveScopes;
 
     class ScopeCache {
     public:
@@ -281,8 +287,19 @@ namespace mongo {
             list<Scope*>& l = _pools[pool];
             bool oom = s->hasOutOfMemoryException();
 
-            // do not keep too many contexts, or use them for too long
-            if (l.size() > 10 || s->getTimeUsed() > 10 || oom || !s->getError().empty()) {
+            const unsigned kMaxPoolSize = 10;
+            const int kMaxScopeReuse = 10;
+
+            // 'orphaned' scopes were in-use while the ScopeCache was clear()ed.  they should not
+            // be returned to any pool since authentication credentials may have changed.
+            bool orphaned = !_active.erase(s);
+
+            // do not keep too many contexts, use them for too long, or reuse after error
+            if (l.size() > kMaxPoolSize ||
+                s->getTimeUsed() > kMaxScopeReuse ||
+                !s->getError().empty() ||
+                oom ||
+                orphaned) {
                 delete s;
             }
             else {
@@ -301,10 +318,11 @@ namespace mongo {
             scoped_lock lk(_mutex);
             list<Scope*>& l = _pools[pool];
             if (l.size() == 0)
-                return 0;
+                return NULL;
 
             Scope* s = l.back();
             l.pop_back();
+            _active.insert(s);
             s->reset();
             s->incTimeUsed();
             return s;
@@ -320,10 +338,26 @@ namespace mongo {
                 }
             }
             _pools.clear();
+            _active.clear();
+
+        }
+
+        /**
+         * Add a scope to the active (or in-use) set of scopes.
+         * A scope is considered active if it is not in the pool.  If the pool is cleared while an
+         * active scope is still running, the active scope will become orphaned.  When the orphaned
+         * scope calls done(), it will be freed instead of being placed back in the pool for reuse.
+         *
+         * This should only be called when ScriptEngine::getPooledScope() must create a new scope
+         * for the pool.
+         */
+        void addActive(Scope* scope) {
+            _active.insert(scope);
         }
 
     private:
-        PoolToScopes _pools;
+        PoolToScopes _pools;    // protected by _mutex
+        ActiveScopes _active;   // protected by _mutex
         mongo::mutex _mutex;
     };
 
@@ -417,8 +451,10 @@ namespace mongo {
             scopeCache.reset(new ScopeCache());
 
         Scope* s = scopeCache->get(pool + scopeType);
-        if (!s)
+        if (!s) {
             s = newScope();
+            scopeCache->addActive(s);
+        }
 
         auto_ptr<Scope> p;
         p.reset(new PooledScope(pool + scopeType, s));

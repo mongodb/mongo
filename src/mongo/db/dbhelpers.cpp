@@ -33,6 +33,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
+#include "mongo/db/query_runner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/s/d_logic.h"
@@ -123,7 +124,7 @@ namespace mongo {
 
         BSONObj key = i.getKeyFromQuery( query );
 
-        DiskLoc loc = i.idxInterface().findSingle(i , i.head , key);
+        DiskLoc loc = QueryRunner::fastFindSingle(i, key);
         if ( loc.isNull() )
             return false;
         result = loc.obj();
@@ -136,7 +137,7 @@ namespace mongo {
         uassert(13430, "no _id index", idxNo>=0);
         IndexDetails& i = d->idx( idxNo );
         BSONObj key = i.getKeyFromQuery( idquery );
-        return i.idxInterface().findSingle(i , i.head , key);
+        return QueryRunner::fastFindSingle(i, key);
     }
 
     vector<BSONObj> Helpers::findAll( const string& ns , const BSONObj& query ) {
@@ -212,7 +213,32 @@ namespace mongo {
     void Helpers::putSingletonGod(const char *ns, BSONObj obj, bool logTheOp) {
         OpDebug debug;
         Client::Context context(ns);
-        _updateObjects(/*god=*/true, ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , logTheOp , debug );
+
+        if (isNewUpdateFrameworkEnabled()) {
+
+            _updateObjectsNEW(/*god=*/true,
+                              ns,
+                              obj,
+                              /*pattern=*/BSONObj(),
+                              /*upsert=*/true,
+                              /*multi=*/false,
+                              logTheOp,
+                              debug );
+
+        }
+        else {
+
+            _updateObjects(/*god=*/true,
+                           ns,
+                           obj,
+                           /*pattern=*/BSONObj(),
+                           /*upsert=*/true,
+                           /*multi=*/false,
+                           logTheOp,
+                           debug );
+
+        }
+
         context.getClient()->curop()->done();
     }
 
@@ -232,17 +258,63 @@ namespace mongo {
         return kpBuilder.obj();
     }
 
-    long long Helpers::removeRange( const IndexChunk& chunk ,
-                                    bool maxInclusive ,
-                                    bool secondaryThrottle ,
+    bool findShardKeyIndexPattern_inlock( const string& ns,
+                                          const BSONObj& shardKeyPattern,
+                                          BSONObj* indexPattern ) {
+        verify( Lock::isLocked() );
+        NamespaceDetails* nsd = nsdetails( ns );
+        if ( !nsd )
+            return false;
+        const IndexDetails* idx =
+                nsd->findIndexByPrefix(shardKeyPattern, true /* require single key */);
+
+        if ( !idx )
+            return false;
+        *indexPattern = idx->keyPattern().getOwned();
+        return true;
+    }
+
+    bool findShardKeyIndexPattern( const string& ns,
+                                   const BSONObj& shardKeyPattern,
+                                   BSONObj* indexPattern ) {
+        Client::ReadContext context( ns );
+        return findShardKeyIndexPattern_inlock( ns, shardKeyPattern, indexPattern );
+    }
+
+    long long Helpers::removeRange( const KeyRange& range,
+                                    bool maxInclusive,
+                                    bool secondaryThrottle,
                                     RemoveCallback * callback,
                                     bool fromMigrate,
-                                    bool onlyRemoveOrphanedDocs ) {
-
+                                    bool onlyRemoveOrphanedDocs )
+    {
         Timer rangeRemoveTimer;
-        const string& ns = chunk.ns;
-        const BSONObj& min = chunk.min;
-        const BSONObj& max = chunk.max;
+        const string& ns = range.ns;
+
+        // The IndexChunk has a keyPattern that may apply to more than one index - we need to
+        // select the index and get the full index keyPattern here.
+        BSONObj indexKeyPatternDoc;
+        if ( !findShardKeyIndexPattern( ns,
+                                        range.keyPattern,
+                                        &indexKeyPatternDoc ) )
+        {
+            warning() << "no index found to clean data over range of type "
+                      << range.keyPattern << " in " << ns << endl;
+            return -1;
+        }
+
+        KeyPattern indexKeyPattern( indexKeyPatternDoc );
+
+        // Extend bounds to match the index we found
+
+        // Extend min to get (min, MinKey, MinKey, ....)
+        const BSONObj& min =
+                Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.minKey,
+                                                                                   false));
+        // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
+        // If not included, extend max to get (max, MinKey, MinKey, ....)
+        const BSONObj& max =
+                Helpers::toKeyFormat( indexKeyPattern.extendRangeBound(range.maxKey,maxInclusive));
 
         LOG(1) << "begin removal of " << min << " to " << max << " in " << ns
                << (secondaryThrottle ? " (waiting for secondaries)" : "" ) << endl;
@@ -265,23 +337,13 @@ namespace mongo {
                     NamespaceDetails* nsd = nsdetails( ns );
                     if ( ! nsd )
                         break;
-                    
-                    const KeyPattern& keyPattern = chunk.keyPattern;
 
-                    int ii = nsd->findIndexByKeyPattern( keyPattern.toBSON() );
+                    int ii = nsd->findIndexByKeyPattern( indexKeyPattern.toBSON() );
                     verify( ii >= 0 );
                     
                     IndexDetails& i = nsd->idx( ii );
-
-                    // Extend min to get (min, MinKey, MinKey, ....)
-                    BSONObj newMin =
-                            Helpers::toKeyFormat( keyPattern.extendRangeBound( min, false ) );
-                    // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
-                    // If not included, extend max to get (max, MinKey, MinKey, ....)
-                    BSONObj newMax =
-                            Helpers::toKeyFormat( keyPattern.extendRangeBound(max, maxInclusive) );
                     
-                    c.reset( BtreeCursor::make( nsd, i, newMin, newMax, maxInclusive, 1 ) );
+                    c.reset( BtreeCursor::make( nsd, i, min, max, maxInclusive, 1 ) );
                 }
                 
                 if ( ! c->ok() ) {
@@ -360,17 +422,17 @@ namespace mongo {
         return numDeleted;
     }
 
-    const long long IndexChunk::kMaxDocsPerChunk( 250000 );
+    const long long Helpers::kMaxDocsPerChunk( 250000 );
 
     // Used by migration clone step
     // TODO: Cannot hook up quite yet due to _trackerLocks in shared migration code.
-    Status Helpers::getLocsInRange( const IndexChunk& chunk,
+    Status Helpers::getLocsInRange( const KeyRange& range,
                                     long long maxChunkSizeBytes,
                                     set<DiskLoc>* locs,
                                     long long* numDocs,
                                     long long* estChunkSizeBytes )
     {
-        const string ns = chunk.ns;
+        const string ns = range.ns;
         *estChunkSizeBytes = 0;
         *numDocs = 0;
 
@@ -380,16 +442,16 @@ namespace mongo {
         if ( !details ) return Status( ErrorCodes::NamespaceNotFound, ns );
 
         // Require single key
-        const IndexDetails *idx = details->findIndexByPrefix( chunk.keyPattern.toBSON(), true );
+        const IndexDetails *idx = details->findIndexByPrefix( range.keyPattern, true );
 
         if ( idx == NULL ) {
-            return Status( ErrorCodes::IndexNotFound, chunk.keyPattern.toString() );
+            return Status( ErrorCodes::IndexNotFound, range.keyPattern.toString() );
         }
 
         // Assume both min and max non-empty, append MinKey's to make them fit chosen index
         KeyPattern idxKeyPattern( idx->keyPattern() );
-        BSONObj min = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( chunk.min, false ) );
-        BSONObj max = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( chunk.max, false ) );
+        BSONObj min = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( range.minKey, false ) );
+        BSONObj max = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( range.maxKey, false ) );
 
         // TODO: May not always be btreecursor?
         BtreeCursor* btreeCursor = BtreeCursor::make( details, *idx, min, max, false, 1 );
@@ -408,12 +470,12 @@ namespace mongo {
             // TODO: Figure out what's up here
             avgDocSizeBytes = details->stats.datasize / totalDocsInNS;
             avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
-            avgDocsWhenFull = std::min( IndexChunk::kMaxDocsPerChunk + 1,
+            avgDocsWhenFull = std::min( kMaxDocsPerChunk + 1,
                                         130 * avgDocsWhenFull / 100 /* slack */);
         }
         else {
             avgDocSizeBytes = 0;
-            avgDocsWhenFull = IndexChunk::kMaxDocsPerChunk + 1;
+            avgDocsWhenFull = kMaxDocsPerChunk + 1;
         }
 
         // do a full traversal of the chunk and don't stop even if we think it is a large chunk
@@ -473,7 +535,6 @@ namespace mongo {
         stringstream ss;
         ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
         _file /= ss.str();
-
     }
 
     RemoveSaver::~RemoveSaver() {
@@ -490,7 +551,8 @@ namespace mongo {
             _out = new ofstream();
             _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
             if ( ! _out->good() ) {
-                LOG( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
+                error() << "couldn't create file: " << _file.string() << 
+                    " for remove saving" << endl;
                 delete _out;
                 _out = 0;
                 return;

@@ -17,10 +17,13 @@
 #pragma once
 
 #include "mongo/db/namespace_details.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 
-    class IndexRebuilder {
+    // This is a job that's only run at startup. It finds all incomplete indices and 
+    // finishes rebuilding them. After they complete rebuilding, the thread terminates. 
+    class IndexRebuilder : public BackgroundJob {
     public:
         IndexRebuilder();
 
@@ -40,7 +43,9 @@ namespace mongo {
          * @param nsd the namespace details of the namespace building the index
          * @param index the offset into nsd's index array of the partially-built index
          */
-        void retryIndexBuild(const std::string& dbName, NamespaceDetails* nsd, const int index);
+        void retryIndexBuild(const std::string& dbName, 
+                             NamespaceDetails* nsd, 
+                             const int index);
     };
 
     extern IndexRebuilder indexRebuilder;

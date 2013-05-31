@@ -55,25 +55,25 @@
      @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
 
-#include "cmdline.h"
-#include "client.h"
-#include "dur.h"
-#include "dur_journal.h"
-#include "dur_commitjob.h"
-#include "dur_recover.h"
-#include "dur_stats.h"
-#include "../util/concurrency/race.h"
-#include "../util/mongoutils/hash.h"
-#include "../util/mongoutils/str.h"
-#include "../util/timer.h"
-#include "mongo/util/stacktrace.h"
-#include "../server.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cmdline.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/dur_journal.h"
+#include "mongo/db/dur_recover.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/server.h"
+#include "mongo/util/concurrency/race.h"
+#include "mongo/util/mongoutils/hash.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/timer.h"
 
 using namespace mongoutils;
 

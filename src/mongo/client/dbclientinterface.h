@@ -615,9 +615,9 @@ namespace mongo {
          * are required depends on the mechanism, which is mandatory.
          *
          *     "mechanism": The string name of the sasl mechanism to use.  Mandatory.
-         *     "user": The string name of the principal to authenticate.  Mandatory.
+         *     "user": The string name of the user to authenticate.  Mandatory.
          *     "userSource": The database target of the auth command, which identifies the location
-         *         of the credential information for the principal.  May be "$external" if
+         *         of the credential information for the user.  May be "$external" if
          *         credential information is stored outside of the mongo cluster.  Mandatory.
          *     "pwd": The password data.
          *     "digestPassword": Boolean, set to true if the "pwd" is undigested (default).
@@ -1082,6 +1082,11 @@ namespace mongo {
 
         virtual bool isFailed() const = 0;
 
+        /**
+         * if not checked recently, checks whether the underlying socket/sockets are still valid
+         */
+        virtual bool isStillConnected() = 0;
+
         virtual void killCursor( long long cursorID ) = 0;
 
         virtual bool callRead( Message& toSend , Message& response ) = 0;
@@ -1169,6 +1174,15 @@ namespace mongo {
                 throw ConnectException(string("can't connect ") + errmsg);
         }
 
+        /**
+         * Logs out the connection for the given database.
+         *
+         * @param dbname the database to logout from.
+         * @param info the result object for the logout command (provided for backwards
+         *     compatibility with mongo shell)
+         */
+        virtual void logout(const string& dbname, BSONObj& info);
+
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query=Query(), int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 ) {
             checkConnection();
@@ -1191,6 +1205,8 @@ namespace mongo {
                    a connection will transition back to an ok state after reconnecting.
          */
         bool isFailed() const { return _failed; }
+
+        bool isStillConnected() { return p ? p->isStillConnected() : true; }
 
         MessagingPort& port() { verify(p); return *p; }
 
@@ -1265,7 +1281,7 @@ namespace mongo {
         static bool _lazyKillCursor; // lazy means we piggy back kill cursors on next op
 
 #ifdef MONGO_SSL
-        SSLManager* sslManager();
+        SSLManagerInterface* sslManager();
 #endif
     };
 

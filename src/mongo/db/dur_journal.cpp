@@ -16,32 +16,34 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "client.h"
-#include "namespace.h"
-#include "dur_journal.h"
-#include "dur_journalformat.h"
-#include "dur_stats.h"
-#include "../util/logfile.h"
-#include "../util/timer.h"
-#include "../util/alignedbuilder.h"
-#include "../util/net/listen.h" // getelapsedtimemillis
+#include "mongo/pch.h"
+
+#include "mongo/db/dur_journal.h"
+
 #include <boost/static_assert.hpp>
 #include <boost/filesystem.hpp>
-#include "../util/mongoutils/str.h"
-#include "dur_journalimpl.h"
-#include "../util/file.h"
-#include "../util/checksum.h"
-#include "../util/concurrency/race.h"
-#include "../util/compress.h"
-#include "../util/progress_meter.h"
-#include "../server.h"
-#include "../util/mmap.h"
+#include <boost/filesystem/operations.hpp>
+
+#include "mongo/db/client.h"
+#include "mongo/db/dur_journalformat.h"
+#include "mongo/db/dur_journalimpl.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/db/namespace.h"
 #include "mongo/platform/random.h"
+#include "mongo/server.h"
+#include "mongo/util/alignedbuilder.h"
+#include "mongo/util/checksum.h"
+#include "mongo/util/compress.h"
+#include "mongo/util/concurrency/race.h"
+#include "mongo/util/file.h"
+#include "mongo/util/logfile.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/listen.h" // getelapsedtimemillis
+#include "mongo/util/progress_meter.h"
+#include "mongo/util/timer.h"
 
 using namespace mongoutils;
-
-#include <boost/filesystem/operations.hpp>
 
 namespace mongo {
 

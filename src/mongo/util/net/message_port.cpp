@@ -15,21 +15,20 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/net/message_port.h"
 
 #include <fcntl.h>
 #include <time.h>
 
-#include "message.h"
-#include "message_port.h"
-#include "listen.h"
-
-#include "../goodies.h"
-#include "../background.h"
-#include "../time_support.h"
-#include "../../db/cmdline.h"
-#include "../scopeguard.h"
-
+#include "mongo/db/cmdline.h"
+#include "mongo/util/background.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 #ifndef _WIN32
 # ifndef __sunos__
@@ -175,8 +174,8 @@ again:
 
                 if ( len == 542393671 ) {
                     // an http GET
-                    LOG( psock->getLogLevel() ) << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
-                    string msg = "You are trying to access MongoDB on the native driver port. For http diagnostic access, add 1000 to the port number\n";
+                    string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
+                    LOG( psock->getLogLevel() ) << msg << endl;
                     stringstream ss;
                     ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
                     string s = ss.str();

@@ -91,7 +91,7 @@ namespace mongo {
          * called.  If the index was changed, we may return an error, as our ticket may have been
          * invalidated.
          */
-        virtual Status update(const UpdateTicket& ticket) = 0;
+        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated) = 0;
 
         /**
          * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of
@@ -106,6 +106,17 @@ namespace mongo {
          * See prefetch.cpp.
          */
         virtual Status touch(const BSONObj& obj) = 0;
+
+        /**
+         * Walk the entire index, checking the internal structure for consistency.
+         * Set numKeys to the number of keys in the index.
+         *
+         * Return OK if the index is valid.
+         *
+         * Currently wasserts that the index is invalid.  This could/should be changed in
+         * the future to return a Status.
+         */
+        virtual Status validate(int64_t* numKeys) = 0;
 
         //
         // Bulk operations support (TODO)
@@ -122,20 +133,15 @@ namespace mongo {
      */
     class UpdateTicket {
     public:
-        UpdateTicket() : _isValid(false), _isMultiKey(false) { }
-
-        // Multikey is a bit set in the on-disk catalog.  If an update is multi-key we have
-        // to set that bit.  We propagate this up so the caller can do that.
-        bool isMultiKey() const { return _isMultiKey; }
+        UpdateTicket() : _isValid(false) { }
 
     protected:
         // These friends are the classes that actually fill out an UpdateStatus.
-        template <class Key> friend class BtreeBasedAccessMethod;
+        friend class BtreeBasedAccessMethod;
 
         class PrivateUpdateData;
 
         bool _isValid;
-        bool _isMultiKey;
 
         // This is meant to be filled out only by the friends above.
         scoped_ptr<PrivateUpdateData> _indexSpecificUpdateData;

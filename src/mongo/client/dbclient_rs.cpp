@@ -260,19 +260,30 @@ namespace mongo {
 
     /**
      * @return the connection associated with the monitor node. Will also attempt
-     *     to establish connection if NULL. Can still return NULL if reconnect failed.
+     *     to establish connection if NULL or broken in background.
+     * Can still return NULL if reconnect failed.
      */
-    shared_ptr<DBClientConnection> _getConnWithRefresh(ReplicaSetMonitor::Node& node) {
-        if (node.conn.get() == NULL) {
-            ConnectionString connStr(node.addr);
+    shared_ptr<DBClientConnection> _getConnWithRefresh( ReplicaSetMonitor::Node& node ) {
+        if ( node.conn.get() == NULL || !node.conn->isStillConnected() ) {
+
+            // Note: This constructor only works with MASTER connections
+            ConnectionString connStr( node.addr );
             string errmsg;
 
             try {
-                node.conn.reset(dynamic_cast<DBClientConnection*>(
-                        connStr.connect(errmsg, ReplicaSetMonitor::SOCKET_TIMEOUT_SECS)));
+                DBClientBase* conn = connStr.connect( errmsg,
+                                                      ReplicaSetMonitor::SOCKET_TIMEOUT_SECS );
+                if ( conn == NULL ) {
+                    node.ok = false;
+                    node.conn.reset();
+                }
+                else {
+                    node.conn.reset( dynamic_cast<DBClientConnection*>( conn ) );
+                }
             }
-            catch (const AssertionException&) {
+            catch ( const AssertionException& ) {
                 node.ok = false;
+                node.conn.reset();
             }
         }
 
@@ -1318,6 +1329,30 @@ namespace mongo {
         return rsm->getServerAddress();
     }
 
+    // A replica set connection is never disconnected, since it controls its own reconnection
+    // logic.
+    //
+    // Has the side effect of proactively clearing any cached connections which have been
+    // disconnected in the background.
+    bool DBClientReplicaSet::isStillConnected() {
+
+        if ( _master && !_master->isStillConnected() ) {
+            _master.reset();
+            _masterHost = HostAndPort();
+            // Don't notify monitor of bg failure, since it's not clear how long ago it happened
+        }
+
+        if ( _lastSlaveOkConn && !_lastSlaveOkConn->isStillConnected() ) {
+            _lastSlaveOkConn.reset();
+            _lastSlaveOkHost = HostAndPort();
+            // Reset read pref too, since we're re-selecting the slaveOk host anyway
+            _lastReadPref.reset();
+            // Don't notify monitor of bg failure, since it's not clear how long ago it happened
+        }
+
+        return true;
+    }
+
     DBClientConnection * DBClientReplicaSet::checkMaster() {
         ReplicaSetMonitorPtr monitor = _getMonitor();
         HostAndPort h = monitor->getMaster();
@@ -1383,8 +1418,8 @@ namespace mongo {
             }
             catch (const UserException&) {
                 warning() << "cached auth failed for set: " << _setName <<
-                    " db: " << i->second[saslCommandPrincipalSourceFieldName].str() <<
-                    " user: " << i->second[saslCommandPrincipalFieldName].str() << endl;
+                    " db: " << i->second[saslCommandUserSourceFieldName].str() <<
+                    " user: " << i->second[saslCommandUserFieldName].str() << endl;
             }
         }
     }
@@ -1434,7 +1469,7 @@ namespace mongo {
         }
 
         // now that it does, we should save so that for a new node we can auth
-        _auths[params[saslCommandPrincipalSourceFieldName].str()] = params.getOwned();
+        _auths[params[saslCommandUserSourceFieldName].str()] = params.getOwned();
     }
 
     void DBClientReplicaSet::logout(const string &dbname, BSONObj& info) {

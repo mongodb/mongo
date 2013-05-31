@@ -23,61 +23,11 @@
 #include <vector>
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/index_insertion_continuation.h"
-#include "mongo/db/indexkey.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/key.h"
 #include "mongo/db/namespace.h"
 
 namespace mongo {
-
-    class IndexInterface {
-    protected:
-        virtual ~IndexInterface() { }
-    public:
-        class IndexInserter : private boost::noncopyable {
-        public:
-            IndexInserter();
-            ~IndexInserter();
-
-            void addInsertionContinuation(IndexInsertionContinuation *c);
-            void finishAllInsertions();
-
-        private:
-            std::vector<IndexInsertionContinuation *> _continuations;
-        };
-
-        virtual IndexInsertionContinuation *beginInsertIntoIndex(
-            int idxNo,
-            IndexDetails &_idx, DiskLoc _recordLoc, const BSONObj &_key,
-            const Ordering& _order, bool dupsAllowed) = 0;
-
-        virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
-        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
-        virtual DiskLoc findSingle(const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key) const = 0;
-        virtual bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const = 0;
-        virtual int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
-            const BSONObj& key, const Ordering &order, bool dupsAllowed,
-            IndexDetails& idx, bool toplevel = true) const = 0;
-        virtual DiskLoc addBucket(const IndexDetails&) = 0;
-        virtual void uassertIfDups(IndexDetails& idx, vector<BSONObj*>& addedKeys, DiskLoc head, 
-            DiskLoc self, const Ordering& ordering) = 0;
-
-        // these are for geo
-        virtual bool isUsed(DiskLoc thisLoc, int pos) = 0;
-        virtual void keyAt(DiskLoc thisLoc, int pos, BSONObj&, DiskLoc& recordLoc) = 0;
-        virtual BSONObj keyAt(DiskLoc thisLoc, int pos) = 0;
-        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
-                               int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) = 0;
-        virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
-
-        /**
-         * @return a static IndexInterface consistent with index version DefaultIndexVersionNumber.
-         * An IndexInterface should generally not be retrieved via this function, but from the
-         * IndexDetails for an existing index.
-         */
-        static IndexInterface& defaultVersion();
-    };
 
     /* Details about a particular index. There is one of these effectively for each object in
        system.namespaces (although this also includes the head pointer, which is not in that
@@ -117,13 +67,6 @@ namespace mongo {
             return res;
         }
 
-        /* pull out the relevant key objects from obj, so we
-           can index them.  Note that the set is multiple elements
-           only when it's a "multikey" array.
-           keys will be left empty if key not found in the object.
-        */
-        void getKeysFromObject( const BSONObj& obj, BSONObjSet& keys) const;
-
         /* get the key pattern for this object.
            e.g., { lastname:1, firstname:1 }
         */
@@ -141,10 +84,13 @@ namespace mongo {
         /* true if the specified key is in the index */
         bool hasKey(const BSONObj& key);
 
-        // returns name of this index's storage area
-        // database.table.$index
+        // returns name of this index's storage area (database.collection.$index)
         string indexNamespace() const {
-            BSONObj io = info.obj();
+            return indexNamespaceFromObj(info.obj());
+        }
+
+        // returns the name of an index's storage area (database.collection.$index) from a BSONObj
+        static string indexNamespaceFromObj(const BSONObj& io) {
             string s;
             s.reserve(Namespace::MaxNsLen);
             s = io.getStringField("ns");
@@ -153,6 +99,7 @@ namespace mongo {
             s += io.getStringField("name");
             return s;
         }
+
 
         string indexName() const { // e.g. "ts_1"
             BSONObj io = info.obj();
@@ -216,8 +163,6 @@ namespace mongo {
         */
         void kill_idx();
 
-        const IndexSpec& getSpec() const;
-
         string toString() const {
             return info.obj().toString();
         }
@@ -227,37 +172,10 @@ namespace mongo {
                     of indexes in old formats in the future.
         */
         static bool isASupportedIndexVersionNumber(int v) { return (v&1)==v; } // v == 0 || v == 1
-
-        /** @return the interface for this interface, which varies with the index version.
-            used for backward compatibility of index versions/formats.
-        */
-        IndexInterface& idxInterface() const { 
-            int v = version();
-            dassert( isASupportedIndexVersionNumber(v) );
-            return *iis[v&1];
-        }
-
-        static IndexInterface *iis[];
-    };
-
-    struct IndexChanges { /*on an update*/
-        BSONObjSet oldkeys;
-        BSONObjSet newkeys;
-        vector<BSONObj*> removed; // these keys were removed as part of the change
-        vector<BSONObj*> added;   // these keys were added as part of the change
-
-        /** @curObjLoc - the object we want to add's location.  if it is already in the
-                         index, that is allowed here (for bg indexing case).
-        */
-        void dupCheck(IndexDetails& idx, DiskLoc curObjLoc);
     };
 
     class NamespaceDetails;
     // changedId should be initialized to false
-    void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
-                         BSONObj newObj, BSONObj oldObj, bool &cangedId);
-    void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc);
-
     void assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
     int removeFromSysIndexes(const char *ns, const char *idxName);
 

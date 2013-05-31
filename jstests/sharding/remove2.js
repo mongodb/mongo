@@ -81,6 +81,12 @@ var st = new ShardingTest( testName = "remove2",
                              rs1 : { nodes : 2 }
                            });
 
+// Pending resolution of SERVER-8598, we need to wait for deletion after chunk migrations to avoid
+// a pending delete re-creating a database after it was dropped.
+st.s.getDB("config").settings.update( { _id: "balancer" },
+                                      { $set : { _waitForDelete : true } },
+                                      true );
+
 var rst0 = st._rs[0].test;
 var rst1 = st._rs[1].test;
 

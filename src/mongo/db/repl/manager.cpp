@@ -17,10 +17,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "rs.h"
-#include "connections.h"
-#include "../client.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/connections.h"
+#include "mongo/db/client.h"
 
 namespace mongo {
 

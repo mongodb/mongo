@@ -18,7 +18,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/server_parameters.h"
@@ -38,11 +38,11 @@ namespace {
         ClientBasic* clientBasic = ClientBasic::getCurrent();
         if (!clientBasic)
             return;
-        if (!clientBasic->hasAuthorizationManager())
+        if (!clientBasic->hasAuthorizationSession())
             return;
 
         PrincipalSet::NameIterator principals =
-            clientBasic->getAuthorizationManager()->getAuthenticatedPrincipalNames();
+            clientBasic->getAuthorizationSession()->getAuthenticatedPrincipalNames();
 
         if (!principals.more())
             return;

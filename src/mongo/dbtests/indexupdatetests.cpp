@@ -21,6 +21,7 @@
 #include "mongo/db/btree.h"
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/btree_based_builder.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/sort_phase_one.h"
@@ -32,6 +33,7 @@ namespace IndexUpdateTests {
 
     static const char* const _ns = "unittests.indexupdate";
     DBDirectClient _client;
+    ExternalSortComparison* _aFirstSort = BtreeBasedBuilder::getComparison(0, BSON("a" << 1));
 
     /**
      * Test fixture for a write locked test using collection _ns.  Includes functionality to
@@ -91,7 +93,8 @@ namespace IndexUpdateTests {
                                                              nDocs,
                                                              nDocs));
             // Add keys to phaseOne.
-            addKeysToPhaseOne( _ns, id, BSON( "a" << 1 ), &phaseOne, nDocs, pm.get(), true );
+            BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns, id, BSON( "a" << 1 ), &phaseOne, nDocs, pm.get(), true,
+                                                 nsdetails(_ns)->idxNo(id) );
             // Keys for all documents were added to phaseOne.
             ASSERT_EQUALS( static_cast<uint64_t>( nDocs ), phaseOne.n );
         }
@@ -121,26 +124,27 @@ namespace IndexUpdateTests {
             cc().curop()->kill();
             if ( _mayInterrupt ) {
                 // Add keys to phaseOne.
-                ASSERT_THROWS( addKeysToPhaseOne( _ns,
+                ASSERT_THROWS( BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns,
                                                   id,
                                                   BSON( "a" << 1 ),
                                                   &phaseOne,
                                                   nDocs,
                                                   pm.get(),
-                                                  _mayInterrupt ),
+                                                  _mayInterrupt,
+                                                  nsdetails(_ns)->idxNo(id) ),
                                UserException );
                 // Not all keys were added to phaseOne due to the interrupt.
                 ASSERT( static_cast<uint64_t>( nDocs ) > phaseOne.n );
             }
             else {
                 // Add keys to phaseOne.
-                addKeysToPhaseOne( _ns,
+                BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns,
                                    id,
                                    BSON( "a" << 1 ),
                                    &phaseOne,
                                    nDocs,
                                    pm.get(),
-                                   _mayInterrupt );
+                                   _mayInterrupt, nsdetails(_ns)->idxNo(id) );
                 // All keys were added to phaseOne despite to the kill request, because
                 // mayInterrupt == false.
                 ASSERT_EQUALS( static_cast<uint64_t>( nDocs ), phaseOne.n );
@@ -157,8 +161,7 @@ namespace IndexUpdateTests {
             IndexDetails& id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            phaseOne.sorter.reset( new BSONObjExternalSorter( id.idxInterface(),
-                                                              BSON( "a" << 1 ) ) );
+            phaseOne.sorter.reset( new BSONObjExternalSorter(_aFirstSort));
             // Add index keys to the phaseOne.
             int32_t nKeys = 130;
             for( int32_t i = 0; i < nKeys; ++i ) {
@@ -218,8 +221,7 @@ namespace IndexUpdateTests {
             IndexDetails& id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            phaseOne.sorter.reset( new BSONObjExternalSorter( id.idxInterface(),
-                                                              BSON( "a" << 1 ) ) );
+            phaseOne.sorter.reset(new BSONObjExternalSorter(_aFirstSort));
             // It's necessary to index sufficient keys that a RARELY condition will be triggered,
             // but few enough keys that the btree builder will not create an internal node and check
             // for an interrupt internally (which would cause this test to pass spuriously).
@@ -304,7 +306,7 @@ namespace IndexUpdateTests {
             // Check the expected number of dups.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 * 3 ), dups.size() );
             // Drop the dups.
-            doDropDups( _ns, nsdetails( _ns ), dups, true );
+            BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, true );
             // Check that the expected number of documents remain.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
         }
@@ -341,14 +343,14 @@ namespace IndexUpdateTests {
             cc().curop()->kill();
             if ( _mayInterrupt ) {
                 // doDropDups() aborts.
-                ASSERT_THROWS( doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt ),
+                ASSERT_THROWS( BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt ),
                                UserException );
                 // Not all dups are dropped.
                 ASSERT( static_cast<uint32_t>( nDocs / 4 ) < _client.count( _ns ) );
             }
             else {
                 // doDropDups() succeeds.
-                doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt );
+                BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt );
                 // The expected number of documents were dropped.
                 ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
             }
@@ -543,7 +545,7 @@ namespace IndexUpdateTests {
             nsdetails(_ns)->indexBuildsInProgress--;
 
             ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
-            ASSERT_EQUALS(-1, IndexBuildsInProgress::get(_ns, "d_1"));
+            ASSERT_THROWS(IndexBuildsInProgress::get(_ns, "d_1"), MsgAssertionException);
 
             offset = IndexBuildsInProgress::get(_ns, "a_1");
             IndexBuildsInProgress::remove(_ns, offset);

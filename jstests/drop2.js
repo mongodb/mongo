@@ -34,7 +34,7 @@ countOp = null;
 assert.soon( function() { countOp = op( false ); return countOp; } );
 
 s2 = startParallelShell( "print(\"Drop thread started\");"
-                         + "db.jstests_drop2.drop();"
+                         + "print(\"drop result: \" + db.jstests_drop2.drop() );"
                          + "print(\"Drop thread terminating\")" );
 dropOp = null;
 assert.soon( function() { dropOp = op( true ); return dropOp; } );

@@ -15,11 +15,11 @@
  *    limitations under the License.
  */
 
-#include "explain.h"
+#include "mongo/db/explain.h"
 
-#include "cmdline.h"
-#include "../util/net/sock.h"
-#include "../util/mongoutils/str.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/util/net/sock.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
     

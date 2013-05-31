@@ -111,7 +111,7 @@ for (var iter = 0; iter < numIterations; ++iter) {
     assert.soon(function(){
         return hasChunkOnShard("test.foo", shards[0]._id) && 
                hasChunkOnShard("test.foo", shards[1]._id);
-    }, 2 * 60 * 1000);
+    }, 'Test FAILURE: No migration performed in two minutes', 2 * 60 * 1000);
     
     // Now we can proceed, since we have a collection on both shards.
     

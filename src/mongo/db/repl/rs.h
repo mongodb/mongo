@@ -20,7 +20,6 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
-//#include "mongo/db/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rs_config.h"
@@ -152,6 +151,7 @@ namespace mongo {
         void percolate(const BSONObj& rid, const OpTime& last);
         void associateSlave(const BSONObj& rid, const int memberId);
         void updateSlave(const mongo::OID& id, const OpTime& last);
+        void clearCache();
     };
 
     class Consensus {
@@ -334,6 +334,11 @@ namespace mongo {
         /* todo thread */
         void msgUpdateHBInfo(HeartbeatInfo);
 
+        /**
+         * Updates the lastHeartbeatRecv of Member with the given id.
+         */
+        void msgUpdateHBRecv(unsigned id, time_t newTime);
+
         StateBox box;
 
         OpTime lastOpTimeWritten;
@@ -492,6 +497,9 @@ namespace mongo {
          * have called it again, passing in false.
          */
         bool setMaintenanceMode(const bool inc);
+
+        // Records a new slave's id in the GhostSlave map, at handshake time.
+        void registerSlave(const BSONObj& rid, const int memberId);
     private:
         Member* head() const { return _members.head(); }
     public:

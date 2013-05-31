@@ -16,14 +16,16 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "d_concurrency.h"
-#include "../util/alignedbuilder.h"
-#include "../util/mongoutils/str.h"
-#include "../util/file.h"
-#include "mongommf.h"
-#include "durop.h"
-#include "../util/file_allocator.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/durop.h"
+
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/mongommf.h"
+#include "mongo/util/alignedbuilder.h"
+#include "mongo/util/file.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
 

@@ -26,7 +26,7 @@
 #pragma once
 
 namespace mongo {
-    // This is used by both s2cursor and s2nearcursor.
+
     class S2SearchUtil {
     public:
         // Given a coverer, region, and field name, generate a BSONObj that we can pass to a
@@ -36,38 +36,4 @@ namespace mongo {
         static void setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel);
     };
 
-    struct S2IndexingParams {
-        static const double kRadiusOfEarthInMeters;
-
-        // Since we take the cartesian product when we generate keys for an insert,
-        // we need a cap.
-        size_t maxKeysPerInsert;
-        // This is really an advisory parameter that we pass to the cover generator.  The
-        // finest/coarsest index level determine the required # of cells.
-        int maxCellsInCovering;
-        // What's the finest grained level that we'll index?  When we query for a point
-        // we start at that -- we index nothing finer than this.
-        int finestIndexedLevel;
-        // And, what's the coarsest?  When we search in larger coverings we know we
-        // can stop here -- we index nothing coarser than this.
-        int coarsestIndexedLevel;
-
-        double radius;
-
-        string toString() const {
-            stringstream ss;
-            ss << "maxKeysPerInsert: " << maxKeysPerInsert << endl;
-            ss << "maxCellsInCovering: " << maxCellsInCovering << endl;
-            ss << "finestIndexedLevel: " << finestIndexedLevel << endl;
-            ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << endl;
-            return ss.str();
-        }
-
-        void configureCoverer(S2RegionCoverer *coverer) const {
-            coverer->set_min_level(coarsestIndexedLevel);
-            coverer->set_max_level(finestIndexedLevel);
-            // This is advisory; the two above are strict.
-            coverer->set_max_cells(maxCellsInCovering);
-        }
-    };
 }  // namespace mongo

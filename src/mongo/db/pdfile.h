@@ -309,8 +309,6 @@ namespace mongo {
         Record* accessed();
 
         static bool likelyInPhysicalMemory( const char* data );
-        
-        static bool blockCheckSupported();
 
         /**
          * this adds stats about page fault exceptions currently

@@ -271,7 +271,7 @@ namespace mongo {
             return os.str();
         }
 
-        TestAssertion::TestAssertion( const std::string& file, unsigned line )
+        TestAssertion::TestAssertion( const char* file, unsigned line )
             : _file( file ), _line( line ) {
 
             ++Result::cur->_asserts;
@@ -283,8 +283,8 @@ namespace mongo {
             throw TestAssertionFailureException( _file, _line, message );
         }
 
-        ComparisonAssertion::ComparisonAssertion( const std::string& aexp, const std::string& bexp,
-                                                  const std::string& file, unsigned line )
+        ComparisonAssertion::ComparisonAssertion( const char* aexp, const char* bexp,
+                                                  const char* file, unsigned line )
             : TestAssertion( file, line ), _aexp( aexp ), _bexp( bexp ) {}
 
         std::vector<std::string> getAllSuiteNames() {

@@ -16,9 +16,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "mr.h"
+#include "mongo/db/commands/mr.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
@@ -29,7 +29,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/query_optimizer.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/s/d_chunk_manager.h"
 #include "mongo/s/d_logic.h"
@@ -74,8 +74,8 @@ namespace mongo {
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
             verify( s );
-            if ( s->invoke( _func.func() , &_params, &o , 0 , true, false, true ) )
-                throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
+            if (s->invoke(_func.func(), &_params, &o, 0, true))
+                uasserted(9014, str::stream() << "map invoke failed: " << s->getError());
         }
 
         /**
@@ -194,7 +194,7 @@ namespace mongo {
 
             Scope * s = _func.scope();
 
-            s->invokeSafe( _func.func() , &args, 0, 0, false, false, true );
+            s->invokeSafe(_func.func(), &args, 0);
             ++numReduces;
 
             if ( s->type( "__returnValue" ) == Array ) {
@@ -341,7 +341,7 @@ namespace mongo {
                 // copy indexes
                 auto_ptr<DBClientCursor> idx = _db.getIndexes(_config.outputOptions.finalNamespace);
                 while ( idx->more() ) {
-                    BSONObj i = idx->next();
+                    BSONObj i = idx->nextSafe();
 
                     BSONObjBuilder b( i.objsize() + 16 );
                     b.append( "ns" , _config.tempNamespace );
@@ -506,7 +506,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::DBWrite lock( _config.outputOptions.finalNamespace );
-                    BSONObj o = cursor->next();
+                    BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _config.outputOptions.finalNamespace , o );
                     getDur().commitIfNeeded();
                     pm.hit();
@@ -524,7 +524,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock; // TODO(erh) why global?
-                    BSONObj temp = cursor->next();
+                    BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
                     bool found;
@@ -841,7 +841,7 @@ namespace mongo {
 
                 auto_ptr<DBClientCursor> idx = _db.getIndexes( _config.incLong );
                 while ( idx.get() && idx->more() ) {
-                    BSONObj x = idx->next();
+                    BSONObj x = idx->nextSafe();
                     if ( sortKey.woCompare( x["key"].embeddedObject() ) == 0 ) {
                         foundIndex = true;
                         break;

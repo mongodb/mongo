@@ -24,7 +24,7 @@ namespace mongo {
 
     /*
      *  An ActionSet is a bitmask of ActionTypes that represents a set of actions.
-     *  These are the actions that a Privilege can grant a principal to perform on a resource.
+     *  These are the actions that a Privilege can grant a user to perform on a resource.
      */
     class ActionSet {
     public:
@@ -40,6 +40,8 @@ namespace mongo {
         void removeAllActions();
 
         bool empty() const { return _actions.none(); }
+
+        bool equals(const ActionSet& other) const { return this->_actions == other._actions; }
 
         bool contains(const ActionType& action) const;
 
@@ -59,5 +61,9 @@ namespace mongo {
         // bitmask of actions this privilege grants
         std::bitset<ActionType::NUM_ACTION_TYPES> _actions;
     };
+
+    static inline bool operator==(const ActionSet& lhs, const ActionSet& rhs) {
+        return lhs.equals(rhs);
+    }
 
 } // namespace mongo

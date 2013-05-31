@@ -20,7 +20,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/principal_name.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -40,12 +40,12 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(Principal);
 
     public:
-        Principal(const PrincipalName& name,
+        Principal(const UserName& name,
                   const boost::posix_time::ptime& expirationTime);
-        explicit Principal(const PrincipalName& name);
+        explicit Principal(const UserName& name);
         ~Principal();
 
-        const PrincipalName& getName() const { return _name; }
+        const UserName& getName() const { return _name; }
 
         // Returns the expiration time of this principal information.
         // No expiration is represented as boost::posix_time::pos_infin
@@ -61,7 +61,7 @@ namespace mongo {
         void markDatabaseAsProbed(const StringData& dbname);
 
     private:
-        PrincipalName _name;
+        UserName _name;
         boost::posix_time::ptime _expirationTime;
         bool _enableImplicitPrivileges;
         StringMap<bool> _probedDatabases;

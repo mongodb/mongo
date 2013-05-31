@@ -57,6 +57,8 @@ namespace mongo {
         return out.str();
     }
 
+    template <typename T> std::string integerToHex(T val);
+
     inline std::string toHexLower(const void* inRaw, int len) {
         static const char hexchars[] = "0123456789abcdef";
 

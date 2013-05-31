@@ -29,6 +29,7 @@
 #include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/value.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/ramlog.h"
@@ -36,6 +37,9 @@
 namespace mongo {
 
     using namespace bson;
+
+    MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
+    MONGO_FP_DECLARE(rsStopHeartbeatRequest);
 
     extern bool replSetBlind;
 
@@ -46,6 +50,22 @@ namespace mongo {
         if( downSince == 0 )
             return 0; // still waiting on first heartbeat
         return jsTime() - downSince;
+    }
+
+    void HeartbeatInfo::updateFromLastPoll(const HeartbeatInfo& newInfo) {
+        hbstate = newInfo.hbstate;
+        health = newInfo.health;
+        upSince = newInfo.upSince;
+        downSince = newInfo.downSince;
+        lastHeartbeat = newInfo.lastHeartbeat;
+        lastHeartbeatMsg = newInfo.lastHeartbeatMsg;
+        // Note: lastHeartbeatRecv is updated through CmdReplSetHeartbeat::run().
+
+        syncingTo = newInfo.syncingTo;
+        opTime = newInfo.opTime;
+        skew = newInfo.skew;
+        authIssue = newInfo.authIssue;
+        ping = newInfo.ping;
     }
 
     /* { replSetHeartbeat : <setname> } */
@@ -65,6 +85,11 @@ namespace mongo {
                     errmsg = str::stream() << theReplSet->selfFullName() << " is blind";
                 }
                 return false;
+            }
+
+            MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
+                const BSONObj& data = delay.getData();
+                sleepsecs(data["delay"].numberInt());
             }
 
             /* we don't call ReplSetCommand::check() here because heartbeat
@@ -142,7 +167,9 @@ namespace mongo {
             }
 
             // note that we got a heartbeat from this node
-            from->get_hbinfo().recvHeartbeat();
+            theReplSet->mgr->send(boost::bind(&ReplSet::msgUpdateHBRecv,
+                                              theReplSet, from->hbinfo().id(), time(0)));
+
 
             return true;
         }
@@ -157,6 +184,15 @@ namespace mongo {
                           bool checkEmpty) {
         if( replSetBlind ) {
             return false;
+        }
+
+        MONGO_FAIL_POINT_BLOCK(rsStopHeartbeatRequest, member) {
+            const BSONObj& data = member.getData();
+            const std::string& stopMember = data["member"].str();
+
+            if (memberFullName == stopMember) {
+                return false;
+            }
         }
 
         BSONObj cmd = BSON( "replSetHeartbeat" << setName <<
@@ -443,10 +479,6 @@ namespace mongo {
         // Heartbeat timeout
         time_t _timeout;
     };
-
-    void HeartbeatInfo::recvHeartbeat() {
-        lastHeartbeatRecv = time(0);
-    }
 
     int ReplSetHealthPollTask::s_try_offset = 0;
 

@@ -80,13 +80,12 @@ namespace mongo {
     Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
                                  const InitializerContext::EnvironmentMap& env);
 
+    Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp);
+
     /**
      * Same as runGlobalInitializers(), except prints a brief message to std::cerr
      * and terminates the process on failure.
      */
-    void runGlobalInitializersOrDie(const InitializerContext::ArgumentVector& args,
-                                    const InitializerContext::EnvironmentMap& env);
-
     void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp);
 
 }  // namespace mongo

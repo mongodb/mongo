@@ -16,7 +16,7 @@
 
 #include <mongo/pch.h>
 
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {
@@ -36,13 +36,14 @@ namespace mongo {
 
         bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool fromRepl) {
-            AuthorizationManager* authMgr = ClientBasic::getCurrent()->getAuthorizationManager();
+            AuthorizationSession* authSession =
+                    ClientBasic::getCurrent()->getAuthorizationSession();
 
             BSONObjBuilder authInfo(result.subobjStart("authInfo"));
             {
                 BSONArrayBuilder authenticatedUsers(authInfo.subarrayStart("authenticatedUsers"));
 
-                PrincipalSet::NameIterator nameIter = authMgr->getAuthenticatedPrincipalNames();
+                PrincipalSet::NameIterator nameIter = authSession->getAuthenticatedPrincipalNames();
                 for ( ; nameIter.more(); nameIter.next()) {
                     BSONObjBuilder principal(authenticatedUsers.subobjStart());
                     principal.append("user", nameIter->getUser());

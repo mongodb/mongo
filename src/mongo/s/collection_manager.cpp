@@ -17,6 +17,7 @@
 #include "mongo/s/collection_manager.h"
 
 #include "mongo/bson/util/builder.h" // for StringBuilder
+#include "mongo/s/range_arithmetic.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -73,13 +74,6 @@ namespace mongo {
         return manager.release();
     }
 
-    static bool overlap(const ChunkType& chunk,
-                        const BSONObj& l2,
-                        const BSONObj& h2) {
-        return ! ((chunk.getMax().woCompare(l2) <= 0) ||
-                  (h2.woCompare(chunk.getMin()) <= 0));
-    }
-
     CollectionManager* CollectionManager::clonePlus(const ChunkType& chunk,
                                                     const ChunkVersion& newShardVersion,
                                                     string* errMsg) const {
@@ -102,7 +96,7 @@ namespace mongo {
             if (it != _chunksMap.begin()) {
                 --it;
             }
-            if (overlap(chunk, it->first, it->second)) {
+            if (rangeOverlaps(chunk.getMin(), chunk.getMax(), it->first, it->second)) {
                 *errMsg = stream() << "ranges overlap, "
                                    << "requested: " << chunk.getMin()
                                    <<" -> " << chunk.getMax() << " "
@@ -125,10 +119,6 @@ namespace mongo {
         dassert(manager->isValid());
 
         return manager.release();
-    }
-
-    static bool contains(const BSONObj& min, const BSONObj& max, const BSONObj& point) {
-        return point.woCompare(min) >= 0 && point.woCompare(max) < 0;
     }
 
     CollectionManager* CollectionManager::cloneSplit(const ChunkType& chunk,
@@ -164,7 +154,7 @@ namespace mongo {
         for (vector<BSONObj>::const_iterator it = splitKeys.begin();
              it != splitKeys.end();
              ++it) {
-            if (!contains(chunk.getMin(), chunk.getMax(), *it)) {
+            if (!rangeContains(chunk.getMin(), chunk.getMax(), *it)) {
                 *errMsg = stream() << "can split " << chunk.getMin()
                                    << " -> " << chunk.getMax() << " on " << *it;
                 return NULL;
@@ -211,7 +201,7 @@ namespace mongo {
         if (it != _rangesMap.begin())
             it--;
 
-        bool good = contains(it->first, it->second, point);
+        bool good = rangeContains(it->first, it->second, point);
 
         // Logs if in debugging mode and the point doesn't belong here.
         if(dcompare(!good)) {

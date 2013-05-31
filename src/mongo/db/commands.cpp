@@ -30,7 +30,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {
@@ -164,6 +164,11 @@ namespace mongo {
 
     void Command::help( stringstream& help ) const {
         help << "no help defined";
+    }
+
+    std::vector<BSONObj> Command::stopIndexBuilds(const std::string& dbname, 
+                                                  const BSONObj& cmdObj) {
+        return std::vector<BSONObj>();
     }
 
     Command* Command::findCommand( const string& name ) {

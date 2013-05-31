@@ -37,12 +37,13 @@
 
 #ifdef MONGO_SSL
 #include <openssl/ssl.h>
-#include "mongo/util/net/ssl_manager.h"
 #endif
 
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
+
+    class SSLManagerInterface;
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
 
@@ -176,6 +177,9 @@ namespace mongo {
      */
     class Socket : boost::noncopyable {
     public:
+
+        static const int errorPollIntervalSecs;
+
         Socket(int sock, const SockAddr& farEnd);
 
         /** In some cases the timeout will actually be 2x this value - eg we do a partial send,
@@ -210,12 +214,13 @@ namespace mongo {
         long long getBytesOut() const { return _bytesOut; }
         
         void setTimeout( double secs );
+        bool isStillConnected();
 
 #ifdef MONGO_SSL
         /** secures inline */
-        void secure( SSLManager * ssl );
+        void secure( SSLManagerInterface* ssl );
 
-        void secureAccepted( SSLManager * ssl );
+        void secureAccepted( SSLManagerInterface* ssl );
 #endif
         
         /**
@@ -255,10 +260,11 @@ namespace mongo {
 
         long long _bytesIn;
         long long _bytesOut;
+        time_t _lastValidityCheckAtSecs;
 
 #ifdef MONGO_SSL
         SSL* _ssl;
-        SSLManager * _sslAccepted;
+        SSLManagerInterface* _sslManager;
 #endif
         int _logLevel; // passed to log() when logging errors
 

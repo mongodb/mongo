@@ -33,8 +33,9 @@ _ disallow system* manipulations from the database.
 #include <list>
 
 #include "mongo/base/counter.h"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/auth/auth_index_d.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
@@ -44,7 +45,12 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/extsort.h"
+#include "mongo/db/index_legacy.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index_update.h"
+#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
@@ -52,9 +58,10 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/hashtab.h"
@@ -687,7 +694,7 @@ namespace mongo {
         LOG(3) << "_reuse extent was:" << nsDiagnostic.toString() << " now:" << nsname << endl;
         if (magic != extentSignature) {
             StringBuilder sb;
-            sb << "bad extent signature " << toHex(&magic, 4)
+            sb << "bad extent signature " << integerToHex(magic)
                << " for namespace '" << nsDiagnostic.toString()
                << "' found in Extent::_reuse";
             msgasserted(10360, sb.str());
@@ -734,7 +741,7 @@ namespace mongo {
         if (magic != extentSignature) {
             if (errors) {
                 StringBuilder sb;
-                sb << "bad extent signature " << toHex(&magic, 4)
+                sb << "bad extent signature " << integerToHex(magic)
                     << " in extent " << diskLoc.toString();
                 *errors << sb.str();
             }
@@ -1121,7 +1128,7 @@ namespace mongo {
         }
 
         /* check if any cursors point to us.  if so, advance them. */
-        ClientCursor::aboutToDelete(d, dl);
+        ClientCursor::aboutToDelete(ns, d, dl);
 
         unindexRecord(d, todelete, dl, noWarn);
 
@@ -1167,17 +1174,33 @@ namespace mongo {
 
         NamespaceString nsstring(ns);
         if (nsstring.coll == "system.users") {
-            uassertStatusOK(AuthorizationManager::checkValidPrivilegeDocument(nsstring.db, objNew));
+            uassertStatusOK(AuthorizationSession::checkValidPrivilegeDocument(nsstring.db, objNew));
         }
+
+        uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew,
+                objNew["_id"] == objOld["_id"]);
 
         /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
-        vector<IndexChanges> changes;
-        bool changedId = false;
-        getIndexChanges(changes, ns, *d, objNew, objOld, changedId);
-        uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew , ! changedId );
-        dupCheck(changes, *d, dl);
+        OwnedPointerVector<UpdateTicket> updateTickets;
+        updateTickets.mutableVector().resize(d->getTotalIndexCount());
+        for (int i = 0; i < d->getTotalIndexCount(); ++i) {
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, i));
+            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+            InsertDeleteOptions options;
+            options.logIfError = false;
+            options.dupsAllowed = !(KeyPattern::isIdKeyPattern(descriptor->keyPattern())
+                                    || descriptor->unique())
+                                  || ignoreUniqueIndex(descriptor->getOnDisk());
+            updateTickets.mutableVector()[i] = new UpdateTicket();
+            Status ret = iam->validateUpdate(objOld, objNew, dl, options,
+                                             updateTickets.mutableVector()[i]);
+
+            if (Status::OK() != ret) {
+                uasserted(ASSERT_ID_DUPKEY, "Update validation failed: " + ret.toString());
+            }
+        }
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
@@ -1198,45 +1221,18 @@ namespace mongo {
         nsdt->notifyOfWriteOp();
         d->paddingFits();
 
-        /* have any index keys changed? */
-        {
-            int keyUpdates = 0;
-            int z = d->getTotalIndexCount();
-            for ( int x = 0; x < z; x++ ) {
-                IndexDetails& idx = d->idx(x);
-                IndexInterface& ii = idx.idxInterface();
-                for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
-                    try {
-                        bool found = ii.unindex(idx.head, idx, *changes[x].removed[i], dl);
-                        if ( ! found ) {
-                            RARELY warning() << "ns: " << ns << " couldn't unindex key: " << *changes[x].removed[i] 
-                                             << " for doc: " << objOld["_id"] << endl;
-                        }
-                    }
-                    catch (AssertionException&) {
-                        debug.extra << " exception update unindex ";
-                        problem() << " caught assertion update unindex " << idx.indexNamespace() << endl;
-                    }
-                }
-                verify( !dl.isNull() );
-                BSONObj idxKey = idx.info.obj().getObjectField("key");
-                Ordering ordering = Ordering::make(idxKey);
-                keyUpdates += changes[x].added.size();
-                for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
-                    try {
-                        /* we did the dupCheck() above.  so we don't have to worry about it here. */
-                        ii.bt_insert(
-                            idx.head,
-                            dl, *changes[x].added[i], ordering, /*dupsAllowed*/true, idx);
-                    }
-                    catch (AssertionException& e) {
-                        debug.extra << " exception update index ";
-                        problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << " " << objNew["_id"] << endl;
-                    }
-                }
+        debug.keyUpdates = 0;
+
+        for (int i = 0; i < d->getTotalIndexCount(); ++i) {
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, i));
+            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+            int64_t updatedKeys;
+            Status ret = iam->update(*updateTickets.vector()[i], &updatedKeys);
+            if (Status::OK() != ret) {
+                // This shouldn't happen unless something disastrous occurred.
+                massert(16799, "update failed: " + ret.toString(), false);
             }
-            
-            debug.keyUpdates = keyUpdates;
+            debug.keyUpdates += updatedKeys;
         }
 
         //  update in place
@@ -1343,15 +1339,15 @@ namespace mongo {
                 IndexDetails& idx = d->idx(idxNo);
                 if (ignoreUniqueIndex(idx))
                     continue;
-                BSONObjSet keys;
-                idx.getKeysFromObject(obj, keys);
-                BSONObj order = idx.keyPattern();
-                IndexInterface& ii = idx.idxInterface();
-                for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
-                    // WARNING: findSingle may not be compound index safe.  this may need to change.  see notes in 
-                    // findSingle code.
-                    uassert( 12582, "duplicate key insert for unique index of capped collection",
-                             ii.findSingle(idx, idx.head, *i ).isNull() );
+                auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, idxNo));
+                auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+                InsertDeleteOptions options;
+                options.logIfError = false;
+                options.dupsAllowed = false;
+                UpdateTicket ticket;
+                Status ret = iam->validateUpdate(BSONObj(), obj, DiskLoc(), options, &ticket);
+                if (ret != Status::OK()) {
+                    uasserted(12582, "duplicate key insert for unique index of capped collection");
                 }
             }
         }
@@ -1417,7 +1413,7 @@ namespace mongo {
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
                     BSONObj t( reinterpret_cast<const char *>( obuf ) );
-                    uassertStatusOK(AuthorizationManager::checkValidPrivilegeDocument(
+                    uassertStatusOK(AuthorizationSession::checkValidPrivilegeDocument(
                                             nsToDatabaseSubstring(ns), t));
                 }
             }
@@ -1456,14 +1452,6 @@ namespace mongo {
                 NamespaceString(tabletoidxns).coll != "system.indexes");
 
         BSONObj info = loc.obj();
-        bool background = info["background"].trueValue();
-        if (background && !isMasterNs(tabletoidxns.c_str())) {
-            /* don't do background indexing on slaves.  there are nuances.  this could be added later
-                but requires more code.
-                */
-            log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
-            background = false;
-        }
 
         // The total number of indexes right before we write to the collection
         int oldNIndexes = -1;
@@ -1485,7 +1473,7 @@ namespace mongo {
 
             try {
                 getDur().writingInt(tableToIndex->indexBuildsInProgress) += 1;
-                buildAnIndex(tabletoidxns, tableToIndex, idx, background, mayInterrupt);
+                buildAnIndex(tabletoidxns, tableToIndex, idx, mayInterrupt);
             }
             catch (DBException& e) {
                 // save our error msg string as an exception or dropIndexes will overwrite our message
@@ -1514,7 +1502,6 @@ namespace mongo {
             // Recompute index numbers
             tableToIndex = nsdetails(tabletoidxns);
             idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
-            verify(idxNo > -1);
 
             // Make sure the newly created index is relocated to nIndexes, if it isn't already there
             if (idxNo != tableToIndex->nIndexes) {
@@ -1545,12 +1532,7 @@ namespace mongo {
             tableToIndex->addIndex(tabletoidxns.c_str());
             getDur().writingInt(tableToIndex->indexBuildsInProgress) -= 1;
 
-            IndexType* indexType = idx.getSpec().getType();
-            const IndexPlugin *plugin = indexType ? indexType->getPlugin() : NULL;
-            if (plugin) {
-                plugin->postBuildHook( idx.getSpec() );
-            }
-
+            IndexLegacy::postBuildHook(tableToIndex, idx);
         }
         catch (...) {
             // Generally, this will be called as an exception from building the index bubbles up.
@@ -1584,8 +1566,7 @@ namespace mongo {
                 return i;
             }
         }
-
-        return -1;
+        msgasserted(16574, "could not find index being built");
     }
 
     void IndexBuildsInProgress::remove(const char* ns, int offset) {
@@ -1685,45 +1666,13 @@ namespace mongo {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 
-        bool earlyIndex = true;
-        DiskLoc loc;
-        if( idToInsert.needed() || tableToIndex || d->isCapped() ) {
-            // if need id, we don't do the early indexing. this is not the common case so that is sort of ok
-            earlyIndex = false;
-            loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
-        }
-        else {
-            loc = d->allocWillBeAt(ns, lenWHdr);
-            if( loc.isNull() ) {
-                // need to get a new extent so we have to do the true alloc now (not common case)
-                earlyIndex = false;
-                loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
-            }
-        }
+        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
+
         if ( loc.isNull() ) {
-            log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->isCapped() << endl;
+            log() << "insert: couldn't alloc space for object ns:" << ns
+                  << " capped:" << d->isCapped() << endl;
             verify(d->isCapped());
             return DiskLoc();
-        }
-
-        if( earlyIndex ) { 
-            // add record to indexes using two step method so we can do the reading outside a write lock
-            if ( d->nIndexes ) {
-                verify( obuf );
-                BSONObj obj((const char *) obuf);
-                try {
-                    indexRecordUsingTwoSteps(ns, d, obj, loc, true);
-                }
-                catch( AssertionException& ) {
-                    // should be a dup key error on _id index
-                    dassert( !tableToIndex && !d->isCapped() );
-                    // no need to delete/rollback the record as it was not added yet
-                    throw;
-                }
-            }
-            // really allocate now
-            DiskLoc real = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
-            verify( real == loc );
         }
 
         Record *r = loc.rec();
@@ -1761,16 +1710,11 @@ namespace mongo {
         }
 
         /* add this record to our indexes */
-        if ( !earlyIndex && d->nIndexes ) {
+        if (d->nIndexes) {
             try {
                 BSONObj obj(r->data());
-                // not sure which of these is better -- either can be used.  oldIndexRecord may be faster, 
-                // but twosteps handles dup key errors more efficiently.
-                //oldIndexRecord(d, obj, loc);
-                indexRecordUsingTwoSteps(ns, d, obj, loc, false);
-
-            }
-            catch( AssertionException& e ) {
+                indexRecord(ns, d, obj, loc);
+            } catch( AssertionException& e ) {
                 // should be a dup key error on _id index
                 if( tableToIndex || d->isCapped() ) {
                     massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );

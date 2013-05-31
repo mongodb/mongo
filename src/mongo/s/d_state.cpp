@@ -22,7 +22,8 @@
    mostly around shard management and checking
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -33,7 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/db.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/client/connpool.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"

@@ -846,6 +846,16 @@ namespace JsobjTests {
                 ASSERT_EQUALS( 2 , o.getFieldDotted( "b.a" ).numberInt() );
                 ASSERT_EQUALS( 3 , o.getFieldDotted( "c.0.a" ).numberInt() );
                 ASSERT_EQUALS( 4 , o.getFieldDotted( "c.1.a" ).numberInt() );
+                ASSERT( o.getFieldDotted( "x" ).eoo() );
+                ASSERT( o.getFieldDotted( "a.x" ).eoo() );
+                ASSERT( o.getFieldDotted( "x.y" ).eoo() );
+                ASSERT( o.getFieldDotted( "" ).eoo() );
+                ASSERT( o.getFieldDotted( "." ).eoo() );
+                ASSERT( o.getFieldDotted( ".." ).eoo() );
+                ASSERT( o.getFieldDotted( "..." ).eoo() );
+                ASSERT( o.getFieldDotted( "a." ).eoo() );
+                ASSERT( o.getFieldDotted( ".a" ).eoo() );
+                ASSERT( o.getFieldDotted( "b.a." ).eoo() );
                 keyTest(o);
             }
         };
@@ -2064,6 +2074,27 @@ namespace JsobjTests {
         }
     };
 
+    class NestedBuilderOversize {
+    public:
+        void run() {
+            try {
+                BSONObjBuilder outer;
+                BSONObjBuilder inner(outer.subobjStart("inner"));
+
+                string bigStr(1000, 'x');
+                while (true) {
+                    ASSERT_LESS_THAN_OR_EQUALS(inner.len(), BufferMaxSize);
+                    inner.append("", bigStr);
+                }
+
+                ASSERT(!"Expected Throw");
+            } catch (const DBException& e) {
+                if (e.getCode() != 13548) // we expect the code for oversized buffer
+                    throw;
+            }
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ) {
@@ -2165,6 +2196,7 @@ namespace JsobjTests {
             add< BSONForEachTest >();
             add< CompareOps >();
             add< HashingTest >();
+            add< NestedBuilderOversize >();
         }
     } myall;
 

@@ -114,6 +114,10 @@ namespace mongo {
             strcpy(host, "127.0.0.1");
         }
 
+        // only allow function template to be used by a constructor
+        if (args.This()->Equals(scope->getGlobal()))
+            return v8::Undefined();
+
         string errmsg;
         ConnectionString cs = ConnectionString::parse(host, errmsg);
         if (!cs.isValid()) {
@@ -140,6 +144,10 @@ namespace mongo {
 
     v8::Handle<v8::Value> mongoConsLocal(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 0, "local Mongo constructor takes no args")
+
+        // only allow function template to be used by a constructor
+        if (args.This()->Equals(scope->getGlobal()))
+            return v8::Undefined();
 
         DBClientBase* conn = createDirectClient();
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
@@ -303,8 +311,8 @@ namespace mongo {
             break;
         case 3:
             params = BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                          saslCommandPrincipalSourceFieldName << toSTLString(args[0]) <<
-                          saslCommandPrincipalFieldName << toSTLString(args[1]) <<
+                          saslCommandUserSourceFieldName << toSTLString(args[0]) <<
+                          saslCommandUserFieldName << toSTLString(args[1]) <<
                           saslCommandPasswordFieldName << toSTLString(args[2]));
             break;
         default:
@@ -701,13 +709,13 @@ namespace mongo {
     static v8::Handle<v8::Value> hexToBinData(V8Scope* scope, v8::Local<v8::Object> it, int type,
                                               string hexstr) {
         int len = hexstr.length() / 2;
-        scoped_array<char> data(new char[16]);
+        scoped_array<char> data(new char[len]);
         const char* src = hexstr.c_str();
-        for(int i = 0; i < 16; i++) {
+        for(int i = 0; i < len; i++) {
             data[i] = fromHex(src + i * 2);
         }
 
-        string encoded = base64::encode(data.get(), 16);
+        string encoded = base64::encode(data.get(), len);
         it->ForceSet(v8::String::New("len"), v8::Number::New(len));
         it->ForceSet(v8::String::New("type"), v8::Number::New(type));
         it->SetHiddenValue(v8::String::New("__BinData"), v8::Number::New(1));

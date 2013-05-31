@@ -147,6 +147,12 @@
     <Filter Include="JavaScript source files\Included in shell only">
       <UniqueIdentifier>{48b6c0d6-f99d-4bce-b5f8-07d514b08ad1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\matcher">
+      <UniqueIdentifier>{fa857944-2697-49bd-8828-08fde8c359d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\index">
+      <UniqueIdentifier>{0459ebf5-2166-4cf8-8c8c-bd62aaa1ba75}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -621,9 +627,6 @@
     <ClCompile Include="..\db\dbwebserver.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\indexkey.cpp">
-      <Filter>db\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\jsobj.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
@@ -861,9 +864,6 @@
     <ClCompile Include="..\db\auth\privilege_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\auth\auth_external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="field_parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -888,12 +888,6 @@
     <ClCompile Include="..\db\server_parameters.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\auth\auth_external_state_s.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\auth_external_state_server_common.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="collection_manager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -913,15 +907,6 @@
       <Filter>db\geo</Filter>
     </ClCompile>
     <ClCompile Include="..\db\geo\s2common.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2cursor.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2index.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\s2nearcursor.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
     <ClCompile Include="..\util\exception_filter_win32.cpp">
@@ -962,9 +947,6 @@
     </ClCompile>
     <ClCompile Include="type_tags.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\geo\2d.cpp">
-      <Filter>db\geo</Filter>
     </ClCompile>
     <ClCompile Include="..\db\geo\geonear.cpp">
       <Filter>db\geo</Filter>
@@ -1119,9 +1101,6 @@
     <ClCompile Include="..\db\fts\fts_enabled.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\fts\fts_index.cpp">
-      <Filter>db\fts</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\fts\fts_index_format.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
@@ -1238,6 +1217,186 @@
     </ClCompile>
     <ClCompile Include="..\platform\random_test.cpp">
       <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="range_arithmetic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="range_arithmetic_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_names.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\field_ref.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_array.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_array_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_leaf.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_leaf_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_array_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_leaf_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_tree.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_tree_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_tree.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_tree_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\match_details.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\matcher.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index\btree_key_generator.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_parser_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\expression_where.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\matchable.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\action_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\user_name.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\principal_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\privilege_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\configuration_variable_manager_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\counter_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_dependency_graph_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\owned_pointer_map_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\owned_pointer_vector_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\parse_number_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\status_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\string_data_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_field_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_obj_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_validate_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_session_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_session_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_session_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_session_external_state_server_common.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authorization_session.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authorization_session_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\role_graph.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\role_graph_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\role_name.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\user.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\hex.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\path_internal.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_global_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_global_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_global_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\path.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher\path_test.cpp">
+      <Filter>db\matcher</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1761,9 +1920,6 @@
     <ClInclude Include="..\db\auth\privilege_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\auth\auth_external_state.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="field_parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1935,17 +2091,11 @@
     <ClInclude Include="..\db\server_parameters_inline.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\auth\auth_external_state_s.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="collection_manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="metadata_loader.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\auth_external_state_server_common.h">
-      <Filter>db\auth</Filter>
     </ClInclude>
     <ClInclude Include="..\db\commands\find_and_modify.h">
       <Filter>db\commands</Filter>
@@ -1962,12 +2112,6 @@
     <ClInclude Include="..\db\geo\s2common.h">
       <Filter>db\geo</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\geo\s2cursor.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\s2nearcursor.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\exception_filter_win32.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -1977,7 +2121,7 @@
     <ClInclude Include="..\base\string_data-inl.h">
       <Filter>base</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\auth\principal_name.h">
+    <ClInclude Include="..\db\auth\user_name.h">
       <Filter>db\auth</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\bench.h">
@@ -2025,13 +2169,7 @@
     <ClInclude Include="type_tags.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\geo\2d.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\geo\geoparser.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\geo\s2index.h">
       <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\third_party\s2\hash.h">
@@ -2277,9 +2415,6 @@
     <ClInclude Include="..\db\fts\fts_enabled.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\fts\fts_index.h">
-      <Filter>db\fts</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\fts\fts_index_format.h">
       <Filter>db\fts</Filter>
     </ClInclude>
@@ -2372,6 +2507,100 @@
     </ClInclude>
     <ClInclude Include="..\platform\hash_namespace.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="range_arithmetic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\sequence_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\server.h" />
+    <ClInclude Include="..\base\status_with.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_names.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\field_ref.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_array.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_leaf.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_parser.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_tree.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\match_details.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\matcher.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index\btree_key_generator.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\expression_geo.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\safe_num-inl.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\matchable.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\status-inl.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_session_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_session_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_session_external_state_mock.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_session_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_session_external_state_server_common.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authorization_session.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\role_graph.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\role_name.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\user.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\path_internal.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_global_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_global_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_global_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\matcher\path.h">
+      <Filter>db\matcher</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -2491,6 +2720,12 @@
     </None>
     <None Include="..\platform\SConscript">
       <Filter>platform</Filter>
+    </None>
+    <None Include="..\db\auth\SConscript">
+      <Filter>db\auth</Filter>
+    </None>
+    <None Include="..\base\SConscript">
+      <Filter>base</Filter>
     </None>
   </ItemGroup>
 </Project>

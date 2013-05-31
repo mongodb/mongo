@@ -527,8 +527,8 @@ namespace mongo {
             // Find collections with no epochs
             BSONObj emptyDoc =
                     conn->findOne(CollectionType::ConfigNS + workingSuffix,
-                                  BSON("$unset" <<
-                                       BSON(CollectionType::DEPRECATED_lastmodEpoch() << 1)));
+                                  BSON(CollectionType::DEPRECATED_lastmodEpoch() <<
+                                       BSON("$exists" << false)));
 
             if (!emptyDoc.isEmpty()) {
 
@@ -555,7 +555,7 @@ namespace mongo {
             // Find chunks with no epochs
             emptyDoc =
                     conn->findOne(ChunkType::ConfigNS + workingSuffix,
-                                  BSON("$unset" << BSON(ChunkType::DEPRECATED_epoch() << 1)));
+                                  BSON(ChunkType::DEPRECATED_epoch() << BSON("$exists" << false)));
 
             if (!emptyDoc.isEmpty()) {
 

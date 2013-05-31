@@ -80,6 +80,12 @@ namespace mongo {
             return _pattern.isPrefixOf( other.toBSON() );
         }
 
+        /**
+         * Is the provided key pattern the index over the ID field?
+         * The always required ID index is always {_id: 1} or {_id: -1}.
+         */
+        static bool isIdKeyPattern(const BSONObj& pattern);
+
         /* Takes a BSONObj whose field names are a prefix of the fields in this keyPattern, and
          * outputs a new bound with MinKey values appended to match the fields in this keyPattern
          * (or MaxKey values for descending -1 fields). This is useful in sharding for

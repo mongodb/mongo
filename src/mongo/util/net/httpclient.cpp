@@ -15,13 +15,16 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "httpclient.h"
-#include "sock.h"
-#include "message.h"
-#include "message_port.h"
-#include "../mongoutils/str.h"
-#include "../../bson/util/builder.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/net/httpclient.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/message_port.h"
+#include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 
@@ -102,10 +105,8 @@ namespace mongo {
         
         if ( ssl ) {
 #ifdef MONGO_SSL
-            const SSLParams params(cmdLine.sslPEMKeyFile, 
-                                   cmdLine.sslPEMKeyPassword);
-            // never deleted
-            SSLManager* mgr = new SSLManager(params);
+            // pointer to global singleton instance
+            SSLManagerInterface* mgr = getSSLManager();
 
             sock.secure(mgr);
 #else

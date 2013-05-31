@@ -1,14 +1,19 @@
 t = db.geo_s2index
 t.drop()
 
+// We internally drop adjacent duplicate points in lines.
+someline = { "type" : "LineString", "coordinates": [ [40,5], [40,5], [ 40, 5], [41, 6], [41,6]]}
+t.insert( {geo : someline , nonGeo: "someline"})
+t.ensureIndex({geo: "2dsphere"})
+foo = t.find({geo: {$geoIntersects: {$geometry: {type: "Point", coordinates: [40,5]}}}}).next();
+assert.eq(foo.geo, someline);
+t.dropIndex({geo: "2dsphere"})
+
 pointA = { "type" : "Point", "coordinates": [ 40, 5 ] }
 t.insert( {geo : pointA , nonGeo: "pointA"})
 
 pointD = { "type" : "Point", "coordinates": [ 41.001, 6.001 ] }
 t.insert( {geo : pointD , nonGeo: "pointD"})
-
-someline = { "type" : "LineString", "coordinates": [ [ 40, 5], [41, 6]]}
-t.insert( {geo : someline , nonGeo: "someline"})
 
 pointB = { "type" : "Point", "coordinates": [ 41, 6 ] }
 t.insert( {geo : pointB , nonGeo: "pointB"})

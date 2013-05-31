@@ -19,25 +19,29 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/dbwebserver.h"
+
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <pcrecpp.h>
+
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/privilege.h"
-#include "../util/net/miniwebserver.h"
-#include "../util/mongoutils/html.h"
-#include "../util/md5.hpp"
-#include "db.h"
-#include "instance.h"
-#include "stats/snapshots.h"
-#include "background.h"
-#include "commands.h"
-#include "../util/version.h"
-#include "../util/ramlog.h"
-#include "pcrecpp.h"
-#include "../util/admin_access.h"
-#include "dbwebserver.h"
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include "mongo/db/background.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/db.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/stats/snapshots.h"
+#include "mongo/util/admin_access.h"
+#include "mongo/util/md5.hpp"
+#include "mongo/util/mongoutils/html.h"
+#include "mongo/util/net/miniwebserver.h"
+#include "mongo/util/ramlog.h"
+#include "mongo/util/version.h"
+
+
 
 namespace mongo {
 
@@ -74,13 +78,13 @@ namespace mongo {
         }
 
         void _authorizePrincipal(const std::string& principalName, bool readOnly) {
-            Principal* principal = new Principal(PrincipalName(principalName, "local"));
-            ActionSet actions = AuthorizationManager::getActionsForOldStyleUser(
+            Principal* principal = new Principal(UserName(principalName, "local"));
+            ActionSet actions = AuthorizationSession::getActionsForOldStyleUser(
                     "admin", readOnly);
 
-            AuthorizationManager* authorizationManager = cc().getAuthorizationManager();
-            authorizationManager->addAuthorizedPrincipal(principal);
-            Status status = authorizationManager->acquirePrivilege(
+            AuthorizationSession* authorizationSession = cc().getAuthorizationSession();
+            authorizationSession->addAuthorizedPrincipal(principal);
+            Status status = authorizationSession->acquirePrivilege(
                     Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal->getName());
             verify (status == Status::OK());
         }

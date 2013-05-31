@@ -42,7 +42,7 @@ function assertResults( expectedResults, matchSpec ) {
 }
 
 // Invalid matcher syntax.
-assertError( 10073, { a:{ $mod:[ 0 /* invalid */, 0 ] } } );
+assertError( 16810, { a:{ $mod:[ 0 /* invalid */, 0 ] } } );
 
 // $where not allowed.
 assertError( 16395, { $where:'true' } );

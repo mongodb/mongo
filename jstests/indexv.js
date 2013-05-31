@@ -7,7 +7,7 @@ t.ensureIndex( {'a.b':1} );
 
 t.save( {a:[{},{b:1}]} );
 var e = t.find( {'a.b':null} ).explain();
-assert.eq( 0, e.n );
+assert.eq( 1, e.n );
 assert.eq( 1, e.nscanned );
 
 t.drop();

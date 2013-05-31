@@ -29,7 +29,6 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile_version.h"
-//#include "mongo/scripting/engine.h"
 #include "mongo/util/file.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
@@ -47,7 +46,7 @@ namespace mongo {
      *      1.2.3-rc4-pre-
      * If you really need to do something else you'll need to fix _versionArray()
      */
-    const char versionString[] = "2.5.0-pre-";
+    const char versionString[] = "2.5.1-pre-";
 
     // See unit test for example outputs
     BSONArray toVersionArray(const char* version){

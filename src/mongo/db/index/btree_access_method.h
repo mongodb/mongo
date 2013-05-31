@@ -27,13 +27,21 @@
 
 namespace mongo {
 
+    class BtreeInterface;
     class IndexCursor;
     class IndexDescriptor;
 
-    template <class Key> class BtreeAccessMethod : public BtreeBasedAccessMethod<Key> {
+    /**
+     * The IndexAccessMethod for a Btree index.
+     * Any index created with {field: 1} or {field: -1} uses this.
+     */
+    class BtreeAccessMethod : public BtreeBasedAccessMethod {
     public:
-        using BtreeBasedAccessMethod<Key>::_descriptor;
-        using BtreeBasedAccessMethod<Key>::_ordering;
+        // Every Btree-based index needs these.  We put them in the BtreeBasedAccessMethod
+        // superclass and subclasses (like this) can use them.
+        using BtreeBasedAccessMethod::_descriptor;
+        using BtreeBasedAccessMethod::_interface;
+        using BtreeBasedAccessMethod::_ordering;
 
         BtreeAccessMethod(IndexDescriptor* descriptor);
         virtual ~BtreeAccessMethod() { }

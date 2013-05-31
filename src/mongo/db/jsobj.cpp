@@ -17,7 +17,8 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
 #include "mongo/db/jsobj.h"
 
 #include <limits>
@@ -31,15 +32,14 @@
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/platform/float_utils.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
-
 
 // make sure our assumptions are valid
 BOOST_STATIC_ASSERT( sizeof(short) == 2 );
@@ -742,14 +742,15 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONElement BSONObj::getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const {
+    BSONElement BSONObj::getFieldUsingIndexNames(const StringData& fieldName,
+                                                 const BSONObj &indexKey) const {
         BSONObjIterator i( indexKey );
         int j = 0;
         while( i.moreWithEOO() ) {
             BSONElement f = i.next();
             if ( f.eoo() )
                 return BSONElement();
-            if ( strcmp( f.fieldName(), fieldName ) == 0 )
+            if ( f.fieldName() == fieldName )
                 break;
             ++j;
         }
@@ -891,6 +892,13 @@ namespace mongo {
                     strcmp( name , "$ref" ) == 0 ||
                     strcmp( name , "$id" ) == 0
                     ;
+            }
+
+            // check no regexp for _id (SERVER-9502)
+            if (mongoutils::str::equals(e.fieldName(), "_id")) {
+                if (e.type() == RegEx) {
+                    return false;
+                }
             }
 
             if ( e.mayEncapsulate() ) {

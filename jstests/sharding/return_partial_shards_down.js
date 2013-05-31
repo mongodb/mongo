@@ -7,6 +7,9 @@ var st = new ShardingTest({shards : 3,
                            other : {mongosOptions : {verbose : 2},
                                     separateConfig : true}});
 
+// Stop balancer, we're doing our own manual chunk distribution
+st.stopBalancer();
+
 var mongos = st.s;
 var config = mongos.getDB("config");
 var admin = mongos.getDB("admin");

@@ -31,6 +31,7 @@
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/net/ssl_manager.h"
 
 #ifdef MONGO_SSL
 // TODO: Remove references to cmdline from the client.
@@ -547,11 +548,11 @@ namespace mongo {
         if (mechanism == StringData("MONGODB-CR", StringData::LiteralTag())) {
             std::string userSource;
             uassertStatusOK(bsonExtractStringField(params,
-                                                   saslCommandPrincipalSourceFieldName,
+                                                   saslCommandUserSourceFieldName,
                                                    &userSource));
             std::string user;
             uassertStatusOK(bsonExtractStringField(params,
-                                                   saslCommandPrincipalFieldName,
+                                                   saslCommandUserFieldName,
                                                    &user));
             std::string password;
             uassertStatusOK(bsonExtractStringField(params,
@@ -568,7 +569,7 @@ namespace mongo {
                     _authMongoCR(userSource, user, password, errmsg, digestPassword));
         }
         else if (saslClientAuthenticate != NULL) {
-            uassertStatusOK(saslClientAuthenticate(this, params, NULL));
+            uassertStatusOK(saslClientAuthenticate(this, params));
         }
         else {
             uasserted(ErrorCodes::BadValue,
@@ -587,8 +588,8 @@ namespace mongo {
                                     bool digestPassword) {
         try {
             _auth(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                       saslCommandPrincipalSourceFieldName << dbname <<
-                       saslCommandPrincipalFieldName << username <<
+                       saslCommandUserSourceFieldName << dbname <<
+                       saslCommandUserFieldName << username <<
                        saslCommandPasswordFieldName << password_text <<
                        saslCommandDigestPasswordFieldName << digestPassword));
             return true;
@@ -778,7 +779,6 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::exists( const string& ns ) {
-        list<string> names;
 
         string db = nsGetDB( ns ) + ".system.namespaces";
         BSONObj q = BSON( "name" << ns );
@@ -793,7 +793,7 @@ namespace mongo {
             /* note we remember the auth info before we attempt to auth -- if the connection is broken, we will
                then have it for the next autoreconnect attempt.
             */
-            authCache[params[saslCommandPrincipalSourceFieldName].str()] = params.getOwned();
+            authCache[params[saslCommandUserSourceFieldName].str()] = params.getOwned();
         }
 
         DBClientBase::_auth(params);
@@ -869,6 +869,10 @@ namespace mongo {
         return true;
     }
 
+    void DBClientConnection::logout(const string& dbname, BSONObj& info){
+        authCache.erase(dbname);
+        runCommand(dbname, BSON("logout" << 1), info);
+    }
 
     inline bool DBClientConnection::runCommand(const string &dbname,
                                                const BSONObj& cmd,
@@ -914,8 +918,8 @@ namespace mongo {
                 if (ex.getCode() != ErrorCodes::AuthenticationFailed)
                     throw;
                 LOG(_logLevel) << "reconnect: auth failed db:" <<
-                    i->second[saslCommandPrincipalSourceFieldName] <<
-                    " user:" << i->second[saslCommandPrincipalFieldName] << ' ' <<
+                    i->second[saslCommandUserSourceFieldName] <<
+                    " user:" << i->second[saslCommandUserFieldName] << ' ' <<
                     ex.what() << std::endl;
             }
         }
@@ -1392,21 +1396,14 @@ namespace mongo {
 
 #ifdef MONGO_SSL
     static SimpleMutex s_mtx("SSLManager");
-    static SSLManager* s_sslMgr(NULL);
+    static SSLManagerInterface* s_sslMgr(NULL);
 
-    SSLManager* DBClientConnection::sslManager() {
+    SSLManagerInterface* DBClientConnection::sslManager() {
         SimpleMutex::scoped_lock lk(s_mtx);
         if (s_sslMgr) 
             return s_sslMgr;
-        const SSLParams params(cmdLine.sslPEMKeyFile, 
-                               cmdLine.sslPEMKeyPassword,
-                               cmdLine.sslCAFile,
-                               cmdLine.sslCRLFile,
-                               cmdLine.sslWeakCertificateValidation,
-                               cmdLine.sslFIPSMode);
-        s_sslMgr = new SSLManager(params);
+        s_sslMgr = getSSLManager();
         
-
         return s_sslMgr;
     }
 #endif

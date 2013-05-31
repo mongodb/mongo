@@ -66,7 +66,7 @@ namespace mongo {
          * Returns a copy of the full dotted field in its current state (i.e., some parts may
          * have been replaced since the parse() call).
          */
-        std::string dottedField() const;
+        std::string dottedField( size_t offset = 0 ) const;
 
         /**
          * Resets the internal state. See note in parse() call.
@@ -87,6 +87,11 @@ namespace mongo {
          * fields several times only counts for 1.
          */
         size_t numReplaced() const;
+
+        /**
+         * compares the full dotted path represented by this FieldRef to other
+         */
+        bool equalsDottedField( const StringData& other ) const;
 
     private:
         // Dotted fields are most often not longer than three parts. We use a mixed structure

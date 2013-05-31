@@ -40,7 +40,7 @@ def readErrorCodes( callback, replaceZero = False ):
            re.compile( "((fassertFailed)()) *\(( *)(\d+)" )
            ]
 
-    bad = [ re.compile( "\sassert *\(" ) ]
+    bad = [ re.compile( "^\s*assert *\(" ) ]
     
     for x in utils.getAllSourceFiles():
         

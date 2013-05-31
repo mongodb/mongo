@@ -163,9 +163,6 @@
     <ClCompile Include="commands\distinct.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="geo\2d.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\accumulator.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
@@ -626,9 +623,6 @@
     <ClCompile Include="index.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
-    <ClCompile Include="indexkey.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="instance.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -851,9 +845,6 @@
     <ClCompile Include="..\util\touch_pages.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="hashindex.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="hasher.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -974,12 +965,6 @@
     <ClCompile Include="auth\authorization_manager.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="geo\s2cursor.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="geo\s2index.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="commands\fail_point_cmd.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
@@ -998,9 +983,6 @@
     <ClCompile Include="auth\privilege_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="auth\auth_external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\field_parser.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -1011,9 +993,6 @@
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="geo\s2common.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
-    <ClCompile Include="geo\s2nearcursor.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
     <ClCompile Include="..\s\type_chunk.cpp">
@@ -1036,12 +1015,6 @@
     </ClCompile>
     <ClCompile Include="server_parameters.cpp">
       <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\auth_external_state_d.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\auth_external_state_server_common.cpp">
-      <Filter>db\auth</Filter>
     </ClCompile>
     <ClCompile Include="..\s\collection_manager.cpp">
       <Filter>s</Filter>
@@ -1349,9 +1322,6 @@
     <ClCompile Include="fts\fts_enabled.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
-    <ClCompile Include="fts\fts_index.cpp">
-      <Filter>db\fts</Filter>
-    </ClCompile>
     <ClCompile Include="fts\fts_index_format.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
@@ -1526,9 +1496,389 @@
     <ClCompile Include="index\btree_key_generator.cpp">
       <Filter>db\index</Filter>
     </ClCompile>
+    <ClCompile Include="index\btree_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\btree_interface.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\hash_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\hash_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index_builder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="index\s2_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\s2_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\s2_near_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\s2_simple_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\path_support.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="index\fts_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\haystack_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_arithmetic.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\range_arithmetic_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="index\2d_access_method.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\2d_index_cursor.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index\btree_based_builder.cpp">
+      <Filter>db\index</Filter>
+    </ClCompile>
+    <ClCompile Include="index_names.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="index_selection.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="index_set_test.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_array.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_array_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_leaf.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_leaf_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_array_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_leaf_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_tree.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_tree_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_tree.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_tree_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="query_runner.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\match_details.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\matcher.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="index_legacy.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\field_checker.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\field_checker_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\path_support_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_geo.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_parser_geo_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\expression_where.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_set.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_set_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_unset.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_unset_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher_old.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_bit.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_bit_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\matchable.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\action_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\user_name.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\principal_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\configuration_variable_manager_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\counter_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_dependency_graph_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\owned_pointer_map_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\owned_pointer_vector_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\parse_number_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\status_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\string_data_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_field_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_obj_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_validate_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="range_deleter.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="range_deleter_test.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="range_deleter_mock_env.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="range_deleter_stat_test.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="range_deleter_stats.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_session_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_session_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_session_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_session_external_state_server_common.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authorization_session.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authorization_session_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\role_graph_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\role_name.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="range_deleter_db_env.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="range_deleter_service.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_add_to_set.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_add_to_set_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pull.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pull_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_push.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_push_sorter_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_push_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\user.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pop.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pop_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pull_all.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_pull_all_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\hex.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\path_internal.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_global_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_global_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_global_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\path.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="matcher\path_test.cpp">
+      <Filter>db\matcher</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_object_replace.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_object_replace_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_table.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_table_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\update_driver.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\update_driver_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_inc.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_inc_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\descriptive_stats_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\lame_stacktrace_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\md5_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\mmap_mm.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\mmap_posix.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\ntservice_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_darwin.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_freebsd.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_linux2.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_none.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\systeminfo_linux2.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\systeminfo_none.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\text_startuptest.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\third_party\snappy\config.h">
       <Filter>third_party\snappy</Filter>
     </ClInclude>
@@ -1947,12 +2297,6 @@
     <ClInclude Include="index.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="index_insertion_continuation.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="indexkey.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="instance.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
@@ -2184,9 +2528,6 @@
     <ClInclude Include="..\util\touch_pages.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="hashindex.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="hasher.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
@@ -2400,9 +2741,6 @@
     <ClInclude Include="geo\s2common.h">
       <Filter>db\geo</Filter>
     </ClInclude>
-    <ClInclude Include="geo\s2cursor.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\fail_point_service.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -2413,9 +2751,6 @@
       <Filter>db\auth</Filter>
     </ClInclude>
     <ClInclude Include="auth\privilege_set.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_external_state.h">
       <Filter>db\auth</Filter>
     </ClInclude>
     <ClInclude Include="..\s\field_parser.h">
@@ -2435,9 +2770,6 @@
     </ClInclude>
     <ClInclude Include="index_rebuilder.h">
       <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="geo\s2nearcursor.h">
-      <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\util\string_map.h">
       <Filter>util\Header Files</Filter>
@@ -2538,12 +2870,6 @@
     <ClInclude Include="server_parameters_inline.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="auth\auth_external_state_d.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_external_state_server_common.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="..\s\collection_manager.h">
       <Filter>s</Filter>
     </ClInclude>
@@ -2562,19 +2888,13 @@
     <ClInclude Include="..\base\owned_pointer_map.h">
       <Filter>base</Filter>
     </ClInclude>
-    <ClInclude Include="auth\principal_name.h">
+    <ClInclude Include="auth\user_name.h">
       <Filter>db\auth</Filter>
     </ClInclude>
     <ClInclude Include="sort_phase_one.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="geo\2d.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
     <ClInclude Include="geo\geoparser.h">
-      <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="geo\s2index.h">
       <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="..\s\type_locks.h">
@@ -2847,9 +3167,6 @@
     <ClInclude Include="record.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="replutil.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="restapi.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -2970,9 +3287,6 @@
     <ClInclude Include="fts\fts_enabled.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="fts\fts_index.h">
-      <Filter>db\fts</Filter>
-    </ClInclude>
     <ClInclude Include="fts\fts_index_format.h">
       <Filter>db\fts</Filter>
     </ClInclude>
@@ -3002,9 +3316,6 @@
     </ClInclude>
     <ClInclude Include="fts\stop_words_list.h">
       <Filter>db\fts</Filter>
-    </ClInclude>
-    <ClInclude Include="ops\modifier_base.h">
-      <Filter>db\ops</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\engine_spidermonkey_internal.h">
       <Filter>scripting</Filter>
@@ -3134,6 +3445,226 @@
     </ClInclude>
     <ClInclude Include="index\index_descriptor.h">
       <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\btree_interface.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\emulated_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\hash_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\hash_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index_builder.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_common.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_near_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\s2_simple_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\path_support.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="index\fts_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\haystack_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\haystack_access_method_internal.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\is_master.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\range_arithmetic.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="index\2d_access_method.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\2d_common.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\2d_index_cursor.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="index\btree_based_builder.h">
+      <Filter>db\index</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\sequence_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\server.h" />
+    <ClInclude Include="..\base\status_with.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="index_names.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="index_selection.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\expression.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\expression_array.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\expression_leaf.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\expression_parser.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\expression_tree.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="query_runner.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\match_details.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\matcher.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="index_legacy.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\field_checker.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\expression_geo.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_interface.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_set.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_unset.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher_covered.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher_old.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\safe_num-inl.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_bit.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\matchable.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\status-inl.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="range_deleter.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="range_deleter_mock_env.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="range_deleter_stats.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_session_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_session_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_session_external_state_mock.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_session_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_session_external_state_server_common.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authorization_session.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\role_graph.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\role_name.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="range_deleter_db_env.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="range_deleter_service.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_add_to_set.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_pull.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_push.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_push_sorter.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\user.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_pop.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_pull_all.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\path_internal.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_global_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_global_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_global_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="matcher\path.h">
+      <Filter>db\matcher</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_object_replace.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_table.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\update_driver.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_inc.h">
+      <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -3277,6 +3808,18 @@
     </None>
     <None Include="..\platform\SConscript">
       <Filter>platform</Filter>
+    </None>
+    <None Include="ops\SConscript">
+      <Filter>db\ops</Filter>
+    </None>
+    <None Include="auth\SConscript">
+      <Filter>db\auth</Filter>
+    </None>
+    <None Include="..\base\SConscript">
+      <Filter>base</Filter>
+    </None>
+    <None Include="..\bson\README">
+      <Filter>bson</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -3474,6 +4017,9 @@
     </Filter>
     <Filter Include="db\index">
       <UniqueIdentifier>{1d4d8cb5-38bd-44e8-acc4-989c8d904dea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\matcher">
+      <UniqueIdentifier>{08ab2437-d5a6-45cf-a3d1-f07ed4a92c95}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

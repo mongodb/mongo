@@ -18,6 +18,7 @@ Import("darwin windows solaris linux nix")
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
                 'db/fts/SConscript',
+                'db/ops/SConscript',
                 'db/SConscript',
                 'platform/SConscript',
                 's/SConscript',
@@ -49,7 +50,7 @@ env.StaticLibrary('foundation',
 
 env.CppUnitTest('text_test', 'util/text_test.cpp', LIBDEPS=['foundation'])
 
-env.StaticLibrary('stringutils', ['util/stringutils.cpp', 'util/base64.cpp',])
+env.StaticLibrary('stringutils', ['util/stringutils.cpp', 'util/base64.cpp', 'util/hex.cpp'])
 
 env.StaticLibrary('md5', [
         'util/md5.cpp'
@@ -100,6 +101,9 @@ env.CppUnitTest('string_map_test', ['util/string_map_test.cpp'],
 env.CppUnitTest('bson_field_test', ['bson/bson_field_test.cpp'],
                 LIBDEPS=['bson'])
 
+env.CppUnitTest('bson_obj_test', ['bson/bson_obj_test.cpp'],
+                LIBDEPS=['bson'])
+
 env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
                 LIBDEPS=['bson'])
 
@@ -108,6 +112,59 @@ env.CppUnitTest('namespacestring_test', ['db/namespacestring_test.cpp'],
 
 env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
                 LIBDEPS=['bson','index_set'])
+
+env.StaticLibrary('path',
+                  ['db/matcher/path.cpp',
+                   'db/matcher/path_internal.cpp'],
+                  LIBDEPS=['bson',
+                           '$BUILD_DIR/mongo/db/common'])
+
+env.CppUnitTest('path_test', ['db/matcher/path_test.cpp'],
+                LIBDEPS=['path'])
+
+
+env.StaticLibrary('expressions',
+                  ['db/matcher/expression.cpp',
+                   'db/matcher/expression_array.cpp',
+                   'db/matcher/expression_leaf.cpp',
+                   'db/matcher/expression_tree.cpp',
+                   'db/matcher/expression_parser.cpp',
+                   'db/matcher/expression_parser_tree.cpp',
+                   'db/matcher/matchable.cpp',
+                   'db/matcher/match_details.cpp'],
+                  LIBDEPS=['bson',
+                           'path',
+                           '$BUILD_DIR/mongo/db/common',
+                           '$BUILD_DIR/third_party/pcrecpp'
+                           ] )
+
+env.StaticLibrary('expressions_geo',
+                  ['db/matcher/expression_geo.cpp',
+                   'db/matcher/expression_parser_geo.cpp'],
+                  LIBDEPS=['expressions','geoquery','geoparser'] )
+
+env.StaticLibrary('expressions_where',
+                  ['db/matcher/expression_where.cpp'],
+                  LIBDEPS=['expressions'] )
+
+env.CppUnitTest('expression_test',
+                ['db/matcher/expression_test.cpp',
+                 'db/matcher/expression_leaf_test.cpp',
+                 'db/matcher/expression_tree_test.cpp',
+                 'db/matcher/expression_array_test.cpp'],
+                LIBDEPS=['expressions'] )
+
+env.CppUnitTest('expression_geo_test',
+                ['db/matcher/expression_geo_test.cpp',
+                 'db/matcher/expression_parser_geo_test.cpp'],
+                LIBDEPS=['expressions_geo'] )
+
+env.CppUnitTest('expression_parser_test',
+                ['db/matcher/expression_parser_test.cpp',
+                 'db/matcher/expression_parser_array_test.cpp',
+                 'db/matcher/expression_parser_tree_test.cpp',
+                 'db/matcher/expression_parser_leaf_test.cpp'],
+                LIBDEPS=['expressions'] )
 
 
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
@@ -162,12 +219,15 @@ commonFiles = [ "pch.cpp",
                 "db/dbmessage.cpp"
                 ]
 
-commonSysLibdeps = []
+extraCommonLibdeps = []
 
 if env['MONGO_BUILD_SASL_CLIENT']:
-    commonFiles.extend(['client/sasl_client_authenticate_impl.cpp',
-                        'util/gsasl_session.cpp'])
-    commonSysLibdeps.append('gsasl')
+    env.StaticLibrary('sasl_client_session',
+                      ['client/sasl_client_session.cpp'],
+                      LIBDEPS=['foundation'],
+                      SYSLIBDEPS=['sasl2'])
+    commonFiles.extend(['client/sasl_client_authenticate_impl.cpp'])
+    extraCommonLibdeps.append('sasl_client_session')
 
 # handle processinfo*
 processInfoFiles = [ "util/processinfo.cpp" ]
@@ -215,8 +275,8 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'fail_point',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                           '$BUILD_DIR/third_party/shim_boost'],
-                  SYSLIBDEPS=commonSysLibdeps)
+                           '$BUILD_DIR/third_party/shim_boost'] +
+                           extraCommonLibdeps)
 
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",
@@ -234,8 +294,11 @@ env.StaticLibrary("coredb", [
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",
+        "db/index_names.cpp",
+        "db/index/btree_key_generator.cpp",
         "db/keypattern.cpp",
         "db/matcher.cpp",
+        "db/matcher/matcher.cpp",
         "db/pipeline/accumulator.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",
         "db/pipeline/accumulator_avg.cpp",
@@ -279,11 +342,13 @@ env.StaticLibrary("coredb", [
                            'server_parameters',
                            'geoparser',
                            'geoquery',
+                           'expressions',
+                           'expressions_geo',
+                           'expressions_where',
                            '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",
                     "util/net/miniwebserver.cpp",
-                    "db/indexkey.cpp",
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
                     ]
@@ -339,7 +404,8 @@ if has_option( "asio" ):
 
 env.StaticLibrary('index_set', [ 'db/index_set.cpp' ] )
 
-# mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
+# mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
+# libs.
 serverOnlyFiles = [ "db/curop.cpp",
                     "db/kill_current_op.cpp",
                     "db/memconcept.cpp",
@@ -370,6 +436,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/btree_stats.cpp",
                     "db/clientcursor.cpp",
                     "db/tests.cpp",
+                    "db/range_deleter_db_env.cpp",
+                    "db/range_deleter_service.cpp",
                     "db/repl/repl_start.cpp",
                     "db/repl/rs.cpp",
                     "db/repl/consensus.cpp",
@@ -394,8 +462,22 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/prefetch.cpp",
                     "db/repl/write_concern.cpp",
                     "db/btreecursor.cpp",
+                    "db/index_legacy.cpp",
+                    "db/index_selection.cpp",
+                    "db/index/2d_access_method.cpp",
+                    "db/index/2d_index_cursor.cpp",
                     "db/index/btree_access_method.cpp",
-                    "db/index/btree_key_generator.cpp",
+                    "db/index/btree_based_builder.cpp",
+                    "db/index/btree_index_cursor.cpp",
+                    "db/index/btree_interface.cpp",
+                    "db/index/fts_access_method.cpp",
+                    "db/index/hash_access_method.cpp",
+                    "db/index/hash_index_cursor.cpp",
+                    "db/index/haystack_access_method.cpp",
+                    "db/index/s2_access_method.cpp",
+                    "db/index/s2_index_cursor.cpp",
+                    "db/index/s2_near_cursor.cpp",
+                    "db/index/s2_simple_cursor.cpp",
                     "db/intervalbtreecursor.cpp",
                     "db/btreeposition.cpp",
                     "db/cloner.cpp",
@@ -409,7 +491,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/client.cpp",
                     "db/database.cpp",
                     "db/pdfile.cpp",
-                    "db/record.cpp",
                     "db/cursor.cpp",
                     "db/query_optimizer.cpp",
                     "db/query_optimizer_internal.cpp",
@@ -418,25 +499,24 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/query_plan_selection_policy.cpp",
                     "db/extsort.cpp",
                     "db/index.cpp",
+                    "db/index_builder.cpp",
                     "db/index_update.cpp",
                     "db/index_rebuilder.cpp",
+                    "db/record.cpp",
                     "db/scanandorder.cpp",
                     "db/explain.cpp",
-                    "db/geo/2d.cpp",
                     "db/geo/geonear.cpp",
                     "db/geo/haystack.cpp",
                     "db/geo/s2common.cpp",
-                    "db/geo/s2cursor.cpp",
-                    "db/geo/s2index.cpp",
-                    "db/geo/s2nearcursor.cpp",
-                    "db/hashindex.cpp",
                     "db/ops/count.cpp",
                     "db/ops/delete.cpp",
                     "db/ops/query.cpp",
                     "db/ops/update.cpp",
                     "db/ops/update_internal.cpp",
                     "db/parsed_query.cpp",
+                    "db/query_runner.cpp",
                     "db/dbcommands.cpp",
+                    "db/compact.cpp",
                     "db/dbcommands_admin.cpp",
 
                     # most commands are only for mongod
@@ -580,16 +660,39 @@ env.StaticLibrary("geoquery", [ "db/geo/geoquery.cpp", ],
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
 env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], LIBDEPS = ["geoparser"])
 
+env.StaticLibrary('range_deleter',
+                  [ 'db/range_deleter.cpp',
+                    'db/range_deleter_mock_env.cpp',
+                    'db/range_deleter_stats.cpp'
+                  ],
+                  LIBDEPS = [
+                      '$BUILD_DIR/mongo/s/base', # range_arithmetic.cpp
+                      'base/base',
+                      'bson',
+                      'synchronization'
+                  ])
+
+env.CppUnitTest('range_deleter_test',
+                [ 'db/range_deleter_test.cpp' ],
+                LIBDEPS = [ 'range_deleter' ]);
+
+env.CppUnitTest('range_deleter_stat_test',
+                [ 'db/range_deleter_stat_test.cpp' ],
+                LIBDEPS = [ 'range_deleter' ]);
+
+
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "db/auth/authmongod",
                            "db/fts/ftsmongod",
                            "db/common",
+                           "db/ops/update_driver",
                            "dbcmdline",
                            "defaultversion",
                            "geoparser",
                            "geoquery",
                            "index_set",
+                           'range_deleter',
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.
@@ -600,7 +703,7 @@ mongodAndMongosFiles = [
     ]
 env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)
 
-mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp", "db/commands/touch.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp" ]
 
 # ----- TARGETS ------
 

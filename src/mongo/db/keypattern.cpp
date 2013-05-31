@@ -40,6 +40,17 @@ namespace mongo {
         }
     }
 
+    bool KeyPattern::isIdKeyPattern(const BSONObj& pattern) {
+        BSONObjIterator i(pattern);
+        BSONElement e = i.next();
+        // _id index must have form exactly {_id : 1} or {_id : -1}.
+        // Allows an index of form {_id : "hashed"} to exist but
+        // do not consider it to be the primary _id index
+        return (0 == strcmp(e.fieldName(), "_id"))
+               && (e.numberInt() == 1 || e.numberInt() == -1)
+               && i.next().eoo();
+    }
+
     BSONObj KeyPattern::extractSingleKey(const BSONObj& doc ) const {
         if ( _pattern.isEmpty() )
             return BSONObj();

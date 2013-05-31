@@ -66,7 +66,8 @@ namespace mongo {
         _order = indexDetails.keyPattern();
     }
     
-    void BtreeCursor::init( const BSONObj& sk, const BSONObj& ek, bool endKeyInclusive, int direction ) {
+    void BtreeCursor::init(const BSONObj& sk, const BSONObj& ek, bool endKeyInclusive,
+                           int direction ) {
         _finishConstructorInit();
         startKey = sk;
         endKey = ek;
@@ -75,7 +76,7 @@ namespace mongo {
         _independentFieldRanges = false;
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
 
-        _indexDescriptor.reset(CatalogHack::getDescriptor(d->idx(idxNo)));
+        _indexDescriptor.reset(CatalogHack::getDescriptor(d, idxNo));
         _indexAM.reset(CatalogHack::getBtreeIndex(_indexDescriptor.get()));
 
         IndexCursor *cursor;
@@ -102,7 +103,7 @@ namespace mongo {
         _boundsIterator->advance( startKey ); // handles initialization
         _boundsIterator->prepDive();
 
-        _indexDescriptor.reset(CatalogHack::getDescriptor(d->idx(idxNo)));
+        _indexDescriptor.reset(CatalogHack::getDescriptor(d, idxNo));
         _indexAM.reset(CatalogHack::getBtreeIndex(_indexDescriptor.get()));
 
         IndexCursor *cursor;

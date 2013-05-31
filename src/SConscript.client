@@ -63,6 +63,7 @@ clientSourceBasic = [
     'mongo/util/fail_point.cpp',
     'mongo/util/fail_point_registry.cpp',
     'mongo/util/fail_point_service.cpp',
+    'mongo/util/hex.cpp',
     'mongo/util/histogram.cpp',
     'mongo/util/intrusive_counter.cpp',
     'mongo/util/log.cpp',
@@ -84,10 +85,11 @@ clientSourceBasic = [
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
     'mongo/util/version.cpp',
+    'third_party/murmurhash3/MurmurHash3.cpp',
     ]
 
 clientSourceSasl = ['mongo/client/sasl_client_authenticate_impl.cpp',
-                    'mongo/util/gsasl_session.cpp']
+                    'mongo/client/sasl_client_session.cpp']
 
 clientSourceAll = clientSourceBasic + clientSourceSasl
 
@@ -105,6 +107,7 @@ exampleSourceMap = [
         ('secondExample', 'mongo/client/examples/second.cpp'),
         ('tutorial', 'mongo/client/examples/tutorial.cpp'),
         ('whereExample', 'mongo/client/examples/whereExample.cpp'),
+        ('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp'),
         ]
 
 clientHeaderDirectories = [
@@ -144,9 +147,6 @@ clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target,
                           [source, mongoclient_lib]) for (target, source) in exampleSourceMap])
 
-clientTests.append(
-    clientEnv.Install('#/', clientEnv.Program('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp')))
-
 clientEnv.Alias('clientTests', clientTests, [])
 
 env.Install(
@@ -160,6 +160,7 @@ env.Install(
                  'mongo/base/error_codes.err',
                  'mongo/db/auth/generate_action_types.py',
                  'mongo/db/auth/action_types.txt',
+                 'third_party/murmurhash3/MurmurHash3.h',
                  '#buildscripts/make_archive.py',
                  clientSourceAll,
                  clientHeaders,

@@ -23,6 +23,7 @@
 #include <fstream>
 
 #include "mongo/base/initializer.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
@@ -33,6 +34,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/module.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
@@ -81,7 +84,7 @@ namespace mongo {
     extern string repairpath;
 
     static void setupSignalHandlers();
-    static void startInterruptThread();
+    static void startSignalProcessingThread();
     void exitCleanly( ExitCode code );
 
 #ifdef _WIN32
@@ -94,7 +97,7 @@ namespace mongo {
 
     CmdLine cmdLine;
     static bool scriptingEnabled = true;
-    static bool noHttpInterface = false;
+    static bool httpInterface = false;
     bool shouldRepairDatabases = 0;
     static bool forceRepair = 0;
     Timer startupSrandTimer;
@@ -278,7 +281,7 @@ namespace mongo {
 
         logStartup();
         startReplication();
-        if ( !noHttpInterface )
+        if ( httpInterface )
             boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
 
 #if(TESTEXHAUST)
@@ -368,8 +371,8 @@ namespace mongo {
                     for ( ; cursor && cursor->ok(); cursor->advance()) {
                         const BSONObj index = cursor->current();
                         const BSONObj key = index.getObjectField("key");
-                        const string plugin = IndexPlugin::findPluginName(key);
-                        if (IndexPlugin::existedBefore24(plugin))
+                        const string plugin = IndexNames::findPluginName(key);
+                        if (IndexNames::existedBefore24(plugin))
                             continue;
 
                         log() << "Index " << index << " claims to be of type '" << plugin << "', "
@@ -672,6 +675,11 @@ namespace mongo {
             Client::WriteContext c("admin", dbpath);
         }
 
+        getDeleter()->startWorkers();
+
+        // Starts a background thread that rebuilds all incomplete indices. 
+        indexRebuilder.go(); 
+
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
@@ -717,7 +725,6 @@ using namespace mongo;
 namespace po = boost::program_options;
 
 void show_help_text(po::options_description options) {
-    show_warnings();
     cout << options << endl;
 };
 
@@ -777,9 +784,7 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
-    ("nohttpinterface", "disable http interface")
-        // SERVER-8536
-        //   ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
+    ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
     ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
@@ -979,8 +984,12 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("nopreallocj")) {
             cmdLine.preallocj = false;
         }
-        if (params.count("nohttpinterface")) {
-            noHttpInterface = true;
+        if (params.count("httpinterface")) {
+            if (params.count("nohttpinterface")) {
+                log() << "can't have both --httpinterface and --nohttpinterface" << endl;
+                ::_exit( EXIT_BADOPTIONS );
+            }
+            httpInterface = true;
         }
         if (params.count("rest")) {
             cmdLine.rest = true;
@@ -1291,9 +1300,9 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     if (!initializeServerGlobalState())
         ::_exit(EXIT_FAILURE);
 
-    // Per SERVER-7434, startInterruptThread() must run after any forks
+    // Per SERVER-7434, startSignalProcessingThread() must run after any forks
     // (initializeServerGlobalState()) and before creation of any other threads.
-    startInterruptThread();
+    startSignalProcessingThread();
 
     dataFileSync.go();
 
@@ -1361,15 +1370,27 @@ namespace mongo {
     }
 
     sigset_t asyncSignals;
-    // The above signals will be processed by this thread only, in order to
+    // The signals in asyncSignals will be processed by this thread only, in order to
     // ensure the db and log mutexes aren't held.
-    void interruptThread() {
-        int actualSignal;
-        sigwait( &asyncSignals, &actualSignal );
-        log() << "got signal " << actualSignal << " (" << strsignal( actualSignal )
-              << "), will terminate after current cmd ends" << endl;
-        Client::initThread( "interruptThread" );
-        exitCleanly( EXIT_CLEAN );
+    void signalProcessingThread() {
+        while (true) {
+            int actualSignal = 0;
+            int status = sigwait( &asyncSignals, &actualSignal );
+            fassert(16781, status == 0);
+            switch (actualSignal) {
+            case SIGUSR1:
+                // log rotate signal
+                fassert(16782, rotateLogs());
+                break;
+            default:
+                // interrupt/terminate signal
+                Client::initThread( "signalProcessingThread" );
+                log() << "got signal " << actualSignal << " (" << strsignal( actualSignal )
+                      << "), will terminate after current cmd ends" << endl;
+                exitCleanly( EXIT_CLEAN );
+                break;
+            }
+        }
     }
 
     // this will be called in certain c++ error cases, for example if there are two active
@@ -1410,19 +1431,20 @@ namespace mongo {
         setupSIGTRAPforGDB();
 
         // asyncSignals is a global variable listing the signals that should be handled by the
-        // interrupt thread, once it is started via startInterruptThread().
+        // interrupt thread, once it is started via startSignalProcessingThread().
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGHUP );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
+        sigaddset( &asyncSignals, SIGUSR1 );
 
         set_terminate( myterminate );
         set_new_handler( my_new_handler );
     }
 
-    void startInterruptThread() {
+    void startSignalProcessingThread() {
         verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
-        boost::thread it( interruptThread );
+        boost::thread it( signalProcessingThread );
     }
 
 #else   // WIN32
@@ -1497,7 +1519,7 @@ namespace mongo {
         _set_purecall_handler( myPurecallHandler );
     }
 
-    void startInterruptThread() {}
+    void startSignalProcessingThread() {}
 
 #endif  // if !defined(_WIN32)
 

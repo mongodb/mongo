@@ -26,47 +26,87 @@
 #include "mongo/db/curop-inl.h"
 #include "mongo/util/array.h"
 
+#define MONGO_USE_NEW_SORTER 1
+
+#if MONGO_USE_NEW_SORTER
+#   include "mongo/db/sorter/sorter.h"
+#endif
+
 namespace mongo {
 
+    typedef pair<BSONObj, DiskLoc> ExternalSortDatum;
+
+    /**
+     * To external sort, you provide a pointer to an implementation of this class.
+     * The compare function follows the usual -1, 0, 1 semantics.
+     */
+    class ExternalSortComparison {
+    public:
+        virtual ~ExternalSortComparison() { }
+        virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const = 0;
+    };
+
+#if MONGO_USE_NEW_SORTER
+    // TODO This class will probably disappear in the future or be replaced with a typedef
+    class BSONObjExternalSorter : boost::noncopyable {
+    public:
+        typedef pair<BSONObj, DiskLoc> Data;
+        typedef SortIteratorInterface<BSONObj, DiskLoc> Iterator;
+
+        BSONObjExternalSorter(const ExternalSortComparison* comp, long maxFileSize=100*1024*1024);
+
+        void add( const BSONObj& o, const DiskLoc& loc, bool mayInterrupt ) {
+            *_mayInterrupt = mayInterrupt;
+            _sorter->add(o.getOwned(), loc);
+        }
+
+        auto_ptr<Iterator> iterator() { return auto_ptr<Iterator>(_sorter->done()); }
+
+        void sort( bool mayInterrupt ) { *_mayInterrupt = mayInterrupt; }
+        int numFiles() { return _sorter->numFiles(); }
+        long getCurSizeSoFar() { return _sorter->memUsed(); }
+        void hintNumObjects(long long) {} // unused
+
+    private:
+        shared_ptr<bool> _mayInterrupt;
+        scoped_ptr<Sorter<BSONObj, DiskLoc> > _sorter;
+    };
+#else
     /**
        for external (disk) sorting by BSONObj and attaching a value
      */
     class BSONObjExternalSorter : boost::noncopyable {
     public:
-        BSONObjExternalSorter( IndexInterface &i, const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
+        BSONObjExternalSorter(const ExternalSortComparison* cmp,
+                              long maxFileSize = 1024 * 1024 * 100 );
         ~BSONObjExternalSorter();
-        typedef pair<BSONObj,DiskLoc> Data;
-        /** @return the IndexInterface used to perform key comparisons. */
-        const IndexInterface& getIndexInterface() const { return _idxi; }
  
     private:
         static HLMutex _extSortMutex;
-        IndexInterface& _idxi;
 
-        static int _compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order);
+        static int _compare(const ExternalSortComparison* cmp, const ExternalSortDatum& l,
+                            const ExternalSortDatum& r);
 
         class MyCmp {
         public:
-            MyCmp( IndexInterface& i, BSONObj order = BSONObj() ) : _i(i), _order( Ordering::make(order) ) {}
-            bool operator()( const Data &l, const Data &r ) const {
-                return _compare(_i, l, r, _order) < 0;
+            MyCmp(const ExternalSortComparison* cmp) : _cmp(cmp) { }
+            bool operator()( const ExternalSortDatum &l, const ExternalSortDatum &r ) const {
+                return _cmp->compare(l, r) < 0;
             };
         private:
-            IndexInterface& _i;
-            const Ordering _order;
+            const ExternalSortComparison* _cmp;
         };
 
-        static IndexInterface *extSortIdxInterface;
-        static Ordering extSortOrder;
         static bool extSortMayInterrupt;
         static int extSortComp( const void *lv, const void *rv );
+        static const ExternalSortComparison* staticExtSortCmp;
 
         class FileIterator : boost::noncopyable {
         public:
             FileIterator( const std::string& file );
             ~FileIterator();
             bool more();
-            Data next();
+            ExternalSortDatum next();
         private:
             bool _read( char* buf, long long count );
 
@@ -77,7 +117,7 @@ namespace mongo {
 
     public:
 
-        typedef FastArray<Data> InMemory;
+        typedef FastArray<ExternalSortDatum> InMemory;
 
         class Iterator : boost::noncopyable {
         public:
@@ -85,12 +125,12 @@ namespace mongo {
             Iterator( BSONObjExternalSorter * sorter );
             ~Iterator();
             bool more();
-            Data next();
+            ExternalSortDatum next();
 
         private:
             MyCmp _cmp;
             vector<FileIterator*> _files;
-            vector< pair<Data,bool> > _stash;
+            vector< pair<ExternalSortDatum,bool> > _stash;
 
             InMemory * _in;
             InMemory::iterator _it;
@@ -125,7 +165,7 @@ namespace mongo {
         void sort( const std::string& file );
         void finishMap( bool mayInterrupt );
 
-        BSONObj _order;
+        const ExternalSortComparison* _cmp;
         long _maxFilesize;
         boost::filesystem::path _root;
 
@@ -139,4 +179,5 @@ namespace mongo {
         static unsigned long long _compares;
         static unsigned long long _uniqueNumber;
     };
+#endif
 }

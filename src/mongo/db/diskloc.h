@@ -165,6 +165,15 @@ namespace mongo {
         BtreeBucket<V> * btreemod() const;
 
         /*MongoDataFile& pdf() const;*/
+
+        /// members for Sorter
+        struct SorterDeserializeSettings {}; // unused
+        void serializeForSorter(BufBuilder& buf) const { buf.appendStruct(*this); }
+        static DiskLoc deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+            return buf.read<DiskLoc>();
+        }
+        int memUsageForSorter() const { return sizeof(DiskLoc); }
+        DiskLoc getOwned() const { return *this; }
     };
 #pragma pack()
 

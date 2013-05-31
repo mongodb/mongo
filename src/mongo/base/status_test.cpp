@@ -45,22 +45,22 @@ namespace {
 
     TEST(Cloning, Copy) {
         Status orig(ErrorCodes::MaxError, "error");
-        ASSERT_EQUALS(orig.refCount(), 1);
+        ASSERT_EQUALS(orig.refCount(), 1U);
 
         Status dest(orig);
         ASSERT_EQUALS(dest.code(), ErrorCodes::MaxError);
         ASSERT_EQUALS(dest.reason(), "error");
 
-        ASSERT_EQUALS(dest.refCount(), 2);
-        ASSERT_EQUALS(orig.refCount(), 2);
+        ASSERT_EQUALS(dest.refCount(), 2U);
+        ASSERT_EQUALS(orig.refCount(), 2U);
     }
 
     TEST(Cloning, OKIsNotRefCounted) {
-        ASSERT_EQUALS(Status::OK().refCount(), 0);
+        ASSERT_EQUALS(Status::OK().refCount(), 0U);
 
         Status myOk = Status::OK();
-        ASSERT_EQUALS(myOk.refCount(), 0);
-        ASSERT_EQUALS(Status::OK().refCount(), 0);
+        ASSERT_EQUALS(myOk.refCount(), 0U);
+        ASSERT_EQUALS(Status::OK().refCount(), 0U);
     }
 
     TEST(Parsing, CodeToEnum) {

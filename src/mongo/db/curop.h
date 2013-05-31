@@ -121,8 +121,8 @@ namespace mongo {
 
         void set( const BSONObj& o ) {
             scoped_spinlock lk(_lock);
-            int sz = o.objsize();
-            if ( sz > (int) sizeof(_buf) ) {
+            size_t sz = o.objsize();
+            if ( sz > sizeof(_buf) ) {
                 _reset(TOO_BIG_SENTINEL);
             }
             else {
@@ -220,7 +220,12 @@ namespace mongo {
         int elapsedSeconds() { return elapsedMillis() / 1000; }
         void setQuery(const BSONObj& query) { _query.set( query ); }
         Client * getClient() const { return _client; }
+
         BSONObj info();
+
+        // Fetches less information than "info()"; used to search for ops with certain criteria
+        BSONObj description();
+
         string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
         ProgressMeter& setMessage(const char * msg,
                                   std::string name = "Progress",
@@ -245,6 +250,15 @@ namespace mongo {
         LockStat& lockStat() { return _lockStat; }
 
         void setKillWaiterFlags();
+
+        /**
+         * Find a currently running operation matching the given criteria. This assumes that you're
+         * going to kill the operation, so it must be called multiple times to get multiple matching
+         * operations.
+         * @param criteria the search to do against the infoNoauth() BSONObj
+         * @return a pointer to a matching op or NULL if no ops match
+         */
+        static CurOp* getOp(const BSONObj& criteria);
     private:
         friend class Client;
         void _reset();

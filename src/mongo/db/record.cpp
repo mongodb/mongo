@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "mongo/base/init.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/databaseholder.h"
 #include "mongo/db/pagefault.h"
@@ -420,7 +421,13 @@ namespace mongo {
         }
     }
 
-    const bool blockSupported = ProcessInfo::blockCheckSupported();
+    static bool blockSupported = false;
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(RecordBlockSupported,
+                                         ("SystemInfo"))(InitializerContext* cx) {
+        blockSupported = ProcessInfo::blockCheckSupported();
+        return Status::OK();
+    }
 
     void Record::appendWorkingSetInfo( BSONObjBuilder& b ) {
         if ( ! blockSupported ) {
@@ -429,10 +436,6 @@ namespace mongo {
         }
         
         ps::appendWorkingSetInfo( b );
-    }
-
-    bool Record::blockCheckSupported() { 
-        return ProcessInfo::blockCheckSupported();
     }
 
     bool Record::likelyInPhysicalMemory() const {
@@ -477,7 +480,7 @@ namespace mongo {
         
 #ifdef _DEBUG
             if ( blockSupported && ! ProcessInfo::blockInMemory(data) ) {
-                warning() << "we think data is in ram but system says no"  << endl;
+                RARELY warning() << "we think data is in ram but system says no"  << endl;
             }
 #endif
             return true;

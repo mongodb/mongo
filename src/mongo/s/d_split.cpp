@@ -31,6 +31,7 @@
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/index_legacy.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk.h" // for static genID only
@@ -132,9 +133,9 @@ namespace mongo {
 
             // Find the 'missingField' value used to represent a missing document field in a key of
             // this index.
-            // NOTE A local copy of 'missingField' is made because IndexSpec objects may be
+            // NOTE A local copy of 'missingField' is made because indices may be
             // invalidated during a db lock yield.
-            BSONObj missingFieldObj = idx->getSpec().missingField().wrap();
+            BSONObj missingFieldObj = IndexLegacy::getMissingField(idx->info.obj());
             BSONElement missingField = missingFieldObj.firstElement();
             
             // for now, the only check is that all shard keys are filled
@@ -474,7 +475,7 @@ namespace mongo {
 
     string ChunkInfo::toString() const {
         ostringstream os;
-        os << "lastmod: " << lastmod.toString() << " min: " << min << " max: " << endl;
+        os << "lastmod: " << lastmod.toString() << " min: " << min << " max: " << max << endl;
         return os.str();
     }
     // ** end temporary **

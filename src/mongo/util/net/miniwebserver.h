@@ -18,10 +18,11 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "message.h"
-#include "message_port.h"
-#include "listen.h"
-#include "../../db/jsobj.h"
+
+#include "mongo/db/jsobj.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 

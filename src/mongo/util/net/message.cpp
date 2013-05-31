@@ -15,18 +15,17 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/net/message.h"
 
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
 
-#include "message.h"
-#include "message_port.h"
-#include "listen.h"
-
-#include "../goodies.h"
-
+#include "mongo/util/goodies.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 

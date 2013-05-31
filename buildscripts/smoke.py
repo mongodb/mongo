@@ -196,8 +196,9 @@ class mongod(object):
             call(argv)
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
-        # This should always be set for tests
-        argv += ['--setParameter', 'enableTestCommands=1']
+        # These parameters are alwas set for tests
+        # SERVER-9137 Added httpinterface parameter to keep previous behavior
+        argv += ['--setParameter', 'enableTestCommands=1', '--httpinterface']
         if self.kwargs.get('small_oplog'):
             argv += ["--master", "--oplogSize", "511"]
         if self.kwargs.get('small_oplog_rs'):
@@ -243,7 +244,6 @@ class mongod(object):
         child processes of this process can be killed with a single
         call to TerminateJobObject (see self.stop()).
         """
-        proc = Popen(argv)
 
         if os.sys.platform == "win32":
             # Create a job object with the "kill on job close"
@@ -252,6 +252,12 @@ class mongod(object):
             # and lets us terminate the whole tree of processes
             # rather than orphaning the mongod.
             import win32job
+
+            # Magic number needed to allow job reassignment in Windows 7
+            # see: MSDN - Process Creation Flags - ms684863
+            CREATE_BREAKAWAY_FROM_JOB = 0x01000000
+
+            proc = Popen(argv, creationflags=CREATE_BREAKAWAY_FROM_JOB)
 
             self.job_object = win32job.CreateJobObject(None, '')
 
@@ -264,6 +270,9 @@ class mongod(object):
                 job_info)
 
             win32job.AssignProcessToJobObject(self.job_object, proc._handle)
+
+        else:
+            proc = Popen(argv)
 
         return proc
 

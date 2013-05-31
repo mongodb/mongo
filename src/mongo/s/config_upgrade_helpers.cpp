@@ -247,32 +247,43 @@ namespace mongo {
 
         Timer t;
         int64_t docCount = 0;
-        const int32_t maxBatchSize = BSONObjMaxUserSize / 2;
+        const int32_t maxBatchSize = BSONObjMaxUserSize / 16;
         try {
+            log() << "About to copy " << fromNS << " to " << toNS << endl;
+
+            // Lower the query's batchSize so that we incur in getMore()'s more frequently.
+            // The rationale here is that, if for some reason the config server is extremely
+            // slow, we wouldn't time this cursor out.
             ScopedDbConnection& conn = *connPtr;
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(fromNS, BSONObj())));
+            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(fromNS,
+                                                                      BSONObj(),
+                                                                      0 /* nToReturn */,
+                                                                      0 /* nToSkip */,
+                                                                      NULL /* fieldsToReturn */,
+                                                                      0 /* queryOptions */,
+                                                                      1024 /* batchSize */)));
 
             vector<BSONObj> insertBatch;
             int32_t insertSize = 0;
             while (cursor->more()) {
 
-                BSONObj next = cursor->nextSafe();
+                BSONObj next = cursor->nextSafe().getOwned();
                 ++docCount;
 
-                if (insertSize + next.objsize() > maxBatchSize ) {
+                insertBatch.push_back(next);
+                insertSize += next.objsize();
+
+                if (insertSize > maxBatchSize ) {
                     conn->insert(toNS, insertBatch);
                     _checkGLE(conn);
                     insertBatch.clear();
                     insertSize = 0;
                 }
 
-                insertBatch.push_back(next);
-                insertSize += next.objsize();
-
-                if (t.seconds() > 10) {
+                if (t.seconds() >= 10) {
                     t.reset();
                     log() << "Copied " << docCount << " documents so far from "
-                          << fromNS << " to " << toNS;
+                          << fromNS << " to " << toNS << endl;
                 }
             }
 
@@ -280,6 +291,10 @@ namespace mongo {
                 conn->insert(toNS, insertBatch);
                 _checkGLE(conn);
             }
+
+            log() << "Finished copying " << docCount << " documents from "
+                  << fromNS << " to " << toNS << endl;
+
         }
         catch (const DBException& e) {
             return e.toStatus("could not copy data into new collection");

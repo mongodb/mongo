@@ -26,6 +26,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/namespacestring.h"
@@ -36,14 +37,12 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/s/d_logic.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
-
-    // from d_migrate.cpp
-    void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static NamespaceDetails *localOplogMainDetails = 0;
@@ -95,6 +94,8 @@ namespace mongo {
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
+
+                replset::BackgroundSync::notify();
             }
         }
 
@@ -324,12 +325,18 @@ namespace mongo {
           d delete / remove
           u update
     */
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b, bool fromMigrate) {
+    void logOp(const char* opstr,
+               const char* ns,
+               const BSONObj& obj,
+               BSONObj* patt,
+               bool* b,
+               bool fromMigrate,
+               const BSONObj* fullObj) {
         if ( replSettings.master ) {
             _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
-        logOpForSharding( opstr , ns , obj , patt );
+        logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
     }
 
     void createOplog() {
@@ -439,10 +446,18 @@ namespace mongo {
         if ( *opType == 'i' ) {
             opCounters->gotInsert();
 
-            if (NamespaceString(ns).coll == "system.indexes") {
-                // updates aren't allowed for indexes -- so we will do a regular insert. if index already
-                // exists, that is ok.
-                theDataFileMgr.insert(ns, (void*) o.objdata(), o.objsize());
+            const char *p = strchr(ns, '.');
+            if ( p && strcmp(p, ".system.indexes") == 0 ) {
+                if (o["background"].trueValue()) {
+                    IndexBuilder* builder = new IndexBuilder(ns, o);
+                    // This spawns a new thread and returns immediately.
+                    builder->go();
+                }
+                else {
+                    IndexBuilder builder(ns, o);
+                    // Finish the foreground build before returning
+                    builder.build();
+                }
             }
             else {
                 // do upserts for inserts as we might get replayed more than once

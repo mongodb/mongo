@@ -28,6 +28,10 @@
 
 namespace mongo {
 namespace replset {
+
+    int SleepToAllowBatchingMillis = 2;
+    const int BatchIsSmallish = 40000; // bytes
+
     MONGO_FP_DECLARE(rsBgSyncProduce);
 
     BackgroundSync* BackgroundSync::s_instance = 0;
@@ -313,10 +317,6 @@ namespace replset {
             return;
         }
 
-        while (MONGO_FAIL_POINT(rsBgSyncProduce)) {
-            sleepmillis(0);
-        }
-
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
         if (isRollbackRequired(r)) {
@@ -328,6 +328,20 @@ namespace replset {
             while (!inShutdown()) {
 
                 if (!r.moreInCurrentBatch()) {
+                    int bs = r.currentBatchMessageSize();
+                    if( bs > 0 && bs < BatchIsSmallish ) {
+                        // on a very low latency network, if we don't wait a little, we'll be 
+                        // getting ops to write almost one at a time.  this will both be expensive
+                        // for the upstream server as well as postentiallyd efating our parallel 
+                        // application of batches on the secondary.
+                        //
+                        // the inference here is basically if the batch is really small, we are 
+                        // "caught up".
+                        //
+                        dassert( !Lock::isLocked() );
+                        sleepmillis(SleepToAllowBatchingMillis);
+                    }
+  
                     if (theReplSet->gotForceSync()) {
                         return;
                     }
@@ -471,6 +485,10 @@ namespace replset {
             while (!_appliedBuffer) {
                 _condvar.wait(lock);
             }
+        }
+
+        while (MONGO_FAIL_POINT(rsBgSyncProduce)) {
+            sleepmillis(0);
         }
 
         verify(r.conn() == NULL);

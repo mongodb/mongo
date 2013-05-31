@@ -15,7 +15,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
@@ -431,7 +431,7 @@ namespace mongo {
             try {
                 bob res;
                 string errmsg;
-                LOG(1) << "replSet rollback drop: " << *i << rsLog;
+                log() << "replSet rollback drop: " << *i << rsLog;
                 dropCollection(*i, errmsg, res);
             }
             catch(...) {
@@ -466,6 +466,16 @@ namespace mongo {
 
                 // todo: lots of overhead in context, this can be faster
                 Client::Context c(d.ns);
+
+                // Add the doc to our rollback file
+                BSONObj obj;
+                bool found = Helpers::findOne(d.ns, pattern, obj, false);
+                if ( found ) {
+                    rs->goingToDelete( obj );
+                } else {
+                    error() << "rollback cannot find object by id" << endl;
+                }
+
                 if( i->second.isEmpty() ) {
                     // wasn't on the primary; delete.
                     /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
@@ -540,7 +550,32 @@ namespace mongo {
                     // todo faster...
                     OpDebug debug;
                     updates++;
-                    _updateObjects(/*god*/true, d.ns, i->second, pattern, /*upsert=*/true, /*multi=*/false , /*logtheop=*/false , debug, rs.get() );
+                    if (isNewUpdateFrameworkEnabled()) {
+
+                        _updateObjectsNEW(/*god*/true,
+                                          d.ns,
+                                          i->second,
+                                          pattern,
+                                          /*upsert=*/true,
+                                          /*multi=*/false,
+                                          /*logtheop=*/false,
+                                          debug,
+                                          rs.get());
+
+                    }
+                    else {
+
+                        _updateObjects(/*god*/true,
+                                       d.ns,
+                                       i->second,
+                                       pattern,
+                                       /*upsert=*/true,
+                                       /*multi=*/false,
+                                       /*logtheop=*/false,
+                                       debug,
+                                       rs.get());
+
+                    }
                 }
             }
             catch(DBException& e) {

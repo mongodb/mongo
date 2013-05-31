@@ -299,8 +299,10 @@ namespace mongo {
                         break;
                     }
                     if ( last != buf ) {
-                        strcpy( temp, last );
-                        strcpy( buf, temp );
+                        strncpy( temp, last, bufSize );
+                        temp[ bufSize-1 ] = '\0';
+                        strncpy( buf, temp, bufSize );
+                        buf[ bufSize-1 ] = '\0';
                     }
                     else {
                         verify( strlen( buf ) < bufSize );
@@ -556,6 +558,14 @@ namespace mongo {
             return undefinedReturn;
         }
 
+        BSONObj PathExists( const BSONObj &a, void* data ) {
+            verify( a.nFields() == 1 );
+            string path = a.firstElement().valuestrsafe();
+            verify( !path.empty() );
+            bool exists = boost::filesystem::exists(path);
+            return BSON( string( "" ) << exists );
+        }
+
         void copyDir( const boost::filesystem::path &from, const boost::filesystem::path &to ) {
             boost::filesystem::directory_iterator end;
             boost::filesystem::directory_iterator i( from );
@@ -773,6 +783,7 @@ namespace mongo {
             scope.injectNative( "waitProgram" , WaitProgram );
             scope.injectNative( "checkProgram" , CheckProgram );
             scope.injectNative( "resetDbpath", ResetDbpath );
+            scope.injectNative( "pathExists", PathExists );
             scope.injectNative( "copyDbpath", CopyDbpath );
         }
     }

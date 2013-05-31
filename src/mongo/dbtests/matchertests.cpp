@@ -25,6 +25,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/query_optimizer.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -45,46 +46,51 @@ namespace MatcherTests {
         const char * const _ns;
         DBDirectClient _client;
     };
-    
+
+    template <typename M>
     class Basic {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":\"b\"}" );
-            Matcher m( query );
+            M m( query );
             ASSERT( m.matches( fromjson( "{\"a\":\"b\"}" ) ) );
         }
     };
 
+    template <typename M>
     class DoubleEqual {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":5}" );
-            Matcher m( query );
+            M m( query );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
         }
     };
 
+    template <typename M>
     class MixedNumericEqual {
     public:
         void run() {
             BSONObjBuilder query;
             query.append( "a", 5 );
-            Matcher m( query.done() );
+            M m( query.done() );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
         }
     };
 
+    template <typename M>
     class MixedNumericGt {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":{\"$gt\":4}}" );
-            Matcher m( query );
+            M m( query );
             BSONObjBuilder b;
             b.append( "a", 5 );
             ASSERT( m.matches( b.done() ) );
         }
     };
 
+    template <typename M>
     class MixedNumericIN {
     public:
         void run() {
@@ -92,7 +98,7 @@ namespace MatcherTests {
             ASSERT_EQUALS( 4 , query["a"].embeddedObject()["$in"].embeddedObject()["0"].number() );
             ASSERT_EQUALS( NumberInt , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
 
-            Matcher m( query );
+            M m( query );
 
             {
                 BSONObjBuilder b;
@@ -116,19 +122,21 @@ namespace MatcherTests {
         }
     };
 
+    template <typename M>
     class MixedNumericEmbedded {
     public:
         void run() {
-            Matcher m( BSON( "a" << BSON( "x" << 1 ) ) );
+            M m( BSON( "a" << BSON( "x" << 1 ) ) );
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1 ) ) ) );
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1.0 ) ) ) );
         }
     };
 
+    template <typename M>
     class Size {
     public:
         void run() {
-            Matcher m( fromjson( "{a:{$size:4}}" ) );
+            M m( fromjson( "{a:{$size:4}}" ) );
             ASSERT( m.matches( fromjson( "{a:[1,2,3,4]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3,'a','b']}" ) ) );
@@ -136,10 +144,11 @@ namespace MatcherTests {
         }
     };
 
+    template <typename M>
     class WithinBox {
     public:
         void run() {
-            Matcher m(fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}"));
+            M m(fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}"));
             ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
             ASSERT(m.matches(fromjson("{loc: [4,4]}")));
             ASSERT(m.matches(fromjson("{loc: [5,5]}")));
@@ -148,10 +157,11 @@ namespace MatcherTests {
         }
     };
 
+    template <typename M>
     class WithinPolygon {
     public:
         void run() {
-            Matcher m(fromjson("{loc:{$within:{$polygon:[{x:0,y:0},[0,5],[5,5],[5,0]]}}}"));
+            M m(fromjson("{loc:{$within:{$polygon:[{x:0,y:0},[0,5],[5,5],[5,0]]}}}"));
             ASSERT(m.matches(fromjson("{loc: [3,4]}")));
             ASSERT(m.matches(fromjson("{loc: [4,4]}")));
             ASSERT(m.matches(fromjson("{loc: {x:5,y:5}}")));
@@ -160,10 +170,11 @@ namespace MatcherTests {
         }
     };
 
+    template <typename M>
     class WithinCenter {
     public:
         void run() {
-            Matcher m(fromjson("{loc:{$within:{$center:[{x:30,y:30},10]}}}"));
+            M m(fromjson("{loc:{$within:{$center:[{x:30,y:30},10]}}}"));
             ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
             ASSERT(m.matches(fromjson("{loc: {x:30,y:30}}")));
             ASSERT(m.matches(fromjson("{loc: [20,30]}")));
@@ -175,10 +186,11 @@ namespace MatcherTests {
     };
 
     /** Test that MatchDetails::elemMatchKey() is set correctly after a match. */
+    template <typename M>
     class ElemMatchKey {
     public:
         void run() {
-            Matcher matcher( BSON( "a.b" << 1 ) );
+            M matcher( BSON( "a.b" << 1 ) );
             MatchDetails details;
             details.requestElemMatchKey();
             ASSERT( !details.hasElemMatchKey() );
@@ -186,6 +198,17 @@ namespace MatcherTests {
             // The '0' entry of the 'a' array is matched.
             ASSERT( details.hasElemMatchKey() );
             ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
+        }
+    };
+
+    template <typename M>
+    class WhereSimple1 {
+    public:
+        void run() {
+            Client::ReadContext ctx( "unittests.matchertests" );
+            M m( BSON( "$where" << "function(){ return this.a == 1; }" ) );
+            ASSERT( m.matches( BSON( "a" << 1 ) ) );
+            ASSERT( !m.matches( BSON( "a" << 2 ) ) );
         }
     };
 
@@ -266,156 +289,190 @@ namespace MatcherTests {
                 ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
             }
         };
-        
+
     } // namespace Covered
-    
+
+
+    template< typename M >
     class TimingBase {
     public:
-        long time( const BSONObj& patt , const BSONObj& obj ) {
-            Matcher m( patt );
+        long dotime( const BSONObj& patt , const BSONObj& obj ) {
+            M m( patt );
             Timer t;
-            for ( int i=0; i<10000; i++ ) {
-                ASSERT( m.matches( obj ) );
+            for ( int i=0; i<900000; i++ ) {
+                if ( !m.matches( obj ) ) {
+                    ASSERT( 0 );
+                }
             }
             return t.millis();
         }
     };
 
-    class AllTiming : public TimingBase {
+    template< typename M >
+    class AllTiming : public TimingBase<M> {
     public:
         void run() {
-            long normal = time( BSON( "x" << 5 ) , BSON( "x" << 5 ) );
-            long all = time( BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 ) ) ) , BSON( "x" << 5 ) );
+            long normal = TimingBase<M>::dotime( BSON( "x" << 5 ),
+                                                 BSON( "x" << 5 ) );
 
-            cout << "normal: " << normal << " all: " << all << endl;
+            long all = TimingBase<M>::dotime( BSON( "x" << BSON( "$all" << BSON_ARRAY( 5 ) ) ),
+                                              BSON( "x" << 5 ) );
+
+            cout << "AllTiming " << demangleName(typeid(M))
+                 << " normal: " << normal << " all: " << all << endl;
         }
     };
 
-    /**
-     * Helper class to extract the top level equality fields of a matcher, which can serve as a
-     * useful way to identify the matcher.
-     */
-    class EqualityFieldExtractor : public MatcherVisitor {
-    public:
-        EqualityFieldExtractor( const Matcher &originalMatcher ) :
-            _originalMatcher( &originalMatcher ),
-            _currentMatcher( 0 ) {
-        }
-        virtual void visitMatcher( const Matcher &matcher ) {
-            _currentMatcher = &matcher;
-        }
-        virtual void visitElementMatcher( const ElementMatcher &elementMatcher ) {
-            // If elementMatcher is visited before any Matcher other than _originalMatcher, it is
-            // a top level ElementMatcher within _originalMatcher.
-            if ( _currentMatcher != _originalMatcher ) {
-                return;
-            }
-            if ( elementMatcher._compareOp != BSONObj::Equality ) {
-                return;
-            }
-            _equalityFields.insert( elementMatcher._toMatch.fieldName() );
-        }
-        BSONArray equalityFields() const {
-            BSONArrayBuilder ret;
-            for( set<string>::const_iterator i = _equalityFields.begin();
-                i != _equalityFields.end(); ++i ) {
-                ret << *i;
-            }
-            return ret.arr();
-        }
-        const Matcher *_originalMatcher;
-        const Matcher *_currentMatcher;
-        set<string> _equalityFields;
-    };
 
-    /**
-     * Matcher::visit() visits all nested Matchers and ElementMatchers, in the expected
-     * order.  In particular:
-     * - All of a Matcher's top level ElementMatchers are visited immediately after the Matcher
-     *   itself (before any other Matchers are visited).
-     * - All nested Matchers and ElementMatchers are visited.
-     */
-    class Visit {
+    template <typename M>
+      class AtomicMatchTest {
     public:
         void run() {
-            Matcher matcher( fromjson( "{ a:1, b:2, $and:[ { c:6, d:7 }, { n:12 } ],"
-                                      "$or:[ { e:8, l:10 } ], $nor:[ { f:9, m:11 } ],"
-                                      "g:{ $elemMatch:{ h:3 } },"
-                                      "i:{ $all:[ { $elemMatch:{ j:4 } },"
-                                      "{ $elemMatch:{ k:5 } } ] } }" ) );
-            Visitor testVisitor;
-            matcher.visit( testVisitor );
-            BSONObj expectedTraversal = fromjson
-                    ( "{"
-                     "Matcher:[ 'a', 'b' ],"
-                     "ElementMatcher:{ a:1 },"
-                     "ElementMatcher:{ b:2 },"
-                     "ElementMatcher:{ g:{ h:3 } },"
-                     "ElementMatcher:{ i:{ $all:[ { $elemMatch:{ j:4 } },"
-                            "{ $elemMatch:{ k:5 } } ] } },"
-                     "Matcher:[ 'h' ],"
-                     "ElementMatcher:{ h:3 },"
-                     "Matcher:[ 'j' ],"
-                     "ElementMatcher:{ j:4 },"
-                     "Matcher:[ 'k' ],"
-                     "ElementMatcher:{ k:5 },"
-                     "Matcher:[ 'c', 'd' ],"
-                     "ElementMatcher:{ c:6 },"
-                     "ElementMatcher:{ d:7 },"
-                     "Matcher:[ 'n' ],"
-                     "ElementMatcher:{ n:12 },"
-                     "Matcher:[ 'e', 'l' ],"
-                     "ElementMatcher:{ e:8 },"
-                     "ElementMatcher:{ l:10 },"
-                     "Matcher:[ 'f', 'm' ],"
-                     "ElementMatcher:{ f:9 },"
-                     "ElementMatcher:{ m:11 }"
-                     "}" );
-            ASSERT_EQUALS( expectedTraversal, testVisitor.traversal() );
+
+            {
+                M m( BSON( "x" << 5 ) );
+                ASSERT( !m.atomic() );
+            }
+
+            {
+                M m( BSON( "x" << 5 << "$atomic" << false ) );
+                ASSERT( !m.atomic() );
+            }
+
+            {
+                M m( BSON( "x" << 5 << "$atomic" << true ) );
+                ASSERT( m.atomic() );
+            }
+
+            {
+                bool threwError = false;
+                try {
+                    M m( BSON( "x" << 5 <<
+                               "$or" << BSON_ARRAY( BSON( "$atomic" << true << "y" << 6 ) ) ) );
+                }
+                catch ( ... ) {
+                    threwError = true;
+                }
+                ASSERT( threwError );
+            }
         }
-    private:
-        /** Helper MatcherVisitor class that records all visit callbacks. */
-        class Visitor : public MatcherVisitor {
-        public:
-            virtual void visitMatcher( const Matcher &matcher ) {
-                _traversal << "Matcher" << extractEqualityFields( matcher );
-            }
-            virtual void visitElementMatcher( const ElementMatcher &elementMatcher ) {
-                _traversal << "ElementMatcher" << elementMatcher._toMatch.wrap();
-            }
-            BSONObj traversal() { return _traversal.obj(); }
-        private:
-            static BSONArray extractEqualityFields( const Matcher &matcher ) {
-                EqualityFieldExtractor extractor( matcher );
-                matcher.visit( extractor );
-                return extractor.equalityFields();                    
-            }
-            BSONObjBuilder _traversal;
-        };
     };
-    
+
+    template <typename M>
+    class SingleSimpleCriterion {
+    public:
+        void run() {
+
+            {
+                M m( BSON( "x" << 5 ) );
+                ASSERT( m.singleSimpleCriterion() );
+            }
+
+            {
+                M m( BSON( "x" << 5 << "y" << 5 ) );
+                ASSERT( !m.singleSimpleCriterion() );
+            }
+
+            {
+                M m( BSON( "x" << BSON( "$gt" << 5 ) ) );
+                ASSERT( !m.singleSimpleCriterion() );
+            }
+
+        }
+    };
+
+    template <typename M>
+    class IndexPortion1 {
+    public:
+        void run() {
+            M full( BSON( "x" << 5 << "y" << 7 ) );
+            M partial( full, BSON( "x" << 1) );
+
+            ASSERT( full.matches( BSON( "x" << 5 << "y" << 7 ) ) );
+            ASSERT( partial.matches( BSON( "x" << 5 << "y" << 7 ) ) );
+
+            ASSERT( !full.matches( BSON( "x" << 5 << "y" << 8 ) ) );
+            ASSERT( partial.matches( BSON( "x" << 5 << "y" << 8 ) ) );
+
+            ASSERT( !full.keyMatch( partial ) );
+            ASSERT( full.keyMatch( full ) );
+            ASSERT( partial.keyMatch( partial ) );
+        }
+    };
+
+    template <typename M>
+    class ExistsFalse1 {
+    public:
+        void run() {
+            {
+                M m( BSON( "a" << BSON( "$exists" << true ) ) );
+                ASSERT( !m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "a" << BSON( "$exists" << false ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "a" << BSON( "$not" << BSON( "$exists" << false ) ) ) );
+                ASSERT( !m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "$or" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << true ) ) ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+            {
+                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$not" << BSON( "$exists" << true ) ) ) ) ) );
+                ASSERT( m.hasExistsFalse() );
+            }
+
+
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "matcher" ) {
         }
 
+#define ADD_BOTH(TEST) \
+        add< TEST<MatcherOld> >(); \
+        add< TEST<Matcher2> >();
+
         void setupTests() {
-            add<Basic>();
-            add<DoubleEqual>();
-            add<MixedNumericEqual>();
-            add<MixedNumericGt>();
-            add<MixedNumericIN>();
-            add<Size>();
-            add<MixedNumericEmbedded>();
-            add<ElemMatchKey>();
+            ADD_BOTH(Basic);
+            ADD_BOTH(DoubleEqual);
+            ADD_BOTH(MixedNumericEqual);
+            ADD_BOTH(MixedNumericGt);
+            ADD_BOTH(MixedNumericIN);
+            ADD_BOTH(Size);
+            ADD_BOTH(MixedNumericEmbedded);
+            ADD_BOTH(ElemMatchKey);
+            ADD_BOTH(WhereSimple1);
             add<Covered::ElemMatchKeyUnindexed>();
             add<Covered::ElemMatchKeyIndexed>();
             add<Covered::ElemMatchKeyIndexedSingleKey>();
-            add<AllTiming>();
-            add<Visit>();
-            add<WithinBox>();
-            add<WithinCenter>();
-            add<WithinPolygon>();
+            ADD_BOTH(AllTiming);
+            ADD_BOTH(WithinBox);
+            ADD_BOTH(WithinCenter);
+            ADD_BOTH(WithinPolygon);
+            ADD_BOTH(AtomicMatchTest);
+            ADD_BOTH(SingleSimpleCriterion);
+            ADD_BOTH(IndexPortion1);
+            ADD_BOTH(ExistsFalse1);
         }
     } dball;
 

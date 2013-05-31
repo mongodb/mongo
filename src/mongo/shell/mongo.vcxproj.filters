@@ -158,6 +158,9 @@
     <Filter Include="JavaScript source files\Included in shell only">
       <UniqueIdentifier>{0d7ccbd5-b4e4-4e57-ae0b-b4a80a6fa6bb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party\MurmurHash3">
+      <UniqueIdentifier>{51e6660e-644c-44e4-b9f9-a44b6f25ccd8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\scripting\engine.cpp">
@@ -1022,6 +1025,48 @@
     <ClCompile Include="..\platform\random_test.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
+      <Filter>third_party\MurmurHash3</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\configuration_variable_manager_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\counter_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_dependency_graph_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\owned_pointer_map_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\owned_pointer_vector_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\parse_number_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\status_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\string_data_test.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_field_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_obj_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_validate_test.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\hex.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\v8\src\apinatives.js">
@@ -1134,6 +1179,9 @@
     </None>
     <None Include="..\platform\SConscript">
       <Filter>platform</Filter>
+    </None>
+    <None Include="..\base\SConscript">
+      <Filter>base</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -1348,9 +1396,6 @@
     <ClInclude Include="..\db\index.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\indexkey.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\instance.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
@@ -1391,9 +1436,6 @@
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\queryutil.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\replutil.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\repl\rs.h">
@@ -1507,7 +1549,6 @@
     <ClInclude Include="..\util\stacktrace.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\util\timer-win32-inl.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -2398,6 +2439,24 @@
     </ClInclude>
     <ClInclude Include="..\platform\hash_namespace.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\repl\is_master.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\sequence_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\status_with.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
+      <Filter>third_party\MurmurHash3</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\safe_num-inl.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\status-inl.h">
+      <Filter>base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

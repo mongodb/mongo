@@ -27,8 +27,7 @@ namespace mongo {
     using namespace mongoutils;
 
     Status (*saslClientAuthenticate)(DBClientWithCommands* client,
-                                     const BSONObj& saslParameters,
-                                     void* sessionHook) = NULL;
+                                     const BSONObj& saslParameters) = NULL;
 
     const char* const saslStartCommandName = "saslStart";
     const char* const saslContinueCommandName = "saslContinue";
@@ -41,8 +40,8 @@ namespace mongo {
     const char* const saslCommandMechanismListFieldName = "supportedMechanisms";
     const char* const saslCommandPasswordFieldName = "pwd";
     const char* const saslCommandPayloadFieldName = "payload";
-    const char* const saslCommandPrincipalFieldName = "user";
-    const char* const saslCommandPrincipalSourceFieldName = "userSource";
+    const char* const saslCommandUserFieldName = "user";
+    const char* const saslCommandUserSourceFieldName = "userSource";
     const char* const saslCommandServiceHostnameFieldName = "serviceHostname";
     const char* const saslCommandServiceNameFieldName = "serviceName";
     const char* const saslCommandDigestPasswordFieldName = "digestPassword";

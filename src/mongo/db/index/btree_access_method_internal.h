@@ -18,9 +18,9 @@
 
 #include <vector>
 
-#include "mongo/bson/ordering.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/index/btree_interface.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -35,7 +35,7 @@ namespace mongo {
      * 2. override newCursor, and
      * 3. override getKeys.
      */
-    template <class Key> class BtreeBasedAccessMethod : public IndexAccessMethod {
+    class BtreeBasedAccessMethod : public IndexAccessMethod {
     public:
         BtreeBasedAccessMethod(IndexDescriptor *descriptor);
         virtual ~BtreeBasedAccessMethod() { }
@@ -56,35 +56,46 @@ namespace mongo {
                                       const InsertDeleteOptions& options,
                                       UpdateTicket* ticket);
 
-        virtual Status update(const UpdateTicket& ticket);
+        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated);
 
         virtual Status newCursor(IndexCursor **out) = 0;
 
         virtual Status touch(const BSONObj& obj);
 
+        virtual Status validate(int64_t* numKeys);
+
     protected:
         // Friends who need getKeys.
-        // TODO: uncomment when builder is in.
-        // template <class K> friend class BtreeBasedIndexBuilder;
+        friend class BtreeBasedBuilder;
 
         // See below for body.
         class BtreeBasedPrivateUpdateData;
 
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
-        IndexDescriptor *_descriptor;
+        IndexDescriptor* _descriptor;
         Ordering _ordering;
+
+        // There are 2 types of Btree disk formats.  We put them both behind one interface.
+        BtreeInterface* _interface;
 
     private:
         bool removeOneKey(const BSONObj& key, const DiskLoc& loc);
     };
 
-    template <class Key> class BtreeBasedAccessMethod<Key>::BtreeBasedPrivateUpdateData
+    /**
+     * What data do we need to perform an update?
+     */
+    class BtreeBasedAccessMethod::BtreeBasedPrivateUpdateData
         : public UpdateTicket::PrivateUpdateData {
     public:
         virtual ~BtreeBasedPrivateUpdateData() { }
+
         BSONObjSet oldKeys, newKeys;
+
+        // These point into the sets oldKeys and newKeys.
         vector<BSONObj*> removed, added;
+
         DiskLoc loc;
         bool dupsAllowed;
     };

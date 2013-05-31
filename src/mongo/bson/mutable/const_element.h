@@ -42,6 +42,7 @@ namespace mutablebson {
 
         inline ConstElement leftChild() const;
         inline ConstElement rightChild() const;
+        inline bool hasChildren() const;
         inline ConstElement leftSibling() const;
         inline ConstElement rightSibling() const;
         inline ConstElement parent() const;
@@ -87,9 +88,16 @@ namespace mutablebson {
         inline StringData getFieldName() const;
         inline Element::RepIdx getIdx() const;
 
+        inline std::string toString() const;
+
         friend bool operator==(const ConstElement&, const ConstElement&);
 
     private:
+        friend class Document;
+
+        template<typename Builder>
+        inline void writeElement(Builder* builder, const StringData* fieldName = NULL) const;
+
         Element _basis;
     };
 

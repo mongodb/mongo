@@ -17,12 +17,14 @@
 */
 
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/lockstate.h"
+
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/client.h"
 #include "mongo/util/mongoutils/str.h"
-#include "lockstate.h"
 
 namespace mongo {
 
@@ -211,16 +213,16 @@ namespace mongo {
     }
 
     void LockState::unlockedOther() {
-        _otherName = "";
+        // we leave _otherName and _otherLock set as
+        // _otherLock exists to cache a pointer
         _otherCount = 0;
-        _otherLock = 0;
     }
 
     LockStat* LockState::getRelevantLockStat() {
         if ( _whichNestable )
             return Lock::nestableLockStat( _whichNestable );
 
-        if ( _otherLock )
+        if ( _otherCount && _otherLock )
             return &_otherLock->stats;
         
         if ( isRW() ) 

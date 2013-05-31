@@ -56,7 +56,7 @@ namespace mutablebson {
     class SafeNum {
     public:
         SafeNum();
-        ~SafeNum() { }
+        ~SafeNum();
 
         //
         // construction support
@@ -106,6 +106,22 @@ namespace mutablebson {
         // TODO other operations than sum
 
         //
+        // logical operation support. Note that these operations are only supported for
+        // integral types. Attempts to apply with either side holding a double value
+        // will result in an EOO typed safenum.
+        //
+
+        // Bitwise 'and' support
+        SafeNum bitAnd(const SafeNum& rhs) const;
+        SafeNum operator&(const SafeNum& rhs) const;
+        SafeNum& operator&=(const SafeNum& rhs);
+
+        // Bitwise 'or' support
+        SafeNum bitOr(const SafeNum& rhs) const;
+        SafeNum operator|(const SafeNum& rhs) const;
+        SafeNum& operator|=(const SafeNum& rhs);
+
+        //
         // output support
         //
 
@@ -117,8 +133,8 @@ namespace mutablebson {
         //
         // accessors
         //
-        bool isValid() const { return _type != EOO; }
-        BSONType type() const { return _type; }
+        bool isValid() const;
+        BSONType type() const;
         std::string debugString() const;
 
         //
@@ -148,6 +164,16 @@ namespace mutablebson {
          */
         static SafeNum addInternal(const SafeNum& lhs, const SafeNum& rhs);
 
+        /** Returns the bitwise 'and' of lhs and rhs, taking into consideration their types. If
+         *  the operation is invalid for the underlying types, returns an EOO instance.
+         */
+        static SafeNum andInternal(const SafeNum& lhs, const SafeNum& rhs);
+
+        /** Returns the bitwise 'or' of lhs and rhs, taking into consideration their types. If
+         *  the operation is invalid for the underlying types, returns an EOO instance.
+         */
+        static SafeNum orInternal(const SafeNum& lhs, const SafeNum& rhs);
+
         /**
          * Extracts the value of 'snum' in a long format. It assumes 'snum' is an NumberInt
          * or a NumberDouble.
@@ -165,3 +191,6 @@ namespace mutablebson {
     std::ostream& operator<<(std::ostream& os, const SafeNum& snum);
 
 } // namespace mongo
+
+#include "mongo/util/safe_num-inl.h"
+

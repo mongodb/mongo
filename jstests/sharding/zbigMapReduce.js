@@ -1,4 +1,11 @@
-s = new ShardingTest( "bigMapReduce" , 2 , 1 , 1 , { rs: true, numReplicas: 2, chunksize : 1 } );
+s = new ShardingTest( { shards : 2, 
+                        verbose : 1,
+                        mongos : 1,
+                        other: { rs: true, 
+                                 numReplicas: 2, 
+                                 chunksize : 1,
+                                 rsOptions: { oplogSize : 50 } } } 
+                       );
 
 // reduce chunk size to split
 var config = s.getDB("config");

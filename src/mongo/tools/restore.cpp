@@ -484,24 +484,33 @@ private:
     }
 
     void createCollectionWithOptions(BSONObj cmdObj) {
-        if (!cmdObj.hasField("create") || cmdObj["create"].String() != _curcoll) {
-            BSONObjBuilder bo;
-            if (!cmdObj.hasField("create")) {
+
+        // Create a new cmdObj to skip undefined fields and fix collection name
+        BSONObjBuilder bo;
+
+        // Add a "create" field if it doesn't exist
+        if (!cmdObj.hasField("create")) {
+            bo.append("create", _curcoll);
+        }
+
+        BSONObjIterator i(cmdObj);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+
+            // Replace the "create" field with the name of the collection we are actually creating
+            if (strcmp(e.fieldName(), "create") == 0) {
                 bo.append("create", _curcoll);
             }
-
-            BSONObjIterator i(cmdObj);
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                if (strcmp(e.fieldName(), "create") == 0) {
-                    bo.append("create", _curcoll);
+            else {
+                if (e.type() == Undefined) {
+                    log() << _curns << ": skipping undefined field: " << e.fieldName() << endl;
                 }
                 else {
                     bo.append(e);
                 }
             }
-            cmdObj = bo.obj();
         }
+        cmdObj = bo.obj();
 
         BSONObj fields = BSON("options" << 1);
         scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces", Query(BSON("name" << _curns)), 0, 0, &fields));

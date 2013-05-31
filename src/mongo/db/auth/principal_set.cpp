@@ -60,7 +60,7 @@ namespace mongo {
         }
     }
 
-    Principal* PrincipalSet::lookup(const PrincipalName& name) const {
+    Principal* PrincipalSet::lookup(const UserName& name) const {
         Principal* principal = lookupByDBName(name.getDB());
         if (principal && principal->getName() == name) {
             return principal;

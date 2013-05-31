@@ -20,48 +20,31 @@
 
 namespace mongo {
 
-    Status::ErrorInfo* Status::getOKInfo() {
-        static ErrorInfo* okInfo = new ErrorInfo(ErrorCodes::OK, "", 0);
-        return okInfo;
+    Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, const StringData& aReason, int aLocation)
+        : code(aCode), reason(aReason.toString()), location(aLocation) {
     }
 
-    Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, const std::string& aReason, int aLocation)
-        : code(aCode), reason(aReason), location(aLocation) {}
+    Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, const StringData& r, int l) {
+        const bool needRep = ((c != ErrorCodes::OK) ||
+                              !r.empty() ||
+                              (l != 0));
+        return needRep ? new ErrorInfo(c, r, l) : NULL;
+    }
 
-    Status::Status(ErrorCodes::Error code, const char* reason, int location) {
-        _error = new ErrorInfo(code, std::string(reason), location);
+    Status::Status(ErrorCodes::Error code, const std::string& reason, int location)
+        : _error(ErrorInfo::create(code, reason, location)) {
         ref(_error);
     }
 
-    Status::Status(ErrorCodes::Error code, const std::string& reason, int location) {
-        _error = new ErrorInfo(code, reason, location);
+    Status::Status(ErrorCodes::Error code, const char* reason, int location)
+        : _error(ErrorInfo::create(code, reason, location)) {
         ref(_error);
-    }
-
-    Status::Status(ErrorInfo* info) {
-        _error = info;
-        ref(info);
-    }
-
-    Status::Status(const Status& other) {
-        ref(other._error);
-        _error = other._error;
-    }
-
-    Status& Status::operator=(const Status& other) {
-        ref(other._error);
-        unref(_error);
-        _error = other._error;
-        return *this;
-    }
-
-    Status::~Status() {
-        unref(_error);
     }
 
     bool Status::compare(const Status& other) const {
-        return _error->code == other._error->code &&
-               _error->location == other._error->location;
+        return
+            code() == other.code() &&
+            location() == other.location();
     }
 
     bool Status::operator==(const Status& other) const {
@@ -73,7 +56,7 @@ namespace mongo {
     }
 
     bool Status::compareCode(const ErrorCodes::Error other) const {
-        return _error->code == other;
+        return code() == other;
     }
 
     bool Status::operator==(const ErrorCodes::Error other) const {
@@ -82,25 +65,6 @@ namespace mongo {
 
     bool Status::operator!=(const ErrorCodes::Error other) const {
         return ! compareCode(other);
-    }
-
-    void Status::ref(ErrorInfo* error) {
-        // okInfo is never deallocated, so no need to bump ref here.
-        if (error == getOKInfo()) {
-            return;
-        }
-        error->refs.fetchAndAdd(1);
-    }
-
-    void Status::unref(ErrorInfo* error) {
-        // okInfo is never deallocated.
-        if (error == getOKInfo()) {
-            return;
-        }
-
-        if (error->refs.subtractAndFetch(1) == 0) {
-            delete error;
-        }
     }
 
     std::ostream& operator<<(std::ostream& os, const Status& status) {
@@ -120,11 +84,5 @@ namespace mongo {
             ss << " @ " << location();
         return ss.str();
     }
-
-namespace {
-    /// Ensure that Status::OK() is called at least once in single threaded context,
-    /// by creating a global variable whose static initializer calls it.
-    Status okStatusInstance = Status::OK();
-}  // namespace
 
 } // namespace mongo

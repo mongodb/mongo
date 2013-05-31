@@ -491,6 +491,18 @@ namespace mongo {
         verify(0);
     }
 
+    // A SCC should be reused only if all the existing connections haven't been broken in the
+    // background.
+    // Note: an SCC may have missing connections if a config server is temporarily offline,
+    // but reading from the others is still allowed.
+    bool SyncClusterConnection::isStillConnected() {
+        for ( size_t i = 0; i < _conns.size(); i++ ) {
+            if ( _conns[i] && !_conns[i]->isStillConnected() ) return false;
+
+        }
+        return true;
+    }
+
     void SyncClusterConnection::setAllSoTimeouts( double socketTimeout ){
         _socketTimeout = socketTimeout;
         for ( size_t i=0; i<_conns.size(); i++ )

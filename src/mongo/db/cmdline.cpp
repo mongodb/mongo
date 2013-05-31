@@ -85,6 +85,7 @@ namespace {
         ("keyFile", po::value<string>(), "private key for cluster authentication")
         ("setParameter", po::value< std::vector<std::string> >()->composing(),
                 "Set a configurable parameter")
+        ("httpinterface", "enable http interface")
 #ifndef _WIN32
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
@@ -110,6 +111,7 @@ namespace {
         
         // Extra hidden options
         hidden.add_options()
+        ("nohttpinterface", "disable http interface")
         ("objcheck", "inspect client data for validity on receipt (DEFAULT)")
         ("noobjcheck", "do NOT inspect client data for validity on receipt")
         ("traceExceptions", "log stack traces for every exception")
@@ -310,10 +312,6 @@ namespace {
 
             if ( cmdLine.maxConns < 5 ) {
                 out() << "maxConns has to be at least 5" << endl;
-                return false;
-            }
-            else if ( cmdLine.maxConns > MAX_MAX_CONN ) {
-                out() << "maxConns can't be greater than " << MAX_MAX_CONN << endl;
                 return false;
             }
         }

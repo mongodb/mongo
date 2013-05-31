@@ -22,12 +22,18 @@
 
 namespace mongo {
 
+    /**
+     * Internal class used by BtreeAccessMethod to generate keys for indexed documents.
+     * This class is meant to be kept under the index access layer.
+     */
     class BtreeKeyGenerator {
     public:
         BtreeKeyGenerator(vector<const char*> fieldNames, vector<BSONElement> fixed, bool isSparse);
         virtual ~BtreeKeyGenerator() { }
 
         void getKeys(const BSONObj &obj, BSONObjSet *keys) const;
+
+        static const int ParallelArraysCode;
 
     protected:
         // These are used by the getKeysImpl(s) below.

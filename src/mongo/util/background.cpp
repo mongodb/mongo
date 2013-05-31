@@ -65,7 +65,7 @@ namespace mongo {
             run();
         }
         catch ( std::exception& e ) {
-            LOG( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
+            LOG( LL_ERROR ) << "backgroundjob " << name() << " exception: " << e.what() << endl;
         }
         catch(...) {
             LOG( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
@@ -78,7 +78,9 @@ namespace mongo {
         }
 
 #ifdef MONGO_SSL
-        SSLManager::cleanupThreadLocals();
+        SSLManagerInterface* manager = getSSLManager();
+        if (manager)
+            manager->cleanupThreadLocals();
 #endif
         if( status->deleteSelf )
             delete this;

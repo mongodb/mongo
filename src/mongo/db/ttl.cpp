@@ -26,7 +26,7 @@
 #include "mongo/db/databaseholder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/replutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/util/background.h"
 
 namespace mongo {

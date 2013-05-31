@@ -20,6 +20,7 @@
 
 #include "mongo/db/index.h"  // For IndexDetails.
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_details.h"  // For NamespaceDetails.
 
 namespace mongo {
 
@@ -44,10 +45,10 @@ namespace mongo {
          * OnDiskIndexData is a pointer to the memory mapped per-index data.
          * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
          */
-        IndexDescriptor(OnDiskIndexData* data, BSONObj infoObj)
-            : _onDiskData(data)
-            , _infoObj(infoObj)
-            , _numFields(infoObj.getObjectField("key").nFields()) { }
+        IndexDescriptor(NamespaceDetails* namespaceDetails, int indexNumber, OnDiskIndexData* data,
+                        BSONObj infoObj)
+            : _namespaceDetails(namespaceDetails), _indexNumber(indexNumber), _onDiskData(data),
+              _infoObj(infoObj), _numFields(infoObj.getObjectField("key").nFields()) { }
 
         //
         // Information about the key pattern.
@@ -105,6 +106,9 @@ namespace mongo {
         // Is this index sparse?
         bool isSparse() const { return _infoObj["sparse"].trueValue(); }
 
+        // Is this index multikey?
+        bool isMultikey() const { return _namespaceDetails->isMultikey(_indexNumber); }
+
         //
         // Properties that are Index-specific.
         //
@@ -126,7 +130,27 @@ namespace mongo {
         // Return a (rather compact) string representation.
         string toString() { return _infoObj.toString(); }
 
+        // Return the info object.
+        BSONObj infoObj() { return _infoObj; }
+
+        // Set multikey attribute.  We never unset it.
+        void setMultikey() {
+            _namespaceDetails->setIndexIsMultikey(parentNS().c_str(), _indexNumber);
+        }
+
+        // Is this index being created in the background?
+        bool isBackgroundIndex() {
+            return _indexNumber >= _namespaceDetails->nIndexes;
+        }
+
     private:
+        // Related catalog information.
+        NamespaceDetails* _namespaceDetails;
+
+        // What # index are we in the catalog represented by _namespaceDetails?  Needed for setting
+        // and getting multikey.
+        int _indexNumber;
+
         OnDiskIndexData* _onDiskData;
 
         // The BSONObj describing the index.  Accessed through the various members above.

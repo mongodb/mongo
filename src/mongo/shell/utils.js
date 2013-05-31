@@ -224,7 +224,8 @@ if ( typeof _threadInject != "undefined" ){
                                                         // this has a chance to see the message
                                    "jstests/connections_opened.js", // counts connections, globally
                                    "jstests/opcounters.js",
-                                   "jstests/currentop.js"// SERVER-8673, plus rwlock yielding issues
+                                   "jstests/currentop.js", // SERVER-8673, plus rwlock yielding issues
+                                   "jstests/set_param1.js" // changes global state
                                   ] );
         
         // some tests can't be run in parallel with each other

@@ -18,7 +18,6 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "sock.h"
 
 namespace mongo {
 
@@ -68,11 +67,5 @@ namespace mongo {
 
     private:
         int _go( const char * command , string url , const char * body , Result * result );
-
-#ifdef MONGO_SSL
-        void _checkSSLManager();
-
-        scoped_ptr<SSLManager> _sslManager;
-#endif
     };
 }

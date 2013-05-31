@@ -16,7 +16,11 @@ env.StaticLibrary('base', ['configuration_variable_manager.cpp',
                            'make_string_vector.cpp',
                            'parse_number.cpp',
                            'status.cpp',
-                           'string_data.cpp'])
+                           'string_data.cpp',
+                           ],
+                           LIBDEPS=[
+                           '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
+                           ])
 
 env.CppUnitTest('configuration_variable_manager_test',
                 ['configuration_variable_manager_test.cpp'],

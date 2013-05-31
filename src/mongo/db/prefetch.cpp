@@ -20,6 +20,7 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
@@ -103,7 +104,6 @@ namespace mongo {
 
     void prefetchIndexPages(NamespaceDetails *nsd, const BSONObj& obj) {
         DiskLoc unusedDl; // unused
-        IndexInterface::IndexInserter inserter;
         BSONObjSet unusedKeys;
         ReplSetImpl::IndexPrefetchConfig prefetchConfig = theReplSet->getIndexPrefetchConfig();
 
@@ -121,13 +121,9 @@ namespace mongo {
             int indexNo = nsd->findIdIndex();
             if (indexNo == -1) return;
             try {
-                fetchIndexInserters(/*out*/unusedKeys, 
-                                    inserter, 
-                                    nsd, 
-                                    indexNo, 
-                                    obj, 
-                                    unusedDl, 
-                                    /*allowDups*/true);
+                auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, indexNo));
+                auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(desc.get()));
+                iam->touch(obj);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;
@@ -143,13 +139,9 @@ namespace mongo {
                 TimerHolder timer( &prefetchIndexStats);
                 // This will page in all index pages for the given object.
                 try {
-                    fetchIndexInserters(/*out*/unusedKeys, 
-                                        inserter, 
-                                        nsd, 
-                                        indexNo, 
-                                        obj, 
-                                        unusedDl, 
-                                        /*allowDups*/true);
+                    auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, indexNo));
+                    auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(desc.get()));
+                    iam->touch(obj);
                 }
                 catch (const DBException& e) {
                     LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;

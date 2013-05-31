@@ -116,7 +116,7 @@ namespace mongo {
         }
 
         bool operator<=( const ChunkVersion& otherVersion ) const {
-            return this->_combined < otherVersion._combined;
+            return this->_combined <= otherVersion._combined;
         }
 
         //

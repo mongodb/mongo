@@ -33,7 +33,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
@@ -56,7 +56,10 @@ namespace mongo {
     boost::recursive_mutex& ClientCursor::ccmutex( *(new boost::recursive_mutex()) );
     long long ClientCursor::numberTimedOut = 0;
 
-    void aboutToDeleteForSharding( const Database* db, const NamespaceDetails* nsd, const DiskLoc& dl ); // from s/d_logic.h
+    void aboutToDeleteForSharding( const StringData& ns,
+                                   const Database* db,
+                                   const NamespaceDetails* nsd,
+                                   const DiskLoc& dl ); // from s/d_logic.h
 
     /*static*/ void ClientCursor::assertNoCursors() {
         recursive_scoped_lock lock(ccmutex);
@@ -222,7 +225,10 @@ namespace mongo {
     }
 
     /* must call this on a delete so we clean up the cursors. */
-    void ClientCursor::aboutToDelete(const NamespaceDetails* nsd, const DiskLoc& dl) {
+    void ClientCursor::aboutToDelete( const StringData& ns,
+                                      const NamespaceDetails* nsd,
+                                      const DiskLoc& dl )
+    {
         NoPageFaultsAllowed npfa;
 
         recursive_scoped_lock lock(ccmutex);
@@ -230,7 +236,7 @@ namespace mongo {
         Database *db = cc().database();
         verify(db);
 
-        aboutToDeleteForSharding( db, nsd, dl );
+        aboutToDeleteForSharding( ns, db, nsd, dl );
 
         CCByLoc& bl = db->ccByLoc;
         CCByLoc::iterator j = bl.lower_bound(ByLocKey::min(dl));
@@ -572,7 +578,11 @@ namespace mongo {
                     // This sleep helps reader threads yield to writer threads.
                     // Without this, the underlying reader/writer lock implementations
                     // are not sufficiently writer-greedy.
+#ifdef _WIN32
+                    SwitchToThread();
+#else
                     sleepmicros(1);
+#endif
                 }
                 else {
                     if ( micros == -1 )
@@ -883,7 +893,7 @@ namespace mongo {
         }
 
         // Can't be in a lock when checking authorization
-        if (!cc().getAuthorizationManager()->checkAuthorization(ns, ActionType::killCursors)) {
+        if (!cc().getAuthorizationSession()->checkAuthorization(ns, ActionType::killCursors)) {
             return false;
         }
 

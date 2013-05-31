@@ -18,19 +18,26 @@
 
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/db/index/btree_index_cursor.h"
+#include "mongo/db/index/btree_interface.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pdfile_private.h"
 
 namespace mongo {
 
-    template <class Key> BtreeBasedAccessMethod<Key>::BtreeBasedAccessMethod(
-        IndexDescriptor *descriptor) : _descriptor(descriptor),
-                                       _ordering(Ordering::make(_descriptor->keyPattern())) { }
+    BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexDescriptor *descriptor)
+        : _descriptor(descriptor), _ordering(Ordering::make(_descriptor->keyPattern())) {
+
+        verify(0 == descriptor->version() || 1 == descriptor->version());
+        _interface = BtreeInterface::interfaces[descriptor->version()];
+    }
 
     // Find the keys for obj, put them in the tree pointing to loc
-    template <class Key> Status BtreeBasedAccessMethod<Key>::insert(const BSONObj& obj,
-        const DiskLoc& loc, const InsertDeleteOptions& options, int64_t* numInserted) {
+    Status BtreeBasedAccessMethod::insert(const BSONObj& obj, const DiskLoc& loc,
+            const InsertDeleteOptions& options, int64_t* numInserted) {
 
         *numInserted = 0;
 
@@ -42,13 +49,13 @@ namespace mongo {
 
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
             try {
-                _descriptor->getHead().btree<Key>()->bt_insert(
-                    _descriptor->getHead(), loc, *i, _ordering, options.dupsAllowed,
-                    _descriptor->getOnDisk(), true);
+                _interface->bt_insert(_descriptor->getHead(), loc, *i, _ordering,
+                                      options.dupsAllowed, _descriptor->getOnDisk(), true);
                 ++*numInserted;
             } catch (AssertionException& e) {
-                if (10287 == e.getCode() && options.dupsAllowed) {
-                    // Duplicate key, but our options say to ignore it.
+                if (10287 == e.getCode() && _descriptor->isBackgroundIndex()) {
+                    // This is the duplicate key exception.  We ignore it for some reason in BG
+                    // indexing.
                     DEV log() << "info: key already in index during bg indexing (ok)\n";
                 } else if (!options.dupsAllowed) {
                     // Assuming it's a duplicate key exception.  Clean up any inserted keys.
@@ -66,17 +73,18 @@ namespace mongo {
             }
         }
 
+        if (*numInserted > 1) {
+            _descriptor->setMultikey();
+        }
+
         return ret;
     }
 
-    template <class Key> bool BtreeBasedAccessMethod<Key>::removeOneKey(const BSONObj& key,
-        const DiskLoc& loc) {
-
+    bool BtreeBasedAccessMethod::removeOneKey(const BSONObj& key, const DiskLoc& loc) {
         bool ret = false;
 
         try {
-            ret = _descriptor->getHead().btree<Key>()->unindex(_descriptor->getHead(),
-                _descriptor->getOnDisk(), key, loc);
+            ret = _interface->unindex(_descriptor->getHead(), _descriptor->getOnDisk(), key, loc);
         } catch (AssertionException& e) {
             problem() << "Assertion failure: _unindex failed "
                 << _descriptor->indexNamespace() << endl;
@@ -91,9 +99,8 @@ namespace mongo {
     }
 
     // Remove the provided doc from the index.
-    template <class Key> Status BtreeBasedAccessMethod<Key>::remove(
-        const BSONObj &obj, const DiskLoc& loc, const InsertDeleteOptions &options,
-        int64_t* numDeleted) {
+    Status BtreeBasedAccessMethod::remove(const BSONObj &obj, const DiskLoc& loc,
+        const InsertDeleteOptions &options, int64_t* numDeleted) {
 
         BSONObjSet keys;
         getKeys(obj, &keys);
@@ -133,22 +140,27 @@ namespace mongo {
         }
     }
 
-    template <class Key> Status BtreeBasedAccessMethod<Key>::touch(const BSONObj &obj) {
+    Status BtreeBasedAccessMethod::touch(const BSONObj& obj) {
         BSONObjSet keys;
         getKeys(obj, &keys);
 
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            DiskLoc unusedDiskLoc;
             int unusedPos;
             bool unusedFound;
-            _descriptor->getHead().btree<Key>()->locate(_descriptor->getOnDisk(),
-                _descriptor->getHead(), *i, _ordering, unusedPos, unusedFound, unusedDiskLoc, 1);
+            DiskLoc unusedDiskLoc;
+            _interface->locate(_descriptor->getOnDisk(), _descriptor->getHead(), *i, _ordering,
+                               unusedPos, unusedFound, unusedDiskLoc, 1);
         }
 
         return Status::OK();
     }
 
-    template <class Key> Status BtreeBasedAccessMethod<Key>::validateUpdate(
+    Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {
+        *numKeys = _interface->fullValidate(_descriptor->getHead(), _descriptor->keyPattern());
+        return Status::OK();
+    }
+
+    Status BtreeBasedAccessMethod::validateUpdate(
         const BSONObj &from, const BSONObj &to, const DiskLoc &record,
         const InsertDeleteOptions &options, UpdateTicket* status) {
 
@@ -160,21 +172,22 @@ namespace mongo {
         data->loc = record;
         data->dupsAllowed = options.dupsAllowed;
 
-        status->_isMultiKey = data->newKeys.size() > 1;
-
         setDifference(data->oldKeys, data->newKeys, &data->removed);
         setDifference(data->newKeys, data->oldKeys, &data->added);
 
-        // Check for dups.
-        if (!data->added.empty() && _descriptor->unique() && !options.dupsAllowed) {
-            const BtreeBucket<Key> *head = _descriptor->getHead().btree<Key>();
+        bool checkForDups = !data->added.empty()
+            && (KeyPattern::isIdKeyPattern(_descriptor->keyPattern()) || _descriptor->unique())
+            && !options.dupsAllowed;
+
+        if (checkForDups) {
             for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
-                typename Key::KeyOwned key(**i);
-                if (head->wouldCreateDup(_descriptor->getOnDisk(), _descriptor->getHead(),
-                                         key, _ordering, record)) {
+                if (_interface->wouldCreateDup(_descriptor->getOnDisk(), _descriptor->getHead(),
+                                               **i, _ordering, record)) {
                     status->_isValid = false;
                     return Status(ErrorCodes::DuplicateKey,
-                        head->dupKeyError(_descriptor->getOnDisk(), key));
+                                  _interface->dupKeyError(_descriptor->getHead(),
+                                                          _descriptor->getOnDisk(),
+                                                          **i));
                 }
             }
         }
@@ -184,30 +197,36 @@ namespace mongo {
         return Status::OK();
     }
 
-    template <class Key> Status BtreeBasedAccessMethod<Key>::update(const UpdateTicket& ticket) {
+    Status BtreeBasedAccessMethod::update(const UpdateTicket& ticket, int64_t* numUpdated) {
         if (!ticket._isValid) {
             return Status(ErrorCodes::InternalError, "Invalid updateticket in update");
         }
 
-        BtreeBasedPrivateUpdateData *data =
+        BtreeBasedPrivateUpdateData* data =
             static_cast<BtreeBasedPrivateUpdateData*>(ticket._indexSpecificUpdateData.get());
 
+        if (data->oldKeys.size() + data->added.size() - data->removed.size() > 1) {
+            _descriptor->setMultikey();
+        }
+
         for (size_t i = 0; i < data->added.size(); ++i) {
-            _descriptor->getHead().btree<Key>()->bt_insert(_descriptor->getHead(), data->loc,
-                *data->added[i], _ordering, data->dupsAllowed, _descriptor->getOnDisk(), true);
+            _interface->bt_insert(_descriptor->getHead(), data->loc, *data->added[i], _ordering,
+                                  data->dupsAllowed, _descriptor->getOnDisk(), true);
         }
 
         for (size_t i = 0; i < data->removed.size(); ++i) {
-            _descriptor->getHead().btree<Key>()->unindex(_descriptor->getHead(),
-                _descriptor->getOnDisk(), *data->removed[i], data->loc);
+            _interface->unindex(_descriptor->getHead(), _descriptor->getOnDisk(), *data->removed[i],
+                                data->loc);
         }
+
+        *numUpdated = data->added.size();
 
         return Status::OK();
     }
 
     // Standard Btree implementation below.
-    template <class Key> BtreeAccessMethod<Key>::BtreeAccessMethod(IndexDescriptor *descriptor)
-        : BtreeBasedAccessMethod<Key>(descriptor) {
+    BtreeAccessMethod::BtreeAccessMethod(IndexDescriptor* descriptor)
+        : BtreeBasedAccessMethod(descriptor) {
 
         // The key generation wants these values.
         vector<const char*> fieldNames;
@@ -231,20 +250,13 @@ namespace mongo {
         }
     }
 
-    template <class Key> void BtreeAccessMethod<Key>::getKeys(const BSONObj &obj,
-                                                              BSONObjSet *keys) {
+    void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
         _keyGenerator->getKeys(obj, keys);
     }
 
-    template <class Key> Status BtreeAccessMethod<Key>::newCursor(IndexCursor **out) {
-        *out = new BtreeIndexCursor<Key>(_descriptor, _ordering);
+    Status BtreeAccessMethod::newCursor(IndexCursor** out) {
+        *out = new BtreeIndexCursor(_descriptor, _ordering, _interface);
         return Status::OK();
     }
-
-    template class BtreeBasedAccessMethod<V0>;
-    template class BtreeBasedAccessMethod<V1>;
-
-    template class BtreeAccessMethod<V0>;
-    template class BtreeAccessMethod<V1>;
 
 }  // namespace mongo

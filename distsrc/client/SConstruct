@@ -75,7 +75,7 @@ for lib in boostLibs:
             Exit(1)
 
 env['MONGO_BUILD_SASL_CLIENT'] = conf.CheckLibWithHeader(
-    "gsasl", "gsasl.h", "C", "gsasl_check_version(GSASL_VERSION);", autoadd=False)
+    "sasl2", "sasl/sasl.h", "C", "sasl_version_info(0, 0, 0, 0, 0, 0);", autoadd=False)
 
 conf.Finish()
 

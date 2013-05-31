@@ -17,12 +17,14 @@
 */
 
 
-#include "pch.h"
-#include "diskloc.h"
-#include "pagefault.h"
-#include "client.h"
-#include "pdfile.h"
-#include "server.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/pagefault.h"
+
+#include "mongo/db/client.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/server.h"
 
 namespace mongo { 
 

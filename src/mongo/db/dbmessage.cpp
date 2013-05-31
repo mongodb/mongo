@@ -15,8 +15,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "dbmessage.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/dbmessage.h"
 
 namespace mongo {
 

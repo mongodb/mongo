@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "dur_journalformat.h"
-#include "../util/bufreader.h"
-#include "../util/paths.h"
+#include "mongo/db/dur_journalformat.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/paths.h"
 
 namespace mongo {
 

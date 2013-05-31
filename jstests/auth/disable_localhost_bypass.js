@@ -1,10 +1,13 @@
-var conn = MongoRunner.runMongod({ auth: "", smallfiles: ""});
+var conn1 = MongoRunner.runMongod({ auth: "",
+                                    smallfiles: "",
+                                    setParameter: "enableLocalhostAuthBypass=true"});
+var conn2 = MongoRunner.runMongod({ auth: "",
+                                    smallfiles: "",
+                                    setParameter: "enableLocalhostAuthBypass=false"});
 
-var test = conn.getDB("test");
+// Should succeed because of localhost exception
+conn1.getDB("test").foo.insert({a:1});
+assert.eq(1, conn1.getDB("test").foo.findOne().a);
 
-test.foo.insert({a:1});
-assert.eq(1, test.foo.findOne().a);
-
-conn.getDB("admin").runCommand({setParameter:1, enableLocalhostAuthBypass:false});
-
-assert.throws(function() { db.foo.findOne(); });
+// Should fail since localhost exception is disabled
+assert.throws(function() { conn2.getDB("test").foo.findOne(); });

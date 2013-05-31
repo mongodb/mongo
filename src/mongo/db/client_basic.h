@@ -25,7 +25,7 @@ namespace mongo {
 
     class AuthenticationInfo;
     class AuthenticationSession;
-    class AuthorizationManager;
+    class AuthorizationSession;
 
     /**
      * this is the base class for Client and ClientInfo
@@ -41,9 +41,9 @@ namespace mongo {
         void resetAuthenticationSession(AuthenticationSession* newSession);
         void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other);
 
-        bool hasAuthorizationManager() const;
-        AuthorizationManager* getAuthorizationManager() const;
-        void setAuthorizationManager(AuthorizationManager* authorizationManager);
+        bool hasAuthorizationSession() const;
+        AuthorizationSession* getAuthorizationSession() const;
+        void setAuthorizationSession(AuthorizationSession* authorizationSession);
 
         bool getIsLocalHostConnection() {
             if (!hasRemote()) {
@@ -67,7 +67,7 @@ namespace mongo {
 
     private:
         boost::scoped_ptr<AuthenticationSession> _authenticationSession;
-        boost::scoped_ptr<AuthorizationManager> _authorizationManager;
+        boost::scoped_ptr<AuthorizationSession> _authorizationSession;
         AbstractMessagingPort* const _messagingPort;
     };
 }

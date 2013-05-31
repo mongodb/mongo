@@ -458,6 +458,40 @@ namespace {
         ASSERT_EQUALS(mongo::String, t0.getType());
     }
 
+    TEST(Element, toString) {
+        mongo::BSONObj obj = mongo::fromjson("{ a : 1, b : [1, 2, 3], c : { x : 'x' } }");
+        mmb::Document doc(obj);
+
+        // Deserialize the 'c' but keep its value the same.
+        mmb::Element c = doc.root().rightChild();
+        ASSERT_TRUE(c.ok());
+        ASSERT_OK(c.appendString("y", "y"));
+        ASSERT_OK(c.popBack());
+
+        // 'a'
+        mongo::BSONObjIterator iter(obj);
+        mmb::Element docChild = doc.root().leftChild();
+        ASSERT_TRUE(docChild.ok());
+        ASSERT_EQUALS(iter.next().toString(), docChild.toString());
+
+        // 'b'
+        docChild = docChild.rightSibling();
+        ASSERT_TRUE(docChild.ok());
+        ASSERT_TRUE(iter.more());
+        ASSERT_EQUALS(iter.next().toString(), docChild.toString());
+
+        // 'c'
+        docChild = docChild.rightSibling();
+        ASSERT_TRUE(docChild.ok());
+        ASSERT_TRUE(iter.more());
+        ASSERT_EQUALS(iter.next().toString(), docChild.toString());
+
+        // eoo
+        docChild = docChild.rightSibling();
+        ASSERT_FALSE(iter.more());
+        ASSERT_FALSE(docChild.ok());
+    }
+
     TEST(TimestampType, createElement) {
         mmb::Document doc;
 
@@ -920,6 +954,381 @@ namespace {
         ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
     }
 
+    TEST(Document, ArrayIndexedAccessFromJson) {
+        static const char inJson[] =
+            "{"
+            " a : 1, b : [{ c : 1 }]"
+            "}";
 
-} // namespace
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        mmb::Element a = doc.root().leftChild();
+        ASSERT_TRUE(a.ok());
+        ASSERT_EQUALS("a", a.getFieldName());
+        ASSERT_EQUALS(mongo::NumberInt, a.getType());
+
+        mmb::Element b = a.rightSibling();
+        ASSERT_TRUE(b.ok());
+        ASSERT_EQUALS("b", b.getFieldName());
+        ASSERT_EQUALS(mongo::Array, b.getType());
+
+        mmb::Element b0 = b[0];
+        ASSERT_TRUE(b0.ok());
+        ASSERT_EQUALS("0", b0.getFieldName());
+        ASSERT_EQUALS(mongo::Object, b0.getType());
+    }
+
+    TEST(Document, ArrayIndexedAccessFromManuallyBuilt) {
+        mmb::Document doc;
+        mmb::Element root = doc.root();
+        ASSERT_TRUE(root.ok());
+        {
+            ASSERT_OK(root.appendInt("a", 1));
+            mmb::Element b = doc.makeElementArray("b");
+            ASSERT_TRUE(b.ok());
+            ASSERT_OK(root.pushBack(b));
+            mmb::Element b0 = doc.makeElementObject("ignored");
+            ASSERT_TRUE(b0.ok());
+            ASSERT_OK(b.pushBack(b0));
+            ASSERT_OK(b0.appendInt("c", 1));
+        }
+
+        mmb::Element a = doc.root().leftChild();
+        ASSERT_TRUE(a.ok());
+        ASSERT_EQUALS("a", a.getFieldName());
+        ASSERT_EQUALS(mongo::NumberInt, a.getType());
+
+        mmb::Element b = a.rightSibling();
+        ASSERT_TRUE(b.ok());
+        ASSERT_EQUALS("b", b.getFieldName());
+        ASSERT_EQUALS(mongo::Array, b.getType());
+
+        mmb::Element b0 = b[0];
+        ASSERT_TRUE(b0.ok());
+        ASSERT_EQUALS("ignored", b0.getFieldName());
+        ASSERT_EQUALS(mongo::Object, b0.getType());
+    }
+
+    TEST(Document, EndElement) {
+        mmb::Document doc;
+        mmb::Element end = doc.end();
+        ASSERT_FALSE(end.ok());
+        mmb::Element missing = doc.root().leftChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().leftSibling();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightSibling();
+        ASSERT_EQUALS(end, missing);
+    }
+
+    TEST(Document, ConstEndElement) {
+        const mmb::Document doc;
+        mmb::ConstElement end = doc.end();
+        ASSERT_FALSE(end.ok());
+        mmb::ConstElement missing = doc.root().leftChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightChild();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().leftSibling();
+        ASSERT_EQUALS(end, missing);
+        missing = doc.root().rightSibling();
+        ASSERT_EQUALS(end, missing);
+    }
+
+    TEST(Element, EmptyDocHasNoChildren) {
+        mmb::Document doc;
+        ASSERT_FALSE(doc.root().hasChildren());
+    }
+
+    TEST(Element, PopulatedDocHasChildren) {
+        mmb::Document doc;
+        ASSERT_OK(doc.root().appendInt("a", 1));
+        ASSERT_TRUE(doc.root().hasChildren());
+        mmb::Element lc = doc.root().leftChild();
+        ASSERT_FALSE(lc.hasChildren());
+    }
+
+    TEST(Element, LazyEmptyDocHasNoChildren) {
+        static const char inJson[] = "{}";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+        ASSERT_FALSE(doc.root().hasChildren());
+    }
+
+    TEST(Element, LazySingletonDocHasChildren) {
+        static const char inJson[] = "{ a : 1 }";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+        ASSERT_TRUE(doc.root().hasChildren());
+        ASSERT_FALSE(doc.root().leftChild().hasChildren());
+    }
+
+    TEST(Element, LazyConstDoubletonDocHasChildren) {
+        static const char inJson[] = "{ a : 1, b : 2 }";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        const mmb::Document doc(inObj);
+        ASSERT_TRUE(doc.root().hasChildren());
+        ASSERT_FALSE(doc.root().leftChild().hasChildren());
+        ASSERT_FALSE(doc.root().rightChild().hasChildren());
+        ASSERT_FALSE(doc.root().leftChild() == doc.root().rightChild());
+    }
+
+    TEST(Document, AddChildToEmptyOpaqueSubobject) {
+        mongo::BSONObj inObj = mongo::fromjson("{a: {}}");
+        mmb::Document doc(inObj);
+
+        mmb::Element elem = doc.root()["a"];
+        ASSERT_TRUE(elem.ok());
+
+        mmb::Element newElem = doc.makeElementInt("0", 1);
+        ASSERT_TRUE(newElem.ok());
+
+        ASSERT_OK(elem.pushBack(newElem));
+    }
+
+    TEST(Element, IsNumeric) {
+        mmb::Document doc;
+
+        mmb::Element elt = doc.makeElementNull("dummy");
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementInt("dummy", 42);
+        ASSERT_TRUE(elt.isNumeric());
+
+        elt = doc.makeElementString("dummy", "dummy");
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementLong("dummy", 42);
+        ASSERT_TRUE(elt.isNumeric());
+
+        elt = doc.makeElementBool("dummy", false);
+        ASSERT_FALSE(elt.isNumeric());
+
+        elt = doc.makeElementDouble("dummy", 42.0);
+        ASSERT_TRUE(elt.isNumeric());
+    }
+
+    TEST(Element, IsIntegral) {
+        mmb::Document doc;
+
+        mmb::Element elt = doc.makeElementNull("dummy");
+        ASSERT_FALSE(elt.isIntegral());
+
+        elt = doc.makeElementInt("dummy", 42);
+        ASSERT_TRUE(elt.isIntegral());
+
+        elt = doc.makeElementString("dummy", "dummy");
+        ASSERT_FALSE(elt.isIntegral());
+
+        elt = doc.makeElementLong("dummy", 42);
+        ASSERT_TRUE(elt.isIntegral());
+
+        elt = doc.makeElementDouble("dummy", 42.0);
+        ASSERT_FALSE(elt.isIntegral());
+    }
+
+    TEST(Document, ArraySerialization) {
+
+        static const char inJson[] =
+            "{ "
+            " 'a' : { 'b' : [ 'c', 'd' ] } "
+            "}";
+
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        mmb::Element root = doc.root();
+        mmb::Element a = root.leftChild();
+        mmb::Element b = a.leftChild();
+        mmb::Element new_array = doc.makeElementArray("XXX");
+        mmb::Element e = doc.makeElementString("e", "e");
+        new_array.pushBack(e);
+        b.pushBack(new_array);
+
+        static const char outJson[] =
+            "{ "
+            " 'a' : { 'b' : [ 'c', 'd', [ 'e' ] ] } "
+            "}";
+
+        const mongo::BSONObj outObj = doc.getObject();
+        ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
+    }
+
+    TEST(Document, SetValueBSONElementFieldNameHandling) {
+        static const char inJson[] = "{ a : 4 }";
+        mongo::BSONObj inObj = mongo::fromjson(inJson);
+        mmb::Document doc(inObj);
+
+        static const char inJson2[] = "{ b : 5 }";
+        mongo::BSONObj inObj2 = mongo::fromjson(inJson2);
+        mongo::BSONObjIterator iterator = inObj2.begin();
+
+        ASSERT_TRUE(iterator.more());
+        const mongo::BSONElement b = iterator.next();
+
+        mmb::Element a = doc.root().leftChild();
+        a.setValueBSONElement(b);
+
+        static const char outJson[] = "{ a : 5 }";
+        ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    }
+
+    TEST(Document, CreateElementWithEmptyFieldName) {
+        mmb::Document doc;
+        mmb::Element noname = doc.makeElementObject(mongo::StringData());
+        ASSERT_TRUE(noname.ok());
+        ASSERT_EQUALS(mongo::StringData(), noname.getFieldName());
+    }
+
+    TEST(Document, CreateElementFromBSONElement) {
+        mongo::BSONObj obj = mongo::fromjson("{a:1}}");
+        mmb::Document doc;
+        ASSERT_OK(doc.root().appendElement(obj["a"]));
+
+        mmb::Element newElem = doc.root()["a"];
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(newElem.getType(), mongo::NumberInt);
+        ASSERT_EQUALS(newElem.getValueInt(), 1);
+    }
+
+    TEST(Document, toStringEmpty) {
+        mongo::BSONObj obj;
+        mmb::Document doc;
+        ASSERT_EQUALS(obj.toString(), doc.toString());
+    }
+
+    TEST(Document, toStringComplex) {
+        mongo::BSONObj obj = mongo::fromjson("{a : 1, b : [1, 2, 3], c : 'c'}");
+        mmb::Document doc(obj);
+        ASSERT_EQUALS(obj.toString(), doc.toString());
+    }
+
+    TEST(Document, ElementCloningToDifferentDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document source(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        source.root()["d"].pushBack(source.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Document target;
+
+        mmb::Element newElement = target.makeElement(source.root()["d"]);
+        ASSERT_TRUE(newElement.ok());
+        mongo::Status status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char* expected =
+            "{ d : [ 4, 5, 6, 7 ] }";
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+
+        newElement = target.makeElement(source.root()["b"]);
+        ASSERT_TRUE(newElement.ok());
+        status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ d : [ 4, 5, 6, 7 ], b : [ 1, 2, 3 ] }";
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+
+        newElement = target.makeElementWithNewFieldName("C", source.root()["c"]);
+        ASSERT_TRUE(newElement.ok());
+        status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ d : [ 4, 5, 6, 7 ], b : [ 1, 2, 3 ], C : { 'c' : 'c' } }";
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+    }
+
+    TEST(Document, ElementCloningToSameDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document doc(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Element newElement = doc.makeElement(doc.root()["d"]);
+        ASSERT_TRUE(newElement.ok());
+        mongo::Status status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char* expected =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            " d : [ 4, 5, 6, 7 ] "
+            "}";
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+
+        newElement = doc.makeElement(doc.root()["b"]);
+        ASSERT_TRUE(newElement.ok());
+        status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            " d : [ 4, 5, 6, 7 ], "
+            " b : [ 1, 2, 3 ] "
+            "}";
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+
+        newElement = doc.makeElementWithNewFieldName("C", doc.root()["c"]);
+        ASSERT_TRUE(newElement.ok());
+        status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        expected =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            " d : [ 4, 5, 6, 7 ], "
+            " b : [ 1, 2, 3 ], "
+            " C : { 'c' : 'c' } "
+            "}";
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    }
+
+    TEST(Document, RootCloningToDifferentDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document source(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        source.root()["d"].pushBack(source.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Document target;
+
+        mmb::Element newElement = target.makeElementWithNewFieldName("X", source.root());
+        mongo::Status status = target.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char expected[] =
+            "{ X : { a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ] } }";
+
+        ASSERT_EQUALS(mongo::fromjson(expected), target);
+    }
+
+    TEST(Document, RootCloningToSameDocument) {
+
+        const char initial[] = "{ a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6 ] }";
+
+        mmb::Document doc(mongo::fromjson(initial));
+
+        // Dirty the 'd' node and parents.
+        doc.root()["d"].pushBack(doc.makeElementInt(mongo::StringData(), 7));
+
+        mmb::Element newElement = doc.makeElementWithNewFieldName("X", doc.root());
+        mongo::Status status = doc.root().pushBack(newElement);
+        ASSERT_OK(status);
+        const char expected[] =
+            "{ "
+            " a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ], "
+            "X : { a : 1, b : [ 1, 2, 3 ], c : { 'c' : 'c' }, d : [ 4, 5, 6, 7 ] }"
+            "}";
+
+        ASSERT_EQUALS(mongo::fromjson(expected), doc);
+    }
+
+
+} // namespacem
 

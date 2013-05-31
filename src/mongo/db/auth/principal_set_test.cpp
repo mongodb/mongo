@@ -19,15 +19,15 @@
 
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/db/auth/principal.h"
-#include "mongo/db/auth/principal_name.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/unittest/unittest.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE((EXPR))
 
 namespace mongo {
 
-    static inline std::ostream& operator<<(std::ostream& os, const PrincipalName& pname) {
-        return os << pname.toString();
+    static inline std::ostream& operator<<(std::ostream& os, const UserName& uname) {
+        return os << uname.toString();
     }
 
 namespace {
@@ -35,47 +35,47 @@ namespace {
     TEST(PrincipalSetTest, BasicTest) {
         PrincipalSet set;
 
-        Principal* p1 = new Principal(PrincipalName("Bob", "test"));
-        Principal* p2 = new Principal(PrincipalName("George", "test"));
-        Principal* p3 = new Principal(PrincipalName("Bob", "test2"));
+        Principal* p1 = new Principal(UserName("Bob", "test"));
+        Principal* p2 = new Principal(UserName("George", "test"));
+        Principal* p3 = new Principal(UserName("Bob", "test2"));
 
-        ASSERT_NULL(set.lookup(PrincipalName("Bob", "test")));
-        ASSERT_NULL(set.lookup(PrincipalName("George", "test")));
-        ASSERT_NULL(set.lookup(PrincipalName("Bob", "test2")));
+        ASSERT_NULL(set.lookup(UserName("Bob", "test")));
+        ASSERT_NULL(set.lookup(UserName("George", "test")));
+        ASSERT_NULL(set.lookup(UserName("Bob", "test2")));
         ASSERT_NULL(set.lookupByDBName("test"));
         ASSERT_NULL(set.lookupByDBName("test2"));
 
         set.add(p1);
 
-        ASSERT_EQUALS(p1, set.lookup(PrincipalName("Bob", "test")));
+        ASSERT_EQUALS(p1, set.lookup(UserName("Bob", "test")));
         ASSERT_EQUALS(p1, set.lookupByDBName("test"));
-        ASSERT_NULL(set.lookup(PrincipalName("George", "test")));
-        ASSERT_NULL(set.lookup(PrincipalName("Bob", "test2")));
+        ASSERT_NULL(set.lookup(UserName("George", "test")));
+        ASSERT_NULL(set.lookup(UserName("Bob", "test2")));
         ASSERT_NULL(set.lookupByDBName("test2"));
 
         // This should not replace the existing user "Bob" because they are different databases
         set.add(p3);
 
-        ASSERT_EQUALS(p1, set.lookup(PrincipalName("Bob", "test")));
+        ASSERT_EQUALS(p1, set.lookup(UserName("Bob", "test")));
         ASSERT_EQUALS(p1, set.lookupByDBName("test"));
-        ASSERT_NULL(set.lookup(PrincipalName("George", "test")));
-        ASSERT_EQUALS(p3, set.lookup(PrincipalName("Bob", "test2")));
+        ASSERT_NULL(set.lookup(UserName("George", "test")));
+        ASSERT_EQUALS(p3, set.lookup(UserName("Bob", "test2")));
         ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
 
         set.add(p2); // This should replace Bob since they're on the same database
 
-        ASSERT_NULL(set.lookup(PrincipalName("Bob", "test")));
-        ASSERT_EQUALS(p2, set.lookup(PrincipalName("George", "test")));
+        ASSERT_NULL(set.lookup(UserName("Bob", "test")));
+        ASSERT_EQUALS(p2, set.lookup(UserName("George", "test")));
         ASSERT_EQUALS(p2, set.lookupByDBName("test"));
-        ASSERT_EQUALS(p3, set.lookup(PrincipalName("Bob", "test2")));
+        ASSERT_EQUALS(p3, set.lookup(UserName("Bob", "test2")));
         ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
 
         set.removeByDBName("test");
 
-        ASSERT_NULL(set.lookup(PrincipalName("Bob", "test")));
-        ASSERT_NULL(set.lookup(PrincipalName("George", "test")));
+        ASSERT_NULL(set.lookup(UserName("Bob", "test")));
+        ASSERT_NULL(set.lookup(UserName("George", "test")));
         ASSERT_NULL(set.lookupByDBName("test"));
-        ASSERT_EQUALS(p3, set.lookup(PrincipalName("Bob", "test2")));
+        ASSERT_EQUALS(p3, set.lookup(UserName("Bob", "test2")));
         ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
     }
 
@@ -84,12 +84,12 @@ namespace {
         PrincipalSet::NameIterator iter = pset.getNames();
         ASSERT(!iter.more());
 
-        pset.add(new Principal(PrincipalName("bob", "test")));
+        pset.add(new Principal(UserName("bob", "test")));
 
         iter = pset.getNames();
         ASSERT(iter.more());
-        ASSERT_EQUALS(*iter, PrincipalName("bob", "test"));
-        ASSERT_EQUALS(iter.next(), PrincipalName("bob", "test"));
+        ASSERT_EQUALS(*iter, UserName("bob", "test"));
+        ASSERT_EQUALS(iter.next(), UserName("bob", "test"));
         ASSERT(!iter.more());
     }
 

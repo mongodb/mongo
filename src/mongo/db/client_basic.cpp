@@ -17,7 +17,7 @@
 #include "mongo/db/client_basic.h"
 
 #include "mongo/db/auth/authentication_session.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 
 namespace mongo {
 
@@ -41,22 +41,22 @@ namespace mongo {
         _authenticationSession.swap(other);
     }
 
-    bool ClientBasic::hasAuthorizationManager() const {
-        return _authorizationManager.get();
+    bool ClientBasic::hasAuthorizationSession() const {
+        return _authorizationSession.get();
     }
 
-    AuthorizationManager* ClientBasic::getAuthorizationManager() const {
+    AuthorizationSession* ClientBasic::getAuthorizationSession() const {
             massert(16481,
                     "No AuthorizationManager has been set up for this connection",
-                    hasAuthorizationManager());
-            return _authorizationManager.get();
+                    hasAuthorizationSession());
+            return _authorizationSession.get();
     }
 
-    void ClientBasic::setAuthorizationManager(AuthorizationManager* authorizationManager) {
+    void ClientBasic::setAuthorizationSession(AuthorizationSession* authorizationSession) {
         massert(16477,
                 "An AuthorizationManager has already been set up for this connection",
-                !hasAuthorizationManager());
-        _authorizationManager.reset(authorizationManager);
+                !hasAuthorizationSession());
+        _authorizationSession.reset(authorizationSession);
     }
 
 }  // namespace mongo

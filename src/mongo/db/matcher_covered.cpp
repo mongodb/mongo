@@ -18,11 +18,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-
-#include "mongo/db/matcher.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/cursor.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/matcher_covered.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
 
@@ -91,13 +91,14 @@ namespace mongo {
             }
         }
 
-        if ( details )
-            details->setLoadedRecord( true );
-
         BSONObj obj = recLoc.obj();
         bool res =
             _docMatcher->matches( obj, details ) &&
             !isOrClauseDup( obj );
+
+        if ( details )
+            details->setLoadedRecord( true );
+
         LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;
         return res;
     }

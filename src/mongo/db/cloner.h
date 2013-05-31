@@ -19,12 +19,10 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/sort_phase_one.h"
 
 namespace mongo {
 
     struct CloneOptions;
-    class IndexSpec;
     class DBClientBase;
     class DBClientCursor;
     class Query;
@@ -94,18 +92,8 @@ namespace mongo {
                   bool masterSameProcess, bool slaveOk, bool mayYield, bool mayBeInterrupted,
                   Query q);
 
-        // index presort info
-        typedef struct {
-            IndexSpec spec;
-            SortPhaseOne preSortPhase;
-        } PreSortDetails;
-
-        typedef map<string, PreSortDetails> SortersForIndex; // map from index name to presorter
-        typedef map<string, SortersForIndex> SortersForNS;   // map from ns to indices/sorters
-
         struct Fun;
         auto_ptr<DBClientBase> _conn;
-        SortersForNS _sortersForNS;
     };
 
     struct CloneOptions {

@@ -34,34 +34,28 @@ namespace mongo {
      *
      * The "saslParameters" BSONObj should be initialized with zero or more of the
      * fields below.  Which fields are required depends on the mechanism.  Consult the
-     * libgsasl documentation.
+     * relevant IETF standards.
      *
      *     "mechanism": The string name of the sasl mechanism to use.  Mandatory.
      *     "autoAuthorize": Truthy values tell the server to automatically acquire privileges on
      *         all resources after successful authentication, which is the default.  Falsey values
      *         instruct the server to await separate privilege-acquisition commands.
-     *     "user": The string name of the principal to authenticate, GSASL_AUTHID.
+     *     "user": The string name of the user to authenticate.
      *     "userSource": The database target of the auth command, which identifies the location
-     *         of the credential information for the principal.  May be "$external" if credential
+     *         of the credential information for the user.  May be "$external" if credential
      *         information is stored outside of the mongo cluster.
-     *     "pwd": The password data, GSASL_PASSWORD.
+     *     "pwd": The password.
      *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
      *     "serviceHostname": The GSSAPI hostname to use.  Defaults to the name of the remote host.
      *
      * Other fields in saslParameters are silently ignored.
-     *
-     * "sessionHook" is a pointer to optional data, which may be used by the gsasl_callback
-     * previously set on "gsasl".  The session hook is set on an underlying Gsasl_session using
-     * gsasl_session_hook_set, and may be accessed by callbacks using gsasl_session_hook_get.
-     * See the gsasl documentation.
      *
      * Returns an OK status on success, and ErrorCodes::AuthenticationFailed if authentication is
      * rejected.  Other failures, all of which are tantamount to authentication failure, may also be
      * returned.
      */
     extern Status (*saslClientAuthenticate)(DBClientWithCommands* client,
-                                            const BSONObj& saslParameters,
-                                            void* sessionHook);
+                                            const BSONObj& saslParameters);
 
     /**
      * Extracts the payload field from "cmdObj", and store it into "*payload".
@@ -83,7 +77,7 @@ namespace mongo {
     extern const char* const saslContinueCommandName;
 
     /// Name of the saslStart parameter indicating that the server should automatically grant the
-    /// connection all privileges associated with the principal after successful authentication.
+    /// connection all privileges associated with the user after successful authentication.
     extern const char* const saslCommandAutoAuthorizeFieldName;
 
     /// Name of the field contain the status code in responses from the server.
@@ -113,13 +107,13 @@ namespace mongo {
     /// Field containing sasl payloads passed to and from the server.
     extern const char* const saslCommandPayloadFieldName;
 
-    /// Field containing the string identifier of the principal to authenticate in
+    /// Field containing the string identifier of the user to authenticate in
     /// saslClientAuthenticate().
-    extern const char* const saslCommandPrincipalFieldName;
+    extern const char* const saslCommandUserFieldName;
 
     /// Field containing the string identifier of the database containing credential information,
     /// or "$external" if the credential information is stored outside of the mongo cluster.
-    extern const char* const saslCommandPrincipalSourceFieldName;
+    extern const char* const saslCommandUserSourceFieldName;
 
     /// Field overriding the FQDN of the hostname hosting the mongodb srevice in
     /// saslClientAuthenticate().

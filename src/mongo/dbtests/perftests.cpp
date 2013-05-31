@@ -1231,6 +1231,108 @@ namespace PerfTests {
         }
     }
 
+    class StatusTestBase : public B {
+    public:
+        StatusTestBase()
+            : _message("Some string data that should not fit in a short string optimization") {
+        }
+
+        virtual int howLongMillis() { return 2000; }
+        virtual bool showDurStats() { return false; }
+    protected:
+        NOINLINE_DECL Status doThingOK() const {
+            return Status::OK();
+        }
+
+        NOINLINE_DECL Status doThingNotOK() const{
+            return Status(
+                ErrorCodes::InternalError,
+                _message,
+                42);
+        }
+    private:
+        const std::string _message;
+    };
+
+    class ReturnOKStatus : public StatusTestBase {
+    public:
+        string name() { return "return-ok-status"; }
+        void timed() {
+            doThingOK();
+        }
+    };
+
+    class ReturnNotOKStatus : public StatusTestBase {
+    public:
+        string name() { return "return-not-ok-status"; }
+        void timed() {
+            doThingNotOK();
+        }
+    };
+
+    class CopyOKStatus : public StatusTestBase {
+    public:
+        CopyOKStatus()
+            : _status(doThingOK()) {}
+
+        string name() { return "copy-ok-status"; }
+        void timed() {
+            const Status copy = _status;
+        }
+
+    private:
+        const Status _status;
+    };
+
+    class CopyNotOKStatus : public StatusTestBase {
+    public:
+        CopyNotOKStatus()
+            : _status(doThingNotOK()) {}
+
+        string name() { return "copy-not-ok-status"; }
+        void timed() {
+            const Status copy = _status;
+        }
+
+    private:
+        const Status _status;
+    };
+
+#if __cplusplus >= 201103L
+    class StatusMoveTestBase : public StatusTestBase {
+    public:
+        StatusMoveTestBase(bool ok)
+            : StatusTestBase()
+            , _a(ok ? doThingOK() : doThingNotOK())
+            , _b(_a.isOK() ? Status::OK() : Status(_a.code(), _a.reason().c_str(), _a.location())) {
+        }
+
+        void timed() {
+            Status temp(std::move(_a));
+            _a = std::move(_b);
+            _b = std::move(temp);
+        }
+
+    protected:
+        Status _a;
+        Status _b;
+    };
+
+    class MoveOKStatus : public StatusMoveTestBase  {
+    public:
+        MoveOKStatus()
+            : StatusMoveTestBase(true) {}
+        string name() { return "move-ok-status"; }
+    };
+
+    class MoveNotOKStatus : public StatusMoveTestBase {
+    public:
+        MoveNotOKStatus()
+            : StatusMoveTestBase(false) {}
+        string name() { return "move-not-ok-status"; }
+    };
+#endif
+
     class All : public Suite {
     public:
         All() : Suite( "perf" ) { }
@@ -1305,6 +1407,15 @@ namespace PerfTests {
                 add< FailPointTest<false, false> >();
                 add< FailPointTest<true, false> >();
                 add< FailPointTest<true, true> >();
+
+                add< ReturnOKStatus >();
+                add< ReturnNotOKStatus >();
+                add< CopyOKStatus >();
+                add< CopyNotOKStatus >();
+#if __cplusplus >= 201103L
+                add< MoveOKStatus >();
+                add< MoveNotOKStatus >();
+#endif
             }
         }
     } myall;

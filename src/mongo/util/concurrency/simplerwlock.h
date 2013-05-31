@@ -25,7 +25,7 @@ namespace mongo {
         depending on OS, as there is no upgrade etc. facility herein.
     */
     class SimpleRWLock : boost::noncopyable { 
-#if defined(_WIN32) && defined(MONGO_USE_SRW_ON_WINDOWS)
+#if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
         SRWLOCK _lock;
 #else
         RWLockBase m;

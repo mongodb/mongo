@@ -303,7 +303,7 @@ namespace mutablebson {
         Element makeElementUndefined(const StringData& fieldName);
 
         /** Create a new OID Element with the given value and field name. */
-        Element makeElementOID(const StringData& fieldName, const mongo::OID& value);
+        Element makeElementOID(const StringData& fieldName, mongo::OID value);
 
         /** Create a new bool Element with the given value and field name. */
         Element makeElementBool(const StringData& fieldName, bool value);
@@ -320,7 +320,7 @@ namespace mutablebson {
 
         /** Create a new DBRef Element with the given data and field name. */
         Element makeElementDBRef(
-            const StringData& fieldName, const StringData& ns, const mongo::OID& oid);
+            const StringData& fieldName, const StringData& ns, mongo::OID oid);
 
         /** Create a new code Element with the given value and field name. */
         Element makeElementCode(const StringData& fieldName, const StringData& value);
@@ -365,8 +365,20 @@ namespace mutablebson {
         /** Create a new element of the appopriate type to hold the given value, with the given
          *  field name.
          */
-        Element makeElementSafeNum(const StringData& fieldName, const SafeNum& value);
+        Element makeElementSafeNum(const StringData& fieldName, SafeNum value);
 
+        /** Construct a new element with the same name, type, and value as the provided mutable
+         *  Element. The data is copied from the given Element. Unlike most methods in this
+         *  class the provided Element may be from a different Document.
+         */
+        Element makeElement(ConstElement elt);
+
+        /** Construct a new Element with the same type and value as the provided mutable
+         *  Element, but with a new field name. The data is copied from the given
+         *  Element. Unlike most methods in this class the provided Element may be from a
+         *  different Document.
+         */
+        Element makeElementWithNewFieldName(const StringData& fieldName, ConstElement elt);
 
         //
         // Accessors
@@ -378,6 +390,14 @@ namespace mutablebson {
         /** Returns the root element for this document. */
         inline ConstElement root() const;
 
+        /** Returns an element that will compare equal to a non-ok element. */
+        Element end();
+
+        /** Returns an element that will compare equal to a non-ok element. */
+        ConstElement end() const;
+
+        inline std::string toString() const;
+
     private:
         friend class Element;
 
@@ -385,6 +405,9 @@ namespace mutablebson {
         class Impl;
         inline Impl& getImpl();
         inline const Impl& getImpl() const;
+
+        Element makeElement(ConstElement element, const StringData* fieldName);
+
         const boost::scoped_ptr<Impl> _impl;
 
         // The root element of this document.

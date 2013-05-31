@@ -17,19 +17,6 @@ md = startMongod("--nopreallocj",
 // startMongod connects a Mongo shell, so if we get here, the test is successful.
 
 
-
-
-// Password missing; error logged is:
-//  error:0907B068:PEM routines:PEM_READ_BIO_PRIVATEKEY:bad password read
-var md = runMongoProgram("mongo", "--port", port, 
-                         "--ssl",
-                         "--sslPEMKeyFile", "jstests/libs/password_protected.pem");
-
-// 1 is the exit code for failure
-assert(md==1);
-
-
-
 // Password incorrect; error logged is:
 //  error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad decrypt
 md = runMongoProgram("mongo", "--port", port, 

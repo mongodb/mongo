@@ -38,6 +38,7 @@
 #include "mongo/util/admin_access.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/exception_filter_win32.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/ntservice.h"
@@ -70,7 +71,7 @@ namespace mongo {
     string mongosCommand;
     bool dbexitCalled = false;
     static bool scriptingEnabled = true;
-    static bool noHttpInterface = false;
+    static bool httpInterface = false;
     static vector<string> configdbs;
 
     bool inShutdown() {
@@ -160,6 +161,33 @@ namespace mongo {
         ::_exit(EXIT_ABRUPT);
     }
 
+#ifndef _WIN32
+    sigset_t asyncSignals;
+
+    void signalProcessingThread() {
+        while (true) {
+            int actualSignal = 0;
+            int status = sigwait( &asyncSignals, &actualSignal );
+            fassert(16779, status == 0);
+            switch (actualSignal) {
+            case SIGUSR1:
+                // log rotate signal
+                fassert(16780, rotateLogs());
+                break;
+            default:
+                // no one else should be here
+                fassertFailed(16778);
+                break;
+            }
+        }
+    }
+
+    void startSignalProcessingThread() {
+        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
+        boost::thread it( signalProcessingThread );
+    }
+#endif  // not _WIN32
+
     void setupSignalHandlers() {
         setupSIGTRAPforGDB();
         setupCoreSignals();
@@ -180,13 +208,19 @@ namespace mongo {
         signal( SIGPIPE , SIG_IGN );
 #endif
 
+#ifndef _WIN32
+        sigemptyset( &asyncSignals );
+        sigaddset( &asyncSignals, SIGUSR1 );
+        startSignalProcessingThread();
+#endif
+
         setWindowsUnhandledExceptionFilter();
         set_new_handler( my_new_handler );
     }
 
     void init() {
         serverID.init();
-        setupSignalHandlers();
+
         Logstream::get().addGlobalTee( new RamLog("global") );
     }
 
@@ -229,7 +263,7 @@ namespace mongo {
 using namespace mongo;
 
 static bool runMongosServer( bool doUpgrade ) {
-
+    setupSignalHandlers();
     setThreadName( "mongosMain" );
     printShardingVersionInfo( false );
 
@@ -294,7 +328,7 @@ static bool runMongosServer( bool doUpgrade ) {
     CmdLine::launchOk();
 #endif
 
-    if ( !noHttpInterface )
+    if ( httpInterface )
         boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
     MessageServer::Options opts;
@@ -323,9 +357,6 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     po::positional_options_description positional_options;
 
     CmdLine::addGlobalOptions( general_options, hidden_options, ssl_options );
-
-    general_options.add_options()
-    ("nohttpinterface", "disable http interface");
 
     hidden_options.add_options()
     ("noAutoSplit", "do not send split commands with writes");
@@ -420,8 +451,12 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         scriptingEnabled = false;
     }
 
-    if (params.count("nohttpinterface")) {
-        noHttpInterface = true;
+    if (params.count("httpinterface")) {
+        if (params.count("nohttpinterface")) {
+            out() << "can't have both --httpinterface and --nohttpinterface" << endl;
+            ::_exit(EXIT_FAILURE);
+        }
+        httpInterface = true;
     }
 
     if (params.count("noAutoSplit")) {
