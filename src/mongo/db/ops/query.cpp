@@ -682,7 +682,7 @@ namespace mongo {
                                     const BSONObj &query, const BSONObj &order,
                                     const shared_ptr<ParsedQuery> &pq_shared,
                                     const BSONObj &oldPlan,
-                                    const ConfigVersion &shardingVersionAtStart,
+                                    const ChunkVersion &shardingVersionAtStart,
                                     scoped_ptr<PageFaultRetryableSection>& parentPageFaultSection,
                                     scoped_ptr<NoPageFaultsAllowed>& noPageFault,
                                     Message &result ) {
@@ -1025,7 +1025,7 @@ namespace mongo {
                 
             try {
                 Client::ReadContext ctx( ns , dbpath ); // read locks
-                const ConfigVersion shardingVersionAtStart = shardingState.getVersion( ns );
+                const ChunkVersion shardingVersionAtStart = shardingState.getVersion( ns );
                 
                 replVerifyReadsOk(&pq);
                 

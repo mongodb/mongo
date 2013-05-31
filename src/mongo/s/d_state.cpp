@@ -130,7 +130,7 @@ namespace mongo {
         return it != _chunks.end();
     }
 
-    bool ShardingState::hasVersion( const string& ns , ConfigVersion& version ) {
+    bool ShardingState::hasVersion( const string& ns , ChunkVersion& version ) {
         scoped_lock lk(_mutex);
 
         ChunkManagersMap::const_iterator it = _chunks.find(ns);
@@ -142,7 +142,7 @@ namespace mongo {
         return true;
     }
 
-    const ConfigVersion ShardingState::getVersion( const string& ns ) const {
+    const ChunkVersion ShardingState::getVersion( const string& ns ) const {
         scoped_lock lk(_mutex);
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
@@ -151,7 +151,7 @@ namespace mongo {
             return p->getVersion();
         }
         else {
-            return ConfigVersion( 0, OID() );
+            return ChunkVersion( 0, OID() );
         }
     }
 
@@ -197,7 +197,7 @@ namespace mongo {
         _chunks.erase( ns );
     }
 
-    bool ShardingState::trySetVersion( const string& ns , ConfigVersion& version /* IN-OUT */ ) {
+    bool ShardingState::trySetVersion( const string& ns , ChunkVersion& version /* IN-OUT */ ) {
 
         // Currently this function is called after a getVersion(), which is the first "check", and the assumption here
         // is that we don't do anything nearly as long as a remote query in a thread between then and now.
@@ -223,7 +223,7 @@ namespace mongo {
         //   + two clients reloaded
         //     one triggered the 'slow path' (below)
         //     when the second's request gets here, the version is already current
-        ConfigVersion storedVersion;
+        ChunkVersion storedVersion;
         ShardChunkManagerPtr currManager;
         {
             scoped_lock lk( _mutex );
@@ -270,7 +270,7 @@ namespace mongo {
 
         // Handle the case where the collection isn't sharded more gracefully
         if( p->getKeyPattern().isEmpty() ){
-            version = ConfigVersion( 0, OID() );
+            version = ChunkVersion( 0, OID() );
             // There was an error getting any data for this collection, return false
             return false;
         }
@@ -367,17 +367,17 @@ namespace mongo {
         _tl.reset();
     }
 
-    const ConfigVersion ShardedConnectionInfo::getVersion( const string& ns ) const {
+    const ChunkVersion ShardedConnectionInfo::getVersion( const string& ns ) const {
         NSVersionMap::const_iterator it = _versions.find( ns );
         if ( it != _versions.end() ) {
             return it->second;
         }
         else {
-            return ConfigVersion( 0, OID() );
+            return ChunkVersion( 0, OID() );
         }
     }
 
-    void ShardedConnectionInfo::setVersion( const string& ns , const ConfigVersion& version ) {
+    void ShardedConnectionInfo::setVersion( const string& ns , const ChunkVersion& version ) {
         _versions[ns] = version;
     }
 
@@ -578,17 +578,17 @@ namespace mongo {
                 return false;
             }
 
-            if( ! ConfigVersion::canParseBSON( cmdObj, "version" ) ){
+            if( ! ChunkVersion::canParseBSON( cmdObj, "version" ) ){
                 errmsg = "need to specify version";
                 return false;
             }
 
-            const ConfigVersion version = ConfigVersion::fromBSON( cmdObj, "version" );
+            const ChunkVersion version = ChunkVersion::fromBSON( cmdObj, "version" );
             
             // step 3
 
-            const ConfigVersion oldVersion = info->getVersion(ns);
-            const ConfigVersion globalVersion = shardingState.getVersion(ns);
+            const ChunkVersion oldVersion = info->getVersion(ns);
+            const ChunkVersion globalVersion = shardingState.getVersion(ns);
 
             oldVersion.addToBSON( result, "oldVersion" );
             
@@ -706,7 +706,7 @@ namespace mongo {
 
                     // If this was a reset of a collection, inform mongos to do a full reload
                     if( ! currVersion.isSet()  ){
-                        ConfigVersion( 0, OID() ).addToBSON( result, "version" );
+                        ChunkVersion( 0, OID() ).addToBSON( result, "version" );
                         result.appendBool( "reloadConfig", true );
                     }
                     else{
@@ -793,7 +793,7 @@ namespace mongo {
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    bool shardVersionOk( const string& ns , string& errmsg, ConfigVersion& received, ConfigVersion& wanted ) {
+    bool shardVersionOk( const string& ns , string& errmsg, ChunkVersion& received, ChunkVersion& wanted ) {
 
         if ( ! shardingState.enabled() )
             return true;
