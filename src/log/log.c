@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_log_filename --
+ *	Given a log number, return a WT_ITEM of a generated log file name.
+ */
 int
 __wt_log_filename(WT_SESSION_IMPL *session, uint32_t id, WT_ITEM *buf)
 {
@@ -24,6 +28,29 @@ err:	__wt_buf_free(session, buf);
 	return (ret);
 }
 
+/*
+ * __log_extract_lognum --
+ *	Given a log file name, extract out the log number.
+ */
+int
+__log_extract_lognum(WT_SESSION_IMPL *session, const char *name, uint32_t *id)
+{
+	char *p;
+
+	if (id == NULL || name == NULL)
+		return (0);
+	if ((p = strrchr(name, '.')) == NULL)
+		return (WT_ERROR);
+	++p;
+	if ((sscanf(++p, "%" PRIu32, id)) != 1)
+		return (WT_ERROR);
+	return (0);
+}
+
+/*
+ * __log_openfile --
+ *	Open a log file with the given log file number and return the WT_FH.
+ */
 static int
 __log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
 {
@@ -50,6 +77,64 @@ err:	__wt_scr_free(&path);
 }
 
 /*
+ * __wt_log_open --
+ *	Open the appropriate log file for the connection.  The purpose is
+ *	to find the last log file that exists, open it and set our initial
+ *	LSNs to the end of that file.  If none exist, call __wt_log_newfile
+ *	to create it.
+ */
+int
+__wt_log_open(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_FH *log_fh;
+	WT_LOG *log;
+	uint32_t firstlog, lastlog, lognum;
+	int i, logcount;
+	char **logfiles;
+
+	conn = S2C(session);
+	log = conn->log;
+	lastlog = 0;
+	firstlog = UINT32_MAX;
+	WT_RET(__wt_dirlist(session, conn->log_path,
+	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
+	for (i = 0; i < logcount; i++) {
+		WT_ERR(__log_extract_lognum(session, logfiles[i], &lognum));
+		fprintf(stderr, "[%d] log_open: found logfile %s lognum %d\n",
+		    pthread_self(), logfiles[i], lognum);
+		lastlog = WT_MAX(lastlog, lognum);
+		firstlog = WT_MIN(firstlog, lognum);
+		__wt_free(session, logfiles[i]);
+	}
+	log->fileid = lastlog;
+	fprintf(stderr, "[%d] log_open: firstlog %d lastlog %d\n",
+	    pthread_self(), firstlog, lastlog);
+	if (lastlog == 0)
+		WT_ERR(__wt_log_newfile(session, 1));
+	else {
+		WT_ERR(__log_openfile(session, 0, &log_fh, lastlog));
+		log->log_fh = log_fh;
+		log->alloc_lsn.file = log->fileid;
+		log->alloc_lsn.offset =
+		    __wt_rduppo2(log->log_fh->size, log->allocsize);
+		log->write_lsn = log->alloc_lsn;
+		log->sync_lsn = log->alloc_lsn;
+		log->first_lsn.file = firstlog;
+		log->first_lsn.offset = 0;
+		fprintf(stderr,
+"[%d] log_open: first_lsn %d,%d alloc_lsn %d,%d, sync/write_lsn %d,%d\n",
+	    pthread_self(), log->first_lsn.file, log->first_lsn.offset,
+	    log->alloc_lsn.file, log->alloc_lsn.offset,
+	    log->write_lsn.file, log->write_lsn.offset);
+	}
+err:
+	__wt_free(session, logfiles);
+	return (ret);
+}
+
+/*
  * __wt_log_close --
  *	Close the log file.
  */
@@ -67,6 +152,7 @@ __wt_log_close(WT_SESSION_IMPL *session)
 	if (log->log_fh == NULL)
 		return (0);
 	WT_VERBOSE_RET(session, log, "closing log %s", log->log_fh->name);
+fprintf(stderr, "closing log %s\n", log->log_fh->name);
 	WT_RET(__wt_close(session, log->log_fh));
 	log->log_fh = NULL;
 	return (0);
@@ -152,7 +238,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
 "[%d] log_acquire: slot 0x%x recsize %d startlsn %d,%d endlsn %d,%d\n",
 	    pthread_self(),slot,recsize,
 	    slot->slot_start_lsn.file,slot->slot_start_lsn.offset,
-	    slot->slot_end_lsn.file,slot->slot_end_lsn.offset,recsize);
+	    slot->slot_end_lsn.file,slot->slot_end_lsn.offset);
 	slot->slot_fh = log->log_fh;
 	return (0);
 }
@@ -563,6 +649,8 @@ __scan_call(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, void *cooki
 {
 	WT_LOG_RECORD *logrec;
 
+	WT_UNUSED(session);
+	WT_UNUSED(cookie);
 	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
 	 * Return if log file header record

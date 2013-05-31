@@ -232,8 +232,7 @@ fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
 	INIT_LSN(&log->sync_lsn);
 	INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
-	WT_RET(__wt_log_newfile(session, 1));
-	/* xxx - need to initialize the LSNs from log_fh file_size */
+	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
 	/* If archiving is not configured, we're done. */

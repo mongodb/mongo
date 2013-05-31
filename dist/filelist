@@ -90,6 +90,7 @@ src/meta/meta_turtle.c
 src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
 src/os_posix/os_dlopen.c
+src/os_posix/os_dir.c
 src/os_posix/os_errno.c
 src/os_posix/os_exist.c
 src/os_posix/os_filesize.c
