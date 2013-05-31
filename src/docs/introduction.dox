@@ -1,4 +1,4 @@
--/*! @mainpage Reference Guide
+/*! @mainpage Reference Guide
 
 WiredTiger is an high performance, scalable, production quality, NoSQL,
 Open Source extensible platform for data management.
@@ -11,7 +11,7 @@ access and storage.
 For more information on the WiredTiger architecture and why it might be
 right for your project, see:
 
-- @subpage architecture.
+- @subpage architecture
 
 This documentation describes the programming interface to WiredTiger
 used by developers to construct applications.  We follow SQL
@@ -27,26 +27,22 @@ ANSI C99, POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
 
 For more information about using WiredTiger, see:
 
-- @subpage install\n
+- @subpage install
 
-- @subpage programming\n
+- @subpage programming
 
 - @ref wt "WiredTiger API reference manual"
 
-- @subpage command_line\n
+- @subpage command_line
 
-- @subpage upgrading\n
+- @subpage upgrading
 
-- @subpage admin\n
+- @subpage admin
 
-- @subpage license\n
+- @subpage license
 
-To browse or download the WiredTiger source code, visit our
+To browse the WiredTiger source code or find out how to contact us, see:
 
-- <a href="https://github.com/wiredtiger/wiredtiger"><b>Project page</b></a>
-
-To ask questions or discuss issues related to using WiredTiger, visit our
-
-- <a href="http://groups.google.com/group/wiredtiger-users"><b>User Group</b></a>
+- @subpage community
 
 */
