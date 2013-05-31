@@ -26,12 +26,12 @@ namespace{
 }
 
     void setGlobalAuthorizationManager(AuthorizationManager* authManager) {
-        fassert(16835, globalAuthManager == NULL);
+        fassert(16841, globalAuthManager == NULL);
         globalAuthManager = authManager;
     }
 
     AuthorizationManager* getGlobalAuthorizationManager() {
-        fassert(16836, globalAuthManager != NULL);
+        fassert(16842, globalAuthManager != NULL);
         return globalAuthManager;
     }
 
