@@ -32,6 +32,69 @@ assert.eq = function(a, b, msg){
     doassert("[" + tojson(a) + "] != [" + tojson(b) + "] are not equal : " + msg);
 }
 
+// Sort doc/obj fields and return new sorted obj
+sortDoc = function(doc) {
+
+    // Helper to sort the elements of the array
+    var sortElementsOfArray = function(arr) {
+        var newArr = [];
+        if(!arr.constructor == Array)
+            return arr;
+        for(var i=0; i < arr.length; i++) {
+            newArr.push(sortDoc(arr[i]));
+
+        }
+        return newArr;
+    }
+
+    // not a container we can sort
+    if (!(doc instanceof Object))
+        return doc;
+
+    // if it an array, sort the elements
+    if (doc.constructor == Array)
+        return sortElementsOfArray(doc);
+
+    var newDoc = {};
+    var fields = Object.keys(doc);
+    if (fields.length > 0) {
+        fields.sort();
+        for(var i=0; i < fields.length; i++){
+            var field = fields[i];
+            if (doc.hasOwnProperty(field)) {
+                var tmp = doc[field];
+
+                // Sort recursively for Arrays and Objects (including bson ones)
+                if (tmp.constructor == Array)
+                    tmp = sortElementsOfArray(tmp);
+                else if (tmp._bson || tmp.constructor == Object)
+                    tmp = sortDoc(tmp);
+
+                newDoc[field] = tmp;
+            }
+        }
+    } else {
+        newDoc = doc;
+    }
+
+    return newDoc;
+}
+
+assert.docEq = function(a, b, msg) {
+    if (assert._debug && msg) print("in assert for: " + msg);
+
+    if (a == b)
+        return;
+
+    var aSorted = sortDoc(a);
+    var bSorted = sortDoc(b);
+
+    if ((aSorted != null && bSorted != null) && friendlyEqual(aSorted, bSorted))
+        return;
+
+    doassert("[" + tojson(aSorted) + "] != [" + tojson(bSorted) + "] are not equal : " + msg);
+}
+
 assert.eq.automsg = function(a, b) {
     assert.eq(eval(a), eval(b), "[" + a + "] != [" + b + "]");
 }
