@@ -47,7 +47,7 @@ namespace {
             _objs[_size] = obj;
             _size++;
 
-            ASSERT_OK(_doc.root()["x"].appendObject("", obj));
+            ASSERT_OK(_doc.root()["x"].appendObject(mongo::StringData(), obj));
         }
 
         BSONObj getOrigObj(size_t i) {
