@@ -183,7 +183,7 @@ namespace mongo {
         return Status::OK();
     }
 
-   size_t UpdateDriver::numMods() const {
+    size_t UpdateDriver::numMods() const {
         return _mods.size();
     }
 
