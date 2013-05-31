@@ -111,15 +111,14 @@ hot_backup(void *arg)
 	 * Perform a hot backup at somewhere under 10 seconds (so we get at
 	 * least one done), and then at 45 second intervals.
 	 */
-	for (period = MMRAND(1, 10); !g.threads_finished; period = 45) {
-
-		/* Sleep for a short period so we don't make the run wait. */
-		if (period > 0) {
+	for (period = MMRAND(1, 10);; period = 45) {
+		/* Sleep for short periods so we don't make the run wait. */
+		while (period > 0 && !g.threads_finished) {
 			--period;
 			sleep(1);
-			if (g.threads_finished)
-				break;
 		}
+		if (g.threads_finished)
+			break;
 
 		/* Lock out named checkpoints */
 		if ((ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
