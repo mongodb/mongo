@@ -18,8 +18,6 @@ static int
 __conn_foc_add(WT_SESSION_IMPL *session, const void *p)
 {
 	WT_CONNECTION_IMPL *conn;
-	va_list ap;
-	size_t cnt;
 
 	conn = S2C(session);
 
