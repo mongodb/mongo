@@ -38,7 +38,7 @@ sortDoc = function(doc) {
     // Helper to sort the elements of the array
     var sortElementsOfArray = function(arr) {
         var newArr = [];
-        if(!arr.constructor == Array)
+        if(!arr || arr.constructor != Array)
             return arr;
         for(var i=0; i < arr.length; i++) {
             newArr.push(sortDoc(arr[i]));
@@ -64,12 +64,13 @@ sortDoc = function(doc) {
             if (doc.hasOwnProperty(field)) {
                 var tmp = doc[field];
 
-                // Sort recursively for Arrays and Objects (including bson ones)
-                if (tmp.constructor == Array)
-                    tmp = sortElementsOfArray(tmp);
-                else if (tmp._bson || tmp.constructor == Object)
-                    tmp = sortDoc(tmp);
-
+                if (tmp) {
+                    // Sort recursively for Arrays and Objects (including bson ones)
+                    if (tmp.constructor == Array)
+                        tmp = sortElementsOfArray(tmp);
+                    else if (tmp._bson || tmp.constructor == Object)
+                        tmp = sortDoc(tmp);
+                }
                 newDoc[field] = tmp;
             }
         }
