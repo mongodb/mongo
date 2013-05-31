@@ -5,7 +5,7 @@ t.drop();
 function check( want , err ){
     var x = t.findOne();
     delete x._id;
-    assert.eq( want , x , err );
+    assert.docEq( want , x , err );
 }
 
 t.update( { a : 5 } , { $set : { a : 6 , b : null } } , true );
