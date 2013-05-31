@@ -72,6 +72,22 @@ namespace mongo {
         return dbname + '.' + coll;
     }
 
+
+    string Command::lockTypeInfo() const {
+    	switch(locktype())
+    	{
+    		case READ:
+    					return "READ";
+    		case WRITE:
+    					return "WRITE";
+    		case NONE:
+    		default:
+    					return "NONE";
+    	}
+    	return "";
+    }
+
+
     void Command::htmlHelp(stringstream& ss) const {
         string helpStr;
         {
@@ -86,10 +102,7 @@ namespace mongo {
         if( web ) ss << "</a>";
         ss << "</td>\n";
         ss << "<td>";
-        int l = locktype();
-        //if( l == NONE ) ss << "N ";
-        if( l == READ ) ss << "R ";
-        else if( l == WRITE ) ss << "W ";
+        ss << lockTypeInfo() << " ";
         if( slaveOk() )
             ss << "S ";
         if( adminOnly() )
