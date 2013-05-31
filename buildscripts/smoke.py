@@ -196,8 +196,9 @@ class mongod(object):
             call(argv)
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
-        # This should always be set for tests
-        argv += ['--setParameter', 'enableTestCommands=1']
+        # These parameters are alwas set for tests
+        # SERVER-9137 Added httpinterface parameter to keep previous behavior
+        argv += ['--setParameter', 'enableTestCommands=1', '--httpinterface']
         if self.kwargs.get('small_oplog'):
             argv += ["--master", "--oplogSize", "511"]
         if self.kwargs.get('small_oplog_rs'):
