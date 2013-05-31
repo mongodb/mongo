@@ -537,6 +537,13 @@ namespace mutablebson {
             return Status(ErrorCodes::IllegalOperation, "cannot add the root as a child");
         }
 
+
+        // Enable paranoid mode to force a reallocation on mutation of the princple data
+        // structures in Document::Impl. This is really slow, but can be very helpful if you
+        // suspect an invalidation logic error and want to find it with valgrind. Paranoid mode
+        // only works in debug mode; it is ignored in release builds.
+        const bool paranoid = false;
+
 #if defined(__clang__) || !defined(__GNUC__) || (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
     } // namespace
 #endif
@@ -586,7 +593,7 @@ namespace mutablebson {
             const Element::RepIdx id = _elements.size();
             verify(id <= kMaxRepIdx);
             _elements.push_back(rep);
-            if (debug) {
+            if (debug && paranoid) {
                 // Force all reps to new addresses to help catch invalid rep usage.
                 std::vector<ElementRep> new_elements(_elements);
                 _elements.swap(new_elements);
@@ -630,7 +637,7 @@ namespace mutablebson {
             const size_t objIdx = _objects.size();
             verify(objIdx <= kMaxObjIdx);
             _objects.push_back(newObj);
-            if (debug) {
+            if (debug && paranoid) {
                 // Force reallocation to catch use after invalidation.
                 std::vector<BSONObj> new_objects(_objects);
                 _objects.swap(new_objects);
@@ -874,7 +881,7 @@ namespace mutablebson {
                     fieldName.rawData(),
                     fieldName.rawData() + fieldName.size());
             _fieldNames.push_back('\0');
-            if (debug) {
+            if (debug && paranoid) {
                 // Force names to new addresses to catch invalidation errors.
                 std::vector<char> new_fieldNames(_fieldNames);
                 _fieldNames.swap(new_fieldNames);
