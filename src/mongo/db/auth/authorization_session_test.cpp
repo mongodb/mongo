@@ -19,6 +19,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
@@ -38,13 +39,16 @@ namespace {
         actions.addAction(ActionType::insert);
         Privilege writePrivilege("test", actions);
         Privilege allDBsWritePrivilege("*", actions);
-        AuthzSessionExternalStateMock* externalState = new AuthzSessionExternalStateMock();
-        AuthorizationSession authzSession(externalState);
+        AuthzManagerExternalStateMock* managerExternalState = new AuthzManagerExternalStateMock();
+        AuthorizationManager authManager(managerExternalState);
+        AuthzSessionExternalStateMock* sessionExternalState = new AuthzSessionExternalStateMock(
+                &authManager);
+        AuthorizationSession authzSession(sessionExternalState);
 
         ASSERT_FALSE(authzSession.checkAuthorization("test", ActionType::insert));
-        externalState->setReturnValueForShouldIgnoreAuthChecks(true);
+        sessionExternalState->setReturnValueForShouldIgnoreAuthChecks(true);
         ASSERT_TRUE(authzSession.checkAuthorization("test", ActionType::insert));
-        externalState->setReturnValueForShouldIgnoreAuthChecks(false);
+        sessionExternalState->setReturnValueForShouldIgnoreAuthChecks(false);
         ASSERT_FALSE(authzSession.checkAuthorization("test", ActionType::insert));
 
         ASSERT_EQUALS(ErrorCodes::UserNotFound,
@@ -502,6 +506,9 @@ namespace {
 
     class AuthExternalStateImplictPriv : public AuthzSessionExternalStateMock {
     public:
+        AuthExternalStateImplictPriv(AuthorizationManager* authzManager) :
+            AuthzSessionExternalStateMock(authzManager) {}
+
         virtual bool _findUser(const string& usersNamespace,
                                const BSONObj& query,
                                BSONObj* result) const {
@@ -537,11 +544,13 @@ namespace {
     class ImplicitPriviligesTest : public ::mongo::unittest::Test {
     public:
         AuthExternalStateImplictPriv* state;
-        scoped_ptr<AuthorizationSession> authman;
+        scoped_ptr<AuthorizationSession> authzSession;
+        scoped_ptr<AuthorizationManager> authzManager;
 
         void setUp() {
-            state = new AuthExternalStateImplictPriv;
-            authman.reset(new AuthorizationSession(state));
+            authzManager.reset(new AuthorizationManager(new AuthzManagerExternalStateMock()));
+            state = new AuthExternalStateImplictPriv(authzManager.get());
+            authzSession.reset(new AuthorizationSession(state));
         }
     };
 
@@ -560,37 +569,37 @@ namespace {
                                          "roles" << BSON_ARRAY("clusterAdmin") <<
                                          "otherDBRoles" << BSON("test3" << BSON_ARRAY("dbAdmin"))));
 
-        ASSERT(!authman->checkAuthorization("test.foo", ActionType::find));
-        ASSERT(!authman->checkAuthorization("test.foo", ActionType::insert));
-        ASSERT(!authman->checkAuthorization("test.foo", ActionType::collMod));
-        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::find));
-        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::insert));
-        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::collMod));
-        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::find));
-        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::insert));
-        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::collMod));
-        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::find));
-        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::insert));
-        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::collMod));
-        ASSERT(!authman->checkAuthorization("$SERVER", ActionType::shutdown));
+        ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
 
         Principal* principal = new Principal(UserName("andy", "test"));
         principal->setImplicitPrivilegeAcquisition(true);
-        authman->addAuthorizedPrincipal(principal);
+        authzSession->addAuthorizedPrincipal(principal);
 
-        ASSERT(authman->checkAuthorization("test.foo", ActionType::find));
-        ASSERT(authman->checkAuthorization("test.foo", ActionType::insert));
-        ASSERT(!authman->checkAuthorization("test.foo", ActionType::collMod));
-        ASSERT(authman->checkAuthorization("test2.foo", ActionType::find));
-        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::insert));
-        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::collMod));
-        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::find));
-        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::insert));
-        ASSERT(authman->checkAuthorization("test3.foo", ActionType::collMod));
-        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::find));
-        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::insert));
-        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::collMod));
-        ASSERT(authman->checkAuthorization("$SERVER", ActionType::shutdown));
+        ASSERT(authzSession->checkAuthorization("test.foo", ActionType::find));
+        ASSERT(authzSession->checkAuthorization("test.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::collMod));
+        ASSERT(authzSession->checkAuthorization("test2.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::insert));
+        ASSERT(authzSession->checkAuthorization("test3.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::collMod));
+        ASSERT(authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
     }
 
 }  // namespace

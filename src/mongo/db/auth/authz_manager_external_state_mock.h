@@ -1,4 +1,4 @@
-/**
+/*
 *    Copyright (C) 2012 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
@@ -16,33 +16,29 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authz_session_external_state_server_common.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
     /**
-     * The implementation of AuthzSessionExternalState functionality for mongos.
+     * Mock of the AuthzManagerExternalState class used only for testing.
      */
-    class AuthzSessionExternalStateMongos : public AuthzSessionExternalStateServerCommon {
-        MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMongos);
+    class AuthzManagerExternalStateMock : public AuthzManagerExternalState {
+        MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMock);
 
     public:
-        AuthzSessionExternalStateMongos(AuthorizationManager* authzManager);
-        virtual ~AuthzSessionExternalStateMongos();
 
-        virtual void startRequest();
+        AuthzManagerExternalStateMock() {};
 
-        virtual void onAddAuthorizedPrincipal(Principal*);
-
-        virtual void onLogoutDatabase(const std::string&);
-
-    protected:
-        virtual bool _findUser(const string& usersNamespace,
+        virtual bool _findUser(const std::string& usersNamespace,
                                const BSONObj& query,
-                               BSONObj* result) const;
+                               BSONObj* result) const {
+            return false;
+        }
     };
 
 } // namespace mongo

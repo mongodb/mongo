@@ -18,6 +18,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/d_concurrency.h"
@@ -27,7 +28,9 @@
 
 namespace mongo {
 
-    AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod() {}
+    AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(
+            AuthorizationManager* authzManager) :
+                AuthzSessionExternalStateServerCommon(authzManager) {}
     AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
     void AuthzSessionExternalStateMongod::startRequest() {

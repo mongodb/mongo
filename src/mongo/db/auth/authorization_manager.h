@@ -20,7 +20,10 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
@@ -76,6 +79,17 @@ namespace mongo {
 
         AuthzManagerExternalState* getExternalState() const;
 
+        // Gets the privilege information document for "userName" on "dbname".
+        //
+        // On success, returns Status::OK() and stores a shared-ownership copy of the document into
+        // "result".
+        Status getPrivilegeDocument(const std::string& dbname,
+                                    const UserName& userName,
+                                    BSONObj* result);
+
+        // Returns true if there exists at least one privilege document in the given database.
+        bool hasPrivilegeDocument(const std::string& dbname) const;
+
     private:
 
         static bool _doesSupportOldStylePrivileges;
@@ -85,7 +99,7 @@ namespace mongo {
         // This is a config setting, set at startup and not changing after initialization.
         static bool _authEnabled;
 
-        scoped_ptr<AuthzManagerExternalState> _globalExternalState;
+        scoped_ptr<AuthzManagerExternalState> _externalState;
     };
 
 } // namespace mongo
