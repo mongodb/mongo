@@ -47,46 +47,46 @@ namespace modifiertable {
             }
         };
 
-        typedef unordered_map<StringData, ModifierEntry, StringData::Hasher> NameMap;
+        typedef unordered_map<StringData, ModifierEntry*, StringData::Hasher> NameMap;
 
         NameMap* MODIFIER_NAME_MAP;
 
         void init(NameMap* nameMap) {
-            ModifierEntry entryAddToSet("$addToSet", MOD_ADD_TO_SET);
-            nameMap->insert(make_pair(StringData(entryAddToSet.name), entryAddToSet));
+            ModifierEntry* entryAddToSet = new ModifierEntry("$addToSet", MOD_ADD_TO_SET);
+            nameMap->insert(make_pair(StringData(entryAddToSet->name), entryAddToSet));
 
-            ModifierEntry entryBit("$bit", MOD_BIT);
-            nameMap->insert(make_pair(StringData(entryBit.name), entryBit));
+            ModifierEntry* entryBit = new ModifierEntry("$bit", MOD_BIT);
+            nameMap->insert(make_pair(StringData(entryBit->name), entryBit));
 
-            ModifierEntry entryPop("$pop", MOD_POP);
-            nameMap->insert(make_pair(StringData(entryPop.name), entryPop));
+            ModifierEntry* entryPop = new ModifierEntry("$pop", MOD_POP);
+            nameMap->insert(make_pair(StringData(entryPop->name), entryPop));
 
-            ModifierEntry entryPull("$pull", MOD_PULL);
-            nameMap->insert(make_pair(StringData(entryPull.name), entryPull));
+            ModifierEntry* entryPull = new ModifierEntry("$pull", MOD_PULL);
+            nameMap->insert(make_pair(StringData(entryPull->name), entryPull));
 
-            ModifierEntry entryPullAll("$pullAll", MOD_PULL_ALL);
-            nameMap->insert(make_pair(StringData(entryPullAll.name), entryPullAll));
+            ModifierEntry* entryPullAll = new ModifierEntry("$pullAll", MOD_PULL_ALL);
+            nameMap->insert(make_pair(StringData(entryPullAll->name), entryPullAll));
 
-            ModifierEntry entryPush("$push", MOD_PUSH);
-            nameMap->insert(make_pair(StringData(entryPush.name), entryPush));
+            ModifierEntry* entryPush = new ModifierEntry("$push", MOD_PUSH);
+            nameMap->insert(make_pair(StringData(entryPush->name), entryPush));
 
-            ModifierEntry entryPushAll("$pushAll", MOD_PUSH_ALL);
-            nameMap->insert(make_pair(StringData(entryPushAll.name), entryPushAll));
+            ModifierEntry* entryPushAll = new ModifierEntry("$pushAll", MOD_PUSH_ALL);
+            nameMap->insert(make_pair(StringData(entryPushAll->name), entryPushAll));
 
-            ModifierEntry entryInc("$inc", MOD_INC);
-            nameMap->insert(make_pair(StringData(entryInc.name), entryInc));
+            ModifierEntry* entryInc = new ModifierEntry("$inc", MOD_INC);
+            nameMap->insert(make_pair(StringData(entryInc->name), entryInc));
 
-            ModifierEntry entrySet("$set", MOD_SET);
-            nameMap->insert(make_pair(StringData(entrySet.name), entrySet));
+            ModifierEntry* entrySet = new ModifierEntry("$set", MOD_SET);
+            nameMap->insert(make_pair(StringData(entrySet->name), entrySet));
 
-            ModifierEntry entrySetOnInsert("$setOnInsert", MOD_SET_ON_INSERT);
-            nameMap->insert(make_pair(StringData(entrySetOnInsert.name), entrySetOnInsert));
+            ModifierEntry* entrySetOnInsert = new ModifierEntry("$setOnInsert", MOD_SET_ON_INSERT);
+            nameMap->insert(make_pair(StringData(entrySetOnInsert->name), entrySetOnInsert));
 
-            ModifierEntry entryRename("$rename", MOD_RENAME);
-            nameMap->insert(make_pair(StringData(entryRename.name), entryRename));
+            ModifierEntry* entryRename = new ModifierEntry("$rename", MOD_RENAME);
+            nameMap->insert(make_pair(StringData(entryRename->name), entryRename));
 
-            ModifierEntry entryUnset("$unset", MOD_UNSET);
-            nameMap->insert(make_pair(StringData(entryUnset.name), entryUnset));
+            ModifierEntry* entryUnset = new ModifierEntry("$unset", MOD_UNSET);
+            nameMap->insert(make_pair(StringData(entryUnset->name), entryUnset));
         }
 
     } // unnamed namespace
@@ -103,7 +103,7 @@ namespace modifiertable {
         if (it == MODIFIER_NAME_MAP->end()) {
             return MOD_UNKNOWN;
         }
-        return it->second.type;
+        return it->second->type;
     }
 
     ModifierInterface* makeUpdateMod(ModifierType modType) {
