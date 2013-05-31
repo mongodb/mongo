@@ -270,9 +270,8 @@ __wt_meta_ckptlist_get(
 	if (__wt_config_getones(session, config, "checkpoint", &v) == 0 &&
 	    __wt_config_subinit(session, &ckptconf, &v) == 0)
 		for (; __wt_config_next(&ckptconf, &k, &v) == 0; ++slot) {
-			if (slot * sizeof(WT_CKPT) == allocated)
-				WT_ERR(__wt_realloc(session, &allocated,
-				    (slot + 50) * sizeof(WT_CKPT), &ckptbase));
+			WT_ERR(__wt_realloc_def(
+			    session, &allocated, slot + 1, &ckptbase));
 			ckpt = &ckptbase[slot];
 
 			WT_ERR(__ckpt_load(session, &k, &v, ckpt));
@@ -288,9 +287,7 @@ __wt_meta_ckptlist_get(
 	 * checkpoint).  All of that cooperation is handled in the WT_CKPT
 	 * structure referenced from the WT_BTREE structure.
 	 */
-	if ((slot + 2) * sizeof(WT_CKPT) > allocated)
-		WT_ERR(__wt_realloc(session, &allocated,
-		    (slot + 2) * sizeof(WT_CKPT), &ckptbase));
+	WT_ERR(__wt_realloc_def(session, &allocated, slot + 2, &ckptbase));
 
 	/* Sort in creation-order. */
 	qsort(ckptbase, slot, sizeof(WT_CKPT), __ckpt_compare_order);

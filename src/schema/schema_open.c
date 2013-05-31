@@ -249,11 +249,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 		 * Ensure there is space, including if we have to make room for
 		 * a new entry in the middle of the list.
 		 */
-		if (table->idx_alloc <= sizeof(WT_INDEX *) *
-		    ((size_t)WT_MAX(i, table->nindices) + 1))
-			WT_ERR(__wt_realloc(session, &table->idx_alloc,
-			    WT_MAX(10 * sizeof(WT_INDEX *),
-			    2 * table->idx_alloc), &table->indices));
+		WT_ERR(__wt_realloc_def(session, &table->idx_alloc,
+		    WT_MAX(i, table->nindices) + 1, &table->indices));
 
 		/* Keep the in-memory list in sync with the metadata. */
 		cmp = 0;
