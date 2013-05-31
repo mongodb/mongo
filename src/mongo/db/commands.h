@@ -67,6 +67,12 @@ namespace mongo {
          */
         virtual LockType locktype() const = 0;
 
+        /*
+           locktype() declared above will return integer values which may not be very useful when reading
+           the command help. This function will translate the locktype to more readable format.
+         */
+        virtual string lockTypeInfo() const;
+
         /** if true, lock globally instead of just the one database. by default only the one 
             database will be locked. 
         */

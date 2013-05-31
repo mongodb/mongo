@@ -159,7 +159,7 @@ namespace mongo {
             help << "help for: " << c->name << " ";
             c->help( help );
             result.append( "help" , help.str() );
-            result.append( "lockType" , c->locktype() );
+            result.append( "lockType" , c->lockTypeInfo() );
             appendCommandStatus(result, true, "");
             return;
         }
