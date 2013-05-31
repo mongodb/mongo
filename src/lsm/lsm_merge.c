@@ -26,7 +26,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	if (nchunks > lsm_tree->old_avail) {
 		chunk_sz = sizeof(*lsm_tree->old_chunks);
 		WT_RET(__wt_realloc_def(session, &lsm_tree->old_alloc,
-		    lsm_tree->nold_chunks - lsm_tree->old_avail + nchunks,
+		    (lsm_tree->nold_chunks - lsm_tree->old_avail) + nchunks,
 		    &lsm_tree->old_chunks));
 		lsm_tree->old_avail += (u_int)(lsm_tree->old_alloc / chunk_sz) -
 		    lsm_tree->nold_chunks;
