@@ -22,8 +22,8 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
-        WT_RET(__wt_realloc_def(
-            session, &txn->mod_alloc, txn->mod_count + 1, &txn->mod));
+	WT_RET(__wt_realloc_def(
+	    session, &txn->mod_alloc, txn->mod_count + 1, &txn->mod));
 
 	txn->mod[txn->mod_count++] = id;
 	*id = txn->id;
@@ -45,7 +45,7 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
 	WT_RET(__wt_realloc_def(
-            session, &txn->modref_alloc, txn->modref_count + 1, &txn->modref));
+	    session, &txn->modref_alloc, txn->modref_count + 1, &txn->modref));
 
 	txn->modref[txn->modref_count++] = ref;
 	ref->txnid = txn->id;
