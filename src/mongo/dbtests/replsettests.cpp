@@ -192,50 +192,71 @@ namespace ReplSetTests {
 
             Client::initThread("in progress idx build");
             Client::WriteContext ctx(ns);
-            _client = currentClient.get();
+            {
+                boost::mutex::scoped_lock lk(_mtx);
+                _client = currentClient.get();
+            }
 
             // This spins to mimic the db building an index.  Yield the read lock so that other
             // dbs can be opened (which requires the write lock)
-            while (!_curop || !_curop->killPendingStrict()) {
+            while (true) {
                 dbtemprelease temp;
                 sleepmillis(10);
+                boost::mutex::scoped_lock lk(_mtx);
+                if (_curop) {
+                    if (_curop->killPendingStrict()) {
+                        break;
+                    }
+                }
             }
             log() << "index build ending" << endl;
             killCurrentOp.notifyAllWaiters();
             cc().shutdown();
+
+            boost::mutex::scoped_lock lk(_mtx);
             _done = true;
         }
 
         // Make sure the test doesn't end while this "index build" is still spinning
         void finish() {
-            while (!_curop) {
+            while (true) {
                 sleepmillis(10);
+                boost::mutex::scoped_lock lk(_mtx);
+                if (_curop) break;
             }
 
             _curop->kill();
 
-            while (!_done) {
+            while (!finished()) {
                 sleepmillis(10);
             }
         }
 
         bool finished() {
+            boost::mutex::scoped_lock lk(_mtx);
             return _done;
         }
 
         CurOp* curop() {
-            if (_curop != NULL) {
-                return _curop;
+            {
+                boost::mutex::scoped_lock lk(_mtx);
+                if (_curop != NULL) {
+                    return _curop;
+                }
             }
 
-            while (_client == NULL) {
+            while (true) {
                 sleepmillis(10);
+                boost::mutex::scoped_lock lk(_mtx);
+                if (_client) break;
             }
 
+            boost::mutex::scoped_lock lk(_mtx);
             // On the first time through, make sure the curop is set up correctly
             _client->curop()->reset(HostAndPort::me(), dbInsert);
             _client->curop()->enter(_client->getContext());
             _client->curop()->setQuery(_index);
+
 
             _curop = _client->curop();
             return _curop;
@@ -246,6 +267,9 @@ namespace ReplSetTests {
         BSONObj _index;
         Client* _client;
         CurOp* _curop;
+        // Mutex protects all other members of this class, except _index which is
+        // set in the constructor and never subsequently changed
+        boost::mutex _mtx;
     };
 
     class TestDropDB : public Base {
