@@ -1712,9 +1712,6 @@
     <ClCompile Include="fts\tokenizer_test.cpp">
       <Filter>db\fts\test</Filter>
     </ClCompile>
-    <ClCompile Include="auth\auth_server_parameters.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="stats\timer_stats.cpp">
       <Filter>db\stats</Filter>
     </ClCompile>
@@ -2060,18 +2057,6 @@
     <ClCompile Include="range_deleter_test.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="auth\auth_session_external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\auth_session_external_state_d.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\auth_session_external_state_s.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\auth_session_external_state_server_common.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="auth\authorization_session.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
@@ -2138,15 +2123,6 @@
     <ClCompile Include="matcher\path_internal.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
-    <ClCompile Include="auth\auth_global_external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\auth_global_external_state_d.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\auth_global_external_state_s.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="matcher\path_test.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
@@ -2212,6 +2188,33 @@
     </ClCompile>
     <ClCompile Include="..\util\text_startuptest.cpp">
       <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authorization_manager_global.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authz_manager_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authz_manager_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authz_manager_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authz_session_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authz_session_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authz_session_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authz_session_external_state_server_common.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_server_parameters.cpp">
+      <Filter>db\auth</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -4404,21 +4407,6 @@
     <ClInclude Include="range_deleter_stats.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="auth\auth_session_external_state.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_session_external_state_d.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_session_external_state_mock.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_session_external_state_s.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_session_external_state_server_common.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="auth\authorization_session.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -4461,15 +4449,6 @@
     <ClInclude Include="matcher\path_internal.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
-    <ClInclude Include="auth\auth_global_external_state.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_global_external_state_d.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\auth_global_external_state_s.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="matcher\path.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
@@ -4481,6 +4460,33 @@
     </ClInclude>
     <ClInclude Include="ops\update_driver.h">
       <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authorization_manager_global.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_manager_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_manager_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_manager_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_session_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_session_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_session_external_state_mock.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_session_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authz_session_external_state_server_common.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

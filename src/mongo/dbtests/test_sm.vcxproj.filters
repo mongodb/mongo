@@ -1962,21 +1962,6 @@
     <ClInclude Include="..\base\status-inl.h">
       <Filter>base</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\auth\auth_session_external_state.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\auth_session_external_state_d.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\auth_session_external_state_mock.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\auth_session_external_state_s.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\auth_session_external_state_server_common.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\auth\authorization_session.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -2025,15 +2010,6 @@
     <ClInclude Include="..\db\matcher\path_internal.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\auth\auth_global_external_state.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\auth_global_external_state_d.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\auth_global_external_state_s.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\matcher\path.h">
       <Filter>db\matcher</Filter>
     </ClInclude>
@@ -2045,6 +2021,33 @@
     </ClInclude>
     <ClInclude Include="..\db\ops\update_driver.h">
       <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authorization_manager_global.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_manager_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_manager_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_manager_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_session_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_session_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_session_external_state_mock.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_session_external_state_s.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_session_external_state_server_common.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -3934,18 +3937,6 @@
     <ClCompile Include="..\bson\bson_validate_test.cpp">
       <Filter>bson</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\auth\auth_session_external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\auth_session_external_state_d.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\auth_session_external_state_s.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\auth_session_external_state_server_common.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\auth\authorization_session.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
@@ -4024,15 +4015,6 @@
     <ClCompile Include="..\db\matcher\path_internal.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\auth\auth_global_external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\auth_global_external_state_d.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\auth_global_external_state_s.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\matcher\path.cpp">
       <Filter>db\matcher</Filter>
     </ClCompile>
@@ -4056,6 +4038,30 @@
     </ClCompile>
     <ClCompile Include="..\db\ops\update_driver_test.cpp">
       <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authorization_manager_global.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_manager_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_manager_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_manager_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_session_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_session_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_session_external_state_s.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_session_external_state_server_common.cpp">
+      <Filter>db\auth</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -593,16 +593,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\action_type.h" />
     <ClInclude Include="..\db\auth\authentication_session.h" />
     <ClInclude Include="..\db\auth\authorization_manager.h" />
+    <ClInclude Include="..\db\auth\authorization_manager_global.h" />
     <ClInclude Include="..\db\auth\authorization_session.h" />
-    <ClInclude Include="..\db\auth\auth_global_external_state.h" />
-    <ClInclude Include="..\db\auth\auth_global_external_state_d.h" />
-    <ClInclude Include="..\db\auth\auth_global_external_state_s.h" />
+    <ClInclude Include="..\db\auth\authz_manager_external_state.h" />
+    <ClInclude Include="..\db\auth\authz_manager_external_state_d.h" />
+    <ClInclude Include="..\db\auth\authz_manager_external_state_s.h" />
     <ClInclude Include="..\db\auth\auth_index_d.h" />
-    <ClInclude Include="..\db\auth\auth_session_external_state.h" />
-    <ClInclude Include="..\db\auth\auth_session_external_state_d.h" />
-    <ClInclude Include="..\db\auth\auth_session_external_state_mock.h" />
-    <ClInclude Include="..\db\auth\auth_session_external_state_s.h" />
-    <ClInclude Include="..\db\auth\auth_session_external_state_server_common.h" />
+    <ClInclude Include="..\db\auth\authz_session_external_state.h" />
+    <ClInclude Include="..\db\auth\authz_session_external_state_d.h" />
+    <ClInclude Include="..\db\auth\authz_session_external_state_mock.h" />
+    <ClInclude Include="..\db\auth\authz_session_external_state_s.h" />
+    <ClInclude Include="..\db\auth\authz_session_external_state_server_common.h" />
     <ClInclude Include="..\db\auth\mongo_authentication_session.h" />
     <ClInclude Include="..\db\auth\principal.h" />
     <ClInclude Include="..\db\auth\user_name.h" />
@@ -2319,6 +2320,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="..\db\auth\action_type.cpp" />
     <ClCompile Include="..\db\auth\authorization_manager.cpp" />
+    <ClCompile Include="..\db\auth\authorization_manager_global.cpp" />
     <ClCompile Include="..\db\auth\authorization_session.cpp" />
     <ClCompile Include="..\db\auth\authorization_session_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -2330,9 +2332,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\db\auth\auth_global_external_state.cpp" />
-    <ClCompile Include="..\db\auth\auth_global_external_state_d.cpp" />
-    <ClCompile Include="..\db\auth\auth_global_external_state_s.cpp">
+    <ClCompile Include="..\db\auth\authz_manager_external_state.cpp" />
+    <ClCompile Include="..\db\auth\authz_manager_external_state_d.cpp" />
+    <ClCompile Include="..\db\auth\authz_manager_external_state_s.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
@@ -2344,9 +2346,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="..\db\auth\auth_index_d.cpp" />
     <ClCompile Include="..\db\auth\auth_server_parameters.cpp" />
-    <ClCompile Include="..\db\auth\auth_session_external_state.cpp" />
-    <ClCompile Include="..\db\auth\auth_session_external_state_d.cpp" />
-    <ClCompile Include="..\db\auth\auth_session_external_state_s.cpp">
+    <ClCompile Include="..\db\auth\authz_session_external_state.cpp" />
+    <ClCompile Include="..\db\auth\authz_session_external_state_d.cpp" />
+    <ClCompile Include="..\db\auth\authz_session_external_state_s.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
@@ -2356,7 +2358,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\db\auth\auth_session_external_state_server_common.cpp" />
+    <ClCompile Include="..\db\auth\authz_session_external_state_server_common.cpp" />
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
     <ClCompile Include="..\db\auth\user_name.cpp" />
