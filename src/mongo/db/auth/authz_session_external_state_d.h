@@ -18,7 +18,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state_server_common.h"
 
 namespace mongo {
@@ -30,7 +29,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMongod);
 
     public:
-        AuthzSessionExternalStateMongod(AuthorizationManager* authzManager);
+        AuthzSessionExternalStateMongod();
         virtual ~AuthzSessionExternalStateMongod();
 
         virtual bool shouldIgnoreAuthChecks() const;

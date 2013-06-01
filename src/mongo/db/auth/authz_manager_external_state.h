@@ -45,10 +45,6 @@ namespace mongo {
                                     const UserName& userName,
                                     BSONObj* result);
 
-
-        // Returns true if there exists at least one privilege document in the given database.
-        bool hasPrivilegeDocument(const std::string& dbname) const;
-
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
 
@@ -58,6 +54,8 @@ namespace mongo {
                                const BSONObj& query,
                                BSONObj* result) const = 0;
 
+        // Returns true if there exists at least one privilege document in the given database.
+        bool _hasPrivilegeDocument(const std::string& dbname) const;
     };
 
 } // namespace mongo

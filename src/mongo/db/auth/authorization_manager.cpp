@@ -34,11 +34,11 @@ namespace mongo {
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
     bool AuthorizationManager::_authEnabled = false;
 
-    AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
-            _externalState(externalState) {}
+    AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* globalExternalState) :
+            _globalExternalState(globalExternalState) {}
 
     AuthzManagerExternalState* AuthorizationManager::getExternalState() const {
-        return _externalState.get();
+        return _globalExternalState.get();
     }
 
     void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
@@ -55,16 +55,6 @@ namespace mongo {
 
     bool AuthorizationManager::isAuthEnabled() {
         return _authEnabled;
-    }
-
-    Status AuthorizationManager::getPrivilegeDocument(const std::string& dbname,
-                                                      const UserName& userName,
-                                                      BSONObj* result) {
-        return _externalState->getPrivilegeDocument(dbname, userName, result);
-    }
-
-    bool AuthorizationManager::hasPrivilegeDocument(const std::string& dbname) const {
-        return _externalState->hasPrivilegeDocument(dbname);
     }
 
 } // namespace mongo
