@@ -1783,6 +1783,8 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	ETRET(unlock(wtext, session, &ds->global_lock));
 	ETRET(lock_destroy(wtext, NULL, &ds->global_lock));
 
+	free(ds);
+
 	return (ret);
 }
 
