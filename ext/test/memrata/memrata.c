@@ -902,7 +902,7 @@ kvs_config_devices(WT_EXTENSION_API *wtext,
 		ESET(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_begin: %s",
 		    wtext->strerror(ret));
-		return (ret);
+		goto err;
 	}
 
 	for (cnt = slots = 0; (ret = wtext->
@@ -928,13 +928,13 @@ kvs_config_devices(WT_EXTENSION_API *wtext,
 		ESET(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_next: %s",
 		    wtext->strerror(ret));
-		return (ret);
+		goto err;
 	}
 	if ((ret = wtext->config_scan_end(wtext, scan)) != 0) {
 		ESET(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_end: %s",
 		    wtext->strerror(ret));
-		return (ret);
+		goto err;
 	}
 
 	*devices = argv;
@@ -1069,7 +1069,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
 	int flags, locked, ret = 0;
-	char **device_list, *devices;
+	char **device_list, *devices, **p;
 
 	*refp = NULL;
 
@@ -1166,7 +1166,11 @@ err:		if (locked)
 	}
 
 	free(ks);
-	free(device_list);
+	if (device_list != NULL) {
+		for (p = device_list; *p != NULL; ++p)
+			free(*p);
+		free(device_list);
+	}
 	free(devices);
 	return (ret);
 }
@@ -1403,17 +1407,13 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 
 	/* Get the key/value format strings. */
 	if ((ret = wtext->config_get(
-	    wtext, session, config, "key_format", &a)) != 0) {
-		ESET(wtext, session, ret,
+	    wtext, session, config, "key_format", &a)) != 0)
+		ERET(wtext, session, ret,
 		    "key_format configuration: %s", wtext->strerror(ret));
-		return (ret);
-	}
 	if ((ret = wtext->config_get(
-	    wtext, session, config, "value_format", &b)) != 0) {
-		ESET(wtext, session, ret,
+	    wtext, session, config, "value_format", &b)) != 0)
+		ERET(wtext, session, ret,
 		    "value_format configuration: %s", wtext->strerror(ret));
-		return (ret);
-	}
 
 	/*
 	 * Create a new reference using kvs_add (which fails if the record
@@ -1837,9 +1837,11 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	ds->wtds = wtds;			/* Configure the methods */
 
 	if ((ret = connection->add_data_source(	/* Add the data source */
-	    connection, "memrata:", (WT_DATA_SOURCE *)ds, NULL)) != 0)
+	    connection, "memrata:", (WT_DATA_SOURCE *)ds, NULL)) != 0) {
 		ESET(wtext, NULL, ret,
 		    "WT_CONNECTION.add_data_source: %s", wtext->strerror(ret));
+		goto err;
+	}
 
 	/* Add KVS-specific configuration options. */
 	ret = kvs_config_add(connection, wtext);
