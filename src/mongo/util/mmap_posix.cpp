@@ -174,6 +174,11 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+#if defined(__sunos__) // SERVER-8795
+        verify( Lock::isW() );
+        LockMongoFilesExclusive lockMongoFiles;
+#endif
+
         // don't unmap, just mmap over the old region
         void * x = mmap( oldPrivateAddr, len , PROT_READ|PROT_WRITE , MAP_PRIVATE|MAP_NORESERVE|MAP_FIXED , fd , 0 );
         if( x == MAP_FAILED ) {
