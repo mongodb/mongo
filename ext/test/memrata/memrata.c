@@ -79,7 +79,7 @@
  * leading byte.  A leading byte of 0 is the metadata for the device.
  */
 #define	KVS_MASTER		'\0'		/* Magic byte for master */
-#define	KVS_MASTER_VALUE_MAX	64		/* Maximum master value */
+#define	KVS_MASTER_VALUE_MAX	256		/* Maximum master value */
 
 #define	KVS_MAXID	"WiredTiger.maxid"	/* Maximum object ID key */
 
@@ -89,7 +89,10 @@
  */
 typedef struct __uri_source {
 	char *name;				/* Unique name */
-	pthread_rwlock_t lock;			/* lock */
+	pthread_rwlock_t lock;			/* Lock */
+
+	int	configured;			/* If configured */
+	u_int	ref;				/* Active reference count */
 
 	/*
 	 * Each object has a unique leading byte prefix, which is the object's
@@ -103,9 +106,10 @@ typedef struct __uri_source {
 	char	 idnext[10];			/* Packed next ID prefix */
 	size_t	 idnextlen;			/* Next ID prefix length */
 
-	u_int ref;				/* Active reference count */
-
 	uint64_t append_recno;			/* Allocation record number */
+
+	int	 config_recno;			/* config "key_format=r" */
+	int	 config_bitfield;		/* config "value_format=#t" */
 
 	struct __kvs_source *ks;		/* Underlying KVS source */
 
@@ -116,7 +120,7 @@ typedef struct __kvs_source {
 	char *name;				/* Unique name */
 	kvs_t kvs;				/* Underlying KVS reference */
 
-	struct __uri_source *uri;		/* List of URIs */
+	struct __uri_source *uri_head;		/* List of URIs */
 
 	struct __kvs_source *next;		/* List of KVS sources */
 } KVS_SOURCE;
@@ -135,9 +139,7 @@ typedef struct __cursor {
 	size_t val_len;
 
 	int	 config_append;			/* config "append" */
-	int	 config_bitfield;		/* config "value_format=#t" */
 	int	 config_overwrite;		/* config "overwrite" */
-	int	 config_recno;			/* config "key_format=r" */
 } CURSOR;
 
 typedef struct __data_source {
@@ -147,7 +149,7 @@ typedef struct __data_source {
 
 	pthread_rwlock_t global_lock;		/* Global lock */
 
-	KVS_SOURCE *head;			/* List of KVS sources */
+	KVS_SOURCE *kvs_head;			/* List of KVS sources */
 } DATA_SOURCE;
 
 /*
@@ -251,13 +253,37 @@ copyin_key(WT_CURSOR *wtcursor)
 		*t++ = *p++;
 	r->key_len += us->idlen;
 
-	if (cursor->config_recno) {
+	if (us->config_recno) {
 		if ((ret = wtext->struct_size(wtext, session,
 		    &size, "r", wtcursor->recno)) != 0 ||
 		    (ret = wtext->struct_pack(wtext, session, t,
 		    sizeof(r->key) - us->idlen, "r", wtcursor->recno)) != 0)
 			return (ret);
 		r->key_len += size;
+
+		/*
+		 * A specified record number could potentially be larger than
+		 * the maximum known record number, update the maximum number
+		 * as necessary.
+		 *
+		 * XXX
+		 * Assume we can compare 8B values without locking them, and
+		 * test again after acquiring the lock.
+		 *
+		 * XXX
+		 * If the put fails for some reason, we'll have incremented the
+		 * maximum record number past the correct point.  I can't think
+		 * of a reason any application would care or notice, but it's
+		 * not quite right.
+		 */
+		if (wtcursor->recno > us->append_recno) {
+			if ((ret = writelock(wtext, session, &us->lock)) != 0)
+				return (ret);
+			if (wtcursor->recno > us->append_recno)
+				us->append_recno = wtcursor->recno;
+			if ((ret = unlock(wtext, session, &us->lock)) != 0)
+				return (ret);
+		}
 	} else {
 		if (wtcursor->key.size + us->idlen > KVS_MAX_KEY_LEN)
 			ERET(wtext, session, ERANGE,
@@ -301,7 +327,7 @@ copyout_key(WT_CURSOR *wtcursor)
 			return (WT_NOTFOUND);
 	len = r->key_len - us->idlen;
 
-	if (cursor->config_recno) {
+	if (us->config_recno) {
 		if ((ret = wtext->struct_unpack(
 		    wtext, session, t, len, "r", &wtcursor->recno)) != 0)
 			return (ret);
@@ -381,50 +407,6 @@ copy_key(WT_CURSOR *wtcursor)
 	memcpy(cursor->key, r->key, r->key_len);
 	r->key = cursor->key;
 	return (0);
-}
-
-/*
- * kvs_dump --
- *	Dump the records in the KVS store.
- */
-static void
-kvs_dump(
-    WT_EXTENSION_API *wtext, WT_SESSION *session, kvs_t kvs, const char *tag)
-{
-	struct kvs_record *r, _r;
-	DATA_SOURCE *ds;
-	uint64_t recno;
-	size_t len, size;
-	char *p, key[256], val[256];
-
-	printf("== %s\n", tag);
-
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	r->key_len = 0;
-	r->val = val;
-	r->val_len = sizeof(val);
-	while (kvs_next(kvs, r, 0UL, (unsigned long)sizeof(val)) == 0) {
-		p = r->key;
-		len = r->key_len;
-		if (*p == KVS_MASTER) {
-			printf("\t0:");
-			++p;
-			--len;
-		} else {
-			(void)wtext->struct_unpack(
-			    wtext, session, p, 10, "r", &recno);
-			(void)wtext->struct_size(
-			    wtext, session, &size, "r", recno);
-			printf("\t%" PRIu64 ": ", recno);
-			p += size;
-			len -= size;
-		}
-
-		printf("%.*s/%.*s\n", (int)len, p, (int)r->val_len, r->val);
-		r->val_len = sizeof(val);
-	}
 }
 
 /*
@@ -662,13 +644,12 @@ kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
 }
 
 /*
- * kvs_recno_alloc --
- *	Allocate a new record number.
+ * kvs_cursor_insert --
+ *	WT_CURSOR::insert method.
  */
-static INLINE int
-kvs_recno_alloc(WT_CURSOR *wtcursor)
+static int
+kvs_cursor_insert(WT_CURSOR *wtcursor)
 {
-	struct kvs_record *r;
 	CURSOR *cursor;
 	KVS_SOURCE *ks;
 	URI_SOURCE *us;
@@ -682,61 +663,14 @@ kvs_recno_alloc(WT_CURSOR *wtcursor)
 	ks = cursor->ks;
 	us = cursor->us;
 
-	r = &cursor->record;
-
-	if ((ret = writelock(wtext, session, &us->lock)) != 0)
-		return (ret);
-
-	/*
-	 * If not yet tracking the maximum record number, read the last record
-	 * from the object and figure it out.
-	 *
-	 * XXX
-	 * There is still a race here.  If another thread of control performs a
-	 * WT_CURSOR::insert of an explicit record number (that is, the other
-	 * cursor isn't configured for "append"), we could race.  If we figure
-	 * out the last record in the data-source is 37, then the other thread
-	 * explicitly writes record 37, things will go badly.  I don't want to
-	 * lock the data-source on every update, so I'm leaving this until we
-	 * write the transactional code, because that's going to change all of
-	 * the locking in here.
-	 */
-	if (us->append_recno == 0) {
-		if ((ret = kvs_last(ks->kvs, &cursor->record, 0UL, 0UL)) != 0)
-			goto err;
-
-		if ((ret = wtext->struct_unpack(wtext, session,
-		    r->key, sizeof(r->key), "r", &us->append_recno)) != 0)
-			goto err;
-	}
-
-	wtcursor->recno = ++us->append_recno;
-
-err:	ETRET(unlock(wtext, session, &us->lock));
-	return (ret);
-}
-
-/*
- * kvs_cursor_insert --
- *	WT_CURSOR::insert method.
- */
-static int
-kvs_cursor_insert(WT_CURSOR *wtcursor)
-{
-	CURSOR *cursor;
-	KVS_SOURCE *ks;
-	WT_EXTENSION_API *wtext;
-	WT_SESSION *session;
-	int ret = 0;
-
-	session = wtcursor->session;
-	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
-	ks = cursor->ks;
-
 	/* Allocate a new record for append operations. */
-	if (cursor->config_append && (ret = kvs_recno_alloc(wtcursor)) != 0)
-		return (ret);
+	if (cursor->config_append) {
+		if ((ret = writelock(wtext, session, &us->lock)) != 0)
+			return (ret);
+		wtcursor->recno = ++us->append_recno;
+		if ((ret = unlock(wtext, session, &us->lock)) != 0)
+			return (ret);
+	}
 
 	if ((ret = copyin_key(wtcursor)) != 0)
 		return (ret);
@@ -807,6 +741,7 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
 	KVS_SOURCE *ks;
+	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	int ret = 0;
@@ -815,12 +750,13 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
 	ks = cursor->ks;
+	us = cursor->us;
 
 	/*
 	 * WiredTiger's "remove" of a bitfield is really an update with a value
 	 * of a single byte of zero.
 	 */
-	if (cursor->config_bitfield) {
+	if (us->config_bitfield) {
 		wtcursor->value.size = 1;
 		wtcursor->value.data = "\0";
 		return (kvs_cursor_update(wtcursor));
@@ -907,21 +843,39 @@ static int
 kvs_config_add(WT_CONNECTION *connection, WT_EXTENSION_API *wtext)
 {
 	const KVS_OPTIONS *p;
+	const char *methods[] = {
+	    "session.create",
+	    "session.drop",
+	    "session.open_cursor",
+	    "session.rename",
+	    "session.truncate",
+	    "session.verify",
+	    NULL
+	}, **method;
 	int ret = 0;
 
 	/*
-	 * KVS options are currently only allowed on session.create, which means
-	 * they cannot be modified for each run, the object create configuration
-	 * is permanent.
+	 * All WiredTiger methods taking a URI must support kvs_devices, that's
+	 * how we name the underlying store.
+	 *
+	 * Additionally, any method taking a URI might be the first open of the
+	 * store, and we cache store handles, which means the first entrant gets
+	 * to configure the underlying device.  That's wrong: if we ever care,
+	 * we should check any method taking configuration options against the
+	 * already configured values, failing attempts to change configuration
+	 * on a cached handle.  There's no other fix, KVS configuration is tied
+	 * to device open.
 	 */
-	for (p = kvs_options; p->name != NULL; ++p)
-		if ((ret = connection->configure_method(connection,
-		    "session.create", "memrata:",
-		    p->name, p->type, p->checks)) != 0)
-			ERET(wtext, NULL, ret,
-			    "WT_CONNECTION.configure_method: session.create: "
-			    "{%s, %s, %s}",
-			    p->name, p->type, p->checks, wtext->strerror(ret));
+	for (method = methods; *method != NULL; ++method)
+		for (p = kvs_options; p->name != NULL; ++p)
+			if ((ret = connection->configure_method(connection,
+			    *method,
+			    "memrata:", p->name, p->type, p->checks)) != 0)
+				ERET(wtext, NULL, ret,
+				    "WT_CONNECTION.configure_method: "
+				    "%s: {%s, %s, %s}",
+				    *method, p->name,
+				    p->type, p->checks, wtext->strerror(ret));
 	return (0);
 }
 
@@ -1077,7 +1031,7 @@ device_list_sort(char **device_list)
 
 /*
  * device_string --
- *	Convert the list of devices into a unique, comma-separate string.
+ *	Convert the list of devices into a comma-separated string.
  */
 static int
 device_string(char **device_list, char **devicesp)
@@ -1129,17 +1083,20 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 
 	/*
 	 * Read the configuration.  We require a list of devices underlying the
-	 * KVS source, and that list of devices is a unique name.
+	 * KVS source, parse the device list found in the configuration string
+	 * into an array of paths.
+	 *
+	 * That list of devices is a unique name.  Sort the list of devices so
+	 * ordering doesn't matter in naming, then create a "name" string for
+	 * the device so we can uniquely identify it.  The reason we go from a
+	 * configuration string to an array and then back to another string is
+	 * because we want to be sure the order the devices are listed in the
+	 * string doesn't change the "real" name of the store.
 	 */
 	if ((ret = kvs_config_read(wtext,
 	    session, config, &device_list, &kvs_config, &flags)) != 0)
 		goto err;
-
-	/*
-	 * Sort the list of devices so ordering doesn't matter in naming, then
-	 * create a "name" string for the device so we can unique identify it.
-	 */
-	if (device_list[0] == NULL) {
+	if (device_list == NULL || device_list[0] == NULL) {
 		ESET(wtext, session, EINVAL, "kvs_open: no devices specified");
 		goto err;
 	}
@@ -1156,7 +1113,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	locked = 1;
 
 	/* Check for a match: if we find one we're done. */
-	for (ks = ds->head; ks != NULL; ks = ks->next)
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
 		if (strcmp(ks->name, devices) == 0)
 			goto done;
 
@@ -1196,8 +1153,8 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	}
 
 	/* Insert the new entry at the head of the list. */
-	ks->next = ds->head;
-	ds->head = ks;
+	ks->next = ds->kvs_head;
+	ds->kvs_head = ks;
 
 	/* Return the locked object. */
 done:	*refp = ks;
@@ -1239,7 +1196,7 @@ uri_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		return (ret);
 
 	/* Check for a match: if we find one, we're done. */
-	for (us = ks->uri; us != NULL; us = us->next)
+	for (us = ks->uri_head; us != NULL; us = us->next)
 		if (strcmp(us->name, uri) == 0)
 			goto done;
 
@@ -1255,8 +1212,8 @@ uri_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	us->ks = ks;
 
 	/* Insert the new entry at the head of the list. */
-	us->next = ks->uri;
-	ks->uri = us;
+	us->next = ks->uri_head;
+	ks->uri_head = us;
 
 	/* Return the locked object. */
 done:	if ((ret = writelock(wtext, session, &us->lock)) != 0)
@@ -1276,27 +1233,6 @@ err:		if (lockinit)
 
 	/* Release the global lock. */
 	ETRET(unlock(wtext, session, &ds->global_lock));
-	return (ret);
-}
-
-/*
- * uri_source_destroy --
- *	Destroy a URI_SOURCE object.
- */
-static int
-uri_source_destroy(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
-{
-	DATA_SOURCE *ds;
-	WT_EXTENSION_API *wtext;
-	int ret = 0;
-
-	ds = (DATA_SOURCE *)wtds;
-	wtext = ds->wtext;
-
-	ret = lock_destroy(wtext, session, &us->lock);
-	free(us->name);
-	free(us);
-
 	return (ret);
 }
 
@@ -1343,6 +1279,8 @@ master_id_get(
 	int ret = 0;
 	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
 
+	*maxidp = 0;
+
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 	kvs = us->ks->kvs;
@@ -1359,11 +1297,9 @@ master_id_get(
 		*maxidp = strtouq(r->val, NULL, 10);
 		break;
 	case KVS_E_KEY_NOT_FOUND:
-		*maxidp = 1;
 		ret = 0;
 		break;
 	default:
-		*maxidp = 0;
 		ERET(wtext, session,
 		    WT_ERROR, "kvs_get: %s: %s", KVS_MAXID, kvs_strerror(ret));
 		break;
@@ -1418,7 +1354,6 @@ master_uri_get(WT_DATA_SOURCE *wtds,
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
 	kvs_t kvs;
-	uint64_t maxid;
 	int ret = 0;
 	char key[KVS_MAX_KEY_LEN];
 
@@ -1445,11 +1380,12 @@ master_uri_get(WT_DATA_SOURCE *wtds,
  *	Set the KVS master record for a URI.
  */
 static int
-master_uri_set(
-    WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us, const char *uri)
+master_uri_set(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, URI_SOURCE *us, const char *uri, WT_CONFIG_ARG *config)
 {
 	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
+	WT_CONFIG_ITEM a, b;
 	WT_EXTENSION_API *wtext;
 	kvs_t kvs;
 	uint64_t maxid;
@@ -1460,9 +1396,24 @@ master_uri_set(
 	wtext = ds->wtext;
 	kvs = us->ks->kvs;
 
-	/* Get the next file ID. */
+	/* Get the maximum file ID. */
 	if ((ret = master_id_get(wtds, session, us, &maxid)) != 0)
 		return (ret);
+	++maxid;
+
+	/* Get the key/value format strings. */
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "key_format", &a)) != 0) {
+		ESET(wtext, session, ret,
+		    "key_format configuration: %s", wtext->strerror(ret));
+		return (ret);
+	}
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "value_format", &b)) != 0) {
+		ESET(wtext, session, ret,
+		    "value_format configuration: %s", wtext->strerror(ret));
+		return (ret);
+	}
 
 	/*
 	 * Create a new reference using kvs_add (which fails if the record
@@ -1475,12 +1426,15 @@ master_uri_set(
 		return (ret);
 	r->val = val;
 	r->val_len = snprintf(val, sizeof(val),
-	    "key_generator=1,uid=%" PRIu64 ",version=(major=%d,minor=%d)",
-	    maxid, KVS_MAJOR, KVS_MINOR);
-
+	    "key_generator=1,uid=%" PRIu64
+	    ",version=(major=%d,minor=%d),key_format=%.*s,value_format=%.*s",
+	    maxid, KVS_MAJOR, KVS_MINOR, a.len, a.str, b.len, b.str);
+	if (r->val_len >= sizeof(val))
+		ERET(wtext, session, WT_ERROR, "master URI value too large");
+	++r->val_len;				/* Include the trailing nul. */
 	switch (ret = kvs_add(kvs, r)) {
 	case 0:
-		if ((ret = master_id_set(wtds, session, us, ++maxid)) != 0)
+		if ((ret = master_id_set(wtds, session, us, maxid)) != 0)
 			return (ret);
 		if ((ret = kvs_commit(kvs)) != 0)
 			ERET(wtext, session,
@@ -1506,11 +1460,7 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 	DATA_SOURCE *ds;
 	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
-	WT_CONFIG_ITEM v;
-	size_t size;
 	int ret = 0;
-	const char *cfg[2];
-	char val[KVS_MASTER_VALUE_MAX];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1520,35 +1470,7 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 		return (ret);
 
 	/* Create the URI master record if it doesn't already exist. */
-	ret = master_uri_set(wtds, session, us, uri);
-
-	/* Set the object's unique ID prefix from the master record. */
-	master_uri_get(wtds, session, us, uri, val);
-	cfg[0] = val;
-	cfg[1] = NULL;
-	if ((ret = wtext->config_get(
-	    wtext, session, (WT_CONFIG_ARG *)cfg, "uid", &v)) != 0) {
-		ESET(wtext, session, ret,
-		    "WT_EXTENSION_API.config: uid: %s", wtext->strerror(ret));
-		goto err;
-	}
-
-	/*
-	 * Build packed versions of the unique ID and the next ID (the next ID
-	 * is what we need to do a "previous" cursor traversal.)
-	 */
-	if ((ret = wtext->struct_size(wtext,
-	    session, &us->idlen, "r", v.val)) != 0 ||
-	    (ret = wtext->struct_pack(wtext,
-	    session, us->id, sizeof(us->id), "r", v.val)) != 0 ||
-	    (ret = wtext->struct_size(wtext,
-	    session, &us->idnextlen, "r", v.val + 1)) != 0 ||
-	    (ret = wtext->struct_pack(wtext,
-	    session, us->idnext, sizeof(us->idnext), "r", v.val + 1)) != 0) {
-		ESET(wtext, session, ret,
-		    "WT_EXTENSION_API.config: uid: %s", wtext->strerror(ret));
-		goto err;
-	}
+	ret = master_uri_set(wtds, session, us, uri, config);
 
 	/* Unlock the URI. */
 err:	ETRET(unlock(wtext, session, &us->lock));
@@ -1598,8 +1520,12 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	DATA_SOURCE *ds;
 	URI_SOURCE *us;
 	WT_CONFIG_ITEM v;
+	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
+	size_t size;
 	int ret = 0;
+	const char *cfg[2];
+	char val[KVS_MASTER_VALUE_MAX];
 
 	*new_cursor = NULL;
 
@@ -1644,35 +1570,96 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	}
 	cursor->config_overwrite = v.val != 0;
 
-	if ((ret = wtext->config_get(
-	    wtext, session, config, "key_format", &v)) != 0) {
-		ESET(wtext, session, ret,
-		    "key_format configuration: %s", wtext->strerror(ret));
-		goto err;
-	}
-	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
-
-	if ((ret = wtext->config_get(
-	    wtext, session, config, "value_format", &v)) != 0) {
-		ESET(wtext, session, ret,
-		    "value_format configuration: %s", wtext->strerror(ret));
-		goto err;
-	}
-	cursor->config_bitfield =
-	    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
-
 	/* Get a locked reference to the URI. */
 	if ((ret = uri_source_open(wtds, session, config, uri, &us)) != 0)
 		goto err;
 
-	/* Increment the open cursor count to pin it, and release the lock. */
-	++us->ref;
+	/*
+	 * Finish initializing the cursor (if the URI_SOURCE structure requires
+	 * initialization, we're going to use the cursor as part of that work).
+	 */
+	cursor->ks = us->ks;
+	cursor->us = us;
 
+	/*
+	 * If this is the first access to the URI, we have to configure it
+	 * using information stored in the master record.
+	 */
+	if (!us->configured) {
+		us->configured = 1;
+
+		master_uri_get(wtds, session, us, uri, val);
+		cfg[0] = val;
+		cfg[1] = NULL;
+		if ((ret = wtext->config_get(wtext,
+		    session, (WT_CONFIG_ARG *)cfg, "uid", &v)) != 0) {
+			ESET(wtext, session, ret,
+			    "WT_EXTENSION_API.config: uid: %s",
+			    wtext->strerror(ret));
+			goto err;
+		}
+
+		/*
+		 * Build packed versions of the unique ID and the next ID (the
+		 * next ID is what we need to do a "previous" cursor traversal.)
+		 */
+		if ((ret = wtext->struct_size(wtext,
+		    session, &us->idlen, "r", v.val)) != 0 ||
+		    (ret = wtext->struct_pack(wtext,
+		    session, us->id, sizeof(us->id), "r", v.val)) != 0 ||
+		    (ret = wtext->struct_size(wtext,
+		    session, &us->idnextlen, "r", v.val + 1)) != 0 ||
+		    (ret = wtext->struct_pack(wtext, session,
+		    us->idnext, sizeof(us->idnext), "r", v.val + 1)) != 0) {
+			ESET(wtext, session, ret,
+			    "WT_EXTENSION_API.config: uid: %s",
+			    wtext->strerror(ret));
+			goto err;
+		}
+
+		if ((ret = wtext->config_get(wtext,
+		    session, (WT_CONFIG_ARG *)cfg, "key_format", &v)) != 0) {
+			ESET(wtext, session, ret,
+			    "key_format configuration: %s",
+			    wtext->strerror(ret));
+			goto err;
+		}
+		us->config_recno = v.len == 1 && v.str[0] == 'r';
+
+		if ((ret = wtext->config_get(wtext,
+		    session, (WT_CONFIG_ARG *)cfg, "value_format", &v)) != 0) {
+			ESET(wtext, session, ret,
+			    "value_format configuration: %s",
+			    wtext->strerror(ret));
+			goto err;
+		}
+		us->config_bitfield =
+		    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
+
+		/*
+		 * If it's a record-number key, read the last record from the
+		 * object and set the allocation record value.
+		 */
+		if (us->config_recno) {
+			wtcursor = (WT_CURSOR *)cursor;
+			if ((ret = kvs_cursor_reset(wtcursor)) != 0)
+				goto err;
+
+			if ((ret = kvs_cursor_prev(wtcursor)) == 0)
+				us->append_recno = wtcursor->recno;
+			else if (ret != WT_NOTFOUND)
+				goto err;
+
+			if ((ret = kvs_cursor_reset(wtcursor)) != 0)
+				goto err;
+		}
+	}
+
+	/* Increment the open reference count to pin the URI and unlock it. */
+	++us->ref;
 	if ((ret = unlock(wtext, session, &us->lock)) != 0)
 		goto err;
 
-	cursor->ks = us->ks;
-	cursor->us = us;
 	*new_cursor = (WT_CURSOR *)cursor;
 
 	if (0) {
@@ -1763,31 +1750,32 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 
 	ret = writelock(wtext, session, &ds->global_lock);
 
-	/* Dump the KVS sources. */
-	for (ks = ds->head; ks != NULL; ks = ks->next)
-		kvs_dump(wtext, session, ks->kvs, "terminate");
-
 	/* Start a flush on any open KVS sources. */
-	for (ks = ds->head; ks != NULL; ks = ks->next)
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
 		if ((tret = kvs_commit(ks->kvs)) != 0)
 			ESET(wtext, session, WT_ERROR,
 			    "kvs_commit: %s: %s", ks->name, kvs_strerror(tret));
 
 	/* Close and discard all objects. */
-	while ((ks = ds->head) != NULL) {
-		if ((tret = kvs_close(ks->kvs)) != 0)
-			ESET(wtext, session, WT_ERROR,
-			    "kvs_close: %s: %s", ks->name, kvs_strerror(tret));
-		while ((us = ks->uri) != NULL) {
+	while ((ks = ds->kvs_head) != NULL) {
+		while ((us = ks->uri_head) != NULL) {
 			if (us->ref != 0)
 				ESET(wtext, session, WT_ERROR,
 				    "%s: has open object %s with %u open "
 				    "cursors during close",
 				    ks->name, us->name, us->ref);
-			ks->uri = us->next;
-			ETRET(uri_source_destroy(wtds, session, us));
+
+			ks->uri_head = us->next;
+			ETRET(lock_destroy(wtext, session, &us->lock));
+			free(us->name);
+			free(us);
 		}
-		ds->head = ks->next;
+
+		if ((tret = kvs_close(ks->kvs)) != 0)
+			ESET(wtext, session, WT_ERROR,
+			    "kvs_close: %s: %s", ks->name, kvs_strerror(tret));
+
+		ds->kvs_head = ks->next;
 		free(ks->name);
 		free(ks);
 	}
