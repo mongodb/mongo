@@ -50,7 +50,7 @@ wiredtiger_struct_size(WT_SESSION *wt_session,
 }
 
 /*
- * __wt_ext_struct_unpack --
+ * wiredtiger_struct_unpack --
  *	Unpack a byte string (extension API).
  */
 int
