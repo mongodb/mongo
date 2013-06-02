@@ -420,8 +420,8 @@ __wt_conn_config_init(WT_SESSION_IMPL *session)
 	conn->config_entries = epp;
 
 	/* Fill in the list to reference the default information. */
-	for (ep = config_entries;; ++ep) {
-		*epp++ = ep;
+	for (ep = config_entries;;) {
+		*epp++ = ep++;
 		if (ep->method == NULL)
 			break;
 	}
