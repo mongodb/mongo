@@ -114,7 +114,7 @@ __wt_schema_truncate(
 		    dsrc->truncate(
 			dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
 	else
-		WT_RET_MSG(session, ENOTSUP, "unknown object type: %s", uri);
+		ret = __wt_object_unsupported(session, uri);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

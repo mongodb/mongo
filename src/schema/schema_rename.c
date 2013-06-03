@@ -169,6 +169,24 @@ err:	__wt_scr_free(&nn);
 }
 
 /*
+ * __metadata_rename --
+ *	Rename an entry in the metadata table.
+ */
+static int
+__metadata_rename(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
+{
+	WT_DECL_RET;
+	const char *value;
+
+	WT_RET(__wt_metadata_read(session, uri, &value));
+	WT_ERR(__wt_metadata_remove(session, uri));
+	WT_ERR(__wt_metadata_insert(session, newuri, value));
+
+err:	__wt_free(session, value);
+	return (ret);
+}
+
+/*
  * __rename_table --
  *	WT_SESSION::rename for a table.
  */
@@ -176,11 +194,10 @@ static int
 __rename_table(WT_SESSION_IMPL *session,
     const char *uri, const char *newuri, const char *cfg[])
 {
-	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_TABLE *table;
 	u_int i;
-	const char *oldname, *value;
+	const char *oldname;
 
 	oldname = uri;
 	(void)WT_PREFIX_SKIP(oldname, "table:");
@@ -203,13 +220,9 @@ __rename_table(WT_SESSION_IMPL *session,
 	table = NULL;
 
 	/* Rename the table. */
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_metadata_read(session, uri, &value));
-	WT_ERR(__wt_metadata_remove(session, uri));
-	WT_ERR(__wt_metadata_insert(session, newuri, value));
+	WT_ERR(__metadata_rename(session, uri, newuri));
 
-err:	__wt_scr_free(&buf);
-	if (table != NULL)
+err:	if (table != NULL)
 		__wt_schema_release_table(session, table);
 	return (ret);
 }
@@ -245,11 +258,16 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 		ret = __wt_lsm_tree_rename(session, uri, newuri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __rename_table(session, uri, newuri, cfg);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->rename == NULL ?
-		    __wt_object_unsupported(session, uri) :
-		    dsrc->rename(dsrc, &session->iface,
-			uri, newuri, (WT_CONFIG_ARG *)cfg);
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0) {
+		if (dsrc->rename == NULL)
+			ret = __wt_object_unsupported(session, uri);
+		if (ret == 0)
+			ret = __metadata_rename(session, uri, newuri);
+		if (ret == 0)
+			ret = dsrc->rename(dsrc,
+			    &session->iface, uri, newuri, (WT_CONFIG_ARG *)cfg);
+	} else
+		ret = __wt_object_unsupported(session, uri);
 
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;
