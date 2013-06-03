@@ -368,9 +368,6 @@ def skipTest(path):
     if small_oplog: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js", "connections_opened.js", "opcounters.js"]:
             return True
-        if os.sys.platform == "sunos5":
-            if basename == "geo_update_btree.js":
-                return True
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly
         if parentDir == "auth" or "auth" in basename:
