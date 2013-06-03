@@ -48,9 +48,9 @@ namespace {
     typedef boost::shared_ptr<Socket> SocketPtr;
     typedef std::pair<SocketPtr, SocketPtr> SocketPair;
 
-    // On UNIX, make a connected pair of PF_LOCAL sockets via the native 'socketpair' call. The
-    // 'type' parameter should be one of SOCK_STREAM, SOCK_DGRAM, SOCK_SEQPACKET, etc. For
-    // Win32, we don't have a native socketpair function, so we hack up a connected PF_INET
+    // On UNIX, make a connected pair of PF_LOCAL (aka PF_UNIX) sockets via the native 'socketpair'
+    // call. The 'type' parameter should be one of SOCK_STREAM, SOCK_DGRAM, SOCK_SEQPACKET, etc.
+    // For Win32, we don't have a native socketpair function, so we hack up a connected PF_INET
     // pair on a random port.
     SocketPair socketPair(const int type, const int protocol = 0);
 
@@ -184,7 +184,10 @@ namespace {
 #else
     // We can just use ::socketpair and wrap up the result in a Socket.
     SocketPair socketPair(const int type, const int protocol) {
-        const int domain = PF_LOCAL;
+        // PF_LOCAL is the POSIX name for Unix domain sockets, while PF_UNIX
+        // is the name that BSD used.  We use the BSD name because it is more
+        // widely supported (e.g. Solaris 10).
+        const int domain = PF_UNIX;
 
         int socks[2];
         const int result = ::socketpair(domain, type, protocol, socks);
