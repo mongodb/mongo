@@ -58,7 +58,7 @@ namespace mongo {
                         continue;  // try again
                 }
             } 
-            catch (const SocketException& exc) {
+            catch (const SocketException&) {
                 warning() << "network problem detected while connecting to the "
                           << "sync source, attempt " << retryCount << " of "
                           << retryMax << endl;
@@ -71,7 +71,7 @@ namespace mongo {
             try {
                 missingObj = missingObjReader.findOne(ns, query);
             } 
-            catch (const SocketException& exc) {
+            catch (const SocketException&) {
                 warning() << "network problem detected while fetching a missing document from the "
                           << "sync source, attempt " << retryCount << " of "
                           << retryMax << endl;
