@@ -143,36 +143,45 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	entry->base = p;
 
 	/*
-	 * Build a new checks entry name field.  There may be a default value
-	 * in the config argument we're passed, we don't want that as part of
-	 * the checks entry name field.
+	 * Build a new checks array.
 	 */
-	WT_ERR(__wt_strdup(session, config, &newcheck_name));
-	if ((p = strchr(newcheck_name, '=')) != NULL)
-		*p = '\0';
+	if ((*epp)->checks != NULL || check != NULL) {
+		/*
+		 * There may be a default value in the config argument passed
+		 * in (for example, (kvs_parallelism=64").  The default value
+		 * isn't part of the name, build a new one.
+		 */
+		WT_ERR(__wt_strdup(session, config, &newcheck_name));
+		if ((p = strchr(newcheck_name, '=')) != NULL)
+			*p = '\0';
 
-	/*
-	 * Build a new checks array.  The new configuration name may replace
-	 * an existing check with new information, in that case skip the old
-	 * version.
-	 */
-	for (cnt = 0, cp = (*epp)->checks; cp->name != NULL; ++cp)
-		++cnt;
-	WT_ERR(__wt_calloc_def(session, cnt + 2, &checks));
-	for (cnt = 0, cp = (*epp)->checks; cp->name != NULL; ++cp)
-		if (strcmp(newcheck_name, cp->name) != 0)
-			checks[cnt++] = *cp;
-	newcheck = &checks[cnt];
+		/*
+		 * The new configuration name may replace an existing check with
+		 * new information, in that case skip the old version.
+		 */
+		cnt = 0;
+		if ((*epp)->checks != NULL)
+			for (cp = (*epp)->checks; cp->name != NULL; ++cp)
+				++cnt;
+		WT_ERR(__wt_calloc_def(session, cnt + 2, &checks));
+		cnt = 0;
+		if ((*epp)->checks != NULL)
+			for (cp = (*epp)->checks; cp->name != NULL; ++cp)
+				if (strcmp(newcheck_name, cp->name) != 0)
+					checks[cnt++] = *cp;
+		newcheck = &checks[cnt];
+		newcheck->name = newcheck_name;
+		WT_ERR(__wt_strdup(session, type, &newcheck->type));
+		if (check != NULL)
+			WT_ERR(__wt_strdup(session, check, &newcheck->checks));
+		entry->checks = checks;
 
-	newcheck->name = newcheck_name;
-	WT_ERR(__wt_strdup(session, type, &newcheck->type));
-	if (check != NULL)
-		WT_ERR(__wt_strdup(session, check, &newcheck->checks));
-
-	entry->checks = checks;
-
-	/* Confirm the configuration string passes the new set of checks. */
-	WT_ERR(config_check(session, entry->checks, config, 0));
+		/*
+		 * Confirm the configuration string passes the new set of
+		 * checks.
+		 */
+		WT_ERR(config_check(session, entry->checks, config, 0));
+	}
 
 	/*
 	 * The next time this configuration is updated, we don't want to figure
@@ -182,9 +191,11 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	WT_ERR(__conn_foc_add(session, entry));
 	WT_ERR(__conn_foc_add(session, entry->base));
 	WT_ERR(__conn_foc_add(session, checks));
-	WT_ERR(__conn_foc_add(session, newcheck->name));
-	WT_ERR(__conn_foc_add(session, newcheck->type));
-	WT_ERR(__conn_foc_add(session, newcheck->checks));
+	if (newcheck != NULL) {
+		WT_ERR(__conn_foc_add(session, newcheck->name));
+		WT_ERR(__conn_foc_add(session, newcheck->type));
+		WT_ERR(__conn_foc_add(session, newcheck->checks));
+	}
 
 	*epp = entry;
 
