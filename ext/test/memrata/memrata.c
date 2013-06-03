@@ -418,6 +418,7 @@ copy_key(WT_CURSOR *wtcursor)
 	return (0);
 }
 
+#if 0
 /*
  * kvs_dump --
  *	Dump the records in the KVS store.
@@ -452,6 +453,7 @@ kvs_dump(
 		r->val_len = sizeof(val);
 	}
 }
+#endif
 
 /*
  * kvs_call --
