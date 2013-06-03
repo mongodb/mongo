@@ -1284,6 +1284,56 @@ err:		if (lockinit)
 }
 
 /*
+ * uri_truncate --
+ *	Discard the records for an object.
+ */
+static int
+uri_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
+{
+	struct kvs_record *r, _r;
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	kvs_t kvs;
+	size_t i;
+	int ret = 0;
+	uint8_t *p, *t;
+	char key[KVS_MAX_KEY_LEN];
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+	kvs = us->ks->kvs;
+
+	/* Walk the list of objects, discarding them all. */
+	r = &_r;
+	memset(r, 0, sizeof(*r));
+	r->key = key;
+	memcpy(r->key, us->id, us->idlen);
+	r->key_len = us->idlen;
+	r->val = NULL;
+	r->val_len = 0;
+	while ((ret = kvs_next(kvs, r, 0UL, 0UL)) == 0) {
+		/*
+		 * Check for an object ID mismatch, if we find one, we're
+		 * done.
+		 */
+		for (p = us->id, t = r->key, i = 0; i < us->idlen; ++i)
+			if (*t++ != *p++)
+				return (0);
+		if ((ret = kvs_del(kvs, r)) != 0) {
+			ESET(wtext, session,
+			    WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
+			return (ret);
+		}
+	}
+	if (ret == KVS_E_KEY_NOT_FOUND)
+		ret = 0;
+	if (ret != 0)
+		ESET(wtext, session,
+		    WT_ERROR, "kvs_next: %s", kvs_strerror(ret));
+	return (ret);
+}
+
+/*
  * master_key_set --
  *	Set a master key from a URI, checking the length.
  */
@@ -1523,10 +1573,14 @@ static int
 kvs_session_drop(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
+	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
-	URI_SOURCE *us;
+	KVS_SOURCE *ks;
+	URI_SOURCE **p, *us;
 	WT_EXTENSION_API *wtext;
+	kvs_t kvs;
 	int ret = 0;
+	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1534,16 +1588,56 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	/* Get a locked reference to the data source. */
 	if ((ret = uri_source_open(wtds, session, config, uri, 1, &us)) != 0)
 		return (ret);
+	ks = us->ks;
+	kvs = us->ks->kvs;
 
 	/* If there are active references to the object, we're busy. */
 	if (us->ref != 0) {
 		ret = EBUSY;
-		ETRET(unlock(wtext, session, &us->lock));
-		ETRET(unlock(wtext, session, &ds->global_lock));
-		return (ret);
+		goto err;
 	}
 
-	ERET(wtext, session, ENOTSUP, "drop: %s", strerror(ENOTSUP));
+	/*
+	 * Remove the entry from the URI_SOURCE list -- it's a singly-linked
+	 * list, find the reference to it.
+	 */
+	for (p = &ks->uri_head; *p != NULL; p = &(*p)->next)
+		if (*p == us)
+			break;
+	/*
+	 * We should be guaranteed to find an entry, after all, we just looked
+	 * it up, and everything is locked down.
+	 */
+	if (*p == NULL) {
+		ret = WT_NOTFOUND;
+		goto err;
+	}
+	*p = (*p)->next;
+
+	/*
+	 * Create a new reference to the newname, using kvs_add (which fails
+	 * if the record already exists).
+	 */
+	r = &_r;
+	memset(r, 0, sizeof(*r));
+	r->key = key;
+	if ((ret = master_key_set(wtds, session, uri, r)) != 0)
+		goto err;
+	r->val = NULL;
+	r->val_len = 0;
+	if ((ret = kvs_del(kvs, r)) != 0) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_del: %s: %s", uri, kvs_strerror(ret));
+		goto err;
+	}
+
+	ret = uri_truncate(wtds, session, us);
+
+	kvs_dump(wtext, session, ks->kvs, "after drop");
+
+err:	ETRET(unlock(wtext, session, &us->lock));
+	ETRET(unlock(wtext, session, &ds->global_lock));
+	return (ret);
 }
 
 /*
@@ -1763,14 +1857,15 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	switch (ret = kvs_add(kvs, r)) {
 	case 0:
 		/* Remove the original entry. */
-		memset(r, 0, sizeof(*r));
-		r->key = key;
-		if ((ret = master_key_set(wtds, session, uri, r)) != 0 ||
-		    (ret = kvs_del(kvs, r)) != 0) {
+		if ((ret = master_key_set(wtds, session, uri, r)) != 0)
+			goto cleanup;
+		r->val = NULL;
+		r->val_len = 0;
+		if ((ret = kvs_del(kvs, r)) != 0) {
 			ESET(wtext, session, WT_ERROR,
 			    "kvs_del: %s: %s", uri, kvs_strerror(ret));
 
-			/*
+cleanup:		/*
 			 * Try and remove the new entry if we can't remove the
 			 * old entry.
 			 */
@@ -1784,9 +1879,11 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		}
 
 		/* Flush the change. */
-		if ((ret = kvs_commit(kvs)) != 0)
+		if ((ret = kvs_commit(kvs)) != 0) {
 			ESET(wtext, session,
 			    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
+			goto err;
+		}
 		break;
 	case KVS_E_KEY_EXISTS:
 		ESET(wtext, session, EEXIST, "%s", newname);
@@ -1794,6 +1891,7 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	default:
 		ESET(wtext, session,
 		    WT_ERROR, "kvs_add: %s", newname, kvs_strerror(ret));
+		break;
 	}
 
 err:	ETRET(unlock(wtext, session, &us->lock));
@@ -1809,15 +1907,10 @@ static int
 kvs_session_truncate(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
-	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
-	size_t i;
 	int ret = 0;
-	uint8_t *p, *t;
-	char key[KVS_MAX_KEY_LEN];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1825,45 +1918,14 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 	/* Get a locked reference to the URI. */
 	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
 		return (ret);
-	kvs = us->ks->kvs;
 
-	/* If there are active references to the object, we're busy. */
-	if (us->ref != 0) {
-		ret = EBUSY;
-		goto err;
-	}
+	/*
+	 * If there are active references to the object, we're busy.
+	 * Else, discard the records.
+	 */
+	ret = us->ref == 0 ? uri_truncate(wtds, session, us) : EBUSY;
 
-	/* Walk the list of objects, discarding them all. */
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	memcpy(r->key, us->id, us->idlen);
-	r->key_len = us->idlen;
-	r->val = NULL;
-	r->val_len = 0;
-	while ((ret = kvs_next(kvs, r, 0UL, 0UL)) == 0) {
-		/*
-		 * Check for an object ID mismatch, if we find one, we're
-		 * done.
-		 */
-		for (p = us->id, t = r->key, i = 0; i < us->idlen; ++i)
-			if (*t++ != *p++)
-				goto err;
-		if ((ret = kvs_del(kvs, r)) != 0) {
-			ESET(wtext, session,
-			    WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
-			goto err;
-		}
-	}
-	if (ret == KVS_E_KEY_NOT_FOUND)
-		ret = 0;
-	if (ret != 0) {
-		ESET(wtext, session,
-		    WT_ERROR, "kvs_next: %s", kvs_strerror(ret));
-		goto err;
-	}
-
-err:	ETRET(unlock(wtext, session, &us->lock));
+	ETRET(unlock(wtext, session, &us->lock));
 	return (ret);
 }
 
