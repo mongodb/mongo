@@ -235,7 +235,7 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
  *	Copy a WT_CURSOR key to a struct kvs_record key.
  */
 static INLINE int
-copyin_key(WT_CURSOR *wtcursor)
+copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
@@ -261,14 +261,9 @@ copyin_key(WT_CURSOR *wtcursor)
 	r->key_len += us->idlen;
 
 	if (us->config_recno) {
-		if ((ret = wtext->struct_size(wtext, session,
-		    &size, "r", wtcursor->recno)) != 0 ||
-		    (ret = wtext->struct_pack(wtext, session, t,
-		    sizeof(r->key) - us->idlen, "r", wtcursor->recno)) != 0)
-			return (ret);
-		r->key_len += size;
-
 		/*
+		 * Allocate a new record for append operations.
+		 *
 		 * A specified record number could potentially be larger than
 		 * the maximum known record number, update the maximum number
 		 * as necessary.
@@ -283,7 +278,13 @@ copyin_key(WT_CURSOR *wtcursor)
 		 * of a reason any application would care or notice, but it's
 		 * not quite right.
 		 */
-		if (wtcursor->recno > us->append_recno) {
+		if (allocate_key && cursor->config_append) {
+			if ((ret = writelock(wtext, session, &us->lock)) != 0)
+				return (ret);
+			wtcursor->recno = ++us->append_recno;
+			if ((ret = unlock(wtext, session, &us->lock)) != 0)
+				return (ret);
+		} else if (wtcursor->recno > us->append_recno) {
 			if ((ret = writelock(wtext, session, &us->lock)) != 0)
 				return (ret);
 			if (wtcursor->recno > us->append_recno)
@@ -291,6 +292,13 @@ copyin_key(WT_CURSOR *wtcursor)
 			if ((ret = unlock(wtext, session, &us->lock)) != 0)
 				return (ret);
 		}
+
+		if ((ret = wtext->struct_size(wtext, session,
+		    &size, "r", wtcursor->recno)) != 0 ||
+		    (ret = wtext->struct_pack(wtext, session, t,
+		    sizeof(r->key) - us->idlen, "r", wtcursor->recno)) != 0)
+			return (ret);
+		r->key_len += size;
 	} else {
 		if (wtcursor->key.size + us->idlen > KVS_MAX_KEY_LEN)
 			ERET(wtext, session, ERANGE,
@@ -634,7 +642,7 @@ kvs_cursor_search(WT_CURSOR *wtcursor)
 {
 	int ret = 0;
 
-	if ((ret = copyin_key(wtcursor)) != 0)
+	if ((ret = copyin_key(wtcursor, 0)) != 0)
 		return (ret);
 	if ((ret = kvs_call(wtcursor, "kvs_get", kvs_get)) != 0)
 		return (ret);
@@ -695,7 +703,6 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
 	KVS_SOURCE *ks;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	int ret = 0;
@@ -704,18 +711,8 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
 	ks = cursor->ks;
-	us = cursor->us;
 
-	/* Allocate a new record for append operations. */
-	if (cursor->config_append) {
-		if ((ret = writelock(wtext, session, &us->lock)) != 0)
-			return (ret);
-		wtcursor->recno = ++us->append_recno;
-		if ((ret = unlock(wtext, session, &us->lock)) != 0)
-			return (ret);
-	}
-
-	if ((ret = copyin_key(wtcursor)) != 0)
+	if ((ret = copyin_key(wtcursor, 1)) != 0)
 		return (ret);
 	if ((ret = copyin_val(wtcursor)) != 0)
 		return (ret);
@@ -759,7 +756,7 @@ kvs_cursor_update(WT_CURSOR *wtcursor)
 	wtext = cursor->wtext;
 	ks = cursor->ks;
 
-	if ((ret = copyin_key(wtcursor)) != 0)
+	if ((ret = copyin_key(wtcursor, 0)) != 0)
 		return (ret);
 	if ((ret = copyin_val(wtcursor)) != 0)
 		return (ret);
@@ -805,7 +802,7 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 		return (kvs_cursor_update(wtcursor));
 	}
 
-	if ((ret = copyin_key(wtcursor)) != 0)
+	if ((ret = copyin_key(wtcursor, 0)) != 0)
 		return (ret);
 	if ((ret = kvs_del(ks->kvs, &cursor->record)) == 0)
 		return (0);
