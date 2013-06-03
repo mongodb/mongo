@@ -172,7 +172,7 @@ oc_conf(char *buf, size_t buflen, const char *plus)
 	size_t len;
 
 	len = snprintf(buf, buflen, "%s,%s",
-	    plus == NULL ? "" : plus, 
+	    plus == NULL ? "" : plus,
 	    DATASOURCE("memrata") ? MEMRATA_DEVICE : "");
 	if (len > buflen)
 		die(EINVAL, "open.cursor configuration buffer too small");
