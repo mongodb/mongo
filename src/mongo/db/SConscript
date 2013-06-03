@@ -14,4 +14,4 @@ env.StaticLibrary('common', ['field_ref.cpp', 'field_parser.cpp'],
 
 env.CppUnitTest('field_ref_test', ['field_ref_test.cpp'], LIBDEPS=['common'])
 
-env.CppUnitTest('field_parser_test', 'field_parser_test.cpp', LIBDEPS=['common'])
+env.CppUnitTest('field_parser_test', ['field_parser_test.cpp'], LIBDEPS=['common'])

@@ -673,11 +673,11 @@ env.StaticLibrary('range_deleter',
 
 env.CppUnitTest('range_deleter_test',
                 [ 'db/range_deleter_test.cpp' ],
-                LIBDEPS = [ 'range_deleter' ]);
+                LIBDEPS = [ 'range_deleter', 'db/common' ]);
 
 env.CppUnitTest('range_deleter_stat_test',
                 [ 'db/range_deleter_stat_test.cpp' ],
-                LIBDEPS = [ 'range_deleter' ]);
+                LIBDEPS = [ 'range_deleter', 'db/common' ]);
 
 
 env.StaticLibrary("serveronly", serverOnlyFiles,
