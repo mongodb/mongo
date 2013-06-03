@@ -76,15 +76,16 @@
 
 /*
  * We partition the flat space into a set of objects based on a packed, 8B
- * leading byte.  A leading byte of 0 is the metadata for the device.
+ * leading byte.
+ *
+ * Object ID 1 is for master records; object ID from 1 to KVS_MAXID_BASE are
+ * reserved for future use (and, I suppose object ID 0 would work as well).
+ * I can't think of any reason I'd need them, but it's a cheap and easy backup
+ * plan.
  */
-#define	KVS_MASTER		'\0'		/* Magic byte for master */
+#define	KVS_MASTER_ID		1		/* Master object ID */
 #define	KVS_MASTER_VALUE_MAX	256		/* Maximum master value */
 
-/*
- * Object IDs from 0 to KVS_MAXID_BASE are reserved for future use.  I can't
- * think of any reason I'd need them, but it's a cheap and easy backup plan.
- */
 #define	KVS_MAXID	"WiredTiger.maxid"	/* Maximum object ID key */
 #define	KVS_MAXID_BASE	6			/* First object ID */
 
@@ -106,9 +107,10 @@ typedef struct __uri_source {
 	 * ID and a packed copy of the ID one greateer than the object's ID,
 	 * the latter is what we use for a "previous" cursor traversal.
 	 */
-	char	 id[10];			/* Packed unique ID prefix */
+#define	KVS_MAX_PACKED_8B	10
+	char	 id[KVS_MAX_PACKED_8B];		/* Packed unique ID prefix */
 	size_t	 idlen;				/* ID prefix length */
-	char	 idnext[10];			/* Packed next ID prefix */
+	char	 idnext[KVS_MAX_PACKED_8B];	/* Packed next ID prefix */
 	size_t	 idnextlen;			/* Next ID prefix length */
 
 	uint64_t append_recno;			/* Allocation record number */
@@ -439,20 +441,11 @@ kvs_dump(
 	while (kvs_next(kvs, r, 0UL, (unsigned long)sizeof(val)) == 0) {
 		p = r->key;
 		len = r->key_len;
-		if (*p == KVS_MASTER) {
-			printf("\t0:");
-			++p;
-			--len;
-		} else {
-			(void)wtext->struct_unpack(
-			    wtext, session, p, 10, "r", &recno);
-			(void)wtext->struct_size(
-			    wtext, session, &size, "r", recno);
-			printf("\t%" PRIu64 ": ", recno);
-			p += size;
-			len -= size;
-		}
-		printf("%.*s/%.*s\n", (int)len, p, (int)r->val_len, r->val);
+		(void)wtext->struct_unpack(wtext, session, p, 10, "r", &recno);
+		(void)wtext->struct_size(wtext, session, &size, "r", recno);
+		printf("\t%" PRIu64 ": ", recno);
+		printf("%.*s/%.*s\n",
+		    (int)len - size, p + size, (int)r->val_len, r->val);
 
 		r->val_len = sizeof(val);
 	}
@@ -1344,25 +1337,31 @@ uri_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
  */
 static int
 master_key_set(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, const char *uri, struct kvs_record *r)
+    WT_SESSION *session, const char *key, struct kvs_record *r)
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	size_t len;
+	size_t idlen, len;
+	int ret = 0;
+	char id[KVS_MAX_PACKED_8B];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	/* Check to see if the URI can fit into a key. */
-	len = strlen(uri);
-	if (len + 1 > KVS_MAX_KEY_LEN)
-		ERET(wtext, session, EINVAL,
-		    "%s: too large for a Memrata key, maximum is %d",
-		    KVS_MAX_KEY_LEN);
+	if ((ret = wtext->struct_size(wtext,
+	    session, &idlen, "r", KVS_MASTER_ID)) != 0 ||
+	    (ret = wtext->struct_pack(wtext,
+	    session, id, sizeof(id), "r", KVS_MAX_PACKED_8B)) != 0)
+		return (ret);
 
-	((uint8_t *)r->key)[0] = KVS_MASTER;
-	memcpy((uint8_t *)r->key + 1, uri, len);
-	r->key_len = len + 1;
+	/* Check to see if the ID and key can fit into a key. */
+	len = strlen(key);
+	if (idlen + len > KVS_MAX_KEY_LEN)
+		ERET(wtext, session, EINVAL, "%s: too large for a Memrata key");
+
+	memcpy((uint8_t *)r->key, id, idlen);
+	memcpy((uint8_t *)r->key + idlen, key, len);
+	r->key_len = idlen + len;
 	return (0);
 }
 
