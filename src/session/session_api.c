@@ -204,10 +204,12 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->open_cursor == NULL ?
 		    __wt_object_unsupported(session, uri) :
 		    __wt_curds_create(session, uri, cfg, dsrc, cursorp);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	return (ret);
 }

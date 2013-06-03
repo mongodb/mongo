@@ -81,7 +81,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_schema_worker(session, idx->source,
 			    file_func, name_func, cfg, open_flags));
 		}
-	} else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0) {
+	} else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL) {
 		wt_session = (WT_SESSION *)session;
 		if (file_func == __wt_compact && dsrc->compact != NULL)
 			WT_ERR(dsrc->compact(

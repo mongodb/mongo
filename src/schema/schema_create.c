@@ -577,10 +577,12 @@ __wt_schema_create(
 		ret = __create_index(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __create_table(session, uri, exclusive, config);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->create == NULL ?
 		    __wt_object_unsupported(session, uri) :
 		    __create_data_source(session, uri, exclusive, config, dsrc);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	session->dhandle = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));

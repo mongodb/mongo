@@ -11,20 +11,15 @@
  * __wt_schema_get_source --
  *	Find a matching data source or report an error.
  */
-int
-__wt_schema_get_source(
-    WT_SESSION_IMPL *session, const char *name, WT_DATA_SOURCE **dsrcp)
+WT_DATA_SOURCE *
+__wt_schema_get_source(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_NAMED_DATA_SOURCE *ndsrc;
 
-	TAILQ_FOREACH(ndsrc, &S2C(session)->dsrcqh, q) {
-		if (!WT_PREFIX_MATCH(name, ndsrc->prefix))
-			continue;
-		*dsrcp = ndsrc->dsrc;
-		return (0);
-	}
-
-	return (__wt_bad_object_type(session, name));
+	TAILQ_FOREACH(ndsrc, &S2C(session)->dsrcqh, q)
+		if (WT_PREFIX_MATCH(name, ndsrc->prefix))
+			return (ndsrc->dsrc);
+	return (NULL);
 }
 
 /*

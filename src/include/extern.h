@@ -1048,9 +1048,8 @@ extern int __wt_schema_stat_init(WT_SESSION_IMPL *session,
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);
-extern int __wt_schema_get_source( WT_SESSION_IMPL *session,
-    const char *name,
-    WT_DATA_SOURCE **dsrcp);
+extern WT_DATA_SOURCE *__wt_schema_get_source(WT_SESSION_IMPL *session,
+    const char *name);
 extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,

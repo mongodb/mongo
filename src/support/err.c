@@ -461,8 +461,7 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
 	    WT_PREFIX_MATCH(uri, "lsm:") ||
 	    WT_PREFIX_MATCH(uri, "statistics:") ||
 	    WT_PREFIX_MATCH(uri, "table:"))
-		WT_RET_MSG(session, ENOTSUP,
-		    "unsupported object type: %s", uri);
+		return (__wt_object_unsupported(session, uri));
 
 	WT_RET_MSG(session, ENOTSUP, "unknown object type: %s", uri);
 }

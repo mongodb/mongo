@@ -108,13 +108,13 @@ __wt_schema_truncate(
 		ret = __wt_lsm_tree_truncate(session, uri, cfg);
 	else if (WT_PREFIX_SKIP(tablename, "table:"))
 		ret = __truncate_table(session, tablename, cfg);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->truncate == NULL ?
 		    __truncate_dsrc(session, uri) :
 		    dsrc->truncate(
 			dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
 	else
-		ret = __wt_object_unsupported(session, uri);
+		ret = __wt_bad_object_type(session, uri);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

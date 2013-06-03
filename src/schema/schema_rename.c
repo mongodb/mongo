@@ -258,7 +258,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 		ret = __wt_lsm_tree_rename(session, uri, newuri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __rename_table(session, uri, newuri, cfg);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0) {
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL) {
 		if (dsrc->rename == NULL)
 			ret = __wt_object_unsupported(session, uri);
 		if (ret == 0)
@@ -267,7 +267,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 			ret = dsrc->rename(dsrc,
 			    &session->iface, uri, newuri, (WT_CONFIG_ARG *)cfg);
 	} else
-		ret = __wt_object_unsupported(session, uri);
+		ret = __wt_bad_object_type(session, uri);
 
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;
