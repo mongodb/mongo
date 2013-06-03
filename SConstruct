@@ -614,11 +614,12 @@ elif "win32" == os.sys.platform:
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
 
     win_version_min_choices = {
-        'xpsp3'  : ('0501', '0300'),
-        'vista'  : ('0600', '0000'),
-        'ws08r2' : ('0601', '0000'),
-        'win7'   : ('0601', '0000'),
-        'win8'   : ('0602', '0000'),
+        'xpsp3'   : ('0501', '0300'),
+        'ws03sp2' : ('0502', '0200'),
+        'vista'   : ('0600', '0000'),
+        'ws08r2'  : ('0601', '0000'),
+        'win7'    : ('0601', '0000'),
+        'win8'    : ('0602', '0000'),
     }
 
     add_option("win-version-min", "minimum Windows version to support", 1, False,
@@ -920,7 +921,7 @@ def doConfigure(myenv):
     if windows:
         win_version_min = None
         default_32_bit_min = 'xpsp3'
-        default_64_bit_min = 'vista'
+        default_64_bit_min = 'ws03sp2'
         if has_option('win-version-min'):
             win_version_min = get_option('win-version-min')
         elif has_option('win2008plus'):

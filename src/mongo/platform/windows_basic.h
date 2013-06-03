@@ -28,8 +28,8 @@
 #if !defined(_WIN32_WINNT)
 // Can't use symbolic versions here, since we may not have seen sdkddkver.h yet.
 #if defined(_WIN64)
-// 64-bit builds default to Windows Vista support.
-#define _WIN32_WINNT 0x0600
+// 64-bit builds default to Windows Server 2003 support.
+#define _WIN32_WINNT 0x0502
 #else
 // 32-bit builds default to Windows XP support.
 #define _WIN32_WINNT 0x0501
@@ -62,8 +62,8 @@
 #endif
 
 #if defined(_WIN64)
-#if !defined(NTDDI_VISTA) || (NTDDI_VERSION < NTDDI_VISTA)
-#error "64 bit mongo does not support Windows versions older than Vista"
+#if !defined(NTDDI_WS03SP2) || (NTDDI_VERSION < NTDDI_WS03SP2)
+#error "64 bit mongo does not support Windows versions older than Windows Server 2003 SP 2"
 #endif
 #else
 #if !defined(NTDDI_WINXPSP3) || (NTDDI_VERSION < NTDDI_WINXPSP3)
