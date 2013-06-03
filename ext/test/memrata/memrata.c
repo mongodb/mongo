@@ -329,6 +329,8 @@ copyout_key(WT_CURSOR *wtcursor)
 	 * Check the object's unique ID, if it doesn't match we've hit the end
 	 * of the object on a cursor search.
 	 */
+	if (r->key_len < us->idlen)
+		return (WT_NOTFOUND);
 	for (p = us->id, t = r->key, i = 0; i < us->idlen; ++i)
 		if (*t++ != *p++)
 			return (WT_NOTFOUND);
@@ -1333,7 +1335,7 @@ uri_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
 
 /*
  * master_key_set --
- *	Set a master key from a URI, checking the length.
+ *	Set a master key from a key, checking the length.
  */
 static int
 master_key_set(WT_DATA_SOURCE *wtds,
@@ -1351,7 +1353,7 @@ master_key_set(WT_DATA_SOURCE *wtds,
 	if ((ret = wtext->struct_size(wtext,
 	    session, &idlen, "r", KVS_MASTER_ID)) != 0 ||
 	    (ret = wtext->struct_pack(wtext,
-	    session, id, sizeof(id), "r", KVS_MAX_PACKED_8B)) != 0)
+	    session, id, sizeof(id), "r", KVS_MASTER_ID)) != 0)
 		return (ret);
 
 	/* Check to see if the ID and key can fit into a key. */
@@ -1636,8 +1638,6 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	}
 
 	ret = uri_truncate(wtds, session, us);
-
-	kvs_dump(wtext, session, ks->kvs, "after drop");
 
 err:	ETRET(unlock(wtext, session, &us->lock));
 	ETRET(unlock(wtext, session, &ds->global_lock));
