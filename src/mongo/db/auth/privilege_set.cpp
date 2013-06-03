@@ -79,7 +79,7 @@ namespace mongo {
         resourceSearchList[1] = nsToDatabaseSubstring(desiredPrivilege.getResource());
 
         ActionSet unmetRequirements = desiredPrivilege.getActions();
-        for (int i = 0; i < boost::size(resourceSearchList); ++i) {
+        for (int i = 0; i < static_cast<int>(boost::size(resourceSearchList)); ++i) {
             ResourcePrivilegeCacheEntry* entry = _lookupEntry(resourceSearchList[i]);
             if (NULL == entry)
                 continue;

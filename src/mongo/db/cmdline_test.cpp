@@ -102,7 +102,7 @@ namespace {
             "--servicePassword",
             "xxxxxxxxxxxxxxxx"
         };
-        ASSERT_EQUALS(boost::size(expected), argc);
+        ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
 
         testCensoringArgv(expected, argv, argc);
     }
@@ -134,7 +134,7 @@ namespace {
             "-servicePassword",
             "xxxxxxxxxxxxxxxx"
         };
-        ASSERT_EQUALS(boost::size(expected), argc);
+        ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
 
         testCensoringArgv(expected, argv, argc);
     }
@@ -183,7 +183,7 @@ namespace {
             "--servicePassword",
             "<password>"
         };
-        ASSERT_EQUALS(boost::size(expected), argc);
+        ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
 
         testCensoringVector(expected, argv, argc);
     }
@@ -215,7 +215,7 @@ namespace {
             "-servicePassword",
             "<password>"
         };
-        ASSERT_EQUALS(boost::size(expected), argc);
+        ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
 
         testCensoringVector(expected, argv, argc);
     }
