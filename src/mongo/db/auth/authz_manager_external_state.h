@@ -43,7 +43,7 @@ namespace mongo {
         // "result".
         Status getPrivilegeDocument(const std::string& dbname,
                                     const UserName& userName,
-                                    BSONObj* result);
+                                    BSONObj* result) const;
 
 
         // Returns true if there exists at least one privilege document in the given database.

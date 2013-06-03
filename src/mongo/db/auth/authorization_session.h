@@ -55,7 +55,7 @@ namespace mongo {
 
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
-        // TODO: try to eliminate theneed for this call.
+        // TODO: try to eliminate the need for this call.
         void startRequest();
 
         // Adds "principal" to the authorization manager, and takes ownership of it.
@@ -99,14 +99,6 @@ namespace mongo {
         Status acquirePrivilegesFromPrivilegeDocument(const std::string& dbname,
                                                       const UserName& user,
                                                       const BSONObj& privilegeDocument);
-
-        // Returns the privilege document with the given user name in the given database. Currently
-        // this information comes from the system.users collection in that database.
-        Status getPrivilegeDocument(const std::string& dbname,
-                                    const UserName& userName,
-                                    BSONObj* result) {
-            return _externalState->getPrivilegeDocument(dbname, userName, result);
-        }
 
         // Checks if this connection has the privileges necessary to perform a query on the given
         // namespace.

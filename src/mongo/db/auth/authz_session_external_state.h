@@ -40,6 +40,8 @@ namespace mongo {
 
         virtual ~AuthzSessionExternalState();
 
+        const AuthorizationManager& getAuthorizationManager() const;
+
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
         // are that auth isn't enabled, the connection is from localhost and there are no admin
@@ -52,15 +54,6 @@ namespace mongo {
         // necessary to determine if localhost connections should be given full access.
         virtual void startRequest() = 0;
 
-        // Gets the privilege information document for "userName" on "dbname".
-        //
-        // On success, returns Status::OK() and stores a shared-ownership copy of the document into
-        // "result".
-        // TODO: remove this in favor of using the AuthzManagerExternalState
-        Status getPrivilegeDocument(const std::string& dbname,
-                                    const UserName& userName,
-                                    BSONObj* result);
-
         // Authorization event hooks
 
         // Handle any global state which needs to be updated when a new user has been authorized
@@ -72,17 +65,6 @@ namespace mongo {
     protected:
         // This class should never be instantiated directly.
         AuthzSessionExternalState(AuthorizationManager* authzManager);
-
-        // Queries the userNamespace with the given query and returns the privilegeDocument found
-        // in *result.  Returns true if it finds a document matching the query, or false if not.
-        // TODO: remove this in favor of using the AuthzManagerExternalState
-        virtual bool _findUser(const std::string& usersNamespace,
-                               const BSONObj& query,
-                               BSONObj* result) const = 0;
-
-        // Returns true if there exists at least one privilege document in the given database.
-        // TODO: remove this in favor of using the AuthzManagerExternalState
-        bool _hasPrivilegeDocument(const std::string& dbname) const;
 
         AuthorizationManager* _authzManager;
     };

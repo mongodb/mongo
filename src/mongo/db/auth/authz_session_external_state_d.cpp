@@ -39,15 +39,6 @@ namespace mongo {
         }
     }
 
-    bool AuthzSessionExternalStateMongod::_findUser(const string& usersNamespace,
-                                                    const BSONObj& query,
-                                                    BSONObj* result) const {
-        Client::GodScope gs;
-        Client::ReadContext ctx(usersNamespace);
-
-        return Helpers::findOne(usersNamespace, query, *result);
-    }
-
     bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
         return cc().isGod() || AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
     }

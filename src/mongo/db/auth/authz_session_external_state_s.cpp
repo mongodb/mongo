@@ -54,13 +54,4 @@ namespace mongo {
         }
     }
 
-    bool AuthzSessionExternalStateMongos::_findUser(const string& usersNamespace,
-                                                   const BSONObj& query,
-                                                   BSONObj* result) const {
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
-        *result = conn->get()->findOne(usersNamespace, query).getOwned();
-        conn->done();
-        return !result->isEmpty();
-    }
-
 } // namespace mongo

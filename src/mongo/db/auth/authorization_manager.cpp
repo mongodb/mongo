@@ -59,7 +59,7 @@ namespace mongo {
 
     Status AuthorizationManager::getPrivilegeDocument(const std::string& dbname,
                                                       const UserName& userName,
-                                                      BSONObj* result) {
+                                                      BSONObj* result) const {
         return _externalState->getPrivilegeDocument(dbname, userName, result);
     }
 

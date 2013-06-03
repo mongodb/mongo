@@ -29,7 +29,7 @@ namespace mongo {
 
     Status AuthzManagerExternalState::getPrivilegeDocument(const std::string& dbname,
                                                            const UserName& userName,
-                                                           BSONObj* result) {
+                                                           BSONObj* result) const {
 
         if (dbname == StringData("$external", StringData::LiteralTag()) ||
             dbname == AuthorizationManager::SERVER_RESOURCE_NAME ||

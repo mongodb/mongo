@@ -41,10 +41,6 @@ namespace mongo {
 
         virtual void onLogoutDatabase(const std::string&);
 
-    protected:
-        virtual bool _findUser(const string& usersNamespace,
-                               const BSONObj& query,
-                               BSONObj* result) const;
     };
 
 } // namespace mongo
