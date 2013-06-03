@@ -405,7 +405,7 @@ copy_key(WT_CURSOR *wtcursor)
 
 	r = &cursor->record;
 
-	if (cursor->key == r->key)
+	if (r->key == cursor->key)
 		return (0);
 
 	if (r->key_len > sizeof(cursor->key))
@@ -563,6 +563,8 @@ kvs_cursor_next(WT_CURSOR *wtcursor)
 	if (cursor->record.key_len == 0)
 		nextprev_init(wtcursor, us->id, us->idlen);
 
+	if ((ret = copy_key(wtcursor)) != 0)
+		return (ret);
 	if ((ret = kvs_call(wtcursor, "kvs_next", kvs_next)) != 0)
 		return (ret);
 	if ((ret = copyout_key(wtcursor)) != 0)
