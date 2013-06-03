@@ -177,6 +177,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
+	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
 	const char **cfg;
@@ -184,6 +185,16 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	btree = S2BT(session);
 	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
+
+	/* Dump out format information. */
+	if (WT_VERBOSE_ISSET(session, version)) {
+		WT_RET(__wt_config_gets(session, cfg, "version.major", &cval));
+		maj_version = cval.val;
+		WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
+		min_version = cval.val;
+		WT_VERBOSE_RET(session, version,
+		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
+	}
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));

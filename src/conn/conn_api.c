@@ -788,6 +788,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "reconcile",	WT_VERB_reconcile },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
+		{ "version",	WT_VERB_version },
 		{ "write",	WT_VERB_write },
 		{ NULL, 0 }
 	};
@@ -1014,6 +1015,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
+
+	WT_VERBOSE_ERR(session, version, WIREDTIGER_VERSION_STRING);
 
 	/*
 	 * Destroying the connection on error will destroy our session handle,

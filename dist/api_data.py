@@ -331,6 +331,7 @@ connection_runtime_config = [
 		    'reconcile',
 		    'salvage',
 		    'verify',
+		    'version',
 		    'write']),
 ]
 

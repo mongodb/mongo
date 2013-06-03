@@ -44,7 +44,8 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "verbose", "list",
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
-	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]",
+	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -248,7 +249,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "verbose", "list",
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
-	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]",
+	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
