@@ -81,7 +81,12 @@
 #define	KVS_MASTER		'\0'		/* Magic byte for master */
 #define	KVS_MASTER_VALUE_MAX	256		/* Maximum master value */
 
+/*
+ * Object IDs from 0 to KVS_MAXID_BASE are reserved for future use.  I can't
+ * think of any reason I'd need them, but it's a cheap and easy backup plan.
+ */
 #define	KVS_MAXID	"WiredTiger.maxid"	/* Maximum object ID key */
+#define	KVS_MAXID_BASE	6			/* First object ID */
 
 /*
  * Each KVS source supports a set of URIs (named objects).  Cursors reference
@@ -1375,7 +1380,7 @@ master_id_get(
 	int ret = 0;
 	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
 
-	*maxidp = 0;
+	*maxidp = KVS_MAXID_BASE;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
