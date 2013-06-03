@@ -148,7 +148,7 @@ ops(void *arg)
 	uint8_t *keybuf, *valbuf;
 	u_int np;
 	int dir, insert, notfound, ret;
-	char *ckpt_config, buf[64];
+	char *ckpt_config, config[64];
 
 	conn = g.wts_conn;
 
@@ -202,13 +202,15 @@ ops(void *arg)
 			 * have to specify the record number, which requires an
 			 * append configuration.
 			 */
-			if ((ret = session->open_cursor(session,
-			    g.uri, NULL, "overwrite", &cursor)) != 0)
+			if ((ret = session->open_cursor(session, g.uri, NULL,
+			    oc_conf(config, sizeof(config), "overwrite"),
+			    &cursor)) != 0)
 				die(ret, "session.open_cursor");
 			if ((g.type == FIX || g.type == VAR) &&
 			    (ret = session->open_cursor(
-			    session, g.uri,
-			    NULL, "append", &cursor_insert)) != 0)
+			    session, g.uri, NULL,
+			    oc_conf(config, sizeof(config), "append"),
+			    &cursor_insert)) != 0)
 				die(ret, "session.open_cursor");
 		}
 
@@ -223,9 +225,9 @@ ops(void *arg)
 			if (DATASOURCE("lsm") || MMRAND(1, 4) == 1)
 				ckpt_config = NULL;
 			else {
-				(void)snprintf(buf, sizeof(buf),
+				(void)snprintf(config, sizeof(config),
 				    "name=thread-%d", tinfo->id);
-				ckpt_config = buf;
+				ckpt_config = config;
 			}
 
 			/* Named checkpoints lock out hot backups */
@@ -366,6 +368,7 @@ wts_read_scan(void)
 	uint64_t cnt, last_cnt;
 	uint8_t *keybuf;
 	int ret;
+	char config[64];
 
 	conn = g.wts_conn;
 
@@ -376,8 +379,8 @@ wts_read_scan(void)
 	/* Open a session and cursor pair. */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->open_cursor(
-	    session, g.uri, NULL, NULL, &cursor)) != 0)
+	if ((ret = session->open_cursor(session,
+	    g.uri, NULL, oc_conf(config, sizeof(config), NULL), &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Check a random subset of the records using the key. */

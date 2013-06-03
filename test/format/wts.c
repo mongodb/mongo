@@ -246,12 +246,10 @@ wts_create(void)
 	if (DATASOURCE("lsm"))
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
 
-#define	MEMRATA_DEVICE		"/dev/loop0"
-#define	MEMRATA_DEVICE_FAKE	"RUNDIR/KVS"
 	if (DATASOURCE("memrata"))
 		p += snprintf(
-		    p, (size_t)(end - p), ",type=memrata,kvs_devices=[%s]",
-		    MEMRATA_DEVICE);
+		    p, (size_t)(end - p),
+		    ",type=memrata,kvs_open_o_truncate=1,%s", MEMRATA_DEVICE);
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);

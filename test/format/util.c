@@ -162,6 +162,24 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	}
 }
 
+/*
+ * oc_conf --
+ *	Return the open.cursor configuration.
+ */
+char *
+oc_conf(char *buf, size_t buflen, const char *plus)
+{
+	size_t len;
+
+	len = snprintf(buf, buflen, "%s,%s",
+	    plus == NULL ? "" : plus, 
+	    DATASOURCE("memrata") ? MEMRATA_DEVICE : "");
+	if (len > buflen)
+		die(EINVAL, "open.cursor configuration buffer too small");
+
+	return (buf);
+}
+
 void
 track(const char *tag, uint64_t cnt, TINFO *tinfo)
 {
