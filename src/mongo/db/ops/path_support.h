@@ -27,6 +27,10 @@ namespace mongo {
 
     namespace pathsupport {
 
+        // Cap on the number of nulls we'll add to an array if we're inserting to an index that
+        // doesn't exist.
+        static const size_t kMaxPaddingAllowed = 1500000;
+
         /**
          * Finds the longest portion of 'prefix' that exists in document rooted at 'root' and is
          * "viable." A viable path is one that, if fully created on a given doc, would not

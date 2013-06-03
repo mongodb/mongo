@@ -16,6 +16,8 @@
 
 #include "mongo/db/ops/path_support.h"
 
+#include <string>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -27,6 +29,7 @@
 #include "mongo/db/json.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace {
 
@@ -46,6 +49,8 @@ namespace {
     using mongo::mutablebson::getNthChild;
     using mongo::mutablebson::Document;
     using mongo::mutablebson::Element;
+    using mongoutils::str::stream;
+    using std::string;
 
     class EmptyDoc : public mongo::unittest::Test {
     public:
@@ -416,6 +421,24 @@ namespace {
         ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
         BSONObj obj = fromjson("{a: [], b: [{c:1},null,null,null,null,1]}");
         ASSERT_TRUE(checkDoc(doc(), obj));
+    }
+
+    TEST_F(ArrayDoc, ExcessivePaddingRequested) {
+        // Try to create an array item beyond what we're allowed to pad.
+        string paddedField = stream() << "b." << mongo::pathsupport::kMaxPaddingAllowed + 1;;
+        setField(paddedField);
+
+        int32_t idxFound;
+        Element elemFound = root();
+        ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+
+        // From this point on, try to create the padded part that wasn't found.
+        Element newElem = doc().makeElementInt("", 1);
+        ASSERT_TRUE(newElem.ok());
+        ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of 'b'
+
+        Status status = createPathAt(field(), idxFound+1, elemFound, newElem);
+        ASSERT_EQUALS(status.code(), ErrorCodes::CannotBackfillArray);
     }
 
     TEST_F(ArrayDoc, NonNumericPathInArray) {

@@ -21,6 +21,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace pathsupport {
@@ -44,6 +45,12 @@ namespace pathsupport {
         Status maybePadTo(mutablebson::Element* elemArray,
                           size_t sizeRequired) {
             dassert(elemArray->getType() == Array);
+
+            if (sizeRequired > kMaxPaddingAllowed) {
+                return Status(ErrorCodes::CannotBackfillArray,
+                              mongoutils::str::stream() << "can't backfill array to larger than "
+                                                        << kMaxPaddingAllowed << " elements");
+            }
 
             size_t currSize = mutablebson::countChildren(*elemArray);
             size_t toPad = sizeRequired - currSize;

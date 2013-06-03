@@ -59,9 +59,9 @@ assert( db.getLastError() == null );
 t.drop();
 t.save( {a:[]} );
 t.update( {}, {$set:{"a.1500001":1}} ); // 1 over limit
-assert.eq(15891 , db.getLastErrorObj().code );
+assert.neq( db.getLastErrorObj(), null );
 
 t.drop();
 t.save( {a:[]} );
 t.update( {}, {$set:{"a.1000000000":1}} ); // way over limit
-assert.eq(15891 , db.getLastErrorObj().code );
+assert.neq( db.getLastErrorObj(), null );
