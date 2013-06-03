@@ -1384,12 +1384,11 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, \, the
  * maximum size of the log file., an integer between 1MB and 2GB; default \c
  * 100MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
- * which the log records are written.  It will have log numbers appended to it
- * the file name.  If the value is not an absolute path name\, the file is
- * created relative to the database home., a string; default \c "".}
- * @config{
- * ),,}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into
+ * which the log files are written.  If the value is not an absolute path name\,
+ * the files are created relative to the database home., a string; default \c
+ * "".}
+ * @config{ ),,}
  * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
  * \c true.}
  * @config{mmap, Use memory mapping to access files when possible., a boolean

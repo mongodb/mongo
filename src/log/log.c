@@ -281,6 +281,14 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		WT_RET(__wt_close(session, log->log_close_fh));
 		log->log_close_fh = NULL;
 		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
+#if 1
+		/*
+		 * Update ckpt_lsn for archive testing purposes only.
+		 */
+		log->ckpt_lsn = log->write_lsn;
+		if (conn->arch_cond != NULL)
+			WT_ERR(__wt_cond_signal(session, conn->arch_cond));
+#endif
 	}
 
 err:
@@ -355,14 +363,6 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	 */
 	if (conn_create)
 		log->write_lsn = tmp.slot_end_lsn;
-#if 1
-	/*
-	 * Update ckpt_lsn for archive testing purposes only.
-	 */
-	log->ckpt_lsn = log->alloc_lsn;
-	if (conn->arch_cond != NULL)
-		WT_ERR(__wt_cond_signal(session, conn->arch_cond));
-#endif
 
 err:
 	__wt_scr_free(&buf);

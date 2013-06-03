@@ -583,9 +583,8 @@ methods = {
 		the maximum size of the log file''',
 		min='1MB', max='2GB'),
 		Config('path', '""', r'''
-		the pathname to a file into which the log records are written.
-                It will have log numbers appended to it the file name.  If the
-		value is not an absolute path name, the file is created
+		the path to a directory into which the log files are written.
+                If the value is not an absolute path name, the files are created
                 relative to the database home'''),
 		]),
 	Config('lsm_merge', 'true', r'''

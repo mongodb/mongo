@@ -19,22 +19,18 @@ __logger_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	conn = S2C(session);
 
-fprintf(stderr, "logger_config: cfg %s\n", *cfg);
 	/*
 	 * The logging configuration is off by default.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
-fprintf(stderr, "logger_config: enabled %d\n", cval.val);
 	*runp = cval.val != 0;
 	if (*runp == 0)
 		return (0);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
-fprintf(stderr, "logger_config: archive %d\n", cval.val);
 	conn->archive = cval.val != 0;
 
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
-fprintf(stderr, "logger_config: file_max %"PRId64"\n", (uint64_t)cval.val);
 	conn->log_file_max = (uint64_t)cval.val;
 	WT_CSTAT_SET(session, log_max_filesize, conn->log_file_max);
 
@@ -53,6 +49,7 @@ static void *
 __log_archive_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(path);
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LSN lsn;
@@ -64,6 +61,8 @@ __log_archive_server(void *arg)
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
+
+	WT_ERR(__wt_scr_alloc(session, 0, &path));
 
 	/*
 	 * The log archive server may be running before the database is
@@ -99,8 +98,14 @@ __log_archive_server(void *arg)
 			fprintf(stderr,
 			    "[%d] log_archive: found log %s lognum %d\n",
 			    pthread_self(), logfiles[i], lognum);
-			if (lognum < lsn.file)
-				WT_ERR(__wt_remove(session, logfiles[i]));
+			if (lognum < lsn.file) {
+				WT_ERR(__wt_log_filename(
+				    session, lognum, path));
+				fprintf(stderr,
+				    "[%d] log_archive: remove log %s\n",
+				    pthread_self(), path->data);
+				WT_ERR(__wt_remove(session, path->data));
+			}
 			__wt_free(session, logfiles[i]);
 			logfiles[i] = NULL;
 		}
@@ -121,6 +126,7 @@ __log_archive_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log archive server error");
 	}
+	__wt_scr_free(&path);
 	if (logfiles != NULL) {
 		for (i = 0; i < logcount; i++)
 			if (logfiles[i] != NULL)
