@@ -526,23 +526,18 @@ restart:
 static INLINE void
 nextprev_init(WT_CURSOR *wtcursor, uint8_t *id, size_t idlen)
 {
-	struct kvs_record *r;
 	CURSOR *cursor;
-	URI_SOURCE *us;
 	size_t i;
 	uint8_t *p, *t;
 
 	cursor = (CURSOR *)wtcursor;
-	us = cursor->us;
-
-	r = &cursor->record;
-	r->key = cursor->key;
-	r->key_len = 0;
 
 	/* Prefix the key with a unique ID. */
-	for (p = id, t = r->key, i = 0; i < idlen; ++i)
+	for (p = id, t = cursor->key, i = 0; i < idlen; ++i)
 		*t++ = *p++;
-	r->key_len = idlen;
+
+	cursor->record.key = cursor->key;
+	cursor->record.key_len = idlen;
 }
 
 /*
@@ -1747,16 +1742,62 @@ static int
 kvs_session_truncate(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
+	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
+	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
-
-	(void)uri;				/* Unused parameters */
-	(void)config;
+	kvs_t kvs;
+	size_t i;
+	int ret = 0;
+	uint8_t *p, *t;
+	char key[KVS_MAX_KEY_LEN];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	ERET(wtext, session, ENOTSUP, "truncate: %s", strerror(ENOTSUP));
+	/* Get a locked reference to the URI. */
+	if ((ret = uri_source_open(wtds, session, config, uri, &us)) != 0)
+		return (ret);
+	kvs = us->ks->kvs;
+
+	/* If there are active references to the object, we're busy. */
+	if (us->ref != 0) {
+		ret = EBUSY;
+		goto err;
+	}
+
+	/* Walk the list of objects, discarding them all. */
+	r = &_r;
+	memset(r, 0, sizeof(*r));
+	r->key = key;
+	memcpy(r->key, us->id, us->idlen);
+	r->key_len = us->idlen;
+	r->val = NULL;
+	r->val_len = 0;
+	while ((ret = kvs_next(kvs, r, 0UL, 0UL)) == 0) {
+		/*
+		 * Check for an object ID mismatch, if we find one, we're
+		 * done.
+		 */
+		for (p = us->id, t = r->key, i = 0; i < us->idlen; ++i)
+			if (*t++ != *p++)
+				goto err;
+		if ((ret = kvs_del(kvs, r)) != 0) {
+			ESET(wtext, session,
+			    WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
+			goto err;
+		}
+	}
+	if (ret == KVS_E_KEY_NOT_FOUND)
+		ret = 0;
+	if (ret != 0) {
+		ESET(wtext, session,
+		    WT_ERROR, "kvs_next: %s", kvs_strerror(ret));
+		goto err;
+	}
+
+err:	ETRET(unlock(wtext, session, &us->lock));
+	return (ret);
 }
 
 /*
