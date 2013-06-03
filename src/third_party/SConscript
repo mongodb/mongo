@@ -9,11 +9,11 @@ env.SConscript( [
 env.Append(CPPPATH='$BUILD_DIR/third_party/s2')
 
 if use_system_version_of_library("pcre"):
-    env.StaticLibrary( "pcrecpp", ['shim_pcrecpp.cc'],
+    env.StaticLibrary( "shim_pcrecpp", ['shim_pcrecpp.cc'],
                        SYSLIBDEPS=[ 'pcre' , 'pcrecpp' ] )
 else:
     env.SConscript('pcre-${PCRE_VERSION}/SConscript')
-    env.StaticLibrary( "pcrecpp", ['shim_pcrecpp.cc'],
+    env.StaticLibrary( "shim_pcrecpp", ['shim_pcrecpp.cc'],
                        LIBDEPS=[ 'pcre-${PCRE_VERSION}/pcrecpp' ] )
 
 if use_system_version_of_library("boost"):
@@ -60,4 +60,10 @@ else:
     env.StaticLibrary('shim_allocator', 'shim_allocator.cpp',
                       LIBDEPS=['gperftools-2.0/tcmalloc_minimal'])
 
-env.SConscript('libstemmer_c/SConscript')
+if use_system_version_of_library("stemmer"):
+    env.StaticLibrary("shim_stemmer", ['shim_stemmer.cpp'],
+                      SYSLIBDEPS= ['stemmer'])
+else:
+    env.SConscript('libstemmer_c/SConscript')
+    env.StaticLibrary("shim_stemmer", ['shim_stemmer.cpp'],
+                      LIBDEPS=['libstemmer_c/stemmer'])

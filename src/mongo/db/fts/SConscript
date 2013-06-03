@@ -37,7 +37,7 @@ env.StaticLibrary('base', [
         ], LIBDEPS=["$BUILD_DIR/mongo/base/base",
                     "$BUILD_DIR/mongo/bson",
                     "$BUILD_DIR/mongo/platform/platform",
-                    "$BUILD_DIR/third_party/libstemmer_c/stemmer"
+                    "$BUILD_DIR/third_party/shim_stemmer"
                     ])
 
 env.StaticLibrary( 'server_common', [

@@ -135,7 +135,7 @@ env.StaticLibrary('expressions',
                   LIBDEPS=['bson',
                            'path',
                            '$BUILD_DIR/mongo/db/common',
-                           '$BUILD_DIR/third_party/pcrecpp'
+                           '$BUILD_DIR/third_party/shim_pcrecpp'
                            ] )
 
 env.StaticLibrary('expressions_geo',
@@ -273,7 +273,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'stacktrace',
                            'stringutils',
                            'fail_point',
-                           '$BUILD_DIR/third_party/pcrecpp',
+                           '$BUILD_DIR/third_party/shim_pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/shim_boost'] +
                            extraCommonLibdeps)
@@ -371,7 +371,8 @@ env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evalua
 if usesm:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_spidermonkey.cpp',
                                                              'scripting/sm_db.cpp'],
-                      LIBDEPS=['$BUILD_DIR/third_party/js-1.7/js', 'bson_template_evaluator'])
+                      LIBDEPS=['$BUILD_DIR/third_party/shim_spidermonkey',
+                               'bson_template_evaluator'])
 elif usev8:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_v8.cpp',
                                                              'scripting/v8_db.cpp',
@@ -833,7 +834,7 @@ if shellEnv is not None:
         "mongo",
         coreShellFiles,
         LIBDEPS=[ "clientandshell", "mongocommon", "scripting", 
-                 "$BUILD_DIR/third_party/pcrecpp"] + env['MODULE_LIBDEPS_MONGOSHELL'] )
+                 "$BUILD_DIR/third_party/shim_pcrecpp"] + env['MODULE_LIBDEPS_MONGOSHELL'] )
 
     shellEnv.Install( '#/', mongo_shell )
 

@@ -245,7 +245,10 @@ add_option( "use-system-boost", "use system version of boost libraries", 0, True
 add_option( "use-system-snappy", "use system version of snappy library", 0, True )
 
 add_option( "use-system-sm", "use system version of spidermonkey library", 0, True )
+
 add_option( "use-system-v8", "use system version of v8 library", 0, True )
+
+add_option( "use-system-stemmer", "use system version of stemmer", 0, True )
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
@@ -805,6 +808,9 @@ env.Prepend(CPPPATH=['$BUILD_DIR/third_party/s2'])
 if not use_system_version_of_library("stemmer"):
     env.Prepend(CPPPATH=['$BUILD_DIR/third_party/libstemmer_c/include'])
 
+if not use_system_version_of_library("snappy"):
+    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/snappy'])
+
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
 
@@ -1128,6 +1134,24 @@ def doConfigure(myenv):
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
 
     conf = Configure(myenv)
+
+    if use_system_version_of_library("pcre"):
+        if not conf.CheckLib("pcre"):
+            print( "Can't find pcre library" )
+            Exit(1)
+        if not conf.CheckLib("pcrecpp"):
+            print( "Can't find prcecpp library" )
+            Exit(1)
+
+    if use_system_version_of_library("snappy"):
+        if not conf.CheckLib("snappy"):
+            print( "Can't find snappy library" )
+            Exit(1)
+
+    if use_system_version_of_library("stemmer"):
+        if not conf.CheckLib("stemmer"):
+            print( "Can't find stemmer library" )
+            Exit(1)
 
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
