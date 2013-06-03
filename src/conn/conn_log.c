@@ -36,7 +36,6 @@ __logger_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_nfilename(session, cval.str, cval.len, &conn->log_path));
-fprintf(stderr, "logger_config: log_path %s\n", conn->log_path);
 
 	return (0);
 }
@@ -83,8 +82,8 @@ __log_archive_server(void *arg)
 
 		lsn = log->ckpt_lsn;
 		lsn.offset = 0;
-		fprintf(stderr, "[%d] log_archive: ckpt LSN %d,%d\n",
-		    pthread_self(), lsn.file, lsn.offset);
+		WT_VERBOSE_ERR(session, log, "log_archive: ckpt LSN %d,%d",
+		    lsn.file, lsn.offset);
 		/*
 		 * Main archive code.  Get the list of all log files and
 		 * remove any earlier than the checkpoint LSN.
@@ -95,15 +94,12 @@ __log_archive_server(void *arg)
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
-			fprintf(stderr,
-			    "[%d] log_archive: found log %s lognum %d\n",
-			    pthread_self(), logfiles[i], lognum);
 			if (lognum < lsn.file) {
 				WT_ERR(__wt_log_filename(
 				    session, lognum, path));
-				fprintf(stderr,
-				    "[%d] log_archive: remove log %s\n",
-				    pthread_self(), path->data);
+				WT_VERBOSE_ERR(session, log,
+				    "log_archive: remove log %s",
+				    (char *)path->data);
 				WT_ERR(__wt_remove(session, path->data));
 			}
 			__wt_free(session, logfiles[i]);
@@ -119,8 +115,7 @@ __log_archive_server(void *arg)
 		log->first_lsn = lsn;
 
 		/* Wait until the next event. */
-		WT_ERR(
-		    __wt_cond_wait(session, conn->arch_cond, 0));
+		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 0));
 	}
 
 	if (0) {
@@ -145,16 +140,13 @@ __wt_logger_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 	WT_LOG *log;
-	int i, run;
+	int run;
 
 	session = conn->default_session;
 
 	/* Handle configuration. */
-fprintf(stderr, "logger_create: called\n");
 	WT_RET(__logger_config(session, cfg, &run));
 
-fprintf(stderr, "logger_create: logger_config returned %d\n", run);
-	WT_VERBOSE_RET(session, log, "logger_create: run %d", run);
 	/* If logging is not configured, we're done. */
 	if (!run)
 		return (0);
@@ -165,21 +157,12 @@ fprintf(stderr, "logger_create: logger_config returned %d\n", run);
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_LOG), &conn->log));
 	log = conn->log;
-fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
-	WT_VERBOSE_RET(session, log, "logger_create: open the log");
 	__wt_spin_init(session, &log->log_lock);
 	__wt_spin_init(session, &log->log_slot_lock);
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize = LOG_ALIGN_DIRECTIO;
 	else
 		log->allocsize = LOG_ALIGN;
-	WT_RET(__wt_cond_alloc(
-	    session, "log slot sync", 0, &log->slot_sync_cond));
-#if 0
-	for (i = 0; i < SLOT_POOL; i++)
-		WT_RET(__wt_cond_alloc(
-		    session, "log slot", 0, &log->slot_pool[i].slot_cond));
-#endif
 	/*
 	 * Initialize fileid to 0 so that newfile moves to log file 1.
 	 */
@@ -235,7 +218,6 @@ __wt_logger_destroy(WT_CONNECTION_IMPL *conn)
 	WT_LOG *log;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
-	int i;
 
 	session = conn->default_session;
 
@@ -259,11 +241,6 @@ __wt_logger_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(wt_session->close(wt_session, NULL));
 		__wt_free(session, conn->arch_session->hazard);
 	}
-#if 0
-	for (i = 0; i < SLOT_POOL; i++)
-		WT_TRET(__wt_cond_destroy(
-		    session, &log->slot_pool[i].slot_cond));
-#endif
 	__wt_spin_destroy(session, &log->log_lock);
 	__wt_spin_destroy(session, &log->log_slot_lock);
 	__wt_free(session, conn->log);

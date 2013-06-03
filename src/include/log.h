@@ -91,12 +91,6 @@ typedef struct {
 #undef	slot_fh
 #define	slot_fh			u.slot.fh
 			WT_FH	*fh;		/* File handle for this group */
-#if 0
-/* Do we need this?  Not used at the moment. */
-#undef	slot_cond
-#define	slot_cond		u.slot.cond
-			WT_CONDVAR	*cond;	/* Condition variable */
-#endif
 #undef	slot_flags
 #define	slot_flags		u.slot.flags
 #define	SLOT_CLOSEFH	0x01			/* Close old fh on release */
@@ -135,7 +129,6 @@ typedef struct {
 	 */
 	WT_SPINLOCK      log_lock;      /* Locked: Logging fields */
 	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
-	WT_CONDVAR      *slot_sync_cond;/* Logging sync wait mutex */
 
 	/*
 	 * Consolidation array information

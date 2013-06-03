@@ -33,8 +33,10 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
-	for (i = 0; i < SLOT_POOL; i++)
+	for (i = 0; i < SLOT_POOL; i++) {
 		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
+		log->slot_pool[i].slot_index = SLOT_INVALID_INDEX;
+	}
 
 	/*
 	 * Set up the available slots from the pool the first time.
@@ -108,9 +110,6 @@ join_slot:
 		FLD_SET(slot->slot_flags, SLOT_SYNC);
 	myslotp->slot = slot;
 	myslotp->offset = (off_t)old_state - WT_LOG_SLOT_READY;
-	fprintf(stderr,
-	    "[%d] slot_join: joined slot %d, 0x%x.  My offset 0x%x\n",
-	    pthread_self(),i,slot,myslotp->offset);
 	return (0);
 }
 
@@ -153,9 +152,6 @@ retry:
 	old_state = WT_ATOMIC_STORE(slot->slot_state, WT_LOG_SLOT_PENDING);
 	slot->slot_group_size = old_state - WT_LOG_SLOT_READY;
 	WT_CSTAT_INCRV(session, log_slot_consolidated, slot->slot_group_size);
-	fprintf(stderr,
-"[%d] slot_close: closed slot 0x%x at index %d.  New slot %d.  Group size %d\n",
-	   pthread_self(),slot,slot->slot_index, pool_i, slot->slot_group_size);
 	return (0);
 }
 
