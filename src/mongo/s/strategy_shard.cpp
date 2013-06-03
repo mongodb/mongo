@@ -979,7 +979,7 @@ namespace mongo {
                     return;
                 }
 
-                if( query.hasField("$atomic") ){
+                if( query.hasField("$atomic") || query.hasField("$isolated") ){
 
                     // We can't run an atomic operation on more than one shard
 
@@ -992,7 +992,7 @@ namespace mongo {
                     _sleepForVerifiedLocalError();
 
                     uasserted( 13506, str::stream()
-                        << "$atomic not supported sharded : " << query );
+                        << "$atomic/$isolated not supported sharded : " << query );
                 }
 
                 return;
@@ -1131,7 +1131,7 @@ namespace mongo {
                 return;
             }
 
-            if( query.hasField( "$atomic" ) ){
+            if( query.hasField( "$atomic" ) || query.hasField( "$isolated" ) ){
 
                 // Retry reloading the config data once
                 if( ! reloadConfigData ){
@@ -1143,7 +1143,7 @@ namespace mongo {
                 _sleepForVerifiedLocalError();
 
                 uasserted( 13505, str::stream()
-                    << "$atomic not supported for sharded delete : " << query );
+                    << "$atomic/$isolated not supported for sharded delete : " << query );
             }
             else if( justOne && ! query.hasField( "_id" ) ){
 

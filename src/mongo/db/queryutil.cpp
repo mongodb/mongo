@@ -1053,7 +1053,8 @@ namespace mongo {
                 return;
             }
 
-            if ( str::equals( matchFieldName, "$atomic" ) ) {
+            if ( str::equals( matchFieldName, "$atomic" ) ||
+                 str::equals( matchFieldName, "$isolated" ) ) {
                 return;
             }
         }

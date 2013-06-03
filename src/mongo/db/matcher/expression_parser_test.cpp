@@ -52,6 +52,14 @@ namespace mongo {
         BSONObj query = BSON( "x" << 5 << "$atomic" << BSON( "$gt" << 5 << "$lt" << 8 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+
+        query = BSON( "x" << 5 << "$isolated" << 1 );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        query = BSON( "x" << 5 << "y" << BSON( "$isolated" << 1 ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
     }
 
     StatusWith<int> fib( int n ) {

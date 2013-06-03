@@ -258,10 +258,11 @@ namespace mongo {
                         return StatusWithMatchExpression( s );
                     root->add( temp.release() );
                 }
-                else if ( mongoutils::str::equals( "atomic", rest ) ) {
+                else if ( mongoutils::str::equals( "atomic", rest ) || 
+                          mongoutils::str::equals( "isolated", rest ) ) {
                     if ( !topLevel )
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                          "$atomic has to be at the top level" );
+                                                          "$atomic/$isolated has to be at the top level" );
                     if ( e.trueValue() )
                         root->add( new AtomicMatchExpression() );
                 }
