@@ -24,7 +24,12 @@ namespace mongo {
     AuthorizationManager* getGlobalAuthorizationManager();
 
     // Sets the singleton AuthorizationManager object for this server process.
-    // Must be called once at startup and then never again.
+    // Must be called once at startup and then never again (unless clearGlobalAuthorizationManager
+    // is called, at which point this can be called again, but should only happen in tests).
     void setGlobalAuthorizationManager(AuthorizationManager* authManager);
+
+    // Sets the singleton AuthorizationManager object for this server process to NULL.
+    // Should only be used in tests.
+    void clearGlobalAuthorizationManager();
 
 } // namespace mongo
