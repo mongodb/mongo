@@ -410,6 +410,50 @@ copy_key(WT_CURSOR *wtcursor)
 }
 
 /*
+ * kvs_dump --
+ *	Dump the records in the KVS store.
+ */
+static void
+kvs_dump(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, kvs_t kvs, const char *tag)
+{
+	struct kvs_record *r, _r;
+	DATA_SOURCE *ds;
+	uint64_t recno;
+	size_t len, size;
+	char *p, key[256], val[256];
+
+	printf("== %s\n", tag);
+
+	r = &_r;
+	memset(r, 0, sizeof(*r));
+	r->key = key;
+	r->key_len = 0;
+	r->val = val;
+	r->val_len = sizeof(val);
+	while (kvs_next(kvs, r, 0UL, (unsigned long)sizeof(val)) == 0) {
+		p = r->key;
+		len = r->key_len;
+		if (*p == KVS_MASTER) {
+			printf("\t0:");
+			++p;
+			--len;
+		} else {
+			(void)wtext->struct_unpack(
+			    wtext, session, p, 10, "r", &recno);
+			(void)wtext->struct_size(
+			    wtext, session, &size, "r", recno);
+			printf("\t%" PRIu64 ": ", recno);
+			p += size;
+			len -= size;
+		}
+		printf("%.*s/%.*s\n", (int)len, p, (int)r->val_len, r->val);
+
+		r->val_len = sizeof(val);
+	}
+}
+
+/*
  * kvs_call --
  *	Call a KVS function.
  */
@@ -830,6 +874,7 @@ static const KVS_OPTIONS kvs_options[] = {
 	{ "kvs_open_o_debug=0",		"boolean", NULL },
 	{ "kvs_open_o_reclaim=0",	"boolean", NULL },
 	{ "kvs_open_o_scan=0",		"boolean", NULL },
+	{ "kvs_open_o_truncate=0",	"boolean", NULL },
 
 	{ NULL, NULL, NULL }
 };
@@ -1006,6 +1051,7 @@ kvs_config_read(WT_EXTENSION_API *wtext,
 		KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
 		KVS_FLAG_SET("kvs_open_o_reclaim", KVS_O_SCAN);
 		KVS_FLAG_SET("kvs_open_o_scan",  KVS_O_RECLAIM);
+		KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_CREATE);
 	}
 	return (0);
 }
@@ -1134,7 +1180,8 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 #if defined(KVS_O_TRUNCATE)
 	This is fragile: once KVS_O_CREATE changes to not always destroy the
 	store, we can set it all the time, and whatever new flag destroys the
-	store should get pushed out into the api as a new kvs flag.
+	store should get pushed out into the api as a new kvs flag.  (See the
+	above setting of KVS_O_CREATE for the kvs_open_o_truncate option.)
 #endif
 	ks->kvs = kvs_open(device_list, &kvs_config, flags);
 	if (ks->kvs == NULL)
