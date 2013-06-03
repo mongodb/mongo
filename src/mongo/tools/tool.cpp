@@ -24,6 +24,9 @@
 #include "pcrecpp.h"
 
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/password.h"
@@ -120,6 +123,8 @@ namespace mongo {
     }
     int Tool::main( int argc , char ** argv ) {
         static StaticObserver staticObserver;
+
+        setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
 
         cmdLine.prealloc = false;
 
