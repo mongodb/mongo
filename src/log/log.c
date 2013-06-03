@@ -29,11 +29,12 @@ err:	__wt_buf_free(session, buf);
 }
 
 /*
- * __log_extract_lognum --
+ * __wt_log_extract_lognum --
  *	Given a log file name, extract out the log number.
  */
 int
-__log_extract_lognum(WT_SESSION_IMPL *session, const char *name, uint32_t *id)
+__wt_log_extract_lognum(
+    WT_SESSION_IMPL *session, const char *name, uint32_t *id)
 {
 	char *p;
 
@@ -101,7 +102,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	WT_RET(__wt_dirlist(session, conn->log_path,
 	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
-		WT_ERR(__log_extract_lognum(session, logfiles[i], &lognum));
+		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		fprintf(stderr, "[%d] log_open: found logfile %s lognum %d\n",
 		    pthread_self(), logfiles[i], lognum);
 		lastlog = WT_MAX(lastlog, lognum);
@@ -288,6 +289,10 @@ err:
 	return (ret);
 }
 
+/*
+ * __wt_log_newfile --
+ *	Create the next log file and write the file header record into it.
+ */
 int
 __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 {
@@ -350,6 +355,15 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	 */
 	if (conn_create)
 		log->write_lsn = tmp.slot_end_lsn;
+#if 1
+	/*
+	 * Update ckpt_lsn for archive testing purposes only.
+	 */
+	log->ckpt_lsn = log->alloc_lsn;
+	if (conn->arch_cond != NULL)
+		WT_ERR(__wt_cond_signal(session, conn->arch_cond));
+#endif
+
 err:
 	__wt_scr_free(&buf);
 	return (0);

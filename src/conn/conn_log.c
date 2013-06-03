@@ -52,32 +52,18 @@ fprintf(stderr, "logger_config: log_path %s\n", conn->log_path);
 static void *
 __log_archive_server(void *arg)
 {
-	FILE *fp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_ITEM path, tmp;
 	WT_LOG *log;
-	WT_LSN *lsn;
+	WT_LSN lsn;
 	WT_SESSION_IMPL *session;
+	uint32_t lognum;
+	int i, logcount;
+	char **logfiles;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-
-	WT_CLEAR(path);
-	WT_CLEAR(tmp);
-
-	/*
-	 * We need a temporary place to build a path and an entry prefix.
-	 * The length of the path plus 128 should be more than enough.
-	 *
-	 * We also need a place to store the current path, because that's
-	 * how we know when to close/re-open the file.
-	 */
-	WT_ERR(__wt_buf_init(session, &path,
-	    strlen(conn->log_path) + ENTRY_SIZE));
-	WT_ERR(__wt_buf_init(session, &tmp,
-	    strlen(conn->log_path) + ENTRY_SIZE));
 
 	/*
 	 * The log archive server may be running before the database is
@@ -87,83 +73,46 @@ __log_archive_server(void *arg)
 		__wt_sleep(1, 0);
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
-#if 0
 		/*
-		 * If archiving is turned off, wait until it's time to archive
-		 * and check again.
+		 * If archiving is reconfigured and turned off, wait until
+		 * it gets turned back on and check again.
 		 */
 		if (conn->archive == 0) {
-			WT_ERR(__wt_cond_wait(
-			    session, conn->arch_cond, conn->arch_usecs));
+			WT_ERR(__wt_cond_wait(session, conn->arch_cond, 0));
 			continue;
 		}
 
-		/* Get the current local time of day. */
-		WT_ERR(__wt_epoch(session, &ts));
-		tm = localtime_r(&ts.tv_sec, &_tm);
+		lsn = log->ckpt_lsn;
+		lsn.offset = 0;
+		fprintf(stderr, "[%d] log_archive: ckpt LSN %d,%d\n",
+		    pthread_self(), lsn.file, lsn.offset);
+		/*
+		 * Main archive code.  Get the list of all log files and
+		 * remove any earlier than the checkpoint LSN.
+		 */
+		WT_ERR(__wt_dirlist(session, conn->log_path,
+		    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
 
-		/* Create the logging path name for this time of day. */
-		if (strftime(tmp.mem, tmp.memsize, conn->stat_path, tm) == 0)
-			WT_ERR_MSG(
-			    session, ENOMEM, "strftime path conversion");
-
-		/* If the path has changed, close/open the new log file. */
-		if (fp == NULL || strcmp(tmp.mem, path.mem) != 0) {
-			if (fp != NULL) {
-				(void)fclose(fp);
-				fp = NULL;
-			}
-
-			(void)strcpy(path.mem, tmp.mem);
-			WT_ERR_TEST(
-			    (fp = fopen(path.mem, "a")) == NULL, __wt_errno());
+		for (i = 0; i < logcount; i++) {
+			WT_ERR(__wt_log_extract_lognum(
+			    session, logfiles[i], &lognum));
+			fprintf(stderr,
+			    "[%d] log_archive: found log %s lognum %d\n",
+			    pthread_self(), logfiles[i], lognum);
+			if (lognum < lsn.file)
+				WT_ERR(__wt_remove(session, logfiles[i]));
+			__wt_free(session, logfiles[i]);
+			logfiles[i] = NULL;
 		}
-
-		/* Create the entry prefix for this time of day. */
-		if (strftime(tmp.mem, tmp.memsize, conn->stat_format, tm) == 0)
-			WT_ERR_MSG(
-			    session, ENOMEM, "strftime timestamp conversion");
-
-		/* Reference temporary values from the connection structure. */
-		conn->stat_fp = fp;
-		conn->stat_stamp = tmp.mem;
-
-		/* Dump the connection statistics. */
-		WT_ERR(__statlog_dump(session, conn->home, 1));
-	XXX
+		__wt_free(session, logfiles);
+		logfiles = NULL;
+		logcount = 0;
 
 		/*
-		 * Lock the schema and walk the list of open handles, dumping
-		 * any that match the list of object sources.
+		 * Indicate what is our new earliest LSN.
 		 */
-		if (conn->stat_sources != NULL)
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_conn_btree_apply(
-			    session, __statlog_apply, NULL));
-		WT_ERR(ret);
+		log->first_lsn = lsn;
 
-		/*
-		 * Lock the schema and walk the list of open LSM trees, dumping
-		 * any that match the list of object sources.
-		 *
-		 * XXX
-		 * This code should be removed when LSM objects are converted to
-		 * data handles.
-		 */
-		if (conn->stat_sources != NULL)
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_statlog_lsm_apply(session));
-		WT_ERR(ret);
-	XXX
-
-		/* Flush. */
-		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
-
-#endif
-		/*
-		 * Indicate what is our earliest LSN.
-		 */
-		log->first_lsn = *lsn;
 		/* Wait until the next event. */
 		WT_ERR(
 		    __wt_cond_wait(session, conn->arch_cond, 0));
@@ -172,10 +121,12 @@ __log_archive_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log archive server error");
 	}
-	if (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
-	__wt_buf_free(session, &path);
-	__wt_buf_free(session, &tmp);
+	if (logfiles != NULL) {
+		for (i = 0; i < logcount; i++)
+			if (logfiles[i] != NULL)
+				__wt_free(session, logfiles[i]);
+		__wt_free(session, logfiles);
+	}
 	return (NULL);
 }
 
@@ -235,23 +186,34 @@ fprintf(stderr, "logger_create: open the log, size 0x%d\n",conn->log_file_max);
 	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
-	/* If archiving is not configured, we're done. */
+	/* If archiving is not configured, we're done. */ 
 	if (!conn->archive)
 		return (0);
 
-	/* The log archive server gets its own session. */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &conn->arch_session));
-	conn->arch_session->name = "archive-server";
-
-	WT_RET(__wt_cond_alloc(
-	    session, "log archiving server", 0, &conn->arch_cond));
-
 	/*
-	 * Start the thread.
+	 * If an archive thread exists, the user may have reconfigured the
+	 * archive thread.  Signal the thread.  Otherwise the user wants
+	 * archiving and we need to start up the thread.
 	 */
-	WT_RET(__wt_thread_create(session,
-	    &conn->arch_tid, __log_archive_server, conn->arch_session));
-	conn->arch_tid_set = 1;
+	if (conn->arch_session != NULL) {
+		WT_ASSERT(session, conn->arch_cond != NULL);
+		WT_ASSERT(session, conn->arch_tid_set != 0);
+		WT_RET(__wt_cond_signal(session, conn->arch_cond));
+	} else {
+		/* The log archive server gets its own session. */
+		WT_RET(__wt_open_session(
+		    conn, 1, NULL, NULL, &conn->arch_session));
+		conn->arch_session->name = "archive-server";
+		WT_RET(__wt_cond_alloc(
+		    session, "log archiving server", 0, &conn->arch_cond));
+
+		/*
+		 * Start the thread.
+		 */
+		WT_RET(__wt_thread_create(session,
+		    &conn->arch_tid, __log_archive_server, conn->arch_session));
+		conn->arch_tid_set = 1;
+	}
 
 	return (0);
 }
