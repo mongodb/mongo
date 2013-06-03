@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
-#include "mongo/s/field_parser.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/s/type_changelog.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_shard.h"

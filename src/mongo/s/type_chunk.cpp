@@ -17,7 +17,7 @@
 
 #include <cstring>
 
-#include "mongo/s/field_parser.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

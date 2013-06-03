@@ -8,8 +8,10 @@ Import("env")
 # get resolved.
 #
 
-env.StaticLibrary('common', ['field_ref.cpp'],
+env.StaticLibrary('common', ['field_ref.cpp', 'field_parser.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/bson',
                            '$BUILD_DIR/mongo/foundation'])
 
 env.CppUnitTest('field_ref_test', ['field_ref_test.cpp'], LIBDEPS=['common'])
+
+env.CppUnitTest('field_parser_test', 'field_parser_test.cpp', LIBDEPS=['common'])

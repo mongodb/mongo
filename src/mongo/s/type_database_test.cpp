@@ -17,7 +17,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/bson/oid.h"
-#include "mongo/s/field_parser.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/s/type_database.h"
 #include "mongo/unittest/unittest.h"
 

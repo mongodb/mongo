@@ -15,7 +15,7 @@
  */
 #include "mongo/s/type_settings.h"
 
-#include "mongo/s/field_parser.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 

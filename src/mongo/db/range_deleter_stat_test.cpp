@@ -18,7 +18,7 @@
 #include <boost/thread.hpp>
 #include <string>
 
-#include "mongo/s/field_parser.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/db/range_deleter.h"
 #include "mongo/db/range_deleter_mock_env.h"
 #include "mongo/db/range_deleter_stats.h"
