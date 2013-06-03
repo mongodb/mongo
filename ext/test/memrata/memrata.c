@@ -1223,7 +1223,7 @@ err:		if (locked)
  */
 static int
 uri_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
-    WT_CONFIG_ARG *config, const char *uri, URI_SOURCE **refp)
+    WT_CONFIG_ARG *config, const char *uri, int hold_global, URI_SOURCE **refp)
 {
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
@@ -1277,8 +1277,9 @@ err:		if (lockinit)
 		}
 	}
 
-	/* Release the global lock. */
-	ETRET(unlock(wtext, session, &ds->global_lock));
+	/* If our caller doesn't need it, release the global lock. */
+	if (ret != 0 || !hold_global)
+		ETRET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
 }
 
@@ -1316,12 +1317,11 @@ master_key_set(WT_DATA_SOURCE *wtds,
  */
 static int
 master_id_get(
-    WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us, uint64_t *maxidp)
+    WT_DATA_SOURCE *wtds, WT_SESSION *session, kvs_t kvs, uint64_t *maxidp)
 {
 	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
 	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
 
@@ -1329,7 +1329,6 @@ master_id_get(
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	kvs = us->ks->kvs;
 
 	r = &_r;
 	memset(r, 0, sizeof(*r));
@@ -1359,18 +1358,16 @@ master_id_get(
  */
 static int
 master_id_set(
-    WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us, uint64_t maxid)
+    WT_DATA_SOURCE *wtds, WT_SESSION *session, kvs_t kvs, uint64_t maxid)
 {
 	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
 	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	kvs = us->ks->kvs;
 
 	r = &_r;
 	memset(r, 0, sizeof(*r));
@@ -1394,18 +1391,16 @@ master_id_set(
  */
 static int
 master_uri_get(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, URI_SOURCE *us, const char *uri, char *val)
+    WT_SESSION *session, const char *uri, kvs_t kvs, char *val)
 {
 	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
 	char key[KVS_MAX_KEY_LEN];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	kvs = us->ks->kvs;
 
 	r = &_r;
 	memset(r, 0, sizeof(*r));
@@ -1427,23 +1422,21 @@ master_uri_get(WT_DATA_SOURCE *wtds,
  */
 static int
 master_uri_set(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, URI_SOURCE *us, const char *uri, WT_CONFIG_ARG *config)
+    WT_SESSION *session, const char *uri, kvs_t kvs, WT_CONFIG_ARG *config)
 {
 	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_CONFIG_ITEM a, b;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	uint64_t maxid;
 	int ret = 0;
 	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	kvs = us->ks->kvs;
 
 	/* Get the maximum file ID. */
-	if ((ret = master_id_get(wtds, session, us, &maxid)) != 0)
+	if ((ret = master_id_get(wtds, session, kvs, &maxid)) != 0)
 		return (ret);
 	++maxid;
 
@@ -1476,7 +1469,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 	++r->val_len;				/* Include the trailing nul. */
 	switch (ret = kvs_add(kvs, r)) {
 	case 0:
-		if ((ret = master_id_set(wtds, session, us, maxid)) != 0)
+		if ((ret = master_id_set(wtds, session, kvs, maxid)) != 0)
 			return (ret);
 		if ((ret = kvs_commit(kvs)) != 0)
 			ERET(wtext, session,
@@ -1502,17 +1495,19 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 	DATA_SOURCE *ds;
 	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
+	kvs_t kvs;
 	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
 	/* Get a locked reference to the URI. */
-	if ((ret = uri_source_open(wtds, session, config, uri, &us)) != 0)
+	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
 		return (ret);
+	kvs = us->ks->kvs;
 
 	/* Create the URI master record if it doesn't already exist. */
-	ret = master_uri_set(wtds, session, us, uri, config);
+	ret = master_uri_set(wtds, session, uri, kvs, config);
 
 	/* Unlock the URI. */
 err:	ETRET(unlock(wtext, session, &us->lock));
@@ -1537,13 +1532,14 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	wtext = ds->wtext;
 
 	/* Get a locked reference to the data source. */
-	if ((ret = uri_source_open(wtds, session, config, uri, &us)) != 0)
+	if ((ret = uri_source_open(wtds, session, config, uri, 1, &us)) != 0)
 		return (ret);
 
 	/* If there are active references to the object, we're busy. */
 	if (us->ref != 0) {
 		ret = EBUSY;
 		ETRET(unlock(wtext, session, &us->lock));
+		ETRET(unlock(wtext, session, &ds->global_lock));
 		return (ret);
 	}
 
@@ -1564,6 +1560,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	WT_CONFIG_ITEM v;
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
+	kvs_t kvs;
 	size_t size;
 	int ret = 0;
 	const char *cfg[2];
@@ -1613,8 +1610,9 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	cursor->config_overwrite = v.val != 0;
 
 	/* Get a locked reference to the URI. */
-	if ((ret = uri_source_open(wtds, session, config, uri, &us)) != 0)
+	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
 		goto err;
+	kvs = us->ks->kvs;
 
 	/*
 	 * Finish initializing the cursor (if the URI_SOURCE structure requires
@@ -1630,7 +1628,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if (!us->configured) {
 		us->configured = 1;
 
-		master_uri_get(wtds, session, us, uri, val);
+		master_uri_get(wtds, session, uri, kvs, val);
 		cfg[0] = val;
 		cfg[1] = NULL;
 		if ((ret = wtext->config_get(wtext,
@@ -1721,17 +1719,86 @@ static int
 kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, const char *newname, WT_CONFIG_ARG *config)
 {
+	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
+	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
-
-	(void)uri;
-	(void)newname;
-	(void)config;
+	kvs_t kvs;
+	int ret = 0;
+	char *copy, key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	ERET(wtext, session, ENOTSUP, "rename: %s", strerror(ENOTSUP));
+	/* Get a copy of the new name. */
+	if ((copy = strdup(newname)) == NULL)
+		return (os_errno());
+
+	/* Get a locked reference to the URI. */
+	if ((ret = uri_source_open(wtds, session, config, uri, 1, &us)) != 0)
+		return (ret);
+	kvs = us->ks->kvs;
+
+	/* If there are active references to the object, we're busy. */
+	if (us->ref != 0) {
+		ret = EBUSY;
+		goto err;
+	}
+
+	/* Get the master record for the original name. */
+	if ((ret = master_uri_get(wtds, session, uri, kvs, val)) != 0)
+		goto err;
+
+	/*
+	 * Create a new reference to the newname, using kvs_add (which fails
+	 * if the record already exists).
+	 */
+	r = &_r;
+	memset(r, 0, sizeof(*r));
+	r->key = key;
+	if ((ret = master_key_set(wtds, session, newname, r)) != 0)
+		goto err;
+	r->val = val;
+	r->val_len = strlen(val) + 1;		/* Include the trailing nul. */
+	switch (ret = kvs_add(kvs, r)) {
+	case 0:
+		/* Remove the original entry. */
+		memset(r, 0, sizeof(*r));
+		r->key = key;
+		if ((ret = master_key_set(wtds, session, uri, r)) != 0 ||
+		    (ret = kvs_del(kvs, r)) != 0) {
+			ESET(wtext, session, WT_ERROR,
+			    "kvs_del: %s: %s", uri, kvs_strerror(ret));
+
+			/*
+			 * Try and remove the new entry if we can't remove the
+			 * old entry.
+			 */
+			if ((ret =
+			    master_key_set(wtds, session, newname, r)) == 0 &&
+			    (ret = kvs_del(kvs, r)) != 0)
+				ESET(wtext, session, WT_ERROR,
+				    "kvs_del: %s: %s",
+				    newname, kvs_strerror(ret));
+			goto err;
+		}
+
+		/* Flush the change. */
+		if ((ret = kvs_commit(kvs)) != 0)
+			ESET(wtext, session,
+			    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
+		break;
+	case KVS_E_KEY_EXISTS:
+		ESET(wtext, session, EEXIST, "%s", newname);
+		break;
+	default:
+		ESET(wtext, session,
+		    WT_ERROR, "kvs_add: %s", newname, kvs_strerror(ret));
+	}
+
+err:	ETRET(unlock(wtext, session, &us->lock));
+	ETRET(unlock(wtext, session, &ds->global_lock));
+	return (ret);
 }
 
 /*
@@ -1756,7 +1823,7 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 	wtext = ds->wtext;
 
 	/* Get a locked reference to the URI. */
-	if ((ret = uri_source_open(wtds, session, config, uri, &us)) != 0)
+	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
 		return (ret);
 	kvs = us->ks->kvs;
 
