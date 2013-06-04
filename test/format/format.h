@@ -160,6 +160,14 @@ typedef struct {
 
 	uint32_t key_cnt;			/* Keys loaded so far */
 	uint32_t rows;				/* Total rows */
+
+	/*
+	 * We don't want to get to far past the end of the original bulk
+	 * load, we can run out of space to track the added records.
+	 */
+#define	MAX_EXTEND	(g.c_threads * 3)
+	uint32_t extend;			/* Total extended slots */
+
 	uint16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;

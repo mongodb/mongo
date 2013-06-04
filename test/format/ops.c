@@ -279,7 +279,8 @@ ops(void *arg)
 				col_remove(cursor, &key, keyno, &notfound);
 				break;
 			}
-		} else if (op < g.c_delete_pct + g.c_insert_pct) {
+		} else if (g.extend < MAX_EXTEND &&
+		    op < g.c_delete_pct + g.c_insert_pct) {
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
@@ -687,22 +688,22 @@ table_extend(uint64_t keyno)
 	 * scheduler pauses a particular thread and other threads race allocate
 	 * multiple new records while it's sleeping.  Give ourselves some room.
 	 */
-	if (n < g.c_threads * 5) {
+	if (n < MAX_EXTEND) {
 		free(slots);
-		n = g.c_threads * 5;
+		n = MAX_EXTEND;
 		if ((slots = calloc(n, sizeof(uint64_t))) == NULL)
 			die(errno, "calloc");
 		ep = slots + n;
 	}
 
 	/* Enter the new key into the list. */
-	for (p = slots; p < ep; ++p)
+	for (p = slots; p < ep; ++p) {
 		if (*p == 0) {
 			*p = keyno;
 			break;
 		}
-	if (p == ep)
-		die(ENOMEM, "table extend new row array overflow");
+		++g.extend;
+	}
 
 	/* Process the table until we don't find the "next" value. */
 	for (;;) {
@@ -710,6 +711,7 @@ table_extend(uint64_t keyno)
 			if (*p == g.rows + 1) {
 				g.rows = *p;
 				*p = 0;
+				--g.extend;
 				break;
 			}
 		if (p == ep)
