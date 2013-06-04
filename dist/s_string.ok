@@ -129,11 +129,13 @@ Llqrt
 LoadLoad
 Lookup
 MALLOC
+MAXID
 MBUF
 MEM
 MERCHANTABILITY
 MVCC
 Marsaglia's
+Memrata
 Metadata
 Mewhort
 Multi
@@ -524,6 +526,7 @@ lzo
 madvise
 majorp
 malloc
+maxid
 maxintlitem
 maxintlpage
 maxleafitem
@@ -588,6 +591,7 @@ nthread
 nul
 numSymbols
 numbare
+oc
 offpage
 ok
 oldname
@@ -769,6 +773,7 @@ txn
 txnid
 typedef
 uB
+uid
 uint
 unbare
 uncompressing

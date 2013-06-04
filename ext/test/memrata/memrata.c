@@ -104,7 +104,7 @@ typedef struct __uri_source {
 	 * Each object has a unique leading byte prefix, which is the object's
 	 * ID turned into a packed string (any 8B unsigned value will pack
 	 * into a maximum of 9 bytes.)  We create a packed copy of the object's
-	 * ID and a packed copy of the ID one greateer than the object's ID,
+	 * ID and a packed copy of the ID one greater than the object's ID,
 	 * the latter is what we use for a "previous" cursor traversal.
 	 */
 #define	KVS_MAX_PACKED_8B	10
