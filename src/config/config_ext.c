@@ -42,7 +42,8 @@ __wt_ext_config_strget(WT_EXTENSION_API *wt_api,
 {
 	const char *cfg_arg[] = { config, NULL };
 
-	return (__wt_ext_config_get(wt_api, wt_session, cfg_arg, key, cval));
+	return (__wt_ext_config_get(
+	    wt_api, wt_session, (WT_CONFIG_ARG *)cfg_arg, key, cval));
 }
 
 /*
