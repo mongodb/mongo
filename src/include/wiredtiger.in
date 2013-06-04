@@ -832,8 +832,7 @@ struct __wt_session {
 	 * method is called.
 	 *
 	 * @param session the session handle
-	 * @param session the session handle
-	 * @configempty{session.log_printf, see dist/api_data.py}
+	 * @param fmt a printf format specifier
 	 * @errors
 	 */
 	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);

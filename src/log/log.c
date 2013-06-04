@@ -247,7 +247,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	}
 	log->write_lsn = slot->slot_end_lsn;
 	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
-		WT_RET(__wt_close(session, log->log_close_fh));
+		WT_ERR(__wt_close(session, log->log_close_fh));
 		log->log_close_fh = NULL;
 		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
 #if 1
@@ -260,8 +260,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 #endif
 	}
 
-err:
-	if (ret != 0 && slot->slot_error == 0)
+err:	if (ret != 0 && slot->slot_error == 0)
 		slot->slot_error = ret;
 	return (ret);
 }
@@ -603,7 +602,8 @@ err:
 
 #if 1
 static void
-__scan_call(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, void *cookie)
+__scan_call(
+    WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, void *cookie)
 {
 	WT_LOG_RECORD *logrec;
 
