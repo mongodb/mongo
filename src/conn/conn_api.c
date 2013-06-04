@@ -735,7 +735,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
 		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
-		    WT_SINGLETHREAD, wiredtiger_version(NULL, NULL, NULL));
+		    WT_SINGLETHREAD, WIREDTIGER_VERSION_STRING);
 		WT_ERR(__wt_write(
 		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
 		created = 1;
@@ -998,6 +998,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
+	/* Now that we know if verbose is configured, output the version. */
+	WT_VERBOSE_ERR(session, version, "%s", WIREDTIGER_VERSION_STRING);
+
 	/* Open the connection. */
 	WT_ERR(__wt_connection_open(conn, cfg));
 
@@ -1015,8 +1018,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
-
-	WT_VERBOSE_ERR(session, version, WIREDTIGER_VERSION_STRING);
 
 	/*
 	 * Destroying the connection on error will destroy our session handle,
