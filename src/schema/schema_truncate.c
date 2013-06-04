@@ -112,7 +112,7 @@ __wt_schema_truncate(
 		ret = dsrc->truncate == NULL ?
 		    __truncate_dsrc(session, uri) :
 		    dsrc->truncate(
-			dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
+		    dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
 	else
 		ret = __wt_bad_object_type(session, uri);
 
