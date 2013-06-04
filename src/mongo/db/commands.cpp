@@ -140,7 +140,7 @@ namespace mongo {
         ss << "</tr>\n";
     }
 
-    Command::Command(const char *_name, bool web, const char *oldName) : name(_name) {
+    Command::Command(StringData _name, bool web, StringData oldName) : name(_name.toString()) {
         // register ourself.
         if ( _commands == 0 )
             _commands = new map<string,Command*>;
@@ -158,8 +158,8 @@ namespace mongo {
             (*_webCommands)[name] = this;
         }
 
-        if( oldName )
-            (*_commands)[oldName] = this;
+        if( !oldName.empty() )
+            (*_commands)[oldName.toString()] = this;
     }
 
     void Command::help( stringstream& help ) const {

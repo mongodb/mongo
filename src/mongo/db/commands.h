@@ -129,7 +129,7 @@ namespace mongo {
         /** @param webUI expose the command in the web ui as localhost:28017/<name>
             @param oldName an optional old, deprecated name for the command
         */
-        Command(const char *_name, bool webUI = false, const char *oldName = 0);
+        Command(StringData _name, bool webUI = false, StringData oldName = StringData());
 
         virtual ~Command() {}
 
