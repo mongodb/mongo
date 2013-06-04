@@ -69,9 +69,6 @@ __log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
 	    (const char *)path->data);
 	WT_ERR(__wt_open(
 	    session, path->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
-	/*
-	 * Need to store new fileid in metadata.
-	 */
 err:	__wt_scr_free(&path);
 	return (ret);
 }
@@ -107,7 +104,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		__wt_free(session, logfiles[i]);
 	}
 	log->fileid = lastlog;
-	WT_VERBOSE_ERR(session, log, "log_open: firstlog %d lastlog %d",
+	WT_VERBOSE_ERR(session, log, "log_open: first log %d last log %d",
 	    firstlog, lastlog);
 	if (lastlog == 0)
 		WT_ERR(__wt_log_newfile(session, 1));
@@ -162,9 +159,9 @@ __log_fill(WT_SESSION_IMPL *session,
 
 	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
-	 * Call __wt_write.  Note, myslot->offset might be a unit of
-	 * LOG_ALIGN.  May need to multiply by LOG_ALIGN here if it is to get
-	 * real file offset for write().  For now just use it as is.
+	 * Call __wt_write.  For now the offset is the real byte offset.
+	 * If the offset becomes a unit of LOG_ALIGN this is where we would
+	 * multiply by LOG_ALIGN to get the real file byte offset for write().
 	 */
 	WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 	    myslot->offset + myslot->slot->slot_start_offset,
@@ -205,18 +202,21 @@ __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
 	log = conn->log;
 	/*
 	 * Called locked.  Add recsize to alloc_lsn.  Save our starting LSN
-	 * as where the previous allocation finished.  That way when log files
-	 * switch, we're waiting for the correct LSN from outstanding writes.
+	 * where the previous allocation finished for the release LSN.
+	 * That way when log files switch, we're waiting for the correct LSN
+	 * from outstanding writes.
 	 */
-	slot->slot_start_lsn = log->alloc_lsn;
+	slot->slot_release_lsn = log->alloc_lsn;
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
 		WT_RET(__wt_log_newfile(session, 0));
 		if (log->log_close_fh != NULL)
 			FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
 	}
 	/*
-	 * Need to minimally fill in slot info here.
+	 * Need to minimally fill in slot info here.  Our slot start LSN
+	 * comes after any potential new log file creations.
 	 */
+	slot->slot_start_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.offset;
 	log->alloc_lsn.offset += recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
@@ -237,7 +237,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	/*
 	 * Wait for earlier groups to finish.  Slot_lsn is my beginning LSN.
 	 */
-	while (LOG_CMP(&log->write_lsn, &slot->slot_start_lsn) != 0)
+	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
 	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
 		WT_CSTAT_INCR(session, log_sync);
@@ -253,8 +253,11 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 #if 1
 		/*
 		 * Update ckpt_lsn for archive testing purposes only.
+		 * Set it back an extra log file so that racing read ops
+		 * don't fail.
 		 */
-		log->ckpt_lsn = log->write_lsn;
+		if (log->write_lsn.file > 2)
+			log->ckpt_lsn.file = log->write_lsn.file - 1;
 		if (conn->arch_cond != NULL)
 			WT_ERR(__wt_cond_signal(session, conn->arch_cond));
 #endif
@@ -651,7 +654,7 @@ WT_CLEAR(rdbuf);
 	(void)vsnprintf((char *)&logrec->record, len, fmt, ap);
 
 	WT_VERBOSE_RET(session, log,
-	    "log_printf: %s\n", (char *)&logrec->record);
+	    "log_printf: %s", (char *)&logrec->record);
 #if 0
 	return (__wt_log_write(session, buf, NULL, 0));
 #else

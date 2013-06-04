@@ -12,8 +12,10 @@ APIs
 ARG
 ARGS
 Addr
+Ailamaki
 Alakuijala
 Alloc
+Athanassoulis
 Athlon
 BBBBB
 BBBBBB
@@ -59,6 +61,7 @@ CustomersPhone
 DATAITEMs
 DESC
 DHANDLE
+DOI
 DSRC
 DUPLICATEV
 DbCursor
@@ -107,6 +110,7 @@ INITIALIZER
 INSERT's
 INUSE
 ISSET
+Ippokratis
 JPEG
 JSON
 Jyrki
@@ -133,6 +137,7 @@ MBUF
 MEM
 MERCHANTABILITY
 MVCC
+Manos
 Marsaglia's
 Metadata
 Mewhort
@@ -161,6 +166,7 @@ POSIX
 PSIZE
 PTR
 Pagesize
+Pandis
 Phong
 PlatformSDK
 Pre
@@ -175,6 +181,7 @@ RLE
 RNG
 RPC
 RUNDIR
+Radu
 Recurse
 Redistributions
 Resize
@@ -189,11 +196,13 @@ SSq
 STAILQ
 STRUCT
 SYS
+Scalability
 Sevii
 SiH
 Skiplist
 Solaris
 Split's
+Stoica
 StoreLoad
 Strsep
 Subtree
@@ -215,6 +224,7 @@ UTF
 UnixLib
 Unmap
 VARCHAR
+VLDB
 Vanishingly
 Vc
 Vixie
@@ -365,6 +375,7 @@ desc
 dest
 dev
 dhandle
+dirlist
 dlclose
 dlh
 dll
@@ -552,7 +563,9 @@ mnt
 msg
 msgv
 mtx
+multicore
 multiprocess
+multisocket
 multithread
 multithreaded
 munmap

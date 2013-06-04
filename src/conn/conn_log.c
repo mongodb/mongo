@@ -165,9 +165,6 @@ __wt_logger_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		log->allocsize = LOG_ALIGN_DIRECTIO;
 	else
 		log->allocsize = LOG_ALIGN;
-	/*
-	 * Initialize fileid to 0 so that newfile moves to log file 1.
-	 */
 	INIT_LSN(&log->alloc_lsn);
 	INIT_LSN(&log->ckpt_lsn);
 	INIT_LSN(&log->first_lsn);

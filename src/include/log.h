@@ -82,6 +82,9 @@ typedef struct {
 #undef	slot_start_offset
 #define	slot_start_offset	u.slot.start_offset
 			off_t	 start_offset;	/* Starting file offset */
+#undef	slot_release_lsn
+#define	slot_release_lsn	u.slot.release_lsn
+			WT_LSN	release_lsn;	/* Slot release LSN */
 #undef	slot_start_lsn
 #define	slot_start_lsn		u.slot.start_lsn
 			WT_LSN	start_lsn;	/* Slot starting LSN */
