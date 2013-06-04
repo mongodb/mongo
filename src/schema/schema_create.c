@@ -492,22 +492,11 @@ err:		if (table != NULL) {
 
 static int
 __create_data_source(WT_SESSION_IMPL *session,
-    const char *uri, int exclusive, const char *config, WT_DATA_SOURCE *dsrc)
+    const char *uri, const char *config, WT_DATA_SOURCE *dsrc)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
-	const char *cfg[4], *fileconf;
-
-	fileconf = NULL;
-
-	/* Check if the data-source already exists. */
-	if ((ret =
-	    __wt_metadata_read(session, uri, &fileconf)) != WT_NOTFOUND) {
-		__wt_free(session, fileconf);
-		if (exclusive)
-			WT_TRET(EEXIST);
-		return (ret);
-	}
+	const char *cfg[] = {
+	    WT_CONFIG_BASE(session, session_create), config, NULL };
 
 	/*
 	 * User-specified collators aren't supported for data-source objects.
@@ -518,34 +507,7 @@ __create_data_source(WT_SESSION_IMPL *session,
 		    "WT_DATA_SOURCE objects do not support WT_COLLATOR "
 		    "ordering");
 
-	/*
-	 * Set a default key/value format, and insert the configuration into
-	 * the metadata.
-	 *
-	 * XXX
-	 * Use the session_create information, even though it includes a ton of
-	 * things we don't care about (like checksum configuration).  We should
-	 * be stripping that information out.
-	 */
-	cfg[0] = WT_CONFIG_BASE(session, session_create);
-	cfg[1] = "key_format=u,value_format=u";
-	cfg[2] = config;
-	cfg[3] = NULL;
-	WT_RET(__wt_config_collapse(session, cfg, &fileconf));
-	if ((ret = __wt_metadata_insert(session, uri, fileconf)) == 0) {
-		cfg[0] = fileconf;
-		cfg[1] = NULL;
-		WT_ERR(dsrc->create(
-		    dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg));
-	} else if (ret == WT_DUPLICATE_KEY)
-		ret = EEXIST;
-
-	if (0) {
-err:		WT_TRET(__wt_metadata_remove(session, uri));
-	}
-
-	__wt_free(session, fileconf);
-	return (ret);
+	return (dsrc->create(dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg));
 }
 
 int
@@ -580,7 +542,7 @@ __wt_schema_create(
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->create == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    __create_data_source(session, uri, exclusive, config, dsrc);
+		    __create_data_source(session, uri, config, dsrc);
 	else
 		ret = __wt_bad_object_type(session, uri);
 

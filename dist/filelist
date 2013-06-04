@@ -79,9 +79,9 @@ src/lsm/lsm_meta.c
 src/lsm/lsm_stat.c
 src/lsm/lsm_tree.c
 src/lsm/lsm_worker.c
-src/meta/meta_api.c
 src/meta/meta_apply.c
 src/meta/meta_ckpt.c
+src/meta/meta_ext.c
 src/meta/meta_table.c
 src/meta/meta_track.c
 src/meta/meta_turtle.c

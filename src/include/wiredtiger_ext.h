@@ -194,6 +194,53 @@ struct __wt_extension_api {
 	    WT_CONFIG_SCAN *scan, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 
 	/*!
+	 * Insert a row into the metadata.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @param value row value
+	 * @errors
+	 */
+	int (*metadata_insert)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *key, const char *value);
+
+	/*!
+	 * Read a row from the metadata.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @param [out] valuep the row value
+	 * @errors
+	 */
+	int (*metadata_read)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *key, const char **valuep);
+
+	/*!
+	 * Remove a row in the metadata.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @errors
+	 */
+	int (*metadata_remove)(
+	    WT_EXTENSION_API *wt_api, WT_SESSION *session, const char *key);
+
+	/*!
+	 * Update a row in the metadata.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @param value row value
+	 * @errors
+	 */
+	int (*metadata_update)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *key, const char *value);
+
+	/*!
 	 * Pack a structure into a buffer.
 	 * See ::wiredtiger_struct_pack for details.
 	 *
