@@ -34,12 +34,17 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 		else if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
 		ret = __wt_session_get_btree(session, uri, NULL, NULL, 0);
-		if (ret == EBUSY)
+		if (ret == 0) {
+			ret = func(session, cfg);
+			if (WT_META_TRACKING(session))
+				WT_TRET(
+				    __wt_meta_track_handle_lock(session, 0));
+			else
+				WT_TRET(__wt_session_release_btree(session));
+		} else if (ret == EBUSY) {
+			ret = 0;
 			WT_ERR(__wt_conn_btree_apply_single(
 			    session, uri, func, cfg));
-		else {
-			ret = func(session, cfg);
-			WT_TRET(__wt_session_release_btree(session));
 		}
 		WT_ERR(ret);
 	}

@@ -390,13 +390,27 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 		    WT_PREFIX_MATCH(dhandle->name, "file:") &&
 		    !WT_IS_METADATA(dhandle)) {
 			/*
-			 * We have the schema lock, which prevents handles being
-			 * opened or closed, so there is no need for additional
-			 * handle locking here, or pulling every tree into this
-			 * session's handle cache.
+			 * We need to pull the handle into the session handle
+			 * cache and make sure it's referenced to stop other
+			 * internal code dropping the handle (e.g in LSM when
+			 * cleaning up obsolete chunks). Holding the metadata
+			 * lock isn't enough.
 			 */
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = func(session, cfg));
+			ret = __wt_session_get_btree(
+			    session, dhandle->name, NULL, NULL, 0);
+			if (ret == 0) {
+				ret = func(session, cfg);
+				if (WT_META_TRACKING(session))
+					WT_TRET(__wt_meta_track_handle_lock(
+					    session, 0));
+				else
+					WT_TRET(__wt_session_release_btree(
+					    session));
+			} else if (ret == EBUSY) {
+				ret = 0;
+				WT_RET(__wt_conn_btree_apply_single(
+				    session, dhandle->name, func, cfg));
+			}
 			WT_RET(ret);
 		}
 
