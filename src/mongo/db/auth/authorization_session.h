@@ -44,6 +44,12 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(AuthorizationSession);
     public:
 
+        // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
+        // "system.users" collection of database "dbname".
+        //
+        // Returns Status::OK() if the document is good, or Status(ErrorCodes::BadValue), otherwise.
+        static Status checkValidPrivilegeDocument(const StringData& dbname, const BSONObj& doc);
+
         // Takes ownership of the externalState.
         explicit AuthorizationSession(AuthzSessionExternalState* externalState);
         ~AuthorizationSession();
@@ -123,6 +129,17 @@ namespace mongo {
         // Checks if this connection is authorized for all the given Privileges.
         Status checkAuthForPrivileges(const vector<Privilege>& privileges);
 
+        // Given a database name and a readOnly flag return an ActionSet describing all the actions
+        // that an old-style user with those attributes should be given.
+        static ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly);
+
+        // Parses the privilege document and returns a PrivilegeSet of all the Privileges that
+        // the privilege document grants.
+        static Status buildPrivilegeSet(const std::string& dbname,
+                                        const UserName& user,
+                                        const BSONObj& privilegeDocument,
+                                        PrivilegeSet* result);
+
     private:
         // Finds the set of privileges attributed to "principal" in database "dbname",
         // and adds them to the set of acquired privileges.
@@ -132,6 +149,25 @@ namespace mongo {
         // Checks to see if the given privilege is allowed, performing implicit privilege
         // acquisition if enabled and necessary to resolve the privilege.
         Status _probeForPrivilege(const Privilege& privilege);
+
+        // Parses the old-style (pre 2.4) privilege document and returns a PrivilegeSet of all the
+        // Privileges that the privilege document grants.
+        static Status _buildPrivilegeSetFromOldStylePrivilegeDocument(
+                const std::string& dbname,
+                const UserName& user,
+                const BSONObj& privilegeDocument,
+                PrivilegeSet* result);
+
+        // Parses extended-form (2.4+) privilege documents and returns a PrivilegeSet of all the
+        // privileges that the document grants.
+        //
+        // The document, "privilegeDocument", is assumed to describe privileges for "principal", and
+        // to come from database "dbname".
+        static Status _buildPrivilegeSetFromExtendedPrivilegeDocument(
+                const std::string& dbname,
+                const UserName& user,
+                const BSONObj& privilegeDocument,
+                PrivilegeSet* result);
 
         // Returns a new privilege that has replaced the actions needed to handle special casing
         // certain namespaces like system.users and system.profile.
