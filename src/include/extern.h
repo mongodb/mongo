@@ -526,6 +526,11 @@ extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api,
     WT_CONFIG_ARG *cfg_arg,
     const char *key,
     WT_CONFIG_ITEM *cval);
+extern int __wt_ext_config_strget(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *config,
+    const char *key,
+    WT_CONFIG_ITEM *cval);
 extern int __wt_ext_config_scan_begin( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     const char *str,

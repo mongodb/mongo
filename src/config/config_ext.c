@@ -10,7 +10,7 @@
 /*
  * __wt_ext_config_get --
  *	Given a NULL-terminated list of configuration strings, find the final
- *	value for a given string key (external API version).
+ * value for a given string key (external API version).
  */
 int
 __wt_ext_config_get(WT_EXTENSION_API *wt_api,
@@ -28,6 +28,21 @@ __wt_ext_config_get(WT_EXTENSION_API *wt_api,
 	if ((cfg = (const char **)cfg_arg) == NULL)
 		return (WT_NOTFOUND);
 	return (__wt_config_gets(session, cfg, key, cval));
+}
+
+/*
+ * __wt_ext_config_strget --
+ *	Given a single configuration string, find the final value for a given
+ * string key (external API version).
+ */
+int
+__wt_ext_config_strget(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, const char *config, const char *key,
+    WT_CONFIG_ITEM *cval)
+{
+	const char *cfg_arg[] = { config, NULL };
+
+	return (__wt_ext_config_get(wt_api, wt_session, cfg_arg, key, cval));
 }
 
 /*

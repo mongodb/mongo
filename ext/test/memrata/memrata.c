@@ -1662,7 +1662,6 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	WT_EXTENSION_API *wtext;
 	kvs_t kvs;
 	int ret = 0;
-	const char *cfg[2];
 	char val[KVS_MASTER_VALUE_MAX];
 
 	*new_cursor = NULL;
@@ -1729,10 +1728,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 		if ((ret = master_uri_get(wtds, session, uri, kvs, val)) != 0)
 			goto err;
-		cfg[0] = val;
-		cfg[1] = NULL;
-		if ((ret = wtext->config_get(wtext,
-		    session, (WT_CONFIG_ARG *)cfg, "uid", &v)) != 0) {
+		if ((ret = wtext->config_strget(
+		    wtext, session, val, "uid", &v)) != 0) {
 			ESET(wtext, session, ret,
 			    "WT_EXTENSION_API.config: uid: %s",
 			    wtext->strerror(ret));
@@ -1757,8 +1754,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 			goto err;
 		}
 
-		if ((ret = wtext->config_get(wtext,
-		    session, (WT_CONFIG_ARG *)cfg, "key_format", &v)) != 0) {
+		if ((ret = wtext->config_strget(
+		    wtext, session, val, "key_format", &v)) != 0) {
 			ESET(wtext, session, ret,
 			    "key_format configuration: %s",
 			    wtext->strerror(ret));
@@ -1766,8 +1763,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		}
 		us->config_recno = v.len == 1 && v.str[0] == 'r';
 
-		if ((ret = wtext->config_get(wtext,
-		    session, (WT_CONFIG_ARG *)cfg, "value_format", &v)) != 0) {
+		if ((ret = wtext->config_strget(
+		    wtext, session, val, "value_format", &v)) != 0) {
 			ESET(wtext, session, ret,
 			    "value_format configuration: %s",
 			    wtext->strerror(ret));

@@ -122,7 +122,6 @@ struct __wt_extension_api {
 	 * @param session the session handle (or NULL if none available)
 	 * @param key configuration key string
 	 * @param config the configuration information passed to an application
-	 * callback
 	 * @param value the returned value
 	 * @errors
 	 *
@@ -130,6 +129,21 @@ struct __wt_extension_api {
 	 */
 	int (*config_get)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
 	    WT_CONFIG_ARG *config, const char *key, WT_CONFIG_ITEM *value);
+
+	/*!
+	 * Return the value of a configuration string.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key configuration key string
+	 * @param config a configuration string
+	 * @param value the returned value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION config_get
+	 */
+	int (*config_strget)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    const char *config, const char *key, WT_CONFIG_ITEM *value);
 
 	/*!
 	 * Return the list entries of a configuration string value.

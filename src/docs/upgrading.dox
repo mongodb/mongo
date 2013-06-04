@@ -1,5 +1,17 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_162 Upgrading to Version 1.6.2
+<dl>
+
+<dt>Table of WiredTiger extension methods</dt>
+<dd>
+In the 1.6.2 release, new entries were added to the list of WiredTiger
+extension methods; applications using the extension methods will require
+recompilation.
+</dd>
+
+</dl>
+<hr>
 @section version_161 Upgrading to Version 1.6.1
 <dl>
 
