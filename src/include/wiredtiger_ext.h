@@ -140,7 +140,7 @@ struct __wt_extension_api {
 	 * @param value the returned value
 	 * @errors
 	 *
-	 * @snippet ex_data_source.c WT_EXTENSION config_get
+	 * @snippet ex_data_source.c WT_EXTENSION config_strget
 	 */
 	int (*config_strget)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
 	    const char *config, const char *key, WT_CONFIG_ITEM *value);
@@ -194,13 +194,15 @@ struct __wt_extension_api {
 	    WT_CONFIG_SCAN *scan, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 
 	/*!
-	 * Insert a row into the metadata.
+	 * Insert a row into the metadata if it does not already exist.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
 	 * @param key row key
 	 * @param value row value
 	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata insert
 	 */
 	int (*metadata_insert)(WT_EXTENSION_API *wt_api,
 	    WT_SESSION *session, const char *key, const char *value);
@@ -212,6 +214,8 @@ struct __wt_extension_api {
 	 * @param session the session handle (or NULL if none available)
 	 * @param key row key
 	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata remove
 	 */
 	int (*metadata_remove)(
 	    WT_EXTENSION_API *wt_api, WT_SESSION *session, const char *key);
@@ -224,18 +228,23 @@ struct __wt_extension_api {
 	 * @param key row key
 	 * @param [out] valuep the row value
 	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata search
 	 */
 	int (*metadata_search)(WT_EXTENSION_API *wt_api,
 	    WT_SESSION *session, const char *key, const char **valuep);
 
 	/*!
-	 * Update a row in the metadata.
+	 * Update a row in the metadata by either inserting a new record or
+	 * updating an existing record.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
 	 * @param key row key
 	 * @param value row value
 	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata update
 	 */
 	int (*metadata_update)(WT_EXTENSION_API *wt_api,
 	    WT_SESSION *session, const char *key, const char *value);

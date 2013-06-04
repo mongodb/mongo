@@ -350,6 +350,7 @@ cxa
 data's
 datalen
 datasets
+datasource
 dbc
 decl
 decr
@@ -796,6 +797,7 @@ untyped
 upd
 upg
 uri
+uri's
 usedp
 usr
 utf
