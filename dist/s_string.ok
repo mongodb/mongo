@@ -700,6 +700,7 @@ strcmp
 strdup
 strerror
 strftime
+strget
 stringin
 strncpy
 strndup
@@ -801,6 +802,7 @@ utf
 util
 uu
 va
+valuep
 vanishingly
 vcell
 verrx
