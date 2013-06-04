@@ -1041,7 +1041,7 @@ namespace mongo {
     {}
 
     intrusive_ptr<Expression> ExpressionObject::optimize() {
-        for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
+        for (FieldMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second)
                 it->second = it->second->optimize();
         }
@@ -1050,7 +1050,7 @@ namespace mongo {
     }
 
     bool ExpressionObject::isSimple() {
-        for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
+        for (FieldMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second && !it->second->isSimple())
                 return false;
         }
@@ -1076,7 +1076,7 @@ namespace mongo {
         }
         
 
-        for (ExpressionMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
+        for (FieldMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second) {
                 if (path) path->push_back(it->first);
                 it->second->addDependencies(deps, path);
@@ -1097,7 +1097,7 @@ namespace mongo {
         const Variables& vars
         ) const
     {
-        ExpressionMap::const_iterator end = _expressions.end();
+        FieldMap::const_iterator end = _expressions.end();
 
         // This is used to mark fields we've done so that we can add the ones we haven't
         set<string> doneFields;
@@ -1108,7 +1108,7 @@ namespace mongo {
 
             // TODO don't make a new string here
             const string fieldName = field.first.toString();
-            ExpressionMap::const_iterator exprIter = _expressions.find(fieldName);
+            FieldMap::const_iterator exprIter = _expressions.find(fieldName);
 
             // This field is not supposed to be in the output (unless it is _id)
             if (exprIter == end) {
@@ -1193,7 +1193,7 @@ namespace mongo {
 
         /* add any remaining fields we haven't already taken care of */
         for (vector<string>::const_iterator i(_order.begin()); i!=_order.end(); ++i) {
-            ExpressionMap::const_iterator it = _expressions.find(*i);
+            FieldMap::const_iterator it = _expressions.find(*i);
             string fieldName(it->first);
 
             /* if we've already dealt with this field, above, do nothing */

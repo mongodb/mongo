@@ -917,10 +917,10 @@ namespace mongo {
     private:
         ExpressionObject(bool atRoot);
 
-        // mapping from fieldname to Expression to generate the value
-        // NULL expression means include from source document
-        typedef map<string, intrusive_ptr<Expression> > ExpressionMap;
-        ExpressionMap _expressions;
+        // Mapping from fieldname to the Expression that generates its value.
+        // NULL expression means inclusion from source document.
+        typedef map<string, intrusive_ptr<Expression> > FieldMap;
+        FieldMap _expressions;
 
         // this is used to maintain order for generated fields not in the source document
         vector<string> _order;
