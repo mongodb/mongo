@@ -36,6 +36,19 @@
 #endif
 #endif
 
+// As above, but for NTDDI_VERSION. Otherwise, <windows.h> would set our NTDDI_VERSION based on
+// _WIN32_WINNT, but not select the service pack revision.
+#if !defined(NTDDI_VERSION)
+// Can't use symbolic versions here, since we may not have seen sdkddkver.h yet.
+#if defined(_WIN64)
+// 64-bit builds default to Windows Server 2003 SP 2 support.
+#define NTDDI_VERSION 0x05020200
+#else
+// 32-bit builds default to Windows XP SP 3 support.
+#define NTDDI_VERSION 0x05010300
+#endif
+#endif
+
 // No need to set WINVER, SdkDdkVer.h does that for us, we double check this below.
 
 // for rand_s() usage:
