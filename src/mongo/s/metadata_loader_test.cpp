@@ -133,7 +133,7 @@ namespace {
                                                                   NULL, /* no old manager */
                                                                   NULL  /* no need for errMsg */);
         ASSERT_TRUE(manager != NULL);
-        ASSERT_EQUALS(0U, manager->getMaxShardVersion().toLong());
+        ASSERT_EQUALS(0U, manager->getShardVersion().toLong());
     }
 
     class ConfigServerFixture : public mongo::unittest::Test {
@@ -229,7 +229,7 @@ namespace {
                                                                   NULL, /* no old manager */
                                                                   NULL  /* no need for errMsg */);
 
-        ASSERT_TRUE(getMaxCollVersion().isEquivalentTo(manager->getMaxCollVersion()));
+        ASSERT_TRUE(getMaxCollVersion().isEquivalentTo(manager->getCollVersion()));
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetMaxShardVersion) {
@@ -241,7 +241,7 @@ namespace {
                                                                   NULL, /* no old manager */
                                                                   NULL  /* no need for errMsg */);
 
-        ASSERT_TRUE(getMaxShardVersion().isEquivalentTo(manager->getMaxShardVersion()));
+        ASSERT_TRUE(getMaxShardVersion().isEquivalentTo(manager->getShardVersion()));
     }
 
     TEST_F(ConfigServerFixture, NoChunks) {
@@ -259,8 +259,8 @@ namespace {
         ASSERT_TRUE(manager != NULL);
 
         ChunkVersion versionZero(0, 0, OID());
-        ASSERT_EQUALS(versionZero.toLong(), manager->getMaxCollVersion().toLong());
-        ASSERT_EQUALS(versionZero.toLong(), manager->getMaxShardVersion().toLong());
+        ASSERT_EQUALS(versionZero.toLong(), manager->getCollVersion().toLong());
+        ASSERT_EQUALS(versionZero.toLong(), manager->getShardVersion().toLong());
         ASSERT_EQUALS(0U, manager->getNumChunks());
     }
 
@@ -354,11 +354,11 @@ namespace {
             MockConnRegistry::get()->removeServer(_dummyConfig->getServerAddress());
         }
 
-        ChunkVersion getMaxCollVersion() const {
+        ChunkVersion getCollVersion() const {
             return _maxCollVersion;
         }
 
-        const ChunkVersion& getMaxShardVersion(size_t shard) const {
+        const ChunkVersion& getShardVersion(size_t shard) const {
             return _maxCollVersion;
         }
 
@@ -464,11 +464,11 @@ namespace {
             MockConnRegistry::get()->removeServer(_dummyConfig->getServerAddress());
         }
 
-        ChunkVersion getMaxCollVersion() const {
+        ChunkVersion getCollVersion() const {
             return _maxCollVersion;
         }
 
-        const ChunkVersion& getMaxShardVersion(size_t shard) const {
+        const ChunkVersion& getShardVersion(size_t shard) const {
             return _maxShardVersion[shard];
         }
 

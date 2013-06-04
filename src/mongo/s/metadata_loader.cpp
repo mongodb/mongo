@@ -94,8 +94,8 @@ namespace mongo {
 
     CollectionManager* MetadataLoader::makeEmptyCollectionManager() {
         CollectionManager* manager = new CollectionManager;
-        manager->_maxCollVersion = ChunkVersion(1, 0, OID());
-        manager->_maxShardVersion = ChunkVersion(1, 0, OID());
+        manager->_collVersion = ChunkVersion(1, 0, OID());
+        manager->_shardVersion = ChunkVersion(1, 0, OID());
         dassert(manager->isValid());
         return manager;
     }
@@ -152,8 +152,8 @@ namespace mongo {
             }
 
             manager->_keyPattern = BSONObj();
-            manager->_maxShardVersion = ChunkVersion(1, 0, collDoc.getEpoch());
-            manager->_maxCollVersion = manager->_maxShardVersion;
+            manager->_shardVersion = ChunkVersion(1, 0, collDoc.getEpoch());
+            manager->_collVersion = manager->_shardVersion;
         }
         else {
             *errMsg = str::stream() << "collection " << ns << " does not have a shard key "
@@ -173,20 +173,20 @@ namespace mongo {
                                     string* errMsg) {
 
         map<string,ChunkVersion> versionMap;
-        manager->_maxCollVersion = ChunkVersion(0, 0, collDoc.getEpoch());
+        manager->_collVersion = ChunkVersion(0, 0, collDoc.getEpoch());
 
         // Check to see if we should use the old version or not.
         if (oldManager) {
 
-            ChunkVersion oldVersion = oldManager->getMaxShardVersion();
+            ChunkVersion oldVersion = oldManager->getShardVersion();
 
             if (oldVersion.isSet() && oldVersion.hasCompatibleEpoch(collDoc.getEpoch())) {
 
                 // Our epoch for coll version and shard version should be the same.
-                verify(oldManager->getMaxCollVersion().hasCompatibleEpoch(collDoc.getEpoch()));
+                verify(oldManager->getCollVersion().hasCompatibleEpoch(collDoc.getEpoch()));
 
-                versionMap[shard] = oldManager->_maxShardVersion;
-                manager->_maxCollVersion = oldManager->_maxCollVersion;
+                versionMap[shard] = oldManager->_shardVersion;
+                manager->_collVersion = oldManager->_collVersion;
 
                 // TODO: This could be made more efficient if copying not required, but
                 // not as frequently reloaded as in mongos.
@@ -194,7 +194,7 @@ namespace mongo {
 
                 LOG(2) << "loading new chunks for collection " << ns
                        << " using old chunk manager w/ version "
-                       << oldManager->getMaxShardVersion()
+                       << oldManager->getShardVersion()
                        << " and " << manager->_chunksMap.size() << " chunks" << endl;
             }
         }
@@ -202,7 +202,7 @@ namespace mongo {
         // Exposes the new 'manager's range map and version to the "differ," who
         // would ultimately be responsible of filling them up.
         SCMConfigDiffTracker differ(shard);
-        differ.attach(ns, manager->_chunksMap, manager->_maxCollVersion, versionMap);
+        differ.attach(ns, manager->_chunksMap, manager->_collVersion, versionMap);
 
         try {
 
@@ -213,7 +213,7 @@ namespace mongo {
 
             if (!cursor.get()) {
                 // 'errMsg' was filled by the getChunkCursor() call.
-                manager->_maxCollVersion = ChunkVersion();
+                manager->_collVersion = ChunkVersion();
                 manager->_chunksMap.clear();
                 conn.done();
                 return false;
@@ -225,9 +225,9 @@ namespace mongo {
 
                 LOG(2) << "loaded " << diffsApplied
                        << " chunks into new chunk manager for " << ns
-                       << " with version " << manager->_maxCollVersion << endl;
+                       << " with version " << manager->_collVersion << endl;
 
-                manager->_maxShardVersion = versionMap[shard];
+                manager->_shardVersion = versionMap[shard];
                 manager->fillRanges();
                 conn.done();
                 return true;
@@ -236,9 +236,9 @@ namespace mongo {
 
                 warning() << "no chunks found when reloading " << ns
                           << ", previous version was "
-                          << manager->_maxCollVersion.toString() << endl;
+                          << manager->_collVersion.toString() << endl;
 
-                manager->_maxCollVersion = ChunkVersion();
+                manager->_collVersion = ChunkVersion();
                 manager->_chunksMap.clear();
                 conn.done();
                 return true;
@@ -250,12 +250,12 @@ namespace mongo {
 
                 *errMsg = str::stream() << "invalid chunks found when reloading " << ns
                                         << ", previous version was "
-                                        << manager->_maxCollVersion.toString()
+                                        << manager->_collVersion.toString()
                                         << ", this should be rare";
 
                 warning() << errMsg << endl;
 
-                manager->_maxCollVersion = ChunkVersion();
+                manager->_collVersion = ChunkVersion();
                 manager->_chunksMap.clear();
                 conn.done();
                 return false;

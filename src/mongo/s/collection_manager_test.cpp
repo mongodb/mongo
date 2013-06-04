@@ -113,8 +113,8 @@ namespace {
 
         ASSERT(errMsg.empty());
         ASSERT_EQUALS(1u, cloned->getNumChunks());
-        ASSERT_EQUALS(cloned->getMaxShardVersion().toLong(), version.toLong());
-        ASSERT_EQUALS(cloned->getMaxCollVersion().toLong(), version.toLong());
+        ASSERT_EQUALS(cloned->getShardVersion().toLong(), version.toLong());
+        ASSERT_EQUALS(cloned->getCollVersion().toLong(), version.toLong());
         ASSERT(cloned->keyBelongsToMe(BSON("a" << 15)));
     }
 
@@ -223,9 +223,9 @@ namespace {
 
         ASSERT(errMsg.empty());
         ASSERT_EQUALS(0u, cloned->getNumChunks());
-        ASSERT_EQUALS(cloned->getMaxShardVersion().toLong(), zeroVersion.toLong());
-        ASSERT_EQUALS(cloned->getMaxCollVersion().toLong(),
-                getCollManager()->getMaxCollVersion().toLong());
+        ASSERT_EQUALS(cloned->getShardVersion().toLong(), zeroVersion.toLong());
+        ASSERT_EQUALS(cloned->getCollVersion().toLong(),
+                getCollManager()->getCollVersion().toLong());
         ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 15)));
     }
 
@@ -457,8 +457,8 @@ namespace {
 
         version.incMinor(); /* second chunk 1|100, first split point */
         version.incMinor(); /* third chunk 1|101, second split point */
-        ASSERT_EQUALS(cloned->getMaxShardVersion().toLong(), version.toLong() /* 1|101 */ );
-        ASSERT_EQUALS(cloned->getMaxCollVersion().toLong(), version.toLong());
+        ASSERT_EQUALS(cloned->getShardVersion().toLong(), version.toLong() /* 1|101 */ );
+        ASSERT_EQUALS(cloned->getCollVersion().toLong(), version.toLong());
         ASSERT_EQUALS(getCollManager()->getNumChunks(), 2u);
         ASSERT_EQUALS(cloned->getNumChunks(), 4u);
         ASSERT(cloned->keyBelongsToMe(min));

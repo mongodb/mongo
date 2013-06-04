@@ -53,9 +53,9 @@ namespace mongo {
         }
         // Can't move version backwards when subtracting chunks.  This is what guarantees that
         // no read or write would be taken once we subtract data from the current shard.
-        else if (newShardVersion <= _maxShardVersion) {
+        else if (newShardVersion <= _shardVersion) {
             *errMsg = stream() << "version " << newShardVersion.toString()
-                               << " not greater than " << _maxShardVersion.toString();
+                               << " not greater than " << _shardVersion.toString();
             return NULL;
         }
 
@@ -64,9 +64,9 @@ namespace mongo {
         manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
         manager->_chunksMap.erase(chunk.getMin());
-        manager->_maxShardVersion = newShardVersion;
-        manager->_maxCollVersion = newShardVersion > _maxCollVersion ?
-                                   newShardVersion : this->_maxCollVersion;
+        manager->_shardVersion = newShardVersion;
+        manager->_collVersion = newShardVersion > _collVersion ?
+                                   newShardVersion : this->_collVersion;
         manager->fillRanges();
 
         dassert(manager->isValid());
@@ -111,9 +111,9 @@ namespace mongo {
         manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
         manager->_chunksMap.insert(make_pair(chunk.getMin().getOwned(), chunk.getMax().getOwned()));
-        manager->_maxShardVersion = newShardVersion;
-        manager->_maxCollVersion = newShardVersion > _maxCollVersion ?
-                                   newShardVersion : this->_maxCollVersion;
+        manager->_shardVersion = newShardVersion;
+        manager->_collVersion = newShardVersion > _collVersion ?
+                                   newShardVersion : this->_collVersion;
         manager->fillRanges();
 
         dassert(manager->isValid());
@@ -139,9 +139,9 @@ namespace mongo {
         //
         // TODO drop the uniqueness constraint and tighten the check below so that only the
         // minor portion of version changes
-        if (newShardVersion <= _maxShardVersion) {
+        if (newShardVersion <= _shardVersion) {
             *errMsg = stream()<< "version " << newShardVersion.toString()
-                              << " not greater than " << _maxShardVersion.toString();
+                              << " not greater than " << _shardVersion.toString();
             return NULL;
         }
 
@@ -165,7 +165,7 @@ namespace mongo {
         manager->_keyPattern = this->_keyPattern;
         manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
-        manager->_maxShardVersion = newShardVersion; // will increment 2nd, 3rd,... chunks below
+        manager->_shardVersion = newShardVersion; // will increment 2nd, 3rd,... chunks below
 
         BSONObj startKey = chunk.getMin();
         for (vector<BSONObj>::const_iterator it = splitKeys.begin();
@@ -174,12 +174,12 @@ namespace mongo {
             BSONObj split = *it;
             manager->_chunksMap[chunk.getMin()] = split.getOwned();
             manager->_chunksMap.insert(make_pair(split.getOwned(), chunk.getMax().getOwned()));
-            manager->_maxShardVersion.incMinor();
+            manager->_shardVersion.incMinor();
             startKey = split;
         }
 
-        manager->_maxCollVersion = manager->_maxShardVersion > _maxCollVersion ?
-                        manager->_maxShardVersion : this->_maxCollVersion;
+        manager->_collVersion = manager->_shardVersion > _collVersion ?
+                        manager->_shardVersion : this->_collVersion;
         manager->fillRanges();
 
         dassert(manager->isValid());
@@ -241,7 +241,7 @@ namespace mongo {
 
     string CollectionManager::toString() const {
         StringBuilder ss;
-        ss << " CollectionManager version: " << _maxShardVersion.toString() << " key: " << _keyPattern;
+        ss << " CollectionManager version: " << _shardVersion.toString() << " key: " << _keyPattern;
         if (_rangesMap.empty()) {
             return ss.str();
         }
@@ -255,11 +255,11 @@ namespace mongo {
     }
 
     bool CollectionManager::isValid() const {
-        if (_maxShardVersion > _maxCollVersion) {
+        if (_shardVersion > _collVersion) {
             return false;
         }
 
-        if (_maxCollVersion.majorVersion() == 0)
+        if (_collVersion.majorVersion() == 0)
             return false;
 
         return true;

@@ -110,13 +110,13 @@ namespace mongo {
         // accessors
         //
 
-        ChunkVersion getMaxCollVersion() const { return _maxCollVersion; }
+        ChunkVersion getCollVersion() const { return _collVersion; }
 
-        ChunkVersion getMaxShardVersion() const { return _maxShardVersion; }
+        ChunkVersion getShardVersion() const { return _shardVersion; }
 
         BSONObj getKeyPattern() const { return _keyPattern; }
 
-        size_t getNumChunks() const { return _chunksMap.size(); }
+        std::size_t getNumChunks() const { return _chunksMap.size(); }
 
         string toString() const;
 
@@ -127,14 +127,14 @@ namespace mongo {
 
         // a version for this collection that identifies the collection incarnation (ie, a
         // dropped and recreated collection with the same name would have a different version)
-        ChunkVersion _maxCollVersion;
+        ChunkVersion _collVersion;
 
         //
         // sharded state below, for when the collection gets sharded
         //
 
         // highest ChunkVersion for which this manager's information is accurate
-        ChunkVersion _maxShardVersion;
+        ChunkVersion _shardVersion;
 
         // key pattern for chunks under this range
         BSONObj _keyPattern;
