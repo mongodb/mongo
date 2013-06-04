@@ -1387,7 +1387,6 @@ master_uri_get(WT_DATA_SOURCE *wtds,
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1404,7 +1403,6 @@ master_uri_drop(WT_DATA_SOURCE *wtds, WT_SESSION *session, const char *uri)
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1475,7 +1473,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 
 	/* Get the key/value format strings. */
 	if ((ret = wtext->config_get(
-	    wtext, session, config, "key_format", &a)) != 0)
+	    wtext, session, config, "key_format", &a)) != 0) {
 		if (ret == WT_NOTFOUND) {
 			a.str = "u";
 			a.len = 1;
@@ -1483,8 +1481,9 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 			ERET(wtext, session, ret,
 			    "key_format configuration: %s",
 			    wtext->strerror(ret));
+	}
 	if ((ret = wtext->config_get(
-	    wtext, session, config, "value_format", &b)) != 0)
+	    wtext, session, config, "value_format", &b)) != 0) {
 		if (ret == WT_NOTFOUND) {
 			b.str = "u";
 			b.len = 1;
@@ -1492,6 +1491,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 			ERET(wtext, session, ret,
 			    "value_format configuration: %s",
 			    wtext->strerror(ret));
+	}
 
 	/*
 	 * Create a new reference using insert (which fails if the record
