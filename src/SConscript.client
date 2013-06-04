@@ -186,8 +186,10 @@ mongoClientSharedLib = None
 if buildShared:
 
     # TODO: When we are ready to set a SONAME for mongoclient, set SHLIBVERSION=x.y.z in this
-    # environment to enable SCons versioned shared library support. This support is only stable
-    # in SCons > 2.3.0, so if you add it here, be sure to add a EnsuredSconsVersion as well.
+    # environment to enable SCons versioned shared library support, and then change the two
+    # 'Install' calls in this block to 'InstallVersionedLibrary'. SHLIBVERSION and
+    # InstallVersionedLibrary support is only stable in SCons > 2.3.0, so if you add support
+    # here, be sure to add an EnsuredSconsVersion here as well.
     sharedLibEnv = env.Clone()
     sharedLibEnv.AppendUnique(
         LIBS=mongoClientLibs + mongoClientSysLibDeps,
@@ -198,7 +200,7 @@ if buildShared:
 
     mongoClientSharedLib = sharedLibEnv.SharedLibrary('mongoclient', clientObjects)
 
-    mongoClientSharedLibInstall = sharedLibEnv.InstallVersionedLib(
+    mongoClientSharedLibInstall = sharedLibEnv.Install(
         '#/sharedclient', mongoClientSharedLib)
 
     if darwin:
@@ -213,7 +215,7 @@ if buildShared:
     mongoClientInstalls.append(mongoClientSharedLibInstall)
 
     if installSetup.libraries:
-        mongoClientSharedLibPrefixInstall = sharedLibEnv.InstallVersionedLib(
+        mongoClientSharedLibPrefixInstall = sharedLibEnv.Install(
             '$INSTALL_DIR/lib', mongoClientSharedLib)
         if darwin:
             sharedLibEnv.AddPostAction(
