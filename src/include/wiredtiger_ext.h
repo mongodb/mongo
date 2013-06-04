@@ -135,8 +135,8 @@ struct __wt_extension_api {
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
-	 * @param key configuration key string
 	 * @param config a configuration string
+	 * @param key configuration key string
 	 * @param value the returned value
 	 * @errors
 	 *
@@ -153,7 +153,9 @@ struct __wt_extension_api {
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
-	 * @param value the returned value
+	 * @param str the configuration string to scan
+	 * @param len the number of valid bytes in \c str
+	 * @param[out] scanp a handle used to scan the config string
 	 * @errors
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION config scan
@@ -181,10 +183,9 @@ struct __wt_extension_api {
 	 * boolean \c "true" value.
 	 *
 	 * @param wt_api the extension handle
-	 * @param session the session handle (or NULL if none available)
-	 * @param str the configuration string to scan
-	 * @param len the number of valid bytes in \c str
-	 * @param[out] scanp a handle used to scan the config string
+	 * @param scan the configuration scanner
+	 * @param key the returned key
+	 * @param value the returned value
 	 * @errors
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION config scan
