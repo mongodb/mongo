@@ -30,7 +30,8 @@
     Windows: project files are available in this directory for bsondemo.cpp for use with Visual Studio.
 */
 
-#include "../bson.h"
+#include "mongo/client/dbclient.h"
+
 #include <iostream>
 #include <vector>
 
