@@ -23,7 +23,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/principal_set.h"
@@ -53,8 +52,6 @@ namespace mongo {
         // Takes ownership of the externalState.
         explicit AuthorizationSession(AuthzSessionExternalState* externalState);
         ~AuthorizationSession();
-
-        const AuthorizationManager& getAuthorizationManager() const;
 
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
@@ -139,6 +136,10 @@ namespace mongo {
                                         const UserName& user,
                                         const BSONObj& privilegeDocument,
                                         PrivilegeSet* result);
+
+        // Returns an ActionSet of all actions that can be be granted to users.  This does not
+        // include internal-only actions.
+        static ActionSet getAllUserActions();
 
     private:
         // Finds the set of privileges attributed to "principal" in database "dbname",
