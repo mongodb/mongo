@@ -26,6 +26,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <pcrecpp.h>
 
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/privilege.h"
@@ -79,7 +81,7 @@ namespace mongo {
 
         void _authorizePrincipal(const std::string& principalName, bool readOnly) {
             Principal* principal = new Principal(UserName(principalName, "local"));
-            ActionSet actions = AuthorizationSession::getActionsForOldStyleUser(
+            ActionSet actions = getGlobalAuthorizationManager()->getActionsForOldStyleUser(
                     "admin", readOnly);
 
             AuthorizationSession* authorizationSession = cc().getAuthorizationSession();
