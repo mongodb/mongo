@@ -330,7 +330,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * Use a local variable: we don't care what the existing configuration
 	 * is, but we don't want to overwrite the real config.
 	 */
-	if (__wt_metadata_read(session, uri, &tmpconfig) == 0) {
+	if (__wt_metadata_search(session, uri, &tmpconfig) == 0) {
 		__wt_free(session, tmpconfig);
 		return (exclusive ? EEXIST : 0);
 	}

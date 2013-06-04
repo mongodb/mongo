@@ -26,27 +26,8 @@ __wt_ext_metadata_insert(WT_EXTENSION_API *wt_api,
 }
 
 /*
- * __wt_ext_metadata_read --
- *	Reads and copies a row from the metadata (external API version).
- *	The caller is responsible for freeing the allocated memory.
- */
-int
-__wt_ext_metadata_read(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session, const char *key, const char **valuep)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
-
-	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
-	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
-		session = conn->default_session;
-
-	return (__wt_metadata_read(session, key, valuep));
-}
-
-/*
  * __wt_ext_metadata_remove --
- *	Removes a row from the metadata (external API version).
+ *	Remove a row from the metadata (external API version).
  */
 int
 __wt_ext_metadata_remove(
@@ -60,6 +41,25 @@ __wt_ext_metadata_remove(
 		session = conn->default_session;
 
 	return (__wt_metadata_remove(session, key));
+}
+
+/*
+ * __wt_ext_metadata_search --
+ *	Return a copied row from the metadata (external API version).
+ *	The caller is responsible for freeing the allocated memory.
+ */
+int
+__wt_ext_metadata_search(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, const char *key, const char **valuep)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	return (__wt_metadata_search(session, key, valuep));
 }
 
 /*

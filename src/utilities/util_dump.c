@@ -189,7 +189,7 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 		wtext = session->
 		    connection->get_extension_api(session->connection);
 		if ((ret =
-		    wtext->metadata_read(wtext, session, uri, &value)) == 0) {
+		    wtext->metadata_search(wtext, session, uri, &value)) == 0) {
 			if (dump_prefix(hex) != 0 ||
 			    print_config(session, uri, value, NULL) != 0 ||
 			    dump_suffix() != 0)

@@ -206,19 +206,7 @@ struct __wt_extension_api {
 	    WT_SESSION *session, const char *key, const char *value);
 
 	/*!
-	 * Read a row from the metadata.
-	 *
-	 * @param wt_api the extension handle
-	 * @param session the session handle (or NULL if none available)
-	 * @param key row key
-	 * @param [out] valuep the row value
-	 * @errors
-	 */
-	int (*metadata_read)(WT_EXTENSION_API *wt_api,
-	    WT_SESSION *session, const char *key, const char **valuep);
-
-	/*!
-	 * Remove a row in the metadata.
+	 * Remove a row from the metadata.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
@@ -227,6 +215,18 @@ struct __wt_extension_api {
 	 */
 	int (*metadata_remove)(
 	    WT_EXTENSION_API *wt_api, WT_SESSION *session, const char *key);
+
+	/*!
+	 * Return a row from the metadata.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @param [out] valuep the row value
+	 * @errors
+	 */
+	int (*metadata_search)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *key, const char **valuep);
 
 	/*!
 	 * Update a row in the metadata.

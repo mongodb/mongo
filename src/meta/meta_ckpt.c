@@ -30,7 +30,7 @@ __wt_meta_checkpoint(WT_SESSION_IMPL *session,
 	config = NULL;
 
 	/* Retrieve the metadata entry for the file. */
-	WT_ERR(__wt_metadata_read(session, fname, &config));
+	WT_ERR(__wt_metadata_search(session, fname, &config));
 
 	/* Check the major/minor version numbers. */
 	WT_ERR(__ckpt_version_chk(session, fname, config));
@@ -69,7 +69,7 @@ __wt_meta_checkpoint_last_name(
 	config = NULL;
 
 	/* Retrieve the metadata entry for the file. */
-	WT_ERR(__wt_metadata_read(session, fname, &config));
+	WT_ERR(__wt_metadata_search(session, fname, &config));
 
 	/* Check the major/minor version numbers. */
 	WT_ERR(__ckpt_version_chk(session, fname, config));
@@ -111,7 +111,7 @@ __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v)
 	config = newcfg = NULL;
 
 	/* Retrieve the metadata for this file. */
-	WT_ERR(__wt_metadata_read(session, fname, &config));
+	WT_ERR(__wt_metadata_search(session, fname, &config));
 
 	/* Replace the checkpoint entry. */
 	cfg[0] = config;
@@ -263,7 +263,7 @@ __wt_meta_ckptlist_get(
 	config = NULL;
 
 	/* Retrieve the metadata information for the file. */
-	WT_RET(__wt_metadata_read(session, fname, &config));
+	WT_RET(__wt_metadata_search(session, fname, &config));
 
 	/* Load any existing checkpoints into the array. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));

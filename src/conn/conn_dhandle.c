@@ -247,7 +247,7 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 	 * don't find one.
 	 */
 	if ((ret =
-	    __wt_metadata_read(session, dhandle->name, &metaconf)) != 0) {
+	    __wt_metadata_search(session, dhandle->name, &metaconf)) != 0) {
 		if (ret == WT_NOTFOUND)
 			ret = ENOENT;
 		WT_RET(ret);

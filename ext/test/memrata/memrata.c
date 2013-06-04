@@ -1344,7 +1344,7 @@ master_id_get(WT_DATA_SOURCE *wtds, WT_SESSION *session, uint64_t *maxidp)
 	wtext = ds->wtext;
 
 	if ((ret =
-	    wtext->metadata_read(wtext, session, KVS_MAXID, &value)) == 0) {
+	    wtext->metadata_search(wtext, session, KVS_MAXID, &value)) == 0) {
 		*maxidp = strtouq(value, NULL, 10);
 		return (0);
 	}
@@ -1392,7 +1392,7 @@ master_uri_get(WT_DATA_SOURCE *wtds,
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	return (wtext->metadata_read(wtext, session, uri, valuep));
+	return (wtext->metadata_search(wtext, session, uri, valuep));
 }
 
 /*

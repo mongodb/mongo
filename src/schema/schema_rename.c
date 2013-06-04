@@ -36,13 +36,13 @@ __rename_file(
 	 * WT_NOTFOUND when the renamed file doesn't exist (subsequently mapped
 	 * to ENOENT by the session layer).
 	 */
-	WT_ERR(__wt_metadata_read(session, uri, &oldvalue));
+	WT_ERR(__wt_metadata_search(session, uri, &oldvalue));
 
 	/*
 	 * Check to see if the proposed name is already in use, in either the
 	 * metadata or the filesystem.
 	 */
-	switch (ret = __wt_metadata_read(session, newuri, &newvalue)) {
+	switch (ret = __wt_metadata_search(session, newuri, &newvalue)) {
 	case 0:
 		WT_ERR_MSG(session, EEXIST, "%s", newuri);
 	case WT_NOTFOUND:
@@ -119,7 +119,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 		++suffix;
 
 	/* Read the old schema value. */
-	WT_ERR(__wt_metadata_read(session, name, &value));
+	WT_ERR(__wt_metadata_search(session, name, &value));
 
 	/*
 	 * Calculate the new data source URI.  Use the existing table structure
@@ -178,7 +178,7 @@ __metadata_rename(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 	WT_DECL_RET;
 	const char *value;
 
-	WT_RET(__wt_metadata_read(session, uri, &value));
+	WT_RET(__wt_metadata_search(session, uri, &value));
 	WT_ERR(__wt_metadata_remove(session, uri));
 	WT_ERR(__wt_metadata_insert(session, newuri, value));
 

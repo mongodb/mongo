@@ -771,13 +771,13 @@ extern int __wt_ext_metadata_insert(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     const char *key,
     const char *value);
-extern int __wt_ext_metadata_read(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session,
-    const char *key,
-    const char **valuep);
 extern int __wt_ext_metadata_remove( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     const char *key);
+extern int __wt_ext_metadata_search(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *key,
+    const char **valuep);
 extern int __wt_ext_metadata_update(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     const char *key,
@@ -797,7 +797,7 @@ extern int __wt_metadata_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
 extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
-extern int __wt_metadata_read( WT_SESSION_IMPL *session,
+extern int __wt_metadata_search( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
 extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);

@@ -83,9 +83,9 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 			wtext = session->
 			    connection->get_extension_api(session->connection);
 			if ((ret = wtext->
-			    metadata_read(wtext, session, uri, &value)) != 0)
+			    metadata_search(wtext, session, uri, &value)) != 0)
 				return (
-				    util_err(ret, "metadata read: %s", uri));
+				    util_err(ret, "metadata search: %s", uri));
 			printf("%s\n", value);
 		}
 	}

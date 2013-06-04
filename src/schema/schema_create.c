@@ -68,7 +68,7 @@ __create_file(WT_SESSION_IMPL *session,
 
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
-	    __wt_metadata_read(session, uri, &fileconf)) != WT_NOTFOUND) {
+	    __wt_metadata_search(session, uri, &fileconf)) != WT_NOTFOUND) {
 		if (exclusive)
 			WT_TRET(EEXIST);
 		goto err;
