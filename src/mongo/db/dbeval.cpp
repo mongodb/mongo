@@ -21,6 +21,8 @@
 #include <time.h>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/cmdline.h"
@@ -123,7 +125,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             // $eval can do pretty much anything, so require all privileges.
             out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
-                                     AuthorizationSession::getAllUserActions()));
+                                     getGlobalAuthorizationManager()->getAllUserActions()));
         }
         CmdEval() : Command("eval", false, "$eval") { }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

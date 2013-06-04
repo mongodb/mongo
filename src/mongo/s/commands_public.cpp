@@ -24,6 +24,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/find_and_modify.h"
@@ -1709,7 +1710,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 // applyOps can do pretty much anything, so require all privileges.
                 out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
-                                         AuthorizationSession::getAllUserActions()));
+                                         getGlobalAuthorizationManager()->getAllUserActions()));
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";
@@ -1742,7 +1743,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 // $eval can do pretty much anything, so require all privileges.
                 out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
-                                         AuthorizationSession::getAllUserActions()));
+                                         getGlobalAuthorizationManager()->getAllUserActions()));
             }
             virtual bool run(const string& dbName,
                              BSONObj& cmdObj,
