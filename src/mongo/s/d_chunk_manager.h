@@ -100,21 +100,14 @@ namespace mongo {
                                        const ChunkVersion& version );
 
         /**
-         * Checks whether a document belongs to this shard.
+         * Checks whether a document key belongs to the collection on this shard.
          *
-         * @param obj document containing sharding keys (and, optionally, other attributes)
-         * @return true if shards hold the object
-         */
-        bool belongsToMe( const BSONObj& doc ) const;
-
-        /**
-         * Checks whether the document currently pointed to by this cursor belongs to this shard.
-         * This version of the function will use a covered index if there is one in the cursor.
+         * Note that !keyBelongsToMe() does not necessarily imply the document is orphaned - it
+         * might be part of a migration.
          *
-         * @param cc cursor pointing to an object
-         * @return true if shards hold the object
+         * @param key the full shard key
          */
-        bool belongsToMe( ClientCursor* cc ) const;
+        bool keyBelongsToMe( const BSONObj& key ) const;
         
         /**
          * Given a chunk's min key (or empty doc), gets the boundary of the chunk following that one (the first).
@@ -130,24 +123,19 @@ namespace mongo {
 
         ChunkVersion getVersion() const { return _version; }
         ChunkVersion getCollVersion() const { return _collVersion; }
-        BSONObj getKey() const { return _key.getOwned(); }
+        BSONObj getKeyPattern() const { return _keyPattern.getOwned(); }
         unsigned getNumChunks() const { return _chunksMap.size(); }
 
         string toString() const;
     private:
         void _init( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager = ShardChunkManagerPtr() );
 
-        /**
-         * @same as belongsToMe but point is the extracted shard key
-         */
-        bool _belongsToMe( const BSONObj& point ) const;
-
         ChunkVersion _collVersion;
         // highest ChunkVersion for which this ShardChunkManager's information is accurate
         ChunkVersion _version;
 
         // key pattern for chunks under this range
-        BSONObj _key;
+        BSONObj _keyPattern;
 
         // a map from a min key into the chunk's (or range's) max boundary
         typedef map< BSONObj, BSONObj , BSONObjCmp > RangeMap;

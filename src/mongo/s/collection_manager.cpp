@@ -60,8 +60,8 @@ namespace mongo {
         }
 
         auto_ptr<CollectionManager> manager(new CollectionManager);
-        manager->_key = this->_key;
-        manager->_key.getOwned();
+        manager->_keyPattern = this->_keyPattern;
+        manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
         manager->_chunksMap.erase(chunk.getMin());
         manager->_maxShardVersion = newShardVersion;
@@ -107,8 +107,8 @@ namespace mongo {
         }
 
         auto_ptr<CollectionManager> manager(new CollectionManager);
-        manager->_key = this->_key;
-        manager->_key.getOwned();
+        manager->_keyPattern = this->_keyPattern;
+        manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
         manager->_chunksMap.insert(make_pair(chunk.getMin().getOwned(), chunk.getMax().getOwned()));
         manager->_maxShardVersion = newShardVersion;
@@ -162,8 +162,8 @@ namespace mongo {
         }
 
         auto_ptr<CollectionManager> manager(new CollectionManager);
-        manager->_key = this->_key;
-        manager->_key.getOwned();
+        manager->_keyPattern = this->_keyPattern;
+        manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
         manager->_maxShardVersion = newShardVersion; // will increment 2nd, 3rd,... chunks below
 
@@ -186,30 +186,28 @@ namespace mongo {
         return manager.release();
     }
 
-    bool CollectionManager::belongsToMe(const BSONObj& point) const {
+    bool CollectionManager::keyBelongsToMe( const BSONObj& key ) const {
         // For now, collections don't move. So if the collection is not sharded, assume
-        // the documet ca be accessed.
-        if (_key.isEmpty()) {
+        // the document with the given key can be accessed.
+        if ( _keyPattern.isEmpty() ) {
             return true;
         }
 
-        if (_rangesMap.size() <= 0) {
+        if ( _rangesMap.size() <= 0 ) {
             return false;
         }
 
-        RangeMap::const_iterator it = _rangesMap.upper_bound(point);
-        if (it != _rangesMap.begin())
-            it--;
+        RangeMap::const_iterator it = _rangesMap.upper_bound( key );
+        if ( it != _rangesMap.begin() ) it--;
 
-        bool good = rangeContains(it->first, it->second, point);
+        bool good = rangeContains( it->first, it->second, key );
 
         // Logs if in debugging mode and the point doesn't belong here.
-        if(dcompare(!good)) {
-            log() << "bad: " << point << " "
-                  << it->first << " " << point.woCompare(it->first) << " "
-                  << point.woCompare(it->second) << endl;
+        if ( dcompare(!good) ) {
+            log() << "bad: " << key << " " << it->first << " " << key.woCompare( it->first ) << " "
+                  << key.woCompare( it->second ) << endl;
 
-            for (RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i) {
+            for ( RangeMap::const_iterator i = _rangesMap.begin(); i != _rangesMap.end(); ++i ) {
                 log() << "\t" << i->first << "\t" << i->second << "\t" << endl;
             }
         }
@@ -243,7 +241,7 @@ namespace mongo {
 
     string CollectionManager::toString() const {
         StringBuilder ss;
-        ss << " CollectionManager version: " << _maxShardVersion.toString() << " key: " << _key;
+        ss << " CollectionManager version: " << _maxShardVersion.toString() << " key: " << _keyPattern;
         if (_rangesMap.empty()) {
             return ss.str();
         }

@@ -368,15 +368,23 @@ namespace mongo {
                     verify(shardingState.enabled());
 
                     // In write lock, so will be the most up-to-date version
-                    ShardChunkManagerPtr managerNow = shardingState.getShardChunkManager(ns);
+                    // TODO: This is not quite correct, we may be transferring docs in the same
+                    // range.  Right now we're protected since we can't transfer docs in while we
+                    // delete.
+                    ShardChunkManagerPtr managerNow = shardingState.getShardChunkManager( ns );
+                    bool docIsOrphan = true;
+                    if ( managerNow ) {
+                        KeyPattern kp( managerNow->getKeyPattern() );
+                        docIsOrphan = !managerNow->keyBelongsToMe( kp.extractSingleKey( obj ) );
+                    }
+                    else {
+                        docIsOrphan = false;
+                    }
 
-                    if (!managerNow || managerNow->belongsToMe(obj)) {
-
-                        warning() << "aborting migration cleanup for chunk "
-                                  << min << " to " << max
-                                  << (managerNow ? (string)" at document " + obj.toString() : "")
+                    if ( !docIsOrphan ) {
+                        warning() << "aborting migration cleanup for chunk " << min << " to " << max
+                                  << ( managerNow ? (string) " at document " + obj.toString() : "" )
                                   << ", collection " << ns << " has changed " << endl;
-
                         break;
                     }
                 }

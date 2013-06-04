@@ -138,6 +138,7 @@ namespace mongo {
 
             // This manager may be stale, but it's the state of chunking when the cursor was created.
             ShardChunkManagerPtr manager = cc->getChunkManager();
+            KeyPattern keyPattern( manager ? manager->getKeyPattern() : BSONObj() );
 
             while ( 1 ) {
                 if ( !c->ok() ) {
@@ -172,8 +173,9 @@ namespace mongo {
                 // in some cases (clone collection) there won't be a matcher
                 if ( !c->currentMatches( &details ) ) {
                 }
-                else if ( manager && ! manager->belongsToMe( cc ) ){
-                    LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
+                else if ( manager && !manager->keyBelongsToMe( cc->extractKey( keyPattern ) ) ) {
+                    LOG(2) << "cursor skipping document in un-owned chunk: " << c->current()
+                               << endl;
                 }
                 else {
                     if( c->getsetdup(c->currLoc()) ) {
@@ -663,7 +665,8 @@ namespace mongo {
         }
         // TODO: should make this covered at some point
         resultDetails->loadedRecord = true;
-        if ( _chunkManager->belongsToMe( _cursor->current() ) ) {
+        KeyPattern kp( _chunkManager->getKeyPattern() );
+        if ( _chunkManager->keyBelongsToMe( kp.extractSingleKey( _cursor->current() ) ) ) {
             return true;
         }
         resultDetails->chunkSkip = true;
@@ -877,12 +880,15 @@ namespace mongo {
                     
                     if ( shardingState.needShardChunkManager( ns ) ) {
                         ShardChunkManagerPtr m = shardingState.getShardChunkManager( ns );
-                        if ( m && ! m->belongsToMe( resObject ) ) {
-                            // I have something this _id
-                            // but it doesn't belong to me
-                            // so return nothing
-                            resObject = BSONObj();
-                            found = false;
+                        if ( m ) {
+                            KeyPattern kp( m->getKeyPattern() );
+                            if ( !m->keyBelongsToMe( kp.extractSingleKey( resObject ) ) ) {
+                                // I have something this _id
+                                // but it doesn't belong to me
+                                // so return nothing
+                                resObject = BSONObj();
+                                found = false;
+                            }
                         }
                     }
                     

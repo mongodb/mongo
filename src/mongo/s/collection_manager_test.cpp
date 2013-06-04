@@ -88,12 +88,12 @@ namespace {
     };
 
     TEST_F(NoChunkFixture, BasicBelongsToMe) {
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << MINKEY)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << 10)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << MINKEY)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << 10)));
     }
 
     TEST_F(NoChunkFixture, CompoudKeyBelongsToMe) {
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << 1 << "b" << 2)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << 1 << "b" << 2)));
     }
 
     TEST_F(NoChunkFixture, getNextFromEmpty) {
@@ -115,7 +115,7 @@ namespace {
         ASSERT_EQUALS(1u, cloned->getNumChunks());
         ASSERT_EQUALS(cloned->getMaxShardVersion().toLong(), version.toLong());
         ASSERT_EQUALS(cloned->getMaxCollVersion().toLong(), version.toLong());
-        ASSERT(cloned->belongsToMe(BSON("a" << 15)));
+        ASSERT(cloned->keyBelongsToMe(BSON("a" << 15)));
     }
 
     TEST_F(NoChunkFixture, MustHaveVersionForFirstChunk) {
@@ -181,22 +181,22 @@ namespace {
     };
 
     TEST_F(SingleChunkFixture, BasicBelongsToMe) {
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 10)));
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 15)));
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 19)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 10)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 15)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 19)));
     }
 
     TEST_F(SingleChunkFixture, DoesntBelongsToMe) {
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << 0)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << 9)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << 20)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << 1234)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << MINKEY)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << MAXKEY)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << 0)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << 9)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << 20)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << 1234)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << MINKEY)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << MAXKEY)));
     }
 
     TEST_F(SingleChunkFixture, CompoudKeyBelongsToMe) {
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 15 << "a" << 14)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 15 << "a" << 14)));
     }
 
     TEST_F(SingleChunkFixture, getNextFromEmpty) {
@@ -226,7 +226,7 @@ namespace {
         ASSERT_EQUALS(cloned->getMaxShardVersion().toLong(), zeroVersion.toLong());
         ASSERT_EQUALS(cloned->getMaxCollVersion().toLong(),
                 getCollManager()->getMaxCollVersion().toLong());
-        ASSERT_FALSE(cloned->belongsToMe(BSON("a" << 15)));
+        ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 15)));
     }
 
     TEST_F(SingleChunkFixture, LastChunkMinusCantHaveNonZeroVersion) {
@@ -297,10 +297,10 @@ namespace {
     // if shard key is compound.
 
     TEST_F(SingleChunkMinMaxCompoundKeyFixture, CompoudKeyBelongsToMe) {
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << MINKEY << "b" << MINKEY)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << MAXKEY << "b" << MAXKEY)));
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << MINKEY << "b" << 10)));
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 10 << "b" << 20)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << MINKEY << "b" << MINKEY)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << MAXKEY << "b" << MAXKEY)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << MINKEY << "b" << 10)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 10 << "b" << 20)));
     }
 
     /**
@@ -379,12 +379,12 @@ namespace {
 
         // TODO: test maxShardVersion, maxCollVersion
 
-        ASSERT_FALSE(cloned->belongsToMe(BSON("a" << 25 << "b" << 0)));
-        ASSERT_FALSE(cloned->belongsToMe(BSON("a" << 29 << "b" << 0)));
-        ASSERT(cloned->belongsToMe(BSON("a" << 30 << "b" << 0)));
-        ASSERT(cloned->belongsToMe(BSON("a" << 45 << "b" << 0)));
-        ASSERT(cloned->belongsToMe(BSON("a" << 49 << "b" << 0)));
-        ASSERT_FALSE(cloned->belongsToMe(BSON("a" << 50 << "b" << 0)));
+        ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 25 << "b" << 0)));
+        ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 29 << "b" << 0)));
+        ASSERT(cloned->keyBelongsToMe(BSON("a" << 30 << "b" << 0)));
+        ASSERT(cloned->keyBelongsToMe(BSON("a" << 45 << "b" << 0)));
+        ASSERT(cloned->keyBelongsToMe(BSON("a" << 49 << "b" << 0)));
+        ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 50 << "b" << 0)));
     }
 
     TEST_F(TwoChunksWithGapCompoundKeyFixture, ClonePlusOverlappingRange) {
@@ -416,11 +416,11 @@ namespace {
 
         // TODO: test maxShardVersion, maxCollVersion
 
-        ASSERT_FALSE(cloned->belongsToMe(BSON("a" << 5 << "b" << 0)));
-        ASSERT_FALSE(cloned->belongsToMe(BSON("a" << 15 << "b" << 0)));
-        ASSERT(cloned->belongsToMe(BSON("a" << 30 << "b" << 0)));
-        ASSERT(cloned->belongsToMe(BSON("a" << 35 << "b" << 0)));
-        ASSERT_FALSE(cloned->belongsToMe(BSON("a" << 40 << "b" << 0)));
+        ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 5 << "b" << 0)));
+        ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 15 << "b" << 0)));
+        ASSERT(cloned->keyBelongsToMe(BSON("a" << 30 << "b" << 0)));
+        ASSERT(cloned->keyBelongsToMe(BSON("a" << 35 << "b" << 0)));
+        ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 40 << "b" << 0)));
     }
 
     TEST_F(TwoChunksWithGapCompoundKeyFixture, CloneMinusNonExisting) {
@@ -461,10 +461,10 @@ namespace {
         ASSERT_EQUALS(cloned->getMaxCollVersion().toLong(), version.toLong());
         ASSERT_EQUALS(getCollManager()->getNumChunks(), 2u);
         ASSERT_EQUALS(cloned->getNumChunks(), 4u);
-        ASSERT(cloned->belongsToMe(min));
-        ASSERT(cloned->belongsToMe(split1));
-        ASSERT(cloned->belongsToMe(split2));
-        ASSERT(!cloned->belongsToMe(max));
+        ASSERT(cloned->keyBelongsToMe(min));
+        ASSERT(cloned->keyBelongsToMe(split1));
+        ASSERT(cloned->keyBelongsToMe(split2));
+        ASSERT(!cloned->keyBelongsToMe(max));
     }
 
     TEST_F(TwoChunksWithGapCompoundKeyFixture, CloneSplitOutOfRangeSplitPoint) {
@@ -585,15 +585,15 @@ namespace {
     };
 
     TEST_F(ThreeChunkWithRangeGapFixture, ShardOwnsDoc) {
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 5)));
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 10)));
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 30)));
-        ASSERT(getCollManager()->belongsToMe(BSON("a" << 40)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 5)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 10)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 30)));
+        ASSERT(getCollManager()->keyBelongsToMe(BSON("a" << 40)));
     }
 
     TEST_F(ThreeChunkWithRangeGapFixture, ShardDoesntOwnDoc) {
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << 25)));
-        ASSERT_FALSE(getCollManager()->belongsToMe(BSON("a" << MAXKEY)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << 25)));
+        ASSERT_FALSE(getCollManager()->keyBelongsToMe(BSON("a" << MAXKEY)));
     }
 
     TEST_F(ThreeChunkWithRangeGapFixture, GetNextFromEmpty) {

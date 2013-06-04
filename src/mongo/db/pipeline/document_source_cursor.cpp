@@ -126,8 +126,10 @@ namespace mongo {
 
                 // check to see if this is a new object we don't own yet
                 // because of a chunk migration
-                if (chunkMgr() && ! chunkMgr()->belongsToMe(next))
-                    continue;
+                if (chunkMgr()) {
+                    KeyPattern kp( chunkMgr()->getKeyPattern() );
+                    if ( !chunkMgr()->keyBelongsToMe( kp.extractSingleKey( next ) ) ) continue;
+                }
 
                 if (!_projection) {
                     pCurrent = Document(next);

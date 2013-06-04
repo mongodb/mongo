@@ -43,11 +43,11 @@ namespace {
             ShardChunkManager s ( collection , chunks );
 
             BSONObj k1 = BSON( "a" << MINKEY );
-            ASSERT( s.belongsToMe( k1 ) );
+            ASSERT( s.keyBelongsToMe( k1 ) );
             BSONObj k2 = BSON( "a" << MAXKEY );
-            ASSERT( ! s.belongsToMe( k2 ) );
+            ASSERT( ! s.keyBelongsToMe( k2 ) );
             BSONObj k3 = BSON( "a" << 1 << "b" << 2 );
-            ASSERT( s.belongsToMe( k3 ) );
+            ASSERT( s.keyBelongsToMe( k3 ) );
         }
     };
 
@@ -70,13 +70,13 @@ namespace {
             ShardChunkManager s ( collection , chunks );
 
             BSONObj k1 = BSON( "a" << MINKEY << "b" << MINKEY );
-            ASSERT( s.belongsToMe( k1 ) );
+            ASSERT( s.keyBelongsToMe( k1 ) );
             BSONObj k2 = BSON( "a" << MAXKEY << "b" << MAXKEY );
-            ASSERT( ! s.belongsToMe( k2 ) );
+            ASSERT( ! s.keyBelongsToMe( k2 ) );
             BSONObj k3 = BSON( "a" << MINKEY << "b" << 10 );
-            ASSERT( s.belongsToMe( k3 ) );
+            ASSERT( s.keyBelongsToMe( k3 ) );
             BSONObj k4 = BSON( "a" << 10 << "b" << 20 );
-            ASSERT( s.belongsToMe( k4 ) );
+            ASSERT( s.keyBelongsToMe( k4 ) );
         }
     };
 
@@ -108,15 +108,15 @@ namespace {
             ShardChunkManager s ( collection , chunks );
 
             BSONObj k1 = BSON( "a" << 5 );
-            ASSERT( s.belongsToMe( k1 ) );
+            ASSERT( s.keyBelongsToMe( k1 ) );
             BSONObj k2 = BSON( "a" << 10 );
-            ASSERT( s.belongsToMe( k2 ) );
+            ASSERT( s.keyBelongsToMe( k2 ) );
             BSONObj k3 = BSON( "a" << 25 );
-            ASSERT( ! s.belongsToMe( k3 ) );
+            ASSERT( ! s.keyBelongsToMe( k3 ) );
             BSONObj k4 = BSON( "a" << 30 );
-            ASSERT( s.belongsToMe( k4 ) );
+            ASSERT( s.keyBelongsToMe( k4 ) );
             BSONObj k5 = BSON( "a" << 40 );
-            ASSERT( s.belongsToMe( k5 ) );
+            ASSERT( s.keyBelongsToMe( k5 ) );
         }
     };
 
@@ -219,13 +219,13 @@ namespace {
             ShardChunkManagerPtr cloned( s.clonePlus( min , max , ChunkVersion( 1, 0, OID() ) /* TODO test version */ ) );
 
             BSONObj k1 = BSON( "a" << 5 << "b" << 0 );
-            ASSERT( ! cloned->belongsToMe( k1 ) );
+            ASSERT( ! cloned->keyBelongsToMe( k1 ) );
             BSONObj k2 = BSON( "a" << 20 << "b" << 0 );
-            ASSERT( cloned->belongsToMe( k2 ) );
+            ASSERT( cloned->keyBelongsToMe( k2 ) );
             BSONObj k3 = BSON( "a" << 25 << "b" << 0 );
-            ASSERT( cloned->belongsToMe( k3 ) );
+            ASSERT( cloned->keyBelongsToMe( k3 ) );
             BSONObj k4 = BSON( "a" << 30 << "b" << 0 );
-            ASSERT( ! cloned->belongsToMe( k4 ) );
+            ASSERT( ! cloned->keyBelongsToMe( k4 ) );
         }
     };
 
@@ -280,15 +280,15 @@ namespace {
             ShardChunkManagerPtr cloned( s.cloneMinus( min , max , ChunkVersion( 1, 0, OID() ) /* TODO test version */ ) );
 
             BSONObj k1 = BSON( "a" << 5 << "b" << 0 );
-            ASSERT( ! cloned->belongsToMe( k1 ) );
+            ASSERT( ! cloned->keyBelongsToMe( k1 ) );
             BSONObj k2 = BSON( "a" << 15 << "b" << 0 );
-            ASSERT( ! cloned->belongsToMe( k2 ) );
+            ASSERT( ! cloned->keyBelongsToMe( k2 ) );
             BSONObj k3 = BSON( "a" << 30 << "b" << 0 );
-            ASSERT( cloned->belongsToMe( k3 ) );
+            ASSERT( cloned->keyBelongsToMe( k3 ) );
             BSONObj k4 = BSON( "a" << 35 << "b" << 0 );
-            ASSERT( cloned->belongsToMe( k4 ) );
+            ASSERT( cloned->keyBelongsToMe( k4 ) );
             BSONObj k5 = BSON( "a" << 40 << "b" << 0 );
-            ASSERT( ! cloned->belongsToMe( k5 ) );
+            ASSERT( ! cloned->keyBelongsToMe( k5 ) );
         }
     };
 
@@ -358,10 +358,10 @@ namespace {
             ASSERT_EQUALS( cloned->getVersion().toLong() , version.toLong() /* 1|101 */ );
             ASSERT_EQUALS( s.getNumChunks() , 1u );
             ASSERT_EQUALS( cloned->getNumChunks() , 3u );
-            ASSERT( cloned->belongsToMe( min ) );
-            ASSERT( cloned->belongsToMe( split1 ) );
-            ASSERT( cloned->belongsToMe( split2 ) );
-            ASSERT( ! cloned->belongsToMe( max ) );
+            ASSERT( cloned->keyBelongsToMe( min ) );
+            ASSERT( cloned->keyBelongsToMe( split1 ) );
+            ASSERT( cloned->keyBelongsToMe( split2 ) );
+            ASSERT( ! cloned->keyBelongsToMe( max ) );
         }
     };
 
@@ -442,7 +442,7 @@ namespace {
             ASSERT_EQUALS( empty->getVersion().toLong() , ChunkVersion( 0, 0, OID() ).toLong() );
             ASSERT_EQUALS( empty->getNumChunks() , 0u );
             BSONObj k = BSON( "a" << 15 << "b" << 0 );
-            ASSERT( ! empty->belongsToMe( k ) );
+            ASSERT( ! empty->keyBelongsToMe( k ) );
 
             // we can add a chunk to an empty manager
             // version should be provided
@@ -450,7 +450,7 @@ namespace {
             ShardChunkManagerPtr cloned( empty->clonePlus( min , max , nonZero ) );
             ASSERT_EQUALS( cloned->getVersion().toLong(), nonZero.toLong() );
             ASSERT_EQUALS( cloned->getNumChunks() , 1u );
-            ASSERT( cloned->belongsToMe( k ) );
+            ASSERT( cloned->keyBelongsToMe( k ) );
         }
     };
 

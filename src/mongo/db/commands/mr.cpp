@@ -1212,8 +1212,12 @@ namespace mongo {
 
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
-                            if ( chunkManager && ! chunkManager->belongsToMe( o ) )
-                                continue;
+                            if ( chunkManager ) {
+                                KeyPattern kp( chunkManager->getKeyPattern() );
+                                if ( !chunkManager->keyBelongsToMe( kp.extractSingleKey( o ) ) ) {
+                                    continue;
+                                }
+                            }
 
                             // do map
                             if ( config.verbose ) mt.reset();

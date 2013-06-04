@@ -217,7 +217,7 @@ namespace {
                                                                   "shard0000",
                                                                   NULL, /* no old manager */
                                                                   NULL  /* no need for errMsg */);
-        ASSERT_TRUE(manager->getKey().equal(BSON("a" << 1)));
+        ASSERT_TRUE(manager->getKeyPattern().equal(BSON("a" << 1)));
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetMaxCollVersion) {

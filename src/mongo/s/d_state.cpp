@@ -269,7 +269,7 @@ namespace mongo {
         ShardChunkManagerPtr p( ShardChunkManager::make( c , ns , _shardName, currManager ) );
 
         // Handle the case where the collection isn't sharded more gracefully
-        if( p->getKey().isEmpty() ){
+        if( p->getKeyPattern().isEmpty() ){
             version = ConfigVersion( 0, OID() );
             // There was an error getting any data for this collection, return false
             return false;

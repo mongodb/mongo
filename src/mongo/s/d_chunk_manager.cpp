@@ -185,7 +185,7 @@ namespace mongo {
         BSONElement e = collectionDoc["key"];
         uassert( 13542 , str::stream() << "collection doesn't have a key: " << collectionDoc , ! e.eoo() && e.isABSONObj() );
 
-        _key = e.Obj().getOwned();
+        _keyPattern = e.Obj().getOwned();
     }
 
     void ShardChunkManager::_fillChunks( DBClientCursorInterface* cursor ) {
@@ -239,33 +239,19 @@ namespace mongo {
         _rangesMap.insert( make_pair( min , max ) );
     }
 
-    static bool contains( const BSONObj& min , const BSONObj& max , const BSONObj& point ) {
-        return point.woCompare( min ) >= 0 && point.woCompare( max ) < 0;
+    static bool contains( const BSONObj& min , const BSONObj& max , const BSONObj& key ) {
+        return key.woCompare( min ) >= 0 && key.woCompare( max ) < 0;
     }
     
-    bool ShardChunkManager::belongsToMe( ClientCursor* cc ) const {
-        verify( cc );
-        if ( _rangesMap.size() == 0 )
-            return false;
-        
-        KeyPattern pat( _key );
-        return _belongsToMe( cc->extractKey( pat ) );
-    }
+    bool ShardChunkManager::keyBelongsToMe( const BSONObj& key ) const {
 
-    bool ShardChunkManager::belongsToMe( const BSONObj& doc ) const {
-        if ( _rangesMap.size() == 0 )
-            return false;
+        if ( _rangesMap.size() == 0 ) return false;
 
-        KeyPattern pat( _key );
-        return _belongsToMe( pat.extractSingleKey( doc ) );
-    }
-
-    bool ShardChunkManager::_belongsToMe( const BSONObj& point ) const {
-        RangeMap::const_iterator it = _rangesMap.upper_bound( point );
+        RangeMap::const_iterator it = _rangesMap.upper_bound( key );
         if ( it != _rangesMap.begin() )
             it--;
 
-        bool good = contains( it->first , it->second , point );
+        bool good = contains( it->first , it->second , key );
 
 #if 0
         if ( ! good ) {
@@ -328,7 +314,7 @@ namespace mongo {
         _assertChunkExists( min , max );
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
-        p->_key = this->_key;
+        p->_keyPattern = this->_keyPattern;
 
         if ( _chunksMap.size() == 1 ) {
             // if left with no chunks, just reset version
@@ -384,7 +370,7 @@ namespace mongo {
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
 
-        p->_key = this->_key;
+        p->_keyPattern = this->_keyPattern;
         p->_chunksMap = this->_chunksMap;
         p->_chunksMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
         p->_version = version;
@@ -419,7 +405,7 @@ namespace mongo {
 
         auto_ptr<ShardChunkManager> p( new ShardChunkManager );
 
-        p->_key = this->_key;
+        p->_keyPattern = this->_keyPattern;
         p->_chunksMap = this->_chunksMap;
         p->_version = version; // will increment second, third, ... chunks below
 
@@ -442,7 +428,7 @@ namespace mongo {
 
     string ShardChunkManager::toString() const {
         StringBuilder ss;
-        ss << " ShardChunkManager version: " << _version.toString() << " key: " << _key;
+        ss << " ShardChunkManager version: " << _version.toString() << " keyPattern: " << _keyPattern;
         bool first = true;
         for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ) {
             if ( first ) first = false;
