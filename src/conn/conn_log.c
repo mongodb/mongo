@@ -60,6 +60,8 @@ __log_archive_server(void *arg)
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
+	logcount = 0;
+	logfiles = NULL;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &path));
 
