@@ -67,13 +67,6 @@ wts_ops(void)
 		total.id = 1;
 		(void)ops(&total);
 	} else {
-		/*
-		 * We have to single-thread named checkpoints and hot backups,
-		 * initialize a lock.
-		 */
-		if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
-			die(ret, "pthread_rwlock_init: hot-backup lock");
-
 		g.threads_finished = 0;
 
 		/* Create thread structure, start worker, hot-backup threads. */
@@ -122,9 +115,6 @@ wts_ops(void)
 		/* Wait for the backup thread. */
 		g.threads_finished = 1;
 		(void)pthread_join(backup_tid, NULL);
-
-		if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
-			die(ret, "pthread_rwlock_destroy: hot-backup lock");
 	}
 
 	if (g.logging != 0) {
@@ -667,6 +657,70 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 }
 
 /*
+ * table_extend --
+ *	Handle the complexity of extending the table.
+ */
+static void
+table_extend(uint64_t keyno)
+{
+	static size_t n;
+	static uint64_t *slots;
+	static uint64_t *ep;
+	uint64_t *p;
+	int ret;
+
+	/*
+	 * We don't want to ignore records we append, which requires we update
+	 * the "last row" as we insert new records.   There are problems: if
+	 * the underlying record numbers are allocated such that the threads
+	 * allocating the record number can race with other threads, the thread
+	 * allocating record N may return after the thread allocating N + 1.
+	 * Since it will cause problems if we try and replace a record before
+	 * it's been inserted, we have to make sure we don't skip records as we
+	 * increment the last record in the table.
+	 */
+	if ((ret = pthread_rwlock_wrlock(&g.table_extend_lock)) != 0)
+		die(ret, "pthread_rwlock_wrlock: table_extend");
+
+	/*
+	 * It's possible to get more than an allocated record per thread, if the
+	 * scheduler pauses a particular thread and other threads race allocate
+	 * multiple new records while it's sleeping.  Give ourselves some room.
+	 */
+	if (n < g.c_threads * 5) {
+		free(slots);
+		n = g.c_threads * 5;
+		if ((slots = calloc(n, sizeof(uint64_t))) == NULL)
+			die(errno, "calloc");
+		ep = slots + n;
+	}
+
+	/* Enter the new key into the list. */
+	for (p = slots; p < ep; ++p)
+		if (*p == 0) {
+			*p = keyno;
+			break;
+		}
+	if (p == ep)
+		die(ENOMEM, "table extend new row array overflow");
+
+	/* Process the table until we don't find the "next" value. */
+	for (;;) {
+		for (p = slots; p < ep; ++p)
+			if (*p == g.rows + 1) {
+				g.rows = *p;
+				*p = 0;
+				break;
+			}
+		if (p == ep)
+			break;
+	}
+
+	if ((ret = pthread_rwlock_unlock(&g.table_extend_lock)) != 0)
+		die(ret, "pthread_rwlock_unlock: table_extend");
+}
+
+/*
  * col_insert --
  *	Insert an element in a column-store file.
  */
@@ -691,13 +745,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		die(ret, "cursor.get_key");
 	*keynop = (uint32_t)keyno;
 
-	/*
-	 * Assign the maximum number of rows to the returned key: that key may
-	 * not be the current maximum value, if we race with another thread,
-	 * but that's OK, we just want it to keep increasing so we don't ignore
-	 * records at the end of the table.
-	 */
-	g.rows = (uint32_t)keyno;
+	table_extend(keyno);		/* Extend the object. */
 
 	if (g.logging == LOG_OPS) {
 		if (g.type == FIX)

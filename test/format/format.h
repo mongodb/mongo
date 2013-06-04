@@ -109,6 +109,7 @@ typedef struct {
 	int threads_finished;			/* Operations completed */
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
+	pthread_rwlock_t table_extend_lock;	/* Updating last record */
 
 	char *uri;				/* Object name */
 
