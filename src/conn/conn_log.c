@@ -35,7 +35,7 @@ __logger_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_CSTAT_SET(session, log_max_filesize, conn->log_file_max);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
-	WT_RET(__wt_nfilename(session, cval.str, cval.len, &conn->log_path));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	return (0);
 }

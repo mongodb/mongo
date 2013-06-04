@@ -21,9 +21,12 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	WT_DECL_RET;
 	struct dirent *dp;
 	DIR *dirp;
+	const char *path;
 	char **entries;
 	size_t dirallocsz;
 	int count, dirsz, match;
+
+	WT_RET(__wt_filename(session, dir, &path));
 
 	*countp = 0;
 	entries = NULL;
@@ -31,13 +34,13 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	if (flags == 0)
 		LF_SET(WT_DIRLIST_INCLUDE);
 	WT_VERBOSE_RET(session, fileops, "wt_dirlist of %s %s prefix %s",
-	    dir, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
+	    path, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
 	    prefix == NULL ? "all" : prefix);
 fprintf(stderr, "wt_dirlist of %s %s prefix %s\n",
-	    dir, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
+	    path, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
 	    prefix == NULL ? "all" : prefix);
 
-	WT_SYSCALL_RETRY(((dirp = opendir(dir)) == NULL ? 1 : 0), ret);
+	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	*dirlist = NULL;
 	for (dirsz = count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
@@ -72,6 +75,7 @@ fprintf(stderr, "wt_dirlist of %s %s prefix %s\n",
 	*countp = count;
 err:
 	(void)closedir(dirp);
+	__wt_free(session, path);
 
 	if (ret == 0)
 		return (0);

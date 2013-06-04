@@ -25,7 +25,7 @@ __wt_absolute_path(const char *path)
 int
 __wt_filename(WT_SESSION_IMPL *session, const char *name, const char **path)
 {
-	return __wt_nfilename(session, name, strlen(name), path);
+	return (__wt_nfilename(session, name, strlen(name), path));
 }
 
 /*

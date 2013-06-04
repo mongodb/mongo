@@ -14,18 +14,18 @@
 int
 __wt_log_filename(WT_SESSION_IMPL *session, uint32_t id, WT_ITEM *buf)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
+	const char *log_path;
 
-	conn = S2C(session);
-	WT_RET(__wt_buf_initsize(session, buf,
-	    strlen(conn->log_path) + ENTRY_SIZE));
-	WT_ERR(__wt_buf_fmt(session, buf, "%s/%s.%010" PRIu32,
-	    conn->log_path, WT_LOG_FILENAME, id));
+	log_path = S2C(session)->log_path;
+
+	if (log_path != NULL && log_path[0] != '\0')
+		WT_RET(__wt_buf_fmt(session, buf, "%s/%s.%010" PRIu32,
+		    log_path, WT_LOG_FILENAME, id));
+	else
+		WT_RET(__wt_buf_fmt(session, buf, "%s.%010" PRIu32,
+		    WT_LOG_FILENAME, id));
+
 	return (0);
-
-err:	__wt_buf_free(session, buf);
-	return (ret);
 }
 
 /*
