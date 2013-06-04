@@ -108,9 +108,9 @@ typedef struct __uri_source {
 	 * the latter is what we use for a "previous" cursor traversal.
 	 */
 #define	KVS_MAX_PACKED_8B	10
-	char	 id[KVS_MAX_PACKED_8B];		/* Packed unique ID prefix */
+	uint8_t	 id[KVS_MAX_PACKED_8B];		/* Packed unique ID prefix */
 	size_t	 idlen;				/* ID prefix length */
-	char	 idnext[KVS_MAX_PACKED_8B];	/* Packed next ID prefix */
+	uint8_t	 idnext[KVS_MAX_PACKED_8B];	/* Packed next ID prefix */
 	size_t	 idnextlen;			/* Next ID prefix length */
 
 	uint64_t append_recno;			/* Allocation record number */
@@ -141,9 +141,9 @@ typedef struct __cursor {
 	URI_SOURCE *us;				/* Underlying URI */
 
 	struct kvs_record record;		/* Record */
-	char   key[KVS_MAX_KEY_LEN];		/* key, value */
-	char  *val;
-	size_t val_len;
+	uint8_t  key[KVS_MAX_KEY_LEN];		/* key, value */
+	uint8_t *val;
+	size_t   val_len;
 
 	int	 config_append;			/* config "append" */
 	int	 config_overwrite;		/* config "overwrite" */
@@ -372,7 +372,7 @@ copyin_val(WT_CURSOR *wtcursor)
 	 * XXX
 	 * The underlying KVS library data fields aren't const.
 	 */
-	r->val = (char *)wtcursor->value.data;
+	r->val = (uint8_t *)wtcursor->value.data;
 	r->val_len = (unsigned long)wtcursor->value.size;
 	return (0);
 }
@@ -436,10 +436,9 @@ kvs_dump(
     WT_EXTENSION_API *wtext, WT_SESSION *session, kvs_t kvs, const char *tag)
 {
 	struct kvs_record *r, _r;
-	DATA_SOURCE *ds;
 	uint64_t recno;
 	size_t len, size;
-	char *p, key[256], val[256];
+	uint8_t *p, key[256], val[256];
 
 	printf("== %s\n", tag);
 
@@ -456,7 +455,8 @@ kvs_dump(
 		(void)wtext->struct_size(wtext, session, &size, "r", recno);
 		printf("\t%" PRIu64 ": ", recno);
 		printf("%.*s/%.*s\n",
-		    (int)len - size, p + size, (int)r->val_len, r->val);
+		    (int)(len - size), p + size,
+		    (int)r->val_len, (char *)r->val);
 
 		r->val_len = sizeof(val);
 	}
@@ -543,7 +543,8 @@ nextprev_init(WT_CURSOR *wtcursor, uint8_t *id, size_t idlen)
 	cursor = (CURSOR *)wtcursor;
 
 	/* Prefix the key with a unique ID. */
-	for (p = id, t = cursor->key, i = 0; i < idlen; ++i)
+	for (p = id,
+	t = cursor->key, i = 0; i < idlen; ++i)
 		*t++ = *p++;
 
 	cursor->record.key = cursor->key;
@@ -1085,7 +1086,7 @@ device_string(char **device_list, char **devicesp)
 	for (len = 0, p = device_list; *p != NULL; ++p)
 		len += strlen(*p) + 5;
 	if ((tmp = malloc(len)) == NULL)
-		return (__os_errno());
+		return (os_errno());
 
 	tmp[0] = '\0';
 	for (p = device_list; *p != NULL; ++p) {
@@ -1346,7 +1347,7 @@ master_key_set(WT_DATA_SOURCE *wtds,
 	WT_EXTENSION_API *wtext;
 	size_t idlen, len;
 	int ret = 0;
-	char id[KVS_MAX_PACKED_8B];
+	uint8_t id[KVS_MAX_PACKED_8B];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1404,7 +1405,7 @@ master_id_get(
 	default:
 		ERET(wtext, session,
 		    WT_ERROR, "kvs_get: %s: %s", KVS_MAXID, kvs_strerror(ret));
-		break;
+		/* NOTREACHED */
 	}
 	return (ret);
 }
@@ -1432,7 +1433,7 @@ master_id_set(
 	if ((ret = master_key_set(wtds, session, KVS_MAXID, r)) != 0)
 		return (ret);
 	r->val = val;
-	r->val_len = snprintf(val, sizeof(val), "%" PRIu64, maxid);
+	r->val_len = (size_t)snprintf(val, sizeof(val), "%" PRIu64, maxid);
 	if ((ret = kvs_set(kvs, r)) != 0)
 		ERET(wtext, session,
 		    WT_ERROR, "kvs_set: %s: %s", KVS_MAXID, kvs_strerror(ret));
@@ -1517,10 +1518,10 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 	if ((ret = master_key_set(wtds, session, uri, r)) != 0)
 		return (ret);
 	r->val = val;
-	r->val_len = snprintf(val, sizeof(val),
+	r->val_len = (size_t)snprintf(val, sizeof(val),
 	    "key_generator=1,uid=%" PRIu64
 	    ",version=(major=%d,minor=%d),key_format=%.*s,value_format=%.*s",
-	    maxid, KVS_MAJOR, KVS_MINOR, a.len, a.str, b.len, b.str);
+	    maxid, KVS_MAJOR, KVS_MINOR, (int)a.len, a.str, (int)b.len, b.str);
 	if (r->val_len >= sizeof(val))
 		ERET(wtext, session, WT_ERROR, "master URI value too large");
 	++r->val_len;				/* Include the trailing nul. */
@@ -1567,7 +1568,7 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 	ret = master_uri_set(wtds, session, uri, kvs, config);
 
 	/* Unlock the URI. */
-err:	ETRET(unlock(wtext, session, &us->lock));
+	ETRET(unlock(wtext, session, &us->lock));
 
 	return (ret);
 }
@@ -1587,7 +1588,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	WT_EXTENSION_API *wtext;
 	kvs_t kvs;
 	int ret = 0;
-	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
+	char key[KVS_MAX_KEY_LEN];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1660,7 +1661,6 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
 	kvs_t kvs;
-	size_t size;
 	int ret = 0;
 	const char *cfg[2];
 	char val[KVS_MASTER_VALUE_MAX];
@@ -1727,7 +1727,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if (!us->configured) {
 		us->configured = 1;
 
-		master_uri_get(wtds, session, uri, kvs, val);
+		if ((ret = master_uri_get(wtds, session, uri, kvs, val)) != 0)
+			goto err;
 		cfg[0] = val;
 		cfg[1] = NULL;
 		if ((ret = wtext->config_get(wtext,
@@ -1883,6 +1884,11 @@ cleanup:		/*
 			goto err;
 		}
 
+		/* Copy in the new name. */
+		free(us->name);
+		us->name = copy;
+		copy = NULL;
+
 		/* Flush the change. */
 		if ((ret = kvs_commit(kvs)) != 0) {
 			ESET(wtext, session,
@@ -1901,6 +1907,8 @@ cleanup:		/*
 
 err:	ETRET(unlock(wtext, session, &us->lock));
 	ETRET(unlock(wtext, session, &ds->global_lock));
+
+	free(copy);
 	return (ret);
 }
 
