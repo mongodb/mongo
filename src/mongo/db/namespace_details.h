@@ -289,10 +289,11 @@ namespace mongo {
         }
 
         // @return offset in indexes[]
-        int findIndexByName(const char *name);
+        int findIndexByName(const char *name, bool includeBackgroundInProgress = false);
 
         // @return offset in indexes[]
-        int findIndexByKeyPattern(const BSONObj& keyPattern);
+        int findIndexByKeyPattern(const BSONObj& keyPattern, 
+                                  bool includeBackgroundInProgress = false);
 
         void findIndexByType( const string& name , vector<int>& matches ) {
             IndexIterator i = ii();

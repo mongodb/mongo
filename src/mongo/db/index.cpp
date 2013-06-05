@@ -212,11 +212,14 @@ namespace mongo {
             verify( sourceCollection );
         }
 
-        if ( sourceCollection->findIndexByName(name) >= 0 ) {
+        // Check both existing and in-progress indexes (2nd param = true)
+        if ( sourceCollection->findIndexByName(name, true) >= 0 ) {
             // index already exists.
             return false;
         }
-        if( sourceCollection->findIndexByKeyPattern(key) >= 0 ) {
+
+        // Check both existing and in-progress indexes (2nd param = true)
+        if( sourceCollection->findIndexByKeyPattern(key, true) >= 0 ) {
             LOG(2) << "index already exists with diff name " << name << ' ' << key.toString() << endl;
             return false;
         }
