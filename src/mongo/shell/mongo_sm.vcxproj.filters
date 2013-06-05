@@ -674,6 +674,12 @@
     <ClCompile Include="..\util\hex.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\process_id.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\process_id_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">
@@ -1527,6 +1533,9 @@
     </ClInclude>
     <ClInclude Include="..\base\status-inl.h">
       <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\process_id.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

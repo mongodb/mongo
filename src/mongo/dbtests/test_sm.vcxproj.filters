@@ -908,9 +908,6 @@
     <ClInclude Include="..\db\auth\privilege_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="..\s\field_parser.h">
-      <Filter>s</Filter>
-    </ClInclude>
     <ClInclude Include="..\s\type_collection.h">
       <Filter>s</Filter>
     </ClInclude>
@@ -2049,6 +2046,15 @@
     <ClInclude Include="..\db\auth\authz_session_external_state_server_common.h">
       <Filter>db\auth</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\field_parser.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\field_parser-inl.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\process_id.h">
+      <Filter>platform</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -2973,9 +2979,6 @@
     </ClCompile>
     <ClCompile Include="..\db\auth\privilege_set.cpp">
       <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\s\field_parser.cpp">
-      <Filter>s</Filter>
     </ClCompile>
     <ClCompile Include="..\s\type_collection.cpp">
       <Filter>s</Filter>
@@ -4061,6 +4064,36 @@
       <Filter>db\auth</Filter>
     </ClCompile>
     <ClCompile Include="..\db\auth\authz_session_external_state_server_common.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\field_parser.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\process_id.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\process_id_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_darwin.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_freebsd.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_linux2.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_none.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_sunos5.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_test.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authorization_manager_test.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
   </ItemGroup>

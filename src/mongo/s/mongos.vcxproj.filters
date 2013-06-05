@@ -810,9 +810,6 @@
     <ClCompile Include="..\db\auth\privilege_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="field_parser.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="type_collection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1803,6 +1800,18 @@
     <ClCompile Include="..\db\auth\authz_session_external_state_server_common.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\field_parser.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\process_id.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\process_id_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authorization_manager_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -2184,9 +2193,6 @@
     <ClInclude Include="..\db\auth\privilege_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="field_parser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="type_collection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2407,9 +2413,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="chunk_diff.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="field_parser-inl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="type_changelog.h">
@@ -3480,6 +3483,15 @@
     </ClInclude>
     <ClInclude Include="..\db\auth\authz_session_external_state_server_common.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\field_parser-inl.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\field_parser.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\process_id.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

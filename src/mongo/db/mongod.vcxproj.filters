@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\util\compress.cpp">
-      <Filter>third_party\snappy</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\snappy\snappy-sinksource.cc">
       <Filter>third_party\snappy</Filter>
     </ClCompile>
@@ -1322,9 +1319,6 @@
     <ClCompile Include="auth\privilege_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\field_parser.cpp">
-      <Filter>s</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\type_collection.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -2214,6 +2208,24 @@
       <Filter>db\auth</Filter>
     </ClCompile>
     <ClCompile Include="auth\auth_server_parameters.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="field_parser.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\compress.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_sunos5.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\process_id.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\process_id_test.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authorization_manager_test.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
   </ItemGroup>
@@ -3548,9 +3560,6 @@
     <ClInclude Include="auth\privilege_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="..\s\field_parser.h">
-      <Filter>s</Filter>
-    </ClInclude>
     <ClInclude Include="..\s\type_collection.h">
       <Filter>s</Filter>
     </ClInclude>
@@ -4487,6 +4496,15 @@
     </ClInclude>
     <ClInclude Include="auth\authz_session_external_state_server_common.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="field_parser.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="field_parser-inl.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\process_id.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
