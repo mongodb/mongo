@@ -21,7 +21,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/d_chunk_manager.h"
+#include "mongo/s/collection_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
@@ -94,7 +94,7 @@ namespace mongo {
         // querying support
 
         bool needShardChunkManager( const string& ns ) const;
-        ShardChunkManagerPtr getShardChunkManager( const string& ns );
+        CollectionManagerPtr getShardChunkManager( const string& ns );
 
         // chunk migrate and split support
 
@@ -163,7 +163,7 @@ namespace mongo {
 
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
         // a ShardChunkManager carries all state we need for a collection at this shard, including its version information
-        typedef map<string,ShardChunkManagerPtr> ChunkManagersMap;
+        typedef map<string,CollectionManagerPtr> ChunkManagersMap;
         ChunkManagersMap _chunks;
     };
 

@@ -30,7 +30,7 @@ namespace mongo {
         : _readContext( ns ) // Take a read lock.
         , _chunkMgr(shardingState.needShardChunkManager( ns )
                     ? shardingState.getShardChunkManager( ns )
-                    : ShardChunkManagerPtr())
+                    : CollectionManagerPtr())
     {}
 
     DocumentSourceCursor::~DocumentSourceCursor() {

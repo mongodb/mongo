@@ -947,7 +947,7 @@ namespace mongo {
 
             // 3.
 
-            ShardChunkManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
+            CollectionManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
             verify( chunkManager != NULL );
             BSONObj shardKeyPattern = chunkManager->getKeyPattern();
             if ( shardKeyPattern.isEmpty() ){
@@ -1176,14 +1176,18 @@ namespace mongo {
                 // we can figure that out by grabbing the chunkManager installed on 5.a
                 // TODO expose that manager when installing it
 
-                ShardChunkManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
+                CollectionManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
                 if( chunkManager->getNumChunks() > 0 ) {
 
                     // get another chunk on that shard
                     BSONObj lookupKey;
-                    BSONObj bumpMin, bumpMax;
+                    BSONObj bumpMin;
+                    BSONObj bumpMax;
                     do {
-                        chunkManager->getNextChunk( lookupKey , &bumpMin , &bumpMax );
+                        ChunkType bumpChunk;
+                        chunkManager->getNextChunk( lookupKey , &bumpChunk );
+                        bumpMin = bumpChunk.getMin();
+                        bumpMax = bumpChunk.getMax();
                         lookupKey = bumpMin;
                     }
                     while( bumpMin == min );

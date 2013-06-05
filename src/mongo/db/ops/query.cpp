@@ -137,7 +137,7 @@ namespace mongo {
             DiskLoc last;
 
             // This manager may be stale, but it's the state of chunking when the cursor was created.
-            ShardChunkManagerPtr manager = cc->getChunkManager();
+            CollectionManagerPtr manager = cc->getChunkManager();
             KeyPattern keyPattern( manager ? manager->getKeyPattern() : BSONObj() );
 
             while ( 1 ) {
@@ -599,9 +599,9 @@ namespace mongo {
         return _builder->bufferedMatches();
     }
 
-    ShardChunkManagerPtr QueryResponseBuilder::newChunkManager() const {
+    CollectionManagerPtr QueryResponseBuilder::newChunkManager() const {
         if ( !shardingState.needShardChunkManager( _parsedQuery.ns() ) ) {
-            return ShardChunkManagerPtr();
+            return CollectionManagerPtr();
         }
         return shardingState.getShardChunkManager( _parsedQuery.ns() );
     }
@@ -879,7 +879,7 @@ namespace mongo {
                     }
                     
                     if ( shardingState.needShardChunkManager( ns ) ) {
-                        ShardChunkManagerPtr m = shardingState.getShardChunkManager( ns );
+                        CollectionManagerPtr m = shardingState.getShardChunkManager( ns );
                         if ( m ) {
                             KeyPattern kp( m->getKeyPattern() );
                             if ( !m->keyBelongsToMe( kp.extractSingleKey( resObject ) ) ) {

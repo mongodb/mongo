@@ -103,13 +103,15 @@ env.Library('upgrade', ['cluster_client_internal.cpp',
 env.StaticLibrary('metadata', ['collection_manager.cpp',
                                'metadata_loader.cpp'],
                   LIBDEPS=['base',
-                           '$BUILD_DIR/mongo/clientandshell',
+                           '$BUILD_DIR/mongo/bson',
                            '$BUILD_DIR/mongo/base/base',
-                           '$BUILD_DIR/mongo/bson'])
+                           '$BUILD_DIR/mongo/mongocommon', # DBClient library
+                          ])
 
 env.CppUnitTest('chunk_diff_test',
                 'chunk_diff_test.cpp',
                 LIBDEPS=['metadata',
+                         '$BUILD_DIR/mongo/clientandshell', # CmdLine crutch
                          '$BUILD_DIR/mongo/db/common'],
                 NO_CRUTCH=True)
 
@@ -117,6 +119,7 @@ env.CppUnitTest('collection_manager_test',
                 'collection_manager_test.cpp',
                 LIBDEPS=['metadata',
                          '$BUILD_DIR/mongo/mocklib',
+                         '$BUILD_DIR/mongo/clientandshell', # CmdLine crutch
                          '$BUILD_DIR/mongo/db/common'],
                 NO_CRUTCH=True)
 
@@ -124,6 +127,7 @@ env.CppUnitTest('metadata_loader_test',
                 'metadata_loader_test.cpp',
                 LIBDEPS=['metadata',
                          '$BUILD_DIR/mongo/mocklib',
+                         '$BUILD_DIR/mongo/clientandshell', # CmdLine crutch
                          '$BUILD_DIR/mongo/db/common'],
                 NO_CRUTCH=True);
 

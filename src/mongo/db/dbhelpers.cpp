@@ -371,7 +371,7 @@ namespace mongo {
                     // TODO: This is not quite correct, we may be transferring docs in the same
                     // range.  Right now we're protected since we can't transfer docs in while we
                     // delete.
-                    ShardChunkManagerPtr managerNow = shardingState.getShardChunkManager( ns );
+                    CollectionManagerPtr managerNow = shardingState.getShardChunkManager( ns );
                     bool docIsOrphan = true;
                     if ( managerNow ) {
                         KeyPattern kp( managerNow->getKeyPattern() );

@@ -25,6 +25,10 @@ namespace mongo {
 
     class MetadataLoader;
 
+    // For now, we handle lifecycle of CollectionManager via shared_ptrs
+    class CollectionManager;
+    typedef shared_ptr<const CollectionManager> CollectionManagerPtr;
+
     /**
      * The collection manager has metadata information about a collection, in particular the
      * sharding information. It's main goal in life is to be capable of answering if a certain

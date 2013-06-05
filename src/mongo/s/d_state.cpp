@@ -39,6 +39,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/metadata_loader.h"
 #include "mongo/s/shard.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -137,8 +138,8 @@ namespace mongo {
         if ( it == _chunks.end() )
             return false;
 
-        ShardChunkManagerPtr p = it->second;
-        version = p->getVersion();
+        CollectionManagerPtr p = it->second;
+        version = p->getShardVersion();
         return true;
     }
 
@@ -147,8 +148,8 @@ namespace mongo {
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         if ( it != _chunks.end() ) {
-            ShardChunkManagerPtr p = it->second;
-            return p->getVersion();
+            CollectionManagerPtr p = it->second;
+            return p->getShardVersion();
         }
         else {
             return ChunkVersion( 0, OID() );
@@ -160,12 +161,20 @@ namespace mongo {
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         verify( it != _chunks.end() ) ;
-        ShardChunkManagerPtr p = it->second;
+        CollectionManagerPtr p = it->second;
 
         // empty shards should have version 0
         version = ( p->getNumChunks() > 1 ) ? version : ChunkVersion( 0 , OID() );
 
-        ShardChunkManagerPtr cloned( p->cloneMinus( min , max , version ) );
+        ChunkType chunk;
+        chunk.setMin( min );
+        chunk.setMax( max );
+        string errMsg;
+
+        CollectionManagerPtr cloned( p->cloneMinus( chunk, version, &errMsg ) );
+        // Errors reported via assertions here
+        uassert( 16844, errMsg, NULL != cloned.get() );
+
         // TODO: a bit dangerous to have two different zero-version states - no-manager and
         // no-version
         _chunks[ns] = cloned;
@@ -177,18 +186,40 @@ namespace mongo {
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         verify( it != _chunks.end() ) ;
-        ShardChunkManagerPtr p( it->second->clonePlus( min , max , version ) );
-        _chunks[ns] = p;
+
+        ChunkType chunk;
+        chunk.setMin( min );
+        chunk.setMax( max );
+        string errMsg;
+
+        CollectionManagerPtr cloned( it->second->clonePlus( chunk, version, &errMsg ) );
+        // Errors reported via assertions here
+        uassert( 16845, errMsg, NULL != cloned.get() );
+
+        _chunks[ns] = cloned;
     }
 
-    void ShardingState::splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
-                                    ChunkVersion version ) {
+    void ShardingState::splitChunk( const string& ns,
+                                    const BSONObj& min,
+                                    const BSONObj& max,
+                                    const vector<BSONObj>& splitKeys,
+                                    ChunkVersion version )
+    {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         verify( it != _chunks.end() ) ;
-        ShardChunkManagerPtr p( it->second->cloneSplit( min , max , splitKeys , version ) );
-        _chunks[ns] = p;
+
+        ChunkType chunk;
+        chunk.setMin( min );
+        chunk.setMax( max );
+        string errMsg;
+
+        CollectionManagerPtr cloned( it->second->cloneSplit( chunk, splitKeys, version, &errMsg ) );
+        // Errors reported via assertions here
+        uassert( 16846, errMsg, NULL != cloned.get() );
+
+        _chunks[ns] = cloned;
     }
 
     void ShardingState::resetVersion( const string& ns ) {
@@ -224,7 +255,7 @@ namespace mongo {
         //     one triggered the 'slow path' (below)
         //     when the second's request gets here, the version is already current
         ChunkVersion storedVersion;
-        ShardChunkManagerPtr currManager;
+        CollectionManagerPtr currManager;
         {
             scoped_lock lk( _mutex );
             ChunkManagersMap::const_iterator it = _chunks.find( ns );
@@ -236,7 +267,7 @@ namespace mongo {
             }
             else{
                 currManager = it->second;
-                if( ( storedVersion = it->second->getVersion() ).isEquivalentTo( version ) )
+                if( ( storedVersion = it->second->getShardVersion() ).isEquivalentTo( version ) )
                     return true;
             }
         }
@@ -255,7 +286,12 @@ namespace mongo {
         //   + a stale client request a version that's not current anymore
 
         // Can't lock default mutex while creating ShardChunkManager, b/c may have to create a new connection to myself
-        const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
+
+        string errMsg;
+        ConnectionString configLoc = ConnectionString::parse( _configServer, errMsg );
+        uassert( 16847, str::stream() << "bad config server connection string" << _configServer
+                << causedBy( errMsg ),
+                configLoc.type() != ConnectionString::INVALID );
 
         // If our epochs aren't compatible, it's not useful to use the old manager for chunk diffs
         if( currManager && ! currManager->getCollVersion().hasCompatibleEpoch( version ) ){
@@ -266,12 +302,16 @@ namespace mongo {
             currManager.reset();
         }
 
-        ShardChunkManagerPtr p( ShardChunkManager::make( c , ns , _shardName, currManager ) );
+        MetadataLoader mdLoader( configLoc );
+        CollectionManagerPtr newManager( mdLoader.makeCollectionManager( ns,
+                                                                         _shardName,
+                                                                         currManager.get(),
+                                                                         &errMsg ) );
 
-        // Handle the case where the collection isn't sharded more gracefully
-        if( p->getKeyPattern().isEmpty() ){
+        if ( !newManager ) {
             version = ChunkVersion( 0, OID() );
-            // There was an error getting any data for this collection, return false
+            warning() << errMsg << endl;
+            // There was an error getting sharded data for this collection, return false
             return false;
         }
 
@@ -285,12 +325,14 @@ namespace mongo {
             // since we loaded the chunk manager unlocked, other thread may have done the same
             // make sure we keep the freshest config info only
             ChunkManagersMap::const_iterator it = _chunks.find( ns );
-            if ( it == _chunks.end() || p->getVersion() >= it->second->getVersion() ) {
-                _chunks[ns] = p;
+            if ( it == _chunks.end()
+                || newManager->getShardVersion() >= it->second->getShardVersion() )
+            {
+                _chunks[ns] = newManager;
             }
 
             ChunkVersion oldVersion = version;
-            version = p->getVersion();
+            version = newManager->getShardVersion();
             return oldVersion.isEquivalentTo( version );
         }
     }
@@ -310,8 +352,8 @@ namespace mongo {
             scoped_lock lk(_mutex);
 
             for ( ChunkManagersMap::iterator it = _chunks.begin(); it != _chunks.end(); ++it ) {
-                ShardChunkManagerPtr p = it->second;
-                bb.appendTimestamp( it->first , p->getVersion().toLong() );
+                CollectionManagerPtr p = it->second;
+                bb.appendTimestamp( it->first , p->getShardVersion().toLong() );
             }
             bb.done();
         }
@@ -328,12 +370,12 @@ namespace mongo {
         return true;
     }
 
-    ShardChunkManagerPtr ShardingState::getShardChunkManager( const string& ns ) {
+    CollectionManagerPtr ShardingState::getShardChunkManager( const string& ns ) {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         if ( it == _chunks.end() ) {
-            return ShardChunkManagerPtr();
+            return CollectionManagerPtr();
         }
         else {
             return it->second;

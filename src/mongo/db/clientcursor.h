@@ -37,8 +37,8 @@
 #include "dbhelpers.h"
 #include "matcher.h"
 #include "projection.h"
-#include "s/d_chunk_manager.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/s/collection_manager.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
@@ -288,8 +288,8 @@ namespace mongo {
             return _c->matcher()->matchesCurrent( _c.get() );
         }
 
-        void setChunkManager( ShardChunkManagerPtr manager ){ _chunkManager = manager; }
-        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
+        void setChunkManager( CollectionManagerPtr manager ){ _chunkManager = manager; }
+        CollectionManagerPtr getChunkManager(){ return _chunkManager; }
 
     private:
         void setLastLoc_inlock(DiskLoc);
@@ -417,7 +417,7 @@ namespace mongo {
         bool _doingDeletes; // when true we are the delete and aboutToDelete shouldn't manipulate us
         ElapsedTracker _yieldSometimesTracker;
 
-        ShardChunkManagerPtr _chunkManager;
+        CollectionManagerPtr _chunkManager;
 
     public:
         shared_ptr<ParsedQuery> pq;

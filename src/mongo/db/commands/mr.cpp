@@ -31,7 +31,7 @@
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/s/d_chunk_manager.h"
+#include "mongo/s/collection_manager.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
@@ -1119,7 +1119,7 @@ namespace mongo {
                 uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
 
                 ClientCursor::Holder holdCursor;
-                ShardChunkManagerPtr chunkManager;
+                CollectionManagerPtr chunkManager;
 
                 {
                     // Get chunk manager before we check our version, to make sure it doesn't increment

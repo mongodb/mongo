@@ -643,7 +643,6 @@ serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_state.cpp",
                      "s/d_split.cpp",
                      "client/distlock_test.cpp",
-                     "s/d_chunk_manager.cpp",
                      "db/module.cpp" ]
 
 env.StaticLibrary("defaultversion", "s/default_version.cpp")
@@ -694,6 +693,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "geoquery",
                            "index_set",
                            'range_deleter',
+                           's/metadata',
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.
