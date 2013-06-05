@@ -417,9 +417,10 @@ __wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
 	cb = session->bkp_cursor;
 
 	/* Add the metadata entry to the backup file. */
-	WT_RET(__wt_metadata_read(session, name, &value));
+	WT_RET(__wt_metadata_search(session, name, &value));
 	WT_RET_TEST(
 	    (fprintf(cb->bfp, "%s\n%s\n", name, value) < 0), __wt_errno());
+	__wt_free(session, value);
 
 	/* Add file type objects to the list of files to be copied. */
 	if (WT_PREFIX_MATCH(name, "file:"))

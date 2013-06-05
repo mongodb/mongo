@@ -75,7 +75,7 @@ err:	session->dhandle = saved_dhandle;
 
 /*
  * __wt_metadata_insert --
- *	Insert a row into the metadata
+ *	Insert a row into the metadata.
  */
 int
 __wt_metadata_insert(
@@ -127,7 +127,7 @@ err:	WT_TRET(cursor->close(cursor));
 
 /*
  * __wt_metadata_remove --
- *	Removes a row from the metadata.
+ *	Remove a row from the metadata.
  */
 int
 __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
@@ -151,12 +151,12 @@ err:	WT_TRET(cursor->close(cursor));
 }
 
 /*
- * __wt_metadata_read --
- *	Reads and copies a row from the metadata.
+ * __wt_metadata_search --
+ *	Return a copied row from the metadata.
  *	The caller is responsible for freeing the allocated memory.
  */
 int
-__wt_metadata_read(
+__wt_metadata_search(
     WT_SESSION_IMPL *session, const char *key, const char **valuep)
 {
 	WT_CURSOR *cursor;

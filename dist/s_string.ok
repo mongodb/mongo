@@ -350,6 +350,7 @@ cxa
 data's
 datalen
 datasets
+datasource
 dbc
 decl
 decr
@@ -700,6 +701,7 @@ strcmp
 strdup
 strerror
 strftime
+strget
 stringin
 strncpy
 strndup
@@ -795,12 +797,14 @@ untyped
 upd
 upg
 uri
+uri's
 usedp
 usr
 utf
 util
 uu
 va
+valuep
 vanishingly
 vcell
 verrx

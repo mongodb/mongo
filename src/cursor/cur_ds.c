@@ -299,7 +299,7 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	 * XXX
 	 * We'll need the object's key and value formats.
 	 */
-	WT_ERR(__wt_metadata_read(session, uri, &metaconf));
+	WT_ERR(__wt_metadata_search(session, uri, &metaconf));
 	WT_ERR(__wt_config_getones(session, metaconf, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &cursor->key_format));
 	WT_ERR(__wt_config_getones(session, metaconf, "value_format", &cval));

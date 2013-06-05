@@ -70,7 +70,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 		WT_ERR(__wt_schema_colgroup_name(session, table,
 		    ckey.str, ckey.len, buf));
-		if ((ret = __wt_metadata_read(
+		if ((ret = __wt_metadata_search(
 		    session, buf->data, &cgconfig)) != 0) {
 			/* It is okay if the table is incomplete. */
 			if (ret == WT_NOTFOUND)

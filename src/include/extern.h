@@ -526,6 +526,11 @@ extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api,
     WT_CONFIG_ARG *cfg_arg,
     const char *key,
     WT_CONFIG_ITEM *cval);
+extern int __wt_ext_config_strget(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *config,
+    const char *key,
+    WT_CONFIG_ITEM *cval);
 extern int __wt_ext_config_scan_begin( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     const char *str,
@@ -740,13 +745,6 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 extern void *__wt_lsm_merge_worker(void *vargs);
 extern void *__wt_lsm_bloom_worker(void *arg);
 extern void *__wt_lsm_checkpoint_worker(void *arg);
-extern int __wt_metadata_get(WT_SESSION *session,
-    const char *uri,
-    const char **valuep);
-extern int __wt_metadata_get_ckptlist( WT_SESSION *session,
-    const char *name,
-    WT_CKPT **ckptbasep);
-extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
 extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
@@ -769,6 +767,25 @@ extern int __wt_meta_ckptlist_set( WT_SESSION_IMPL *session,
 extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern void __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt);
+extern int __wt_ext_metadata_insert(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *key,
+    const char *value);
+extern int __wt_ext_metadata_remove( WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *key);
+extern int __wt_ext_metadata_search(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *key,
+    const char **valuep);
+extern int __wt_ext_metadata_update(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    const char *key,
+    const char *value);
+extern int __wt_metadata_get_ckptlist( WT_SESSION *session,
+    const char *name,
+    WT_CKPT **ckptbasep);
+extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
@@ -780,7 +797,7 @@ extern int __wt_metadata_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
 extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
-extern int __wt_metadata_read( WT_SESSION_IMPL *session,
+extern int __wt_metadata_search( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
 extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);

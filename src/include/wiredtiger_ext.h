@@ -122,7 +122,6 @@ struct __wt_extension_api {
 	 * @param session the session handle (or NULL if none available)
 	 * @param key configuration key string
 	 * @param config the configuration information passed to an application
-	 * callback
 	 * @param value the returned value
 	 * @errors
 	 *
@@ -132,6 +131,21 @@ struct __wt_extension_api {
 	    WT_CONFIG_ARG *config, const char *key, WT_CONFIG_ITEM *value);
 
 	/*!
+	 * Return the value of a configuration string.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param config a configuration string
+	 * @param key configuration key string
+	 * @param value the returned value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION config_strget
+	 */
+	int (*config_strget)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    const char *config, const char *key, WT_CONFIG_ITEM *value);
+
+	/*!
 	 * Return the list entries of a configuration string value.
 	 * This method steps through the entries found in the last returned
 	 * value from WT_EXTENSION_API::config_get.  The last returned value
@@ -139,7 +153,9 @@ struct __wt_extension_api {
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
-	 * @param value the returned value
+	 * @param str the configuration string to scan
+	 * @param len the number of valid bytes in \c str
+	 * @param[out] scanp a handle used to scan the config string
 	 * @errors
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION config scan
@@ -167,16 +183,71 @@ struct __wt_extension_api {
 	 * boolean \c "true" value.
 	 *
 	 * @param wt_api the extension handle
-	 * @param session the session handle (or NULL if none available)
-	 * @param str the configuration string to scan
-	 * @param len the number of valid bytes in \c str
-	 * @param[out] scanp a handle used to scan the config string
+	 * @param scan the configuration scanner
+	 * @param key the returned key
+	 * @param value the returned value
 	 * @errors
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION config scan
 	 */
 	int (*config_scan_next)(WT_EXTENSION_API *wt_api,
 	    WT_CONFIG_SCAN *scan, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
+
+	/*!
+	 * Insert a row into the metadata if it does not already exist.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @param value row value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata insert
+	 */
+	int (*metadata_insert)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *key, const char *value);
+
+	/*!
+	 * Remove a row from the metadata.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata remove
+	 */
+	int (*metadata_remove)(
+	    WT_EXTENSION_API *wt_api, WT_SESSION *session, const char *key);
+
+	/*!
+	 * Return a row from the metadata.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @param [out] valuep the row value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata search
+	 */
+	int (*metadata_search)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *key, const char **valuep);
+
+	/*!
+	 * Update a row in the metadata by either inserting a new record or
+	 * updating an existing record.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param key row key
+	 * @param value row value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION metadata update
+	 */
+	int (*metadata_update)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *key, const char *value);
 
 	/*!
 	 * Pack a structure into a buffer.

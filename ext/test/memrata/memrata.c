@@ -68,26 +68,19 @@
 } while (0)
 
 /*
- * I think it's pretty unlikely we'll ever need to revise the version, but
- * it can't hurt to be cautious.
+ * Version each file, out of sheer raging paranoia.
  */
 #define	KVS_MAJOR	1			/* KVS major, minor version */
 #define	KVS_MINOR	0
 
 /*
  * We partition the flat space into a set of objects based on a packed, 8B
- * leading byte.
- *
- * Object ID 1 is for master records; object ID from 1 to KVS_MAXID_BASE are
- * reserved for future use (and, I suppose object ID 0 would work as well).
- * I can't think of any reason I'd need them, but it's a cheap and easy backup
+ * leading byte.  Object IDs from 0 to KVS_MAXID_BASE are reserved for future
+ * use -- I can't think of any reason I'd need them, but it's a cheap backup
  * plan.
  */
-#define	KVS_MASTER_ID		1		/* Master object ID */
-#define	KVS_MASTER_VALUE_MAX	256		/* Maximum master value */
-
-#define	KVS_MAXID	"WiredTiger.maxid"	/* Maximum object ID key */
-#define	KVS_MAXID_BASE	6			/* First object ID */
+#define	KVS_MAXID	"memrata:WiredTiger.maxid"	/* max object ID key */
+#define	KVS_MAXID_BASE	6				/* first object ID */
 
 /*
  * Each KVS source supports a set of URIs (named objects).  Cursors reference
@@ -97,7 +90,7 @@ typedef struct __uri_source {
 	char *name;				/* Unique name */
 	pthread_rwlock_t lock;			/* Lock */
 
-	int	configured;			/* If configured */
+	int	configured;			/* If URI source configured */
 	u_int	ref;				/* Active reference count */
 
 	/*
@@ -1336,78 +1329,30 @@ uri_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
 }
 
 /*
- * master_key_set --
- *	Set a master key from a key, checking the length.
- */
-static int
-master_key_set(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, const char *key, struct kvs_record *r)
-{
-	DATA_SOURCE *ds;
-	WT_EXTENSION_API *wtext;
-	size_t idlen, len;
-	int ret = 0;
-	uint8_t id[KVS_MAX_PACKED_8B];
-
-	ds = (DATA_SOURCE *)wtds;
-	wtext = ds->wtext;
-
-	if ((ret = wtext->struct_size(wtext,
-	    session, &idlen, "r", KVS_MASTER_ID)) != 0 ||
-	    (ret = wtext->struct_pack(wtext,
-	    session, id, sizeof(id), "r", KVS_MASTER_ID)) != 0)
-		return (ret);
-
-	/* Check to see if the ID and key can fit into a key. */
-	len = strlen(key);
-	if (idlen + len > KVS_MAX_KEY_LEN)
-		ERET(wtext, session, EINVAL, "%s: too large for a Memrata key");
-
-	memcpy((uint8_t *)r->key, id, idlen);
-	memcpy((uint8_t *)r->key + idlen, key, len);
-	r->key_len = idlen + len;
-	return (0);
-}
-
-/*
  * master_id_get --
  *	Return the maximum file ID in the system.
  */
 static int
-master_id_get(
-    WT_DATA_SOURCE *wtds, WT_SESSION *session, kvs_t kvs, uint64_t *maxidp)
+master_id_get(WT_DATA_SOURCE *wtds, WT_SESSION *session, uint64_t *maxidp)
 {
-	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
 	int ret = 0;
-	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
-
-	*maxidp = KVS_MAXID_BASE;
+	const char *value;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	if ((ret = master_key_set(wtds, session, KVS_MAXID, r)) != 0)
-		return (ret);
-	r->val = val;
-	r->val_len = sizeof(val);
-	switch (ret = kvs_get(kvs, r, 0UL, (unsigned long)sizeof(val))) {
-	case 0:
-		*maxidp = strtouq(r->val, NULL, 10);
-		break;
-	case KVS_E_KEY_NOT_FOUND:
-		ret = 0;
-		break;
-	default:
-		ERET(wtext, session,
-		    WT_ERROR, "kvs_get: %s: %s", KVS_MAXID, kvs_strerror(ret));
-		/* NOTREACHED */
+	if ((ret =
+	    wtext->metadata_search(wtext, session, KVS_MAXID, &value)) == 0) {
+		*maxidp = strtouq(value, NULL, 10);
+		return (0);
 	}
-	return (ret);
+	if (ret == WT_NOTFOUND) {
+		*maxidp = KVS_MAXID_BASE;
+		return (0);
+	}
+	ERET(wtext, session, ret, "%s: %s", KVS_MAXID, wtext->strerror(ret));
 }
 
 /*
@@ -1415,32 +1360,21 @@ master_id_get(
  *	Increment the maximum file ID in the system.
  */
 static int
-master_id_set(
-    WT_DATA_SOURCE *wtds, WT_SESSION *session, kvs_t kvs, uint64_t maxid)
+master_id_set(WT_DATA_SOURCE *wtds, WT_SESSION *session, uint64_t maxid)
 {
-	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
 	int ret = 0;
-	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
+	char value[32];			/* Large enough for any 8B value. */
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	if ((ret = master_key_set(wtds, session, KVS_MAXID, r)) != 0)
-		return (ret);
-	r->val = val;
-	r->val_len = (size_t)snprintf(val, sizeof(val), "%" PRIu64, maxid);
-	if ((ret = kvs_set(kvs, r)) != 0)
-		ERET(wtext, session,
-		    WT_ERROR, "kvs_set: %s: %s", KVS_MAXID, kvs_strerror(ret));
-	if ((ret = kvs_commit(kvs)) != 0)
-		ERET(wtext, session,
-		    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
-	return (0);
+	(void)snprintf(value, sizeof(value), "%" PRIu64, maxid);
+	if ((ret =
+	    wtext->metadata_update(wtext, session, KVS_MAXID, value)) == 0)
+		return (0);
+	ERET(wtext, session, ret, "%s: %s", KVS_MAXID, wtext->strerror(ret));
 }
 
 /*
@@ -1449,29 +1383,61 @@ master_id_set(
  */
 static int
 master_uri_get(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, const char *uri, kvs_t kvs, char *val)
+    WT_SESSION *session, const char *uri, const char **valuep)
 {
-	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	int ret = 0;
-	char key[KVS_MAX_KEY_LEN];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	if ((ret = master_key_set(wtds, session, uri, r)) != 0)
+	return (wtext->metadata_search(wtext, session, uri, valuep));
+}
+
+/*
+ * master_uri_drop --
+ *	Drop the KVS master record for a URI.
+ */
+static int
+master_uri_drop(WT_DATA_SOURCE *wtds, WT_SESSION *session, const char *uri)
+{
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	return (wtext->metadata_remove(wtext, session, uri));
+}
+
+/*
+ * master_uri_rename --
+ *	Rename the KVS master record for a URI.
+ */
+static int
+master_uri_rename(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, const char *newuri)
+{
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
+	const char *value;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	/* Insert the record under a new name. */
+	if ((ret = master_uri_get(wtds, session, uri, &value)) != 0 ||
+	    (ret = wtext->metadata_insert(wtext, session, newuri, value)) != 0)
 		return (ret);
-	r->val = val;
-	r->val_len = KVS_MASTER_VALUE_MAX;
-	if ((ret = kvs_get(kvs, r, 0UL, KVS_MASTER_VALUE_MAX)) == 0)
-		return (0);
-	if (ret == KVS_E_KEY_NOT_FOUND)
-		return (WT_NOTFOUND);
-	ERET(wtext, session, WT_ERROR, "kvs_get: %s", uri, kvs_strerror(ret));
+
+	/*
+	 * Remove the original record, and if that fails, attempt to remove
+	 * the new record.
+	 */
+	if ((ret = wtext->metadata_remove(wtext, session, uri)) != 0)
+		(void)wtext->metadata_remove(wtext, session, newuri);
+	return (ret);
 }
 
 /*
@@ -1480,66 +1446,70 @@ master_uri_get(WT_DATA_SOURCE *wtds,
  */
 static int
 master_uri_set(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, const char *uri, kvs_t kvs, WT_CONFIG_ARG *config)
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
-	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	WT_CONFIG_ITEM a, b;
 	WT_EXTENSION_API *wtext;
 	uint64_t maxid;
-	int ret = 0;
-	char key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
+	int exclusive, ret = 0;
+	char value[1024];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
 	/* Get the maximum file ID. */
-	if ((ret = master_id_get(wtds, session, kvs, &maxid)) != 0)
+	if ((ret = master_id_get(wtds, session, &maxid)) != 0)
 		return (ret);
 	++maxid;
 
+	exclusive = 0;
+	if ((ret =
+	    wtext->config_get(wtext, session, config, "exclusive", &a)) == 0)
+		exclusive = a.val != 0;
+	else if (ret != WT_NOTFOUND)
+		ERET(wtext, session, ret,
+		    "exclusive configuration: %s", wtext->strerror(ret));
+
 	/* Get the key/value format strings. */
 	if ((ret = wtext->config_get(
-	    wtext, session, config, "key_format", &a)) != 0)
-		ERET(wtext, session, ret,
-		    "key_format configuration: %s", wtext->strerror(ret));
+	    wtext, session, config, "key_format", &a)) != 0) {
+		if (ret == WT_NOTFOUND) {
+			a.str = "u";
+			a.len = 1;
+		} else
+			ERET(wtext, session, ret,
+			    "key_format configuration: %s",
+			    wtext->strerror(ret));
+	}
 	if ((ret = wtext->config_get(
-	    wtext, session, config, "value_format", &b)) != 0)
-		ERET(wtext, session, ret,
-		    "value_format configuration: %s", wtext->strerror(ret));
+	    wtext, session, config, "value_format", &b)) != 0) {
+		if (ret == WT_NOTFOUND) {
+			b.str = "u";
+			b.len = 1;
+		} else
+			ERET(wtext, session, ret,
+			    "value_format configuration: %s",
+			    wtext->strerror(ret));
+	}
 
 	/*
-	 * Create a new reference using kvs_add (which fails if the record
-	 * already exists).
+	 * Create a new reference using insert (which fails if the record
+	 * already exists).  If that succeeds, we just used up a unique ID,
+	 * update the master ID record.
 	 */
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	if ((ret = master_key_set(wtds, session, uri, r)) != 0)
-		return (ret);
-	r->val = val;
-	r->val_len = (size_t)snprintf(val, sizeof(val),
-	    "key_generator=1,uid=%" PRIu64
-	    ",version=(major=%d,minor=%d),key_format=%.*s,value_format=%.*s",
+	(void)snprintf(value, sizeof(value),
+	    "uid=%" PRIu64
+	    ",version=(major=%d,minor=%d)"
+	    ",key_format=%.*s,value_format=%.*s",
 	    maxid, KVS_MAJOR, KVS_MINOR, (int)a.len, a.str, (int)b.len, b.str);
-	if (r->val_len >= sizeof(val))
-		ERET(wtext, session, WT_ERROR, "master URI value too large");
-	++r->val_len;				/* Include the trailing nul. */
-	switch (ret = kvs_add(kvs, r)) {
-	case 0:
-		if ((ret = master_id_set(wtds, session, kvs, maxid)) != 0)
-			return (ret);
-		if ((ret = kvs_commit(kvs)) != 0)
-			ERET(wtext, session,
-			    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
-		break;
-	case KVS_E_KEY_EXISTS:
-		break;
-	default:
-		ERET(wtext,
-		    session, WT_ERROR, "kvs_add: %s", uri, kvs_strerror(ret));
-	}
-	return (0);
+	if ((ret = wtext->metadata_insert(wtext, session, uri, value)) == 0)
+		return (master_id_set(wtds, session, maxid));
+
+	if (ret == WT_DUPLICATE_KEY)
+		return (exclusive ? EEXIST : 0);
+
+	ERET(wtext, session, ret, "%s: %s", KVS_MAXID, wtext->strerror(ret));
 }
 
 /*
@@ -1553,7 +1523,6 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 	DATA_SOURCE *ds;
 	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
@@ -1562,10 +1531,9 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 	/* Get a locked reference to the URI. */
 	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
 		return (ret);
-	kvs = us->ks->kvs;
 
 	/* Create the URI master record if it doesn't already exist. */
-	ret = master_uri_set(wtds, session, uri, kvs, config);
+	ret = master_uri_set(wtds, session, uri, config);
 
 	/* Unlock the URI. */
 	ETRET(unlock(wtext, session, &us->lock));
@@ -1581,14 +1549,11 @@ static int
 kvs_session_drop(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
-	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
 	URI_SOURCE **p, *us;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
-	char key[KVS_MAX_KEY_LEN];
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
@@ -1597,13 +1562,16 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	if ((ret = uri_source_open(wtds, session, config, uri, 1, &us)) != 0)
 		return (ret);
 	ks = us->ks;
-	kvs = us->ks->kvs;
 
 	/* If there are active references to the object, we're busy. */
 	if (us->ref != 0) {
 		ret = EBUSY;
 		goto err;
 	}
+
+	/* Discard all of the rows in the object. */
+	if ((ret = uri_truncate(wtds, session, us)) != 0)
+		goto err;
 
 	/*
 	 * Remove the entry from the URI_SOURCE list -- it's a singly-linked
@@ -1613,8 +1581,8 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 		if (*p == us)
 			break;
 	/*
-	 * We should be guaranteed to find an entry, after all, we just looked
-	 * it up, and everything is locked down.
+	 * We should be guaranteed to find an entry, we just looked it up and
+	 * everything is locked down.
 	 */
 	if (*p == NULL) {
 		ret = WT_NOTFOUND;
@@ -1622,24 +1590,8 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	}
 	*p = (*p)->next;
 
-	/*
-	 * Create a new reference to the newname, using kvs_add (which fails
-	 * if the record already exists).
-	 */
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	if ((ret = master_key_set(wtds, session, uri, r)) != 0)
-		goto err;
-	r->val = NULL;
-	r->val_len = 0;
-	if ((ret = kvs_del(kvs, r)) != 0) {
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_del: %s: %s", uri, kvs_strerror(ret));
-		goto err;
-	}
-
-	ret = uri_truncate(wtds, session, us);
+	/* Discard the metadata entry. */
+	ret = master_uri_drop(wtds, session, uri);
 
 err:	ETRET(unlock(wtext, session, &us->lock));
 	ETRET(unlock(wtext, session, &ds->global_lock));
@@ -1660,16 +1612,15 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	WT_CONFIG_ITEM v;
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
-	const char *cfg[2];
-	char val[KVS_MASTER_VALUE_MAX];
+	const char *value;
 
 	*new_cursor = NULL;
 
 	cursor = NULL;
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
+	value = NULL;
 
 	/* Allocate and initialize a cursor. */
 	if ((cursor = calloc(1, sizeof(CURSOR))) == NULL)
@@ -1711,7 +1662,6 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	/* Get a locked reference to the URI. */
 	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
 		goto err;
-	kvs = us->ks->kvs;
 
 	/*
 	 * Finish initializing the cursor (if the URI_SOURCE structure requires
@@ -1727,12 +1677,10 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if (!us->configured) {
 		us->configured = 1;
 
-		if ((ret = master_uri_get(wtds, session, uri, kvs, val)) != 0)
+		if ((ret = master_uri_get(wtds, session, uri, &value)) != 0)
 			goto err;
-		cfg[0] = val;
-		cfg[1] = NULL;
-		if ((ret = wtext->config_get(wtext,
-		    session, (WT_CONFIG_ARG *)cfg, "uid", &v)) != 0) {
+		if ((ret = wtext->config_strget(
+		    wtext, session, value, "uid", &v)) != 0) {
 			ESET(wtext, session, ret,
 			    "WT_EXTENSION_API.config: uid: %s",
 			    wtext->strerror(ret));
@@ -1757,8 +1705,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 			goto err;
 		}
 
-		if ((ret = wtext->config_get(wtext,
-		    session, (WT_CONFIG_ARG *)cfg, "key_format", &v)) != 0) {
+		if ((ret = wtext->config_strget(
+		    wtext, session, value, "key_format", &v)) != 0) {
 			ESET(wtext, session, ret,
 			    "key_format configuration: %s",
 			    wtext->strerror(ret));
@@ -1766,8 +1714,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		}
 		us->config_recno = v.len == 1 && v.str[0] == 'r';
 
-		if ((ret = wtext->config_get(wtext,
-		    session, (WT_CONFIG_ARG *)cfg, "value_format", &v)) != 0) {
+		if ((ret = wtext->config_strget(
+		    wtext, session, value, "value_format", &v)) != 0) {
 			ESET(wtext, session, ret,
 			    "value_format configuration: %s",
 			    wtext->strerror(ret));
@@ -1808,6 +1756,7 @@ err:		if (cursor != NULL) {
 			free(cursor);
 		}
 	}
+	free((void *)value);
 	return (ret);
 }
 
@@ -1817,27 +1766,21 @@ err:		if (cursor != NULL) {
  */
 static int
 kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
-    const char *uri, const char *newname, WT_CONFIG_ARG *config)
+    const char *uri, const char *newuri, WT_CONFIG_ARG *config)
 {
-	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
 	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
-	char *copy, key[KVS_MAX_KEY_LEN], val[KVS_MASTER_VALUE_MAX];
+	char *copy;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-
-	/* Get a copy of the new name. */
-	if ((copy = strdup(newname)) == NULL)
-		return (os_errno());
+	copy = NULL;
 
 	/* Get a locked reference to the URI. */
 	if ((ret = uri_source_open(wtds, session, config, uri, 1, &us)) != 0)
 		return (ret);
-	kvs = us->ks->kvs;
 
 	/* If there are active references to the object, we're busy. */
 	if (us->ref != 0) {
@@ -1845,65 +1788,18 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		goto err;
 	}
 
-	/* Get the master record for the original name. */
-	if ((ret = master_uri_get(wtds, session, uri, kvs, val)) != 0)
+	/* Get a copy of the new name to simplify cleanup. */
+	if ((copy = strdup(newuri)) == NULL)
+		return (os_errno());
+
+	/* Update the metadata record. */
+	if ((ret = master_uri_rename(wtds, session, uri, newuri)) != 0)
 		goto err;
 
-	/*
-	 * Create a new reference to the newname, using kvs_add (which fails
-	 * if the record already exists).
-	 */
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	if ((ret = master_key_set(wtds, session, newname, r)) != 0)
-		goto err;
-	r->val = val;
-	r->val_len = strlen(val) + 1;		/* Include the trailing nul. */
-	switch (ret = kvs_add(kvs, r)) {
-	case 0:
-		/* Remove the original entry. */
-		if ((ret = master_key_set(wtds, session, uri, r)) != 0)
-			goto cleanup;
-		r->val = NULL;
-		r->val_len = 0;
-		if ((ret = kvs_del(kvs, r)) != 0) {
-			ESET(wtext, session, WT_ERROR,
-			    "kvs_del: %s: %s", uri, kvs_strerror(ret));
-
-cleanup:		/*
-			 * Try and remove the new entry if we can't remove the
-			 * old entry.
-			 */
-			if ((ret =
-			    master_key_set(wtds, session, newname, r)) == 0 &&
-			    (ret = kvs_del(kvs, r)) != 0)
-				ESET(wtext, session, WT_ERROR,
-				    "kvs_del: %s: %s",
-				    newname, kvs_strerror(ret));
-			goto err;
-		}
-
-		/* Copy in the new name. */
-		free(us->name);
-		us->name = copy;
-		copy = NULL;
-
-		/* Flush the change. */
-		if ((ret = kvs_commit(kvs)) != 0) {
-			ESET(wtext, session,
-			    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
-			goto err;
-		}
-		break;
-	case KVS_E_KEY_EXISTS:
-		ESET(wtext, session, EEXIST, "%s", newname);
-		break;
-	default:
-		ESET(wtext, session,
-		    WT_ERROR, "kvs_add: %s", newname, kvs_strerror(ret));
-		break;
-	}
+	/* Swap our copy of the name. */
+	free(us->name);
+	us->name = copy;
+	copy = NULL;
 
 err:	ETRET(unlock(wtext, session, &us->lock));
 	ETRET(unlock(wtext, session, &ds->global_lock));

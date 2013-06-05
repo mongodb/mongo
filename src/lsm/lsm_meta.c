@@ -27,7 +27,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_CLEAR(buf);
 	chunk_sz = sizeof(WT_LSM_CHUNK);
 
-	WT_RET(__wt_metadata_read(session, lsm_tree->name, &lsmconfig));
+	WT_RET(__wt_metadata_search(session, lsm_tree->name, &lsmconfig));
 	WT_ERR(__wt_config_init(session, &cparser, lsmconfig));
 	while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
 		if (WT_STRING_MATCH("key_format", ck.str, ck.len)) {
