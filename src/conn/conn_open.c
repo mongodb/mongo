@@ -59,7 +59,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_statlog_create(conn, cfg));
 
-fprintf(stderr, "Calling wt_logger_create\n");
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_logger_create(conn, cfg));
 

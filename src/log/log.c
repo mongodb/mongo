@@ -472,7 +472,9 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			rd_lsn.offset = 0;
 			/*
 			 * If there is no next file, we're done.  WT_ERR will
-			 * break us out of this loop.
+			 * break us out of this loop.  It is possible we
+			 * reached the end of the log entirely or that we
+			 * raced the removal of log files via archive.
 			 */
 			WT_ERR(__log_openfile(
 			    session, 0, &log_fh, rd_lsn.file));
@@ -486,6 +488,9 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		if (reclen > buf.memsize)
 			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
 
+		/*
+		 * Now read in the actual log record itself.
+		 */
 		WT_ERR(__wt_read(
 		    session, log_fh, rd_lsn.offset, reclen, buf.mem));
 		/*
@@ -633,7 +638,7 @@ WT_DECL_RET;
 WT_LOG *log;
 WT_LSN lsn;
 WT_ITEM rdbuf;
-uint32_t sync;
+uint32_t logsync;
 
 	conn = S2C(session);
 log = conn->log;
@@ -655,18 +660,18 @@ WT_CLEAR(rdbuf);
 
 	WT_VERBOSE_RET(session, log,
 	    "log_printf: %s", (char *)&logrec->record);
-#if 0
+#if 1
 	return (__wt_log_write(session, buf, NULL, 0));
 #else
 	if (len % 2 == 0)
-		sync = WT_LOG_SYNC;
+		logsync = WT_LOG_SYNC;
 	else
-		sync = 0;
-	ret = __wt_log_write(session, buf, &lsn, sync);
+		logsync = 0;
+	ret = __wt_log_write(session, buf, &lsn, logsync);
 	/*
-	 * Only read some records.  Randomize on sync.
+	 * Only read some records.  Randomize on logsync.
 	 */
-	if (ret == 0 && sync) {
+	if (ret == 0 && logsync) {
 		if (lsn.file == 2 && !F_ISSET(log, LOG_AUTOREMOVE)) {
 			F_SET(log, LOG_AUTOREMOVE);
 			ret = __wt_log_scan(

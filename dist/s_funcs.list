@@ -12,7 +12,6 @@ __wt_debug_offset
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_fsync
-__wt_log_printf
 __wt_nlpo2
 __wt_nlpo2_round
 __wt_print_huffman_code

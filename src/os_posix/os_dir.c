@@ -36,9 +36,6 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	WT_VERBOSE_RET(session, fileops, "wt_dirlist of %s %s prefix %s",
 	    path, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
 	    prefix == NULL ? "all" : prefix);
-fprintf(stderr, "wt_dirlist of %s %s prefix %s\n",
-	    path, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
-	    prefix == NULL ? "all" : prefix);
 
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	*dirlist = NULL;
