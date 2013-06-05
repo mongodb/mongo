@@ -301,7 +301,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "file.meta",
 	  "allocation_size=4KB,block_compressor=,cache_resident=0,checkpoint=,"
-	  "checksum=on,collator=,columns=,dictionary=0,format=btree,"
+	  "checksum=uncompressed,collator=,columns=,dictionary=0,format=btree,"
 	  "huffman_key=,huffman_value=,internal_item_max=0,"
 	  "internal_key_truncate=,internal_page_max=4KB,key_format=u,key_gap=10"
 	  ",leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB,"
@@ -334,16 +334,17 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_session_compact
 	},
 	{ "session.create",
-	  "allocation_size=4KB,block_compressor=,cache_resident=0,checksum=on,"
-	  "colgroups=,collator=,columns=,dictionary=0,exclusive=0,format=btree,"
-	  "huffman_key=,huffman_value=,internal_item_max=0,"
-	  "internal_key_truncate=,internal_page_max=4KB,key_format=u,key_gap=10"
-	  ",leaf_item_max=0,leaf_page_max=1MB,lsm_auto_throttle=,lsm_bloom=,"
-	  "lsm_bloom_bit_count=8,lsm_bloom_config=,lsm_bloom_hash_count=4,"
-	  "lsm_bloom_newest=0,lsm_bloom_oldest=0,lsm_chunk_size=2MB,"
-	  "lsm_merge_max=15,lsm_merge_threads=1,memory_page_max=5MB,"
-	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,source=,"
-	  "split_pct=75,type=file,value_format=u",
+	  "allocation_size=4KB,block_compressor=,cache_resident=0,"
+	  "checksum=uncompressed,colgroups=,collator=,columns=,dictionary=0,"
+	  "exclusive=0,format=btree,huffman_key=,huffman_value=,"
+	  "internal_item_max=0,internal_key_truncate=,internal_page_max=4KB,"
+	  "key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
+	  "lsm_auto_throttle=,lsm_bloom=,lsm_bloom_bit_count=8,"
+	  "lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
+	  "lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
+	  "lsm_merge_threads=1,memory_page_max=5MB,os_cache_dirty_max=0,"
+	  "os_cache_max=0,prefix_compression=,source=,split_pct=75,type=file,"
+	  "value_format=u",
 	  confchk_session_create
 	},
 	{ "session.drop",

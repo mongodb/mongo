@@ -641,14 +641,13 @@ struct __wt_session {
 	 * @config{cache_resident, do not ever evict the object's pages; see
 	 * @ref tuning_cache_resident for more information., a boolean flag;
 	 * default \c false.}
-	 * @config{checksum, configure file block checksums; permitted values
-	 * are <code>on</code> (checksum all file blocks)\, <code>off</code>
-	 * (checksum no file blocks) and <code>uncompresssed</code> (checksum
-	 * only file blocks which are not compressed for some reason). The \c
-	 * uncompressed value is for applications which can reasonably rely on
-	 * decompression to fail if a block has been corrupted., a string\,
-	 * chosen from the following options: \c "on"\, \c "off"\, \c
-	 * "uncompressed"; default \c on.}
+	 * @config{checksum, configure block checksums; permitted values are
+	 * <code>on</code> (checksum all blocks)\, <code>off</code> (checksum no
+	 * blocks) and <code>uncompresssed</code> (checksum only blocks which
+	 * are not compressed for any reason). The \c uncompressed setting is
+	 * for applications which can rely on decompression to fail if a block
+	 * has been corrupted., a string\, chosen from the following options: \c
+	 * "on"\, \c "off"\, \c "uncompressed"; default \c uncompressed.}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
 	 * the table.  If no column groups are specified\, all columns are

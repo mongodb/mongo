@@ -145,15 +145,13 @@ file_config = format_meta + [
 		do not ever evict the object's pages; see @ref
 		tuning_cache_resident for more information''',
 		type='boolean'),
-	Config('checksum', 'on', r'''
-		configure file block checksums; permitted values are
-		<code>on</code> (checksum all file blocks),
-		<code>off</code> (checksum no file blocks) and
-		<code>uncompresssed</code> (checksum only file blocks
-		which are not compressed for some reason).  The \c
-		uncompressed value is for applications which can
-		reasonably rely on decompression to fail if a block has
-		been corrupted''',
+	Config('checksum', 'uncompressed', r'''
+		configure block checksums; permitted values are <code>on</code>
+		(checksum all blocks), <code>off</code> (checksum no blocks) and
+		<code>uncompresssed</code> (checksum only blocks which are not
+		compressed for any reason).  The \c uncompressed setting is for
+		applications which can rely on decompression to fail if a block
+		has been corrupted''',
 		choices=['on', 'off', 'uncompressed']),
 	Config('collator', '', r'''
 		configure custom collation for keys.  Value must be a collator

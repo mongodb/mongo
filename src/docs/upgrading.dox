@@ -5,9 +5,8 @@
 
 <dt>Table of WiredTiger extension methods</dt>
 <dd>
-In the 1.6.2 release, new entries were added to the list of WiredTiger
-extension methods; applications using the extension methods will require
-recompilation.
+New functionality was added to the list of WiredTiger extension methods;
+applications using the extension methods will require recompilation.
 </dd>
 
 <dt>WT_SESSION::create no longer accepts a "source" configuration</dt>
@@ -15,6 +14,15 @@ recompilation.
 The \c "source" configuration key has been removed from WT_SESSION::create.
 Normal applications should not have been using it, and there were a number of
 bugs associated with it.
+</dd>
+
+<dt>Default checksum configuration</dt>
+<dd>
+The default file checksum configuration was changed to \c uncompressed,
+which means blocks that are compressed will no longer also include a
+checksum, by default.  Applications using compression insufficient for
+the purposes of corrupted block identification should change their file
+checksum configuration to \c on.
 </dd>
 
 </dl>
