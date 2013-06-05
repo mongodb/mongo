@@ -56,8 +56,9 @@ namespace mongo {
         return -1;
     }
 
-    inline int NamespaceDetails::findIndexByKeyPattern(const BSONObj& keyPattern) {
-        IndexIterator i = ii();
+    inline int NamespaceDetails::findIndexByKeyPattern(const BSONObj& keyPattern,
+                                                       bool includeBackgroundInProgress) {
+        IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
             if( i.next().keyPattern() == keyPattern )
                 return i.pos()-1;
@@ -83,8 +84,9 @@ namespace mongo {
     }
 
     // @return offset in indexes[]
-    inline int NamespaceDetails::findIndexByName(const char *name) {
-        IndexIterator i = ii();
+    inline int NamespaceDetails::findIndexByName(const char *name,
+                                                 bool includeBackgroundInProgress) {
+        IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
             if ( strcmp(i.next().info.obj().getStringField("name"),name) == 0 )
                 return i.pos()-1;
