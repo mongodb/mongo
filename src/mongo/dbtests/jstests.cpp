@@ -439,6 +439,19 @@ namespace JSTests {
                 ASSERT_EQUALS( (string)"^a" , out["a"].regex() );
                 ASSERT_EQUALS( (string)"i" , out["a"].regexFlags() );
 
+                // This regex used to cause a segfault because x isn't a valid flag for a js RegExp.
+                // Now it throws a JS exception.
+                BSONObj invalidRegex = BSON_ARRAY(BSON("regex" << BSONRegEx("asdf", "x")));
+                const char* code = "function (obj) {"
+                                   "    var threw = false;"
+                                   "    try {"
+                                   "        obj.regex;" // should throw
+                                   "    } catch(e) {"
+                                   "         threw = true;"
+                                   "    }"
+                                   "    assert(threw);"
+                                   "}";
+                ASSERT_EQUALS(s->invoke(code, &invalidRegex, NULL), 0);
             }
 
             // array

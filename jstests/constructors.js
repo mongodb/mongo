@@ -91,15 +91,14 @@ function whereConstructorTest (constructorList) {
 
 var dbrefConstructors = {
     "valid" : [
-            // SERVER-8961
-            //"DBRef()",
             "DBRef(\"namespace\", 0)",
             "DBRef(\"namespace\", \"test\")",
             "DBRef(\"namespace\", ObjectId())",
             "DBRef(\"namespace\", ObjectId(\"000000000000000000000000\"))",
-            "DBRef(true, ObjectId())"
         ],
     "invalid" : [
+            "DBRef()",
+            "DBRef(true, ObjectId())",
             "DBRef(\"namespace\")",
             "DBRef(\"namespace\", ObjectId(), true)"
         ]
@@ -107,15 +106,14 @@ var dbrefConstructors = {
 
 var dbpointerConstructors = {
     "valid" : [
-            // SERVER-8961
-            //"DBPointer(\"namespace\", 0)",
-            //"DBPointer(\"namespace\", \"test\")",
             "DBPointer(\"namespace\", ObjectId())",
             "DBPointer(\"namespace\", ObjectId(\"000000000000000000000000\"))",
-            "DBPointer(true, ObjectId())"
         ],
     "invalid" : [
             "DBPointer()",
+            "DBPointer(true, ObjectId())",
+            "DBPointer(\"namespace\", 0)",
+            "DBPointer(\"namespace\", \"test\")",
             "DBPointer(\"namespace\")",
             "DBPointer(\"namespace\", ObjectId(), true)"
         ]

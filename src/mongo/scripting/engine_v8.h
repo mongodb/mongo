@@ -203,9 +203,23 @@ namespace mongo {
         virtual void injectNative(const char* field, NativeFunction func, void* data = 0);
         void injectNative(const char* field, NativeFunction func, v8::Handle<v8::Object>& obj,
                           void* data = 0);
-        void injectV8Function(const char* name, v8Function func);
-        void injectV8Function(const char* name, v8Function func, v8::Handle<v8::Object>& obj);
-        void injectV8Function(const char* name, v8Function func, v8::Handle<v8::Template>& t);
+
+        // These functions inject a function (either an unwrapped function pointer or a pre-wrapped
+        // FunctionTemplate) into the provided object. If no object is provided, the function will
+        // be injected at global scope. These functions take care of setting the function and class
+        // name on the returned FunctionTemplate.
+        v8::Handle<v8::FunctionTemplate> injectV8Function(const char* name, v8Function func);
+        v8::Handle<v8::FunctionTemplate> injectV8Function(const char* name,
+                                                          v8Function func,
+                                                          v8::Handle<v8::Object>& obj);
+        v8::Handle<v8::FunctionTemplate> injectV8Function(const char* name,
+                                                          v8::Handle<v8::FunctionTemplate> ft,
+                                                          v8::Handle<v8::Object>& obj);
+
+        // Injects a method into the provided prototype
+        v8::Handle<v8::FunctionTemplate> injectV8Method(const char* name,
+                                                        v8Function func,
+                                                        v8::Handle<v8::ObjectTemplate>& proto);
         v8::Handle<v8::FunctionTemplate> createV8Function(v8Function func);
         virtual ScriptingFunction _createFunction(const char* code,
                                                   ScriptingFunction functionNumber = 0);
@@ -215,7 +229,7 @@ namespace mongo {
         /**
          * Convert BSON types to v8 Javascript types
          */
-        v8::Persistent<v8::Object> mongoToLZV8(const mongo::BSONObj& m, bool readOnly = false);
+        v8::Handle<v8::Object> mongoToLZV8(const mongo::BSONObj& m, bool readOnly = false);
         v8::Handle<v8::Value> mongoToV8Element(const BSONElement& f, bool readOnly = false);
 
         /**
@@ -234,30 +248,18 @@ namespace mongo {
                              BSONObj* originalParent);
         void v8ToMongoNumber(BSONObjBuilder& b,
                              const StringData& elementName,
-                             v8::Handle<v8::Value> value,
+                             v8::Handle<v8::Number> value,
                              BSONObj* originalParent);
-        void v8ToMongoNumberLong(BSONObjBuilder& b,
-                                 const StringData& elementName,
-                                 v8::Handle<v8::Object> obj);
-        void v8ToMongoInternal(BSONObjBuilder& b,
-                               const StringData& elementName,
-                               v8::Handle<v8::Object> obj);
         void v8ToMongoRegex(BSONObjBuilder& b,
                             const StringData& elementName,
-                            v8::Handle<v8::Object> v8Regex);
+                            v8::Handle<v8::RegExp> v8Regex);
         void v8ToMongoDBRef(BSONObjBuilder& b,
                             const StringData& elementName,
                             v8::Handle<v8::Object> obj);
         void v8ToMongoBinData(BSONObjBuilder& b,
                               const StringData& elementName,
                               v8::Handle<v8::Object> obj);
-        void v8ToMongoObjectID(BSONObjBuilder& b,
-                               const StringData& elementName,
-                               v8::Handle<v8::Object> obj);
-
-        v8::Function* getNamedCons(const char* name);
-
-        v8::Function* getObjectIdCons();
+        OID v8ToMongoObjectID(v8::Handle<v8::Object> obj);
 
         v8::Local<v8::Value> newId(const OID& id);
 
@@ -266,11 +268,6 @@ namespace mongo {
          * access to the V8Scope instance to report source context information.
          */
         std::string v8ExceptionToSTLString(const v8::TryCatch* try_catch);
-
-        /**
-         * GC callback for weak references to BSON objects (via BSONHolder)
-         */
-        v8::Persistent<v8::Object> wrapBSONObject(v8::Local<v8::Object> obj, BSONHolder* data);
 
         /**
          * Create a V8 string with a local handle
@@ -300,7 +297,52 @@ namespace mongo {
         ObjTracker<DBClientBase> dbClientBaseTracker;
         ObjTracker<DBClientCursor> dbClientCursorTracker;
 
+        // These are all named after the JS constructor name + FT
+        v8::Handle<v8::FunctionTemplate> ObjectIdFT()       const { return _ObjectIdFT; }
+        v8::Handle<v8::FunctionTemplate> DBRefFT()          const { return _DBRefFT; }
+        v8::Handle<v8::FunctionTemplate> DBPointerFT()      const { return _DBPointerFT; }
+        v8::Handle<v8::FunctionTemplate> BinDataFT()        const { return _BinDataFT; }
+        v8::Handle<v8::FunctionTemplate> NumberLongFT()     const { return _NumberLongFT; }
+        v8::Handle<v8::FunctionTemplate> NumberIntFT()      const { return _NumberIntFT; }
+        v8::Handle<v8::FunctionTemplate> TimestampFT()      const { return _TimestampFT; }
+        v8::Handle<v8::FunctionTemplate> MinKeyFT()         const { return _MinKeyFT; }
+        v8::Handle<v8::FunctionTemplate> MaxKeyFT()         const { return _MaxKeyFT; }
+        v8::Handle<v8::FunctionTemplate> MongoFT()          const { return _MongoFT; }
+        v8::Handle<v8::FunctionTemplate> DBFT()             const { return _DBFT; }
+        v8::Handle<v8::FunctionTemplate> DBCollectionFT()   const { return _DBCollectionFT; }
+        v8::Handle<v8::FunctionTemplate> DBQueryFT()        const { return _DBQueryFT; }
+        v8::Handle<v8::FunctionTemplate> InternalCursorFT() const { return _InternalCursorFT; }
+        v8::Handle<v8::FunctionTemplate> LazyBsonFT()       const { return _LazyBsonFT; }
+        v8::Handle<v8::FunctionTemplate> ROBsonFT()         const { return _ROBsonFT; }
+
+        template <size_t N>
+        v8::Handle<v8::String> strLitToV8(const char (&str)[N]) {
+            // Note that _strLitMap is keyed on string pointer not string
+            // value. This is OK because each string literal has a constant
+            // pointer for the program's lifetime. This works best if (but does
+            // not require) the linker interns all string literals giving
+            // identical strings used in different places the same pointer.
+
+            StrLitMap::iterator it = _strLitMap.find(str);
+            if (it != _strLitMap.end())
+                return it->second;
+
+            StringData sd (str, StringData::LiteralTag());
+            v8::Handle<v8::String> v8Str = v8StringData(sd);
+
+            // We never need to Dispose since this should last as long as V8Scope exists
+            _strLitMap[str] = v8::Persistent<v8::String>::New(v8Str);
+
+            return v8Str;
+        }
+
     private:
+
+        /**
+         * Attach data to obj such that the data has the same lifetime as the Object obj points to.
+         * obj must have been created by either LazyBsonFT or ROBsonFT.
+         */
+        void wrapBSONObject(v8::Handle<v8::Object> obj, BSONObj data, bool readOnly);
 
         /**
          * Trampoline to call a c++ function with a specific signature (V8Scope*, v8::Arguments&).
@@ -349,16 +391,6 @@ namespace mongo {
         void unregisterOpId();
 
         /**
-        * Creates a new instance of the MinKey object
-        */
-        v8::Local<v8::Object> newMinKeyInstance();
-
-        /**
-         * Creates a new instance of the MaxKey object
-         */
-        v8::Local<v8::Object> newMaxKeyInstance();
-
-        /**
          * Create a new function; primarily used for BSON/V8 conversion.
          */
         v8::Local<v8::Value> newFunction(const StringData& code);
@@ -368,27 +400,6 @@ namespace mongo {
                                const v8::TryCatch& try_catch,
                                bool reportError = true,
                                bool assertOnError = true);
-
-        template <size_t N>
-        v8::Handle<v8::String> strLitToV8(const char (&str)[N]) {
-            // Note that _strLitMap is keyed on string pointer not string
-            // value. This is OK because each string literal has a constant
-            // pointer for the program's lifetime. This works best if (but does
-            // not require) the linker interns all string literals giving
-            // identical strings used in different places the same pointer.
-
-            StrLitMap::iterator it = _strLitMap.find(str);
-            if (it != _strLitMap.end())
-                return it->second;
-
-            StringData sd (str, StringData::LiteralTag());
-            v8::Handle<v8::String> v8Str = v8StringData(sd);
-
-            // We never need to Dispose since this should last as long as V8Scope exists
-            _strLitMap[str] = v8::Persistent<v8::String>::New(v8Str);
-
-            return v8Str;
-        }
 
         V8ScriptEngine* _engine;
 
@@ -400,11 +411,25 @@ namespace mongo {
         enum ConnectState { NOT, LOCAL, EXTERNAL };
         ConnectState _connectState;
 
-        v8::Persistent<v8::FunctionTemplate> lzFunctionTemplate;
-        v8::Persistent<v8::ObjectTemplate> lzObjectTemplate;
-        v8::Persistent<v8::ObjectTemplate> roObjectTemplate;
-        v8::Persistent<v8::ObjectTemplate> lzArrayTemplate;
-        v8::Persistent<v8::ObjectTemplate> internalFieldObjects;
+        // These are all named after the JS constructor name + FT
+        v8::Persistent<v8::FunctionTemplate> _ObjectIdFT;
+        v8::Persistent<v8::FunctionTemplate> _DBRefFT;
+        v8::Persistent<v8::FunctionTemplate> _DBPointerFT;
+        v8::Persistent<v8::FunctionTemplate> _BinDataFT;
+        v8::Persistent<v8::FunctionTemplate> _NumberLongFT;
+        v8::Persistent<v8::FunctionTemplate> _NumberIntFT;
+        v8::Persistent<v8::FunctionTemplate> _TimestampFT;
+        v8::Persistent<v8::FunctionTemplate> _MinKeyFT;
+        v8::Persistent<v8::FunctionTemplate> _MaxKeyFT;
+        v8::Persistent<v8::FunctionTemplate> _MongoFT;
+        v8::Persistent<v8::FunctionTemplate> _DBFT;
+        v8::Persistent<v8::FunctionTemplate> _DBCollectionFT;
+        v8::Persistent<v8::FunctionTemplate> _DBQueryFT;
+        v8::Persistent<v8::FunctionTemplate> _InternalCursorFT;
+        v8::Persistent<v8::FunctionTemplate> _LazyBsonFT;
+        v8::Persistent<v8::FunctionTemplate> _ROBsonFT;
+
+        v8::Persistent<v8::Function> _jsRegExpConstructor;
 
         v8::Isolate* _isolate;
         V8CpuProfiler _cpuProfiler;
@@ -418,6 +443,11 @@ namespace mongo {
         bool _pendingKill;           // protected by _interruptLock
         int _opId;                   // op id for this scope
     };
+
+    /// Helper to extract V8Scope for an Isolate
+    inline V8Scope* getScope(v8::Isolate* isolate) {
+        return static_cast<V8Scope*>(isolate->GetData());
+    }
 
     class V8ScriptEngine : public ScriptEngine {
     public:
