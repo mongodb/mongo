@@ -44,9 +44,8 @@ int main( int argc, const char **argv, char **envp) {
 
 #ifdef MONGO_SSL
     cmdLine.sslOnNormalPorts = true;
-#endif
-
     runGlobalInitializersOrDie(argc, argv, envp);
+#endif
 
     int port = 27017;
     if ( argc != 1 ) {
