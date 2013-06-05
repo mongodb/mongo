@@ -246,9 +246,10 @@ exampleObjMap = [(target, clientEnv.Object(source)) for (target, source) in exam
 # we need to use LIBS. For in-tree builds we need LIBDEPS.
 staticClientEnv = clientEnv.Clone()
 if '_LIBDEPS' in clientEnv:
-    staticClientEnv.AppendUnique(LIBDEPS=[mongoClientStaticLib])
+    staticClientEnv.PrependUnique(LIBDEPS=[mongoClientStaticLib])
 else:
-    staticClientEnv.AppendUnique(LIBS=[mongoClientStaticLib])
+    # We need the mongo client library to preceed the boost libraries.
+    staticClientEnv.PrependUnique(LIBS=[mongoClientStaticLib])
 
 # Build each statically linked client program
 staticClientPrograms = [staticClientEnv.Program(target, obj) for (target, obj) in exampleObjMap]
@@ -267,12 +268,12 @@ if buildShared:
     # dylib in #sharedclient, which has @executable path set as its install_name.
     if nix:
         if darwin:
-            sharedClientEnv.AppendUnique(
+            sharedClientEnv.PrependUnique(
                 LIBS=['mongoclient'],
                 LIBPATH=["#/sharedclient"]
             )
         else:
-            sharedClientEnv.AppendUnique(
+            sharedClientEnv.PrependUnique(
                 LIBS=[mongoClientSharedLib],
                 LINKFLAGS="-Wl,-z,origin",
                 RPATH=[sharedClientEnv.Literal("\\$$ORIGIN")])
