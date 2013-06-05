@@ -392,16 +392,19 @@ namespace {
 
     class CompatibilityModeDisabler {
     public:
-        CompatibilityModeDisabler() {
-            AuthorizationManager::setSupportOldStylePrivilegeDocuments(false);
+        CompatibilityModeDisabler(AuthorizationManager* authzManager) :_authzManager(authzManager) {
+            _authzManager->setSupportOldStylePrivilegeDocuments(false);
         }
         ~CompatibilityModeDisabler() {
-            AuthorizationManager::setSupportOldStylePrivilegeDocuments(true);
+            _authzManager->setSupportOldStylePrivilegeDocuments(true);
         }
+
+    private:
+        AuthorizationManager* _authzManager;
     };
 
     TEST_F(AuthorizationManagerTest, DisableCompatibilityMode) {
-        CompatibilityModeDisabler disabler;
+        CompatibilityModeDisabler disabler(authzManager.get());
 
         ASSERT_NOT_OK(authzManager->checkValidPrivilegeDocument("test",
                 BSON("user" << "andy" << "pwd" << "a")));

@@ -16,6 +16,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {
@@ -24,7 +25,7 @@ namespace {
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(supportCompatibilityFormPrivilegeDocuments, bool, true);
 
     MONGO_INITIALIZER(AuthSetPrivilegeDocumentCompatibilitySupport)(InitializerContext*) {
-        AuthorizationManager::setSupportOldStylePrivilegeDocuments(
+        getGlobalAuthorizationManager()->setSupportOldStylePrivilegeDocuments(
                 supportCompatibilityFormPrivilegeDocuments);
         return Status::OK();
     }

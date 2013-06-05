@@ -40,9 +40,6 @@ namespace mongo {
     const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "userSource";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
 
-    bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
-    bool AuthorizationManager::_authEnabled = false;
-
 namespace {
     const std::string ADMIN_DBNAME = "admin";
     const std::string LOCAL_DBNAME = "local";
@@ -250,7 +247,9 @@ namespace {
 
 
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
-            _externalState(externalState) {}
+            _externalState(externalState),
+            _authEnabled(false),
+            _doesSupportOldStylePrivileges(true) {}
 
     AuthzManagerExternalState* AuthorizationManager::getExternalState() const {
         return _externalState.get();
@@ -260,7 +259,7 @@ namespace {
         _doesSupportOldStylePrivileges = enabled;
     }
 
-    bool AuthorizationManager::getSupportOldStylePrivilegeDocuments() {
+    bool AuthorizationManager::getSupportOldStylePrivilegeDocuments() const {
         return _doesSupportOldStylePrivileges;
     }
 
@@ -268,7 +267,7 @@ namespace {
         _authEnabled = enabled;
     }
 
-    bool AuthorizationManager::isAuthEnabled() {
+    bool AuthorizationManager::isAuthEnabled() const {
         return _authEnabled;
     }
 
