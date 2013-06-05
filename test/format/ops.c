@@ -154,12 +154,13 @@ ops(void *arg)
 	 * Each thread does its share of the total operations, and make sure
 	 * that it's not 0 (testing runs: threads might be larger than ops).
 	 */
-	thread_ops = g.c_threads + g.c_ops / g.c_threads;
+	thread_ops = 1 + g.c_ops / g.c_threads;
 
 	/* Pick a period for re-opening the session and cursors. */
 	session = NULL;
 	cursor = cursor_insert = NULL;
-	session_period = 100 * MMRAND(1, 50);
+	session_period = SINGLETHREADED ?
+	    MMRAND(1, thread_ops) :  100 * MMRAND(1, 50);
 
 	/* Pick an operation where we'll do a checkpoint, compaction. */
 	ckpt_op = MMRAND(1, thread_ops);
