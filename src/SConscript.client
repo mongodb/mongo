@@ -157,9 +157,7 @@ mongoClientSysLibDeps = []
 if usingSasl:
     mongoClientSysLibDeps += ["sasl2"]
 
-if use_system_version_of_library("boost"):
-    mongoClientLibs.append(['boost_thread-mt'])
-else:
+if not use_system_version_of_library("boost"):
     mongoClientLibDeps.append(['$BUILD_DIR/third_party/shim_boost'])
 
 mongoClientInstalls = []
