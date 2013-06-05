@@ -30,7 +30,6 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 	WT_TXN *txn;
 	int busy, oldgen;
 
@@ -78,21 +77,13 @@ __wt_page_in_func(
 			    page != NULL && !WT_PAGE_IS_ROOT(page));
 
 			/*
-			 * Ensure the page doesn't have ancient updates on it.
-			 * If it did, reading the page could ignore committed
-			 * updates.  This should be extremely unlikely in real
-			 * applications, wait for eviction of the page to avoid
-			 * the issue.
-			 *
-			 * Also, make sure the page isn't too big.  Only do
-			 * this check once per transaction: it is not a common
-			 * case, and we don't want to get stuck if it isn't
-			 * possible to evict the page.
+			 * Make sure the page isn't too big.  Only do this
+			 * check once per transaction: it is not a common case,
+			 * and we don't want to get stuck if it isn't possible
+			 * to evict the page.
 			 */
-			if ((mod = page->modify) != NULL &&
-			    (__wt_txn_ancient(session, mod->first_id) ||
-			    (!F_ISSET(txn, TXN_FORCE_EVICT) &&
-			    __wt_eviction_page_force(session, page)))) {
+			if (!F_ISSET(txn, TXN_FORCE_EVICT) &&
+			    __wt_eviction_page_force(session, page)) {
 				F_SET(txn, TXN_FORCE_EVICT);
 				page->read_gen = WT_READ_GEN_OLDEST;
 				WT_RET(__wt_page_release(session, page));

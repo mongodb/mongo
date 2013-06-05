@@ -61,7 +61,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  */
 void
 __wt_txn_refresh(
-    WT_SESSION_IMPL *session, wt_txnid_t max_id, int alloc_id, int get_snapshot)
+    WT_SESSION_IMPL *session, wt_txnid_t max_id, int get_snapshot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -75,36 +75,7 @@ __wt_txn_refresh(
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
 
-	if (alloc_id) {
-		/*
-		 * Allocate a transaction ID.
-		 *
-		 * We use an atomic compare and swap to ensure that we get a
-		 * unique ID that is published before the global counter is
-		 * updated.
-		 *
-		 * If two threads race to allocate an ID, only the latest ID
-		 * will proceed.  The winning thread can be sure its snapshot
-		 * contains all of the earlier active IDs.  Threads that race
-		 * and get an earlier ID may not appear in the snapshot, but
-		 * they will loop and allocate a new ID before proceeding to
-		 * make any updates.
-		 *
-		 * This potentially wastes transaction IDs when threads race to
-		 * begin transactions: that is the price we pay to keep this
-		 * path latch free.
-		 */
-		do {
-			current_id = txn_global->current;
-			txn_state->id = txn->id = current_id + 1;
-		} while (!WT_ATOMIC_CAS(txn_global->current,
-		    current_id, txn->id) ||
-		    txn->id == WT_TXN_NONE ||
-		    txn->id == WT_TXN_ABORTED);
-
-		if (!get_snapshot)
-			return;
-	} else if (!alloc_id && get_snapshot &&
+	if (get_snapshot &&
 	    txn->id == max_id &&
 	    txn->last_id == txn_global->current &&
 	    txn->last_gen == txn_global->gen &&
@@ -119,11 +90,7 @@ __wt_txn_refresh(
 		txn->last_scan_gen = txn_global->scan_gen;
 		txn->last_gen = txn_global->gen;
 		txn->last_id = current_id = txn_global->current;
-
-		if (alloc_id)
-			snap_min = txn->id;
-		else
-			snap_min = current_id + 1;
+		snap_min = current_id + 1;
 
 		/*
 		 * Constrain the oldest ID we calculate to be less than the
@@ -210,7 +177,7 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 	 * The oldest active snapshot ID in the system that should *not* be
 	 * visible to eviction.  Create a snapshot containing that ID.
 	 */
-	__wt_txn_refresh(session, WT_TXN_NONE, 0, 0);
+	__wt_txn_refresh(session, WT_TXN_NONE, 0);
 	oldest_id = txn_global->oldest_id;
 	__txn_sort_snapshot(session, 0, oldest_id);
 
@@ -233,6 +200,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
+	wt_txnid_t current_id;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -251,9 +219,41 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
 		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
 
+	/*
+	 * Allocate a transaction ID.
+	 *
+	 * We use an atomic compare and swap to ensure that we get a
+	 * unique ID that is published before the global counter is
+	 * updated.
+	 *
+	 * If two threads race to allocate an ID, only the latest ID
+	 * will proceed.  The winning thread can be sure its snapshot
+	 * contains all of the earlier active IDs.  Threads that race
+	 * and get an earlier ID may not appear in the snapshot, but
+	 * they will loop and allocate a new ID before proceeding to
+	 * make any updates.
+	 *
+	 * This potentially wastes transaction IDs when threads race to
+	 * begin transactions: that is the price we pay to keep this
+	 * path latch free.
+	 */
+	do {
+		current_id = txn_global->current;
+		txn_state->id = txn->id = current_id + 1;
+	} while (
+	    !WT_ATOMIC_CAS(txn_global->current, current_id, txn->id) ||
+	    txn->id == WT_TXN_NONE);
+
+	/*
+	 * If we have use 64-bits of transaction IDs, there is nothing
+	 * more we can do.
+	 */
+	if (txn->id == WT_TXN_ABORTED)
+		WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
+
 	F_SET(txn, TXN_RUNNING);
-	__wt_txn_refresh(
-	    session, WT_TXN_NONE, 1, txn->isolation == TXN_ISO_SNAPSHOT);
+	if (txn->isolation == TXN_ISO_SNAPSHOT)
+		__wt_txn_refresh(session, txn->id, 1);
 	return (0);
 }
 
@@ -320,7 +320,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * commit.
 	 */
 	if (session->ncursors > 0 && txn->isolation != TXN_ISO_READ_UNCOMMITTED)
-		__wt_txn_refresh(session, txn->id + 1, 0, 1);
+		__wt_txn_refresh(session, txn->id + 1, 1);
 	__wt_txn_release(session);
 	return (0);
 }
