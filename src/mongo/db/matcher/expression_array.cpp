@@ -36,7 +36,7 @@ namespace mongo {
         boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
 
         while ( cursor->more() ) {
-            ElementIterator::Element e = cursor->next();
+            ElementIterator::Context e = cursor->next();
             if ( e.element().type() != Array )
                 continue;
 
@@ -189,7 +189,7 @@ namespace mongo {
     bool AllElemMatchOp::matches( const MatchableDocument* doc, MatchDetails* details ) const {
         boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
         while ( cursor->more() ) {
-            ElementIterator::Element e = cursor->next();
+            ElementIterator::Context e = cursor->next();
             if ( e.element().type() != Array )
                 continue;
             if ( _allMatch( e.element().Obj() ) )

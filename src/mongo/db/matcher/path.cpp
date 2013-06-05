@@ -34,11 +34,11 @@ namespace mongo {
     ElementIterator::~ElementIterator(){
     }
 
-    void ElementIterator::Element::reset() {
+    void ElementIterator::Context::reset() {
         _element = BSONElement();
     }
 
-    void ElementIterator::Element::reset( BSONElement element,
+    void ElementIterator::Context::reset( BSONElement element,
                                           BSONElement arrayOffset,
                                           bool outerArray ) {
         _element = element;
@@ -58,14 +58,14 @@ namespace mongo {
         return _iterator.more() || _returnArrayLast;
     }
 
-    ElementIterator::Element SimpleArrayElementIterator::next() {
+    ElementIterator::Context SimpleArrayElementIterator::next() {
         if ( _iterator.more() ) {
-            Element e;
+            Context e;
             e.reset( _iterator.next(), BSONElement(), false );
             return e;
         }
         _returnArrayLast = false;
-        Element e;
+        Context e;
         e.reset( _theArray, BSONElement(), true );
         return e;
     }
@@ -230,13 +230,13 @@ namespace mongo {
         return false;
     }
 
-    ElementIterator::Element BSONElementIterator::next() {
+    ElementIterator::Context BSONElementIterator::next() {
         if ( _subCursor ) {
-            Element e = _subCursor->next();
+            Context e = _subCursor->next();
             e.setArrayOffset( _arrayIterationState._current );
             return e;
         }
-        Element x = _next;
+        Context x = _next;
         _next.reset();
         return x;
     }

@@ -44,7 +44,7 @@ namespace mongo {
 
     class ElementIterator {
     public:
-        class Element {
+        class Context {
         public:
 
             void reset();
@@ -66,7 +66,7 @@ namespace mongo {
         virtual ~ElementIterator();
 
         virtual bool more() = 0;
-        virtual Element next() = 0;
+        virtual Context next() = 0;
 
     };
 
@@ -81,11 +81,11 @@ namespace mongo {
         virtual ~SingleElementElementIterator(){}
 
         virtual bool more() { return !_seen; }
-        virtual Element next() { _seen = true; return _element; }
+        virtual Context next() { _seen = true; return _element; }
 
     private:
         bool _seen;
-        ElementIterator::Element _element;
+        ElementIterator::Context _element;
     };
 
     class SimpleArrayElementIterator : public ElementIterator {
@@ -93,7 +93,7 @@ namespace mongo {
         SimpleArrayElementIterator( const BSONElement& theArray, bool returnArrayLast );
 
         virtual bool more();
-        virtual Element next();
+        virtual Context next();
 
     private:
         BSONElement _theArray;
@@ -107,14 +107,14 @@ namespace mongo {
         virtual ~BSONElementIterator();
 
         bool more();
-        Element next();
+        Context next();
 
     private:
         const ElementPath& _path;
         BSONObj _context;
 
         enum State { BEGIN, IN_ARRAY, DONE } _state;
-        Element _next;
+        Context _next;
 
         struct ArrayIterationState {
 

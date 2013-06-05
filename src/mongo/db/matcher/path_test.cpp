@@ -32,7 +32,7 @@ namespace mongo {
 
         BSONElementIterator cursor( p, doc );
         ASSERT( cursor.more() );
-        ElementIterator::Element e = cursor.next();
+        ElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( (string)"a", e.element().fieldName() );
         ASSERT_EQUALS( 5, e.element().numberInt() );
         ASSERT( !cursor.more() );
@@ -47,7 +47,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 5, e.element().numberInt() );
 
         ASSERT( cursor.more() );
@@ -71,7 +71,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT( e.element().type() == Array );
 
         ASSERT( !cursor.more() );
@@ -90,7 +90,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 5, e.element().numberInt() );
         ASSERT( !e.outerArray() );
 
@@ -138,7 +138,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 5, e.element().numberInt() );
         ASSERT( !e.outerArray() );
 
@@ -172,7 +172,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 7, e.element().numberInt() );
 
         ASSERT( !cursor.more() );
@@ -187,7 +187,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( Array, e.element().type() );
 
         ASSERT( !cursor.more() );
@@ -202,7 +202,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 4, e.element().numberInt() );
 
         ASSERT( cursor.more() );
@@ -221,7 +221,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT( e.element().eoo() );
 
         ASSERT( cursor.more() );
@@ -241,7 +241,7 @@ namespace mongo {
         BSONElementIterator cursor( p, doc );
 
         ASSERT( cursor.more() );
-        BSONElementIterator::Element e = cursor.next();
+        BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 4, e.element().numberInt() );
 
 
@@ -253,7 +253,7 @@ namespace mongo {
         SimpleArrayElementIterator i( obj["a"], false );
 
         ASSERT( i.more() );
-        ElementIterator::Element e = i.next();
+        ElementIterator::Context e = i.next();
         ASSERT_EQUALS( 5, e.element().numberInt() );
 
         ASSERT( i.more() );
@@ -276,7 +276,7 @@ namespace mongo {
         SimpleArrayElementIterator i( obj["a"], true );
 
         ASSERT( i.more() );
-        ElementIterator::Element e = i.next();
+        ElementIterator::Context e = i.next();
         ASSERT_EQUALS( 5, e.element().numberInt() );
 
         ASSERT( i.more() );
@@ -303,7 +303,7 @@ namespace mongo {
         SingleElementElementIterator i( obj["y"] );
 
         ASSERT( i.more() );
-        ElementIterator::Element e = i.next();
+        ElementIterator::Context e = i.next();
         ASSERT_EQUALS( 5, e.element().numberInt() );
 
         ASSERT( !i.more() );
