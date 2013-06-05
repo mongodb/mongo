@@ -94,11 +94,7 @@ __create_file(WT_SESSION_IMPL *session,
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 		filecfg[2] = val->data;
 		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
-		if ((ret = __wt_metadata_insert(session, uri, fileconf)) != 0) {
-			if (ret == WT_DUPLICATE_KEY)
-				ret = EEXIST;
-			goto err;
-		}
+		WT_ERR(__wt_metadata_insert(session, uri, fileconf));
 	}
 
 	/*
