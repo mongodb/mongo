@@ -129,8 +129,14 @@ hot_backup(void *arg)
 		if (mkdir(RUNDIR_BACKUP, 0777) != 0)
 			die(errno, "mkdir: %s", RUNDIR_BACKUP);
 
-		if ((ret = session->open_cursor(session,
-		    "backup:", NULL, NULL, &backup_cursor)) != 0)
+		/*
+		 * open_cursor can return EBUSY if a metadata operation is
+		 * currently happening - retry in that case.
+		 */
+		while ((ret = session->open_cursor(session,
+		    "backup:", NULL, NULL, &backup_cursor)) == EBUSY)
+			sleep(1);
+		if (ret != 0)
 			die(ret, "session.open_cursor: backup");
 
 		while ((ret = backup_cursor->next(backup_cursor)) == 0) {
