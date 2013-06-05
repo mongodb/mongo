@@ -715,6 +715,27 @@ namespace mongo {
         intrusive_ptr<Expression> _subExpression;
     };
 
+    class ExpressionMap : public Expression {
+    public:
+        // virtuals from Expression
+        virtual ~ExpressionMap();
+        virtual intrusive_ptr<Expression> optimize();
+        virtual Value serialize() const;
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+
+        static intrusive_ptr<ExpressionMap> parse(BSONElement expr);
+
+    private:
+        ExpressionMap(const string& varName, // name of variable to set
+                      intrusive_ptr<Expression> input, // yields array to iterate
+                      intrusive_ptr<Expression> each); // yields results to be added to output array
+
+        string _varName;
+        intrusive_ptr<Expression> _input;
+        intrusive_ptr<Expression> _each;
+    };
+
     class ExpressionMillisecond :
         public ExpressionNary {
     public:

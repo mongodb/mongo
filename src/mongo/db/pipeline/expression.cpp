@@ -269,6 +269,7 @@ namespace mongo {
         {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
         {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
         // $let handled specially in parseExpression
+        // $map handled specially in parseExpression
         {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
         {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
         {"$millisecond", ExpressionMillisecond::create, OpDesc::FIXED_COUNT, 1},
@@ -300,6 +301,9 @@ namespace mongo {
         }
         else if (str::equals(pOpName, "$let")) {
             return ExpressionLet::parse(*pBsonElement);
+        }
+        else if (str::equals(pOpName, "$map")) {
+            return ExpressionMap::parse(*pBsonElement);
         }
 
         OpDesc key;
@@ -1809,10 +1813,11 @@ namespace mongo {
             const Value newVar = it->second->evaluateInternal(originalVars);
 
             // Can't set ROOT (checked in parse())
-            if (it->first == "CURRENT")
+            if (it->first == "CURRENT") {
                 newVars.current = newVar;
-            else
+            } else {
                 newRest[it->first] = newVar;
+            }
         }
 
         newVars.rest = newRest.freeze();
@@ -1829,6 +1834,116 @@ namespace mongo {
         _subExpression->addDependencies(deps);
     }
 
+
+    /* ------------------------- ExpressionMap ----------------------------- */
+
+    ExpressionMap::~ExpressionMap() {}
+
+    intrusive_ptr<ExpressionMap> ExpressionMap::parse(BSONElement expr) {
+        verify(str::equals(expr.fieldName(), "$map"));
+
+        uassert(16878, "$map only supports an object as it's argument",
+                expr.type() == Object);
+
+        // used for input validation
+        bool haveInput = false;
+        bool haveAs = false;
+        bool haveIn = false;
+
+        string varName;
+        intrusive_ptr<Expression> input;
+        intrusive_ptr<Expression> in;
+
+        const BSONObj args = expr.embeddedObject();
+        BSONForEach(arg, args) {
+            if (str::equals(arg.fieldName(), "input")) {
+                haveInput = true;
+                input = parseOperand(&arg);
+            } else if (str::equals(arg.fieldName(), "as")) {
+                haveAs = true;
+                varName = arg.str();
+                Variables::uassertValidNameForUserWrite(varName);
+            } else if (str::equals(arg.fieldName(), "in")) {
+                haveIn = true;
+                in = parseOperand(&arg);
+            } else {
+                uasserted(16879, str::stream()
+                        << "Unrecognized parameter to $map: " << arg.fieldName());
+            }
+        }
+
+        uassert(16880, "Missing 'input' parameter to $map",
+                haveInput);
+        uassert(16881, "Missing 'as' parameter to $map",
+                haveAs);
+        uassert(16882, "Missing 'in' parameter to $map",
+                haveIn);
+
+        return new ExpressionMap(varName, input, in);
+    }
+
+    ExpressionMap::ExpressionMap(const string& varName,
+                                 intrusive_ptr<Expression> input,
+                                 intrusive_ptr<Expression> each)
+        : _varName(varName)
+        , _input(input)
+        , _each(each)
+    {}
+
+    intrusive_ptr<Expression> ExpressionMap::optimize() {
+        // TODO handle when _input is constant
+        _input = _input->optimize();
+        _each = _each->optimize();
+        return this;
+    }
+
+    Value ExpressionMap::serialize() const {
+        return Value(DOC("$map" << DOC("input" << _input->serialize()
+                                    << "as" << _varName
+                                    << "in" << _each->serialize()
+                                    )));
+    }
+
+    Value ExpressionMap::evaluateInternal(const Variables& originalVars) const {
+        const Value inputVal = _input->evaluateInternal(originalVars);
+        if (inputVal.nullish())
+            return Value(BSONNULL);
+
+        uassert(16883, str::stream() << "input to $map must be an Array not "
+                                     << typeName(inputVal.getType()),
+                inputVal.getType() == Array);
+
+        const vector<Value>& input = inputVal.getArray();
+
+        if (input.empty())
+            return inputVal;
+
+        MutableDocument newRest(originalVars.rest);
+        vector<Value> output;
+        output.reserve(input.size());
+        for (size_t i=0; i < input.size(); i++) {
+            Variables newVars = originalVars;
+            if (_varName == "CURRENT") { // Can't set ROOT (checked in parse())
+                newVars.current = input[i];
+            } else {
+                newRest[_varName] = input[i];
+                newVars.rest = newRest.peek();
+            }
+
+            Value toInsert = _each->evaluateInternal(newVars);
+            if (toInsert.missing())
+                toInsert = Value(BSONNULL); // can't insert missing values into array
+
+            output.push_back(toInsert);
+        }
+
+        return Value::consume(output);
+    }
+
+    void ExpressionMap::addDependencies(set<string>& deps, vector<string>* path) const {
+        _input->addDependencies(deps);
+        _each->addDependencies(deps);
+    }
 
     /* ------------------------- ExpressionMillisecond ----------------------------- */
 
