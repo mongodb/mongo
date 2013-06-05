@@ -21,7 +21,6 @@
 #include <map>
 
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/repl/rs.h" // extern Tee* rslog
 
 namespace mongo {
@@ -128,7 +127,7 @@ namespace mongo {
           // or our key file has to change.  if our key file has to change, we'll
           // be rebooting. if their file has to change, they'll be rebooted so the
           // connection created above will go dead, reconnect, and reauth.
-          if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+          if (AuthorizationManager::isAuthEnabled()) {
               if (!connInfo->cc->auth("local",
                                       internalSecurity.user,
                                       internalSecurity.pwd,

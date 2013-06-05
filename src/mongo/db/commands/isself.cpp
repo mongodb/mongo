@@ -24,7 +24,6 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/jsobj.h"
 #include "../../util/net/listen.h"
@@ -244,7 +243,7 @@ namespace mongo {
                 return false;
             }
 
-            if (getGlobalAuthorizationManager()->isAuthEnabled() && !cmdLine.keyFile.empty() ) {
+            if (AuthorizationManager::isAuthEnabled() && !cmdLine.keyFile.empty() ) {
                 if (!conn.auth("local", internalSecurity.user, internalSecurity.pwd, errmsg, false)) {
                     return false;
                 }

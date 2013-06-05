@@ -26,7 +26,6 @@
 #endif
 
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/platform/process_id.h"
@@ -187,7 +186,7 @@ namespace mongo {
                 return false;
             }
 
-            getGlobalAuthorizationManager()->setAuthEnabled(true);
+            AuthorizationManager::setAuthEnabled(true);
         }
 
         return true;

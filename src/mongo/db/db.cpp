@@ -22,6 +22,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state_d.h"
@@ -669,7 +670,7 @@ namespace mongo {
         CmdLine::launchOk();
 #endif
 
-        if(getGlobalAuthorizationManager()->isAuthEnabled()) {
+        if(AuthorizationManager::isAuthEnabled()) {
             // open admin db in case we need to use it later. TODO this is not the right way to
             // resolve this.
             Client::WriteContext c("admin", dbpath);
@@ -926,10 +927,10 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             cmdLine.cpu = true;
         }
         if (params.count("noauth")) {
-            getGlobalAuthorizationManager()->setAuthEnabled(false);
+            AuthorizationManager::setAuthEnabled(false);
         }
         if (params.count("auth")) {
-            getGlobalAuthorizationManager()->setAuthEnabled(true);
+            AuthorizationManager::setAuthEnabled(true);
         }
         if (params.count("quota")) {
             cmdLine.quota = true;
@@ -1269,6 +1270,11 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     }
 }
 
+MONGO_INITIALIZER(CreateAuthorizationManager)(InitializerContext* context) {
+    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongod()));
+    return Status::OK();
+}
+
 static int mongoDbMain(int argc, char* argv[], char **envp) {
     static StaticObserver staticObserver;
 
@@ -1292,7 +1298,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     if( argc == 1 )
         cout << dbExecCommand << " --help for help and startup options" << endl;
 
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongod()));
+
     processCommandLineOptions(std::vector<std::string>(argv, argv + argc));
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     CmdLine::censor(argc, argv);

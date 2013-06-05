@@ -17,7 +17,6 @@
 #include "mongo/db/range_deleter_db_env.h"
 
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
@@ -50,7 +49,7 @@ namespace mongo {
             Client::initThread("RangeDeleter");
         }
 
-        if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+        if (AuthorizationManager::isAuthEnabled()) {
             cc().getAuthorizationSession()->grantInternalAuthorization("_cleanupOldData");
         }
 

@@ -56,26 +56,28 @@ namespace mongo {
         static const std::string USER_SOURCE_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
 
+        // TODO: Make the following functions no longer static.
+
         /**
          * Sets whether or not we allow old style (pre v2.4) privilege documents for this whole
          * server.
          */
-        void setSupportOldStylePrivilegeDocuments(bool enabled);
+        static void setSupportOldStylePrivilegeDocuments(bool enabled);
 
         /**
          * Returns true if we allow old style privilege privilege documents for this whole server.
          */
-        bool getSupportOldStylePrivilegeDocuments() const;
+        static bool getSupportOldStylePrivilegeDocuments();
 
         /**
          * Sets whether or not access control enforcement is enabled for this whole server.
          */
-        void setAuthEnabled(bool enabled);
+        static void setAuthEnabled(bool enabled);
 
         /**
          * Returns true if access control is enabled on this server.
          */
-        bool isAuthEnabled() const;
+        static bool isAuthEnabled();
 
         AuthzManagerExternalState* getExternalState() const;
 
@@ -132,17 +134,14 @@ namespace mongo {
                 const BSONObj& privilegeDocument,
                 PrivilegeSet* result) const;
 
-        // Pointer to the single AuthzManagerExternalState object for this instance.
-        scoped_ptr<AuthzManagerExternalState> _externalState;
+        static bool _doesSupportOldStylePrivileges;
 
         // True if access control enforcement is enabled on this node (ie it was started with
         // --auth or --keyFile).
         // This is a config setting, set at startup and not changing after initialization.
-        bool _authEnabled;
+        static bool _authEnabled;
 
-        // True if we allow old-style (pre v2.4) privilege documents.
-        // This is a config setting, set at startup and not changing after initialization
-        bool _doesSupportOldStylePrivileges;
+        scoped_ptr<AuthzManagerExternalState> _externalState;
     };
 
 } // namespace mongo

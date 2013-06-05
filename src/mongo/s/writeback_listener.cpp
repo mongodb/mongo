@@ -21,7 +21,6 @@
 #include "writeback_listener.h"
 
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client_info.h"
@@ -298,7 +297,7 @@ namespace mongo {
                             r.d().reservedField() |= Reserved_FromWriteback;
 
                             ClientInfo * ci = r.getClientInfo();
-                            if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+                            if (AuthorizationManager::isAuthEnabled()) {
                                 ci->getAuthorizationSession()->grantInternalAuthorization(
                                         "_writebackListener");
                             }

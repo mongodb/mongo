@@ -38,7 +38,7 @@ namespace {
     AuthzSessionExternalStateServerCommon::~AuthzSessionExternalStateServerCommon() {}
 
     void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost() {
-        if (!getAuthorizationManager().isAuthEnabled())
+        if (!AuthorizationManager::isAuthEnabled())
             return;
         // If we know that an admin user exists, don't re-check.
         if (!_allowLocalhost)
@@ -60,7 +60,7 @@ namespace {
 
     bool AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks() const {
         ClientBasic* client = ClientBasic::getCurrent();
-        return !getAuthorizationManager().isAuthEnabled() ||
+        return !AuthorizationManager::isAuthEnabled() ||
                 (enableLocalhostAuthBypass &&client->getIsLocalHostConnection() && _allowLocalhost);
     }
 
