@@ -751,11 +751,38 @@ namespace mongo {
 
         _config = configHosts;
 
+        string errmsg;
+        if( ! checkHostsAreUnique(configHosts, &errmsg) ) {
+            error() << errmsg << endl;;
+            return false;
+        }
+
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
         _primary.setAddress( ConnectionString( fullString , ConnectionString::SYNC ) );
         LOG(1) << " config string : " << fullString << endl;
 
+        return true;
+    }
+
+    bool ConfigServer::checkHostsAreUnique( const vector<string>& configHosts, string* errmsg ) {
+
+        //If we have one host, its always unique
+        if ( configHosts.size() == 1 ) {
+            return true;
+        }
+
+        //Compare each host with all other hosts.
+        set<string> hostsTest;
+        pair<set<string>::iterator,bool> ret;
+        for ( size_t x=0; x < configHosts.size(); x++) {
+            ret = hostsTest.insert( configHosts[x] );
+            if ( ret.second == false ) {
+               *errmsg = str::stream() << "config servers " << configHosts[x]
+                                       << " exists twice in config listing.";
+               return false;
+            }
+        }
         return true;
     }
 
