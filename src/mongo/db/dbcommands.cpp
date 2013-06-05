@@ -1804,6 +1804,21 @@ namespace mongo {
             out->push_back(Privilege(dbname, actions));
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            Timer timer;
+
+            set<string> desiredCollections;
+            if ( cmdObj["collections"].type() == Array ) {
+                BSONObjIterator i( cmdObj["collections"].Obj() );
+                while ( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.type() != String ) {
+                        errmsg = "collections entries have to be strings";
+                        return false;
+                    }
+                    desiredCollections.insert( e.String() );
+                }
+            }
+
             list<string> colls;
             Database* db = cc().database();
             if ( db )
@@ -1818,20 +1833,26 @@ namespace mongo {
 
             BSONObjBuilder bb( result.subobjStart( "collections" ) );
             for ( list<string>::iterator i=colls.begin(); i != colls.end(); i++ ) {
-                string c = *i;
-                if ( c.find( ".system.profile" ) != string::npos )
+                string fullCollectionName = *i;
+                string shortCollectionName = fullCollectionName.substr( dbname.size() + 1 );
+
+                if ( shortCollectionName.find( "system." ) == 0 )
+                    continue;
+
+                if ( desiredCollections.size() > 0 &&
+                     desiredCollections.count( shortCollectionName ) == 0 )
                     continue;
 
                 shared_ptr<Cursor> cursor;
 
-                NamespaceDetails * nsd = nsdetails( c );
+                NamespaceDetails * nsd = nsdetails( fullCollectionName );
 
                 // debug SERVER-761
                 NamespaceDetails::IndexIterator ii = nsd->ii();
                 while( ii.more() ) {
                     const IndexDetails &idx = ii.next();
                     if ( !idx.head.isValid() || !idx.info.isValid() ) {
-                        log() << "invalid index for ns: " << c << " " << idx.head << " " << idx.info;
+                        log() << "invalid index for ns: " << fullCollectionName << " " << idx.head << " " << idx.info;
                         if ( idx.info.isValid() )
                             log() << " " << idx.info.obj();
                         log() << endl;
@@ -1847,14 +1868,11 @@ namespace mongo {
                                                      false,
                                                      1 ) );
                 }
-                else if ( c.find( ".system." ) != string::npos ) {
-                    continue;
-                }
                 else if ( nsd->isCapped() ) {
-                    cursor = findTableScan( c.c_str() , BSONObj() );
+                    cursor = findTableScan( fullCollectionName.c_str() , BSONObj() );
                 }
                 else {
-                    log() << "can't find _id index for: " << c << endl;
+                    log() << "can't find _id index for: " << fullCollectionName << endl;
                     continue;
                 }
 
@@ -1872,7 +1890,7 @@ namespace mongo {
                 md5_finish(&st, d);
                 string hash = digestToString( d );
 
-                bb.append( c.c_str() + ( dbname.size() + 1 ) , hash );
+                bb.append( shortCollectionName, hash );
 
                 md5_append( &globalState , (const md5_byte_t*)hash.c_str() , hash.size() );
             }
@@ -1883,7 +1901,7 @@ namespace mongo {
             string hash = digestToString( d );
 
             result.append( "md5" , hash );
-
+            result.appendNumber( "timeMillis", timer.millis() );
             return 1;
         }
 

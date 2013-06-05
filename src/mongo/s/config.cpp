@@ -776,7 +776,11 @@ namespace mongo {
             try {
                 conn.reset( new ScopedDbConnection( _config[i], 30.0 ) );
 
-                if ( ! conn->get()->simpleCommand( "config" , &result, "dbhash" ) ) {
+                if ( ! conn->get()->runCommand( "config",
+                                                BSON( "dbhash" << 1 <<
+                                                      "collections" << BSON_ARRAY( "chunks" <<
+                                                                                   "databases" ) ),
+                                                result ) ) {
 
                     // TODO: Make this a helper
                     error = result["errmsg"].eoo() ? "" : result["errmsg"].String();
