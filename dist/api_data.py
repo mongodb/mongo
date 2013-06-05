@@ -64,7 +64,7 @@ source_meta = [
 		table.  By default, the data source URI is derived from the \c
 		type and the column group or index name.  Applications can
 		create tables from existing data sources by supplying a \c
-		source configuration'''),
+		source configuration''', undoc=True),
 	Config('type', 'file', r'''
 		set the type of data source used to store a column group, index
 		or simple table.  By default, a \c "file:" URI is derived from

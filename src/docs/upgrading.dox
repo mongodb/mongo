@@ -10,6 +10,13 @@ extension methods; applications using the extension methods will require
 recompilation.
 </dd>
 
+<dt>WT_SESSION::create no longer accepts a "source" configuration</dt>
+<dd>
+The \c "source" configuration key has been removed from WT_SESSION::create.
+Normal applications should not have been using it, and there were a number of
+bugs associated with it.
+</dd>
+
 </dl>
 <hr>
 @section version_161 Upgrading to Version 1.6.1
