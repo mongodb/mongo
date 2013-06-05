@@ -82,22 +82,22 @@ namespace mongo {
         bool ok = true;
         errmsg = "";
         for ( size_t i=0; i<_conns.size(); i++ ) {
-            BSONObj res;
+            string singleErr;
             try {
-                if ( _conns[i]->simpleCommand( "admin" , &res , "fsync" ) )
+                // this is fsync=true
+                // which with journalling on is a journal commit
+                // without journalling, is a full fsync
+                singleErr = _conns[i]->getLastError( true );
+
+                if ( singleErr.size() == 0 )
                     continue;
+
             }
             catch ( DBException& e ) {
-                errmsg += e.toString();
-            }
-            catch ( std::exception& e ) {
-                errmsg += e.what();
-            }
-            catch ( ... ) {
-                warning() << "unknown exception in SyncClusterConnection::fsync" << endl;
+                singleErr = e.toString();
             }
             ok = false;
-            errmsg += " " + _conns[i]->toString() + ":" + res.toString();
+            errmsg += " " + _conns[i]->toString() + ":" + singleErr;
         }
         return ok;
     }
