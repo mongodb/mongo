@@ -72,7 +72,7 @@ __wt_lsm_merge(
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk, *youngest;
 	uint32_t generation, start_id;
-	uint64_t insert_count, record_count, r;
+	uint64_t insert_count, record_count;
 	u_int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
 	int create_bloom;
 	const char *cfg[3];
@@ -288,15 +288,12 @@ __wt_lsm_merge(
 	WT_ERR(ret);
 
 	/*
-	 * Fault in some pages.  We use a random cursor to jump around in the
-	 * tree.  The count here is fairly arbitrary: what we want is to have
-	 * enough internal pages in cache so that application threads don't
-	 * stall and block each other reading them in.
+	 * Open a handle on the new chunk before application threads attempt
+	 * to access it. Opening the handle causes internal pages to be
+	 * preloaded into file system cache.
 	 */
-	cfg[1] = "checkpoint=WiredTigerCheckpoint,next_random";
+	cfg[1] = "checkpoint=WiredTigerCheckpoint";
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
-	for (r = 0; ret == 0 && r < 100 + (insert_count >> 16); r++)
-		WT_TRET(dest->next(dest));
 	WT_TRET(dest->close(dest));
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
