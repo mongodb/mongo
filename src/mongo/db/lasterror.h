@@ -17,7 +17,11 @@
 
 #pragma once
 
+#include <boost/thread/tss.hpp>
+#include <string>
+
 #include "mongo/bson/oid.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
     class BSONObjBuilder;
@@ -25,7 +29,7 @@ namespace mongo {
 
     struct LastError {
         int code;
-        string msg;
+        std::string msg;
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         OID upsertedId;
         OID writebackId; // this shouldn't get reset so that old GLE are handled
@@ -34,7 +38,7 @@ namespace mongo {
         int nPrev;
         bool valid;
         bool disabled;
-        void writeback( OID& oid ) {
+        void writeback(const OID& oid) {
             reset( true );
             writebackId = oid;
             writebackSince = 0;
