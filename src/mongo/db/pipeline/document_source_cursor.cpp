@@ -28,9 +28,9 @@ namespace mongo {
 
     DocumentSourceCursor::CursorWithContext::CursorWithContext( const string& ns )
         : _readContext( ns ) // Take a read lock.
-        , _chunkMgr(shardingState.needShardChunkManager( ns )
-                    ? shardingState.getShardChunkManager( ns )
-                    : CollectionManagerPtr())
+        , _collMetadata(shardingState.needCollectionMetadata( ns )
+                    ? shardingState.getCollectionMetadata( ns )
+                    : CollectionMetadataPtr())
     {}
 
     DocumentSourceCursor::~DocumentSourceCursor() {
@@ -71,9 +71,9 @@ namespace mongo {
     }
 
     bool DocumentSourceCursor::canUseCoveredIndex() {
-        // We can't use a covered index when we have a chunk manager because we
+        // We can't use a covered index when we have collection metadata because we
         // need to examine the object to see if it belongs on this shard
-        return (!chunkMgr() &&
+        return (!collMetadata() &&
                 cursor()->ok() && cursor()->c()->keyFieldsOnly());
     }
 
@@ -117,7 +117,7 @@ namespace mongo {
 
             // grab the matching document
             if (canUseCoveredIndex()) {
-                // Can't have a Chunk Manager if we are here
+                // Can't have collection metadata if we are here
                 BSONObj indexKey = cursor()->currKey();
                 pCurrent = Document(cursor()->c()->keyFieldsOnly()->hydrate(indexKey));
             }
@@ -126,9 +126,9 @@ namespace mongo {
 
                 // check to see if this is a new object we don't own yet
                 // because of a chunk migration
-                if (chunkMgr()) {
-                    KeyPattern kp( chunkMgr()->getKeyPattern() );
-                    if ( !chunkMgr()->keyBelongsToMe( kp.extractSingleKey( next ) ) ) continue;
+                if (collMetadata()) {
+                    KeyPattern kp( collMetadata()->getKeyPattern() );
+                    if ( !collMetadata()->keyBelongsToMe( kp.extractSingleKey( next ) ) ) continue;
                 }
 
                 if (!_projection) {

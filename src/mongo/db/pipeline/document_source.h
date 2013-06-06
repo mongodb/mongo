@@ -378,7 +378,7 @@ namespace mongo {
             // Must be the first struct member for proper construction and destruction, as other
             // members may depend on the read lock it acquires.
             Client::ReadContext _readContext;
-            shared_ptr<const CollectionManager> _chunkMgr;
+            shared_ptr<const CollectionMetadata> _collMetadata;
             ClientCursor::Holder _cursor;
         };
 
@@ -473,7 +473,7 @@ namespace mongo {
         shared_ptr<CursorWithContext> _cursorWithContext;
 
         ClientCursor::Holder& cursor();
-        const CollectionManager* chunkMgr() { return _cursorWithContext->_chunkMgr.get(); }
+        const CollectionMetadata* collMetadata() { return _cursorWithContext->_collMetadata.get(); }
 
         bool canUseCoveredIndex();
 

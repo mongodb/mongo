@@ -100,7 +100,7 @@ env.Library('upgrade', ['cluster_client_internal.cpp',
 # Support for maintaining persistent sharding state and data.
 #
 
-env.StaticLibrary('metadata', ['collection_manager.cpp',
+env.StaticLibrary('metadata', ['collection_metadata.cpp',
                                'metadata_loader.cpp'],
                   LIBDEPS=['base',
                            '$BUILD_DIR/mongo/bson',
@@ -115,8 +115,8 @@ env.CppUnitTest('chunk_diff_test',
                          '$BUILD_DIR/mongo/db/common'],
                 NO_CRUTCH=True)
 
-env.CppUnitTest('collection_manager_test',
-                'collection_manager_test.cpp',
+env.CppUnitTest('collection_metadata_test',
+                'collection_metadata_test.cpp',
                 LIBDEPS=['metadata',
                          '$BUILD_DIR/mongo/mocklib',
                          '$BUILD_DIR/mongo/clientandshell', # CmdLine crutch

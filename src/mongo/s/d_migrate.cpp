@@ -924,7 +924,8 @@ namespace mongo {
                     return false;
                 }
 
-                // since this could be the first call that enable sharding we also make sure to have the chunk manager up to date
+                // since this could be the first call that enable sharding we also make sure to
+                // load the shard's metadata, if we don't have it
                 shardingState.gotShardName( myOldShard );
 
                 // Using the maxVersion we just found will enforce a check - if we use zero version,
@@ -947,9 +948,9 @@ namespace mongo {
 
             // 3.
 
-            CollectionManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
-            verify( chunkManager != NULL );
-            BSONObj shardKeyPattern = chunkManager->getKeyPattern();
+            CollectionMetadataPtr collMetadata = shardingState.getCollectionMetadata( ns );
+            verify( collMetadata != NULL );
+            BSONObj shardKeyPattern = collMetadata->getKeyPattern();
             if ( shardKeyPattern.isEmpty() ){
                 errmsg = "no shard key found";
                 return false;
@@ -1073,7 +1074,8 @@ namespace mongo {
 
             {
                 // 5.a
-                // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
+                // we're under the collection lock here, so no other migrate can change maxVersion
+                // or CollectionMetadata state
                 migrateFromStatus.setInCriticalSection( true );
                 ChunkVersion myVersion = maxVersion;
                 myVersion.incMajor();
@@ -1082,8 +1084,9 @@ namespace mongo {
                     Lock::DBWrite lk( ns );
                     verify( myVersion > shardingState.getVersion( ns ) );
 
-                    // bump the chunks manager's version up and "forget" about the chunk being moved
-                    // this is not the commit point but in practice the state in this shard won't until the commit it done
+                    // bump the metadata's version up and "forget" about the chunk being moved
+                    // this is not the commit point but in practice the state in this shard won't
+                    // until the commit it done
                     shardingState.donateChunk( ns , min , max , myVersion );
                 }
 
@@ -1172,12 +1175,11 @@ namespace mongo {
 
                 nextVersion = myVersion;
 
-                // if we have chunks left on the FROM shard, update the version of one of them as well
-                // we can figure that out by grabbing the chunkManager installed on 5.a
-                // TODO expose that manager when installing it
+                // if we have chunks left on the FROM shard, update the version of one of them as
+                // well.  we can figure that out by grabbing the metadata installed on 5.a
 
-                CollectionManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
-                if( chunkManager->getNumChunks() > 0 ) {
+                collMetadata = shardingState.getCollectionMetadata( ns );
+                if( collMetadata->getNumChunks() > 0 ) {
 
                     // get another chunk on that shard
                     BSONObj lookupKey;
@@ -1185,7 +1187,7 @@ namespace mongo {
                     BSONObj bumpMax;
                     do {
                         ChunkType bumpChunk;
-                        chunkManager->getNextChunk( lookupKey , &bumpChunk );
+                        collMetadata->getNextChunk( lookupKey , &bumpChunk );
                         bumpMin = bumpChunk.getMin();
                         bumpMax = bumpChunk.getMax();
                         lookupKey = bumpMin;
@@ -1276,7 +1278,7 @@ namespace mongo {
                     {
                         Lock::GlobalWrite lk;
 
-                        // Revert the chunk manager back to the state before "forgetting"
+                        // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
                         shardingState.undoDonateChunk( ns , min , max , startingVersion );
                     }

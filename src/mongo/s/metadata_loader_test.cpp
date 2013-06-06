@@ -23,7 +23,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/s/collection_manager.h"
+#include "mongo/s/collection_metadata.h"
 #include "mongo/s/metadata_loader.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
@@ -37,7 +37,7 @@ namespace {
     using mongo::BSONArray;
     using mongo::ChunkType;
     using mongo::ChunkVersion;
-    using mongo::CollectionManager;
+    using mongo::CollectionMetadata;
     using mongo::CollectionType;
     using mongo::ConnectionString;
     using mongo::Date_t;
@@ -58,28 +58,27 @@ namespace {
     // TODO: Test that you can properly load config using format with deprecated fields?
 
     TEST(MetadataLoader, DroppedColl) {
-        MockRemoteDBServer dummyConfig(CONFIG_HOST_PORT);
-        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-        MockConnRegistry::get()->addServer(&dummyConfig);
+        MockRemoteDBServer dummyConfig( CONFIG_HOST_PORT );
+        mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
+        MockConnRegistry::get()->addServer( &dummyConfig );
 
-        dummyConfig.insert(CollectionType::ConfigNS,
-                           BSON(CollectionType::ns("test.foo") <<
-                                CollectionType::dropped(true)));
+        dummyConfig.insert( CollectionType::ConfigNS, BSON(CollectionType::ns("test.foo") <<
+                CollectionType::dropped(true)) );
 
-        dummyConfig.insert(ChunkType::ConfigNS, BSONObj());
+        dummyConfig.insert( ChunkType::ConfigNS, BSONObj() );
 
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
 
         string errmsg;
-        scoped_ptr<CollectionManager> manager;
-        manager.reset(loader.makeCollectionManager("test.foo",
-                                                   "shard0000",
-                                                   NULL, /* no old manager */
-                                                   &errmsg));
+        scoped_ptr<CollectionMetadata> metadata;
+        metadata.reset( loader.makeCollectionMetadata( "test.foo", // br
+                                                       "shard0000",
+                                                       NULL, /* no old metadata */
+                                                       &errmsg ) );
 
-        ASSERT_FALSE(errmsg.empty());
+        ASSERT_FALSE( errmsg.empty() );
 
         MockConnRegistry::get()->clear();
         ScopedDbConnection::clearPool();
@@ -88,18 +87,18 @@ namespace {
     class NoChunkFixture : public mongo::unittest::Test {
     protected:
         void setUp() {
-            _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-            mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-            MockConnRegistry::get()->addServer(_dummyConfig.get());
+            _dummyConfig.reset( new MockRemoteDBServer( CONFIG_HOST_PORT ) );
+            mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
+            MockConnRegistry::get()->addServer( _dummyConfig.get() );
 
             OID epoch = OID::gen();
             BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                                   CollectionType::keyPattern(BSON("a" << 1)) <<
-                                   CollectionType::unique(false) <<
-                                   CollectionType::updatedAt(1ULL) <<
-                                   CollectionType::epoch(epoch));
+                    CollectionType::keyPattern(BSON("a" << 1)) <<
+                    CollectionType::unique(false) <<
+                    CollectionType::updatedAt(1ULL) <<
+                    CollectionType::epoch(epoch));
 
-            _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+            _dummyConfig->insert( CollectionType::ConfigNS, collFoo );
         }
 
         void tearDown() {
@@ -112,55 +111,55 @@ namespace {
     };
 
     TEST_F(NoChunkFixture, CheckNumChunk) {
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
 
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
-        ASSERT_TRUE(manager != NULL);
-        ASSERT_EQUALS(0U, manager->getNumChunks());
+        CollectionMetadata* metadata =
+                loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
+                                               NULL /* no need for errMsg */);
+        ASSERT_TRUE( metadata != NULL );
+        ASSERT_EQUALS( 0U, metadata->getNumChunks() );
     }
 
     TEST_F(NoChunkFixture, VersionIsZero) {
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
-        ASSERT_TRUE(manager != NULL);
-        ASSERT_EQUALS(0U, manager->getShardVersion().toLong());
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
+        CollectionMetadata* metadata =
+                loader.makeCollectionMetadata( "test.foo", // br
+                                               "shard0000",
+                                               NULL, /* no old metadata */
+                                               NULL /* no need for errMsg */);
+        ASSERT_TRUE( metadata != NULL );
+        ASSERT_EQUALS( 0U, metadata->getShardVersion().toLong() );
     }
 
     class ConfigServerFixture : public mongo::unittest::Test {
     protected:
         void setUp() {
-            _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-            mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-            MockConnRegistry::get()->addServer(_dummyConfig.get());
+            _dummyConfig.reset( new MockRemoteDBServer( CONFIG_HOST_PORT ) );
+            mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
+            MockConnRegistry::get()->addServer( _dummyConfig.get() );
 
             OID epoch = OID::gen();
-            _maxCollVersion = ChunkVersion(1, 0, epoch);
+            _maxCollVersion = ChunkVersion( 1, 0, epoch );
 
             BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                                   CollectionType::keyPattern(BSON("a" << 1)) <<
-                                   CollectionType::unique(false) <<
-                                   CollectionType::updatedAt(1ULL) <<
-                                   CollectionType::epoch(epoch));
-            _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+                    CollectionType::keyPattern(BSON("a" << 1)) <<
+                    CollectionType::unique(false) <<
+                    CollectionType::updatedAt(1ULL) <<
+                    CollectionType::epoch(epoch));
+            _dummyConfig->insert( CollectionType::ConfigNS, collFoo );
 
             BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
-                                     ChunkType::ns("test.foo") <<
-                                     ChunkType::min(BSON("a" << MINKEY)) <<
-                                     ChunkType::max(BSON("a" << MAXKEY)) <<
-                                     ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                     ChunkType::DEPRECATED_epoch(epoch) <<
-                                     ChunkType::shard("shard0000"));
-            _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
+                    ChunkType::ns("test.foo") <<
+                    ChunkType::min(BSON("a" << MINKEY)) <<
+                    ChunkType::max(BSON("a" << MAXKEY)) <<
+                    ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                    ChunkType::DEPRECATED_epoch(epoch) <<
+                    ChunkType::shard("shard0000"));
+            _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
         }
 
         void tearDown() {
@@ -186,298 +185,294 @@ namespace {
 
     TEST_F(ConfigServerFixture, SingleChunkCheckNumChunk) {
         // Load from mock server.
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
-        ASSERT_TRUE(manager != NULL);
-        ASSERT_EQUALS(1U, manager->getNumChunks());
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
+        CollectionMetadata* metadata =
+                loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
+                                               NULL /* no need for errMsg */);
+        ASSERT_TRUE( metadata != NULL );
+        ASSERT_EQUALS( 1U, metadata->getNumChunks() );
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetNext) {
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
+        CollectionMetadata* metadata =
+                loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
+                                               NULL /* no need for errMsg */);
         ChunkType chunkInfo;
-        ASSERT_TRUE(manager->getNextChunk(BSON("a" << MINKEY), &chunkInfo));
+        ASSERT_TRUE( metadata->getNextChunk(BSON("a" << MINKEY), &chunkInfo) );
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetShardKey) {
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
-        ASSERT_TRUE(manager->getKeyPattern().equal(BSON("a" << 1)));
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
+        CollectionMetadata* metadata =
+                loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
+                                               NULL /* no need for errMsg */);
+        ASSERT_TRUE( metadata->getKeyPattern().equal(BSON("a" << 1)) );
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetMaxCollVersion) {
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
+        CollectionMetadata* metadata =
+                loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
+                                               NULL /* no need for errMsg */);
 
-        ASSERT_TRUE(getMaxCollVersion().isEquivalentTo(manager->getCollVersion()));
+        ASSERT_TRUE( getMaxCollVersion().isEquivalentTo( metadata->getCollVersion() ) );
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetMaxShardVersion) {
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
+        CollectionMetadata* metadata =
+                loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
+                                               NULL /* no need for errMsg */);
 
-        ASSERT_TRUE(getMaxShardVersion().isEquivalentTo(manager->getShardVersion()));
+        ASSERT_TRUE( getMaxShardVersion().isEquivalentTo( metadata->getShardVersion() ) );
     }
 
     TEST_F(ConfigServerFixture, NoChunks) {
-        getConfigServer()->remove(ChunkType::ConfigNS, BSONObj());
+        getConfigServer()->remove( ChunkType::ConfigNS, BSONObj() );
 
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
+        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString configLoc( confServerStr );
+        MetadataLoader loader( configLoc );
 
-        CollectionManager* manager = loader.makeCollectionManager("test.foo",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL);
-
-        ASSERT_TRUE(manager != NULL);
-
-        ChunkVersion versionZero(0, 0, OID());
-        ASSERT_EQUALS(versionZero.toLong(), manager->getCollVersion().toLong());
-        ASSERT_EQUALS(versionZero.toLong(), manager->getShardVersion().toLong());
-        ASSERT_EQUALS(0U, manager->getNumChunks());
-    }
-
-#if 0
-    // TODO: MockServer functionality does not support selective query - consider
-    // inserting nothing at all to chunk/collections collection
-    TEST_F(ConfigServerFixture, EmptyDataForNS) {
-        ConnectionString confServerStr(CONFIG_HOST_PORT);
-        ConnectionString configLoc(confServerStr);
-        MetadataLoader loader(configLoc);
-        CollectionManager* manager = loader.makeCollectionManager("not.sharded",
-                                                                  "shard0000",
-                                                                  NULL, /* no old manager */
-                                                                  NULL  /* no need for errMsg */);
-        ASSERT_TRUE(manager == NULL);
-    }
-#endif
-
-#if 0
-    // TODO: d_chunk_manager_test has no tests for passing old ShardChunkManager
-    class TwoChunkFixture : public mongo::unittest::Test {
-    protected:
-        void setUp() {
-            _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-            mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-            MockConnRegistry::get()->addServer(_dummyConfig.get());
-
-            OID epoch = OID::gen();
-            _maxCollVersion = ChunkVersion(1, 0, epoch);
-
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                                   CollectionType::keyPattern(BSON("a" << 1)) <<
-                                   CollectionType::unique(false) <<
-                                   CollectionType::updatedAt(1ULL) <<
-                                   CollectionType::epoch(epoch));
-            _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
-
-            BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
-                                     ChunkType::ns("test.foo") <<
-                                     ChunkType::min(BSON("a" << MINKEY)) <<
-                                     ChunkType::max(BSON("a" << MAXKEY)) <<
-                                     ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                     ChunkType::DEPRECATED_epoch(epoch) <<
-                                     ChunkType::shard("shard0000"));
-            _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
-
-            ConnectionString confServerStr(CONFIG_HOST_PORT);
-            ConnectionString configLoc(confServerStr);
-            MetadataLoader loader(configLoc);
-            _oldManager = loader.makeCollectionManager("not.sharded",
-                                                       "shard0000",
-                                                       NULL, /* no old manager */
-                                                       NULL  /* no need for errMsg */);
-            ASSERT(_oldManager != NULL);
-
-            // Needs to delete the collection and rebuild because the mock server
-            // not support updates.
-            _dummyConfig->remove(CollectionType::ConfigNS, BSONObj());
-            _dummyConfig->remove(ChunkType::ConfigNS, BSONObj());
-
-            OID epoch2 = OID::gen();
-            _maxCollVersion = ChunkVersion(2, 0, epoch2);
-
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                                   CollectionType::keyPattern(BSON("a" << 1)) <<
-                                   CollectionType::unique(false) <<
-                                   CollectionType::updatedAt(2ULL) <<
-                                   CollectionType::epoch(epoch2));
-            _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
-
-            BSONObj chunk1 = BSON(ChunkType::name("test.foo-a_MinKey") <<
-                                  ChunkType::ns("test.foo") <<
-                                  ChunkType::min(BSON("a" << MINKEY)) <<
-                                  ChunkType::max(BSON("a" << 100)) <<
-                                  ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                  ChunkType::DEPRECATED_epoch(epoch2) <<
-                                  ChunkType::shard("shard0000"));
-            _dummyConfig->insert(ChunkType::ConfigNS, chunk1);
-
-            BSONObj chunk2 = BSON(ChunkType::name("test.foo-a_100") <<
-                                  ChunkType::ns("test.foo") <<
-                                  ChunkType::min(BSON("a" << 100)) <<
-                                  ChunkType::max(BSON("a" << MAXKEY)) <<
-                                  ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                  ChunkType::DEPRECATED_epoch(epoch2) <<
-                                  ChunkType::shard("shard0000"));
-            _dummyConfig->insert(ChunkType::ConfigNS, chunk2);
-        }
-
-        void tearDown() {
-            MockConnRegistry::get()->removeServer(_dummyConfig->getServerAddress());
-        }
-
-        ChunkVersion getCollVersion() const {
-            return _maxCollVersion;
-        }
-
-        const ChunkVersion& getShardVersion(size_t shard) const {
-            return _maxCollVersion;
-        }
-
-        const CollectionManager* getOldManager() const {
-            return _oldManager;
-        }
-
-    private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
-        CollectionManager* _oldManager;
-
-        ChunkVersion _maxCollVersion;
-    };
-#endif
-
-#if 0
-
-    // TODO: MockServer functionality does not support selective query
-    class ThreeChunkTwoShardFixture : public mongo::unittest::Test {
-    protected:
-        void setUp() {
-            _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-            mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-            MockConnRegistry::get()->addServer(_dummyConfig.get());
-
-            OID epoch = OID::gen();
-            _maxCollVersion = ChunkVersion(1, 0, epoch);
-
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                                   CollectionType::keyPattern(BSON("a" << 1)) <<
-                                   CollectionType::unique(false) <<
-                                   CollectionType::updatedAt(1ULL) <<
-                                   CollectionType::epoch(epoch));
-            _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
-
-            BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
-                                     ChunkType::ns("test.foo") <<
-                                     ChunkType::min(BSON("a" << MINKEY)) <<
-                                     ChunkType::max(BSON("a" << MAXKEY)) <<
-                                     ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                     ChunkType::DEPRECATED_epoch(epoch) <<
-                                     ChunkType::shard("shard0000"));
-            _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
-
-            ConnectionString confServerStr(CONFIG_HOST_PORT);
-            ConnectionString configLoc(confServerStr);
-            MetadataLoader loader(configLoc);
-            CollectionManager* manager = loader.makeCollectionManager("not.sharded",
+        CollectionMetadata* metadata = loader.makeCollectionMetadata( "test.foo", // br
                                                                       "shard0000",
-                                                                      NULL, /* no old manager */
-                                                                      NULL  /* no need for errMsg */);
-            ASSERT(manager != NULL);
+                                                                      NULL, /* no old metadata */
+                                                                      NULL );
 
-            // Needs to delete the collection and rebuild because the mock server
-            // not support updates.
-            _dummyConfig->remove(CollectionType::ConfigNS, BSONObj());
-            _dummyConfig->remove(ChunkType::ConfigNS, BSONObj());
+        ASSERT_TRUE( metadata != NULL );
 
-            OID epoch2 = OID::gen();
-            _maxCollVersion = ChunkVersion(2, 0, epoch2);
-            _maxShardVersion.push_back(_maxCollVersion);
+        ChunkVersion versionZero( 0, 0, OID() );
+        ASSERT_EQUALS( versionZero.toLong(), metadata->getCollVersion().toLong() );
+        ASSERT_EQUALS( versionZero.toLong(), metadata->getShardVersion().toLong() );
+        ASSERT_EQUALS( 0U, metadata->getNumChunks() );
+    }
 
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                                   CollectionType::keyPattern(BSON("a" << 1)) <<
-                                   CollectionType::unique(false) <<
-                                   CollectionType::updatedAt(2ULL) <<
-                                   CollectionType::epoch(epoch2));
-            _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
-
-            BSONObj chunk1 = BSON(ChunkType::name("test.foo-a_MinKey") <<
-                                  ChunkType::ns("test.foo") <<
-                                  ChunkType::min(BSON("a" << MINKEY)) <<
-                                  ChunkType::max(BSON("a" << 10)) <<
-                                  ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                  ChunkType::DEPRECATED_epoch(epoch2) <<
-                                  ChunkType::shard("shard0000"));
-            _dummyConfig->insert(ChunkType::ConfigNS, chunk1);
-
-            OID epoch3 = OID::gen();
-            _maxCollVersion = ChunkVersion(2, 0, epoch3);
-            _maxShardVersion.push_back(_maxCollVersion);
-
-            BSONObj chunk2 = BSON(ChunkType::name("test.foo-a_10") <<
-                                  ChunkType::ns("test.foo") <<
-                                  ChunkType::min(BSON("a" << 10)) <<
-                                  ChunkType::max(BSON("a" << 100)) <<
-                                  ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                  ChunkType::DEPRECATED_epoch(epoch3) <<
-                                  ChunkType::shard("shard0001"));
-            _dummyConfig->insert(ChunkType::ConfigNS, chunk2);
-
-            BSONObj chunk3 = BSON(ChunkType::name("test.foo-a_100") <<
-                                  ChunkType::ns("test.foo") <<
-                                  ChunkType::min(BSON("a" << 100)) <<
-                                  ChunkType::max(BSON("a" << MAXKEY)) <<
-                                  ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
-                                  ChunkType::DEPRECATED_epoch(epoch3) <<
-                                  ChunkType::shard("shard0001"));
-            _dummyConfig->insert(ChunkType::ConfigNS, chunk3);
-        }
-
-        void tearDown() {
-            MockConnRegistry::get()->removeServer(_dummyConfig->getServerAddress());
-        }
-
-        ChunkVersion getCollVersion() const {
-            return _maxCollVersion;
-        }
-
-        const ChunkVersion& getShardVersion(size_t shard) const {
-            return _maxShardVersion[shard];
-        }
-
-    private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
-        CollectionManager* _oldManager;
-
-        ChunkVersion _maxCollVersion;
-        vector<ChunkVersion> _maxShardVersion;
-    };
+#if 0
+// TODO: MockServer functionality does not support selective query - consider
+// inserting nothing at all to chunk/collections collection
+TEST_F(ConfigServerFixture, EmptyDataForNS) {
+    ConnectionString confServerStr(CONFIG_HOST_PORT);
+    ConnectionString configLoc(confServerStr);
+    MetadataLoader loader(configLoc);
+    CollectionMetadata* metadata = loader.makeCollectionMetadata("not.sharded",
+            "shard0000",
+            NULL, /* no old metadata */
+            NULL /* no need for errMsg */);
+    ASSERT_TRUE(metadata == NULL);
+}
 #endif
-} // unnamed namespace
+
+#if 0
+// TODO: d_chunk_manager_test has no tests for passing old ShardChunkManager
+class TwoChunkFixture : public mongo::unittest::Test {
+protected:
+    void setUp() {
+        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
+        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+        MockConnRegistry::get()->addServer(_dummyConfig.get());
+
+        OID epoch = OID::gen();
+        _maxCollVersion = ChunkVersion(1, 0, epoch);
+
+        BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
+                CollectionType::keyPattern(BSON("a" << 1)) <<
+                CollectionType::unique(false) <<
+                CollectionType::updatedAt(1ULL) <<
+                CollectionType::epoch(epoch));
+        _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+
+        BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
+                ChunkType::ns("test.foo") <<
+                ChunkType::min(BSON("a" << MINKEY)) <<
+                ChunkType::max(BSON("a" << MAXKEY)) <<
+                ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                ChunkType::DEPRECATED_epoch(epoch) <<
+                ChunkType::shard("shard0000"));
+        _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
+
+        ConnectionString confServerStr(CONFIG_HOST_PORT);
+        ConnectionString configLoc(confServerStr);
+        MetadataLoader loader(configLoc);
+        _oldMetadata = loader.makeCollectionMetadata("not.sharded",
+                "shard0000",
+                NULL, /* no old metadata */
+                NULL /* no need for errMsg */);
+        ASSERT(_oldMetadata != NULL);
+
+        // Needs to delete the collection and rebuild because the mock server
+        // not support updates.
+        _dummyConfig->remove(CollectionType::ConfigNS, BSONObj());
+        _dummyConfig->remove(ChunkType::ConfigNS, BSONObj());
+
+        OID epoch2 = OID::gen();
+        _maxCollVersion = ChunkVersion(2, 0, epoch2);
+
+        BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
+                CollectionType::keyPattern(BSON("a" << 1)) <<
+                CollectionType::unique(false) <<
+                CollectionType::updatedAt(2ULL) <<
+                CollectionType::epoch(epoch2));
+        _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+
+        BSONObj chunk1 = BSON(ChunkType::name("test.foo-a_MinKey") <<
+                ChunkType::ns("test.foo") <<
+                ChunkType::min(BSON("a" << MINKEY)) <<
+                ChunkType::max(BSON("a" << 100)) <<
+                ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                ChunkType::DEPRECATED_epoch(epoch2) <<
+                ChunkType::shard("shard0000"));
+        _dummyConfig->insert(ChunkType::ConfigNS, chunk1);
+
+        BSONObj chunk2 = BSON(ChunkType::name("test.foo-a_100") <<
+                ChunkType::ns("test.foo") <<
+                ChunkType::min(BSON("a" << 100)) <<
+                ChunkType::max(BSON("a" << MAXKEY)) <<
+                ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                ChunkType::DEPRECATED_epoch(epoch2) <<
+                ChunkType::shard("shard0000"));
+        _dummyConfig->insert(ChunkType::ConfigNS, chunk2);
+    }
+
+    void tearDown() {
+        MockConnRegistry::get()->removeServer(_dummyConfig->getServerAddress());
+    }
+
+    ChunkVersion getCollVersion() const {
+        return _maxCollVersion;
+    }
+
+    const ChunkVersion& getShardVersion(size_t shard) const {
+        return _maxCollVersion;
+    }
+
+    const CollectionMetadata* getOldMetadata() const {
+        return _oldMetadata;
+    }
+
+private:
+    scoped_ptr<MockRemoteDBServer> _dummyConfig;
+    CollectionMetadata* _oldMetadata;
+
+    ChunkVersion _maxCollVersion;
+};
+#endif
+
+#if 0
+
+// TODO: MockServer functionality does not support selective query
+class ThreeChunkTwoShardFixture : public mongo::unittest::Test {
+protected:
+    void setUp() {
+        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
+        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+        MockConnRegistry::get()->addServer(_dummyConfig.get());
+
+        OID epoch = OID::gen();
+        _maxCollVersion = ChunkVersion(1, 0, epoch);
+
+        BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
+                CollectionType::keyPattern(BSON("a" << 1)) <<
+                CollectionType::unique(false) <<
+                CollectionType::updatedAt(1ULL) <<
+                CollectionType::epoch(epoch));
+        _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+
+        BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
+                ChunkType::ns("test.foo") <<
+                ChunkType::min(BSON("a" << MINKEY)) <<
+                ChunkType::max(BSON("a" << MAXKEY)) <<
+                ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                ChunkType::DEPRECATED_epoch(epoch) <<
+                ChunkType::shard("shard0000"));
+        _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
+
+        ConnectionString confServerStr(CONFIG_HOST_PORT);
+        ConnectionString configLoc(confServerStr);
+        MetadataLoader loader(configLoc);
+        CollectionMetadata* metadata = loader.makeCollectionMetadata("not.sharded",
+                "shard0000",
+                NULL, /* no old metadata */
+                NULL /* no need for errMsg */);
+        ASSERT(metadata != NULL);
+
+        // Needs to delete the collection and rebuild because the mock server
+        // not support updates.
+        _dummyConfig->remove(CollectionType::ConfigNS, BSONObj());
+        _dummyConfig->remove(ChunkType::ConfigNS, BSONObj());
+
+        OID epoch2 = OID::gen();
+        _maxCollVersion = ChunkVersion(2, 0, epoch2);
+        _maxShardVersion.push_back(_maxCollVersion);
+
+        BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
+                CollectionType::keyPattern(BSON("a" << 1)) <<
+                CollectionType::unique(false) <<
+                CollectionType::updatedAt(2ULL) <<
+                CollectionType::epoch(epoch2));
+        _dummyConfig->insert(CollectionType::ConfigNS, collFoo);
+
+        BSONObj chunk1 = BSON(ChunkType::name("test.foo-a_MinKey") <<
+                ChunkType::ns("test.foo") <<
+                ChunkType::min(BSON("a" << MINKEY)) <<
+                ChunkType::max(BSON("a" << 10)) <<
+                ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                ChunkType::DEPRECATED_epoch(epoch2) <<
+                ChunkType::shard("shard0000"));
+        _dummyConfig->insert(ChunkType::ConfigNS, chunk1);
+
+        OID epoch3 = OID::gen();
+        _maxCollVersion = ChunkVersion(2, 0, epoch3);
+        _maxShardVersion.push_back(_maxCollVersion);
+
+        BSONObj chunk2 = BSON(ChunkType::name("test.foo-a_10") <<
+                ChunkType::ns("test.foo") <<
+                ChunkType::min(BSON("a" << 10)) <<
+                ChunkType::max(BSON("a" << 100)) <<
+                ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                ChunkType::DEPRECATED_epoch(epoch3) <<
+                ChunkType::shard("shard0001"));
+        _dummyConfig->insert(ChunkType::ConfigNS, chunk2);
+
+        BSONObj chunk3 = BSON(ChunkType::name("test.foo-a_100") <<
+                ChunkType::ns("test.foo") <<
+                ChunkType::min(BSON("a" << 100)) <<
+                ChunkType::max(BSON("a" << MAXKEY)) <<
+                ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                ChunkType::DEPRECATED_epoch(epoch3) <<
+                ChunkType::shard("shard0001"));
+        _dummyConfig->insert(ChunkType::ConfigNS, chunk3);
+    }
+
+    void tearDown() {
+        MockConnRegistry::get()->removeServer(_dummyConfig->getServerAddress());
+    }
+
+    ChunkVersion getCollVersion() const {
+        return _maxCollVersion;
+    }
+
+    const ChunkVersion& getShardVersion(size_t shard) const {
+        return _maxShardVersion[shard];
+    }
+
+private:
+    scoped_ptr<MockRemoteDBServer> _dummyConfig;
+    CollectionMetadata* _oldMetadata;
+
+    ChunkVersion _maxCollVersion;
+    vector<ChunkVersion> _maxShardVersion;
+};
+#endif
+}
+ // unnamed namespace

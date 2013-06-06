@@ -1,4 +1,4 @@
- /**
+/**
  *    Copyright (C) 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -21,7 +21,7 @@
 #include "mongo/client/dbclientmockcursor.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/collection_manager.h"
+#include "mongo/s/collection_metadata.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 
@@ -33,29 +33,33 @@ namespace mongo {
      *
      * The mongod adapter here tracks only a single shard, and stores ranges by (min, max).
      */
-    class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj,string> {
+    class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj, string> {
     public:
-        SCMConfigDiffTracker(const string& currShard) : _currShard(currShard) {}
+        SCMConfigDiffTracker( const string& currShard ) :
+                _currShard( currShard )
+        {
+        }
 
-        virtual bool isTracked(const BSONObj& chunkDoc) const {
+        virtual bool isTracked( const BSONObj& chunkDoc ) const {
             return chunkDoc["shard"].type() == String && chunkDoc["shard"].String() == _currShard;
         }
 
-        virtual BSONObj maxFrom(const BSONObj& val) const {
+        virtual BSONObj maxFrom( const BSONObj& val ) const {
             return val;
         }
 
-        virtual pair<BSONObj,BSONObj> rangeFor(const BSONObj& chunkDoc,
-                                               const BSONObj& min,
-                                               const BSONObj& max) const {
-            return make_pair(min, max);
+        virtual pair<BSONObj, BSONObj> rangeFor( const BSONObj& chunkDoc,
+                                                 const BSONObj& min,
+                                                 const BSONObj& max ) const
+        {
+            return make_pair( min, max );
         }
 
-        virtual string shardFor(const string& name) const {
+        virtual string shardFor( const string& name ) const {
             return name;
         }
 
-        virtual string nameFrom(const string& shard) const {
+        virtual string nameFrom( const string& shard ) const {
             return shard;
         }
 
@@ -66,45 +70,52 @@ namespace mongo {
     // MetadataLoader implementation
     //
 
-    MetadataLoader::MetadataLoader(ConnectionString configLoc) : _configLoc(configLoc) { }
+    MetadataLoader::MetadataLoader( ConnectionString configLoc ) :
+            _configLoc( configLoc )
+    {
+    }
 
-    MetadataLoader::~MetadataLoader() { }
+    MetadataLoader::~MetadataLoader() {
+    }
 
-    CollectionManager* MetadataLoader::makeCollectionManager(const string& ns,
-                                                             const string& shard,
-                                                             const CollectionManager* oldManager,
-                                                             string* errMsg) {
+    CollectionMetadata* // br
+    MetadataLoader::makeCollectionMetadata( const string& ns,
+                                            const string& shard,
+                                            const CollectionMetadata* oldMetadata,
+                                            string* errMsg )
+    {
         // The error message string is optional.
         string dummy;
-        if (errMsg == NULL) {
+        if ( errMsg == NULL ) {
             errMsg = &dummy;
         }
 
-        auto_ptr<CollectionManager> manager(new CollectionManager);
-        if (initCollection(ns, shard, oldManager, manager.get(), errMsg)) {
-            if (manager->getNumChunks() > 0) {
-                dassert(manager->isValid());
+        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        if ( initCollection( ns, shard, oldMetadata, metadata.get(), errMsg ) ) {
+            if ( metadata->getNumChunks() > 0 ) {
+                dassert(metadata->isValid());
             }
 
-            return manager.release();
+            return metadata.release();
         }
 
         return NULL;
     }
 
-    CollectionManager* MetadataLoader::makeEmptyCollectionManager() {
-        CollectionManager* manager = new CollectionManager;
-        manager->_collVersion = ChunkVersion(1, 0, OID());
-        manager->_shardVersion = ChunkVersion(1, 0, OID());
-        dassert(manager->isValid());
-        return manager;
+    CollectionMetadata* MetadataLoader::makeEmptyCollectionMetadata() {
+        CollectionMetadata* metadata = new CollectionMetadata;
+        metadata->_collVersion = ChunkVersion( 1, 0, OID() );
+        metadata->_shardVersion = ChunkVersion( 1, 0, OID() );
+        dassert(metadata->isValid());
+        return metadata;
     }
 
-    bool MetadataLoader::initCollection(const string& ns,
-                                        const string& shard,
-                                        const CollectionManager* oldManager,
-                                        CollectionManager* manager,
-                                        string* errMsg) {
+    bool MetadataLoader::initCollection( const string& ns,
+                                         const string& shard,
+                                         const CollectionMetadata* oldMetadata,
+                                         CollectionMetadata* metadata,
+                                         string* errMsg )
+    {
         //
         // Bring collection entry from the config server.
         //
@@ -112,13 +123,13 @@ namespace mongo {
         BSONObj collObj;
         {
             try {
-                ScopedDbConnection conn(_configLoc.toString(), 30);
-                collObj = conn->findOne(CollectionType::ConfigNS, QUERY(CollectionType::ns()<<ns));
+                ScopedDbConnection conn( _configLoc.toString(), 30 );
+                collObj = conn->findOne( CollectionType::ConfigNS, QUERY(CollectionType::ns()<<ns));
                 conn.done();
             }
-            catch (const DBException& e) {
+            catch ( const DBException& e ) {
                 *errMsg = str::stream() << "caught exception accessing the config servers "
-                                        << causedBy(e);
+                                        << causedBy( e );
 
                 // We deliberately do not return conn to the pool, since it was involved
                 // with the error here.
@@ -128,7 +139,7 @@ namespace mongo {
         }
 
         CollectionType collDoc;
-        if (!collDoc.parseBSON(collObj, errMsg) || !collDoc.isValid(errMsg)) {
+        if ( !collDoc.parseBSON( collObj, errMsg ) || !collDoc.isValid( errMsg ) ) {
             return false;
         }
 
@@ -136,24 +147,24 @@ namespace mongo {
         // Load or generate default chunks for collection config.
         //
 
-        if (!collDoc.getKeyPattern().isEmpty()) {
+        if ( !collDoc.getKeyPattern().isEmpty() ) {
 
-            manager->_keyPattern = collDoc.getKeyPattern();
+            metadata->_keyPattern = collDoc.getKeyPattern();
 
-            if(!initChunks(collDoc, ns, shard, oldManager, manager, errMsg)){
+            if ( !initChunks( collDoc, ns, shard, oldMetadata, metadata, errMsg ) ) {
                 return false;
             }
         }
-        else if(collDoc.getPrimary() == shard) {
+        else if ( collDoc.getPrimary() == shard ) {
 
-            if (shard == "") {
-                warning() << "shard not verified, assuming collection "
-                          << ns << " is unsharded on this shard" << endl;
+            if ( shard == "" ) {
+                warning() << "shard not verified, assuming collection " << ns
+                          << " is unsharded on this shard" << endl;
             }
 
-            manager->_keyPattern = BSONObj();
-            manager->_shardVersion = ChunkVersion(1, 0, collDoc.getEpoch());
-            manager->_collVersion = manager->_shardVersion;
+            metadata->_keyPattern = BSONObj();
+            metadata->_shardVersion = ChunkVersion( 1, 0, collDoc.getEpoch() );
+            metadata->_collVersion = metadata->_shardVersion;
         }
         else {
             *errMsg = str::stream() << "collection " << ns << " does not have a shard key "
@@ -165,105 +176,103 @@ namespace mongo {
         return true;
     }
 
-    bool MetadataLoader::initChunks(const CollectionType& collDoc,
-                                    const string& ns,
-                                    const string& shard,
-                                    const CollectionManager* oldManager,
-                                    CollectionManager* manager,
-                                    string* errMsg) {
+    bool MetadataLoader::initChunks( const CollectionType& collDoc,
+                                     const string& ns,
+                                     const string& shard,
+                                     const CollectionMetadata* oldMetadata,
+                                     CollectionMetadata* metadata,
+                                     string* errMsg )
+    {
 
-        map<string,ChunkVersion> versionMap;
-        manager->_collVersion = ChunkVersion(0, 0, collDoc.getEpoch());
+        map<string, ChunkVersion> versionMap;
+        metadata->_collVersion = ChunkVersion( 0, 0, collDoc.getEpoch() );
 
         // Check to see if we should use the old version or not.
-        if (oldManager) {
+        if ( oldMetadata ) {
 
-            ChunkVersion oldVersion = oldManager->getShardVersion();
+            ChunkVersion oldVersion = oldMetadata->getShardVersion();
 
-            if (oldVersion.isSet() && oldVersion.hasCompatibleEpoch(collDoc.getEpoch())) {
+            if ( oldVersion.isSet() && oldVersion.hasCompatibleEpoch( collDoc.getEpoch() ) ) {
 
                 // Our epoch for coll version and shard version should be the same.
-                verify(oldManager->getCollVersion().hasCompatibleEpoch(collDoc.getEpoch()));
+                verify(oldMetadata->getCollVersion().hasCompatibleEpoch(collDoc.getEpoch()));
 
-                versionMap[shard] = oldManager->_shardVersion;
-                manager->_collVersion = oldManager->_collVersion;
+                versionMap[shard] = oldMetadata->_shardVersion;
+                metadata->_collVersion = oldMetadata->_collVersion;
 
                 // TODO: This could be made more efficient if copying not required, but
                 // not as frequently reloaded as in mongos.
-                manager->_chunksMap = oldManager->_chunksMap;
+                metadata->_chunksMap = oldMetadata->_chunksMap;
 
                 LOG(2) << "loading new chunks for collection " << ns
-                       << " using old chunk manager w/ version "
-                       << oldManager->getShardVersion()
-                       << " and " << manager->_chunksMap.size() << " chunks" << endl;
+                              << " using old metadata w/ version " << oldMetadata->getShardVersion()
+                              << " and " << metadata->_chunksMap.size() << " chunks" << endl;
             }
         }
 
-        // Exposes the new 'manager's range map and version to the "differ," who
+        // Exposes the new metadata's range map and version to the "differ," who
         // would ultimately be responsible of filling them up.
-        SCMConfigDiffTracker differ(shard);
-        differ.attach(ns, manager->_chunksMap, manager->_collVersion, versionMap);
+        SCMConfigDiffTracker differ( shard );
+        differ.attach( ns, metadata->_chunksMap, metadata->_collVersion, versionMap );
 
         try {
 
-            ScopedDbConnection conn(_configLoc.toString(), 30);
+            ScopedDbConnection conn( _configLoc.toString(), 30 );
 
-            auto_ptr<DBClientCursor> cursor = conn->query(ChunkType::ConfigNS,
-                                                          differ.configDiffQuery());
+            auto_ptr<DBClientCursor> cursor = conn->query( ChunkType::ConfigNS,
+                                                           differ.configDiffQuery() );
 
-            if (!cursor.get()) {
+            if ( !cursor.get() ) {
                 // 'errMsg' was filled by the getChunkCursor() call.
-                manager->_collVersion = ChunkVersion();
-                manager->_chunksMap.clear();
+                metadata->_collVersion = ChunkVersion();
+                metadata->_chunksMap.clear();
                 conn.done();
                 return false;
             }
 
             // Diff tracker should *always* find at least one chunk if this shard owns a chunk.
-            int diffsApplied = differ.calculateConfigDiff(*cursor);
-            if (diffsApplied > 0) {
+            int diffsApplied = differ.calculateConfigDiff( *cursor );
+            if ( diffsApplied > 0 ) {
 
-                LOG(2) << "loaded " << diffsApplied
-                       << " chunks into new chunk manager for " << ns
-                       << " with version " << manager->_collVersion << endl;
+                LOG(2) << "loaded " << diffsApplied << " chunks into new metadata for " << ns
+                           << " with version " << metadata->_collVersion << endl;
 
-                manager->_shardVersion = versionMap[shard];
-                manager->fillRanges();
+                metadata->_shardVersion = versionMap[shard];
+                metadata->fillRanges();
                 conn.done();
                 return true;
             }
-            else if(diffsApplied == 0) {
+            else if ( diffsApplied == 0 ) {
 
-                warning() << "no chunks found when reloading " << ns
-                          << ", previous version was "
-                          << manager->_collVersion.toString() << endl;
+                warning() << "no chunks found when reloading " << ns << ", previous version was "
+                          << metadata->_collVersion.toString() << endl;
 
-                manager->_collVersion = ChunkVersion();
-                manager->_chunksMap.clear();
+                metadata->_collVersion = ChunkVersion();
+                metadata->_chunksMap.clear();
                 conn.done();
                 return true;
             }
-            else{
+            else {
 
                 // TODO: make this impossible by making sure we don't migrate / split on this
                 // shard during the reload.  No chunks were found for the ns.
 
                 *errMsg = str::stream() << "invalid chunks found when reloading " << ns
                                         << ", previous version was "
-                                        << manager->_collVersion.toString()
+                                        << metadata->_collVersion.toString()
                                         << ", this should be rare";
 
                 warning() << errMsg << endl;
 
-                manager->_collVersion = ChunkVersion();
-                manager->_chunksMap.clear();
+                metadata->_collVersion = ChunkVersion();
+                metadata->_chunksMap.clear();
                 conn.done();
                 return false;
             }
         }
-        catch (const DBException& e) {
+        catch ( const DBException& e ) {
             *errMsg = str::stream() << "caught exception accessing the config servers"
-                                    << causedBy(e);
+                                    << causedBy( e );
 
             // We deliberately do not return connPtr to the pool, since it was involved
             // with the error here.

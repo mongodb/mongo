@@ -26,8 +26,8 @@ namespace mongo {
     class MetadataLoader;
 
     // For now, we handle lifecycle of CollectionManager via shared_ptrs
-    class CollectionManager;
-    typedef shared_ptr<const CollectionManager> CollectionManagerPtr;
+    class CollectionMetadata;
+    typedef shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
 
     /**
      * The collection manager has metadata information about a collection, in particular the
@@ -41,10 +41,10 @@ namespace mongo {
      *
      * This class is immutable once constructed.
      */
-    class CollectionManager {
-        MONGO_DISALLOW_COPYING(CollectionManager);
+    class CollectionMetadata {
+    MONGO_DISALLOW_COPYING(CollectionMetadata);
     public:
-        ~CollectionManager();
+        ~CollectionMetadata();
 
         //
         // cloning support
@@ -58,9 +58,9 @@ namespace mongo {
          * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
          */
-        CollectionManager* cloneMinus(const ChunkType& chunk,
-                                      const ChunkVersion& newShardVersion,
-                                      string* errMsg) const;
+        CollectionMetadata* cloneMinus( const ChunkType& chunk,
+                                        const ChunkVersion& newShardVersion,
+                                        string* errMsg ) const;
 
         /**
          * Returns a new manager's instance based on 'this's state by adding 'chunk'. The new
@@ -69,9 +69,9 @@ namespace mongo {
          * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
          */
-        CollectionManager* clonePlus(const ChunkType& chunk,
-                                     const ChunkVersion& newShardVersion,
-                                     string* errMsg) const;
+        CollectionMetadata* clonePlus( const ChunkType& chunk,
+                                       const ChunkVersion& newShardVersion,
+                                       string* errMsg ) const;
 
         /**
          * Returns a new manager's instance by splitting an existing 'chunk' at the points
@@ -82,10 +82,10 @@ namespace mongo {
          * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
          */
-        CollectionManager* cloneSplit(const ChunkType& chunk,
-                                      const vector<BSONObj>& splitKeys,
-                                      const ChunkVersion& newShardVersion,
-                                      string* errMsg) const;
+        CollectionMetadata* cloneSplit( const ChunkType& chunk,
+                                        const vector<BSONObj>& splitKeys,
+                                        const ChunkVersion& newShardVersion,
+                                        string* errMsg ) const;
 
         //
         // verification logic
@@ -108,19 +108,27 @@ namespace mongo {
          *     An empty doc is special and the chunk with the lowest range will be set on
          *     foundChunk.
          */
-        bool getNextChunk(const BSONObj& lookupKey, ChunkType* foundChunk) const;
+        bool getNextChunk( const BSONObj& lookupKey, ChunkType* foundChunk ) const;
 
         //
         // accessors
         //
 
-        ChunkVersion getCollVersion() const { return _collVersion; }
+        ChunkVersion getCollVersion() const {
+            return _collVersion;
+        }
 
-        ChunkVersion getShardVersion() const { return _shardVersion; }
+        ChunkVersion getShardVersion() const {
+            return _shardVersion;
+        }
 
-        BSONObj getKeyPattern() const { return _keyPattern; }
+        BSONObj getKeyPattern() const {
+            return _keyPattern;
+        }
 
-        std::size_t getNumChunks() const { return _chunksMap.size(); }
+        std::size_t getNumChunks() const {
+            return _chunksMap.size();
+        }
 
         string toString() const;
 
@@ -144,7 +152,7 @@ namespace mongo {
         BSONObj _keyPattern;
 
         // a map from a min key into the chunk's (or range's) max boundary
-        typedef map< BSONObj, BSONObj , BSONObjCmp > RangeMap;
+        typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
         RangeMap _chunksMap;
 
         // A second map from a min key into a range or contiguous chunks. The map is redundant
@@ -156,7 +164,7 @@ namespace mongo {
          * Use the MetadataLoader to build new managers using config server data, or the
          * clone*() methods to use existing managers to build new ones.
          */
-        CollectionManager();
+        CollectionMetadata();
 
         /**
          * Returns true if this manager was loaded with all necessary information.
@@ -166,7 +174,7 @@ namespace mongo {
         /**
          * Returns true if 'chunk' exist in this * collections's chunkset.
          */
-        bool chunkExists(const ChunkType& chunk, string* errMsg) const;
+        bool chunkExists( const ChunkType& chunk, string* errMsg ) const;
 
         /**
          * Try to find chunks that are adjacent and record these intervals in the _rangesMap

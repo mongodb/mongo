@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/s/collection_manager.h"
+#include "mongo/s/collection_metadata.h"
 
 #include "mongo/bson/util/builder.h" // for StringBuilder
 #include "mongo/s/range_arithmetic.h"
@@ -24,11 +24,11 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
-    CollectionManager::CollectionManager() { }
+    CollectionMetadata::CollectionMetadata() { }
 
-    CollectionManager::~CollectionManager() { }
+    CollectionMetadata::~CollectionMetadata() { }
 
-    CollectionManager* CollectionManager::cloneMinus(const ChunkType& chunk,
+    CollectionMetadata* CollectionMetadata::cloneMinus(const ChunkType& chunk,
                                                      const ChunkVersion& newShardVersion,
                                                      string* errMsg) const {
         // The error message string is optional.
@@ -59,7 +59,7 @@ namespace mongo {
             return NULL;
         }
 
-        auto_ptr<CollectionManager> manager(new CollectionManager);
+        auto_ptr<CollectionMetadata> manager(new CollectionMetadata);
         manager->_keyPattern = this->_keyPattern;
         manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
@@ -74,7 +74,7 @@ namespace mongo {
         return manager.release();
     }
 
-    CollectionManager* CollectionManager::clonePlus(const ChunkType& chunk,
+    CollectionMetadata* CollectionMetadata::clonePlus(const ChunkType& chunk,
                                                     const ChunkVersion& newShardVersion,
                                                     string* errMsg) const {
         // The error message string is optional.
@@ -106,7 +106,7 @@ namespace mongo {
             }
         }
 
-        auto_ptr<CollectionManager> manager(new CollectionManager);
+        auto_ptr<CollectionMetadata> manager(new CollectionMetadata);
         manager->_keyPattern = this->_keyPattern;
         manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
@@ -121,7 +121,7 @@ namespace mongo {
         return manager.release();
     }
 
-    CollectionManager* CollectionManager::cloneSplit(const ChunkType& chunk,
+    CollectionMetadata* CollectionMetadata::cloneSplit(const ChunkType& chunk,
                                                      const vector<BSONObj>& splitKeys,
                                                      const ChunkVersion& newShardVersion,
                                                      string* errMsg) const {
@@ -161,7 +161,7 @@ namespace mongo {
             }
         }
 
-        auto_ptr<CollectionManager> manager(new CollectionManager);
+        auto_ptr<CollectionMetadata> manager(new CollectionMetadata);
         manager->_keyPattern = this->_keyPattern;
         manager->_keyPattern.getOwned();
         manager->_chunksMap = this->_chunksMap;
@@ -186,7 +186,7 @@ namespace mongo {
         return manager.release();
     }
 
-    bool CollectionManager::keyBelongsToMe( const BSONObj& key ) const {
+    bool CollectionMetadata::keyBelongsToMe( const BSONObj& key ) const {
         // For now, collections don't move. So if the collection is not sharded, assume
         // the document with the given key can be accessed.
         if ( _keyPattern.isEmpty() ) {
@@ -215,7 +215,7 @@ namespace mongo {
         return good;
     }
 
-    bool CollectionManager::getNextChunk(const BSONObj& lookupKey,
+    bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey,
                                          ChunkType* chunk) const {
         if (_chunksMap.empty()) {
             return true;
@@ -239,7 +239,7 @@ namespace mongo {
         return true;
     }
 
-    string CollectionManager::toString() const {
+    string CollectionMetadata::toString() const {
         StringBuilder ss;
         ss << " CollectionManager version: " << _shardVersion.toString() << " key: " << _keyPattern;
         if (_rangesMap.empty()) {
@@ -254,7 +254,7 @@ namespace mongo {
         return ss.str();
     }
 
-    bool CollectionManager::isValid() const {
+    bool CollectionMetadata::isValid() const {
         if (_shardVersion > _collVersion) {
             return false;
         }
@@ -265,7 +265,7 @@ namespace mongo {
         return true;
     }
 
-    bool CollectionManager::chunkExists(const ChunkType& chunk,
+    bool CollectionMetadata::chunkExists(const ChunkType& chunk,
                                         string* errMsg) const {
         RangeMap::const_iterator it = _chunksMap.find(chunk.getMin());
         if (it == _chunksMap.end()) {
@@ -288,7 +288,7 @@ namespace mongo {
         return true;
     }
 
-    void CollectionManager::fillRanges() {
+    void CollectionMetadata::fillRanges() {
         if (_chunksMap.empty())
             return;
 

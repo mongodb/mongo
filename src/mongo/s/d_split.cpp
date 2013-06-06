@@ -652,7 +652,8 @@ namespace mongo {
                 origChunk.max = currMax.getOwned();
                 origChunk.lastmod = ChunkVersion::fromBSON(currChunk[ChunkType::DEPRECATED_lastmod()]);
 
-                // since this could be the first call that enable sharding we also make sure to have the chunk manager up to date
+                // since this could be the first call that enable sharding we also make sure to load
+                // the shard's metadata
                 shardingState.gotShardName( shard );
                 ChunkVersion shardVersion;
                 shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
@@ -732,7 +733,7 @@ namespace mongo {
             }
 
             //
-            // 4. apply the batch of updates to metadata and to the chunk manager
+            // 4. apply the batch of updates to remote and local metadata
             //
 
             BSONObj cmd = cmdBuilder.obj();
@@ -754,7 +755,7 @@ namespace mongo {
                 msgasserted( 13593 , ss.str() );
             }
 
-            // install a chunk manager with knowledge about newly split chunks in this shard's state
+            // install chunk metadata with knowledge about newly split chunks in this shard's state
             splitKeys.pop_back(); // 'max' was used as sentinel
             maxVersion.incMinor();
             shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );

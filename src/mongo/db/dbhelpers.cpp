@@ -371,11 +371,11 @@ namespace mongo {
                     // TODO: This is not quite correct, we may be transferring docs in the same
                     // range.  Right now we're protected since we can't transfer docs in while we
                     // delete.
-                    CollectionManagerPtr managerNow = shardingState.getShardChunkManager( ns );
+                    CollectionMetadataPtr metadataNow = shardingState.getCollectionMetadata( ns );
                     bool docIsOrphan = true;
-                    if ( managerNow ) {
-                        KeyPattern kp( managerNow->getKeyPattern() );
-                        docIsOrphan = !managerNow->keyBelongsToMe( kp.extractSingleKey( obj ) );
+                    if ( metadataNow ) {
+                        KeyPattern kp( metadataNow->getKeyPattern() );
+                        docIsOrphan = !metadataNow->keyBelongsToMe( kp.extractSingleKey( obj ) );
                     }
                     else {
                         docIsOrphan = false;
@@ -383,7 +383,7 @@ namespace mongo {
 
                     if ( !docIsOrphan ) {
                         warning() << "aborting migration cleanup for chunk " << min << " to " << max
-                                  << ( managerNow ? (string) " at document " + obj.toString() : "" )
+                                  << ( metadataNow ? (string) " at document " + obj.toString() : "" )
                                   << ", collection " << ns << " has changed " << endl;
                         break;
                     }

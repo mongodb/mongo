@@ -136,9 +136,10 @@ namespace mongo {
             c->recoverFromYield();
             DiskLoc last;
 
-            // This manager may be stale, but it's the state of chunking when the cursor was created.
-            CollectionManagerPtr manager = cc->getChunkManager();
-            KeyPattern keyPattern( manager ? manager->getKeyPattern() : BSONObj() );
+            // This metadata may be stale, but it's the state of chunking when the cursor was
+            // created.
+            CollectionMetadataPtr metadata = cc->getCollMetadata();
+            KeyPattern keyPattern( metadata ? metadata->getKeyPattern() : BSONObj() );
 
             while ( 1 ) {
                 if ( !c->ok() ) {
@@ -173,7 +174,7 @@ namespace mongo {
                 // in some cases (clone collection) there won't be a matcher
                 if ( !c->currentMatches( &details ) ) {
                 }
-                else if ( manager && !manager->keyBelongsToMe( cc->extractKey( keyPattern ) ) ) {
+                else if ( metadata && !metadata->keyBelongsToMe( cc->extractKey( keyPattern ) ) ) {
                     LOG(2) << "cursor skipping document in un-owned chunk: " << c->current()
                                << endl;
                 }
@@ -536,7 +537,7 @@ namespace mongo {
     }
     
     void QueryResponseBuilder::init( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan ) {
-        _chunkManager = newChunkManager();
+        _collMetadata = newCollMetadata();
         _explain = newExplainRecordingStrategy( queryPlan, oldPlan );
         _builder = newResponseBuildStrategy( queryPlan );
         _builder->resetBuf();
@@ -599,11 +600,11 @@ namespace mongo {
         return _builder->bufferedMatches();
     }
 
-    CollectionManagerPtr QueryResponseBuilder::newChunkManager() const {
-        if ( !shardingState.needShardChunkManager( _parsedQuery.ns() ) ) {
-            return CollectionManagerPtr();
+    CollectionMetadataPtr QueryResponseBuilder::newCollMetadata() const {
+        if ( !shardingState.needCollectionMetadata( _parsedQuery.ns() ) ) {
+            return CollectionMetadataPtr();
         }
-        return shardingState.getShardChunkManager( _parsedQuery.ns() );
+        return shardingState.getCollectionMetadata( _parsedQuery.ns() );
     }
 
     shared_ptr<ExplainRecordingStrategy> QueryResponseBuilder::newExplainRecordingStrategy
@@ -660,13 +661,13 @@ namespace mongo {
     }
 
     bool QueryResponseBuilder::chunkMatches( ResultDetails* resultDetails ) {
-        if ( !_chunkManager ) {
+        if ( !_collMetadata ) {
             return true;
         }
         // TODO: should make this covered at some point
         resultDetails->loadedRecord = true;
-        KeyPattern kp( _chunkManager->getKeyPattern() );
-        if ( _chunkManager->keyBelongsToMe( kp.extractSingleKey( _cursor->current() ) ) ) {
+        KeyPattern kp( _collMetadata->getKeyPattern() );
+        if ( _collMetadata->keyBelongsToMe( kp.extractSingleKey( _cursor->current() ) ) ) {
             return true;
         }
         resultDetails->chunkSkip = true;
@@ -822,7 +823,7 @@ namespace mongo {
             }
             
             // Set attributes for getMore.
-            ccPointer->setChunkManager( queryResponseBuilder->chunkManager() );
+            ccPointer->setCollMetadata( queryResponseBuilder->collMetadata() );
             ccPointer->setPos( nReturned );
             ccPointer->pq = pq_shared;
             ccPointer->fields = pq.getFieldPtr();
@@ -878,8 +879,8 @@ namespace mongo {
                         return false;
                     }
                     
-                    if ( shardingState.needShardChunkManager( ns ) ) {
-                        CollectionManagerPtr m = shardingState.getShardChunkManager( ns );
+                    if ( shardingState.needCollectionMetadata( ns ) ) {
+                        CollectionMetadataPtr m = shardingState.getCollectionMetadata( ns );
                         if ( m ) {
                             KeyPattern kp( m->getKeyPattern() );
                             if ( !m->keyBelongsToMe( kp.extractSingleKey( resObject ) ) ) {

@@ -31,7 +31,7 @@
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/s/collection_manager.h"
+#include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
@@ -1119,13 +1119,13 @@ namespace mongo {
                 uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
 
                 ClientCursor::Holder holdCursor;
-                CollectionManagerPtr chunkManager;
+                CollectionMetadataPtr collMetadata;
 
                 {
-                    // Get chunk manager before we check our version, to make sure it doesn't increment
+                    // Get metadata before we check our version, to make sure it doesn't increment
                     // in the meantime
-                    if ( shardingState.needShardChunkManager( config.ns ) ) {
-                        chunkManager = shardingState.getShardChunkManager( config.ns );
+                    if ( shardingState.needCollectionMetadata( config.ns ) ) {
+                        collMetadata = shardingState.getCollectionMetadata( config.ns );
                     }
 
                     // Check our version immediately, to avoid migrations happening in the meantime while we do prep
@@ -1217,9 +1217,9 @@ namespace mongo {
 
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
-                            if ( chunkManager ) {
-                                KeyPattern kp( chunkManager->getKeyPattern() );
-                                if ( !chunkManager->keyBelongsToMe( kp.extractSingleKey( o ) ) ) {
+                            if ( collMetadata ) {
+                                KeyPattern kp( collMetadata->getKeyPattern() );
+                                if ( !collMetadata->keyBelongsToMe( kp.extractSingleKey( o ) ) ) {
                                     continue;
                                 }
                             }
