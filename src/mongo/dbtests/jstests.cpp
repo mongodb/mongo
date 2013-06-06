@@ -19,11 +19,12 @@
 
 #include "pch.h"
 
+#include "mongo/base/parse_number.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/timer.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/db/json.h"
 
 namespace mongo {
     bool dbEval(const string& dbName , BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
@@ -1198,7 +1199,9 @@ namespace JSTests {
         class RealNumber : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.append( "a", strtod( "0.7", 0 ) );
+                double d;
+                ASSERT(Status::OK() == parseNumberFromString( "0.7", &d ));
+                b.append( "a", d );
                 return b.obj();
             }
             virtual string json() const {
@@ -1209,7 +1212,9 @@ namespace JSTests {
         class FancyNumber : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.append( "a", strtod( "-4.4433e-2", 0 ) );
+                double d;
+                ASSERT(Status::OK() == parseNumberFromString( "-4.4433e-2", &d ));
+                b.append( "a", d );
                 return b.obj();
             }
             virtual string json() const {
