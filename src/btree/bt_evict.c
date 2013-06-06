@@ -525,7 +525,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (__wt_page_is_modified(page)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_refresh(
-					    session, WT_TXN_NONE, 0, 1);
+					    session, WT_TXN_NONE, 1);
 				ret = __wt_rec_write(session, page, NULL, 0);
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_release_snapshot(session);

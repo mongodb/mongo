@@ -97,7 +97,6 @@ connection_stats = [
 	##########################################
 	# Transaction statistics
 	##########################################
-	Stat('txn_ancient', 'ancient transactions'),
 	Stat('txn_begin', 'transactions'),
 	Stat('txn_checkpoint', 'transaction checkpoints'),
 	Stat('txn_commit', 'transactions committed'),
