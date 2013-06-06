@@ -87,6 +87,7 @@ namespace mongo {
                 // this is fsync=true
                 // which with journalling on is a journal commit
                 // without journalling, is a full fsync
+                _conns[i]->simpleCommand( "admin", NULL, "resetError" );
                 singleErr = _conns[i]->getLastError( true );
 
                 if ( singleErr.size() == 0 )
