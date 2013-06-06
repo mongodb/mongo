@@ -289,8 +289,8 @@ __wt_lsm_merge(
 
 	/*
 	 * Open a handle on the new chunk before application threads attempt
-	 * to access it. Opening the handle causes internal pages to be
-	 * preloaded into file system cache.
+	 * to access it. Opening the pre-loads internal pages into the file
+	 * system cache.
 	 */
 	cfg[1] = "checkpoint=WiredTigerCheckpoint";
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
