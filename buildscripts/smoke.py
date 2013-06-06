@@ -693,10 +693,12 @@ def expand_suites(suites,expandUseDB=True):
             if os.sys.platform == "win32":
                 paths = [path + '.exe' for path in paths]
 
-            # Add any files of the same name from the sharedclient directory.
-            scpaths = ["sharedclient/" + path for path in paths]
-            scfiles = glob.glob("sharedclient/*")
-            paths += [scfile for scfile in scfiles if scfile in scpaths]
+            if not test_path:
+                # If we are testing 'in-tree', then add any files of the same name from the
+                # sharedclient directory. The out of tree client build doesn't have shared clients.
+                scpaths = ["sharedclient/" + path for path in paths]
+                scfiles = glob.glob("sharedclient/*")
+                paths += [scfile for scfile in scfiles if scfile in scpaths]
 
             # hack
             tests += [(test_path and path or os.path.join(mongo_repo, path), False) for path in paths]
