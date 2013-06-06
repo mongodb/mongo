@@ -4,7 +4,7 @@
 # programs.
 Import('env has_option installSetup use_system_version_of_library')
 
-Import('nix darwin windows')
+Import('nix linux darwin windows')
 
 buildShared = False
 if has_option("sharedclient"):
@@ -195,6 +195,9 @@ if buildShared:
         # of this shared library, incorrectly. We need to patch up libdeps to treat shared
         # libraries as dependency terminals.
         LIBDEPS=mongoClientLibDeps)
+
+    if linux:
+        sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs"])
 
     mongoClientSharedLib = sharedLibEnv.SharedLibrary('mongoclient', clientObjects)
 
