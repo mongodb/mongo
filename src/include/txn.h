@@ -6,8 +6,7 @@
  */
 
 /*
- * Transaction ID type: transaction IDs are 32-bit integers that wrap after
- * 4 billion transactions are executed.
+ * Transaction ID type: transaction IDs are 64-bit integers.
  */
 typedef uint64_t wt_txnid_t;
 
