@@ -147,6 +147,7 @@ namespace mongo {
             log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
         }
 
+        fassert(16844, _maintenanceMode >= 0);
         return true;
     }
 

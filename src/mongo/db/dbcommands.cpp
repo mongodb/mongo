@@ -2056,6 +2056,21 @@ namespace mongo {
         }
     }
 
+    /* Sometimes we cannot set maintenance mode, in which case the call to setMaintenanceMode will
+       return false.  This class does not treat that case as an error which means that anybody 
+       using it is assuming it is ok to continue execution without maintenance mode.  This 
+       assumption needs to be audited and documented. */
+    class MaintenanceModeSetter {
+    public:
+        MaintenanceModeSetter() : maintenanceModeSet(theReplSet->setMaintenanceMode(true)) {}
+        ~MaintenanceModeSetter() {
+            if(maintenanceModeSet)
+                theReplSet->setMaintenanceMode(false);
+        } 
+    private:
+        bool maintenanceModeSet;
+    };
+
     /**
      * this handles
      - auth
@@ -2073,6 +2088,7 @@ namespace mongo {
                               bool fromRepl ) {
 
         std::string dbname = nsToDatabase( cmdns );
+        scoped_ptr<MaintenanceModeSetter> mmSetter;
 
         if (c->adminOnly() &&
                 c->localHostOnlyIfNoAuth(cmdObj) &&
@@ -2135,8 +2151,8 @@ namespace mongo {
         if ( c->adminOnly() )
             LOG( 2 ) << "command: " << cmdObj << endl;
 
-        if (c->maintenanceMode() && theReplSet && theReplSet->isSecondary()) {
-            theReplSet->setMaintenanceMode(true);
+        if (c->maintenanceMode() && theReplSet) {
+            mmSetter.reset(new MaintenanceModeSetter());
         }
 
         std::string errmsg;
@@ -2184,10 +2200,6 @@ namespace mongo {
             if ( retval && c->logTheOp() && ! fromRepl ) {
                 logOp("c", cmdns, cmdObj);
             }
-        }
-
-        if (c->maintenanceMode() && theReplSet) {
-            theReplSet->setMaintenanceMode(false);
         }
 
         appendCommandStatus(result, retval, errmsg);
