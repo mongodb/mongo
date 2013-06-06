@@ -60,8 +60,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  *	Allocate a transaction ID and/or a snapshot.
  */
 void
-__wt_txn_refresh(
-    WT_SESSION_IMPL *session, wt_txnid_t max_id, int get_snapshot)
+__wt_txn_refresh(WT_SESSION_IMPL *session, wt_txnid_t max_id, int get_snapshot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
