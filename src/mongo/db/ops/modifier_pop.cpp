@@ -31,8 +31,7 @@ namespace mongo {
             , elementToRemove(doc.end())
             , pathFoundIndex(0)
             , pathFoundElement(doc.end())
-            , pathPositionalPart()
-            , applyCalled(false) {
+            , pathPositionalPart() {
         }
 
         // Document that is going to be changed.
@@ -49,8 +48,6 @@ namespace mongo {
 
         // Value to bind to a $-positional field, if one is provided.
         std::string pathPositionalPart;
-
-        bool applyCalled;
     };
 
     ModifierPop::ModifierPop()
@@ -132,6 +129,7 @@ namespace mongo {
         } else {
             // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
             execInfo->noOp = execInfo->inPlace = true;
+            _preparedState->pathFoundElement = root.getDocument().end();
 
             //okay if path not found
             if (status.code() == ErrorCodes::NonExistentPath)
@@ -145,19 +143,15 @@ namespace mongo {
     }
 
     Status ModifierPop::apply() const {
-        _preparedState->applyCalled = true;
         return _preparedState->elementToRemove.remove();
     }
 
     Status ModifierPop::log(mutablebson::Element logRoot) const {
-        // Make sure apply has been called.
-        dassert(_preparedState->applyCalled);
-
         // log document
         mutablebson::Document& doc = logRoot.getDocument();
         const bool pathExists = _preparedState->pathFoundElement.ok() &&
                                 (_preparedState->pathFoundIndex ==
-                                        static_cast<int32_t>(_fieldRef.numParts() - 1));
+                                    static_cast<int32_t>(_fieldRef.numParts() - 1));
 
         // element to log, like $set/$unset
         mutablebson::Element opElement = pathExists ?

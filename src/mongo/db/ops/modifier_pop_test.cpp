@@ -36,7 +36,6 @@ namespace {
     using mongo::ModifierPop;
     using mongo::Status;
     using mongo::StringData;
-    using mongo::mutablebson::checkDoc;
     using mongo::mutablebson::Document;
     using mongo::mutablebson::Element;
 
@@ -95,6 +94,22 @@ namespace {
         ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement()));
     }
 
+    TEST(MissingField, AllButApply) {
+        Document doc(fromjson("{a: [1,2]}"));
+        Mod mod(fromjson("{$pop: {s: 1}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "s");
+        ASSERT_TRUE(execInfo.inPlace);
+        ASSERT_TRUE(execInfo.noOp);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{$unset: {'s': true}}"), logDoc);
+    }
+
     TEST(SimpleMod, PrepareBottom) {
         Document doc(fromjson("{a: [1,2]}"));
         Mod mod(fromjson("{$pop: {a: 1}}"));
@@ -119,7 +134,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a: [1]}"))));
+        ASSERT_EQUALS(fromjson(("{a: [1]}")), doc);
     }
 
     TEST(SimpleMod, PrepareTop) {
@@ -146,7 +161,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a: [2]}"))));
+        ASSERT_EQUALS(fromjson(("{a: [2]}")), doc);
     }
 
     TEST(SimpleMod, ApplyBottomPop) {
@@ -161,7 +176,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a: [1]}"))));
+        ASSERT_EQUALS(fromjson(("{a: [1]}")), doc);
     }
 
     TEST(SimpleMod, ApplyLogBottomPop) {
@@ -176,11 +191,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a:[1]}"))));
+        ASSERT_EQUALS(fromjson(("{a:[1]}")), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
 
     TEST(EmptyArray, PrepareNoOp) {
@@ -207,11 +222,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a:[]}"))));
+        ASSERT_EQUALS(fromjson(("{a:[]}")), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: []}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: []}}"), logDoc);
     }
 
     TEST(ArrayOfArray, ApplyLogPop) {
@@ -226,11 +241,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a:[[1], 1]}"))));
+        ASSERT_EQUALS(fromjson(("{a:[[1], 1]}")), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: { 'a.0': [1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: { 'a.0': [1]}}"), logDoc);
     }
 
     TEST(ArrayOfArray, ApplyLogPopOnlyElement) {
@@ -245,11 +260,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a:[[], 1]}"))));
+        ASSERT_EQUALS(fromjson(("{a:[[], 1]}")), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: { 'a.0': []}}")));
+        ASSERT_EQUALS(fromjson("{$set: { 'a.0': []}}"), logDoc);
     }
 
     TEST(Prepare, MissingPath) {
