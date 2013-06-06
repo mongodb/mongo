@@ -256,13 +256,19 @@ __wt_lsm_merge(
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
 	    record_count, insert_count);
 
-	/* We've successfully created the new chunk.  Now install it. */
+	/*
+	 * We've successfully created the new chunk.  Now install it. We need
+	 * to ensure that the NO_CACHE flag is cleared and the bloom filter
+	 * is closed (even if a step fails), so track errors but don't return
+	 * until we've cleaned up.
+	 */
 	WT_TRET(src->close(src));
 	WT_TRET(dest->close(dest));
 	src = dest = NULL;
 
 	if (create_bloom) {
-		WT_TRET(__wt_bloom_finalize(bloom));
+		if (ret == 0)
+			WT_TRET(__wt_bloom_finalize(bloom));
 
 		/*
 		 * Read in a key to make sure the Bloom filters btree handle is
@@ -270,8 +276,10 @@ __wt_lsm_merge(
 		 * Otherwise application threads will stall while it is opened
 		 * and internal pages are read into cache.
 		 */
-		WT_CLEAR(key);
-		WT_TRET_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
+		if (ret == 0) {
+			WT_CLEAR(key);
+			WT_TRET_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
+		}
 
 		WT_TRET(__wt_bloom_close(bloom));
 		bloom = NULL;
