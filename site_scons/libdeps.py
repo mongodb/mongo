@@ -121,8 +121,9 @@ def __get_syslibdeps(node):
     if not hasattr(node.attributes, cached_var_name):
         syslibdeps = []
         for lib in __get_libdeps(node):
-            for syslib in lib.get_env().get(syslibdeps_env_var, []):
-                syslibdeps.append(syslib)
+            for syslib in node.get_env().Flatten(lib.get_env().get(syslibdeps_env_var, [])):
+                if syslib:
+                    syslibdeps.append(syslib)
         setattr(node.attributes, cached_var_name, syslibdeps)
     return getattr(node.attributes, cached_var_name)
 
