@@ -62,7 +62,7 @@ namespace mongo {
 
             int find( const K_L& key, size_t hash, int* firstEmpty, const UnorderedFastKeyTable& sm ) const;
 
-            void transfer( Area* newArea, const UnorderedFastKeyTable& sm ) const;
+            bool transfer( Area* newArea, const UnorderedFastKeyTable& sm ) const;
 
             void swap( Area* other ) {
                 using std::swap;
