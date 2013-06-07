@@ -173,7 +173,7 @@ namespace mongo {
 
         CollectionMetadataPtr cloned( p->cloneMinus( chunk, version, &errMsg ) );
         // Errors reported via assertions here
-        uassert( 16844, errMsg, NULL != cloned.get() );
+        uassert( 16849, errMsg, NULL != cloned.get() );
 
         // TODO: a bit dangerous to have two different zero-version states - no-metadata and
         // no-version
@@ -194,7 +194,7 @@ namespace mongo {
 
         CollectionMetadataPtr cloned( it->second->clonePlus( chunk, version, &errMsg ) );
         // Errors reported via assertions here
-        uassert( 16845, errMsg, NULL != cloned.get() );
+        uassert( 16850, errMsg, NULL != cloned.get() );
 
         _collMetadata[ns] = cloned;
     }
@@ -217,7 +217,7 @@ namespace mongo {
 
         CollectionMetadataPtr cloned( it->second->cloneSplit( chunk, splitKeys, version, &errMsg ) );
         // Errors reported via assertions here
-        uassert( 16846, errMsg, NULL != cloned.get() );
+        uassert( 16851, errMsg, NULL != cloned.get() );
 
         _collMetadata[ns] = cloned;
     }
@@ -306,16 +306,22 @@ namespace mongo {
         }
 
         MetadataLoader mdLoader( configLoc );
-        CollectionMetadataPtr newMetadata( mdLoader.makeCollectionMetadata( ns,
-                                                                           _shardName,
-                                                                           currMetadata.get(),
-                                                                           &errMsg ) );
+        CollectionMetadata* newMetadataRaw = new CollectionMetadata();
+        CollectionMetadataPtr newMetadata( newMetadataRaw );
+        Status status = mdLoader.makeCollectionMetadata( ns,
+                                                         _shardName,
+                                                         currMetadata.get(),
+                                                         newMetadataRaw );
 
-        if ( !newMetadata ) {
+        if ( status.code() == ErrorCodes::RemoteChangeDetected ) {
             version = ChunkVersion( 0, OID() );
-            warning() << errMsg << endl;
-            // There was an error getting sharded data for this collection, return false
+            warning() << "did not load new metadata for " << causedBy( status.reason() ) << endl;
+            // we loaded something unexpected, the collection may be dropped or dropping
             return false;
+        }
+        else if ( !status.isOK() ) {
+            // Throw exception on connectivity or parsing errors to maintain interface
+            uasserted( 16848, status.reason() );
         }
 
         {

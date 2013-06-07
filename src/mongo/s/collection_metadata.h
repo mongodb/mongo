@@ -44,6 +44,12 @@ namespace mongo {
     class CollectionMetadata {
     MONGO_DISALLOW_COPYING(CollectionMetadata);
     public:
+
+        /**
+         * Use the MetadataLoader to fill the empty metadata from the config server, or use
+         * clone*() methods to use existing managers to build new ones.
+         */
+        CollectionMetadata();
         ~CollectionMetadata();
 
         //
@@ -159,12 +165,6 @@ namespace mongo {
         // w.r.t. _chunkMap but we expect high chunk contiguity, especially in small
         // installations.
         RangeMap _rangesMap;
-
-        /**
-         * Use the MetadataLoader to build new managers using config server data, or the
-         * clone*() methods to use existing managers to build new ones.
-         */
-        CollectionMetadata();
 
         /**
          * Returns true if this manager was loaded with all necessary information.

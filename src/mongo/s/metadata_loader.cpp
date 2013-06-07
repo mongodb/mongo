@@ -78,28 +78,14 @@ namespace mongo {
     MetadataLoader::~MetadataLoader() {
     }
 
-    CollectionMetadata* // br
-    MetadataLoader::makeCollectionMetadata( const string& ns,
-                                            const string& shard,
-                                            const CollectionMetadata* oldMetadata,
-                                            string* errMsg )
+    Status MetadataLoader::makeCollectionMetadata( const string& ns,
+                                                   const string& shard,
+                                                   const CollectionMetadata* oldMetadata,
+                                                   CollectionMetadata* metadata )
     {
-        // The error message string is optional.
-        string dummy;
-        if ( errMsg == NULL ) {
-            errMsg = &dummy;
-        }
-
-        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
-        if ( initCollection( ns, shard, oldMetadata, metadata.get(), errMsg ) ) {
-            if ( metadata->getNumChunks() > 0 ) {
-                dassert(metadata->isValid());
-            }
-
-            return metadata.release();
-        }
-
-        return NULL;
+        Status status = initCollection( ns, shard, metadata );
+        if ( !status.isOK() || metadata->getKeyPattern().isEmpty() ) return status;
+        return initChunks( ns, shard, oldMetadata, metadata );
     }
 
     CollectionMetadata* MetadataLoader::makeEmptyCollectionMetadata() {
@@ -110,11 +96,9 @@ namespace mongo {
         return metadata;
     }
 
-    bool MetadataLoader::initCollection( const string& ns,
-                                         const string& shard,
-                                         const CollectionMetadata* oldMetadata,
-                                         CollectionMetadata* metadata,
-                                         string* errMsg )
+    Status MetadataLoader::initCollection( const string& ns,
+                                           const string& shard,
+                                           CollectionMetadata* metadata )
     {
         //
         // Bring collection entry from the config server.
@@ -128,19 +112,20 @@ namespace mongo {
                 conn.done();
             }
             catch ( const DBException& e ) {
-                *errMsg = str::stream() << "caught exception accessing the config servers "
-                                        << causedBy( e );
+                string errMsg = str::stream() << "could not query collection metadata"
+                                              << causedBy( e );
 
                 // We deliberately do not return conn to the pool, since it was involved
                 // with the error here.
 
-                return false;
+                return Status( ErrorCodes::HostUnreachable, errMsg );
             }
         }
 
         CollectionType collDoc;
-        if ( !collDoc.parseBSON( collObj, errMsg ) || !collDoc.isValid( errMsg ) ) {
-            return false;
+        string errMsg;
+        if ( !collDoc.parseBSON( collObj, &errMsg ) || !collDoc.isValid( &errMsg ) ) {
+            return Status( ErrorCodes::FailedToParse, errMsg );
         }
 
         //
@@ -150,10 +135,10 @@ namespace mongo {
         if ( !collDoc.getKeyPattern().isEmpty() ) {
 
             metadata->_keyPattern = collDoc.getKeyPattern();
+            metadata->_shardVersion = ChunkVersion( 0, 0, collDoc.getEpoch() );
+            metadata->_collVersion = ChunkVersion( 0, 0, collDoc.getEpoch() );
 
-            if ( !initChunks( collDoc, ns, shard, oldMetadata, metadata, errMsg ) ) {
-                return false;
-            }
+            return Status::OK();
         }
         else if ( collDoc.getPrimary() == shard ) {
 
@@ -165,37 +150,34 @@ namespace mongo {
             metadata->_keyPattern = BSONObj();
             metadata->_shardVersion = ChunkVersion( 1, 0, collDoc.getEpoch() );
             metadata->_collVersion = metadata->_shardVersion;
+
+            return Status::OK();
         }
         else {
-            *errMsg = str::stream() << "collection " << ns << " does not have a shard key "
-                                    << "and primary " << collDoc.getPrimary()
-                                    << " does not match this shard " << shard;
-            return false;
+            errMsg = str::stream() << "collection " << ns << " does not have a shard key "
+                                   << "and primary " << collDoc.getPrimary()
+                                   << " does not match this shard " << shard;
+            return Status( ErrorCodes::RemoteChangeDetected, errMsg );
         }
-
-        return true;
     }
 
-    bool MetadataLoader::initChunks( const CollectionType& collDoc,
-                                     const string& ns,
-                                     const string& shard,
-                                     const CollectionMetadata* oldMetadata,
-                                     CollectionMetadata* metadata,
-                                     string* errMsg )
+    Status MetadataLoader::initChunks( const string& ns,
+                                       const string& shard,
+                                       const CollectionMetadata* oldMetadata,
+                                       CollectionMetadata* metadata )
     {
-
         map<string, ChunkVersion> versionMap;
-        metadata->_collVersion = ChunkVersion( 0, 0, collDoc.getEpoch() );
+        OID epoch = metadata->getCollVersion().epoch();
 
         // Check to see if we should use the old version or not.
         if ( oldMetadata ) {
 
             ChunkVersion oldVersion = oldMetadata->getShardVersion();
 
-            if ( oldVersion.isSet() && oldVersion.hasCompatibleEpoch( collDoc.getEpoch() ) ) {
+            if ( oldVersion.isSet() && oldVersion.hasCompatibleEpoch( epoch ) ) {
 
                 // Our epoch for coll version and shard version should be the same.
-                verify(oldMetadata->getCollVersion().hasCompatibleEpoch(collDoc.getEpoch()));
+                verify( oldMetadata->getCollVersion().hasCompatibleEpoch( epoch ) );
 
                 versionMap[shard] = oldMetadata->_shardVersion;
                 metadata->_collVersion = oldMetadata->_collVersion;
@@ -223,11 +205,11 @@ namespace mongo {
                                                            differ.configDiffQuery() );
 
             if ( !cursor.get() ) {
-                // 'errMsg' was filled by the getChunkCursor() call.
                 metadata->_collVersion = ChunkVersion();
                 metadata->_chunksMap.clear();
                 conn.done();
-                return false;
+                return Status( ErrorCodes::HostUnreachable,
+                               "problem opening chunk metadata cursor" );
             }
 
             // Diff tracker should *always* find at least one chunk if this shard owns a chunk.
@@ -240,44 +222,43 @@ namespace mongo {
                 metadata->_shardVersion = versionMap[shard];
                 metadata->fillRanges();
                 conn.done();
-                return true;
+                return Status::OK();
             }
             else if ( diffsApplied == 0 ) {
 
                 warning() << "no chunks found when reloading " << ns << ", previous version was "
                           << metadata->_collVersion.toString() << endl;
 
-                metadata->_collVersion = ChunkVersion();
+                metadata->_collVersion = ChunkVersion( 0, 0, OID() );
                 metadata->_chunksMap.clear();
                 conn.done();
-                return true;
+                return Status::OK();
             }
             else {
 
                 // TODO: make this impossible by making sure we don't migrate / split on this
                 // shard during the reload.  No chunks were found for the ns.
 
-                *errMsg = str::stream() << "invalid chunks found when reloading " << ns
-                                        << ", previous version was "
-                                        << metadata->_collVersion.toString()
-                                        << ", this should be rare";
+                string errMsg = str::stream() << "invalid chunks found when reloading " << ns
+                                              << ", previous version was "
+                                              << metadata->_collVersion.toString()
+                                              << ", this should be rare";
 
                 warning() << errMsg << endl;
 
-                metadata->_collVersion = ChunkVersion();
+                metadata->_collVersion = ChunkVersion( 0, 0, OID() );
                 metadata->_chunksMap.clear();
                 conn.done();
-                return false;
+                return Status( ErrorCodes::RemoteChangeDetected, errMsg );
             }
         }
         catch ( const DBException& e ) {
-            *errMsg = str::stream() << "caught exception accessing the config servers"
-                                    << causedBy( e );
+            string errMsg = str::stream() << "problem querying chunks metadata" << causedBy( e );
 
             // We deliberately do not return connPtr to the pool, since it was involved
             // with the error here.
 
-            return false;
+            return Status( ErrorCodes::HostUnreachable, errMsg );
         }
     }
 

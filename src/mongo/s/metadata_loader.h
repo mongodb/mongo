@@ -18,6 +18,7 @@
 
 #include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 
@@ -51,18 +52,24 @@ namespace mongo {
         ~MetadataLoader();
 
         /**
-         * Returns a new metadata instance representing the chunkset of the collection 'ns'
-         * (or its entirety, if not sharded) that lives on 'shard'. Optionally, uses an
-         * 'oldMetadata' for the same 'ns'/'shard'; the contents of 'oldMetadata' can help
-         * reducing the amount of data read from the config servers.
+         * Fills a new metadata instance representing the chunkset of the collection 'ns'
+         * (or its entirety, if not sharded) that lives on 'shard' with data from the config server.
+         * Optionally, uses an 'oldMetadata' for the same 'ns'/'shard'; the contents of
+         * 'oldMetadata' can help reducing the amount of data read from the config servers.
          *
-         * If the collection's information can't be loaded, returns NULL and fill in 'errMsg'
-         * with a description, if 'errMsg' was provided.
+         * OK on success.
+         *
+         * Failure return values:
+         * Abnormal:
+         * @return FailedToParse if there was an error parsing the remote config data
+         * Normal:
+         * @return HostUnreachable if there was an error contacting the config servers
+         * @return RemoteChangeDetected if the data loaded was modified by another operation
          */
-        CollectionMetadata* makeCollectionMetadata( const string& ns,
-                                                    const string& shard,
-                                                    const CollectionMetadata* oldMetadata,
-                                                    string* errMsg );
+        Status makeCollectionMetadata( const string& ns,
+                                       const string& shard,
+                                       const CollectionMetadata* oldMetadata,
+                                       CollectionMetadata* metadata );
 
         /**
          * Returns a new metadata instance representing an non-sharded, empty collection with
@@ -74,31 +81,33 @@ namespace mongo {
         ConnectionString _configLoc;
 
         /**
-         * Returns true and fills in the internal state of 'metadata' to portray the portion of
-         * the collection 'ns' that lives in 'shard'. If provided, uses the contents of
-         * 'oldMetadata' as a base, which allows less data to be brought from the config
-         * server. If information about the collection can be accessed or is invalid, returns
-         * false and fills in an error description on '*errMsg', which is mandatory here.
+         * Returns OK and fills in the internal state of 'metadata' with general collection
+         * information, not including chunks.
+         *
+         * If information about the collection can be accessed or is invalid, returns:
+         * @return FailedToParse if there was an error parsing the remote config data
+         * @return HostUnreachable if there was an error contacting the config servers
+         * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
+         *
          */
-        bool initCollection( const string& ns,
-                             const string& shard,
-                             const CollectionMetadata* oldMetadata,
-                             CollectionMetadata* metadata,
-                             string* errMsg );
+        Status initCollection( const string& ns,
+                               const string& shard,
+                               CollectionMetadata* metadata );
 
         /**
-         * Returns true and fills in the chunk state of 'metadata' to portray the chunks of the
+         * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the
          * collection 'ns' that sit in 'shard'. If provided, uses the contents of 'oldMetadata'
-         * as a base (see description in initCollection above). If information about the
-         * chunks can be accessed or is invalid, returns false and fills in an error
-         * description on '*errMsg', which is mandatory here.
+         * as a base (see description in initCollection above).
+         *
+         * If information about the chunks can be accessed or is invalid, returns:
+         * @return HostUnreachable if there was an error contacting the config servers
+         * @return RemoteChangeDetected if the chunks loaded are unexpectedly different
+         * TODO: @return FailedToParse
          */
-        bool initChunks( const CollectionType& collDoc,
-                         const string& ns,
-                         const string& shard,
-                         const CollectionMetadata* oldMetadata,
-                         CollectionMetadata* metadata,
-                         string* errMsg );
+        Status initChunks( const string& ns,
+                           const string& shard,
+                           const CollectionMetadata* oldMetadata,
+                           CollectionMetadata* metadata );
     };
 
 } // namespace mongo
