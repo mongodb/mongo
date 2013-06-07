@@ -82,6 +82,7 @@ struct __wt_connection_impl {
 	TAILQ_ENTRY(__wt_connection_impl) cpq;
 
 	const char *home;		/* Database home */
+	const char *error_prefix;	/* Database error prefix */
 	int is_new;			/* Connection created database */
 
 	int connection_initialized;	/* Connection is initialized */
