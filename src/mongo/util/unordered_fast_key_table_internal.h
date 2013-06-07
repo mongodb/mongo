@@ -77,7 +77,7 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
-    inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::transfer(
+    inline bool UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::transfer(
             Area* newArea,
             const UnorderedFastKeyTable& sm) const {
         for ( unsigned i = 0; i < _capacity; i++ ) {
@@ -91,10 +91,13 @@ namespace mongo {
                                      sm );
 
             verify( loc == -1 );
-            verify( firstEmpty >= 0 );
+            if ( firstEmpty < 0 ) {
+                return false;
+            }
 
             newArea->_entries[firstEmpty] = _entries[i];
         }
+        return true;
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
@@ -130,7 +133,7 @@ namespace mongo {
 
         const size_t hash = _hash( key );
 
-        for ( int numGrowTries = 0; numGrowTries < 10; numGrowTries++ ) {
+        for ( int numGrowTries = 0; numGrowTries < 5; numGrowTries++ ) {
             int firstEmpty = -1;
             int pos = _area.find( key, hash, &firstEmpty, *this );
             if ( pos >= 0 )
@@ -169,9 +172,19 @@ namespace mongo {
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
     inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::_grow() {
-        Area newArea( _area._capacity * 2, _maxProbeRatio );
-        _area.transfer( &newArea, *this );
-        _area.swap( &newArea );
+        unsigned capacity = _area._capacity;
+        for ( int numGrowTries = 0; numGrowTries < 5; numGrowTries++ ) {
+            capacity *= 2;
+            Area newArea( capacity, _maxProbeRatio );
+            bool success = _area.transfer( &newArea, *this );
+            if ( !success ) {
+                continue;
+            }
+            _area.swap( &newArea );
+            return;
+        }
+        msgasserted( 16845,
+                     "UnorderedFastKeyTable::_grow couldn't add entry after growing many times" );
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
