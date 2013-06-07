@@ -1659,10 +1659,10 @@ namespace JSTests {
         class NumberInt : public TestRoundTrip {
         public:
             virtual BSONObj bson() const {
-                return BSON( "int" << static_cast<int>(4294967295) );
+                return BSON( "int" << static_cast<int>(100) );
             }
             virtual string json() const {
-                return "{ \"int\": NumberInt(4294967295) }";
+                return "{ \"int\": NumberInt(100) }";
             }
         };
 
