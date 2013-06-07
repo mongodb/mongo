@@ -105,7 +105,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 * place to do this check, but it's only here we have the configuration
 	 * string.
 	 */
-	g.c_hot_backups = strstr(config, "direct_io") == NULL;
+	if (strstr(config, "direct_io") != NULL)
+		g.c_hot_backups = 0;
 
 	if ((ret =
 	    wiredtiger_open(home, &event_handler, config, &conn)) != 0)
