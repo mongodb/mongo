@@ -41,9 +41,9 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * collide with checkpoints either, they are the other operation that
 	 * can reconcile a page.
 	 */
-	__wt_spin_lock(session, &S2C(session)->metadata_lock);
+	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 	WT_RET(__wt_bt_cache_op(session, NULL, WT_SYNC_COMPACT));
-	__wt_spin_unlock(session, &S2C(session)->metadata_lock);
+	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 	/*
 	 * Walk the tree, reviewing on-disk pages to see if they need to be
