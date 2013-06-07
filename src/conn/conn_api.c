@@ -889,6 +889,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Leave space for optional additional configuration. */
 	cfg[2] = cfg[3] = cfg[4] = NULL;
 
+	/* Finish configuring error messages so we get them right early. */
+	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
+	if (cval.len != 0)
+		WT_ERR(__wt_strndup(
+		    session, cval.str, cval.len, &conn->error_prefix));
+
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));
 

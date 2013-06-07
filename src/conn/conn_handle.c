@@ -35,9 +35,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	/* Locks. */
 	__wt_spin_init(session, &conn->api_lock);
+	__wt_spin_init(session, &conn->checkpoint_lock);
 	__wt_spin_init(session, &conn->fh_lock);
 	__wt_spin_init(session, &conn->hot_backup_lock);
-	__wt_spin_init(session, &conn->metadata_lock);
 	__wt_spin_init(session, &conn->schema_lock);
 	__wt_spin_init(session, &conn->serial_lock);
 
@@ -92,14 +92,15 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_spin_destroy(session, &conn->api_lock);
 	__wt_spin_destroy(session, &conn->block_lock);
+	__wt_spin_destroy(session, &conn->checkpoint_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->hot_backup_lock);
-	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->serial_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);
+	__wt_free(session, conn->error_prefix);
 	__wt_free(session, conn->sessions);
 
 	__wt_free(NULL, conn);

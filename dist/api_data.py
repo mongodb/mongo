@@ -94,14 +94,15 @@ format_meta = column_meta + [
 
 lsm_config = [
 	Config('lsm_auto_throttle', 'true', r'''
-		Throttle inserts into LSM trees if flushing to disk isn't keeping up''',
+		Throttle inserts into LSM trees if flushing to disk isn't
+		keeping up''',
 		type='boolean'),
 	Config('lsm_bloom', 'true', r'''
 		create bloom filters on LSM tree chunks as they are merged''',
 		type='boolean'),
 	Config('lsm_bloom_config', '', r'''
-		config string used when creating Bloom filter files, passed to
-		WT_SESSION::create'''),
+		config string used when creating Bloom filter files, passed
+		to WT_SESSION::create'''),
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters''',
 		min='2', max='1000'),
@@ -110,12 +111,12 @@ lsm_config = [
 		filters''',
 		min='2', max='100'),
 	Config('lsm_bloom_newest', 'false', r'''
-		create a bloom filter on an LSM tree chunk before it's first merge.
-		Only supported if bloom filters are enabled''',
+		create a bloom filter on an LSM tree chunk before it's first
+		merge.  Only supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_bloom_oldest', 'false', r'''
-		create a bloom filter on the oldest LSM tree chunk. Only supported if
-		bloom filters are enabled''',
+		create a bloom filter on the oldest LSM tree chunk. Only
+		supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_chunk_size', '2MB', r'''
 		the maximum size of the in-memory chunk of an LSM tree''',

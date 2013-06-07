@@ -147,21 +147,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	int tracking;
 
 	conn = S2C(session);
-	tracking = 0;
 	txn = &session->txn;
+	tracking = 0;
 
 	/*
-	 * Only one checkpoint can be active at a time, and checkpoints must
-	 * run in the same order as they update the metadata; we are using the
-	 * schema lock to determine that ordering, so we can't move this to
-	 * __session_checkpoint.
-	 *
-	 * Begin a transaction for the checkpoint.
+	 * Only one checkpoint can be active at a time, and checkpoints must run
+	 * in the same order as they update the metadata, also, there are other
+	 * operations (for example, Btree compaction) that must serialize with
+	 * checkpoints.
 	 */
-	WT_ASSERT(session,
-	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
-	    !F_ISSET(txn, TXN_RUNNING));
-	__wt_spin_lock(session, &conn->metadata_lock);
+	__wt_spin_lock(session, &conn->checkpoint_lock);
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	txn->isolation = TXN_ISO_READ_COMMITTED;
@@ -230,7 +225,7 @@ err:	/*
 
 	if (F_ISSET(txn, TXN_RUNNING))
 		__wt_txn_release(session);
-	__wt_spin_unlock(session, &conn->metadata_lock);
+	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
 	__wt_scr_free(&tmp);
 	return (ret);

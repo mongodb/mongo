@@ -193,7 +193,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	ckpt_lock = 0;
 	if (F_ISSET(btree, WT_BTREE_BULK)) {
 		ckpt_lock = 1;
-		__wt_spin_lock(session, &S2C(session)->metadata_lock);
+		__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 	}
 
 	if (!F_ISSET(btree,
@@ -205,7 +205,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 	if (ckpt_lock)
-		__wt_spin_unlock(session, &S2C(session)->metadata_lock);
+		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 	return (ret);
 }

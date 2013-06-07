@@ -102,6 +102,10 @@ static CONFIG c[] = {
 	  "type of store to create (fix | var | row)",
 	  0, C_IGNORE|C_STRING, 1, 3, NULL, &g.c_file_type },
 
+	{ "hot_backups",
+	  "if hot backups are enabled",			/* 5% */
+	  0, C_BOOL, 5, 0, &g.c_hot_backups, NULL },
+
 	{ "huffman_key",
 	  "if keys are huffman encoded",		/* 20% */
 	  C_ROW, C_BOOL, 20, 0, &g.c_huffman_key, NULL },

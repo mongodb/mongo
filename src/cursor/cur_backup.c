@@ -405,7 +405,7 @@ __backup_file_remove(WT_SESSION_IMPL *session)
 
 /*
  * __wt_backup_list_append --
- *	Append a new file name to the list, allocated space as necessary.
+ *	Append a new file name to the list, allocate space as necessary.
  *	Called via the schema_worker function.
  */
 int
@@ -431,7 +431,7 @@ __wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
 
 /*
  * __backup_list_append --
- *	Append a new file name to the list, allocated space as necessary.
+ *	Append a new file name to the list, allocate space as necessary.
  */
 static int
 __backup_list_append(
