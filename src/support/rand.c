@@ -37,10 +37,10 @@
  *
  * We have to be very careful about races here.  Multiple threads can call
  * __wt_random concurrently, and it is okay if those concurrent calls get the
- * same return value.  What is *not* okay is if the reading the shared
- * variables races with an update and uses two different values for m_w or m_z.
- * In that case, the result could be zero, in which case they would be stuck on
- * zero forever.  Take local copies of the shared values to avoid this.
+ * same return value.  What is *not* okay is if reading the shared state races
+ * with an update and uses two different values for m_w or m_z.  That could
+ * result in a value of zero, in which case they would be stuck on zero
+ * forever.  Take local copies of the shared values to avoid this.
  */
 uint32_t
 __wt_random(void)
