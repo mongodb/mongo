@@ -733,7 +733,11 @@ if nix:
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
-    env.Append( LINKFLAGS=["-fPIC", "-pthread",  "-rdynamic"] )
+    env.Append( LINKFLAGS=["-fPIC", "-pthread"] )
+
+    if not darwin:
+        env.Append( LINKFLAGS=["-rdynamic"] )
+
     env.Append( LIBS=[] )
 
     #make scons colorgcc friendly
