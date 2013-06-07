@@ -234,8 +234,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 			    *ins_stack[i] != next_stack[i])
 				return (WT_RESTART);
 			if (next_stack[i] == NULL &&
-			    (inshead->tail[i] == NULL ||
-			    ins_stack[i] != &inshead->tail[i]->next[i]))
+			    inshead->tail[i] != NULL &&
+			    ins_stack[i] != &inshead->tail[i]->next[i])
 				return (WT_RESTART);
 		}
 	}
