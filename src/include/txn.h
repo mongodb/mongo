@@ -5,11 +5,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * Transaction ID type: transaction IDs are 64-bit integers.
- */
-typedef uint64_t wt_txnid_t;
-
 #define	WT_TXN_NONE	0		/* No txn running in a session. */
 #define	WT_TXN_ABORTED	UINT64_MAX	/* Update rolled back, ignore. */
 
@@ -27,18 +22,18 @@ typedef uint64_t wt_txnid_t;
 	((t1) != (t2) && TXNID_LE(t1, t2))
 
 struct __wt_txn_state {
-	volatile wt_txnid_t id;
-	volatile wt_txnid_t snap_min;
+	volatile uint64_t id;
+	volatile uint64_t snap_min;
 };
 
 struct __wt_txn_global {
-	volatile wt_txnid_t current;	/* Current transaction ID. */
+	volatile uint64_t current;	/* Current transaction ID. */
 
 	/*
 	 * The oldest transaction ID that is not yet visible to some
 	 * transaction in the system.
 	 */
-	volatile wt_txnid_t oldest_id;
+	volatile uint64_t oldest_id;
 
 	volatile uint32_t gen;		/* Completed transaction generation */
 	volatile uint32_t scan_gen;	/* Snapshot scan generation */
@@ -53,7 +48,7 @@ enum __wt_txn_isolation {
 };
 
 struct __wt_txn {
-	wt_txnid_t id;
+	uint64_t id;
 
 	WT_TXN_ISOLATION isolation;
 
@@ -63,12 +58,12 @@ struct __wt_txn {
 	 *	ids > snap_max are invisible,
 	 *	everything else is visible unless it is in the snapshot.
 	 */
-	wt_txnid_t snap_min, snap_max;
-	wt_txnid_t *snapshot;
+	uint64_t snap_min, snap_max;
+	uint64_t *snapshot;
 	uint32_t snapshot_count;
 
 	/* Saved global state, to avoid repeating scans. */
-	wt_txnid_t last_id;
+	uint64_t last_id;
 	uint32_t last_gen;
 	uint32_t last_scan_gen;
 
@@ -76,7 +71,7 @@ struct __wt_txn {
 	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
 	 * modified by this transaction.
 	 */
-	wt_txnid_t    **mod;
+	uint64_t      **mod;
 	size_t		mod_alloc;
 	u_int		mod_count;
 

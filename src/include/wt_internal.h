@@ -207,7 +207,6 @@ struct __wt_update;
 #include "mutex.h"
 #include "posix.h"
 
-#include "txn.h"			/* typedef for wt_txnid_t */
 #include "stat.h"			/* required by dhandle.h */
 #include "dhandle.h"			/* required by btree.h */
 
@@ -227,6 +226,7 @@ struct __wt_update;
 #include "meta.h"
 #include "os.h"
 #include "schema.h"
+#include "txn.h"
 
 #include "session.h"			/* required by connection.h */
 #include "connection.h"

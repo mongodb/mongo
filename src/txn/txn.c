@@ -14,10 +14,10 @@
 int
 __wt_txnid_cmp(const void *v1, const void *v2)
 {
-	wt_txnid_t id1, id2;
+	uint64_t id1, id2;
 
-	id1 = *(wt_txnid_t *)v1;
-	id2 = *(wt_txnid_t *)v2;
+	id1 = *(uint64_t *)v1;
+	id2 = *(uint64_t *)v2;
 
 	return ((id1 == id2) ? 0 : TXNID_LT(id1, id2) ? -1 : 1);
 }
@@ -27,14 +27,14 @@ __wt_txnid_cmp(const void *v1, const void *v2)
  *	Sort a snapshot for faster searching and set the min/max bounds.
  */
 static void
-__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, wt_txnid_t id)
+__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t id)
 {
 	WT_TXN *txn;
 
 	txn = &session->txn;
 
 	if (n > 1)
-		qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
+		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
 	txn->snap_max = id;
 	txn->snap_min = (n == 0 || TXNID_LT(id, txn->snapshot[0])) ?
@@ -60,13 +60,13 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  *	Allocate a transaction ID and/or a snapshot.
  */
 void
-__wt_txn_refresh(WT_SESSION_IMPL *session, wt_txnid_t max_id, int get_snapshot)
+__wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
-	wt_txnid_t current_id, id, snap_min, oldest_id;
+	uint64_t current_id, id, snap_min, oldest_id;
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
@@ -168,7 +168,7 @@ void
 __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t oldest_id;
+	uint64_t oldest_id;
 
 	txn_global = &S2C(session)->txn_global;
 
@@ -199,7 +199,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	wt_txnid_t current_id;
+	uint64_t current_id;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -332,8 +332,8 @@ int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_TXN *txn;
-	wt_txnid_t **m;
 	WT_REF **rp;
+	uint64_t **m;
 	u_int i;
 
 	WT_UNUSED(cfg);

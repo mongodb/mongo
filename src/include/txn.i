@@ -13,7 +13,7 @@ static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
-__wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
+__wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
 {
 	WT_TXN *txn;
 
@@ -78,7 +78,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
  *	Can the current transaction see the given ID?
  */
 static inline int
-__wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
+__wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN *txn;
 
@@ -124,7 +124,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 		return (1);
 
 	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
-	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
+	    sizeof(uint64_t), __wt_txnid_cmp) == NULL);
 }
 
 /*
@@ -133,10 +133,10 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
  *	all sessions in the system will see the transaction ID.
  */
 static inline int
-__wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
+__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t oldest_id;
+	uint64_t oldest_id;
 
 	txn_global = &S2C(session)->txn_global;
 	oldest_id = txn_global->oldest_id;
@@ -279,8 +279,8 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
+	uint64_t id, my_id;
 	uint32_t i, session_cnt;
-	wt_txnid_t id, my_id;
 
 	/* Cache the result: if we're the oldest, don't keep checking. */
 	txn = &session->txn;

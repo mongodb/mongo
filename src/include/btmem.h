@@ -139,10 +139,10 @@ struct __wt_page_modify {
 	 * times if a snapshot is keeping old versions pinned (e.g., in a
 	 * checkpoint).
 	 */
-	wt_txnid_t disk_snap_min;
+	uint64_t disk_snap_min;
 
 	/* The largest transaction ID written to disk, for clean pages. */
-	wt_txnid_t disk_txn;
+	uint64_t disk_txn;
 
 	union {
 		WT_PAGE *split;		/* Resulting split */
@@ -196,7 +196,7 @@ struct __wt_page_modify {
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
 
-	wt_txnid_t first_id;		/* Earliest transactional update, used
+	uint64_t first_id;		/* Earliest transactional update, used
 					 * to avoid errors from transaction ID
 					 * wraparound.
 					 */
@@ -422,7 +422,7 @@ struct __wt_ref {
 		uint64_t recno;		/* Column-store: starting recno */
 		void	*key;		/* Row-store: on-page cell or WT_IKEY */
 	} u;
-	wt_txnid_t txnid;		/* Transaction ID */
+	uint64_t txnid;			/* Transaction ID */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
 };
@@ -616,7 +616,7 @@ struct __wt_update {
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
 	uint32_t size;			/* update length */
-	wt_txnid_t txnid;		/* update transaction */
+	uint64_t txnid;			/* update transaction */
 
 	WT_UPDATE *next;		/* forward-linked list */
 
