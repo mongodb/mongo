@@ -264,7 +264,13 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	wt_conn = &S2C(session)->iface;
 
-	WT_RET(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+	/*
+	 * All the LSM worker threads do their operations on read-only files.
+	 * Use read-uncommitted isolation to avoid keeping updates in cache
+	 * unnecessarily.
+	 */
+	WT_RET(wt_conn->open_session(
+	    wt_conn, NULL, "isolation=read-uncommitted", &wt_session));
 	lsm_tree->ckpt_session = (WT_SESSION_IMPL *)wt_session;
 	F_SET(lsm_tree->ckpt_session, WT_SESSION_INTERNAL);
 
@@ -274,7 +280,8 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 		for (i = 0; i < lsm_tree->merge_threads; i++) {
 			WT_RET(wt_conn->open_session(
-			    wt_conn, NULL, NULL, &wt_session));
+			    wt_conn, NULL, "isolation=read-uncommitted",
+			    &wt_session));
 			s = (WT_SESSION_IMPL *)wt_session;
 			F_SET(s, WT_SESSION_INTERNAL);
 			lsm_tree->worker_sessions[i] = s;
@@ -287,7 +294,8 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    __wt_lsm_merge_worker, wargs));
 		}
 	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
-		WT_RET(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+		WT_RET(wt_conn->open_session(
+		    wt_conn, NULL, "isolation=read-uncommitted", &wt_session));
 		lsm_tree->bloom_session = (WT_SESSION_IMPL *)wt_session;
 		F_SET(lsm_tree->bloom_session, WT_SESSION_INTERNAL);
 
