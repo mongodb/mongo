@@ -1095,6 +1095,41 @@ def doConfigure(myenv):
             print( 'libc++ requested, but compiler does not support -stdlib=libc++' )
             Exit(1)
 
+    # Check to see if we are trying to use an outdated libstdc++ in C++11 mode. This is
+    # primarly to help people using clang in C++11 mode on OS X but forgetting to use --libc++.
+    if has_option('c++11') and not has_option('libc++'):
+
+        def CheckModernLibStdCxx(context):
+
+            # See http://gcc.gnu.org/onlinedocs/libstdc++/manual/abi.html for the origin of
+            # these values. Our choice of 4.7.0 is somewhat arbitrary.
+            minSupportedLibStdCxx = ("4.7.0", 20120322)
+
+            test_body = """
+            #include <vector>
+            #if defined(__GLIBCXX__) and (__GLIBCXX__ < %d)
+            #error
+            #endif
+            """ % minSupportedLibStdCxx[1]
+
+            messageText = 'Checking for libstdc++ %s or newer (for C++11 support)... '
+            context.Message(messageText % minSupportedLibStdCxx[0])
+            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckModernLibStdCxx' : CheckModernLibStdCxx,
+        })
+        haveGoodLibStdCxx = conf.CheckModernLibStdCxx()
+        conf.Finish()
+
+        if not haveGoodLibStdCxx:
+            print( 'Detected libstdc++ is too old to support C++11 mode' )
+            if darwin:
+                print( 'Try building with --libc++ and --osx-version-min=10.7 or higher' )
+            Exit(1)
+
     if has_option('sanitize'):
         if not (using_clang() or using_gcc()):
             print( 'sanitize is only supported with clang or gcc')
