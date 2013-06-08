@@ -30,12 +30,13 @@
 
 import os
 import shutil
-import wiredtiger, wttest
-from helper import key_populate, value_populate
+from helper import compare_files, key_populate, value_populate
+from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
+import wiredtiger, wttest
 
 # Regression tests.
-class test_bug002(wttest.WiredTigerTestCase):
+class test_bug002(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('file', dict(uri='file:data')),
         ('table', dict(uri='table:data')),
@@ -78,13 +79,14 @@ class test_bug002(wttest.WiredTigerTestCase):
             cursor.close()
 
     # Backup a set of chosen tables/files using the wt backup command.
-    def backup_table_cursor(self, targetdir):
+    def backup_table_cursor(self, session):
         # Remove any previous backup directories.
+        targetdir = 'backup.dir'
         shutil.rmtree(targetdir, True)
         os.mkdir(targetdir)
 
         # Open up the backup cursor, and copy the files.
-        cursor = self.session.open_cursor('backup:', None, None)
+        cursor = session.open_cursor('backup:', None, None)
         while True:
             ret = cursor.next()
             if ret != 0:
@@ -108,7 +110,10 @@ class test_bug002(wttest.WiredTigerTestCase):
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
 
-        self.backup_table_cursor('backup.dir')
+        # Test with the same and different sessions than the bulk-get call,
+        # test both the database handle and session handle caches.
+        self.backup_table_cursor(self.session)
+        self.backup_table_cursor(self.conn.open_session())
 
         # Close the bulk cursor.
         cursor.close()
