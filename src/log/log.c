@@ -416,7 +416,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
-	WT_LSN rd_lsn, start_lsn;
+	WT_LSN end_lsn, rd_lsn, start_lsn;
+	off_t log_size;
 	uint32_t cksum, rdup_len, reclen;
 	int done;
 
@@ -447,8 +448,10 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		start_lsn = log->ckpt_lsn;
 	else
 		start_lsn = *lsnp;
+	end_lsn = log->alloc_lsn;
 	log_fh = NULL;
 	WT_RET(__log_openfile(session, 0, &log_fh, start_lsn.file));
+	WT_ERR(__wt_filesize(session, log_fh, &log_size));
 	if (LF_ISSET(WT_LOGSCAN_ONE))
 		done = 1;
 	else
@@ -461,8 +464,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * Check for out of bounds values.
 		 */
 		reclen = 0;
-		if (__wt_read(session, log_fh, rd_lsn.offset,
-		    sizeof(uint32_t), (void *)&reclen) != 0) {
+		if (rd_lsn.offset >= log_size) {
 			/*
 			 * If we read the last record, go to the next file.
 			 */
@@ -471,15 +473,21 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			rd_lsn.file++;
 			rd_lsn.offset = 0;
 			/*
-			 * If there is no next file, we're done.  WT_ERR will
-			 * break us out of this loop.  It is possible we
-			 * reached the end of the log entirely or that we
-			 * raced the removal of log files via archive.
+			 * Avoid an error message when we reach end of log
+			 * by checking here.
 			 */
+			if (rd_lsn.file > end_lsn.file)
+				break;
 			WT_ERR(__log_openfile(
 			    session, 0, &log_fh, rd_lsn.file));
+			WT_ERR(__wt_filesize(session, log_fh, &log_size));
 			continue;
 		}
+		/*
+		 * Read the record size
+		 */
+		WT_ERR(__wt_read(session, log_fh, rd_lsn.offset,
+		    sizeof(uint32_t), (void *)&reclen));
 		if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
 			ret = WT_NOTFOUND;
 			goto err;
