@@ -300,7 +300,7 @@ copyout_key(WT_CURSOR *wtcursor)
 			return (ret);
 	} else {
 		wtcursor->key.data = r->key;
-		wtcursor->key.size = r->key_len;
+		wtcursor->key.size = (uint32_t)r->key_len;
 	}
 	return (0);
 }
@@ -486,12 +486,7 @@ restart:
 static int
 kvs_cursor_next(WT_CURSOR *wtcursor)
 {
-	CURSOR *cursor;
-	WT_SOURCE *ws;
 	int ret = 0;
-
-	cursor = (CURSOR *)wtcursor;
-	ws = cursor->ws;
 
 	if ((ret = copy_key(wtcursor)) != 0)
 		return (ret);
@@ -511,12 +506,7 @@ kvs_cursor_next(WT_CURSOR *wtcursor)
 static int
 kvs_cursor_prev(WT_CURSOR *wtcursor)
 {
-	CURSOR *cursor;
-	WT_SOURCE *ws;
 	int ret = 0;
-
-	cursor = (CURSOR *)wtcursor;
-	ws = cursor->ws;
 
 	if ((ret = copy_key(wtcursor)) != 0)
 		return (ret);
