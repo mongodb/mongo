@@ -82,15 +82,11 @@
 #define	KVS_MAXID	"memrata:WiredTiger.maxid"	/* max object ID key */
 #define	KVS_MAXID_BASE	6				/* first object ID */
 
-/*
- * Each KVS source supports a set of URIs (named objects).  Cursors reference
- * their underlying URI and underlying KVS source.
- */
-typedef struct __uri_source {
+typedef struct __wt_source {
 	char *name;				/* Unique name */
 	pthread_rwlock_t lock;			/* Lock */
 
-	int	configured;			/* If URI source configured */
+	int	configured;			/* If structure configured */
 	u_int	ref;				/* Active reference count */
 
 	/*
@@ -113,14 +109,14 @@ typedef struct __uri_source {
 
 	struct __kvs_source *ks;		/* Underlying KVS source */
 
-	struct __uri_source *next;		/* List of URIs */
-} URI_SOURCE;
+	struct __wt_source *next;		/* List of WiredTiger objects */
+} WT_SOURCE;
 
 typedef struct __kvs_source {
 	char *name;				/* Unique name */
 	kvs_t kvs;				/* Underlying KVS reference */
 
-	struct __uri_source *uri_head;		/* List of URIs */
+	struct __wt_source *ws_head;		/* List of WiredTiger sources */
 
 	struct __kvs_source *next;		/* List of KVS sources */
 } KVS_SOURCE;
@@ -130,8 +126,8 @@ typedef struct __cursor {
 
 	WT_EXTENSION_API *wtext;		/* Extension functions */
 
-	KVS_SOURCE *ks;				/* Underlying KVS source */
-	URI_SOURCE *us;				/* Underlying URI */
+	KVS_SOURCE *ks;				/* KVS source */
+	WT_SOURCE *ws;				/* WiredTiger source */
 
 	struct kvs_record record;		/* Record */
 	uint8_t  key[KVS_MAX_KEY_LEN];		/* key, value */
@@ -232,16 +228,16 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
+	WT_SOURCE *ws;
 	size_t i, size;
 	uint8_t *p, *t;
 	int ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
-	us = cursor->us;
+	ws = cursor->ws;
 	wtext = cursor->wtext;
 
 	r = &cursor->record;
@@ -249,11 +245,11 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 	r->key_len = 0;
 
 	/* Prefix the key with the object's unique ID. */
-	for (p = us->id, t = r->key, i = 0; i < us->idlen; ++i)
+	for (p = ws->id, t = r->key, i = 0; i < ws->idlen; ++i)
 		*t++ = *p++;
-	r->key_len += us->idlen;
+	r->key_len += ws->idlen;
 
-	if (us->config_recno) {
+	if (ws->config_recno) {
 		/*
 		 * Allocate a new record for append operations.
 		 *
@@ -272,28 +268,28 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 		 * not quite right.
 		 */
 		if (allocate_key && cursor->config_append) {
-			if ((ret = writelock(wtext, session, &us->lock)) != 0)
+			if ((ret = writelock(wtext, session, &ws->lock)) != 0)
 				return (ret);
-			wtcursor->recno = ++us->append_recno;
-			if ((ret = unlock(wtext, session, &us->lock)) != 0)
+			wtcursor->recno = ++ws->append_recno;
+			if ((ret = unlock(wtext, session, &ws->lock)) != 0)
 				return (ret);
-		} else if (wtcursor->recno > us->append_recno) {
-			if ((ret = writelock(wtext, session, &us->lock)) != 0)
+		} else if (wtcursor->recno > ws->append_recno) {
+			if ((ret = writelock(wtext, session, &ws->lock)) != 0)
 				return (ret);
-			if (wtcursor->recno > us->append_recno)
-				us->append_recno = wtcursor->recno;
-			if ((ret = unlock(wtext, session, &us->lock)) != 0)
+			if (wtcursor->recno > ws->append_recno)
+				ws->append_recno = wtcursor->recno;
+			if ((ret = unlock(wtext, session, &ws->lock)) != 0)
 				return (ret);
 		}
 
 		if ((ret = wtext->struct_size(wtext, session,
 		    &size, "r", wtcursor->recno)) != 0 ||
 		    (ret = wtext->struct_pack(wtext, session, t,
-		    sizeof(r->key) - us->idlen, "r", wtcursor->recno)) != 0)
+		    sizeof(r->key) - ws->idlen, "r", wtcursor->recno)) != 0)
 			return (ret);
 		r->key_len += size;
 	} else {
-		if (wtcursor->key.size + us->idlen > KVS_MAX_KEY_LEN)
+		if (wtcursor->key.size + ws->idlen > KVS_MAX_KEY_LEN)
 			ERET(wtext, session, ERANGE,
 			    "key size of %" PRIuMAX " is too large",
 			    (uintmax_t)wtcursor->key.size);
@@ -312,17 +308,17 @@ copyout_key(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
+	WT_SOURCE *ws;
 	size_t i, len;
 	uint8_t *p, *t;
 	int ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
-	us = cursor->us;
 	wtext = cursor->wtext;
+	ws = cursor->ws;
 
 	r = &cursor->record;
 
@@ -330,14 +326,14 @@ copyout_key(WT_CURSOR *wtcursor)
 	 * Check the object's unique ID, if it doesn't match we've hit the end
 	 * of the object on a cursor search.
 	 */
-	if (r->key_len < us->idlen)
+	if (r->key_len < ws->idlen)
 		return (WT_NOTFOUND);
-	for (p = us->id, t = r->key, i = 0; i < us->idlen; ++i)
+	for (p = ws->id, t = r->key, i = 0; i < ws->idlen; ++i)
 		if (*t++ != *p++)
 			return (WT_NOTFOUND);
-	len = r->key_len - us->idlen;
+	len = r->key_len - ws->idlen;
 
-	if (us->config_recno) {
+	if (ws->config_recno) {
 		if ((ret = wtext->struct_unpack(
 		    wtext, session, t, len, "r", &wtcursor->recno)) != 0)
 			return (ret);
@@ -552,18 +548,18 @@ static int
 kvs_cursor_next(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
-	URI_SOURCE *us;
+	WT_SOURCE *ws;
 	int ret = 0;
 
 	cursor = (CURSOR *)wtcursor;
-	us = cursor->us;
+	ws = cursor->ws;
 
 	/*
 	 * If this is the start of a new traversal, set the key to the first
 	 * possible record for the object.
 	 */
 	if (cursor->record.key_len == 0)
-		nextprev_init(wtcursor, us->id, us->idlen);
+		nextprev_init(wtcursor, ws->id, ws->idlen);
 
 	if ((ret = copy_key(wtcursor)) != 0)
 		return (ret);
@@ -584,18 +580,18 @@ static int
 kvs_cursor_prev(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
-	URI_SOURCE *us;
+	WT_SOURCE *ws;
 	int ret = 0;
 
 	cursor = (CURSOR *)wtcursor;
-	us = cursor->us;
+	ws = cursor->ws;
 
 	/*
 	 * If this is the start of a new traversal, set the key to the first
 	 * possible record after the object.
 	 */
 	if (cursor->record.key_len == 0)
-		nextprev_init(wtcursor, us->idnext, us->idnextlen);
+		nextprev_init(wtcursor, ws->idnext, ws->idnextlen);
 
 	if ((ret = copy_key(wtcursor)) != 0)
 		return (ret);
@@ -775,22 +771,22 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
 	KVS_SOURCE *ks;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
+	WT_SOURCE *ws;
 	int ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
 	ks = cursor->ks;
-	us = cursor->us;
+	ws = cursor->ws;
 
 	/*
 	 * WiredTiger's "remove" of a bitfield is really an update with a value
 	 * of a single byte of zero.
 	 */
-	if (us->config_bitfield) {
+	if (ws->config_bitfield) {
 		wtcursor->value.size = 1;
 		wtcursor->value.data = "\0";
 		return (kvs_cursor_update(wtcursor));
@@ -813,20 +809,20 @@ static int
 kvs_cursor_close(WT_CURSOR *wtcursor)
 {
 	CURSOR *cursor;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
+	WT_SOURCE *ws;
 	int ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
-	us = cursor->us;
+	ws = cursor->ws;
 
-	if ((ret = writelock(wtext, session, &us->lock)) != 0)
+	if ((ret = writelock(wtext, session, &ws->lock)) != 0)
 		goto err;
-	--us->ref;
-	if ((ret = unlock(wtext, session, &us->lock)) != 0)
+	--ws->ref;
+	if ((ret = unlock(wtext, session, &ws->lock)) != 0)
 		goto err;
 
 err:	free(cursor->val);
@@ -1198,17 +1194,18 @@ err:		if (locked)
 }
 
 /*
- * uri_source_open --
- *	Return a locked URI, allocating and opening if it doesn't already exist.
+ * ws_source_open --
+ *	Return a locked WiredTiger source, allocating and opening if it doesn't
+ * already exist.
  */
 static int
-uri_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
-    WT_CONFIG_ARG *config, const char *uri, int hold_global, URI_SOURCE **refp)
+ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
+    WT_CONFIG_ARG *config, const char *uri, int hold_global, WT_SOURCE **refp)
 {
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
 	int lockinit, ret = 0;
 
 	*refp = NULL;
@@ -1222,38 +1219,38 @@ uri_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		return (ret);
 
 	/* Check for a match: if we find one, we're done. */
-	for (us = ks->uri_head; us != NULL; us = us->next)
-		if (strcmp(us->name, uri) == 0)
+	for (ws = ks->ws_head; ws != NULL; ws = ws->next)
+		if (strcmp(ws->name, uri) == 0)
 			goto done;
 
-	/* Allocate and initialize a new underlying URI source object. */
-	if ((us = calloc(1, sizeof(*us))) == NULL ||
-	    (us->name = strdup(uri)) == NULL) {
+	/* Allocate and initialize a new underlying WiredTiger source object. */
+	if ((ws = calloc(1, sizeof(*ws))) == NULL ||
+	    (ws->name = strdup(uri)) == NULL) {
 		ret = os_errno();
 		goto err;
 	}
-	if ((ret = lock_init(wtext, session, &us->lock)) != 0)
+	if ((ret = lock_init(wtext, session, &ws->lock)) != 0)
 		goto err;
 	lockinit = 1;
-	us->ks = ks;
+	ws->ks = ks;
 
 	/* Insert the new entry at the head of the list. */
-	us->next = ks->uri_head;
-	ks->uri_head = us;
+	ws->next = ks->ws_head;
+	ks->ws_head = ws;
 
 	/* Return the locked object. */
-done:	if ((ret = writelock(wtext, session, &us->lock)) != 0)
+done:	if ((ret = writelock(wtext, session, &ws->lock)) != 0)
 		goto err;
 
-	*refp = us;
-	us = NULL;
+	*refp = ws;
+	ws = NULL;
 
 	if (0) {
 err:		if (lockinit)
-			ETRET(lock_destroy(wtext, session, &us->lock));
-		if (us != NULL) {
-			free(us->name);
-			free(us);
+			ETRET(lock_destroy(wtext, session, &ws->lock));
+		if (ws != NULL) {
+			free(ws->name);
+			free(ws);
 		}
 	}
 
@@ -1264,11 +1261,11 @@ err:		if (lockinit)
 }
 
 /*
- * uri_truncate --
+ * ws_truncate --
  *	Discard the records for an object.
  */
 static int
-uri_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
+ws_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, WT_SOURCE *ws)
 {
 	struct kvs_record *r, _r;
 	DATA_SOURCE *ds;
@@ -1281,14 +1278,14 @@ uri_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	kvs = us->ks->kvs;
+	kvs = ws->ks->kvs;
 
 	/* Walk the list of objects, discarding them all. */
 	r = &_r;
 	memset(r, 0, sizeof(*r));
 	r->key = key;
-	memcpy(r->key, us->id, us->idlen);
-	r->key_len = us->idlen;
+	memcpy(r->key, ws->id, ws->idlen);
+	r->key_len = ws->idlen;
 	r->val = NULL;
 	r->val_len = 0;
 	while ((ret = kvs_next(kvs, r, 0UL, 0UL)) == 0) {
@@ -1296,7 +1293,7 @@ uri_truncate(WT_DATA_SOURCE *wtds, WT_SESSION *session, URI_SOURCE *us)
 		 * Check for an object ID mismatch, if we find one, we're
 		 * done.
 		 */
-		for (p = us->id, t = r->key, i = 0; i < us->idlen; ++i)
+		for (p = ws->id, t = r->key, i = 0; i < ws->idlen; ++i)
 			if (*t++ != *p++)
 				return (0);
 		if ((ret = kvs_del(kvs, r)) != 0) {
@@ -1506,22 +1503,22 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	DATA_SOURCE *ds;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
 	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	/* Get a locked reference to the URI. */
-	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
+	/* Get a locked reference to the WiredTiger source. */
+	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
 		return (ret);
 
 	/* Create the URI master record if it doesn't already exist. */
 	ret = master_uri_set(wtds, session, uri, config);
 
-	/* Unlock the URI. */
-	ETRET(unlock(wtext, session, &us->lock));
+	/* Unlock the WiredTiger source. */
+	ETRET(unlock(wtext, session, &ws->lock));
 
 	return (ret);
 }
@@ -1536,34 +1533,34 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 {
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
-	URI_SOURCE **p, *us;
 	WT_EXTENSION_API *wtext;
+	WT_SOURCE **p, *ws;
 	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
 	/* Get a locked reference to the data source. */
-	if ((ret = uri_source_open(wtds, session, config, uri, 1, &us)) != 0)
+	if ((ret = ws_source_open(wtds, session, config, uri, 1, &ws)) != 0)
 		return (ret);
-	ks = us->ks;
+	ks = ws->ks;
 
 	/* If there are active references to the object, we're busy. */
-	if (us->ref != 0) {
+	if (ws->ref != 0) {
 		ret = EBUSY;
 		goto err;
 	}
 
 	/* Discard all of the rows in the object. */
-	if ((ret = uri_truncate(wtds, session, us)) != 0)
+	if ((ret = ws_truncate(wtds, session, ws)) != 0)
 		goto err;
 
 	/*
-	 * Remove the entry from the URI_SOURCE list -- it's a singly-linked
+	 * Remove the entry from the WT_SOURCE list -- it's a singly-linked
 	 * list, find the reference to it.
 	 */
-	for (p = &ks->uri_head; *p != NULL; p = &(*p)->next)
-		if (*p == us)
+	for (p = &ks->ws_head; *p != NULL; p = &(*p)->next)
+		if (*p == ws)
 			break;
 	/*
 	 * We should be guaranteed to find an entry, we just looked it up and
@@ -1578,7 +1575,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	/* Discard the metadata entry. */
 	ret = master_uri_drop(wtds, session, uri);
 
-err:	ETRET(unlock(wtext, session, &us->lock));
+err:	ETRET(unlock(wtext, session, &ws->lock));
 	ETRET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
 }
@@ -1593,10 +1590,10 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 {
 	CURSOR *cursor;
 	DATA_SOURCE *ds;
-	URI_SOURCE *us;
 	WT_CONFIG_ITEM v;
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
 	int ret = 0;
 	const char *value;
 
@@ -1644,23 +1641,23 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	}
 	cursor->config_overwrite = v.val != 0;
 
-	/* Get a locked reference to the URI. */
-	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
+	/* Get a locked reference to the WiredTiger source. */
+	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
 		goto err;
 
 	/*
-	 * Finish initializing the cursor (if the URI_SOURCE structure requires
+	 * Finish initializing the cursor (if the WT_SOURCE structure requires
 	 * initialization, we're going to use the cursor as part of that work).
 	 */
-	cursor->ks = us->ks;
-	cursor->us = us;
+	cursor->ks = ws->ks;
+	cursor->ws = ws;
 
 	/*
 	 * If this is the first access to the URI, we have to configure it
 	 * using information stored in the master record.
 	 */
-	if (!us->configured) {
-		us->configured = 1;
+	if (!ws->configured) {
+		ws->configured = 1;
 
 		if ((ret = master_uri_get(wtds, session, uri, &value)) != 0)
 			goto err;
@@ -1677,13 +1674,13 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		 * next ID is what we need to do a "previous" cursor traversal.)
 		 */
 		if ((ret = wtext->struct_size(wtext,
-		    session, &us->idlen, "r", v.val)) != 0 ||
+		    session, &ws->idlen, "r", v.val)) != 0 ||
 		    (ret = wtext->struct_pack(wtext,
-		    session, us->id, sizeof(us->id), "r", v.val)) != 0 ||
+		    session, ws->id, sizeof(ws->id), "r", v.val)) != 0 ||
 		    (ret = wtext->struct_size(wtext,
-		    session, &us->idnextlen, "r", v.val + 1)) != 0 ||
+		    session, &ws->idnextlen, "r", v.val + 1)) != 0 ||
 		    (ret = wtext->struct_pack(wtext, session,
-		    us->idnext, sizeof(us->idnext), "r", v.val + 1)) != 0) {
+		    ws->idnext, sizeof(ws->idnext), "r", v.val + 1)) != 0) {
 			ESET(wtext, session, ret,
 			    "WT_EXTENSION_API.config: uid: %s",
 			    wtext->strerror(ret));
@@ -1697,7 +1694,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 			    wtext->strerror(ret));
 			goto err;
 		}
-		us->config_recno = v.len == 1 && v.str[0] == 'r';
+		ws->config_recno = v.len == 1 && v.str[0] == 'r';
 
 		if ((ret = wtext->config_strget(
 		    wtext, session, value, "value_format", &v)) != 0) {
@@ -1706,20 +1703,20 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 			    wtext->strerror(ret));
 			goto err;
 		}
-		us->config_bitfield =
+		ws->config_bitfield =
 		    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
 		/*
 		 * If it's a record-number key, read the last record from the
 		 * object and set the allocation record value.
 		 */
-		if (us->config_recno) {
+		if (ws->config_recno) {
 			wtcursor = (WT_CURSOR *)cursor;
 			if ((ret = kvs_cursor_reset(wtcursor)) != 0)
 				goto err;
 
 			if ((ret = kvs_cursor_prev(wtcursor)) == 0)
-				us->append_recno = wtcursor->recno;
+				ws->append_recno = wtcursor->recno;
 			else if (ret != WT_NOTFOUND)
 				goto err;
 
@@ -1729,8 +1726,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	}
 
 	/* Increment the open reference count to pin the URI and unlock it. */
-	++us->ref;
-	if ((ret = unlock(wtext, session, &us->lock)) != 0)
+	++ws->ref;
+	if ((ret = unlock(wtext, session, &ws->lock)) != 0)
 		goto err;
 
 	*new_cursor = (WT_CURSOR *)cursor;
@@ -1754,8 +1751,8 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, const char *newuri, WT_CONFIG_ARG *config)
 {
 	DATA_SOURCE *ds;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
 	int ret = 0;
 	char *copy;
 
@@ -1763,12 +1760,12 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	wtext = ds->wtext;
 	copy = NULL;
 
-	/* Get a locked reference to the URI. */
-	if ((ret = uri_source_open(wtds, session, config, uri, 1, &us)) != 0)
+	/* Get a locked reference to the WiredTiger source. */
+	if ((ret = ws_source_open(wtds, session, config, uri, 1, &ws)) != 0)
 		return (ret);
 
 	/* If there are active references to the object, we're busy. */
-	if (us->ref != 0) {
+	if (ws->ref != 0) {
 		ret = EBUSY;
 		goto err;
 	}
@@ -1782,11 +1779,11 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		goto err;
 
 	/* Swap our copy of the name. */
-	free(us->name);
-	us->name = copy;
+	free(ws->name);
+	ws->name = copy;
 	copy = NULL;
 
-err:	ETRET(unlock(wtext, session, &us->lock));
+err:	ETRET(unlock(wtext, session, &ws->lock));
 	ETRET(unlock(wtext, session, &ds->global_lock));
 
 	free(copy);
@@ -1802,24 +1799,24 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	DATA_SOURCE *ds;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
 	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
-	/* Get a locked reference to the URI. */
-	if ((ret = uri_source_open(wtds, session, config, uri, 0, &us)) != 0)
+	/* Get a locked reference to the WiredTiger source. */
+	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
 		return (ret);
 
 	/*
 	 * If there are active references to the object, we're busy.
 	 * Else, discard the records.
 	 */
-	ret = us->ref == 0 ? uri_truncate(wtds, session, us) : EBUSY;
+	ret = ws->ref == 0 ? ws_truncate(wtds, session, ws) : EBUSY;
 
-	ETRET(unlock(wtext, session, &us->lock));
+	ETRET(unlock(wtext, session, &ws->lock));
 	return (ret);
 }
 
@@ -1852,8 +1849,8 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 {
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
-	URI_SOURCE *us;
 	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
 	int tret, ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
@@ -1869,17 +1866,17 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 
 	/* Close and discard all objects. */
 	while ((ks = ds->kvs_head) != NULL) {
-		while ((us = ks->uri_head) != NULL) {
-			if (us->ref != 0)
+		while ((ws = ks->ws_head) != NULL) {
+			if (ws->ref != 0)
 				ESET(wtext, session, WT_ERROR,
 				    "%s: has open object %s with %u open "
 				    "cursors during close",
-				    ks->name, us->name, us->ref);
+				    ks->name, ws->name, ws->ref);
 
-			ks->uri_head = us->next;
-			ETRET(lock_destroy(wtext, session, &us->lock));
-			free(us->name);
-			free(us);
+			ks->ws_head = ws->next;
+			ETRET(lock_destroy(wtext, session, &ws->lock));
+			free(ws->name);
+			free(ws);
 		}
 
 		if ((tret = kvs_close(ks->kvs)) != 0)
