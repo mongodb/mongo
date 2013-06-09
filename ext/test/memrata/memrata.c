@@ -772,8 +772,6 @@ static const KVS_OPTIONS kvs_options[] = {
 	 * KVS_O_FLAG flag configuration
 	 */
 	{ "kvs_open_o_debug=0",		"boolean", NULL },
-	{ "kvs_open_o_reclaim=0",	"boolean", NULL },
-	{ "kvs_open_o_scan=0",		"boolean", NULL },
 	{ "kvs_open_o_truncate=0",	"boolean", NULL },
 
 	{ NULL, NULL, NULL }
@@ -954,7 +952,6 @@ kvs_config_read(WT_EXTENSION_API *wtext,
 		 * it in.
 		 */
 		KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
-		KVS_FLAG_SET("kvs_open_o_scan",  KVS_O_SCAN);
 		KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
 	}
 	return (0);
