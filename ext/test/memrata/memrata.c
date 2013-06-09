@@ -850,13 +850,14 @@ static const KVS_OPTIONS kvs_options[] = {
 	 * struct kvs_config configuration
 	 */
 	{ "kvs_parallelism=64",		"int", "min=1,max=512" },
-	{ "kvs_granularity=4000000",	"int", "min=1000000,max=10000000" },
+	{ "kvs_granularity=2M",		"int", "min=1M,max=10M" },
 	{ "kvs_avg_key_len=16",		"int", "min=10,max=512" },
-	{ "kvs_avg_val_len=16",		"int", "min=10,max=51" },
+	{ "kvs_avg_val_len=100",	"int", "min=10,max=1M" },
 	{ "kvs_write_bufs=32",		"int", "min=16,max=256" },
-	{ "kvs_read_bufs=64",		"int", "min=16,max=256" },
-	{ "kvs_commit_timeout=1000000",	"int", "min=100,max=10000000" },
+	{ "kvs_read_bufs=2048",		"int", "min=16,max=1M" },
+	{ "kvs_commit_timeout=5M",	"int", "min=100,max=10M" },
 	{ "kvs_reclaim_threshold=60",	"int", "min=1,max=80" },
+	{ "kvs_reclaim_period=1000",	"int", "min=100,max=10K" },
 
 	/*
 	 * KVS_O_FLAG flag configuration
@@ -1031,6 +1032,7 @@ kvs_config_read(WT_EXTENSION_API *wtext,
 		KVS_CONFIG_SET("kvs_read_bufs", read_bufs);
 		KVS_CONFIG_SET("kvs_commit_timeout", commit_timeout);
 		KVS_CONFIG_SET("kvs_reclaim_threshold", reclaim_threshold);
+		KVS_CONFIG_SET("kvs_reclaim_period", reclaim_period);
 
 #define	KVS_FLAG_SET(n, f)						\
 		if (strcmp(name, n) == 0) {				\
@@ -1038,10 +1040,13 @@ kvs_config_read(WT_EXTENSION_API *wtext,
 				*flagsp |= f;				\
 			continue;					\
 		}
+		/*
+		 * We don't export KVS_O_CREATE: WT_SESSION.create always adds
+		 * it in.
+		 */
 		KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
-		KVS_FLAG_SET("kvs_open_o_reclaim", KVS_O_SCAN);
-		KVS_FLAG_SET("kvs_open_o_scan",  KVS_O_RECLAIM);
-		KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_CREATE);
+		KVS_FLAG_SET("kvs_open_o_scan",  KVS_O_SCAN);
+		KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
 	}
 	return (0);
 }
@@ -1161,28 +1166,8 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	ks->name = devices;
 	devices = NULL;
 
-	/*
-	 * Open the KVS handle last, so cleanup is easier: we don't have any way
-	 * to say "create the object if it doesn't exist", and since the create
-	 * flag destroys the underlying store, we can't just always set it.  If
-	 * we fail with "invalid volume", try again with a create flag.
-	 */
-#if defined(KVS_O_TRUNCATE)
-	This is fragile: once KVS_O_CREATE changes to not always destroy the
-	store, we can set it all the time, and whatever new flag destroys the
-	store should get pushed out into the api as a new kvs flag.  (See the
-	above setting of KVS_O_CREATE for the kvs_open_o_truncate option.)
-#endif
-	ks->kvs = kvs_open(device_list, &kvs_config, flags);
-	if (ks->kvs == NULL)
-		ret = os_errno();
-	if (ret == KVS_E_VOL_INVALID) {
-		ret = 0;
-		flags |= KVS_O_CREATE;
-		ks->kvs = kvs_open(device_list, &kvs_config, flags);
-		if (ks->kvs == NULL)
-			ret = os_errno();
-	}
+	/* Open the KVS handle last, so cleanup is easier. */
+	ks->kvs = kvs_open(device_list, &kvs_config, flags | KVS_O_CREATE);
 	if (ks->kvs == NULL) {
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
@@ -1947,7 +1932,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if KVS_VERSION_MAJOR != 2 || KVS_VERSION_MINOR != 8
+#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 1
 	ERET(wtext, NULL, EINVAL,
 	    "unsupported KVS library version %d.%d",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
