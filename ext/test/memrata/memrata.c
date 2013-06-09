@@ -209,7 +209,7 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	WT_SOURCE *ws;
-	size_t i, size;
+	size_t size;
 	int ret = 0;
 
 	session = wtcursor->session;
