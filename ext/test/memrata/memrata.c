@@ -1368,8 +1368,9 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	cursor = NULL;
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	value = NULL;
+	ws = NULL;
 	locked = 0;
+	value = NULL;
 
 	/* Allocate and initialize a cursor. */
 	if ((cursor = calloc(1, sizeof(CURSOR))) == NULL)
@@ -1475,7 +1476,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	*new_cursor = (WT_CURSOR *)cursor;
 
 	if (0) {
-err:		if (locked)
+err:		if (ws != NULL && locked)
 			ETRET(unlock(wtext, session, &ws->lock));
 
 		if (cursor != NULL) {

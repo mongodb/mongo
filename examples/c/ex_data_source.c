@@ -565,20 +565,20 @@ main(void)
 
 	{
 	WT_SESSION *session = NULL;
-	/*! [WT_EXTENSION_API transaction ID] */
+	/*! [WT_EXTENSION transaction ID] */
 	uint64_t txnid;
 
 	ret = wt_api->txn_id(wt_api, session, &txnid);
-	/*! [WT_EXTENSION_API transaction ID] */
+	/*! [WT_EXTENSION transaction ID] */
 	}
 
 	{
 	WT_SESSION *session = NULL;
 	uint64_t txnid = 1;
 	int is_visible;
-	/*! [WT_EXTENSION_API transaction visible] */
+	/*! [WT_EXTENSION transaction visible] */
 	is_visible = wt_api->txn_visible(wt_api, session, txnid);
-	/*! [WT_EXTENSION_API transaction visible] */
+	/*! [WT_EXTENSION transaction visible] */
 	}
 
 	(void)conn->close(conn, NULL);
