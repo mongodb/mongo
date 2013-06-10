@@ -1160,7 +1160,8 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	 * Open the underlying KVS namespace (creating it if necessary), then
 	 * push the change.
 	 */
-	if ((ws->kvs = kvs_open_namespace(ws->ks->kvs_device, uri)) == NULL) {
+	if ((ws->kvs = kvs_open_namespace(
+	    ws->ks->kvs_device, uri, KVS_O_CREATE)) == NULL) {
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_open_namespace: %s: %s",
 		    uri, kvs_strerror(os_errno()));
@@ -1837,7 +1838,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 1
+#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 2
 	ERET(wtext, NULL, EINVAL,
 	    "unsupported KVS library version %d.%d",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
