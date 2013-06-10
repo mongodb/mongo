@@ -51,13 +51,6 @@
 	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
 	return (v);							\
 } while (0)
-#undef	ESET
-#define	ESET(wtext, session, v, ...) do {				\
-	(void)								\
-	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
-	if (ret == 0)							\
-		ret = v;						\
-} while (0)
 #undef	ETRET
 #define	ETRET(a) do {							\
 	int __ret;							\
@@ -65,6 +58,12 @@
 	    (__ret == WT_PANIC ||					\
 	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
 		ret = __ret;						\
+} while (0)
+#undef	ESET
+#define	ESET(wtext, session, v, ...) do {				\
+	(void)								\
+	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
+	ETRET(v);							\
 } while (0)
 
 /*
@@ -415,7 +414,7 @@ kvs_dump(
 
 /*
  * kvs_call --
- *	Call a KVS function.
+ *	Call a KVS key retrieval function, handling overflow.
  */
 static INLINE int
 kvs_call(WT_CURSOR *wtcursor, const char *fname,
@@ -1072,12 +1071,20 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	ks->name = devices;
 	devices = NULL;
 
-	/* Open the KVS handle last, so cleanup is easier. */
+	/*
+	 * Open the underlying KVS store (creating it if necessary), then push
+	 * the change.
+	 */
 	ks->kvs_device =
 	    kvs_open(device_list, &kvs_config, flags | KVS_O_CREATE);
 	if (ks->kvs_device == NULL) {
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
+		goto err;
+	}
+	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_commit: %s", kvs_strerror(ret));
 		goto err;
 	}
 
@@ -1094,7 +1101,11 @@ err:		if (locked)
 			ETRET(unlock(wtext, session, &ds->global_lock));
 	}
 
-	free(ks);
+	if (ks != NULL) {
+		if (ks->kvs_device != NULL)
+			(void)kvs_close(ks->kvs_device);
+		free(ks);
+	}
 	if (device_list != NULL) {
 		for (p = device_list; *p != NULL; ++p)
 			free(*p);
@@ -1145,12 +1156,29 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	lockinit = 1;
 	ws->ks = ks;
 
+	/*
+	 * Open the underlying KVS namespace (creating it if necessary), then
+	 * push the change.
+	 */
+	if ((ws->kvs = kvs_open_namespace(
+	    ws->ks->kvs_device, uri, KVS_O_CREATE)) == NULL) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_open_namespace: %s: %s",
+		    uri, kvs_strerror(os_errno()));
+		goto err;
+	}
+	if ((ret = kvs_commit(ws->kvs)) != 0) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_commit: %s", kvs_strerror(ret));
+		goto err;
+	}
+
 	/* Insert the new entry at the head of the list. */
 	ws->next = ks->ws_head;
 	ks->ws_head = ws;
 
-	/* Return the locked object. */
-done:	if ((ret = writelock(wtext, session, &ws->lock)) != 0)
+	/* If we're not holding the global lock, lock the object. */
+done:	if (!hold_global && (ret = writelock(wtext, session, &ws->lock)) != 0)
 		goto err;
 
 	*refp = ws;
@@ -1160,6 +1188,8 @@ done:	if ((ret = writelock(wtext, session, &ws->lock)) != 0)
 err:		if (lockinit)
 			ETRET(lock_destroy(wtext, session, &ws->lock));
 		if (ws != NULL) {
+			if (ws->kvs != NULL)
+				(void)kvs_close(ws->kvs);
 			free(ws->uri);
 			free(ws);
 		}
@@ -1168,6 +1198,23 @@ err:		if (lockinit)
 	/* If our caller doesn't need it, release the global lock. */
 	if (ret != 0 || !hold_global)
 		ETRET(unlock(wtext, session, &ds->global_lock));
+	return (ret);
+}
+
+/*
+ * ws_source_destroy --
+ *	Kill a WT_SOURCE structure.
+ */
+static int
+ws_source_destroy(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
+{
+	int ret = 0;
+
+	ret = lock_destroy(wtext, session, &ws->lock);
+
+	free(ws->uri);
+	free(ws);
+
 	return (ret);
 }
 
@@ -1301,100 +1348,6 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 }
 
 /*
- * kvs_session_create --
- *	WT_SESSION::create method.
- */
-static int
-kvs_session_create(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
-{
-	DATA_SOURCE *ds;
-	WT_EXTENSION_API *wtext;
-	WT_SOURCE *ws;
-	int ret = 0;
-
-	ds = (DATA_SOURCE *)wtds;
-	wtext = ds->wtext;
-
-	/* Get a locked reference to the WiredTiger source. */
-	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
-		return (ret);
-
-	/* Create the URI master record if it doesn't already exist. */
-	ret = master_uri_set(wtds, session, uri, config);
-
-	/* Unlock the WiredTiger source. */
-	ETRET(unlock(wtext, session, &ws->lock));
-
-	return (ret);
-}
-
-/*
- * kvs_session_drop --
- *	WT_SESSION::drop method.
- */
-static int
-kvs_session_drop(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
-{
-	DATA_SOURCE *ds;
-	KVS_SOURCE *ks;
-	WT_EXTENSION_API *wtext;
-	WT_SOURCE **p, *ws;
-	int ret = 0;
-
-	ds = (DATA_SOURCE *)wtds;
-	wtext = ds->wtext;
-
-	/*
-	 * Get a locked reference to the data source; hold the global lock as
-	 * well, we are going to change the list of objects for a KVS store.
-	 */
-	if ((ret = ws_source_open(wtds, session, config, uri, 1, &ws)) != 0)
-		return (ret);
-	ks = ws->ks;
-
-	/* If there are active references to the object, we're busy. */
-	if (ws->ref != 0) {
-		ret = EBUSY;
-		goto err;
-	}
-
-	/* Close and delete the underlying object. */
-	if ((ret = kvs_close(ws->kvs)) != 0) {
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_close: %s: %s", ws->uri, kvs_strerror(ret));
-		goto err;
-	}
-	if ((ret = kvs_delete_namespace(ks->kvs_device, ws->uri)) != 0) {
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_delete_namespace: %s: %s", ws->uri, kvs_strerror(ret));
-		goto err;
-	}
-
-	/* Discard the metadata entry. */
-	ret = master_uri_drop(wtds, session, uri);
-
-	/*
-	 * Remove the entry from the WT_SOURCE list -- it's a singly-linked
-	 * list, find the reference to it.
-	 */
-	for (p = &ks->ws_head; *p != NULL; p = &(*p)->next)
-		if (*p == ws) {
-			*p = (*p)->next;
-
-			ETRET(lock_destroy(wtext, session, &ws->lock));
-			free(ws->uri);
-			free(ws);
-			break;
-		}
-
-err:
-	ETRET(unlock(wtext, session, &ds->global_lock));
-	return (ret);
-}
-
-/*
  * kvs_session_open_cursor --
  *	WT_SESSION::open_cursor method.
  */
@@ -1408,7 +1361,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
-	int ret = 0;
+	int locked, ret = 0;
 	const char *value;
 
 	*new_cursor = NULL;
@@ -1416,6 +1369,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	cursor = NULL;
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
+	ws = NULL;
+	locked = 0;
 	value = NULL;
 
 	/* Allocate and initialize a cursor. */
@@ -1458,6 +1413,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	/* Get a locked reference to the WiredTiger source. */
 	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
 		goto err;
+	locked = 1;
 
 	/*
 	 * Finish initializing the cursor (if the WT_SOURCE structure requires
@@ -1492,15 +1448,6 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		ws->config_bitfield =
 		    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
-		/* Open the underlying KVS namespace. */
-		if ((ws->kvs =
-		    kvs_open_namespace(ws->ks->kvs_device, uri)) == NULL) {
-			ESET(wtext, session, WT_ERROR,
-			    "kvs_open_namespace: %s: %s",
-			    uri, kvs_strerror(os_errno()));
-			goto err;
-		}
-
 		/*
 		 * If it's a record-number key, read the last record from the
 		 * object and set the allocation record value.
@@ -1530,12 +1477,131 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	*new_cursor = (WT_CURSOR *)cursor;
 
 	if (0) {
-err:		if (cursor != NULL) {
+err:		if (ws != NULL && locked)
+			ETRET(unlock(wtext, session, &ws->lock));
+
+		if (cursor != NULL) {
 			free(cursor->val);
 			free(cursor);
 		}
 	}
 	free((void *)value);
+	return (ret);
+}
+
+/*
+ * kvs_session_create --
+ *	WT_SESSION::create method.
+ */
+static int
+kvs_session_create(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
+{
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
+	int ret = 0;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	/*
+	 * Get a locked reference to the WiredTiger source, then immediately
+	 * unlock it, we aren't doing anything else.
+	 */
+	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
+		return (ret);
+	if ((ret = unlock(wtext, session, &ws->lock)) != 0)
+		return (ret);
+
+	/*
+	 * Create the URI master record if it doesn't already exist.
+	 *
+	 * If unable to enter a WiredTiger record, leave the KVS store alone.
+	 * A subsequent create should do the right thing, we aren't leaving
+	 * anything in an inconsistent state.
+	 */
+	return (master_uri_set(wtds, session, uri, config));
+}
+
+/*
+ * kvs_session_drop --
+ *	WT_SESSION::drop method.
+ */
+static int
+kvs_session_drop(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
+{
+	DATA_SOURCE *ds;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
+	WT_SOURCE **p, *ws;
+	int ret = 0;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	/*
+	 * Get a locked reference to the data source; hold the global lock,
+	 * we are going to change the list of objects for a KVS store.
+	 */
+	if ((ret = ws_source_open(wtds, session, config, uri, 1, &ws)) != 0)
+		return (ret);
+	ks = ws->ks;
+
+	/* If there are active references to the object, we're busy. */
+	if (ws->ref != 0) {
+		ret = EBUSY;
+		goto err;
+	}
+
+	/*
+	 * Close and delete the namespace, then push the change.
+	 *
+	 * If the close or delete fails, we can return (an error); once delete
+	 * succeeds, we have to push through, the object is gone.
+	 */
+	if ((ret = kvs_close(ws->kvs)) != 0) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_close: %s: %s", ws->uri, kvs_strerror(ret));
+		goto err;
+	}
+	if ((ret = kvs_delete_namespace(ks->kvs_device, ws->uri)) != 0) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_delete_namespace: %s: %s", ws->uri, kvs_strerror(ret));
+		goto err;
+	}
+
+	/*
+	 * No turning back, now, accumulate errors as we go.
+	 */
+	if ((ret = kvs_commit(ks->kvs_device)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_commit: %s", kvs_strerror(ret));
+
+	/* Discard the metadata entry. */
+	ETRET(master_uri_drop(wtds, session, uri));
+
+	/*
+	 * If we have an error at this point, panic -- there's an inconsistency
+	 * in what WiredTiger knows about and the underlying store.
+	 */
+	if (ret != 0)
+		ret = WT_PANIC;
+
+	/*
+	 * Remove the entry from the WT_SOURCE list -- it's a singly-linked
+	 * list, find the reference to it.
+	 */
+	for (p = &ks->ws_head; *p != NULL; p = &(*p)->next)
+		if (*p == ws) {
+			*p = (*p)->next;
+
+			ETRET(ws_source_destroy(wtext, session, ws));
+			break;
+		}
+
+err:	ETRET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
 }
 
@@ -1559,9 +1625,9 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	copy = NULL;
 
 	/*
-	 * Get a locked reference to the data source; hold the global lock as
-	 * well, we are going to change the object's name, and we can't allow
-	 * other threads to be walking the list and comparing against the name.
+	 * Get a locked reference to the data source; hold the global lock,
+	 * we are going to change the object's name, and we can't allow
+	 * other threads walking the list and comparing against the name.
 	 */
 	if ((ret = ws_source_open(wtds, session, config, uri, 1, &ws)) != 0)
 		return (ret);
@@ -1573,26 +1639,47 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		goto err;
 	}
 
-	/* Update the metadata record. */
-	if ((ret = master_uri_rename(wtds, session, uri, newuri)) != 0)
+	/* Get a copy of the new name, before errors get scary. */
+	if ((copy = strdup(newuri)) == NULL) {
+		ret = os_errno();
 		goto err;
+	}
 
-	/* Update the structure name. */
-	if ((copy = strdup(newuri)) == NULL)
-		return (os_errno());
-	free(ws->uri);
-	ws->uri = copy;
-	copy = NULL;
-
-	/* Rename the KVS namespace. */
+	/*
+	 * Rename the KVS namespace and push the change.
+	 *
+	 * If the rename fails, we can return (an error); once rename succeeds,
+	 * we have to push through, the old object is gone.
+	 */
 	if ((ret = kvs_rename_namespace(ks->kvs_device, uri, newuri)) != 0) {
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_rename_namespace: %s: %s", ws->uri, kvs_strerror(ret));
 		goto err;
 	}
 
-err:	ETRET(unlock(wtext, session, &ws->lock));
-	ETRET(unlock(wtext, session, &ds->global_lock));
+	/*
+	 * No turning back, now, accumulate errors as we go.
+	 */
+	if ((ret = kvs_commit(ws->kvs)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_commit: %s", kvs_strerror(ret));
+
+	/* Update the metadata record. */
+	ETRET(master_uri_rename(wtds, session, uri, newuri));
+
+	/* Update the structure name. */
+	free(ws->uri);
+	ws->uri = copy;
+	copy = NULL;
+
+	/*
+	 * If we have an error at this point, panic -- there's an inconsistency
+	 * in what WiredTiger knows about and the underlying store.
+	 */
+	if (ret != 0)
+		ret = WT_PANIC;
+
+err:	ETRET(unlock(wtext, session, &ds->global_lock));
 
 	free(copy);
 	return (ret);
@@ -1628,6 +1715,11 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 	if ((ret = kvs_truncate(ws->kvs)) != 0) {
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
+		goto err;
+	}
+	if ((ret = kvs_commit(ws->kvs)) != 0) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_commit: %s", kvs_strerror(ret));
 		goto err;
 	}
 
@@ -1677,7 +1769,7 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
 		if ((tret = kvs_commit(ks->kvs_device)) != 0)
 			ESET(wtext, session, WT_ERROR,
-			    "kvs_commit: %s: %s", ks->name, kvs_strerror(tret));
+			    "kvs_commit: %s", kvs_strerror(tret));
 
 	/* Close and discard all objects. */
 	while ((ks = ds->kvs_head) != NULL) {
@@ -1693,9 +1785,7 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 				    ws->uri, kvs_strerror(tret));
 
 			ks->ws_head = ws->next;
-			ETRET(lock_destroy(wtext, session, &ws->lock));
-			free(ws->uri);
-			free(ws);
+			ETRET(ws_source_destroy(wtext, session, ws));
 		}
 
 		if ((tret = kvs_close(ks->kvs_device)) != 0)
@@ -1748,7 +1838,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 1
+#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 2
 	ERET(wtext, NULL, EINVAL,
 	    "unsupported KVS library version %d.%d",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
