@@ -290,6 +290,32 @@ struct __wt_extension_api {
 	 */
 	int (*struct_unpack)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
 	    const void *buffer, size_t size, const char *format, ...);
+
+	/*!
+	 * Return the current transaction ID.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @param [out] txnp the transaction ID
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction ID
+	 */
+	int (*txn_id)(
+	    WT_EXTENSION_API *wt_api, WT_SESSION *session, uint64_t *txnidp);
+
+	/*!
+	 * Return if the current transaction can see the given transaction ID.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @param txnid the transaction ID
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction visible
+	 */
+	int (*txn_visible)(
+	    WT_EXTENSION_API *wt_api, WT_SESSION *session, uint64_t txnid);
 };
 
 /*!
