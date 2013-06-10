@@ -483,9 +483,11 @@ int
 main(void)
 {
 	WT_CONNECTION *conn;
+	WT_SESSION *session;
 	int ret;
 
 	ret = wiredtiger_open(NULL, NULL, "create", &conn);
+	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	my_data_source_init(conn);
 
@@ -564,7 +566,6 @@ main(void)
 	/*! [WT_EXTENSION_API default_session] */
 
 	{
-	WT_SESSION *session = NULL;
 	/*! [WT_EXTENSION transaction ID] */
 	uint64_t txnid;
 
@@ -573,7 +574,6 @@ main(void)
 	}
 
 	{
-	WT_SESSION *session = NULL;
 	uint64_t txnid = 1;
 	int is_visible;
 	/*! [WT_EXTENSION transaction visible] */
