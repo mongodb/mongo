@@ -579,6 +579,7 @@ main(void)
 	/*! [WT_EXTENSION transaction visible] */
 	is_visible = wt_api->txn_visible(wt_api, session, txnid);
 	/*! [WT_EXTENSION transaction visible] */
+	(void)is_visible;
 	}
 
 	(void)conn->close(conn, NULL);
