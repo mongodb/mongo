@@ -343,11 +343,15 @@ namespace mongo {
                 // trim whitespace and append 000 to replace kB.
                 while ( isspace( meminfo.at( lineOff ) ) ) lineOff++;
                 meminfo = meminfo.substr( lineOff );
+
+                unsigned long long systemMem = 0;
+                if ( mongo::parseNumberFromString( meminfo, &systemMem ).isOK() )   {
+                    return systemMem * 1024; // convert from kB to bytes
+                }
+                else
+                    log() << "Unable to collect system memory information" << endl;
             }
-            else {
-                meminfo = "";
-            }
-            return atoll(meminfo.c_str()) * 1024;   // convert from kB to bytes
+            return 0;
         }
 
     };
