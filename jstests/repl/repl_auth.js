@@ -1,11 +1,10 @@
 // Test repl with auth enabled
 
 var baseName = "jstests_repl11test";
+var keyFilePath = "jstests/libs/key1";
 
 setAdmin = function( n ) {
     n.getDB( "admin" ).addUser( "super", "super", false, 3 );
-    n.getDB( "local" ).addUser( "repl", "foo" );
-    n.getDB( "local" ).system.users.findOne();
 }
 
 auth = function( n ) {
@@ -25,10 +24,10 @@ doTest = function(signal, extraOpts) {
     setAdmin( s );
     rt.stop( false );
     
-    m = rt.start( true, { auth:null }, true );
+    m = rt.start( true, { auth:null, keyFile: keyFilePath }, true );
     auth( m );
 
-    var slaveOpt = { auth: null };
+    var slaveOpt = { auth: null, keyFile: keyFilePath };
     slaveOpt = Object.extend(slaveOpt, extraOpts);
 
     s = rt.start( false, slaveOpt, true );
@@ -39,7 +38,7 @@ doTest = function(signal, extraOpts) {
     sa = s.getDB( baseName ).a;
     assert.soon( function() { return 1 == sa.count(); } );
     
-    s.getDB( "local" ).auth( "repl", "foo" );
+    s.getDB( "admin" ).auth( "super", "super" );
     assert.commandWorked( s.getDB( "admin" )._adminCommand( {serverStatus:1,repl:1} ) );
     assert.commandWorked( s.getDB( "admin" )._adminCommand( {serverStatus:1,repl:2} ) );
     
