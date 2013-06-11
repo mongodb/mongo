@@ -53,6 +53,10 @@ namespace mongo {
         virtual Status insertPrivilegeDocument(const std::string& dbname,
                                                const BSONObj& userObj) const = 0;
 
+        // Updates the given user object with the given update modifier.
+        virtual Status updatePrivilegeDocument(const UserName& user,
+                                               const BSONObj& updateObj) const = 0;
+
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
 

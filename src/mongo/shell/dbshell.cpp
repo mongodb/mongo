@@ -129,7 +129,10 @@ void shellHistoryAdd( const char * line ) {
     // We don't want any .auth() or .addUser() commands added, but we want to
     // be able to add things like `.author`, so be smart about how this is
     // detected by using regular expresions.
-    static pcrecpp::RE hiddenCommands("\\.(auth|addUser)\\s*\\(");
+    // TODO(spencer): If the createUser or updateUser commands are run directly via runCommand they
+    // are not filtered from the history.
+    static pcrecpp::RE hiddenCommands(
+            "\\.(auth|addUser|createUser|updateUser|changeUserPassword)\\s*\\(");
     if (!hiddenCommands.PartialMatch(line))
     {
         linenoiseHistoryAdd( line );

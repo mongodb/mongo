@@ -21,6 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/user_name.h"
 
 namespace mongo {
 
@@ -36,6 +37,9 @@ namespace mongo {
 
         virtual Status insertPrivilegeDocument(const std::string& dbname,
                                                const BSONObj& userObj) const;
+
+        virtual Status updatePrivilegeDocument(const UserName& user,
+                                               const BSONObj& updateObj) const;
 
     protected:
         virtual bool _findUser(const string& usersNamespace,

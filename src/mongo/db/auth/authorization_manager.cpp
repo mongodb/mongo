@@ -287,6 +287,11 @@ namespace {
         return _externalState->insertPrivilegeDocument(dbname, userObj);
     }
 
+    Status AuthorizationManager::updatePrivilegeDocument(const UserName& user,
+                                                         const BSONObj& updateObj) const {
+        return _externalState->updatePrivilegeDocument(user, updateObj);
+    }
+
     ActionSet AuthorizationManager::getAllUserActions() const {
         ActionSet allActions;
         allActions.addAllActionsFromSet(readRoleActions);

@@ -95,6 +95,9 @@ namespace mongo {
         // Creates the given user object in the given database.
         Status insertPrivilegeDocument(const std::string& dbname, const BSONObj& userObj) const;
 
+        // Updates the given user object with the given update modifier.
+        Status updatePrivilegeDocument(const UserName& user, const BSONObj& updateObj) const;
+
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
         //

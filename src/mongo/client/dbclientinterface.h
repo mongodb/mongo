@@ -658,7 +658,7 @@ namespace mongo {
         */
         virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
 
-        string createPasswordDigest( const string &username , const string &clearTextPassword );
+        static string createPasswordDigest(const string &username, const string &clearTextPassword);
 
         /** returns true in isMaster parm if this db is the current master
            of a replica pair.

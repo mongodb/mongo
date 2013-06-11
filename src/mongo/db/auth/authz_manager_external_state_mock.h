@@ -40,6 +40,10 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual Status updatePrivilegeDocument(const UserName& user,
+                                               const BSONObj& updateObj) const {
+            return Status::OK();
+        }
 
         virtual bool _findUser(const std::string& usersNamespace,
                                const BSONObj& query,

@@ -178,14 +178,20 @@ DB.prototype.addUser = function() {
     }
 }
 
-DB.prototype.changeUserPassword = function(username, password) {
-    var hashedPassword = _hashPassword(username, password);
-    db.system.users.update({user : username, userSource : null}, {$set : {pwd : hashedPassword}});
-    var err = db.getLastError();
-    if (err) {
-        throw "Changing password failed: " + err;
+DB.prototype.updateUser = function(updateObject) {
+    var cmdObj = {updateUser:1};
+    cmdObj = Object.extend(cmdObj, updateObject);
+    var res = this.runCommand(cmdObj);
+    if (res.ok) {
+        return;
     }
-}
+    throw Error("Updating user failed: " + res.errmsg);
+};
+
+DB.prototype.changeUserPassword = function(username, password) {
+    var updateObject = { user: username, pwd: password};
+    this.updateUser(updateObject);
+};
 
 DB.prototype.logout = function(){
     return this.getMongo().logout(this.getName());

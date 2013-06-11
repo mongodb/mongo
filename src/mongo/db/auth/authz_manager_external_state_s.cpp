@@ -19,6 +19,7 @@
 #include <string>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
@@ -72,6 +73,33 @@ namespace mongo {
                                  "\" already exists on database \"" << dbname << "\"");
         }
         return Status(ErrorCodes::UserModificationFailed, errstr);
+    }
+
+    Status AuthzManagerExternalStateMongos::updatePrivilegeDocument(
+            const UserName& user, const BSONObj& updateObj) const {
+        string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+
+        conn->get()->update(userNS,
+                            QUERY("user" << user.getUser() << "userSource" << BSONNULL),
+                            updateObj);
+
+        // 30 second timeout for w:majority
+        BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+        string err = conn->get()->getLastErrorString(res);
+        if (!err.empty()) {
+            return Status(ErrorCodes::UserModificationFailed, err);
+        }
+
+        int numUpdated = res["n"].numberInt();
+        dassert(numUpdated <= 1 && numUpdated >= 0);
+        if (numUpdated == 0) {
+            return Status(ErrorCodes::UserNotFound,
+                          mongoutils::str::stream() << "User " << user.getFullName() <<
+                                  " not found");
+        }
+
+        return Status::OK();
     }
 
 } // namespace mongo

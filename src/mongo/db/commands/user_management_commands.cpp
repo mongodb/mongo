@@ -19,6 +19,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -165,7 +166,7 @@ namespace mongo {
             }
 
             if (cmdObj.hasField("extraData")) {
-                userObjBuilder.append("extraData", extraData);
+                userObjBuilder.append(extraData);
             }
 
             if (cmdObj.hasField("roles")) {
@@ -182,4 +183,101 @@ namespace mongo {
             return true;
         }
     } cmdCreateUser;
+
+    class CmdUpdateUser : public Command {
+        public:
+
+            virtual bool logTheOp() {
+                return false;
+            }
+
+            virtual bool slaveOk() const {
+                return false;
+            }
+
+            virtual LockType locktype() const {
+                return NONE;
+            }
+
+            CmdUpdateUser() : Command("updateUser") {}
+
+            virtual void help(stringstream& ss) const {
+                ss << "Used to update a user, for example to change its password" << endl;
+            }
+
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                // TODO: update this with the new rules around user creation in 2.6.
+                ActionSet actions;
+                actions.addAction(ActionType::userAdmin);
+                out->push_back(Privilege(dbname, actions));
+            }
+
+            bool run(const string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl) {
+                std::string userName;
+                std::string clearTextPassword;
+                std::string password;
+                BSONElement extraData;
+
+                if (!cmdObj.hasField("pwd") && !cmdObj.hasField("extraData")) {
+                    errmsg = "updateUser: must specify at least one of 'pwd' and 'extraData'";
+                    return false;
+                }
+
+                Status status = bsonExtractStringField(cmdObj, "user", &userName);
+                if (!status.isOK()) {
+                    addStatus(Status(ErrorCodes::UserModificationFailed,
+                                     "\"user\" string not specified"),
+                              result);
+                    return false;
+                }
+
+
+                status = bsonExtractStringFieldWithDefault(cmdObj, "pwd", "", &clearTextPassword);
+                if (!status.isOK()) {
+                    addStatus(Status(ErrorCodes::UserModificationFailed,
+                                     "invalid \"pwd\" string"),
+                              result);
+                    return false;
+                }
+                password = DBClientWithCommands::createPasswordDigest(userName, clearTextPassword);
+
+                if (cmdObj.hasField("extraData")) {
+                    status = bsonExtractField(cmdObj, "extraData", &extraData);
+                    if (!status.isOK()) {
+                        addStatus(Status(ErrorCodes::UserModificationFailed,
+                                         "invalid \"extraData\" string"),
+                                  result);
+                        return false;
+                    }
+                }
+
+                // TODO: This update will have to change once we're using the new v2 user
+                // storage format.
+                BSONObjBuilder setBuilder;
+                if (cmdObj.hasField("pwd")) {
+                    setBuilder.append("pwd", password);
+                }
+                if (cmdObj.hasField("extraData")) {
+                    setBuilder.append(extraData);
+                }
+                BSONObj updateObj = BSON("$set" << setBuilder.obj());
+
+                status = getGlobalAuthorizationManager()->updatePrivilegeDocument(
+                        UserName(userName, dbname), updateObj);
+
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+
+                return true;
+            }
+        } cmdUpdateUser;
 }

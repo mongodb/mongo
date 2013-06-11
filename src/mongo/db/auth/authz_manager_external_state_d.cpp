@@ -17,6 +17,7 @@
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
@@ -50,6 +51,35 @@ namespace mongo {
                                  "\" already exists on database \"" << dbname << "\"");
         }
         return Status(ErrorCodes::UserModificationFailed, errstr);
+    }
+
+    Status AuthzManagerExternalStateMongod::updatePrivilegeDocument(
+            const UserName& user, const BSONObj& updateObj) const {
+        string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
+        Client::GodScope gs;
+        Client::WriteContext ctx(userNS);
+
+        DBDirectClient client;
+        client.update(userNS,
+                      QUERY("user" << user.getUser() << "userSource" << BSONNULL),
+                      updateObj);
+
+        // 30 second timeout for w:majority
+        BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
+        string err = client.getLastErrorString(res);
+        if (!err.empty()) {
+            return Status(ErrorCodes::UserModificationFailed, err);
+        }
+
+        int numUpdated = res["n"].numberInt();
+        dassert(numUpdated <= 1 && numUpdated >= 0);
+        if (numUpdated == 0) {
+            return Status(ErrorCodes::UserNotFound,
+                          mongoutils::str::stream() << "User " << user.getFullName() <<
+                                  " not found");
+        }
+
+        return Status::OK();
     }
 
     bool AuthzManagerExternalStateMongod::_findUser(const string& usersNamespace,
