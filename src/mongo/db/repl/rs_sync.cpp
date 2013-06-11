@@ -605,7 +605,7 @@ namespace replset {
 
         // make sure we're not primary, secondary, rollback, or fatal already
         if (box.getState().primary() || box.getState().secondary() ||
-            box.getState().rollback() || box.getState().fatal()) {
+            box.getState().fatal()) {
             return false;
         }
 
