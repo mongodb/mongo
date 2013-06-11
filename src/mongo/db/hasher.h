@@ -68,6 +68,9 @@ namespace mongo {
         /* The hash function we use can be given a seed, to effectively randomize it
          * by choosing from among a family of hash functions. When it is not specified,
          * use this.
+         *
+         * WARNING: do not change the hash see value. Hash-based sharding clusters will
+         * expect that value to be zero.
          */
         static const int DEFAULT_HASH_SEED = 0;
 

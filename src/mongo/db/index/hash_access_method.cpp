@@ -39,9 +39,19 @@ namespace mongo {
         uassert(16764, "Currently hashed indexes cannot guarantee uniqueness. Use a regular index.",
                 !descriptor->unique());
 
-        //Default _seed to 0 if "seed" is not included in the index spec
-        //or if the value of "seed" is not a number
-        _seed = descriptor->getInfoElement("seed").numberInt();
+        // Default _seed to DEFAULT_HASH_SEED if "seed" is not included in the index spec
+        // or if the value of "seed" is not a number
+
+        // *** WARNING ***
+        // Choosing non-default seeds will invalidate hashed sharding
+        // Changing the seed default will break existing indexes and sharded collections
+
+        if ( descriptor->getInfoElement( "seed" ).eoo() ) {
+            _seed = BSONElementHasher::DEFAULT_HASH_SEED;
+        }
+        else {
+            _seed = descriptor->getInfoElement("seed").numberInt();
+        }
 
         //In case we have hashed indexes based on other hash functions in
         //the future, we store a hashVersion number. If hashVersion changes,
