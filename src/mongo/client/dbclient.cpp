@@ -769,7 +769,7 @@ namespace mongo {
 
         string ns = db + ".system.namespaces";
         auto_ptr<DBClientCursor> c = query( ns.c_str() , BSONObj() );
-        while ( c->more() ) {
+        while ( c.get() && c->more() ) {
             string name = c->next()["name"].valuestr();
             if ( name.find( "$" ) != string::npos )
                 continue;
@@ -1182,20 +1182,28 @@ namespace mongo {
         resetIndexCache();
     }
 
-    void DBClientWithCommands::reIndex( const string& ns ) {
-        list<BSONObj> all;
-        auto_ptr<DBClientCursor> i = getIndexes( ns );
-        while ( i->more() ) {
-            all.push_back( i->next().getOwned() );
-        }
+    bool DBClientWithCommands::reIndex( const string& ns ) {
 
-        dropIndexes( ns );
+        auto_ptr<DBClientCursor> indexCursor = getIndexes( ns );
 
-        for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
-            BSONObj o = *i;
-            insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , o );
-        }
+        if ( indexCursor.get() ) {	//drop the indexes only on a valid cursor
 
+        	list<BSONObj> all;
+
+        	while ( indexCursor->more() ) {
+				all.push_back( indexCursor->next().getOwned() );
+			}
+
+			dropIndexes( ns );
+
+			for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
+				BSONObj o = *i;
+				insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , o );
+			}
+			return true;
+		}
+
+        return false;
     }
 
 

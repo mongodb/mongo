@@ -937,7 +937,7 @@ namespace mongo {
          */
         virtual void dropIndexes( const string& ns );
 
-        virtual void reIndex( const string& ns );
+        virtual bool reIndex( const string& ns );
 
         string genIndexName( const BSONObj& keys );
 
