@@ -89,7 +89,7 @@ namespace mongo {
         char err[_POSIX2_LINE_MAX] = {0};
         if ((kd = kvm_open(NULL, "/dev/null", "/dev/null", O_RDONLY, err)) == NULL)
             return -1;
-        kinfo_proc * task = kvm_getprocs(kd, KERN_PROC_PID, _pid, &cnt);
+        kinfo_proc * task = kvm_getprocs(kd, KERN_PROC_PID, _pid.toNative(), &cnt);
         kvm_close(kd);
         return task->ki_size / 1024 / 1024; // convert from bytes to MB
     }
@@ -100,7 +100,7 @@ namespace mongo {
         char err[_POSIX2_LINE_MAX] = {0};
         if ((kd = kvm_open(NULL, "/dev/null", "/dev/null", O_RDONLY, err)) == NULL)
             return -1;
-        kinfo_proc * task = kvm_getprocs(kd, KERN_PROC_PID, _pid, &cnt);
+        kinfo_proc * task = kvm_getprocs(kd, KERN_PROC_PID, _pid.toNative(), &cnt);
         kvm_close(kd);
         return task->ki_rssize * sysconf( _SC_PAGESIZE ) / 1024 / 1024; // convert from pages to MB
     }
