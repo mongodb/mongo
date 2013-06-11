@@ -15,6 +15,8 @@
  *    limitations under the License.
  */
 
+#pragma once
+
 #include "mongo/base/status.h"
 
 namespace mongo {
