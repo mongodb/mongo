@@ -84,7 +84,7 @@ var config = replTest.getReplSetConfig();
 config.members[1].priority = 0;
 config.members[2].priority = 0;
 config.members[2].hidden = true;
-config.members[2].slaveDelay = 3000;
+config.members[2].slaveDelay = 3;
 config.members[2].buildIndexes = false;
 config.members[3].arbiterOnly = true;
 replTest.initiate(config);
@@ -131,7 +131,7 @@ checkMember({ conn: replTest.liveNodes.slaves[1],
                   ismaster: false,
                   secondary: true,
                   passive: true,
-                  slaveDelay: 3000,
+                  slaveDelay: 3,
                   buildIndexes: false,
                   ok: 1
               },
