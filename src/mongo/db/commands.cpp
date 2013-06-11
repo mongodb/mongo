@@ -74,16 +74,15 @@ namespace mongo {
 
 
     string Command::lockTypeInfo() const {
-    	switch(locktype())
-    	{
-    		case READ:
-    					return "READ";
-    		case WRITE:
-    					return "WRITE";
-    		case NONE:
-    		default:
-    					return "NONE";
-    	}
+        switch(locktype()) {
+        case READ:
+            return "READ";
+        case WRITE:
+            return "WRITE";
+        case NONE:
+        default:
+            return "NONE";
+        }
     	return "";
     }
 
