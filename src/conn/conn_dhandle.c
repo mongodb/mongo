@@ -104,10 +104,11 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
 		    (ckpt != NULL && dhandle->checkpoint != NULL &&
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
+			WT_RET(__conn_dhandle_open_lock(
+			    session, dhandle, flags));
 			++dhandle->refcnt;
 			session->dhandle = dhandle;
-			return (__conn_dhandle_open_lock(
-			    session, dhandle, flags));
+			return (0);
 		}
 
 	/*
