@@ -71,12 +71,6 @@ namespace mongo {
                                        const CollectionMetadata* oldMetadata,
                                        CollectionMetadata* metadata );
 
-        /**
-         * Returns a new metadata instance representing an non-sharded, empty collection with
-         * the initial version number (1|0|oid).
-         */
-        CollectionMetadata* makeEmptyCollectionMetadata();
-
     private:
         ConnectionString _configLoc;
 

@@ -45,11 +45,6 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(CollectionMetadata);
     public:
 
-        /**
-         * Use the MetadataLoader to fill the empty metadata from the config server, or use
-         * clone*() methods to use existing managers to build new ones.
-         */
-        CollectionMetadata();
         ~CollectionMetadata();
 
         //
@@ -137,6 +132,15 @@ namespace mongo {
         }
 
         string toString() const;
+
+        /**
+         * Use the MetadataLoader to fill the empty metadata from the config server, or use
+         * clone*() methods to use existing managers to build new ones.
+         *
+         * Unless you are the MetadataLoader or a test you should probably not be using this
+         * directly.
+         */
+        CollectionMetadata();
 
     private:
         // Effectively, the MetadataLoader is this class's builder. So we open an exception

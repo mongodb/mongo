@@ -378,7 +378,7 @@ namespace mongo {
             // Must be the first struct member for proper construction and destruction, as other
             // members may depend on the read lock it acquires.
             Client::ReadContext _readContext;
-            shared_ptr<const CollectionMetadata> _collMetadata;
+            CollectionMetadataPtr _collMetadata;
             ClientCursor::Holder _cursor;
         };
 

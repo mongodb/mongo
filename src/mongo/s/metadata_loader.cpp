@@ -88,14 +88,6 @@ namespace mongo {
         return initChunks( ns, shard, oldMetadata, metadata );
     }
 
-    CollectionMetadata* MetadataLoader::makeEmptyCollectionMetadata() {
-        CollectionMetadata* metadata = new CollectionMetadata;
-        metadata->_collVersion = ChunkVersion( 1, 0, OID() );
-        metadata->_shardVersion = ChunkVersion( 1, 0, OID() );
-        dassert(metadata->isValid());
-        return metadata;
-    }
-
     Status MetadataLoader::initCollection( const string& ns,
                                            const string& shard,
                                            CollectionMetadata* metadata )

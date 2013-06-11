@@ -172,8 +172,8 @@ namespace mongo {
         string errMsg;
 
         CollectionMetadataPtr cloned( p->cloneMinus( chunk, version, &errMsg ) );
-        // Errors reported via assertions here
-        uassert( 16849, errMsg, NULL != cloned.get() );
+        // uassert to match old behavior, TODO: report errors w/o throwing
+        uassert( 16855, errMsg, NULL != cloned.get() );
 
         // TODO: a bit dangerous to have two different zero-version states - no-metadata and
         // no-version
@@ -193,8 +193,8 @@ namespace mongo {
         string errMsg;
 
         CollectionMetadataPtr cloned( it->second->clonePlus( chunk, version, &errMsg ) );
-        // Errors reported via assertions here
-        uassert( 16850, errMsg, NULL != cloned.get() );
+        // uassert to match old behavior, TODO: report errors w/o throwing
+        uassert( 16856, errMsg, NULL != cloned.get() );
 
         _collMetadata[ns] = cloned;
     }
@@ -216,8 +216,8 @@ namespace mongo {
         string errMsg;
 
         CollectionMetadataPtr cloned( it->second->cloneSplit( chunk, splitKeys, version, &errMsg ) );
-        // Errors reported via assertions here
-        uassert( 16851, errMsg, NULL != cloned.get() );
+        // uassert to match old behavior, TODO: report errors w/o throwing
+        uassert( 16857, errMsg, NULL != cloned.get() );
 
         _collMetadata[ns] = cloned;
     }
@@ -230,10 +230,11 @@ namespace mongo {
 
     bool ShardingState::trySetVersion( const string& ns , ChunkVersion& version /* IN-OUT */ ) {
 
-        // Currently this function is called after a getVersion(), which is the first "check", and the assumption here
-        // is that we don't do anything nearly as long as a remote query in a thread between then and now.
-        // Otherwise it may be worth adding an additional check without the _configServerMutex below, since then it
-        // would be likely that the version may have changed in the meantime without waiting for or fetching config results.
+        // Currently this function is called after a getVersion(), which is the first "check", but
+        // because refreshing the config data from a remote server takes a long time, many
+        // operations may be trying to refresh stale CollectionMetadata at the same time.
+        // The _configServerTickets serializes this process such that only a small number of threads
+        // can try to refresh at the same time.
 
         // TODO:  Mutex-per-namespace?
         
@@ -287,12 +288,9 @@ namespace mongo {
         //     the secondary had no state (metadata) at all, so every client request will fall here
         //   + a stale client request a version that's not current anymore
 
-        // Can't lock default mutex while creating CollectionMetadata, b/c may have to create a new
-        // connection to myself
-
         string errMsg;
         ConnectionString configLoc = ConnectionString::parse( _configServer, errMsg );
-        uassert( 16847, str::stream() << "bad config server connection string" << _configServer
+        uassert( 16853, str::stream() << "bad config server connection string" << _configServer
                 << causedBy( errMsg ),
                 configLoc.type() != ConnectionString::INVALID );
 
@@ -321,7 +319,7 @@ namespace mongo {
         }
         else if ( !status.isOK() ) {
             // Throw exception on connectivity or parsing errors to maintain interface
-            uasserted( 16848, status.reason() );
+            uasserted( 16854, status.reason() );
         }
 
         {
@@ -335,8 +333,7 @@ namespace mongo {
             // make sure we keep the freshest config info only
             CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
             if ( it == _collMetadata.end()
-                || newMetadata->getShardVersion() >= it->second->getShardVersion() )
-            {
+                || newMetadata->getShardVersion() >= it->second->getShardVersion() ) {
                 _collMetadata[ns] = newMetadata;
             }
 
