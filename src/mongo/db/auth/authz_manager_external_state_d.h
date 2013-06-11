@@ -34,6 +34,9 @@ namespace mongo {
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
 
+        virtual Status insertPrivilegeDocument(const std::string& dbname,
+                                               const BSONObj& userObj) const;
+
     protected:
         virtual bool _findUser(const string& usersNamespace,
                                const BSONObj& query,

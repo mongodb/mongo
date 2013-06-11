@@ -291,6 +291,7 @@ env.StaticLibrary("coredb", [
         "db/commands/rename_collection_common.cpp",
         "db/commands/server_status.cpp",
         "db/commands/parameters.cpp",
+        "db/commands/user_management_commands.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",

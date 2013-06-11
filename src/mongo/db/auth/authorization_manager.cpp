@@ -282,6 +282,11 @@ namespace {
         return _externalState->hasPrivilegeDocument(dbname);
     }
 
+    Status AuthorizationManager::insertPrivilegeDocument(const std::string& dbname,
+                                                         const BSONObj& userObj) const {
+        return _externalState->insertPrivilegeDocument(dbname, userObj);
+    }
+
     ActionSet AuthorizationManager::getAllUserActions() const {
         ActionSet allActions;
         allActions.addAllActionsFromSet(readRoleActions);

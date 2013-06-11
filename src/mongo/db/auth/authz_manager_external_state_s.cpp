@@ -21,6 +21,8 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -49,6 +51,27 @@ namespace mongo {
         *result = conn->get()->findOne(usersNamespace, query).getOwned();
         conn->done();
         return !result->isEmpty();
+    }
+
+    Status AuthzManagerExternalStateMongos::insertPrivilegeDocument(const string& dbname,
+                                                                    const BSONObj& userObj) const {
+        string userNS = dbname + ".system.users";
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+
+        conn->get()->insert(userNS, userObj);
+
+        // 30 second timeout for w:majority
+        BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+        string errstr = conn->get()->getLastErrorString(res);
+        if (errstr.empty()) {
+            return Status::OK();
+        }
+        if (res["code"].Int() == ASSERT_ID_DUPKEY) {
+            return Status(ErrorCodes::DuplicateKey,
+                          mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
+                                 "\" already exists on database \"" << dbname << "\"");
+        }
+        return Status(ErrorCodes::UserModificationFailed, errstr);
     }
 
 } // namespace mongo

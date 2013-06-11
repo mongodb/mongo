@@ -19,6 +19,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/jsobj.h"
 
@@ -33,6 +34,12 @@ namespace mongo {
     public:
 
         AuthzManagerExternalStateMock() {};
+
+        virtual Status insertPrivilegeDocument(const std::string& dbname,
+                                               const BSONObj& userObj) const {
+            return Status::OK();
+        }
+
 
         virtual bool _findUser(const std::string& usersNamespace,
                                const BSONObj& query,

@@ -35,5 +35,6 @@ error_code("RoleNotFound", 31)
 error_code("RolesNotRelated", 32)
 error_code("PrivilegeNotFound", 33)
 error_code("CannotBackfillArray", 34)
+error_code("UserModificationFailed", 35)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

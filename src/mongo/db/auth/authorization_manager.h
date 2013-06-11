@@ -92,6 +92,9 @@ namespace mongo {
         // Returns true if there exists at least one privilege document in the given database.
         bool hasPrivilegeDocument(const std::string& dbname) const;
 
+        // Creates the given user object in the given database.
+        Status insertPrivilegeDocument(const std::string& dbname, const BSONObj& userObj) const;
+
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
         //

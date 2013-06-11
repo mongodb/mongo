@@ -49,6 +49,10 @@ namespace mongo {
         // Returns true if there exists at least one privilege document in the given database.
         bool hasPrivilegeDocument(const std::string& dbname) const;
 
+        // Creates the given user object in the given database.
+        virtual Status insertPrivilegeDocument(const std::string& dbname,
+                                               const BSONObj& userObj) const = 0;
+
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
 
