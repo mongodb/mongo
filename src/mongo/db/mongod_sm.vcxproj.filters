@@ -1892,6 +1892,9 @@
     <ClCompile Include="auth\authorization_manager_test.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
+    <ClCompile Include="commands\user_management_commands.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">

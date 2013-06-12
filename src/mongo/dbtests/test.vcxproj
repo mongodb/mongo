@@ -2445,6 +2445,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\db\commands\touch.cpp" />
+    <ClCompile Include="..\db\commands\user_management_commands.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
     <ClCompile Include="..\db\curop.cpp" />
     <ClCompile Include="..\db\dbcommands_admin.cpp" />
