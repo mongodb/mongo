@@ -1085,8 +1085,10 @@ namespace mongo {
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 13091 , "how could chunk manager be null!" , cm );
-                if( cm->getShardKey().key() == BSON("files_id" << 1) || cm->getShardKey().key() == BSON("files_id" << "hashed") ) {
-                    BSONObj finder = BSON("files_id" << cmdObj.firstElement());
+                if( (cm->getShardKey().key() == BSON("files_id" << 1)) ||
+                    (cm->getShardKey().key() == BSON("files_id" << "hashed")) ) {
+
+                	BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
                     map<Shard, BSONObj> resMap;
                     SHARDED->commandOp(dbName, cmdObj, 0, fullns, finder, resMap);
