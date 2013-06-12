@@ -874,15 +874,15 @@ namespace mongo {
         }
         else if ( pollInfo.revents & POLLHUP ) {
             // A hangup has occurred on this socket
-            LOG( _logLevel ) << "Socket hangup detected, no longer connected"
-                             << " (idle " << idleTimeSecs << " secs,"
-                             << " remote host " << remoteString() << ")" << endl;
+            LOG( 0 ) << "Socket hangup detected, no longer connected" << " (idle "
+                         << idleTimeSecs << " secs," << " remote host " << remoteString() << ")"
+                         << endl;
         }
         else if ( pollInfo.revents & POLLERR ) {
             // An error has occurred on this socket
-            LOG( _logLevel ) << "Socket error detected, no longer connected"
-                             << " (idle " << idleTimeSecs << " secs,"
-                             << " remote host " << remoteString() << ")" << endl;
+            LOG( 0 ) << "Socket error detected, no longer connected" << " (idle "
+                         << idleTimeSecs << " secs," << " remote host " << remoteString() << ")"
+                         << endl;
         }
         else if ( pollInfo.revents & POLLNVAL ) {
             // Socket descriptor itself is weird
