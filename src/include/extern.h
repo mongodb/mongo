@@ -1285,3 +1285,9 @@ extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_ext_txn_id( WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    uint64_t *txnidp);
+extern int __wt_ext_txn_visible( WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session,
+    uint64_t txnid);
