@@ -28,6 +28,7 @@
 #include "mongo/db/ops/modifier_pull.h"
 #include "mongo/db/ops/modifier_pull_all.h"
 #include "mongo/db/ops/modifier_push.h"
+#include "mongo/db/ops/modifier_rename.h"
 #include "mongo/db/ops/modifier_set.h"
 #include "mongo/db/ops/modifier_unset.h"
 #include "mongo/platform/unordered_map.h"
@@ -131,8 +132,7 @@ namespace modifiertable {
             verify(false);
             return NULL; // TODO (syntactic sugar)
         case MOD_RENAME:
-            verify(false);
-            return NULL; // TODO
+            return new ModifierRename;
         case MOD_UNSET:
             return new ModifierUnset;
         default:

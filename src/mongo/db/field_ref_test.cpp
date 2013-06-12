@@ -139,6 +139,41 @@ namespace {
         ASSERT_EQUALS(fieldRef.numReplaced(), 1U);
     }
 
+    TEST(Prefix, Normal) {
+        FieldRef prefix;
+        FieldRef other;
+
+        // Positive case
+        prefix.parse( "a.b" );
+        other.parse( "a.b.c" );
+        ASSERT( prefix.isPrefixOf( other ) );
+        prefix.parse( "a" );
+        ASSERT( prefix.isPrefixOf( other ) );
+        prefix.parse( "a.0" );
+        other.parse( "a.0.c" );
+        ASSERT( prefix.isPrefixOf( other ) );
+
+        // All these tests are for a prefix of "a.b" in other
+        // Negative cases
+        prefix.parse( "a.b" );
+        other.parse( "a.b" );
+        ASSERT( !prefix.isPrefixOf( other ) );
+        other.parse( "a" );
+        ASSERT( !prefix.isPrefixOf( other ) );
+        other.parse( "b" );
+        ASSERT( !prefix.isPrefixOf( other ) );
+        other.parse( "" );
+        ASSERT( !prefix.isPrefixOf( other ) );
+
+        // Change to no prefix, empty string, and other is "" also
+        prefix.parse( "" );
+        ASSERT( !prefix.isPrefixOf( other ) );
+
+        // Change other to "a", leave prefix at ""
+        other.parse( "a" );
+        ASSERT( !prefix.isPrefixOf( other ) );
+    }
+
     TEST(Equality, Simple1 ) {
         FieldRef a;
         a.parse( "a.b" );

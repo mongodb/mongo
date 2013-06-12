@@ -47,6 +47,7 @@ env.StaticLibrary(
         'modifier_pull.cpp',
         'modifier_pull_all.cpp',
         'modifier_push.cpp',
+        'modifier_rename.cpp',
         'modifier_set.cpp',
         'modifier_unset.cpp',
     ],
@@ -129,6 +130,15 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='modifier_push_test',
     source='modifier_push_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_rename_test',
+    source='modifier_rename_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/mutable_bson_test_utils',
         'update',

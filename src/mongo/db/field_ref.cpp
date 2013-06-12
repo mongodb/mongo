@@ -117,6 +117,23 @@ namespace mongo {
         return res;
     }
 
+    bool FieldRef::isPrefixOf( const FieldRef& other ) const {
+        // Can't be a prefix if equal to or larger
+        if ( other._size <= _size )
+            return false;
+
+        for ( size_t i = 0; i < _size; i++ ) {
+            // Get parts
+            StringData part = getPart( i );
+            StringData otherPart = other.getPart( i );
+
+            // If the parts are diff, can't be a prefix
+            if ( part != otherPart )
+                return false;
+        }
+        return true;
+    }
+
     bool FieldRef::equalsDottedField( const StringData& other ) const {
         StringData rest = other;
 
