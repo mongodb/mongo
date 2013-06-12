@@ -30,10 +30,13 @@
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+    MONGO_FP_DECLARE(neverBalance);
 
     DBConfigPtr Grid::getDBConfig( string database , bool create , const string& shardNameHint ) {
         {
@@ -463,6 +466,9 @@ namespace mongo {
      * collection.
      */
     bool Grid::shouldBalance( const string& ns, BSONObj* balancerDocOut ) const {
+
+        // Allow disabling the balancer for testing
+        if ( MONGO_FAIL_POINT(neverBalance) ) return false;
 
         ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
         BSONObj balancerDoc;

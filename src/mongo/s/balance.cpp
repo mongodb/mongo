@@ -52,58 +52,70 @@ namespace mongo {
         for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
             const CandidateChunk& chunkInfo = *it->get();
 
-            DBConfigPtr cfg = grid.getDBConfig( chunkInfo.ns );
-            verify( cfg );
+            // Changes to metadata, borked metadata, and connectivity problems should cause us to
+            // abort this chunk move, but shouldn't cause us to abort the entire round of chunks.
+            // TODO: Handle all these things more cleanly, since they're expected problems
+            try {
 
-            ChunkManagerPtr cm = cfg->getChunkManager( chunkInfo.ns );
-            verify( cm );
+                DBConfigPtr cfg = grid.getDBConfig( chunkInfo.ns );
+                verify( cfg );
 
-            ChunkPtr c = cm->findIntersectingChunk( chunkInfo.chunk.min );
-            if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
-                // likely a split happened somewhere
-                cm = cfg->getChunkManager( chunkInfo.ns , true /* reload */);
+                // NOTE: We purposely do not reload metadata here, since _doBalanceRound already
+                // tried to do so once.
+                ChunkManagerPtr cm = cfg->getChunkManager( chunkInfo.ns );
                 verify( cm );
 
-                c = cm->findIntersectingChunk( chunkInfo.chunk.min );
+                ChunkPtr c = cm->findIntersectingChunk( chunkInfo.chunk.min );
                 if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
-                    log() << "chunk mismatch after reload, ignoring will retry issue " << chunkInfo.chunk.toString() << endl;
+                    // likely a split happened somewhere
+                    cm = cfg->getChunkManager( chunkInfo.ns , true /* reload */);
+                    verify( cm );
+
+                    c = cm->findIntersectingChunk( chunkInfo.chunk.min );
+                    if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
+                        log() << "chunk mismatch after reload, ignoring will retry issue " << chunkInfo.chunk.toString() << endl;
+                        continue;
+                    }
+                }
+
+                BSONObj res;
+                if (c->moveAndCommit(Shard::make(chunkInfo.to),
+                                     Chunk::MaxChunkSize,
+                                     secondaryThrottle,
+                                     waitForDelete,
+                                     res)) {
+                    movedCount++;
                     continue;
                 }
-            }
 
-            BSONObj res;
-            if (c->moveAndCommit(Shard::make(chunkInfo.to),
-                                 Chunk::MaxChunkSize,
-                                 secondaryThrottle,
-                                 waitForDelete,
-                                 res)) {
-                movedCount++;
-                continue;
-            }
+                // the move requires acquiring the collection metadata's lock, which can fail
+                log() << "balancer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
+                      << " chunk: " << chunkInfo.chunk << endl;
 
-            // the move requires acquiring the collection metadata's lock, which can fail
-            log() << "balancer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
-                  << " chunk: " << chunkInfo.chunk << endl;
+                if ( res["chunkTooBig"].trueValue() ) {
+                    // reload just to be safe
+                    cm = cfg->getChunkManager( chunkInfo.ns );
+                    verify( cm );
+                    c = cm->findIntersectingChunk( chunkInfo.chunk.min );
 
-            if ( res["chunkTooBig"].trueValue() ) {
-                // reload just to be safe
-                cm = cfg->getChunkManager( chunkInfo.ns );
-                verify( cm );
-                c = cm->findIntersectingChunk( chunkInfo.chunk.min );
-                
-                log() << "forcing a split because migrate failed for size reasons" << endl;
-                
-                res = BSONObj();
-                c->singleSplit( true , res );
-                log() << "forced split results: " << res << endl;
-                
-                if ( ! res["ok"].trueValue() ) {
-                    log() << "marking chunk as jumbo: " << c->toString() << endl;
-                    c->markAsJumbo();
-                    // we increment moveCount so we do another round right away
-                    movedCount++;
+                    log() << "forcing a split because migrate failed for size reasons" << endl;
+
+                    res = BSONObj();
+                    c->singleSplit( true , res );
+                    log() << "forced split results: " << res << endl;
+
+                    if ( ! res["ok"].trueValue() ) {
+                        log() << "marking chunk as jumbo: " << c->toString() << endl;
+                        c->markAsJumbo();
+                        // we increment moveCount so we do another round right away
+                        movedCount++;
+                    }
+
                 }
-
+            }
+            catch( const DBException& ex ) {
+                warning() << "could not move chunk " << chunkInfo.chunk.toString()
+                          << ", continuing balancing round" << causedBy( ex ) << endl;
             }
         }
 
@@ -295,9 +307,18 @@ namespace mongo {
             cursor.reset();
 
             DBConfigPtr cfg = grid.getDBConfig( ns );
-            verify( cfg );
-            ChunkManagerPtr cm = cfg->getChunkManager( ns );
-            verify( cm );
+            if ( !cfg ) {
+                warning() << "could not load db config to balance " << ns << " collection" << endl;
+                continue;
+            }
+
+            // This line reloads the chunk manager once if this process doesn't know the collection
+            // is sharded yet.
+            ChunkManagerPtr cm = cfg->getChunkManagerIfExists( ns, true );
+            if ( !cm ) {
+                warning() << "could not load chunks to balance " << ns << " collection" << endl;
+                continue;
+            }
 
             // loop through tags to make sure no chunk spans tags; splits on tag min. for all chunks
             bool didAnySplits = false;
