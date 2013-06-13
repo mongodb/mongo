@@ -1092,46 +1092,45 @@ namespace mongo {
                 // 5.b
                 // we're under the collection lock here, too, so we can undo the chunk donation because no other state change
                 // could be ongoing
-                {
-                    BSONObj res;
-                    ScopedDbConnection connTo(toShard.getConnString(), 35.0);
 
-                    bool ok;
+                BSONObj res;
+                bool ok;
 
-                    try{
-                        ok = connTo->runCommand( "admin" ,
-                                                        BSON( "_recvChunkCommit" << 1 ) ,
-                                                        res );
-                    }
-                    catch( DBException& e ){
-                        errmsg = str::stream() << "moveChunk could not contact to: shard " << toShard.getConnString() << " to commit transfer" << causedBy( e );
-                        warning() << errmsg << endl;
-                        ok = false;
-                    }
-
+                try {
+                    ScopedDbConnection connTo( toShard.getConnString(), 35.0 );
+                    ok = connTo->runCommand( "admin", BSON( "_recvChunkCommit" << 1 ), res );
                     connTo.done();
-
-                    if ( ! ok ) {
-                        log() << "moveChunk migrate commit not accepted by TO-shard: " << res
-                              << " resetting shard version to: " << startingVersion << migrateLog;
-                        {
-                            Lock::GlobalWrite lk;
-                            log() << "moveChunk global lock acquired to reset shard version from "
-                                    "failed migration" << endl;
-
-                            // revert the chunk manager back to the state before "forgetting" about the chunk
-                            shardingState.undoDonateChunk( ns , min , max , startingVersion );
-                        }
-                        log() << "Shard version successfully reset to clean up failed migration"
-                                << endl;
-
-                        errmsg = "_recvChunkCommit failed!";
-                        result.append( "cause" , res );
-                        return false;
-                    }
-
-                    log() << "moveChunk migrate commit accepted by TO-shard: " << res << migrateLog;
                 }
+                catch ( DBException& e ) {
+                    errmsg = str::stream() << "moveChunk could not contact to: shard "
+                                           << toShard.getConnString() << " to commit transfer"
+                                           << causedBy( e );
+                    warning() << errmsg << endl;
+                    ok = false;
+                }
+
+                if ( !ok ) {
+                    log() << "moveChunk migrate commit not accepted by TO-shard: " << res
+                          << " resetting shard version to: " << startingVersion << migrateLog;
+                    {
+                        Lock::GlobalWrite lk;
+                        log() << "moveChunk global lock acquired to reset shard version from "
+                              "failed migration"
+                              << endl;
+
+                        // revert the chunk manager back to the state before "forgetting" about the
+                        // chunk
+                        shardingState.undoDonateChunk( ns, min, max, startingVersion );
+                    }
+                    log() << "Shard version successfully reset to clean up failed migration"
+                          << endl;
+
+                    errmsg = "_recvChunkCommit failed!";
+                    result.append( "cause", res );
+                    return false;
+                }
+
+                log() << "moveChunk migrate commit accepted by TO-shard: " << res << migrateLog;
 
                 // 5.c
 
@@ -1242,7 +1241,7 @@ namespace mongo {
                 LOG(7) << "moveChunk update: " << cmd << migrateLog;
 
                 int exceptionCode = OkCode;
-                bool ok = false;
+                ok = false;
                 BSONObj cmdResult;
                 try {
                     ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
