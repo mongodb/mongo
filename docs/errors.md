@@ -785,9 +785,12 @@ db/ops/update.cpp
 db/ops/update.h
 ----
 * 10161 [code](http://github.com/mongodb/mongo/blob/master/db/ops/update.h#L379) Invalid modifier specified 
-* 12527 [code](http://github.com/mongodb/mongo/blob/master/db/ops/update.h#L245) not okForStorage
 * 13492 [code](http://github.com/mongodb/mongo/blob/master/db/ops/update.h#L270) mod must be RENAME_TO type
 * 9015 [code](http://github.com/mongodb/mongo/blob/master/db/ops/update.h#L621) 
+
+src/mongo/db/ops/update_internal.h
+----
+* 12527 [code](https://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update_internal.h#L155) not okForStorage
 
 
 db/pdfile.cpp
