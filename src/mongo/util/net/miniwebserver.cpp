@@ -114,7 +114,9 @@ namespace mongo {
         char buf[4096];
         int len = 0;
         try {
+#ifdef MONGO_SSL
             psock->doSSLHandshake();
+#endif
             psock->setTimeout(8);
             while ( 1 ) {
                 int left = sizeof(buf) - 1 - len;
