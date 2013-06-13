@@ -1879,7 +1879,8 @@ namespace mongo {
         Client::initThread( "migrateThread" );
         if (AuthorizationManager::isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
-            cc().getAuthorizationSession()->grantInternalAuthorization("_migrateThread");
+            cc().getAuthorizationSession()->grantInternalAuthorization(
+                    UserName("_migrateThread", "local"));
         }
         migrateStatus.go();
         cc().shutdown();

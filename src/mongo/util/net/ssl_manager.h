@@ -1,5 +1,4 @@
-/*    Copyright 2009 10gen Inc.
- *
+ /*
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
@@ -25,7 +24,6 @@
 #include <openssl/ssl.h>
 
 namespace mongo {
-
     class SSLManagerInterface {
     public:
         virtual ~SSLManagerInterface();
@@ -47,14 +45,21 @@ namespace mongo {
         /**
          * Fetches a peer certificate and validates it if it exists
          * Throws SocketException on failure
+         * @return a std::string containing the certificate's subject name.
          */
-        virtual void validatePeerCertificate(const SSL* ssl) = 0;
+        virtual std::string validatePeerCertificate(const SSL* ssl) = 0;
 
         /**
          * Cleans up SSL thread local memory; use at thread exit
          * to avoid memory leaks
          */
         virtual void cleanupThreadLocals() = 0;
+
+        /**
+         * Get the subject name of our own server certificate
+         * @return the subject name.
+         */
+        virtual std::string getSubjectName() = 0;
 
         /**
          * ssl.h shims

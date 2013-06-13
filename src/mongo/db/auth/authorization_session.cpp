@@ -118,8 +118,8 @@ namespace {
         return Status::OK();
     }
 
-    void AuthorizationSession::grantInternalAuthorization(const std::string& userName) {
-        Principal* principal = new Principal(UserName(userName, "local"));
+    void AuthorizationSession::grantInternalAuthorization(const UserName& userName) {
+        Principal* principal = new Principal(userName);
         ActionSet actions;
         actions.addAllActions();
 

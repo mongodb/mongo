@@ -136,6 +136,8 @@ namespace mongo {
         bool sslOnNormalPorts;      // --sslOnNormalPorts
         std::string sslPEMKeyFile;       // --sslPEMKeyFile
         std::string sslPEMKeyPassword;   // --sslPEMKeyPassword
+        std::string sslClusterFile;       // --sslInternalKeyFile
+        std::string sslClusterPassword;   // --sslInternalKeyPassword
         std::string sslCAFile;      // --sslCAFile
         std::string sslCRLFile;     // --sslCRLFile
         bool sslWeakCertificateValidation;

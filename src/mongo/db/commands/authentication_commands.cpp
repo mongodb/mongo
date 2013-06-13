@@ -35,6 +35,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 
@@ -94,9 +95,27 @@ namespace mongo {
     } cmdGetNonce;
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-
         log() << " authenticate db: " << dbname << " " << cmdObj << endl;
 
+        std::string mechanism = cmdObj.getStringField("mechanism");
+        if (mechanism.empty() || mechanism == "MONGODB-CR") {
+            return authenticateCR(dbname, cmdObj, errmsg, result);
+        }
+#ifdef MONGO_SSL
+        if (mechanism == "MONGODB-X509") {
+            return authenticateX509(dbname, cmdObj, errmsg, result);
+        }
+#endif
+        errmsg = "Unsupported mechanism: " + mechanism;
+        result.append(saslCommandCodeFieldName, ErrorCodes::BadValue);
+        return false;
+    }
+
+    bool CmdAuthenticate::authenticateCR(const string& dbname, 
+                                         BSONObj& cmdObj, 
+                                         string& errmsg, 
+                                         BSONObjBuilder& result) {
+        
         string user = cmdObj.getStringField("user");
 
         if (!_areNonceAuthenticateCommandsEnabled) {
@@ -194,6 +213,49 @@ namespace mongo {
         result.append( "user" , user );
         return true;
     }
+
+#ifdef MONGO_SSL
+    bool CmdAuthenticate::authenticateX509(const string& dbname,
+                                           BSONObj& cmdObj, 
+                                           string& errmsg, 
+                                           BSONObjBuilder& result) {
+        if(dbname != "$external") {
+            errmsg = "X.509 authentication must always use the $external database.";
+            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
+            return false;
+        }
+
+        std::string user = cmdObj.getStringField("user");
+        ClientBasic *client = ClientBasic::getCurrent();
+        AuthorizationSession* authorizationSession = client->getAuthorizationSession();
+        StringData subjectName = client->port()->getX509SubjectName();
+        
+        if (user != subjectName) {
+            errmsg = "There is no x.509 client certificate matching the user.";
+            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
+            return false;
+        }
+        else {
+            StringData srvSubjectName = getSSLManager()->getSubjectName();
+            StringData srvClusterId = srvSubjectName.substr(0, srvSubjectName.find("/CN")+1);
+            StringData peerClusterId = subjectName.substr(0, subjectName.find("/CN")+1);
+
+            // Handle internal cluster member 
+            if (srvClusterId == peerClusterId) {
+                authorizationSession->grantInternalAuthorization(UserName(user, "$external"));
+            }
+            // Handle normal client authentication
+            else {
+                Principal* principal = new Principal(UserName(user, "$external"));
+                principal->setImplicitPrivilegeAcquisition(true);
+                authorizationSession->addAuthorizedPrincipal(principal);
+            }
+            result.append( "dbname" , dbname );
+            result.append( "user" , user );
+            return true;
+        }
+    }
+#endif
     CmdAuthenticate cmdAuthenticate;
 
     class CmdLogout : public Command {

@@ -568,6 +568,21 @@ namespace mongo {
                     errmsg,
                     _authMongoCR(userSource, user, password, errmsg, digestPassword));
         }
+        else if (mechanism == StringData("MONGODB-X509", StringData::LiteralTag())){
+            std::string userSource;
+            uassertStatusOK(bsonExtractStringField(params,
+                                                   saslCommandUserSourceFieldName,
+                                                   &userSource));
+            std::string user;
+            uassertStatusOK(bsonExtractStringField(params,
+                                                   saslCommandUserFieldName,
+                                                   &user));
+
+            std::string errmsg;
+            uassert(ErrorCodes::AuthenticationFailed,
+                    errmsg,
+                    _authMongoX509(userSource, user, errmsg));
+        }
         else if (saslClientAuthenticate != NULL) {
             uassertStatusOK(saslClientAuthenticate(this, params));
         }
@@ -599,6 +614,23 @@ namespace mongo {
             errmsg = ex.what();
             return false;
         }
+    }
+
+    bool DBClientWithCommands::_authMongoX509(const string&dbname,
+                                              const string &username,
+                                              string& errmsg){
+        BSONObj authCmd;
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder << "authenticate" << 1 << "mechanism" << "MONGODB-X509" << "user" << username;
+        authCmd = cmdBuilder.done();
+
+        BSONObj info;
+        if( runCommand(dbname, authCmd, info) ) {
+            return true;
+        }
+
+        errmsg = info.toString();
+        return false;
     }
 
     bool DBClientWithCommands::_authMongoCR(const string &dbname,

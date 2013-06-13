@@ -40,6 +40,14 @@ namespace mongo {
         long long connectionId() const { return _connectionId; }
         void setConnectionId( long long connectionId );
 
+        void setX509SubjectName(const std::string& x509SubjectName){
+            _x509SubjectName = x509SubjectName;
+        }
+
+        std::string getX509SubjectName(){
+            return _x509SubjectName;
+        }
+
     public:
         // TODO make this private with some helpers
 
@@ -48,6 +56,7 @@ namespace mongo {
 
     private:
         long long _connectionId;
+        std::string _x509SubjectName;
     };
 
     class MessagingPort : public AbstractMessagingPort {

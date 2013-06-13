@@ -148,9 +148,13 @@ namespace mongo {
 
             virtual SSL* accept(int fd);
 
-            virtual void validatePeerCertificate(const SSL* ssl);
+            virtual std::string validatePeerCertificate(const SSL* ssl);
 
             virtual void cleanupThreadLocals();
+
+            virtual std::string getSubjectName() {
+                return _subjectName;
+            }
 
             virtual int SSL_read(SSL* ssl, void* buf, int num);
 
@@ -171,6 +175,8 @@ namespace mongo {
             std::string _password;
             bool _validateCertificates;
             bool _weakValidation;
+            std::string _subjectName;
+
             /**
              * creates an SSL context to be used for this file descriptor.
              * caller must SSL_free it.
@@ -219,6 +225,7 @@ namespace mongo {
              */
             static int password_cb( char *buf,int num, int rwflag,void *userdata );
             static int verify_cb(int ok, X509_STORE_CTX *ctx);
+
         };
 
     } // namespace
@@ -243,6 +250,17 @@ namespace mongo {
         if (theSSLManager)
             return theSSLManager;
         return NULL;
+    }
+
+    std::string getCertificateSubjectName(X509* cert) {
+        std::string result;
+        //TODO: Use X509_NAME_print_ex() with the XN_FLAG_RFC2253 flag instead.
+        char* asciiName = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);
+        if (asciiName) {
+            result = asciiName;
+            free(asciiName);
+        }
+        return result;
     }
 
     SSLManagerInterface::~SSLManagerInterface() {}
@@ -348,7 +366,6 @@ namespace mongo {
         return ::SSL_free(ssl);
     }
 
-
     void SSLManager::_setupFIPS() {
         // Turn on FIPS mode if requested.
         int status = FIPS_mode_set(1);
@@ -368,7 +385,7 @@ namespace mongo {
                 _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
-        
+
         // If password is empty, use default OpenSSL callback, which uses the terminal
         // to securely request the password interactively from the user.
         if (!password.empty()) {
@@ -388,6 +405,31 @@ namespace mongo {
                     << endl;
             return false;
         }
+ 
+        // Read the certificate subject name and store it 
+        BIO *in = BIO_new(BIO_s_file_internal());
+        if(NULL == in){
+            error() << "failed to allocate BIO object: " << 
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+        ON_BLOCK_EXIT(BIO_free, in);
+
+        if (BIO_read_filename(in, keyFile.c_str()) <= 0){
+            error() << "cannot read key file: " << keyFile << ' ' <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+
+        X509* x509 = PEM_read_bio_X509(in, NULL, &SSLManager::password_cb, this);
+        if (NULL == x509) {
+            error() << "cannot retreive certificate from keyfile: " << keyFile << ' ' <<
+                _getSSLErrorMessage(ERR_get_error()) << endl; 
+            return false;
+        }
+        ON_BLOCK_EXIT(X509_free, x509);
+        _subjectName = getCertificateSubjectName(x509);
+ 
         return true;
     }
 
@@ -424,7 +466,7 @@ namespace mongo {
             endl;
         return true;
     }
-                
+
     SSL* SSLManager::_secure(int fd) {
         // This just ensures that SSL multithreading support is set up for this thread,
         // if it's not already.
@@ -474,12 +516,12 @@ namespace mongo {
         return ssl;
     }
 
-    void SSLManager::validatePeerCertificate(const SSL* ssl) {
-        if (!_validateCertificates) return;
+    std::string SSLManager::validatePeerCertificate(const SSL* ssl) {
+        if (!_validateCertificates) return "";
 
-        X509* cert = SSL_get_peer_certificate(ssl);
+        X509* peerCert = SSL_get_peer_certificate(ssl);
 
-        if (cert == NULL) { // no certificate presented by peer
+        if (NULL == peerCert) { // no certificate presented by peer
             if (_weakValidation) {
                 warning() << "no SSL certificate provided by peer" << endl;
             }
@@ -487,9 +529,9 @@ namespace mongo {
                 error() << "no SSL certificate provided by peer; connection rejected" << endl;
                 throw SocketException(SocketException::CONNECT_ERROR, "");
             }
-            return;
+            return "";
         }
-        ON_BLOCK_EXIT(X509_free, cert);
+        ON_BLOCK_EXIT(X509_free, peerCert);
 
         long result = SSL_get_verify_result(ssl);
 
@@ -498,8 +540,9 @@ namespace mongo {
                 X509_verify_cert_error_string(result) << endl;
             throw SocketException(SocketException::CONNECT_ERROR, "");
         }
-
+ 
         // TODO: check optional cipher restriction, using cert.
+        return getCertificateSubjectName(peerCert);
     }
 
     void SSLManager::cleanupThreadLocals() {

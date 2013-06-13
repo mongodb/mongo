@@ -21,6 +21,7 @@
 
 #ifndef USE_ASIO
 
+
 #include "mongo/db/cmdline.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
@@ -185,7 +186,10 @@ namespace mongo {
 
                 otherSide = p->psock->remoteString();
 
-                p->psock->doSSLHandshake();
+#ifdef MONGO_SSL
+                std::string x509SubjectName = p->psock->doSSLHandshake();
+                inPort->setX509SubjectName(x509SubjectName);
+#endif 
                 handler->connected( p.get() );
 
                 while ( ! inShutdown() ) {

@@ -451,16 +451,14 @@ namespace mongo {
     void Socket::secureAccepted( SSLManagerInterface* ssl ) { 
         _sslManager = ssl;
     }
-#endif
 
-    void Socket::doSSLHandshake() {
-#ifdef MONGO_SSL
-        if (!_sslManager) return;
+    std::string Socket::doSSLHandshake() {
+        if (!_sslManager) return "";
         fassert(16506, _fd);
         _ssl = _sslManager->accept(_fd);
-        _sslManager->validatePeerCertificate(_ssl);
-#endif
+        return _sslManager->validatePeerCertificate(_ssl);
     }
+#endif
 
     class ConnectBG : public BackgroundJob {
     public:

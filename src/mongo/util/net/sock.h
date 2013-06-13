@@ -226,10 +226,11 @@ namespace mongo {
         /**
          * This function calls SSL_accept() if SSL-encrypted sockets
          * are desired. SSL_accept() waits until the remote host calls
-         * SSL_connect().
+         * SSL_connect(). The return value is the subject name of any
+         * client certificate provided during the handshake.
          * This function may throw SocketException.
          */
-        void doSSLHandshake();
+        std::string doSSLHandshake();
         
         /**
          * @return the time when the socket was opened.

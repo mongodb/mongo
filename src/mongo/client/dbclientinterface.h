@@ -980,6 +980,15 @@ namespace mongo {
                           string& errmsg,
                           bool digestPassword);
 
+        /**
+         * Use the MONGODB-X509 protocol to authenticate as "username. The certificate details
+         * has already been communicated automatically as part of the connect call.
+         * Returns false on failure and set "errmsg".
+         */
+        bool _authMongoX509(const string&dbname,
+                            const string &username,
+                            string& errmsg);
+
     private:
         enum QueryOptions _cachedAvailableOptions;
         bool _haveCachedAvailableOptions;

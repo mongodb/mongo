@@ -74,9 +74,9 @@ namespace mongo {
         Status acquirePrivilege(const Privilege& privilege,
                                 const UserName& authorizingUser);
 
-        // Adds a new principal with the given principal name and authorizes it with full access.
+        // Adds a new principal with the given username and authorizes it with full access.
         // Used to grant internal threads full access.
-        void grantInternalAuthorization(const std::string& userName);
+        void grantInternalAuthorization(const UserName& userName);
 
         // Checks if this connection has been authenticated as an internal user.
         bool hasInternalAuthorization();
