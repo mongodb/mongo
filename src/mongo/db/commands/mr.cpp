@@ -1191,6 +1191,11 @@ namespace mongo {
                         Timer mt;
                         // go through each doc
                         while ( cursor->ok() ) {
+                            if ( ! cursor->yieldSometimes( ClientCursor::WillNeed ) ) {
+                                cursor.release();
+                                break;
+                            }
+
                             if ( ! cursor->currentMatches() ) {
                                 cursor->advance();
                                 continue;
