@@ -348,6 +348,21 @@ env = Environment( BUILD_DIR=variantDir,
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
 
+# This could be 'if solaris', but unfortuantely that variable hasn't been set yet.
+if "sunos5" == os.sys.platform:
+    # SERVER-9890: On Solaris, SCons preferentially loads the sun linker tool 'sunlink' when
+    # using the 'default' tools as we do above. The sunlink tool sets -G as the flag for
+    # creating a shared library. But we don't want that, since we always drive our link step
+    # through CC or CXX. Instead, we want to let the compiler map GCC's '-shared' flag to the
+    # appropriate linker specs that it has compiled in. We could (and should in the future)
+    # select an empty set of tools above and then enable them as appropriate on a per platform
+    # basis. Until then the simplest solution, as discussed on the scons-users mailing list,
+    # appears to be to simply explicitly run the 'gnulink' tool to overwrite the Environment
+    # changes made by 'sunlink'. See the following thread for more detail:
+    #  http://four.pairlist.net/pipermail/scons-users/2013-June/001486.html
+    env.Tool('gnulink')
+
+
 if has_option("propagate-shell-environment"):
     env['ENV'] = dict(os.environ);
 
