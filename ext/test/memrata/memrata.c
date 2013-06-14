@@ -74,7 +74,9 @@
 
 typedef struct __wt_source {
 	char *uri;				/* Unique name */
+
 	pthread_rwlock_t lock;			/* Lock */
+	int		 lockinit;		/* Lock created */
 
 	int	configured;			/* If structure configured */
 	u_int	ref;				/* Active reference count */
@@ -85,6 +87,8 @@ typedef struct __wt_source {
 	int	 config_bitfield;		/* config "value_format=#t" */
 
 	kvs_t kvs;				/* Underlying KVS namespace */
+	kvs_t kvslog;				/* Underlying KVS namespace */
+	kvs_t kvstxn;				/* Underlying KVS namespace */
 	struct __kvs_source *ks;		/* Underlying KVS source */
 
 	struct __wt_source *next;		/* List of WiredTiger objects */
@@ -1116,34 +1120,213 @@ err:		if (locked)
 }
 
 /*
+ * ws_source_name --
+ *	Build a namespace name.
+ */
+static inline int
+ws_source_name(
+    const char *uri, const char *suffix, const char **pp, char **bufp)
+{
+	size_t len;
+	const char *p;
+	char *buf;
+
+	*bufp = NULL;
+
+	/* Create the store's name: the uri with an optional trailing suffix. */
+	if (suffix == NULL)
+		*pp = uri;
+	else {
+		len = strlen(uri) + strlen(".") + strlen(suffix) + 5;
+		if ((buf = malloc(len)) == NULL)
+			return (os_errno());
+		(void)snprintf(buf, len, "%s.%s", uri, suffix);
+		*pp = buf;
+	}
+	return (0);
+}
+
+/*
+ * ws_source_drop_namespace --
+ *	Drop a namespace.
+ */
+static int
+ws_source_drop_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
+    const char *uri, const char *suffix, kvs_t kvs_device)
+{
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	kvs_t kvs;
+	int ret = 0;
+	const char *p;
+	char *buf;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+	buf = NULL;
+
+	/* Drop the underlying KVS namespace. */
+	if ((ret = ws_source_name(uri, suffix, &p, &buf)) != 0)
+		return (ret);
+	if ((ret = kvs_delete_namespace(kvs_device, p)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_delete_namespace: %s: %s", p, kvs_strerror(ret));
+
+	free(buf);
+	return (ret);
+}
+
+/*
+ * ws_source_rename_namespace --
+ *	Rename a namespace.
+ */
+static int
+ws_source_rename_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
+    const char *uri, const char *newuri, const char *suffix, kvs_t kvs_device)
+{
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	kvs_t kvs;
+	int ret = 0;
+	const char *p, *pnew;
+	char *buf, *bufnew;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+	buf = bufnew = NULL;
+
+	/* Rename the underlying KVS namespace. */
+	ret = ws_source_name(uri, suffix, &p, &buf);
+	if (ret == 0)
+		ret = ws_source_name(newuri, suffix, &pnew, &bufnew);
+	if (ret == 0 && (ret = kvs_rename_namespace(kvs_device, p, pnew)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_rename_namespace: %s: %s", p, kvs_strerror(ret));
+
+	free(buf);
+	free(bufnew);
+	return (ret);
+}
+
+/*
+ * ws_source_close --
+ *	Kill a WT_SOURCE structure.
+ */
+static int
+ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
+{
+	int ret = 0;
+
+	if (ws->ref != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "%s: open object with %u open cursors being closed",
+		    ws->uri, ws->ref);
+
+	if (ws->kvs != NULL && (ret = kvs_close(ws->kvs)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_close: %s: %s", ws->uri, kvs_strerror(ret));
+	ws->kvs = NULL;
+	if (ws->kvslog != NULL && (ret = kvs_close(ws->kvslog)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_close: %s.log: %s", ws->uri, kvs_strerror(ret));
+	ws->kvslog = NULL;
+	if (ws->kvstxn != NULL && (ret = kvs_close(ws->kvstxn)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_close: %s.txn: %s", ws->uri, kvs_strerror(ret));
+	ws->kvstxn = NULL;
+
+	if (ws->lockinit)
+		ETRET(lock_destroy(wtext, session, &ws->lock));
+
+	free(ws->uri);
+	free(ws);
+
+	return (ret);
+}
+
+/*
+ * ws_source_open_namespace --
+ *	Open a namespace.
+ */
+static int
+ws_source_open_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
+    const char *uri, const char *suffix, kvs_t kvs_device, kvs_t *kvsp)
+{
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	kvs_t kvs;
+	int ret = 0;
+	const char *p;
+	char *buf;
+
+	*kvsp = NULL;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+	buf = NULL;
+
+	/* Open the underlying KVS namespace (creating it if necessary). */
+	if ((ret = ws_source_name(uri, suffix, &p, &buf)) != 0)
+		return (ret);
+	if ((kvs = kvs_open_namespace(kvs_device, p, KVS_O_CREATE)) == NULL)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_open_namespace: %s: %s", p, kvs_strerror(os_errno()));
+	*kvsp = kvs;
+
+	free(buf);
+	return (ret);
+}
+
+#define	WS_SOURCE_OPEN_BUSY	0x01		/* Fail if source busy */
+#define	WS_SOURCE_OPEN_GLOBAL	0x02		/* Keep the global lock */
+
+/*
  * ws_source_open --
  *	Return a locked WiredTiger source, allocating and opening if it doesn't
  * already exist.
  */
 static int
 ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
-    WT_CONFIG_ARG *config, const char *uri, int hold_global, WT_SOURCE **refp)
+    const char *uri, WT_CONFIG_ARG *config, u_int flags, WT_SOURCE **refp)
 {
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
-	int lockinit, ret = 0;
+	int ret = 0;
 
 	*refp = NULL;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	lockinit = 0;
+	ws = NULL;
 
-	/* Get the underlying KVS source. */
+	/* Get the underlying, locked, KVS source. */
 	if ((ret = kvs_source_open(wtds, session, config, &ks)) != 0)
 		return (ret);
 
-	/* Check for a match: if we find one, we're done. */
+	/*
+	 * Check for a match: if we find one, optionally trade the global lock
+	 * for the object, optionally check if the object is busy, and return.
+	 */
 	for (ws = ks->ws_head; ws != NULL; ws = ws->next)
-		if (strcmp(ws->uri, uri) == 0)
-			goto done;
+		if (strcmp(ws->uri, uri) == 0) {
+			/* Check to see if the object is busy. */
+			if (ws->ref != 0 && (flags & WS_SOURCE_OPEN_BUSY)) {
+				ret = EBUSY;
+				ETRET(unlock(wtext, session, &ds->global_lock));
+				return (ret);
+			}
+			/* Swap the global lock for an object lock. */
+			if (!(flags & WS_SOURCE_OPEN_GLOBAL)) {
+				ret = writelock(wtext, session, &ws->lock);
+				ETRET(unlock(wtext, session, &ds->global_lock));
+				if (ret != 0)
+					return (ret);
+			}
+			*refp = ws;
+			return (0);
+		}
 
 	/* Allocate and initialize a new underlying WiredTiger source object. */
 	if ((ws = calloc(1, sizeof(*ws))) == NULL ||
@@ -1153,68 +1336,52 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	}
 	if ((ret = lock_init(wtext, session, &ws->lock)) != 0)
 		goto err;
-	lockinit = 1;
+	ws->lockinit = 1;
 	ws->ks = ks;
 
 	/*
-	 * Open the underlying KVS namespace (creating it if necessary), then
+	 * Open the underlying KVS namespaces (optionally creating them), then
 	 * push the change.
+	 *
+	 * The naming scheme is simple: the URI names the primary store, and the
+	 * URI with a trailing suffix names the associated logging/txn stores.
 	 */
-	if ((ws->kvs = kvs_open_namespace(
-	    ws->ks->kvs_device, uri, KVS_O_CREATE)) == NULL) {
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_open_namespace: %s: %s",
-		    uri, kvs_strerror(os_errno()));
+	if ((ret = ws_source_open_namespace(
+	    wtds, session, uri, NULL, ks->kvs_device, &ws->kvs)) != 0)
 		goto err;
-	}
+	if ((ret = ws_source_open_namespace(
+	    wtds, session, uri, "log", ks->kvs_device, &ws->kvslog)) != 0)
+		goto err;
+	if ((ret = ws_source_open_namespace(
+	    wtds, session, uri, "txn", ks->kvs_device, &ws->kvstxn)) != 0)
+		goto err;
 	if ((ret = kvs_commit(ws->kvs)) != 0) {
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
 		goto err;
 	}
 
+	/* Optionally trade the global lock for the object. */
+	if (!(flags & WS_SOURCE_OPEN_GLOBAL) &&
+	    (ret = writelock(wtext, session, &ws->lock)) != 0)
+		goto err;
+
 	/* Insert the new entry at the head of the list. */
 	ws->next = ks->ws_head;
 	ks->ws_head = ws;
 
-	/* If we're not holding the global lock, lock the object. */
-done:	if (!hold_global && (ret = writelock(wtext, session, &ws->lock)) != 0)
-		goto err;
-
 	*refp = ws;
 	ws = NULL;
 
-	if (0) {
-err:		if (lockinit)
-			ETRET(lock_destroy(wtext, session, &ws->lock));
-		if (ws != NULL) {
-			if (ws->kvs != NULL)
-				(void)kvs_close(ws->kvs);
-			free(ws->uri);
-			free(ws);
-		}
-	}
+err:	if (ws != NULL)
+		ETRET(ws_source_close(wtext, session, ws));
 
-	/* If our caller doesn't need it, release the global lock. */
-	if (ret != 0 || !hold_global)
+	/*
+	 * If there was an error or our caller doesn't need the global lock,
+	 * release the global lock.
+	 */
+	if (!(flags & WS_SOURCE_OPEN_GLOBAL) || ret != 0)
 		ETRET(unlock(wtext, session, &ds->global_lock));
-	return (ret);
-}
-
-/*
- * ws_source_destroy --
- *	Kill a WT_SOURCE structure.
- */
-static int
-ws_source_destroy(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
-{
-	int ret = 0;
-
-	ret = lock_destroy(wtext, session, &ws->lock);
-
-	free(ws->uri);
-	free(ws);
-
 	return (ret);
 }
 
@@ -1411,7 +1578,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	cursor->config_overwrite = v.val != 0;
 
 	/* Get a locked reference to the WiredTiger source. */
-	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
+	if ((ret = ws_source_open(wtds, session, uri, config, 0, &ws)) != 0)
 		goto err;
 	locked = 1;
 
@@ -1509,7 +1676,7 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 	 * Get a locked reference to the WiredTiger source, then immediately
 	 * unlock it, we aren't doing anything else.
 	 */
-	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
+	if ((ret = ws_source_open(wtds, session, uri, config, 0, &ws)) != 0)
 		return (ret);
 	if ((ret = unlock(wtext, session, &ws->lock)) != 0)
 		return (ret);
@@ -1542,39 +1709,35 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	wtext = ds->wtext;
 
 	/*
-	 * Get a locked reference to the data source; hold the global lock,
+	 * Get a locked reference to the data source: hold the global lock,
 	 * we are going to change the list of objects for a KVS store.
+	 *
+	 * Remove the entry from the WT_SOURCE list -- it's a singly-linked
+	 * list, find the reference to it.
 	 */
-	if ((ret = ws_source_open(wtds, session, config, uri, 1, &ws)) != 0)
+	if ((ret = ws_source_open(wtds, session, uri, config,
+	    WS_SOURCE_OPEN_BUSY | WS_SOURCE_OPEN_GLOBAL, &ws)) != 0)
 		return (ret);
 	ks = ws->ks;
+	for (p = &ks->ws_head; *p != NULL; p = &(*p)->next)
+		if (*p == ws) {
+			*p = (*p)->next;
+			break;
+		}
 
-	/* If there are active references to the object, we're busy. */
-	if (ws->ref != 0) {
-		ret = EBUSY;
-		goto err;
-	}
+	/* Close the source, discarding the handles and structure. */
+	ETRET(ws_source_close(wtext, session, ws));
+	ws = NULL;
 
-	/*
-	 * Close and delete the namespace, then push the change.
-	 *
-	 * If the close or delete fails, we can return (an error); once delete
-	 * succeeds, we have to push through, the object is gone.
-	 */
-	if ((ret = kvs_close(ws->kvs)) != 0) {
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_close: %s: %s", ws->uri, kvs_strerror(ret));
-		goto err;
-	}
-	if ((ret = kvs_delete_namespace(ks->kvs_device, ws->uri)) != 0) {
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_delete_namespace: %s: %s", ws->uri, kvs_strerror(ret));
-		goto err;
-	}
+	/* Drop the underlying namespaces. */
+	ETRET(ws_source_drop_namespace(
+	    wtds, session, uri, NULL, ks->kvs_device));
+	ETRET(ws_source_drop_namespace(
+	    wtds, session, uri, "log", ks->kvs_device));
+	ETRET(ws_source_drop_namespace(
+	    wtds, session, uri, "txn", ks->kvs_device));
 
-	/*
-	 * No turning back, now, accumulate errors as we go.
-	 */
+	/* Push the change. */
 	if ((ret = kvs_commit(ks->kvs_device)) != 0)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
@@ -1588,18 +1751,6 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	 */
 	if (ret != 0)
 		ret = WT_PANIC;
-
-	/*
-	 * Remove the entry from the WT_SOURCE list -- it's a singly-linked
-	 * list, find the reference to it.
-	 */
-	for (p = &ks->ws_head; *p != NULL; p = &(*p)->next)
-		if (*p == ws) {
-			*p = (*p)->next;
-
-			ETRET(ws_source_destroy(wtext, session, ws));
-			break;
-		}
 
 err:	ETRET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
@@ -1622,55 +1773,41 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	copy = NULL;
 
 	/*
 	 * Get a locked reference to the data source; hold the global lock,
 	 * we are going to change the object's name, and we can't allow
 	 * other threads walking the list and comparing against the name.
 	 */
-	if ((ret = ws_source_open(wtds, session, config, uri, 1, &ws)) != 0)
+	if ((ret = ws_source_open(wtds, session, uri, config,
+	    WS_SOURCE_OPEN_BUSY | WS_SOURCE_OPEN_GLOBAL, &ws)) != 0)
 		return (ret);
 	ks = ws->ks;
 
-	/* If there are active references to the object, we're busy. */
-	if (ws->ref != 0) {
-		ret = EBUSY;
-		goto err;
-	}
-
-	/* Get a copy of the new name, before errors get scary. */
+	/* Get a copy of the new name. */
 	if ((copy = strdup(newuri)) == NULL) {
 		ret = os_errno();
 		goto err;
 	}
+	free(ws->uri);
+	ws->uri = copy;
+	copy = NULL;
 
-	/*
-	 * Rename the KVS namespace and push the change.
-	 *
-	 * If the rename fails, we can return (an error); once rename succeeds,
-	 * we have to push through, the old object is gone.
-	 */
-	if ((ret = kvs_rename_namespace(ks->kvs_device, uri, newuri)) != 0) {
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_rename_namespace: %s: %s", ws->uri, kvs_strerror(ret));
-		goto err;
-	}
+	/* Rename the underlying namespaces. */
+	ETRET(ws_source_rename_namespace(
+	    wtds, session, uri, newuri, NULL, ks->kvs_device));
+	ETRET(ws_source_rename_namespace(
+	    wtds, session, uri, newuri, "log", ks->kvs_device));
+	ETRET(ws_source_rename_namespace(
+	    wtds, session, uri, newuri, "txn", ks->kvs_device));
 
-	/*
-	 * No turning back, now, accumulate errors as we go.
-	 */
+	/* Push the change. */
 	if ((ret = kvs_commit(ws->kvs)) != 0)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
 
 	/* Update the metadata record. */
 	ETRET(master_uri_rename(wtds, session, uri, newuri));
-
-	/* Update the structure name. */
-	free(ws->uri);
-	ws->uri = copy;
-	copy = NULL;
 
 	/*
 	 * If we have an error at this point, panic -- there's an inconsistency
@@ -1681,7 +1818,6 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 err:	ETRET(unlock(wtext, session, &ds->global_lock));
 
-	free(copy);
 	return (ret);
 }
 
@@ -1702,26 +1838,20 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 	wtext = ds->wtext;
 
 	/* Get a locked reference to the WiredTiger source. */
-	if ((ret = ws_source_open(wtds, session, config, uri, 0, &ws)) != 0)
+	if ((ret = ws_source_open(wtds, session,
+	    uri, config, WS_SOURCE_OPEN_BUSY, &ws)) != 0)
 		return (ret);
 
-	/* If there are active references to the object, we're busy. */
-	if (ws->ref != 0) {
-		ret = EBUSY;
-		goto err;
-	}
-
-	/* Truncate the underlying object. */
-	if ((ret = kvs_truncate(ws->kvs)) != 0) {
+	/* Truncate the underlying namespaces. */
+	if ((ret = kvs_truncate(ws->kvs)) != 0)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
-		goto err;
-	}
-	if ((ret = kvs_commit(ws->kvs)) != 0) {
+	if ((ret = kvs_truncate(ws->kvslog)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
+	if ((ret = kvs_commit(ws->kvstxn)) != 0)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
-		goto err;
-	}
 
 err:	ETRET(unlock(wtext, session, &ws->lock));
 	return (ret);
@@ -1774,18 +1904,8 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	/* Close and discard all objects. */
 	while ((ks = ds->kvs_head) != NULL) {
 		while ((ws = ks->ws_head) != NULL) {
-			if (ws->ref != 0)
-				ESET(wtext, session, WT_ERROR,
-				    "%s: has open object %s with %u open "
-				    "cursors during close",
-				    ks->name, ws->uri, ws->ref);
-			if ((tret = kvs_close(ws->kvs)) != 0)
-				ESET(wtext, session, WT_ERROR,
-				    "kvs_close: %s: %s",
-				    ws->uri, kvs_strerror(tret));
-
 			ks->ws_head = ws->next;
-			ETRET(ws_source_destroy(wtext, session, ws));
+			ETRET(ws_source_close(wtext, session, ws));
 		}
 
 		if ((tret = kvs_close(ks->kvs_device)) != 0)
