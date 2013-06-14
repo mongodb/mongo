@@ -750,6 +750,18 @@ if nix:
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
     env.Append( LINKFLAGS=["-fPIC", "-pthread"] )
 
+    # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
+    # startup.
+    #
+    # TODO: Is it necessary to add to both linkflags and shlinkflags, or are LINKFLAGS
+    # propagated to SHLINKFLAGS?
+    if darwin:
+        env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
+        env.Append( SHLINKFLAGS=["-Wl,-bind_at_load"] )
+    else:
+        env.Append( LINKFLAGS=["-Wl,-z,now"] )
+        env.Append( SHLINKFLAGS=["-Wl,-z,now"] )
+
     if not darwin:
         env.Append( LINKFLAGS=["-rdynamic"] )
 
