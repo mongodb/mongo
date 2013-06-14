@@ -422,10 +422,10 @@
             }
 //            dump();
             string ns = id().indexNamespace();
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             int expectedCount = 10 - unindexKeys();
 //            dump();
-            ASSERT_EQUALS( 1, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 1, nsdetails( ns )->numRecords() );
             long long unused = 0;
             ASSERT_EQUALS( expectedCount, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
@@ -476,10 +476,10 @@
             }
             //            dump();
             string ns = id().indexNamespace();
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = key( 'a' + 17 );
             unindex( k );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             long long unused = 0;
             ASSERT_EQUALS( 17, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
@@ -620,13 +620,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "bb" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 7, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 5, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 5, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{b:{a:null},d:{c:null},f:{e:null},_:{g:null}}", id() );
         }
     };
@@ -638,13 +638,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "bb" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 5, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 5, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{b:{a:null},cc:{c:null},d:null,f:{e:null},h:{g:null}}", id() );
         }
     };
@@ -657,12 +657,12 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "c" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{d:{b:{a:null}}}", id() );
         }
     };
@@ -674,14 +674,14 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 11, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "bb" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
             // child does not currently replace parent in this case
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{i:{b:{a:null},cc:{c:null},d:null,f:{e:null},h:{g:null}}}", id() );
         }
     };
@@ -693,14 +693,14 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 11, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "ff" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
             // child does not currently replace parent in this case
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{i:{b:{a:null},cc:{c:null},d:null,f:{e:null},h:{g:null}}}", id() );
         }
     };
@@ -712,13 +712,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 11, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "bb" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{d:{b:{a:null},cc:{c:null}},dd:null,_:{f:{e:null},h:{g:null}}}", id() );
         }
     };
@@ -730,13 +730,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 7, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 5, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 5, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "g" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 6, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 5, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 5, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{c:{b:{a:null}},d:null,_:{f:{e:null}}}", id() );
         }
     };
@@ -748,13 +748,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "ee" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{c:{b:{a:null}},_:{e:{d:null},f:null,h:{g:null}}}", id() );
         }
     };
@@ -766,13 +766,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "ee" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{f:{b:{a:null},c:null,e:{d:null}},ff:null,_:{h:{g:null}}}", id() );
         }
     };
@@ -784,13 +784,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 7, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 7, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "ee" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{c:{b:{a:null}},cc:null,_:{e:{d:null},f:null,h:{g:null}}}", id() );
         }
     };
@@ -802,13 +802,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "c" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             // height is not currently reduced in this case
             ArtificialTree::checkStructure( "{j:{g:{b:{a:null},d:null,e:null,f:null},h:null,i:null}}", id() );
         }
@@ -821,13 +821,13 @@
 //            dump();
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
 
             BSONObj k = BSON( "" << "c" );
             verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{g:{b:{a:null},d:null,e:null,f:null},h:null,i:null}", id() );
         }
     };
@@ -838,12 +838,12 @@
             ArtificialTree::setTree( "{h:{e:{b:{a:null},c:null,d:null},_:{f:null}},_:{i:null}}", id() );
             string ns = id().indexNamespace();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "c" );
             verify( unindex( k ) );
             long long keyCount = bt()->fullValidate( dl(), order(), 0, true );
             ASSERT_EQUALS( 7, keyCount );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             // no recursion currently in this case
             ArtificialTree::checkStructure( "{h:{b:{a:null},d:null,e:null,f:null},_:{i:null}}", id() );
         }
@@ -894,7 +894,7 @@
                 long long unused = 0;
                 ASSERT_EQUALS( _count, bt()->fullValidate( dl(), order(), &unused, true ) );
                 ASSERT_EQUALS( 0, unused );
-                ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+                ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
                 BSONObj k = bigKey( *i );
                 unindex( k );
 //                dump();
@@ -908,10 +908,10 @@
             ASSERT_EQUALS( 0, unused );
             validate();
             if ( !merge() ) {
-                ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+                ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             }
             else {
-                ASSERT_EQUALS( 1, nsdetails( ns )->stats.nrecords );
+                ASSERT_EQUALS( 1, nsdetails( ns )->numRecords() );
             }
         }
     protected:
@@ -1011,13 +1011,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},b:{$20:null,$30:null,$40:null,$50:null,a:null},_:{c:null}}", id() );
             ASSERT_EQUALS( 14, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x40 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$6:{$1:null,$2:null,$3:null,$4:null,$5:null},b:{$10:null,$20:null,$30:null,$50:null,a:null},_:{c:null}}", id() );
         }
     };
@@ -1028,13 +1028,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:{$1:null,$2:null,$3:null,$4:null},b:{$20:null,$30:null,$40:null,$50:null,$60:null,$70:null},_:{c:null}}", id() );
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x3 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$20:{$1:null,$2:null,$4:null,$10:null},b:{$30:null,$40:null,$50:null,$60:null,$70:null},_:{c:null}}", id() );
         }
     };
@@ -1045,13 +1045,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$20:{$1:{$0:null},$3:{$2:null},$5:{$4:null},$7:{$6:null},$9:{$8:null},$11:{$10:null},$13:{$12:null},_:{$14:null}},b:{$30:null,$40:{$35:null},$50:{$45:null}},_:{c:null}}", id() );
             ASSERT_EQUALS( 23, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 14, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 14, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x30 ) );
             //            dump();
             ASSERT( unindex( k ) );
             //            dump();
             ASSERT_EQUALS( 22, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 14, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 14, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$9:{$1:{$0:null},$3:{$2:null},$5:{$4:null},$7:{$6:null},_:{$8:null}},b:{$11:{$10:null},$13:{$12:null},$20:{$14:null},$40:{$35:null},$50:{$45:null}},_:{c:null}}", id() );
         }
     };
@@ -1062,13 +1062,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$20:{$1:{$0:null},$3:{$2:null},$5:null,_:{$14:null}},b:{$30:{$25:null},$40:{$35:null},$50:{$45:null},$60:{$55:null},$70:{$65:null},$80:{$75:null},$90:{$85:null},$100:{$95:null}},_:{c:null}}", id() );
             ASSERT_EQUALS( 25, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 15, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 15, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x5 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 24, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 15, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 15, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$50:{$1:{$0:null},$3:{$2:null},$20:{$14:null},$30:{$25:null},$40:{$35:null},_:{$45:null}},b:{$60:{$55:null},$70:{$65:null},$80:{$75:null},$90:{$85:null},$100:{$95:null}},_:{c:null}}", id() );
         }
     };
@@ -1079,13 +1079,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},_:{$20:null,$30:null,$40:null,$50:null,a:null}}", id() );
             ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x40 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 11, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$6:{$1:null,$2:null,$3:null,$4:null,$5:null},_:{$10:null,$20:null,$30:null,$50:null,a:null}}", id() );
         }
     };
@@ -1148,7 +1148,7 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},_:{$20:null,$30:null,$40:null,$50:null,a:null}}", id() );
             ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             // force parent pack
             ArtificialTree::is( dl() )->forcePack();
             BSONObj k = BSON( "" << bigNumString( 0x40 ) );
@@ -1156,7 +1156,7 @@
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 11, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$6:{$1:null,$2:null,$3:null,$4:null,$5:null},_:{$10:null,$20:null,$30:null,$50:null,a:null}}", id() );
         }
     };
@@ -1167,13 +1167,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10$10:{$1:null,$2:null,$3:null,$4:null},$100:{$20:null,$30:null,$40:null,$50:null,$60:null,$70:null,$80:null},$200:null,$300:null,$400:null,$500:null,$600:null,$700:null,$800:null,$900:null,_:{c:null}}", id() );
             ASSERT_EQUALS( 22, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x3 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 21, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 6, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 6, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$500:{$30:{$1:null,$2:null,$4:null,$10$10:null,$20:null},$100:{$40:null,$50:null,$60:null,$70:null,$80:null},$200:null,$300:null,$400:null},_:{$600:null,$700:null,$800:null,$900:null,_:{c:null}}}", id() );
         }
     };
@@ -1291,13 +1291,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:{$1:null,$2:null,$3:null,$4:null,$5:null,$6:null},$20:{$11:null,$12:null,$13:null,$14:null},_:{$30:null}}", id() );
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x12 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$5:{$1:null,$2:null,$3:null,$4:null},$20:{$6:null,$10:null,$11:null,$13:null,$14:null},_:{$30:null}}", id() );
         }
     };
@@ -1308,13 +1308,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:{$1:null},$20:{$11:null,$12:null,$13:null,$14:null},_:{$31:null,$32:null,$33:null,$34:null,$35:null,$36:null}}", id() );
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x12 ) );
             //            dump();
             ASSERT( unindex( k ) );
             //            dump();
             ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$10:{$1:null},$31:{$11:null,$13:null,$14:null,$20:null},_:{$32:null,$33:null,$34:null,$35:null,$36:null}}", id() );
         }
     };
@@ -1325,13 +1325,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{$10:{$5:{$1:null,$2:null},$8:{$6:null,$7:null}},_:{$20:null,$30:null,$40:null,$50:null,$60:null,$70:null,$80:null,$90:null}}", id() );
             ASSERT_EQUALS( 15, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 5, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 5, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x7 ) );
             //            dump();
             ASSERT( unindex( k ) );
             //            dump();
             ASSERT_EQUALS( 14, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$40:{$8:{$1:null,$2:null,$5:null,$6:null},$10:null,$20:null,$30:null},_:{$50:null,$60:null,$70:null,$80:null,$90:null}}", id() );
         }
     };
@@ -1398,13 +1398,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{b:{a:null}}", id() );
             ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 2, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 2, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "a" );
             //            dump();
             ASSERT( unindex( k ) );
             //            dump();
             ASSERT_EQUALS( 1, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 1, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 1, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{b:null}", id() );
         }
     };
@@ -1415,13 +1415,13 @@
             string ns = id().indexNamespace();
             ArtificialTree::setTree( "{a:null,c:{b:null},d:null}", id() );
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 2, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 2, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "b" );
             //            dump();
             ASSERT( unindex( k ) );
             //            dump();
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), 0, true ) );
-            ASSERT_EQUALS( 1, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 1, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{a:null,c:null,d:null}", id() );
         }
     };
@@ -1434,14 +1434,14 @@
             long long unused = 0;
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 2, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 2, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "c" );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 1, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 1, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{a:null,b:null,d:null}", id() );
         }
     };
@@ -1455,7 +1455,7 @@
             long long unused = 0;
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 1, unused );
-            ASSERT_EQUALS( 2, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 2, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "c" );
 //            dump();
             ASSERT( unindex( k ) );
@@ -1463,7 +1463,7 @@
             unused = 0;
             ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 1, unused );
-            ASSERT_EQUALS( 1, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 1, nsdetails( ns )->numRecords() );
             // doesn't discriminate between used and unused
             ArtificialTree::checkStructure( "{a:null,b:null,d:null}", id() );
         }
@@ -1477,7 +1477,7 @@
             long long unused = 0;
             ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 2, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 2, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "a" );
 //            dump();
             ASSERT( unindex( k ) );
@@ -1485,7 +1485,7 @@
             unused = 0;
             ASSERT_EQUALS( 1, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 1, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 1, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{b:null}", id() );
         }
     };
@@ -1498,7 +1498,7 @@
             long long unused = 0;
             ASSERT_EQUALS( 7, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 5, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 5, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "y" );
 //            dump();
             ASSERT( unindex( k ) );
@@ -1506,7 +1506,7 @@
             unused = 0;
             ASSERT_EQUALS( 6, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{a:null,e:{c:{b:null},d:null},z:null}", id() );
         }
     };
@@ -1519,7 +1519,7 @@
             long long unused = 0;
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "a" );
 //            dump();
             ASSERT( unindex( k ) );
@@ -1527,7 +1527,7 @@
             unused = 0;
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 2, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 2, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{c:null,_:{e:null,f:null}}", id() );
         }
     };
@@ -1540,14 +1540,14 @@
             long long unused = 0;
             ASSERT_EQUALS( 5, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "d" );
             //            dump();
             ASSERT( unindex( k ) );
             //            dump();
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 1, unused );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{a:null,d:{c:{b:null}},e:null}", id() );
             ASSERT( bt()->keyNode( 1 ).recordLoc.getOfs() & 1 ); // check 'unused' key
         }
@@ -1561,14 +1561,14 @@
             long long unused = 0;
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << "a" );
             //            dump();
             ASSERT( unindex( k ) );
             //            dump();
             ASSERT_EQUALS( 2, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 1, unused );
-            ASSERT_EQUALS( 3, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 3, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{a:null,_:{c:null,_:{d:null}}}", id() );
             ASSERT( bt()->keyNode( 0 ).recordLoc.getOfs() & 1 ); // check 'unused' key
         }
@@ -1582,14 +1582,14 @@
             long long unused = 0;
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x30, 0x10 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$60:{$10:null,$20:null,$27:{$23:null,$25:null},$40:null,$50:null},_:{$70:null,$80:null,$90:null,$100:null}}", id() );
         }
     };
@@ -1602,14 +1602,14 @@
             long long unused = 0;
             ASSERT_EQUALS( 13, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             BSONObj k = BSON( "" << bigNumString( 0x100, 0x10 ) );
 //            dump();
             ASSERT( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 12, bt()->fullValidate( dl(), order(), &unused, true ) );
             ASSERT_EQUALS( 0, unused );
-            ASSERT_EQUALS( 4, nsdetails( ns )->stats.nrecords );
+            ASSERT_EQUALS( 4, nsdetails( ns )->numRecords() );
             ArtificialTree::checkStructure( "{$80:{$10:null,$20:null,$30:null,$40:null,$50:null,$60:null,$70:null},_:{$90:null,$97:{$93:null,$95:null}}}", id() );
         }
     };

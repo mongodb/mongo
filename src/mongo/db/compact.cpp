@@ -146,19 +146,16 @@ namespace mongo {
                 }
             } // if !L.isNull()
 
-            verify( d->firstExtent == diskloc );
-            verify( d->lastExtent != diskloc );
+            verify( d->firstExtent() == diskloc );
+            verify( d->lastExtent() != diskloc );
             DiskLoc newFirst = e->xnext;
-            d->firstExtent.writing() = newFirst;
+            d->firstExtent().writing() = newFirst;
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
             freeExtents( diskloc, diskloc );
+
             // update datasize/record count for this namespace's extent
-            {
-                NamespaceDetails::Stats *s = getDur().writing(&d->stats);
-                s->datasize += datasize;
-                s->nrecords += nrecords;
-            }
+            d->incrementStats( datasize, nrecords );
 
             getDur().commitIfNeeded();
 
@@ -180,7 +177,7 @@ namespace mongo {
         getDur().commitIfNeeded();
 
         list<DiskLoc> extents;
-        for( DiskLoc L = d->firstExtent; !L.isNull(); L = L.ext()->xnext ) 
+        for( DiskLoc L = d->firstExtent(); !L.isNull(); L = L.ext()->xnext )
             extents.push_back(L);
         log() << "compact " << extents.size() << " extents" << endl;
 
@@ -191,7 +188,8 @@ namespace mongo {
         // same data, but might perform a little different after compact?
         NamespaceDetailsTransient::get(ns).clearQueryCache();
 
-        int nidx = d->nIndexes;
+        verify( d->getCompletedIndexCount() == d->getTotalIndexCount() );
+        int nidx = d->getCompletedIndexCount();
         scoped_array<BSONObj> indexSpecs( new BSONObj[nidx] );
         {
             NamespaceDetails::IndexIterator ii = d->ii(); 
@@ -219,12 +217,10 @@ namespace mongo {
         }
 
         log() << "compact orphan deleted lists" << endl;
-        for( int i = 0; i < Buckets; i++ ) { 
-            d->deletedList[i].writing().Null();
-        }
+        d->orphanDeletedList();
 
         // Start over from scratch with our extent sizing and growth
-        d->lastExtentSize=0;
+        d->setLastExtentSize( 0 );
 
         // before dropping indexes, at least make sure we can allocate one extent!
         uassert(14025, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1, false).isNull());
@@ -245,11 +241,7 @@ namespace mongo {
 
         // reset data size and record counts to 0 for this namespace
         // as we're about to tally them up again for each new extent
-        {
-            NamespaceDetails::Stats *s = getDur().writing(&d->stats);
-            s->datasize = 0;
-            s->nrecords = 0;
-        }
+        d->setStats( 0, 0 );
 
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
             skipped += compactExtent(ns, d, *i, n++, nidx, validate, pf, pb);
@@ -260,7 +252,7 @@ namespace mongo {
             result.append("invalidObjects", skipped);
         }
 
-        verify( d->firstExtent.ext()->xprev.isNull() );
+        verify( d->firstExtent().ext()->xprev.isNull() );
 
         // indexes will do their own progress meter?
         pm.finished();

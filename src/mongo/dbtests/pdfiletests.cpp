@@ -65,7 +65,7 @@ namespace PdfileTests {
                 return 0;
             }
             // bypass standard alloc/insert routines to use the extent we want.
-            static DiskLoc insert( DiskLoc ext, int i ) {
+            static DiskLoc insert( const DiskLoc& ext, int i ) {
                 BSONObjBuilder b;
                 b.append( "a", i );
                 BSONObj o = b.done();
@@ -112,7 +112,7 @@ namespace PdfileTests {
 
         class EmptyLooped : public Base {
             virtual void prepare() {
-                nsd()->writingWithExtra()->capFirstNewRecord = DiskLoc();
+                nsd()->writingWithExtra()->capFirstNewRecord() = DiskLoc();
             }
             virtual int count() const {
                 return 0;
@@ -121,7 +121,7 @@ namespace PdfileTests {
 
         class EmptyMultiExtentLooped : public Base {
             virtual void prepare() {
-                nsd()->writingWithExtra()->capFirstNewRecord = DiskLoc();
+                nsd()->writingWithExtra()->capFirstNewRecord() = DiskLoc();
             }
             virtual int count() const {
                 return 0;
@@ -133,7 +133,7 @@ namespace PdfileTests {
 
         class Single : public Base {
             virtual void prepare() {
-                nsd()->writingWithExtra()->capFirstNewRecord = insert( nsd()->capExtent, 0 );
+                nsd()->writingWithExtra()->capFirstNewRecord() = insert( nsd()->capExtent(), 0 );
             }
             virtual int count() const {
                 return 1;
@@ -142,9 +142,9 @@ namespace PdfileTests {
 
         class NewCapFirst : public Base {
             virtual void prepare() {
-                DiskLoc x = insert( nsd()->capExtent, 0 );
-                nsd()->writingWithExtra()->capFirstNewRecord = x;
-                insert( nsd()->capExtent, 1 );
+                DiskLoc x = insert( nsd()->capExtent(), 0 );
+                nsd()->writingWithExtra()->capFirstNewRecord() = x;
+                insert( nsd()->capExtent(), 1 );
             }
             virtual int count() const {
                 return 2;
@@ -153,8 +153,8 @@ namespace PdfileTests {
 
         class NewCapLast : public Base {
             virtual void prepare() {
-                insert( nsd()->capExtent, 0 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 1 );
+                insert( nsd()->capExtent(), 0 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 1 );
             }
             virtual int count() const {
                 return 2;
@@ -163,9 +163,9 @@ namespace PdfileTests {
 
         class NewCapMiddle : public Base {
             virtual void prepare() {
-                insert( nsd()->capExtent, 0 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 1 );
-                insert( nsd()->capExtent, 2 );
+                insert( nsd()->capExtent(), 0 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 1 );
+                insert( nsd()->capExtent(), 2 );
             }
             virtual int count() const {
                 return 3;
@@ -174,10 +174,10 @@ namespace PdfileTests {
 
         class FirstExtent : public Base {
             virtual void prepare() {
-                insert( nsd()->capExtent, 0 );
-                insert( nsd()->lastExtent, 1 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 2 );
-                insert( nsd()->capExtent, 3 );
+                insert( nsd()->capExtent(), 0 );
+                insert( nsd()->lastExtent(), 1 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
+                insert( nsd()->capExtent(), 3 );
             }
             virtual int count() const {
                 return 4;
@@ -189,11 +189,11 @@ namespace PdfileTests {
 
         class LastExtent : public Base {
             virtual void prepare() {
-                nsd()->capExtent.writing() = nsd()->lastExtent;
-                insert( nsd()->capExtent, 0 );
-                insert( nsd()->firstExtent, 1 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 2 );
-                insert( nsd()->capExtent, 3 );
+                nsd()->capExtent().writing() = nsd()->lastExtent();
+                insert( nsd()->capExtent(), 0 );
+                insert( nsd()->firstExtent(), 1 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
+                insert( nsd()->capExtent(), 3 );
             }
             virtual int count() const {
                 return 4;
@@ -205,12 +205,12 @@ namespace PdfileTests {
 
         class MidExtent : public Base {
             virtual void prepare() {
-                nsd()->capExtent.writing() = nsd()->firstExtent.ext()->xnext;
-                insert( nsd()->capExtent, 0 );
-                insert( nsd()->lastExtent, 1 );
-                insert( nsd()->firstExtent, 2 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 3 );
-                insert( nsd()->capExtent, 4 );
+                nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+                insert( nsd()->capExtent(), 0 );
+                insert( nsd()->lastExtent(), 1 );
+                insert( nsd()->firstExtent(), 2 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 3 );
+                insert( nsd()->capExtent(), 4 );
             }
             virtual int count() const {
                 return 5;
@@ -222,10 +222,10 @@ namespace PdfileTests {
 
         class AloneInExtent : public Base {
             virtual void prepare() {
-                nsd()->capExtent.writing() = nsd()->firstExtent.ext()->xnext;
-                insert( nsd()->lastExtent, 0 );
-                insert( nsd()->firstExtent, 1 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 2 );
+                nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+                insert( nsd()->lastExtent(), 0 );
+                insert( nsd()->firstExtent(), 1 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
             }
             virtual int count() const {
                 return 3;
@@ -237,11 +237,11 @@ namespace PdfileTests {
 
         class FirstInExtent : public Base {
             virtual void prepare() {
-                nsd()->capExtent.writing() = nsd()->firstExtent.ext()->xnext;
-                insert( nsd()->lastExtent, 0 );
-                insert( nsd()->firstExtent, 1 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 2 );
-                insert( nsd()->capExtent, 3 );
+                nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+                insert( nsd()->lastExtent(), 0 );
+                insert( nsd()->firstExtent(), 1 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
+                insert( nsd()->capExtent(), 3 );
             }
             virtual int count() const {
                 return 4;
@@ -253,11 +253,11 @@ namespace PdfileTests {
 
         class LastInExtent : public Base {
             virtual void prepare() {
-                nsd()->capExtent.writing() = nsd()->firstExtent.ext()->xnext;
-                insert( nsd()->capExtent, 0 );
-                insert( nsd()->lastExtent, 1 );
-                insert( nsd()->firstExtent, 2 );
-                nsd()->capFirstNewRecord.writing() = insert( nsd()->capExtent, 3 );
+                nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+                insert( nsd()->capExtent(), 0 );
+                insert( nsd()->lastExtent(), 1 );
+                insert( nsd()->firstExtent(), 2 );
+                nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 3 );
             }
             virtual int count() const {
                 return 4;

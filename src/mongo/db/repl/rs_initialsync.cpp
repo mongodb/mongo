@@ -114,7 +114,7 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(rsoplog);
 
         // temp
-        if( d && d->stats.nrecords == 0 )
+        if( d && d->numRecords() == 0 )
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;

@@ -1202,7 +1202,7 @@ namespace mongo {
             Client::Context ctx( ns );
             NamespaceDetails *d = nsdetails(ns);
 
-            if ( ! d || d->stats.nrecords == 0 ) {
+            if ( ! d || d->numRecords() == 0 ) {
                 result.appendNumber( "size" , 0 );
                 result.appendNumber( "numObjects" , 0 );
                 result.append( "millis" , timer.millis() );
@@ -1214,8 +1214,8 @@ namespace mongo {
             shared_ptr<Cursor> c;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
-                    result.appendNumber( "size" , d->stats.datasize );
-                    result.appendNumber( "numObjects" , d->stats.nrecords );
+                    result.appendNumber( "size" , d->dataSize() );
+                    result.appendNumber( "numObjects" , d->numRecords() );
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
@@ -1246,7 +1246,7 @@ namespace mongo {
                 c.reset( BtreeCursor::make( d, *idx, min, max, false, 1 ) );
             }
 
-            long long avgObjSize = d->stats.datasize / d->stats.nrecords;
+            long long avgObjSize = d->dataSize() / d->numRecords();
 
             long long maxSize = jsobj["maxSize"].numberLong();
             long long maxObjects = jsobj["maxObjects"].numberLong();
@@ -1304,9 +1304,9 @@ namespace mongo {
                     log() << "error: have index ["  << collNS << "] but no NamespaceDetails" << endl;
                     continue;
                 }
-                totalSize += mine->stats.datasize;
+                totalSize += mine->dataSize();
                 if ( details )
-                    details->appendNumber( d.indexName() , mine->stats.datasize / scale );
+                    details->appendNumber( d.indexName() , mine->dataSize() / scale );
             }
             return totalSize;
         }
@@ -1355,19 +1355,19 @@ namespace mongo {
 
             bool verbose = jsobj["verbose"].trueValue();
 
-            long long size = nsd->stats.datasize / scale;
-            result.appendNumber( "count" , nsd->stats.nrecords );
+            long long size = nsd->dataSize() / scale;
+            result.appendNumber( "count" , nsd->numRecords() );
             result.appendNumber( "size" , size );
-            if( nsd->stats.nrecords )
-                result.append      ( "avgObjSize" , double(size) / double(nsd->stats.nrecords) );
+            if( nsd->numRecords() )
+                result.append      ( "avgObjSize" , double(size) / double(nsd->numRecords()) );
 
             int numExtents;
             BSONArrayBuilder extents;
 
             result.appendNumber( "storageSize" , nsd->storageSize( &numExtents , verbose ? &extents : 0  ) / scale );
             result.append( "numExtents" , numExtents );
-            result.append( "nindexes" , nsd->nIndexes );
-            result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
+            result.append( "nindexes" , nsd->getCompletedIndexCount() );
+            result.append( "lastExtentSize" , nsd->lastExtentSize() / scale );
             result.append( "paddingFactor" , nsd->paddingFactor() );
             result.append( "systemFlags" , nsd->systemFlags() );
             result.append( "userFlags" , nsd->userFlags() );
@@ -1552,17 +1552,17 @@ namespace mongo {
                 }
 
                 ncollections += 1;
-                objects += nsd->stats.nrecords;
-                size += nsd->stats.datasize;
+                objects += nsd->numRecords();
+                size += nsd->dataSize();
 
                 int temp;
                 storageSize += nsd->storageSize( &temp );
                 numExtents += temp;
 
-                indexes += nsd->nIndexes;
+                indexes += nsd->getCompletedIndexCount();
                 indexSize += getIndexSizeForCollection(dbname, ns);
             }
-            
+
             result.append      ( "db" , dbname );
             result.appendNumber( "collections" , ncollections );
             result.appendNumber( "objects" , objects );
@@ -1628,9 +1628,9 @@ namespace mongo {
             string toNs = dbname + "." + to;
             NamespaceDetails *nsd = nsdetails( fromNs );
             massert( 10301 ,  "source collection " + fromNs + " does not exist", nsd );
-            long long excessSize = nsd->stats.datasize - size * 2; // datasize and extentSize can't be compared exactly, so add some padding to 'size'
-            DiskLoc extent = nsd->firstExtent;
-            for( ; excessSize > extent.ext()->length && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
+            long long excessSize = nsd->dataSize() - size * 2; // datasize and extentSize can't be compared exactly, so add some padding to 'size'
+            DiskLoc extent = nsd->firstExtent();
+            for( ; excessSize > extent.ext()->length && extent != nsd->lastExtent(); extent = extent.ext()->xnext ) {
                 excessSize -= extent.ext()->length;
                 LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
                 LOG( 6 ) << "excessSize: " << excessSize << endl;

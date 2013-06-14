@@ -82,8 +82,7 @@ namespace mongo {
                 return 0;
             }
 
-            for ( int i = 0; i < Buckets; i++ )
-                d->deletedList[i].Null();
+            d->orphanDeletedList();
 
             result.append("ns", dropns.c_str());
             return 1;
@@ -228,18 +227,18 @@ namespace mongo {
                 result.appendNumber("max", d->maxCappedDocs());
             }
 
-            result.append("firstExtent", str::stream() << d->firstExtent.toString()
-                                    << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString());
-            result.append( "lastExtent", str::stream() <<  d->lastExtent.toString()
-                                    << " ns:" <<  d->lastExtent.ext()->nsDiagnostic.toString());
+            result.append( "firstExtent", str::stream() << d->firstExtent().toString()
+                           << " ns:" << d->firstExtent().ext()->nsDiagnostic.toString());
+            result.append( "lastExtent", str::stream() <<  d->lastExtent().toString()
+                           << " ns:" <<  d->lastExtent().ext()->nsDiagnostic.toString());
 
             BSONArrayBuilder extentData;
             int extentCount = 0;
             try {
-                d->firstExtent.ext()->assertOk();
-                d->lastExtent.ext()->assertOk();
+                d->firstExtent().ext()->assertOk();
+                d->lastExtent().ext()->assertOk();
 
-                DiskLoc extentDiskLoc = d->firstExtent;
+                DiskLoc extentDiskLoc = d->firstExtent();
                 while (!extentDiskLoc.isNull()) {
                     Extent* thisExtent = extentDiskLoc.ext();
                     if (full) {
@@ -258,9 +257,9 @@ namespace mongo {
                         errors << sb.str();
                         valid = false;
                     }
-                    if (nextDiskLoc.isNull() && extentDiskLoc != d->lastExtent) {
+                    if (nextDiskLoc.isNull() && extentDiskLoc != d->lastExtent()) {
                         StringBuilder sb;
-                        sb << "'lastExtent' pointer " << d->lastExtent.toString()
+                        sb << "'lastExtent' pointer " << d->lastExtent().toString()
                            << " does not point to last extent in list " << extentDiskLoc.toString();
                         errors << sb.str();
                         valid = false;
@@ -282,42 +281,42 @@ namespace mongo {
             if ( full )
                 result.appendArray( "extents" , extentData.arr() );
 
-            result.appendNumber("datasize", d->stats.datasize);
-            result.appendNumber("nrecords", d->stats.nrecords);
-            result.appendNumber("lastExtentSize", d->lastExtentSize);
+            result.appendNumber("datasize", d->dataSize());
+            result.appendNumber("nrecords", d->numRecords());
+            result.appendNumber("lastExtentSize", d->lastExtentSize());
             result.appendNumber("padding", d->paddingFactor());
 
             try {
 
                 bool testingLastExtent = false;
                 try {
-                    if (d->firstExtent.isNull()) {
+                    if (d->firstExtent().isNull()) {
                         errors << "'firstExtent' pointer is null";
                         valid=false;
                     }
                     else {
-                        result.append("firstExtentDetails", d->firstExtent.ext()->dump());
-                        if (!d->firstExtent.ext()->xprev.isNull()) {
+                        result.append("firstExtentDetails", d->firstExtent().ext()->dump());
+                        if (!d->firstExtent().ext()->xprev.isNull()) {
                             StringBuilder sb;
-                            sb << "'xprev' pointer in 'firstExtent' " << d->firstExtent.toString()
-                               << " is " << d->firstExtent.ext()->xprev.toString()
+                            sb << "'xprev' pointer in 'firstExtent' " << d->firstExtent().toString()
+                               << " is " << d->firstExtent().ext()->xprev.toString()
                                << ", should be null";
                             errors << sb.str();
                             valid=false;
                         }
                     }
                     testingLastExtent = true;
-                    if (d->lastExtent.isNull()) {
+                    if (d->lastExtent().isNull()) {
                         errors << "'lastExtent' pointer is null";
                         valid=false;
                     }
                     else {
-                        if (d->firstExtent != d->lastExtent) {
-                            result.append("lastExtentDetails", d->lastExtent.ext()->dump());
-                            if (!d->lastExtent.ext()->xnext.isNull()) {
+                        if (d->firstExtent() != d->lastExtent()) {
+                            result.append("lastExtentDetails", d->lastExtent().ext()->dump());
+                            if (!d->lastExtent().ext()->xnext.isNull()) {
                                 StringBuilder sb;
-                                sb << "'xnext' pointer in 'lastExtent' " << d->lastExtent.toString()
-                                   << " is " << d->lastExtent.ext()->xnext.toString()
+                                sb << "'xnext' pointer in 'lastExtent' " << d->lastExtent().toString()
+                                   << " is " << d->lastExtent().ext()->xnext.toString()
                                    << ", should be null";
                                 errors << sb.str();
                                 valid = false;
@@ -434,7 +433,7 @@ namespace mongo {
 
                 BSONArrayBuilder deletedListArray;
                 for ( int i = 0; i < Buckets; i++ ) {
-                    deletedListArray << d->deletedList[i].isNull();
+                    deletedListArray << d->deletedListEntry(i).isNull();
                 }
 
                 int ndel = 0;
@@ -442,7 +441,7 @@ namespace mongo {
                 BSONArrayBuilder delBucketSizes;
                 int incorrect = 0;
                 for ( int i = 0; i < Buckets; i++ ) {
-                    DiskLoc loc = d->deletedList[i];
+                    DiskLoc loc = d->deletedListEntry(i);
                     try {
                         int k = 0;
                         while ( !loc.isNull() ) {
@@ -493,7 +492,7 @@ namespace mongo {
 
                 int idxn = 0;
                 try  {
-                    result.append("nIndexes", d->nIndexes);
+                    result.append("nIndexes", d->getCompletedIndexCount());
                     BSONObjBuilder indexes; // not using subObjStart to be exception safe
                     NamespaceDetails::IndexIterator i = d->ii();
                     while( i.more() ) {

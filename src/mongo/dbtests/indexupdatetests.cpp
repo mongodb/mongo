@@ -527,39 +527,41 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // _id_ is at 0, so nIndexes == 1
-            halfAddIndex("a");
-            halfAddIndex("b");
-            halfAddIndex("c");
-            halfAddIndex("d");
+            NamespaceDetails::IndexBuildBlock* a = halfAddIndex("a");
+            NamespaceDetails::IndexBuildBlock* b = halfAddIndex("b");
+            NamespaceDetails::IndexBuildBlock* c = halfAddIndex("c");
+            NamespaceDetails::IndexBuildBlock* d = halfAddIndex("d");
             int offset = IndexBuildsInProgress::get(_ns, "b_1");
             ASSERT_EQUALS(2, offset);
 
             IndexBuildsInProgress::remove(_ns, offset);
-            nsdetails(_ns)->indexBuildsInProgress--;
+            delete b;
 
             ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
             ASSERT_EQUALS(3, IndexBuildsInProgress::get(_ns, "d_1"));
 
             offset = IndexBuildsInProgress::get(_ns, "d_1");
             IndexBuildsInProgress::remove(_ns, offset);
-            nsdetails(_ns)->indexBuildsInProgress--;
+            delete d;
 
             ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
             ASSERT_THROWS(IndexBuildsInProgress::get(_ns, "d_1"), MsgAssertionException);
 
             offset = IndexBuildsInProgress::get(_ns, "a_1");
             IndexBuildsInProgress::remove(_ns, offset);
-            nsdetails(_ns)->indexBuildsInProgress--;
+            delete a;
 
             ASSERT_EQUALS(1, IndexBuildsInProgress::get(_ns, "c_1"));
+            delete c;
         }
 
     private:
-        IndexDetails& halfAddIndex(const std::string& key) {
+        NamespaceDetails::IndexBuildBlock* halfAddIndex(const std::string& key) {
+            string name = key + "_1";
             BSONObj indexInfo = BSON( "v" << 1 <<
                                       "key" << BSON( key << 1 ) <<
                                       "ns" << _ns <<
-                                      "name" << (key+"_1"));
+                                      "name" << name );
             int32_t lenWHdr = indexInfo.objsize() + Record::HeaderSize;
             const char* systemIndexes = "unittests.system.indexes";
             DiskLoc infoLoc = allocateSpaceForANewRecord( systemIndexes,
@@ -572,9 +574,7 @@ namespace IndexUpdateTests {
             addRecordToRecListInExtent( infoRecord, infoLoc );
             IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
             id.info = infoLoc;
-            nsdetails(_ns)->indexBuildsInProgress++;
-
-            return id;
+            return new NamespaceDetails::IndexBuildBlock( _ns, name );
         }
     };
 

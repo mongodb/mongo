@@ -43,9 +43,8 @@ namespace mongo {
          * @param nsd the namespace details of the namespace building the index
          * @param index the offset into nsd's index array of the partially-built index
          */
-        void retryIndexBuild(const std::string& dbName, 
-                             NamespaceDetails* nsd, 
-                             const int index);
+        void retryIndexBuild(const std::string& dbName,
+                             NamespaceDetails* nsd );
     };
 
     extern IndexRebuilder indexRebuilder;

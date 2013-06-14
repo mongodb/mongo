@@ -55,7 +55,7 @@ namespace mongo {
             }
         }
 
-        if( d->nIndexes >= NamespaceDetails::NIndexesMax ) {
+        if( d->getCompletedIndexCount() >= NamespaceDetails::NIndexesMax ) {
             problem() << "Helper::ensureIndex fails, MaxIndexes exceeded " << ns << '\n';
             return;
         }
@@ -473,10 +473,10 @@ namespace mongo {
         // sizes will vary
         long long avgDocsWhenFull;
         long long avgDocSizeBytes;
-        const long long totalDocsInNS = details->stats.nrecords;
+        const long long totalDocsInNS = details->numRecords();
         if ( totalDocsInNS > 0 ) {
             // TODO: Figure out what's up here
-            avgDocSizeBytes = details->stats.datasize / totalDocsInNS;
+            avgDocSizeBytes = details->dataSize() / totalDocsInNS;
             avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
             avgDocsWhenFull = std::min( kMaxDocsPerChunk + 1,
                                         130 * avgDocsWhenFull / 100 /* slack */);

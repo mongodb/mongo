@@ -105,26 +105,26 @@ namespace mongo {
     
     DiskLoc FindingStartCursor::extentFirstLoc( const DiskLoc &rec ) {
         Extent *e = rec.rec()->myExtent( rec );
-        if ( !_qp.nsd()->capLooped() || ( e->myLoc != _qp.nsd()->capExtent ) )
+        if ( !_qp.nsd()->capLooped() || ( e->myLoc != _qp.nsd()->capExtent() ) )
             return e->firstRecord;
         // Likely we are on the fresh side of capExtent, so return first fresh record.
         // If we are on the stale side of capExtent, then the collection is small and it
         // doesn't matter if we start the extent scan with capFirstNewRecord.
-        return _qp.nsd()->capFirstNewRecord;
+        return _qp.nsd()->capFirstNewRecord();
     }
-    
+
     DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc& rec ) const {
         Extent *e = rec.rec()->myExtent( rec );
         if ( _qp.nsd()->capLooped() ) {
             while( true ) {
                 // Advance e to preceding extent (looping to lastExtent if necessary).
                 if ( e->xprev.isNull() ) {
-                    e = _qp.nsd()->lastExtent.ext();
+                    e = _qp.nsd()->lastExtent().ext();
                 }
                 else {
                     e = e->xprev.ext();
                 }
-                if ( e->myLoc == _qp.nsd()->capExtent ) {
+                if ( e->myLoc == _qp.nsd()->capExtent() ) {
                     // Reached the extent containing the oldest data in the collection.
                     return DiskLoc();
                 }

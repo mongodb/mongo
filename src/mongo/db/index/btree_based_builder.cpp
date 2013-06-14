@@ -188,10 +188,10 @@ namespace mongo {
         /* get and sort all the keys ----- */
         ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
                                               "Index: (1/3) External Sort Progress",
-                                              d->stats.nrecords,
+                                              d->numRecords(),
                                               10));
         SortPhaseOne phase1;
-        addKeysToPhaseOne(d, ns, idx, order, &phase1, d->stats.nrecords, pm.get(),
+        addKeysToPhaseOne(d, ns, idx, order, &phase1, d->numRecords(), pm.get(),
                           mayInterrupt, idxNo );
         pm.finished();
 

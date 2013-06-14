@@ -65,7 +65,7 @@ namespace mongo {
         
         // count of all objects
         if ( query.isEmpty() ) {
-            return applySkipLimit( d->stats.nrecords , cmd );
+            return applySkipLimit( d->numRecords(), cmd );
         }
         
         long long count = 0;

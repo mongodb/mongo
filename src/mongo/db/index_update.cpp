@@ -30,7 +30,6 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/startup_test.h"
 
 namespace mongo {
     
@@ -63,7 +62,7 @@ namespace mongo {
 
         for (int i = 0; i < numIndices; i++) {
             // If i >= d->nIndexes, it's a background index, and we DO NOT want to log anything.
-            bool logIfError = (i < nsd->nIndexes) ? !noWarn : false;
+            bool logIfError = (i < nsd->getCompletedIndexCount()) ? !noWarn : false;
             _unindexRecord(nsd, i, obj, dl, logIfError);
         }
     }
@@ -129,7 +128,7 @@ namespace mongo {
 
             ProgressMeter& progress = cc().curop()->setMessage("bg index build",
                                                                "Background Index Build Progress",
-                                                               d->stats.nrecords);
+                                                               d->numRecords());
 
             unsigned long long n = 0;
             unsigned long long numDropped = 0;
@@ -199,7 +198,7 @@ namespace mongo {
                 getDur().commitIfNeeded();
 
                 if ( cc->yieldSometimes( ClientCursor::WillNeed ) ) {
-                    progress.setTotalWhileRunning( d->stats.nrecords );
+                    progress.setTotalWhileRunning( d->numRecords() );
 
                     // Recalculate idxNo if we yielded
                     idxNo = IndexBuildsInProgress::get(ns, idxName);
@@ -317,51 +316,44 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), mayInterrupt, true);
     }
 
-    /* remove bit from a bit array - actually remove its slot, not a clear
-       note: this function does not work with x == 63 -- that is ok
-             but keep in mind in the future if max indexes were extended to
-             exactly 64 it would be a problem
-    */
-    unsigned long long removeBit(unsigned long long b, int x) {
-        unsigned long long tmp = b;
-        return
-            (tmp & ((((unsigned long long) 1) << x)-1)) |
-            ((tmp >> (x+1)) << x);
-    }
-
     bool dropIndexes(NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex) {
         BackgroundOperation::assertNoBgOpInProgForNs(ns);
-
-        d = d->writingWithExtra();
-        d->aboutToDeleteAnIndex();
 
         /* there may be pointers pointing at keys in the btree(s).  kill them. */
         ClientCursor::invalidate(ns);
 
         // delete a specific index or all?
         if ( *name == '*' && name[1] == 0 ) {
-            LOG(4) << "  d->nIndexes was " << d->nIndexes << std::endl;
-            anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
+            // this should be covered by assertNoBgOpInProgForNs above, but being paranoid
+            verify( d->getCompletedIndexCount() == d->getTotalIndexCount() );
+
+            LOG(4) << "  d->nIndexes was " << d->getCompletedIndexCount() << std::endl;
+            anObjBuilder.appendNumber("nIndexesWas", d->getCompletedIndexCount() );
             IndexDetails *idIndex = 0;
-            if( d->nIndexes ) {
-                for ( int i = 0; i < d->nIndexes; i++ ) {
+
+            while ( 1 ) {
+                bool didAnything = false;
+
+                for ( int i = 0; i < d->getCompletedIndexCount(); i++ ) {
+
                     if ( !mayDeleteIdIndex && d->idx(i).isIdIndex() ) {
                         idIndex = &d->idx(i);
+                        continue;
                     }
-                    else {
-                        d->idx(i).kill_idx();
-                    }
+                    didAnything = true;
+                    d->removeIndex( i );
+                    break;
                 }
-                d->nIndexes = 0;
+
+                if ( !didAnything )
+                    break;
             }
+
             if ( idIndex ) {
-                d->getNextIndexDetails(ns) = *idIndex;
-                d->addIndex(ns);
-                wassert( d->nIndexes == 1 );
+                verify( d->getCompletedIndexCount() == 1 );
             }
-            /* assuming here that id index is not multikey: */
-            d->multiKeyIndexBits = 0;
-            assureSysIndexesEmptied(ns, idIndex);
+
+            verify( 0 == assureSysIndexesEmptied(ns, idIndex) );
             anObjBuilder.append("msg", mayDeleteIdIndex ?
                                 "indexes dropped for collection" :
                                 "non-_id indexes dropped for collection");
@@ -370,23 +362,16 @@ namespace mongo {
             // delete just one index
             int x = d->findIndexByName(name);
             if ( x >= 0 ) {
-                LOG(4) << "  d->nIndexes was " << d->nIndexes << endl;
-                anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
 
-                /* note it is  important we remove the IndexDetails with this
-                 call, otherwise, on recreate, the old one would be reused, and its
-                 IndexDetails::info ptr would be bad info.
-                 */
-                IndexDetails *id = &d->idx(x);
-                if ( !mayDeleteIdIndex && id->isIdIndex() ) {
+                if ( !mayDeleteIdIndex && d->idx(x).isIdIndex() ) {
                     errmsg = "may not delete _id index";
                     return false;
                 }
-                id->kill_idx();
-                d->multiKeyIndexBits = removeBit(d->multiKeyIndexBits, x);
-                d->nIndexes--;
-                for ( int i = x; i < d->nIndexes; i++ )
-                    d->idx(i) = d->idx(i+1);
+
+                LOG(4) << "  d->nIndexes was " << d->getCompletedIndexCount() << endl;
+                anObjBuilder.appendNumber("nIndexesWas", d->getCompletedIndexCount() );
+
+                d->removeIndex( x );
             }
             else {
                 int n = removeFromSysIndexes(ns, name); // just in case an orphaned listing there - i.e. should have been repaired but wasn't
@@ -400,17 +385,5 @@ namespace mongo {
         }
         return true;
     }
-
-    class IndexUpdateTest : public StartupTest {
-    public:
-        void run() {
-            verify( removeBit(1, 0) == 0 );
-            verify( removeBit(2, 0) == 1 );
-            verify( removeBit(2, 1) == 0 );
-            verify( removeBit(255, 1) == 127 );
-            verify( removeBit(21, 2) == 9 );
-            verify( removeBit(0x4000000000000001ULL, 62) == 1 );
-        }
-    } iu_unittest;
 
 }  // namespace mongo

@@ -45,8 +45,8 @@ namespace mongo {
             Client::ReadContext ctx(ns);
             NamespaceDetails *nsd = nsdetails(ns);
             uassert( 16154, "namespace does not exist", nsd );
-            
-            for( DiskLoc L = nsd->firstExtent; !L.isNull(); L = L.ext()->xnext )  {
+
+            for( DiskLoc L = nsd->firstExtent(); !L.isNull(); L = L.ext()->xnext )  {
                 MongoDataFile* mdf = cc().database()->getFile( L.a() );
                 massert( 16238, "can't fetch extent file structure", mdf );
                 touch_location tl;
@@ -54,8 +54,8 @@ namespace mongo {
                 tl.offset = L.getOfs();
                 tl.ext = L.ext();
                 tl.length = tl.ext->length;
-                
-                ranges.push_back(tl);                
+
+                ranges.push_back(tl);
             }
             mongoFilesLock.reset(new LockMongoFilesShared());
         }

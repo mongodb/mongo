@@ -95,9 +95,9 @@ namespace mongo {
             if ( !nsd->capLooped() )
                 start = nsd->firstRecord();
             else {
-                start = nsd->capExtent.ext()->firstRecord;
-                if ( !start.isNull() && start == nsd->capFirstNewRecord ) {
-                    start = nsd->capExtent.ext()->lastRecord;
+                start = nsd->capExtent().ext()->firstRecord;
+                if ( !start.isNull() && start == nsd->capFirstNewRecord() ) {
+                    start = nsd->capExtent().ext()->lastRecord;
                     start = nextLoop( nsd, start );
                 }
             }
@@ -114,16 +114,16 @@ namespace mongo {
 
         DiskLoc i = prev;
         // Last record
-        if ( i == nsd->capExtent.ext()->lastRecord )
+        if ( i == nsd->capExtent().ext()->lastRecord )
             return DiskLoc();
         i = nextLoop( nsd, i );
         // If we become capFirstNewRecord from same extent, advance to next extent.
-        if ( i == nsd->capFirstNewRecord &&
-                i != nsd->capExtent.ext()->firstRecord )
-            i = nextLoop( nsd, nsd->capExtent.ext()->lastRecord );
+        if ( i == nsd->capFirstNewRecord() &&
+             i != nsd->capExtent().ext()->firstRecord )
+            i = nextLoop( nsd, nsd->capExtent().ext()->lastRecord );
         // If we have just gotten to beginning of capExtent, skip to capFirstNewRecord
-        if ( i == nsd->capExtent.ext()->firstRecord )
-            i = nsd->capFirstNewRecord;
+        if ( i == nsd->capExtent().ext()->firstRecord )
+            i = nsd->capFirstNewRecord();
         return i;
     }
 
@@ -137,7 +137,7 @@ namespace mongo {
                 start = nsd->lastRecord();
             }
             else {
-                start = nsd->capExtent.ext()->lastRecord;
+                start = nsd->capExtent().ext()->lastRecord;
             }
         }
         curr = start;
@@ -152,26 +152,26 @@ namespace mongo {
 
         DiskLoc i = prev;
         // Last record
-        if ( nsd->capFirstNewRecord == nsd->capExtent.ext()->firstRecord ) {
-            if ( i == nextLoop( nsd, nsd->capExtent.ext()->lastRecord ) ) {
+        if ( nsd->capFirstNewRecord() == nsd->capExtent().ext()->firstRecord ) {
+            if ( i == nextLoop( nsd, nsd->capExtent().ext()->lastRecord ) ) {
                 return DiskLoc();
             }
         }
         else {
-            if ( i == nsd->capExtent.ext()->firstRecord ) {
+            if ( i == nsd->capExtent().ext()->firstRecord ) {
                 return DiskLoc();
             }
         }
         // If we are capFirstNewRecord, advance to prev extent, otherwise just get prev.
-        if ( i == nsd->capFirstNewRecord )
-            i = prevLoop( nsd, nsd->capExtent.ext()->firstRecord );
+        if ( i == nsd->capFirstNewRecord() )
+            i = prevLoop( nsd, nsd->capExtent().ext()->firstRecord );
         else
             i = prevLoop( nsd, i );
         // If we just became last in cap extent, advance past capFirstNewRecord
         // (We know capExtent.ext()->firstRecord != capFirstNewRecord, since would
         // have returned DiskLoc() earlier otherwise.)
-        if ( i == nsd->capExtent.ext()->lastRecord )
-            i = reverse()->next( nsd->capFirstNewRecord );
+        if ( i == nsd->capExtent().ext()->lastRecord )
+            i = reverse()->next( nsd->capFirstNewRecord() );
 
         return i;
     }

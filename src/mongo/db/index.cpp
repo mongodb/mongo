@@ -55,7 +55,7 @@ namespace mongo {
        call. repair database is the clean solution, but this gives one a lighter weight
        partial option.  see dropIndexes()
     */
-    void assureSysIndexesEmptied(const char *ns, IndexDetails *idIndex) {
+    int assureSysIndexesEmptied(const char *ns, IndexDetails *idIndex) {
         string system_indexes = cc().database()->name + ".system.indexes";
         BSONObjBuilder b;
         b.append("ns", ns);
@@ -67,6 +67,7 @@ namespace mongo {
         if( n ) {
             log() << "info: assureSysIndexesEmptied cleaned up " << n << " entries" << endl;
         }
+        return n;
     }
 
     int IndexDetails::keyPatternOffset( const string& key ) const {
@@ -83,6 +84,7 @@ namespace mongo {
 
     /* delete this index.  does NOT clean up the system catalog
        (system.indexes or system.namespaces) -- only NamespaceIndex.
+       TOOD: above comment is wrong, also, document durability assumptions
     */
     void IndexDetails::kill_idx() {
         string ns = indexNamespace(); // e.g. foo.coll.$ts_1
@@ -224,7 +226,7 @@ namespace mongo {
             return false;
         }
 
-        if ( sourceCollection->nIndexes >= NamespaceDetails::NIndexesMax ) {
+        if ( sourceCollection->getTotalIndexCount() >= NamespaceDetails::NIndexesMax ) {
             stringstream ss;
             ss << "add index fails, too many indexes for " << sourceNS << " key:" << key.toString();
             string s = ss.str();

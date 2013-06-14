@@ -859,7 +859,7 @@ namespace mongo {
                 indexesInProg = stopIndexBuilds(dbname, cmdObj);
                 capped = nsd->isCapped();
                 if ( capped )
-                    for( DiskLoc i = nsd->firstExtent; !i.isNull(); i = i.ext()->xnext )
+                    for( DiskLoc i = nsd->firstExtent(); !i.isNull(); i = i.ext()->xnext )
                         size += i.ext()->length;
             }
 

@@ -140,7 +140,7 @@ namespace mongo {
 
         // Is this index being created in the background?
         bool isBackgroundIndex() {
-            return _indexNumber >= _namespaceDetails->nIndexes;
+            return _indexNumber >= _namespaceDetails->getCompletedIndexCount();
         }
 
     private:

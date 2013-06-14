@@ -516,22 +516,20 @@ namespace mongo {
         NamespaceIndex *ni = nsindex(ns);
         NamespaceDetails *details = ni->details(ns);
         if ( details ) {
-            verify( !details->lastExtent.isNull() );
-            verify( !details->firstExtent.isNull() );
-            getDur().writingDiskLoc(e->xprev) = details->lastExtent;
-            getDur().writingDiskLoc(details->lastExtent.ext()->xnext) = eloc;
+            verify( !details->lastExtent().isNull() );
+            verify( !details->firstExtent().isNull() );
+            getDur().writingDiskLoc(e->xprev) = details->lastExtent();
+            getDur().writingDiskLoc(details->lastExtent().ext()->xnext) = eloc;
             verify( !eloc.isNull() );
-            getDur().writingDiskLoc(details->lastExtent) = eloc;
+            details->setLastExtent( eloc );
         }
         else {
             ni->add_ns(ns, eloc, capped);
             details = ni->details(ns);
         }
 
-        {
-            NamespaceDetails *dw = details->writingWithoutExtra();
-            dw->lastExtentSize = e->length;
-        }
+        details->setLastExtentSize( e->length );
+
         details->addDeletedRec(emptyLoc.drec(), emptyLoc);
     }
 
@@ -603,7 +601,7 @@ namespace mongo {
             int bestDiff = 0x7fffffff;
             {
                 Timer t;
-                DiskLoc L = f->firstExtent;
+                DiskLoc L = f->firstExtent();
                 while( !L.isNull() ) {
                     Extent * e = L.ext();
                     if( e->length >= low && e->length <= high ) {
@@ -647,10 +645,10 @@ namespace mongo {
                     e->xprev.ext()->xnext.writing() = e->xnext;
                 if( !e->xnext.isNull() )
                     e->xnext.ext()->xprev.writing() = e->xprev;
-                if( f->firstExtent == e->myLoc )
-                    f->firstExtent.writing() = e->xnext;
-                if( f->lastExtent == e->myLoc )
-                    f->lastExtent.writing() = e->xprev;
+                if( f->firstExtent() == e->myLoc )
+                    f->setFirstExtent( e->xnext );
+                if( f->lastExtent() == e->myLoc )
+                    f->setLastExtent( e->xprev );
 
                 // use it
                 OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned" << endl;
@@ -859,7 +857,7 @@ namespace mongo {
         if ( ! d )
             return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
 
-        DiskLoc loc = d->firstExtent;
+        DiskLoc loc = d->firstExtent();
         Extent *e = getExtent(loc);
 
         DEBUGGING {
@@ -917,7 +915,7 @@ namespace mongo {
         if ( !d->isCapped() ) {
             if ( !startLoc.isNull() )
                 return shared_ptr<Cursor>(new ReverseCursor( startLoc ));
-            Extent *e = d->lastExtent.ext();
+            Extent *e = d->lastExtent().ext();
             while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
                 OCCASIONALLY out() << "  findTableScan: extent empty, skipping ahead" << endl;
                 e = e->getPrevExtent();
@@ -937,7 +935,7 @@ namespace mongo {
             log() << "  freeExtents==0" << endl;
             return;
         }
-        DiskLoc a = freeExtents->firstExtent;
+        DiskLoc a = freeExtents->firstExtent();
         while( !a.isNull() ) {
             Extent *e = a.ext();
             log() << "  extent " << a.toString() << " len:" << e->length << " prev:" << e->xprev.toString() << endl;
@@ -969,16 +967,16 @@ namespace mongo {
             freeExtents = nsdetails(s);
             massert( 10361 , "can't create .$freelist", freeExtents);
         }
-        if( freeExtents->firstExtent.isNull() ) {
-            freeExtents->firstExtent.writing() = firstExt;
-            freeExtents->lastExtent.writing() = lastExt;
+        if( freeExtents->firstExtent().isNull() ) {
+            freeExtents->setFirstExtent( firstExt );
+            freeExtents->setLastExtent( lastExt );
         }
         else {
-            DiskLoc a = freeExtents->firstExtent;
+            DiskLoc a = freeExtents->firstExtent();
             verify( a.ext()->xprev.isNull() );
             getDur().writingDiskLoc( a.ext()->xprev ) = lastExt;
             getDur().writingDiskLoc( lastExt.ext()->xnext ) = a;
-            getDur().writingDiskLoc( freeExtents->firstExtent ) = firstExt;
+            freeExtents->setFirstExtent( firstExt );
         }
 
         //printFreeList();
@@ -1013,10 +1011,10 @@ namespace mongo {
         }
 
         // free extents
-        if( !d->firstExtent.isNull() ) {
-            freeExtents(d->firstExtent, d->lastExtent);
-            getDur().writingDiskLoc( d->firstExtent ).setInvalid();
-            getDur().writingDiskLoc( d->lastExtent ).setInvalid();
+        if( !d->firstExtent().isNull() ) {
+            freeExtents(d->firstExtent(), d->lastExtent());
+            d->setFirstExtentInvalid();
+            d->setLastExtentInvalid();
         }
 
         // remove from the catalog hashtable
@@ -1031,7 +1029,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForNs(name.c_str());
 
-        if ( d->nIndexes != 0 ) {
+        if ( d->getTotalIndexCount() > 0 ) {
             try {
                 verify( dropIndexes(d, name.c_str(), "*", errmsg, result, true) );
             }
@@ -1041,7 +1039,7 @@ namespace mongo {
                 ss << " cause: " << e.what();
                 uasserted(12503,ss.str());
             }
-            verify( d->nIndexes == 0 );
+            verify( d->getTotalIndexCount() == 0 );
         }
         LOG(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
@@ -1082,11 +1080,7 @@ namespace mongo {
 
         /* add to the free list */
         {
-            {
-                NamespaceDetails::Stats *s = getDur().writing(&d->stats);
-                s->datasize -= todelete->netLength();
-                s->nrecords--;
-            }
+            d->incrementStats( -1 * todelete->netLength(), -1 );
 
             if (NamespaceString(ns).coll ==  "system.indexes") {
                 /* temp: if in system.indexes, don't reuse, and zero out: we want to be
@@ -1336,7 +1330,7 @@ namespace mongo {
     // dummy data here, keeping pointers to the btree nodes holding the dummy data and then
     // updating the dummy data with the DiskLoc of the real record.
     void checkNoIndexConflicts( NamespaceDetails *d, const BSONObj &obj ) {
-        for ( int idxNo = 0; idxNo < d->nIndexes; idxNo++ ) {
+        for ( int idxNo = 0; idxNo < d->getCompletedIndexCount(); idxNo++ ) {
             if( d->idx(idxNo).unique() ) {
                 IndexDetails& idx = d->idx(idxNo);
                 if (ignoreUniqueIndex(idx))
@@ -1379,13 +1373,13 @@ namespace mongo {
         DiskLoc loc;
         if ( ! d->isCapped() ) { // size capped doesn't grow
             LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
-            cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
+            cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize()), false, !god);
             loc = d->alloc(ns, lenWHdr);
             if ( loc.isNull() ) {
-                log() << "warning: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again" << endl;
-                for ( int z=0; z<10 && lenWHdr > d->lastExtentSize; z++ ) {
+                log() << "warning: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize() << "; trying again" << endl;
+                for ( int z=0; z<10 && lenWHdr > d->lastExtentSize(); z++ ) {
                     log() << "try #" << z << endl;
-                    cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
+                    cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize()), false, !god);
                     loc = d->alloc(ns, lenWHdr);
                     if ( ! loc.isNull() )
                         break;
@@ -1445,6 +1439,10 @@ namespace mongo {
         return d;
     }
 
+
+    /**
+     * @param loc the location in system.indexes where the index spec is
+     */
     void NOINLINE_DECL insert_makeIndex(NamespaceDetails* tableToIndex,
                                         const string& tabletoidxns,
                                         const DiskLoc& loc,
@@ -1454,11 +1452,10 @@ namespace mongo {
                 NamespaceString(tabletoidxns).coll != "system.indexes");
 
         BSONObj info = loc.obj();
-
-        // The total number of indexes right before we write to the collection
-        int oldNIndexes = -1;
-        int idxNo = tableToIndex->getTotalIndexCount();
         std::string idxName = info["name"].valuestr();
+
+
+        int idxNo = -1;
 
         // Set curop description before setting indexBuildInProg, so that there's something
         // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
@@ -1469,12 +1466,13 @@ namespace mongo {
 
         try {
             IndexDetails& idx = tableToIndex->getNextIndexDetails(tabletoidxns.c_str());
+            NamespaceDetails::IndexBuildBlock indexBuildBlock( tabletoidxns, idxName );
+
             // It's important that this is outside the inner try/catch so that we never try to call
             // kill_idx on a half-formed disk loc (if this asserts).
             getDur().writingDiskLoc(idx.info) = loc;
 
             try {
-                getDur().writingInt(tableToIndex->indexBuildsInProgress) += 1;
                 buildAnIndex(tabletoidxns, tableToIndex, idx, mayInterrupt);
             }
             catch (DBException& e) {
@@ -1506,33 +1504,19 @@ namespace mongo {
             idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
 
             // Make sure the newly created index is relocated to nIndexes, if it isn't already there
-            if (idxNo != tableToIndex->nIndexes) {
+            if ( idxNo != tableToIndex->getCompletedIndexCount() ) {
                 log() << "switching indexes at position " << idxNo << " and "
-                      << tableToIndex->nIndexes << endl;
-                // We cannot use idx here, as it may point to a different index entry if it was
-                // flipped during building
-                IndexDetails temp = tableToIndex->idx(idxNo);
-                *getDur().writing(&tableToIndex->idx(idxNo)) =
-                    tableToIndex->idx(tableToIndex->nIndexes);
-                *getDur().writing(&tableToIndex->idx(tableToIndex->nIndexes)) = temp;
+                      << tableToIndex->getCompletedIndexCount() << endl;
 
-                // We also have to flip multikey entries
-                bool tempMultikey = tableToIndex->isMultikey(idxNo);
-                tableToIndex->setIndexIsMultikey(tabletoidxns.c_str(), idxNo,
-                                                 tableToIndex->isMultikey(tableToIndex->nIndexes));
-                tableToIndex->setIndexIsMultikey(tabletoidxns.c_str(), tableToIndex->nIndexes,
-                                                 tempMultikey);
+                tableToIndex->swapIndex( tabletoidxns.c_str(),
+                                         idxNo,
+                                         tableToIndex->getCompletedIndexCount() );
 
-                idxNo = tableToIndex->nIndexes;
+                idxNo = tableToIndex->getCompletedIndexCount();
             }
-
-            // Store the current total of indexes in case something goes wrong actually adding the
-            // index
-            oldNIndexes = tableToIndex->getTotalIndexCount();
 
             // clear transient info caches so they refresh; increments nIndexes
             tableToIndex->addIndex(tabletoidxns.c_str());
-            getDur().writingInt(tableToIndex->indexBuildsInProgress) -= 1;
 
             IndexLegacy::postBuildHook(tableToIndex, idx);
         }
@@ -1542,16 +1526,11 @@ namespace mongo {
             // metadata is consistent on any exception. It may leak like a sieve if the index
             // successfully finished building and addIndex or kill_idx threw.
 
-            // Check if nIndexes was incremented
-            if (oldNIndexes != -1 && oldNIndexes != tableToIndex->nIndexes) {
-                getDur().writingInt(tableToIndex->nIndexes) = oldNIndexes;
-            }
-
             // Move any other in prog indexes "back" one. It is important that idxNo is set
             // correctly so that the correct index is removed
-            IndexBuildsInProgress::remove(tabletoidxns.c_str(), idxNo);
-            getDur().writingInt(tableToIndex->indexBuildsInProgress) -= 1;
-
+            if ( idxNo >= 0 ) {
+                IndexBuildsInProgress::remove(tabletoidxns.c_str(), idxNo);
+            }
             throw;
         }
     }
@@ -1563,7 +1542,9 @@ namespace mongo {
         NamespaceDetails* nsd = nsdetails(ns);
 
         // Go through unfinished index builds and try to find this index
-        for (int i=nsd->nIndexes; i<nsd->nIndexes+nsd->indexBuildsInProgress; i++) {
+        for ( int i=nsd->getCompletedIndexCount();
+              i < nsd->getTotalIndexCount();
+              i++ ) {
             if (indexName == nsd->idx(i).indexName()) {
                 return i;
             }
@@ -1659,11 +1640,11 @@ namespace mongo {
 
         int lenWHdr = d->getRecordAllocationSize( len + Record::HeaderSize );
         fassert( 16440, lenWHdr >= ( len + Record::HeaderSize ) );
-        
+
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
-        if (d->nIndexes && 
-            d->isCapped() && 
+        if (d->getCompletedIndexCount() &&
+            d->isCapped() &&
             !god) {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
@@ -1696,12 +1677,7 @@ namespace mongo {
 
         addRecordToRecListInExtent(r, loc);
 
-        /* durability todo : this could be a bit annoying / slow to record constantly */
-        {
-            NamespaceDetails::Stats *s = getDur().writing(&d->stats);
-            s->datasize += r->netLength();
-            s->nrecords++;
-        }
+        d->incrementStats( r->netLength(), 1 );
 
         // we don't bother resetting query optimizer stats for the god tables - also god is true when adding a btree bucket
         if ( !god )
@@ -1712,11 +1688,12 @@ namespace mongo {
         }
 
         /* add this record to our indexes */
-        if (d->nIndexes) {
+        if ( d->getTotalIndexCount() > 0 ) {
             try {
                 BSONObj obj(r->data());
                 indexRecord(ns, d, obj, loc);
-            } catch( AssertionException& e ) {
+            }
+            catch( AssertionException& e ) {
                 // should be a dup key error on _id index
                 if( tableToIndex || d->isCapped() ) {
                     massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );
@@ -1784,13 +1761,7 @@ namespace mongo {
             e->lastRecord.writing() = loc;
         }
 
-        /* todo: don't update for oplog?  seems wasteful. */
-        {
-            NamespaceDetails::Stats *s = getDur().writing(&d->stats);
-            s->datasize += r->netLength();
-            s->nrecords++;
-        }
-
+        d->incrementStats( r->netLength(), 1 );
         return r;
     }
 

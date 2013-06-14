@@ -277,10 +277,10 @@ namespace mongo {
                     // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
                     max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
                 }
-                
-                const long long recCount = d->stats.nrecords;
-                const long long dataSize = d->stats.datasize;
-                
+
+                const long long recCount = d->numRecords();
+                const long long dataSize = d->dataSize();
+
                 //
                 // 1.b Now that we have the size estimate, go over the remaining parameters and apply any maximum size
                 //     restrictions specified there.

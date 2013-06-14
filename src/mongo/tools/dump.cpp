@@ -329,38 +329,38 @@ public:
     }
 
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
-        NamespaceDetails * nsd = nsdetails( ns );
-        log() << "nrecords: " << nsd->stats.nrecords 
-              << " datasize: " << nsd->stats.datasize 
-              << " firstExtent: " << nsd->firstExtent 
+        const NamespaceDetails * nsd = nsdetails( ns );
+        log() << "nrecords: " << nsd->numRecords()
+              << " datasize: " << nsd->dataSize()
+              << " firstExtent: " << nsd->firstExtent()
               << endl;
-        
-        if ( nsd->firstExtent.isNull() ){
+
+        if ( nsd->firstExtent().isNull() ){
             log() << " ERROR fisrtExtent is null" << endl;
             return;
         }
-        
-        if ( ! nsd->firstExtent.isValid() ){
+
+        if ( ! nsd->firstExtent().isValid() ){
             log() << " ERROR fisrtExtent is not valid" << endl;
             return;
         }
 
         outfile /= ( ns.substr( ns.find( "." ) + 1 ) + ".bson" );
         log() << "writing to: " << outfile.string() << endl;
-        
+
         FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
         // init with double the docs count because we make two passes 
-        ProgressMeter m( nsd->stats.nrecords * 2 );
+        ProgressMeter m( nsd->numRecords() * 2 );
         m.setName("Repair Progress");
         m.setUnits("objects");
-        
+
         Writer w( f , &m );
 
         try {
             log() << "forward extent pass" << endl;
             LogIndentLevel lil;
-            DiskLoc eLoc = nsd->firstExtent;
+            DiskLoc eLoc = nsd->firstExtent();
             while ( ! eLoc.isNull() ){
                 log() << "extent loc: " << eLoc << endl;
                 eLoc = _repairExtent( db , ns , true , eLoc , w );
@@ -373,7 +373,7 @@ public:
         try {
             log() << "backwards extent pass" << endl;
             LogIndentLevel lil;
-            DiskLoc eLoc = nsd->lastExtent;
+            DiskLoc eLoc = nsd->lastExtent();
             while ( ! eLoc.isNull() ){
                 log() << "extent loc: " << eLoc << endl;
                 eLoc = _repairExtent( db , ns , false , eLoc , w );

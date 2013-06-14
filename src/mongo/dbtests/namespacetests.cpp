@@ -1568,7 +1568,7 @@ namespace NamespaceTests {
             }
             int nRecords() const {
                 int count = 0;
-                for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext ) {
+                for ( DiskLoc i = nsd()->firstExtent(); !i.isNull(); i = i.ext()->xnext ) {
                     int fileNo = i.ext()->firstRecord.a();
                     if ( fileNo == -1 )
                         continue;
@@ -1577,12 +1577,12 @@ namespace NamespaceTests {
                         ++count;
                     }
                 }
-                ASSERT_EQUALS( count, nsd()->stats.nrecords );
+                ASSERT_EQUALS( count, nsd()->numRecords() );
                 return count;
             }
             int nExtents() const {
                 int count = 0;
-                for ( DiskLoc i = nsd()->firstExtent; !i.isNull(); i = i.ext()->xnext )
+                for ( DiskLoc i = nsd()->firstExtent(); !i.isNull(); i = i.ext()->xnext )
                     ++count;
                 return count;
             }
@@ -1600,8 +1600,8 @@ namespace NamespaceTests {
             }
             static BSONObj bigObj(bool bGenID=false) {
                 BSONObjBuilder b;
-				if (bGenID)
-					b.appendOID("_id", 0, true);
+                if (bGenID)
+                    b.appendOID("_id", 0, true);
                 string as( 187, 'a' );
                 b.append( "a", as );
                 return b.obj();
@@ -1610,8 +1610,8 @@ namespace NamespaceTests {
             /** Return the smallest DeletedRecord in deletedList, or DiskLoc() if none. */
             DiskLoc smallestDeletedRecord() {
                 for( int i = 0; i < Buckets; ++i ) {
-                    if ( !nsd()->deletedList[ i ].isNull() ) {
-                        return nsd()->deletedList[ i ];
+                    if ( !nsd()->deletedListEntry( i ).isNull() ) {
+                        return nsd()->deletedListEntry( i );
                     }
                 }
                 return DiskLoc();
@@ -1626,9 +1626,9 @@ namespace NamespaceTests {
                 // Extract the first DeletedRecord from the deletedList.
                 DiskLoc deleted;
                 for( int i = 0; i < Buckets; ++i ) {
-                    if ( !nsd()->deletedList[ i ].isNull() ) {
-                        deleted = nsd()->deletedList[ i ];
-                        nsd()->deletedList[ i ].writing().Null();
+                    if ( !nsd()->deletedListEntry( i ).isNull() ) {
+                        deleted = nsd()->deletedListEntry( i );
+                        nsd()->deletedListEntry( i ).writing().Null();
                         break;
                     }
                 }
@@ -1641,7 +1641,7 @@ namespace NamespaceTests {
 
                 // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
                 // new size.
-                nsd()->deletedList[ NamespaceDetails::bucket( newDeletedRecordSize ) ].writing() =
+                nsd()->deletedListEntry( NamespaceDetails::bucket( newDeletedRecordSize ) ).writing() =
                         deleted;
             }
         };
@@ -1652,10 +1652,10 @@ namespace NamespaceTests {
                 create();
                 ASSERT( nsd() );
                 ASSERT_EQUALS( 0, nRecords() );
-                ASSERT( nsd()->firstExtent == nsd()->capExtent );
+                ASSERT( nsd()->firstExtent() == nsd()->capExtent() );
                 DiskLoc initial = DiskLoc();
                 initial.setInvalid();
-                ASSERT( initial == nsd()->capFirstNewRecord );
+                ASSERT( initial == nsd()->capFirstNewRecord() );
             }
         };
 
@@ -2144,7 +2144,7 @@ namespace NamespaceTests {
                 }
 
                 nsd->cappedTruncateAfter(ns(), truncAt, false);
-                ASSERT_EQUALS( nsd->stats.nrecords , 28 );
+                ASSERT_EQUALS( nsd->numRecords() , 28 );
 
                 {
                     scoped_ptr<ForwardCappedCursor> c( ForwardCappedCursor::make( nsd ) );
@@ -2175,18 +2175,18 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                nsd()->deletedList[ 2 ] = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted();
+                nsd()->deletedListEntry( 2 ) = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted();
                 nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted().writing() = DiskLoc();
                 nsd()->cappedLastDelRecLastExtent().Null();
                 NamespaceDetails *d = nsd();
-                zero( &d->capExtent );
-                zero( &d->capFirstNewRecord );
+                zero( &d->capExtent() );
+                zero( &d->capFirstNewRecord() );
 
                 nsd();
 
-                ASSERT( nsd()->firstExtent == nsd()->capExtent );
-                ASSERT( nsd()->capExtent.getOfs() != 0 );
-                ASSERT( !nsd()->capFirstNewRecord.isValid() );
+                ASSERT( nsd()->firstExtent() == nsd()->capExtent() );
+                ASSERT( nsd()->capExtent().getOfs() != 0 );
+                ASSERT( !nsd()->capFirstNewRecord().isValid() );
                 int nDeleted = 0;
                 for ( DiskLoc i = nsd()->cappedListOfAllDeletedRecords(); !i.isNull(); i = i.drec()->nextDeleted(), ++nDeleted );
                 ASSERT_EQUALS( 10, nDeleted );

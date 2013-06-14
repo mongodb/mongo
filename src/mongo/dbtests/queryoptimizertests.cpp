@@ -93,7 +93,7 @@ namespace {
             }
             int existingIndexNo( const BSONObj &key ) const {
                 NamespaceDetails *d = nsd();
-                for( int i = 0; i < d->nIndexes; ++i ) {
+                for( int i = 0; i < d->getCompletedIndexCount(); ++i ) {
                     if ( ( d->idx( i ).keyPattern() == key ) ||
                         ( d->idx( i ).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) ) {
                         return i;

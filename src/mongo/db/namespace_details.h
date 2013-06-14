@@ -55,9 +55,13 @@ namespace mongo {
     public:
         enum { NIndexesMax = 64, NIndexesExtra = 30, NIndexesBase  = 10 };
 
+    private:
+
         /*-------- data fields, as present on disk : */
-        DiskLoc firstExtent;
-        DiskLoc lastExtent;
+
+        DiskLoc _firstExtent;
+        DiskLoc _lastExtent;
+
         /* NOTE: capped collections v1 override the meaning of deletedList.
                  deletedList[0] points to a list of free records (DeletedRecord's) for all extents in
                  the capped namespace.
@@ -65,16 +69,18 @@ namespace mongo {
                  changes, this value is updated.  !deletedList[1].isValid() when this value is not
                  yet computed.
         */
-        DiskLoc deletedList[Buckets];
+        DiskLoc _deletedList[Buckets];
+
         // ofs 168 (8 byte aligned)
         struct Stats {
             // datasize and nrecords MUST Be adjacent code assumes!
             long long datasize; // this includes padding, but not record headers
             long long nrecords;
-        } stats;
-        int lastExtentSize;
-        int nIndexes;
-    private:
+        } _stats;
+
+        int _lastExtentSize;
+        int _nIndexes;
+
         // ofs 192
         IndexDetails _indexes[NIndexesBase];
 
@@ -85,21 +91,22 @@ namespace mongo {
         double _paddingFactor;                 // 1.0 = no padding.
         // ofs 386 (16)
         int _systemFlags; // things that the system sets/cares about
-    public:
-        DiskLoc capExtent; // the "current" extent we're writing too for a capped collection
-        DiskLoc capFirstNewRecord;
-        unsigned short dataFileVersion;       // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
-        unsigned short indexFileVersion;
-        unsigned long long multiKeyIndexBits;
-    private:
+
+        DiskLoc _capExtent; // the "current" extent we're writing too for a capped collection
+        DiskLoc _capFirstNewRecord;
+
+        unsigned short _dataFileVersion;       // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
+        unsigned short _indexFileVersion;
+        unsigned long long _multiKeyIndexBits;
+
         // ofs 400 (16)
-        unsigned long long reservedA;
-        long long extraOffset;                // where the $extra info is located (bytes relative to this)
-    public:
-        int indexBuildsInProgress;            // Number of indexes currently being built
-    private:
+        unsigned long long _reservedA;
+        long long _extraOffset;               // where the $extra info is located (bytes relative to this)
+
+        int _indexBuildsInProgress;            // Number of indexes currently being built
+
         int _userFlags;
-        char reserved[72];
+        char _reserved[72];
         /*-------- end data 496 bytes */
     public:
         explicit NamespaceDetails( const DiskLoc &loc, bool _capped );
@@ -130,8 +137,8 @@ namespace mongo {
             }
         };
         Extra* extra() {
-            if( extraOffset == 0 ) return 0;
-            return (Extra *) (((char *) this) + extraOffset);
+            if( _extraOffset == 0 ) return 0;
+            return (Extra *) (((char *) this) + _extraOffset);
         }
         /* add extra space for indexes when more than 10 */
         Extra* allocExtra(const char *ns, int nindexessofar);
@@ -143,8 +150,15 @@ namespace mongo {
         /* dump info on all extents for this namespace.  for debugging. */
         void dumpExtents();
 
+    public:
+        const DiskLoc& capExtent() const { return _capExtent; }
+        const DiskLoc capFirstNewRecord() const { return _capFirstNewRecord; }
+
+        DiskLoc& capExtent() { return _capExtent; }
+        DiskLoc& capFirstNewRecord() { return _capFirstNewRecord; }
+
     private:
-        Extent *theCapExtent() const { return capExtent.ext(); }
+        Extent *theCapExtent() const { return _capExtent.ext(); }
         void advanceCapExtent( const char *ns );
         DiskLoc __capAlloc(int len);
         DiskLoc cappedAlloc(const char *ns, int len);
@@ -153,19 +167,51 @@ namespace mongo {
 
     public:
 
+        const DiskLoc& firstExtent() const { return _firstExtent; }
+        const DiskLoc& lastExtent() const { return _lastExtent; }
+
+        DiskLoc& firstExtent() { return _firstExtent; }
+        DiskLoc& lastExtent() { return _lastExtent; }
+
+        void setFirstExtent( DiskLoc newFirstExtent );
+        void setLastExtent( DiskLoc newLastExtent );
+
+        void setFirstExtentInvalid();
+        void setLastExtentInvalid();
+
+
+        long long dataSize() const { return _stats.datasize; }
+        long long numRecords() const { return _stats.nrecords; }
+
+        void incrementStats( long long dataSizeIncrement,
+                             long long numRecordsIncrement );
+
+        void setStats( long long dataSizeIncrement,
+                       long long numRecordsIncrement );
+
+
         bool isCapped() const { return _isCapped; }
         long long maxCappedDocs() const;
         void setMaxCappedDocs( long long max );
+
+        int lastExtentSize() const { return _lastExtentSize; }
+        void setLastExtentSize( int newMax );
+
+        const DiskLoc& deletedListEntry( int bucket ) const { return _deletedList[bucket]; }
+        DiskLoc& deletedListEntry( int bucket ) { return _deletedList[bucket]; }
+
+        void orphanDeletedList();
+
         /**
          * @param max in and out, will be adjusted
          * @return if the value is valid at all
          */
         static bool validMaxCappedDocs( long long* max );
 
-        DiskLoc& cappedListOfAllDeletedRecords() { return deletedList[0]; }
-        DiskLoc& cappedLastDelRecLastExtent()    { return deletedList[1]; }
+        DiskLoc& cappedListOfAllDeletedRecords() { return _deletedList[0]; }
+        DiskLoc& cappedLastDelRecLastExtent()    { return _deletedList[1]; }
         void cappedDumpDelInfo();
-        bool capLooped() const { return _isCapped && capFirstNewRecord.isValid();  }
+        bool capLooped() const { return _isCapped && _capFirstNewRecord.isValid();  }
         bool inCapExtent( const DiskLoc &dl ) const;
         void cappedCheckMigrate();
         /**
@@ -181,7 +227,11 @@ namespace mongo {
         /* when a background index build is in progress, we don't count the index in nIndexes until
            complete, yet need to still use it in _indexRecord() - thus we use this function for that.
         */
-        int getTotalIndexCount() const { return nIndexes + indexBuildsInProgress; }
+        int getTotalIndexCount() const { return _nIndexes + _indexBuildsInProgress; }
+
+        int getCompletedIndexCount() const { return _nIndexes; }
+
+        int getIndexBuildsInProgress() const { return _indexBuildsInProgress; }
 
         /* NOTE: be careful with flags.  are we manipulating them in read locks?  if so,
                  this isn't thread safe.  TODO
@@ -219,7 +269,7 @@ namespace mongo {
              for a single document. see multikey in docs.
            for these, we have to do some dedup work on queries.
         */
-        bool isMultikey(int i) const { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
+        bool isMultikey(int i) const { return (_multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
         void setIndexIsMultikey(const char *thisns, int i, bool multikey = true);
 
         /**
@@ -280,7 +330,7 @@ namespace mongo {
                    can pushes this down considerably. further tweaking will be a good idea but 
                    this should be an adequate starting point.
                 */
-                double N = min(nIndexes,7) + 3;
+                double N = min(_nIndexes,7) + 3;
                 double x = _paddingFactor + (0.001 * N);
                 if ( x <= 2.0 ) {
                     setPaddingFactor( x );
@@ -310,6 +360,26 @@ namespace mongo {
         const IndexDetails* findIndexByPrefix( const BSONObj &keyPattern ,
                                                bool requireSingleKey );
 
+        void removeIndex( int idx );
+
+        /**
+         * removes things beteen getCompletedIndexCount() and getTotalIndexCount()
+         * this should only be used for crash recovery
+         */
+        void blowAwayInProgressIndexEntries();
+
+        /**
+         * @return the info for the index to retry
+         */
+        BSONObj prepOneUnfinishedIndex();
+
+        /**
+         * swaps all meta data for 2 indexes
+         * a and b are 2 index ids, whose contents will be swapped
+         * must have a lock on the entire collection to do this
+         */
+        void swapIndex( const char* ns, int a, int b );
+
         /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
          * The specified index must already contain an expireAfterSeconds field, and the value in
          * that field and newExpireSecs must both be numeric.
@@ -324,10 +394,9 @@ namespace mongo {
 
         const int userFlags() const { return _userFlags; }
         bool isUserFlagSet( int flag ) const { return _userFlags & flag; }
-        
-        
+
         /**
-         * these methods only modify NamespaceDetails and do not 
+         * these methods only modify NamespaceDetails and do not
          * sync changes back to system.namespaces
          * a typical call might
          if ( nsd->setUserFlag( 4 ) ) {
@@ -335,7 +404,7 @@ namespace mongo {
          }
          * these methods all return true iff only something was modified
          */
-        
+
         bool setUserFlag( int flag );
         bool clearUserFlag( int flag );
         bool replaceUserFlags( int flags );
@@ -354,7 +423,7 @@ namespace mongo {
             return -1;
         }
 
-        bool haveIdIndex() { 
+        bool haveIdIndex() {
             return isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex ) || findIdIndex() >= 0;
         }
 
@@ -401,9 +470,9 @@ namespace mongo {
         long long storageSize( int * numExtents = 0 , BSONArrayBuilder * extentInfo = 0 ) const;
 
         int averageObjectSize() {
-            if ( stats.nrecords == 0 )
+            if ( _stats.nrecords == 0 )
                 return 5;
-            return (int) (stats.datasize / stats.nrecords);
+            return (int) (_stats.datasize / _stats.nrecords);
         }
 
         NamespaceDetails *writingWithoutExtra() {
@@ -412,7 +481,20 @@ namespace mongo {
         /** Make all linked Extra objects writeable as well */
         NamespaceDetails *writingWithExtra();
 
+        class IndexBuildBlock {
+        public:
+            IndexBuildBlock( const string& ns, const string& indexName );
+            ~IndexBuildBlock();
+
+        private:
+            string _ns;
+            string _indexName;
+        };
+
     private:
+
+        void _removeIndex( int idx );
+
         DiskLoc _alloc(const char *ns, int len);
         void maybeComplain( const char *ns, int len ) const;
         DiskLoc __stdAlloc(int len, bool willBeAt);
@@ -586,7 +668,7 @@ namespace mongo {
         bool find(const char *ns, DiskLoc& loc) {
             NamespaceDetails *l = details(ns);
             if ( l ) {
-                loc = l->firstExtent;
+                loc = l->_firstExtent;
                 return true;
             }
             return false;

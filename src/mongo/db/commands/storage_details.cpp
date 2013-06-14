@@ -368,7 +368,7 @@ namespace {
      */
     const Extent* getNthExtent(int extentNum, const NamespaceDetails* nsd) {
         int curExtent = 0;
-        for (Extent* ex = DataFileMgr::getExtent(nsd->firstExtent);
+        for (Extent* ex = DataFileMgr::getExtent(nsd->firstExtent());
              ex != NULL;
              ex = ex->getNextExtent()) {
 
@@ -564,7 +564,7 @@ namespace {
 
         if (processingDeletedRecords) {
             for (int bucketNum = 0; bucketNum < mongo::Buckets; bucketNum++) {
-                DiskLoc dl = nsd->deletedList[bucketNum];
+                DiskLoc dl = nsd->deletedListEntry(bucketNum);
                 while (!dl.isNull()) {
                     DeletedRecord* dr = dl.drec();
                     processDeletedRecord(dl, dr, ex, params, bucketNum, sliceData,
@@ -714,7 +714,7 @@ namespace {
             success = analyzeExtent(nsd, ex, subCommand, globalParams, errmsg, outputBuilder);
         }
         else {
-            const DiskLoc dl = nsd->firstExtent;
+            const DiskLoc dl = nsd->firstExtent();
             if (dl.isNull()) {
                 errmsg = "no extents in namespace";
                 return false;

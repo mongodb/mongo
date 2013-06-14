@@ -176,7 +176,8 @@ namespace mongo {
 
     class NamespaceDetails;
     // changedId should be initialized to false
-    void assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
+    // @return how many things were deleted
+    int assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
     int removeFromSysIndexes(const char *ns, const char *idxName);
 
     /**

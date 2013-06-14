@@ -98,7 +98,7 @@ namespace mongo {
                                                           bool includeBackgroundInProgress) {
         d = _d;
         i = 0;
-        n = includeBackgroundInProgress ? d->getTotalIndexCount() : d->nIndexes;
+        n = includeBackgroundInProgress ? d->getTotalIndexCount() : d->_nIndexes;
     }
 
 }
