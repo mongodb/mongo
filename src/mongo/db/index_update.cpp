@@ -331,22 +331,15 @@ namespace mongo {
             anObjBuilder.appendNumber("nIndexesWas", d->getCompletedIndexCount() );
             IndexDetails *idIndex = 0;
 
-            while ( 1 ) {
-                bool didAnything = false;
+            for ( int i = 0; i < d->getCompletedIndexCount(); i++ ) {
 
-                for ( int i = 0; i < d->getCompletedIndexCount(); i++ ) {
-
-                    if ( !mayDeleteIdIndex && d->idx(i).isIdIndex() ) {
-                        idIndex = &d->idx(i);
-                        continue;
-                    }
-                    didAnything = true;
-                    d->removeIndex( i );
-                    break;
+                if ( !mayDeleteIdIndex && d->idx(i).isIdIndex() ) {
+                    idIndex = &d->idx(i);
+                    continue;
                 }
 
-                if ( !didAnything )
-                    break;
+                d->removeIndex( i );
+                i--;
             }
 
             if ( idIndex ) {
