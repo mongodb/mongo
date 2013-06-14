@@ -115,11 +115,11 @@ namespace mongo {
             return;
         }
 
-        cout << "ns         " << firstExtent.toString() << ' ' << lastExtent.toString() << " nidx:" << nIndexes << '\n';
-        cout << "ns         " << stats.datasize << ' ' << stats.nrecords << ' ' << nIndexes << '\n';
-        cout << "ns         " << isCapped() << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << dataFileVersion << '\n';
-        cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildsInProgress << '\n';
-        cout << "ns         " << (int) reserved[0] << ' ' << (int) reserved[59];
+        cout << "ns         " << _firstExtent.toString() << ' ' << _lastExtent.toString() << " nidx:" << _nIndexes << '\n';
+        cout << "ns         " << _stats.datasize << ' ' << _stats.nrecords << ' ' << _nIndexes << '\n';
+        cout << "ns         " << isCapped() << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << _dataFileVersion << '\n';
+        cout << "ns         " << _multiKeyIndexBits << ' ' << _indexBuildsInProgress << '\n';
+        cout << "ns         " << (int)_reserved[0] << ' ' << (int)_reserved[59];
         cout << endl;
     }
 #endif
