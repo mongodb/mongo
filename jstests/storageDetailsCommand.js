@@ -8,12 +8,8 @@ for (var i = 0; i < 3000; ++i) {
 }
 
 function test() {
-    var result = t.diskStorageStats({numberOfSlices: 100});
-    if (result["bad cmd"]) {
-        print("storageDetails command not available: skipping");
-        return;
-    }
 
+    var result = t.diskStorageStats({numberOfSlices: 100});
     assert.commandWorked(result);
 
     function checkDiskStats(data) {
@@ -48,6 +44,8 @@ function test() {
         }
     }
 
+    // subcommand pagesInRAM
+
     result = t.pagesInRAM({numberOfSlices: 100});
     assert(result.ok);
 
@@ -66,6 +64,27 @@ function test() {
             assert(isNumber(extents[i].slices[c]));
         }
     }
+
+    // subcommand documentsInRAM
+
+    result = t.documentsInRAM();
+    assert(result.ok);
+
+    assert(isNumber(result.inMem));
+    assert(isNumber(result.nscanned));
+    assert(isNumber(result.netBytesInRAM));
+    assert(isNumber(result.pageBytesInRAM));
+    assert(isNumber(result.memFragmentation));
+
+    stats = t.stats();
+    assert(stats.ok);
+
+    assert.eq(result.inMem, 1.0);
+    assert.eq(result.nscanned, stats.count);
+    assert.eq(result.netBytesInRAM, stats.size);
+    assert(result.pageBytesInRAM >= result.netBytesInRAM);
+    assert(result.memFragmentation >= 0.0);
+    assert(result.memFragmentation <= 1.0);
 
     function checkErrorConditions(helper) {
         var result = helper.apply(t, [{extent: 'a'}]);
@@ -96,3 +115,5 @@ function test() {
     checkErrorConditions(t.diskStorageStats);
     checkErrorConditions(t.pagesInRAM);
 }
+
+test()
