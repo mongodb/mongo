@@ -27,6 +27,8 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/unordered_set.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -68,6 +70,22 @@ namespace mongo {
             out->push_back(Privilege(dbname, actions));
         }
 
+        struct CreateUserArgs {
+            std::string userName;
+            std::string clearTextPassword;
+            std::string userSource; // TODO(spencer): remove this once we're using v2 user format
+            bool readOnly; // TODO(spencer): remove this once we're using the new v2 user format
+            BSONObj extraData; // Owned by the owner of the command object used to call createUser
+            BSONArray roles; // Owned by the owner of the command object used to call createUser
+            bool hasPassword;
+            bool hasUserSource;
+            bool hasReadOnly;
+            bool hasExtraData;
+            bool hasRoles;
+            CreateUserArgs() : readOnly(false), hasPassword(false), hasUserSource(false),
+                    hasReadOnly(false), hasExtraData(false), hasRoles(false) {}
+        };
+
         // TODO: The bulk of the implementation of this will need to change once we're using the
         // new v2 authorization storage format.
         bool run(const string& dbname,
@@ -76,102 +94,37 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
-            std::string userName;
-            std::string clearTextPassword;
-            std::string password;
-            std::string userSource; // TODO: remove this.
-            bool readOnly; // TODO: remove this.
-            BSONElement extraData;
-            BSONElement roles;
-
-            if (cmdObj.hasField("pwd") && cmdObj.hasField("userSource")) {
-                errmsg = "User objects can't have both 'pwd' and 'userSource'";
-                return false;
-            }
-
-            if (!cmdObj.hasField("pwd") && !cmdObj.hasField("userSource")) {
-                errmsg = "User objects must have one of 'pwd' and 'userSource'";
-                return false;
-            }
-
-            if (cmdObj.hasField("roles") && cmdObj.hasField("readOnly")) {
-                errmsg = "User objects can't have both 'roles' and 'readOnly'";
-                return false;
-            }
-
-            Status status = bsonExtractStringField(cmdObj, "user", &userName);
+            CreateUserArgs args;
+            Status status = _parseAndValidateInput(cmdObj, &args);
             if (!status.isOK()) {
-                addStatus(Status(ErrorCodes::UserModificationFailed,
-                                 "\"user\" string not specified"),
-                          result);
+                addStatus(status, result);
                 return false;
             }
 
-            status = bsonExtractStringFieldWithDefault(cmdObj, "pwd", "", &clearTextPassword);
-            if (!status.isOK()) {
-                addStatus(Status(ErrorCodes::UserModificationFailed,
-                                 "Invalid \"pwd\" string"),
-                          result);
-                return false;
-            }
-            password = DBClientWithCommands::createPasswordDigest(userName, clearTextPassword);
+            std::string password = DBClientWithCommands::createPasswordDigest(
+                    args.userName, args.clearTextPassword);
 
-            status = bsonExtractStringFieldWithDefault(cmdObj, "userSource", "", &userSource);
-            if (!status.isOK()) {
-                addStatus(Status(ErrorCodes::UserModificationFailed,
-                                 "Invalid \"userSource\" string"),
-                          result);
-                return false;
-            }
-
-            status = bsonExtractBooleanFieldWithDefault(cmdObj, "readOnly", false, &readOnly);
-            if (!status.isOK()) {
-                addStatus(Status(ErrorCodes::UserModificationFailed,
-                                 "Invalid \"readOnly\" boolean"),
-                          result);
-                return false;
-            }
-
-            if (cmdObj.hasField("extraData")) {
-                status = bsonExtractField(cmdObj, "extraData", &extraData);
-                if (!status.isOK()) {
-                    addStatus(Status(ErrorCodes::UserModificationFailed,
-                                     "Invalid \"extraData\" object"),
-                              result);
-                    return false;
-                }
-            }
-
-            if (cmdObj.hasField("roles")) {
-                status = bsonExtractField(cmdObj, "roles", &roles);
-                if (!status.isOK()) {
-                    addStatus(Status(ErrorCodes::UserModificationFailed,
-                                     "Invalid \"roles\" array"),
-                              result);
-                    return false;
-                }
-            }
 
             BSONObjBuilder userObjBuilder;
-            userObjBuilder.append("user", userName);
-            if (cmdObj.hasField("pwd")) {
+            userObjBuilder.append("user", args.userName);
+            if (args.hasPassword) {
                 userObjBuilder.append("pwd", password);
             }
 
-            if (cmdObj.hasField("userSource")) {
-                userObjBuilder.append("userSource", userSource);
+            if (args.hasUserSource) {
+                userObjBuilder.append("userSource", args.userSource);
             }
 
-            if (cmdObj.hasField("readOnly")) {
-                userObjBuilder.append("readOnly", readOnly);
+            if (args.hasReadOnly) {
+                userObjBuilder.append("readOnly", args.readOnly);
             }
 
-            if (cmdObj.hasField("extraData")) {
-                userObjBuilder.append(extraData);
+            if (args.hasExtraData) {
+                userObjBuilder.append("extraData", args.extraData);
             }
 
-            if (cmdObj.hasField("roles")) {
-                userObjBuilder.append(roles);
+            if (args.hasRoles) {
+                userObjBuilder.append("roles", args.roles);
             }
 
             status = getGlobalAuthorizationManager()->insertPrivilegeDocument(dbname,
@@ -183,6 +136,96 @@ namespace mongo {
 
             return true;
         }
+
+    private:
+
+        Status _parseAndValidateInput(BSONObj cmdObj, CreateUserArgs* parsedArgs) const {
+            unordered_set<std::string> validFieldNames;
+            validFieldNames.insert("createUser");
+            validFieldNames.insert("user");
+            validFieldNames.insert("pwd");
+            validFieldNames.insert("userSource");
+            validFieldNames.insert("roles");
+            validFieldNames.insert("readOnly");
+            validFieldNames.insert("extraData");
+
+            // Iterate through all fields in command object and make sure there are no unexpected
+            // ones.
+            for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
+                StringData fieldName = (*iter).fieldNameStringData();
+                if (!validFieldNames.count(fieldName.toString())) {
+                    return Status(ErrorCodes::BadValue,
+                                  mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                                          "a valid argument to createUser");
+                }
+            }
+
+            Status status = bsonExtractStringField(cmdObj, "user", &parsedArgs->userName);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (cmdObj.hasField("pwd")) {
+                parsedArgs->hasPassword = true;
+                status = bsonExtractStringField(cmdObj, "pwd", &parsedArgs->clearTextPassword);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
+
+            if (cmdObj.hasField("userSource")) {
+                parsedArgs->hasUserSource = true;
+                status = bsonExtractStringField(cmdObj, "userSource", &parsedArgs->userSource);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
+            if (cmdObj.hasField("readOnly")) {
+                parsedArgs->hasReadOnly = true;
+                status = bsonExtractBooleanField(cmdObj, "readOnly", &parsedArgs->readOnly);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
+            if (cmdObj.hasField("extraData")) {
+                parsedArgs->hasExtraData = true;
+                BSONElement element;
+                status = bsonExtractTypedField(cmdObj, "extraData", Object, &element);
+                if (!status.isOK()) {
+                    return status;
+                }
+                parsedArgs->extraData = element.Obj();
+            }
+
+            if (cmdObj.hasField("roles")) {
+                parsedArgs->hasRoles = true;
+                BSONElement element;
+                status = bsonExtractTypedField(cmdObj, "roles", Array, &element);
+                if (!status.isOK()) {
+                    return status;
+                }
+                parsedArgs->roles = BSONArray(element.Obj());
+            }
+
+            if (parsedArgs->hasPassword && parsedArgs->hasUserSource) {
+                return Status(ErrorCodes::BadValue,
+                              "User objects can't have both 'pwd' and 'userSource'");
+            }
+            if (!parsedArgs->hasPassword && !parsedArgs->hasUserSource) {
+                return Status(ErrorCodes::BadValue,
+                              "User objects must have one of 'pwd' and 'userSource'");
+            }
+            if (parsedArgs->hasRoles && parsedArgs->hasReadOnly) {
+                return Status(ErrorCodes::BadValue,
+                              "User objects can't have both 'roles' and 'readOnly'");
+            }
+
+            return Status::OK();
+        }
+
     } cmdCreateUser;
 
     class CmdUpdateUser : public Command {
@@ -215,63 +258,43 @@ namespace mongo {
                 out->push_back(Privilege(dbname, actions));
             }
 
+            struct UpdateUserArgs {
+                std::string userName;
+                std::string clearTextPassword;
+                BSONObj extraData; // Owned by the owner of the command object given to updateUser
+                bool hasPassword;
+                bool hasExtraData;
+                UpdateUserArgs() : hasPassword(false), hasExtraData(false) {}
+            };
+
             bool run(const string& dbname,
                      BSONObj& cmdObj,
                      int options,
                      string& errmsg,
                      BSONObjBuilder& result,
                      bool fromRepl) {
-                std::string userName;
-                std::string clearTextPassword;
-                std::string password;
-                BSONElement extraData;
-
-                if (!cmdObj.hasField("pwd") && !cmdObj.hasField("extraData")) {
-                    errmsg = "updateUser: must specify at least one of 'pwd' and 'extraData'";
-                    return false;
-                }
-
-                Status status = bsonExtractStringField(cmdObj, "user", &userName);
+                UpdateUserArgs args;
+                Status status = _parseAndValidateInput(cmdObj, &args);
                 if (!status.isOK()) {
-                    addStatus(Status(ErrorCodes::UserModificationFailed,
-                                     "\"user\" string not specified"),
-                              result);
+                    addStatus(status, result);
                     return false;
-                }
-
-
-                status = bsonExtractStringFieldWithDefault(cmdObj, "pwd", "", &clearTextPassword);
-                if (!status.isOK()) {
-                    addStatus(Status(ErrorCodes::UserModificationFailed,
-                                     "invalid \"pwd\" string"),
-                              result);
-                    return false;
-                }
-                password = DBClientWithCommands::createPasswordDigest(userName, clearTextPassword);
-
-                if (cmdObj.hasField("extraData")) {
-                    status = bsonExtractField(cmdObj, "extraData", &extraData);
-                    if (!status.isOK()) {
-                        addStatus(Status(ErrorCodes::UserModificationFailed,
-                                         "invalid \"extraData\" string"),
-                                  result);
-                        return false;
-                    }
                 }
 
                 // TODO: This update will have to change once we're using the new v2 user
                 // storage format.
                 BSONObjBuilder setBuilder;
-                if (cmdObj.hasField("pwd")) {
+                if (args.hasPassword) {
+                    std::string password = DBClientWithCommands::createPasswordDigest(
+                            args.userName, args.clearTextPassword);
                     setBuilder.append("pwd", password);
                 }
-                if (cmdObj.hasField("extraData")) {
-                    setBuilder.append(extraData);
+                if (args.hasExtraData) {
+                    setBuilder.append("extraData", args.extraData);
                 }
                 BSONObj updateObj = BSON("$set" << setBuilder.obj());
 
                 status = getGlobalAuthorizationManager()->updatePrivilegeDocument(
-                        UserName(userName, dbname), updateObj);
+                        UserName(args.userName, dbname), updateObj);
 
                 if (!status.isOK()) {
                     addStatus(status, result);
@@ -279,6 +302,57 @@ namespace mongo {
                 }
 
                 return true;
+            }
+
+        private:
+
+            Status _parseAndValidateInput(BSONObj cmdObj, UpdateUserArgs* parsedArgs) const {
+                unordered_set<std::string> validFieldNames;
+                validFieldNames.insert("updateUser");
+                validFieldNames.insert("user");
+                validFieldNames.insert("pwd");
+                validFieldNames.insert("extraData");
+
+                // Iterate through all fields in command object and make sure there are no
+                // unexpected ones.
+                for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
+                    StringData fieldName = (*iter).fieldNameStringData();
+                    if (!validFieldNames.count(fieldName.toString())) {
+                        return Status(ErrorCodes::BadValue,
+                                      mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                                              "a valid argument to updateUser");
+                    }
+                }
+
+                Status status = bsonExtractStringField(cmdObj, "user", &parsedArgs->userName);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                if (cmdObj.hasField("pwd")) {
+                    parsedArgs->hasPassword = true;
+                    status = bsonExtractStringField(cmdObj, "pwd", &parsedArgs->clearTextPassword);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                }
+
+                if (cmdObj.hasField("extraData")) {
+                    parsedArgs->hasExtraData = true;
+                    BSONElement element;
+                    status = bsonExtractTypedField(cmdObj, "extraData", Object, &element);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                    parsedArgs->extraData = element.Obj();
+                }
+
+
+                if (!parsedArgs->hasPassword && !parsedArgs->hasExtraData) {
+                    return Status(ErrorCodes::BadValue,
+                                  "Must specify at least one of 'pwd' and 'extraData'");
+                }
+                return Status::OK();
             }
         } cmdUpdateUser;
 }

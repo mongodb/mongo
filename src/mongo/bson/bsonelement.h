@@ -144,11 +144,17 @@ namespace mongo {
             return data + 1;
         }
 
-
+        /**
+         * NOTE: size includes the NULL terminator.
+         */
         int fieldNameSize() const {
             if ( fieldNameSize_ == -1 )
                 fieldNameSize_ = (int)strlen( fieldName() ) + 1;
             return fieldNameSize_;
+        }
+
+        const StringData fieldNameStringData() const {
+            return StringData(fieldName(), fieldNameSize() - 1);
         }
 
         /** raw data of the element's value (so be careful). */

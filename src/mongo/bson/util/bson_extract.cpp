@@ -16,6 +16,7 @@
 #include "mongo/bson/util/bson_extract.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -24,7 +25,9 @@ namespace mongo {
                             BSONElement* outElement) {
         BSONElement element = object.getField(fieldName);
         if (element.eoo())
-            return Status(ErrorCodes::NoSuchKey, fieldName.toString());
+            return Status(ErrorCodes::NoSuchKey,
+                          mongoutils::str::stream() << "Missing expected field \"" <<
+                                  fieldName.toString() << "\"");
         *outElement = element;
         return Status::OK();
     }
@@ -38,9 +41,21 @@ namespace mongo {
             return status;
         if (type != outElement->type()) {
             return Status(ErrorCodes::TypeMismatch,
-                          std::string("Expected ") + typeName(type) +
-                          " found " + typeName(outElement->type()));
+                          mongoutils::str::stream() << "\"" << fieldName <<
+                          "\" had the wrong type. Expected " << typeName(type) <<
+                          ", found " << typeName(outElement->type()));
         }
+        return Status::OK();
+    }
+
+    Status bsonExtractBooleanField(const BSONObj& object,
+                                   const StringData& fieldName,
+                                   bool* out) {
+        BSONElement element;
+        Status status = bsonExtractTypedField(object, fieldName, Bool, &element);
+        if (!status.isOK())
+            return status;
+        *out = element.boolean();
         return Status::OK();
     }
 

@@ -50,6 +50,18 @@ namespace mongo {
                                  BSONElement* outElement);
 
     /**
+     * Finds a bool-like element named "fieldName" in "object".
+     *
+     * Returns Status::OK() and sets *out to the found element's boolean value on success.  Returns
+     * ErrorCodes::NoSuchKey if there are no matches for "fieldName", and ErrorCodes::TypeMismatch
+     * if the type of the matching element is not Bool or a number type.  For return values other
+     * than Status::OK(), the resulting value of "*out" is undefined.
+     */
+    Status bsonExtractBooleanField(const BSONObj& object,
+                                   const StringData& fieldName,
+                                   bool* out);
+
+    /**
      * Finds a string-typed element named "fieldName" in "object" and stores its value in "out".
      *
      * Returns Status::OK() and sets *out to the found element's string value on success.  Returns
