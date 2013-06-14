@@ -154,6 +154,10 @@ src/third_party/js-1.7/jsautokw.h
 src/third_party/v8/src/experimental-libraries.cc
 src/third_party/v8/src/libraries.cc
 
+# Eclipse build artifacts
+.cproject
+.project
+
 # old things that should be removed
 # maybe remove this mid 2012
 src/third_party/js-1.7/jscpucfg
