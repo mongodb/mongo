@@ -184,16 +184,16 @@ namespace mongo {
                     out << " ,\n";
                 BSONObj obj = cursor->next();
                 if( html ) {
+                    out << obj.jsonString(Strict, html?1:0) << "\n\n";
                     if( out.tellp() > 4 * 1024 * 1024 ) {
                         out << "Stopping output: more than 4MB returned and in html mode\n";
                         break;
                     }
-                    out << obj.jsonString(Strict, html?1:0) << "\n\n";
                 }
                 else {
+                    out << "    " << obj.jsonString();
                     if( out.tellp() > 50 * 1024 * 1024 ) // 50MB limit - we are using ram
                         break;
-                    out << "    " << obj.jsonString();
                 }
             }
 
