@@ -404,7 +404,11 @@ namespace mongo {
         boost::filesystem::path path( dbpath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
+        #if BOOST_VERSION >= 104400
             string fileName = boost::filesystem::path(*i).leaf().string();
+        #else
+            string fileName = boost::filesystem::path(*i).leaf();
+        #endif
             if ( boost::filesystem::is_directory( *i ) &&
                     fileName.length() && fileName[ 0 ] == '$' )
                 boost::filesystem::remove_all( *i );

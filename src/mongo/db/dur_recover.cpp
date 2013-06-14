@@ -75,7 +75,11 @@ namespace mongo {
                     i != boost::filesystem::directory_iterator();
                     ++i ) {
                 boost::filesystem::path filepath = *i;
+            #if BOOST_VERSION >= 104400
                 string fileName = boost::filesystem::path(*i).leaf().string();
+            #else
+                string fileName = boost::filesystem::path(*i).leaf();
+            #endif
                 if( str::startsWith(fileName, "j._") ) {
                     unsigned u = str::toUnsigned( str::after(fileName, '_') );
                     if( m.count(u) ) {
@@ -87,8 +91,13 @@ namespace mongo {
             for( map<unsigned,boost::filesystem::path>::iterator i = m.begin(); i != m.end(); ++i ) {
                 if( i != m.begin() && m.count(i->first - 1) == 0 ) {
                     uasserted(13532,
-                    str::stream() << "unexpected file in journal directory " << dir.string()
-                      << " : " << boost::filesystem::path(i->second).leaf().string() << " : can't find its preceding file");
+                    str::stream() << "unexpected file in journal directory " << dir.string() << " : "
+                    #if BOOST_VERSION >= 104400
+                        << boost::filesystem::path(i->second).leaf().string()
+                    #else
+                        << boost::filesystem::path(i->second).leaf()
+                    #endif
+                        << " : can't find its preceding file");
                 }
                 files.push_back(i->second);
             }

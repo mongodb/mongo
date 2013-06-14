@@ -871,13 +871,21 @@ namespace mongo {
                 i != boost::filesystem::directory_iterator(); ++i ) {
             if ( directoryperdb ) {
                 boost::filesystem::path p = *i;
+            #if BOOST_VERSION >= 104400
                 string dbName = p.leaf().string();
+            #else
+                string dbName = p.leaf();
+            #endif
                 p /= ( dbName + ".ns" );
                 if ( exists( p ) )
                     names.push_back( dbName );
             }
             else {
+            #if BOOST_VERSION >= 104400
                 string fileName = boost::filesystem::path(*i).leaf().string();
+            #else
+                string fileName = boost::filesystem::path(*i).leaf();
+            #endif
                 if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
                     names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
             }

@@ -198,7 +198,11 @@ namespace {
     void MongoFile::setFilename(const std::string& fn) {
         LockMongoFilesExclusive lk;
         verify( _filename.empty() );
+    #if BOOST_VERSION >= 104400
         _filename = boost::filesystem::absolute(fn).generic_string();
+    #else
+        _filename = boost::filesystem::system_complete(fn).string();
+    #endif
         MongoFile *&ptf = pathToFile[_filename];
         massert(13617, "MongoFile : multiple opens of same filename", ptf == 0);
         ptf = this;
@@ -206,8 +210,12 @@ namespace {
 
     MongoFile* MongoFileFinder::findByPath(const std::string& path) const {
         return mapFindWithDefault(pathToFile,
-                                  boost::filesystem::absolute(path).generic_string(),
-                                  static_cast<MongoFile*>(NULL));
+        #if BOOST_VERSION >= 104400
+            boost::filesystem::absolute(path).generic_string(),
+        #else
+            boost::filesystem::system_complete(path).string(),
+        #endif
+            static_cast<MongoFile*>(NULL));
     }
 
 

@@ -47,6 +47,7 @@
 #define BOOST_FILESYSTEM_VERSION 3
 #include <boost/shared_ptr.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 #include <boost/version.hpp>
