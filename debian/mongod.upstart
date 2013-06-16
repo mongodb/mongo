@@ -13,8 +13,15 @@ limit nproc 32000 32000
 kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
 
 pre-start script
-    mkdir -p /var/lib/mongodb/
-    mkdir -p /var/log/mongodb/
+    if ! [ -d /var/lib/mongodb/ ]; then
+        mkdir -p /var/lib/mongodb/
+        chown -R mongodb:mongodb /var/lib/mongodb/
+    fi
+
+    if ! [ -d /var/log/mongodb/ ]; then
+        mkdir -p /var/log/mongodb/
+        chown -R mongodb:mongodb /var/log/mongodb/
+    fi
 end script
 
 start on runlevel [2345]
