@@ -447,11 +447,14 @@ def runTest(test):
     else:
         keyFileData = None
 
+    mongo_test_filename = os.path.basename(path)
+    if 'sharedclient' in path:
+        mongo_test_filename += "-sharedclient"
 
     # sys.stdout.write() is more atomic than print, so using it prevents
     # lines being interrupted by, e.g., child processes
     sys.stdout.write(" *******************************************\n")
-    sys.stdout.write("         Test : %s ...\n" % os.path.basename(path))
+    sys.stdout.write("         Test : %s ...\n" % mongo_test_filename)
     sys.stdout.flush()
 
     # FIXME: we don't handle the case where the subprocess
@@ -485,7 +488,7 @@ def runTest(test):
     sys.stdout.write("         Date : %s\n" % datetime.now().ctime())
     sys.stdout.flush()
 
-    os.environ['MONGO_TEST_FILENAME'] = os.path.basename(path)
+    os.environ['MONGO_TEST_FILENAME'] = mongo_test_filename
     t1 = time.time()
     r = call(buildlogger(argv), cwd=test_path)
     t2 = time.time()
