@@ -34,6 +34,10 @@ int delay = 0;
 string destUri;
 void cleanup( int sig );
 
+namespace mongo {
+    CmdLine cmdLine;
+}
+
 class Forwarder {
 public:
     Forwarder( MessagingPort &mp ) : mp_( mp ) {

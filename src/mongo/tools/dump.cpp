@@ -22,12 +22,10 @@
 #include <fstream>
 #include <map>
 
-#include "mongo/base/initializer.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/tools/tool.h"
-#include "mongo/util/text.h"
 
 using namespace mongo;
 
@@ -541,26 +539,4 @@ public:
     BSONObj _query;
 };
 
-int toolMain( int argc , char ** argv, char ** envp ) {
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    Dump d;
-    return d.main( argc , argv );
-}
-
-#if defined(_WIN32)
-// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
-// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
-// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
-// and makes them available through the argv() and envp() members.  This enables toolMain()
-// to process UTF-8 encoded arguments and environment variables without regard to platform.
-int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = toolMain(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
-}
-#else
-int main(int argc, char* argv[], char** envp) {
-    int exitCode = toolMain(argc, argv, envp);
-    ::_exit(exitCode);
-}
-#endif
+REGISTER_MONGO_TOOL(Dump);
