@@ -24,6 +24,7 @@
 
 #include "pcrecpp.h"
 
+#include "mongo/base/initializer.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -34,6 +35,7 @@
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/password.h"
+#include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
 using namespace std;
@@ -121,7 +123,7 @@ namespace mongo {
             out << " (commit " << mongo::gitVersion() << ")";
         out << endl;
     }
-    int Tool::main( int argc , char ** argv ) {
+    int Tool::main( int argc , char ** argv, char ** envp ) {
         static StaticObserver staticObserver;
 
         setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
@@ -196,9 +198,31 @@ namespace mongo {
         }
 #endif
 
-        preSetup();
+        if ( _params.count( "db" ) )
+            _db = _params["db"].as<string>();
+
+        if ( _params.count( "collection" ) )
+            _coll = _params["collection"].as<string>();
+
+        if ( _params.count( "username" ) )
+            _username = _params["username"].as<string>();
+
+        if ( _params.count( "password" )
+                && ( _password.empty() ) ) {
+            _password = askPassword();
+        }
+
+        if (_params.count("ipv6"))
+            enableIPv6();
 
         bool useDirectClient = hasParam( "dbpath" );
+        if ( useDirectClient && _params.count("journal")){
+            cmdLine.dur = true;
+        }
+
+        mongo::runGlobalInitializersOrDie(argc, argv, envp);
+
+        preSetup();
 
         if ( ! useDirectClient ) {
             _host = "127.0.0.1";
@@ -238,10 +262,6 @@ namespace mongo {
             }
             verify( lastError.get( true ) );
 
-            if (_params.count("journal")){
-                cmdLine.dur = true;
-            }
-
             Client::initThread("tools");
             _conn = new DBDirectClient();
             _host = "DIRECT";
@@ -262,23 +282,6 @@ namespace mongo {
 
             dur::startup();
         }
-
-        if ( _params.count( "db" ) )
-            _db = _params["db"].as<string>();
-
-        if ( _params.count( "collection" ) )
-            _coll = _params["collection"].as<string>();
-
-        if ( _params.count( "username" ) )
-            _username = _params["username"].as<string>();
-
-        if ( _params.count( "password" )
-                && ( _password.empty() ) ) {
-            _password = askPassword();
-        }
-
-        if (_params.count("ipv6"))
-            enableIPv6();
 
         int ret = -1;
         try {
@@ -564,3 +567,23 @@ namespace mongo {
     }
 
 }
+
+#if defined(_WIN32)
+// In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
+// as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
+// WindowsCommandLine object converts these wide character strings to a UTF-8 coded equivalent
+// and makes them available through the argv() and envp() members.  This enables toolMain()
+// to process UTF-8 encoded arguments and environment variables without regard to platform.
+int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+    mongo::WindowsCommandLine wcl(argc, argvW, envpW);
+    auto_ptr<Tool> instance = (*Tool::createInstance)();
+    int exitCode = instance->main(argc, wcl.argv(), wcl.envp());
+    ::_exit(exitCode);
+}
+
+#else
+int main(int argc, char* argv[], char** envp) {
+    auto_ptr<Tool> instance = (*Tool::createInstance)();
+    ::_exit(instance->main(argc, argv, envp));
+}
+#endif
