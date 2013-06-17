@@ -32,6 +32,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <pthread.h>
@@ -67,6 +68,8 @@ extern WT_EXTENSION_API *wt_api;
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
 
+#define	MEMRATA_DEVICE	"kvs_devices=[/dev/loop0]"
+
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 
@@ -76,6 +79,7 @@ extern WT_EXTENSION_API *wt_api;
 #define	WT_NAME	"wt"				/* Object name */
 
 #define	RUNDIR		"RUNDIR"		/* Run home */
+#define	RUNDIR_BACKUP	"RUNDIR/BACKUP"		/* Hot-backup directory */
 #define	RUNDIR_KVS	"RUNDIR/KVS"		/* Run home for data-source */
 
 #define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
@@ -87,7 +91,8 @@ typedef struct {
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
 
-	void *wts_conn;				/* WT_CONNECTION handle */
+	WT_CONNECTION	 *wts_conn;
+	WT_EXTENSION_API *wt_api;
 
 	FILE *rand_log;				/* Random number log */
 
@@ -101,6 +106,10 @@ typedef struct {
 
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
+	int threads_finished;			/* Operations completed */
+
+	pthread_rwlock_t backup_lock;		/* Hot backup running */
+	pthread_rwlock_t table_extend_lock;	/* Updating last record */
 
 	char *uri;				/* Object name */
 
@@ -126,6 +135,7 @@ typedef struct {
 	char *c_data_source;
 	u_int c_delete_pct;
 	u_int c_dictionary;
+	u_int c_hot_backups;
 	char *c_file_type;
 	u_int c_huffman_key;
 	u_int c_huffman_value;
@@ -150,6 +160,14 @@ typedef struct {
 
 	uint32_t key_cnt;			/* Keys loaded so far */
 	uint32_t rows;				/* Total rows */
+
+	/*
+	 * We don't want to get to far past the end of the original bulk
+	 * load, we can run out of space to track the added records.
+	 */
+#define	MAX_EXTEND	(g.c_threads * 3)
+	uint32_t extend;			/* Total extended slots */
+
 	uint16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
@@ -184,17 +202,20 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	 die(int, const char *, ...);
+void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+char	*oc_conf(char *, size_t, const char *);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
 void	 value_gen(uint8_t *, uint32_t *, uint64_t);
 void	 wts_close(void);
+void	 wts_create(void);
 void	 wts_dump(const char *, int);
 void	 wts_load(void);
-void	 wts_open(void);
+void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(void);
 uint32_t wts_rand(void);
 void	 wts_read_scan(void);

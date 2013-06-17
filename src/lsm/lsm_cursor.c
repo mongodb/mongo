@@ -1045,7 +1045,7 @@ err:	API_END(session);
  */
 int
 __wt_clsm_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
 	    NULL,			/* get-key */
@@ -1097,7 +1097,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	clsm->dsk_gen = 0;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	/*
 	 * LSM cursors default to overwrite: if no setting was supplied, turn

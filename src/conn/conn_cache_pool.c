@@ -48,8 +48,9 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		reconfiguring = 1;
 	else {
 		/* Only setup if a shared cache was explicitly configured. */
-		if (__wt_config_gets(session, WT_SKIP_DEFAULT_CONFIG(cfg),
-		    "shared_cache", &cval) == WT_NOTFOUND)
+		WT_RET(__wt_config_gets(
+		    session, cfg, "shared_cache.enable", &cval));
+		if (!cval.val)
 			return (0);
 		WT_RET_NOTFOUND_OK(
 		    __wt_config_gets(session, cfg, "shared_cache.name", &cval));

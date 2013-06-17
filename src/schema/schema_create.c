@@ -7,11 +7,49 @@
 
 #include "wt_internal.h"
 
+/*
+ * __wt_direct_io_size_check --
+ *	Return a size from the configuration, complaining if it's insufficient
+ * for direct I/O.
+ */
+int
+__wt_direct_io_size_check(WT_SESSION_IMPL *session,
+    const char **cfg, const char *config_name, uint32_t *sizep)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	int64_t align;
+
+	*sizep = 0;
+
+	conn = S2C(session);
+
+	WT_RET(__wt_config_gets(session, cfg, config_name, &cval));
+
+	/*
+	 * This function exists as a place to hang this comment: if direct I/O
+	 * is configured, page sizes must be at least as large as any buffer
+	 * alignment as well as a multiple of the alignment.  Linux gets unhappy
+	 * if you configure direct I/O and then don't do I/O in alignments and
+	 * units of its happy place.
+	 */
+	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_DATA)) {
+		align = (int64_t)conn->buffer_alignment;
+		if (align != 0 && (cval.val < align || cval.val % align != 0))
+			WT_RET_MSG(session, EINVAL,
+			    "when direct I/O is configured, the %s size must "
+			    "be at least as large as the buffer alignment as "
+			    "well as a multiple of the buffer alignment",
+			    config_name);
+	}
+	*sizep = (uint32_t)cval.val;
+	return (0);
+}
+
 static int
 __create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
 	uint32_t allocsize;
@@ -30,14 +68,15 @@ __create_file(WT_SESSION_IMPL *session,
 
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
-	    __wt_metadata_read(session, uri, &fileconf)) != WT_NOTFOUND) {
+	    __wt_metadata_search(session, uri, &fileconf)) != WT_NOTFOUND) {
 		if (exclusive)
 			WT_TRET(EEXIST);
 		goto err;
 	}
 
-	WT_RET(__wt_config_gets(session, filecfg, "allocation_size", &cval));
-	allocsize = (uint32_t)cval.val;
+	/* Sanity check the allocation size. */
+	WT_RET(__wt_direct_io_size_check(
+	    session, filecfg, "allocation_size", &allocsize));
 
 	/* Create the file. */
 	WT_ERR(__wt_block_manager_create(session, filename, allocsize));
@@ -55,11 +94,7 @@ __create_file(WT_SESSION_IMPL *session,
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 		filecfg[2] = val->data;
 		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
-		if ((ret = __wt_metadata_insert(session, uri, fileconf)) != 0) {
-			if (ret == WT_DUPLICATE_KEY)
-				ret = EEXIST;
-			goto err;
-		}
+		WT_ERR(__wt_metadata_insert(session, uri, fileconf));
 	}
 
 	/*
@@ -453,22 +488,11 @@ err:		if (table != NULL) {
 
 static int
 __create_data_source(WT_SESSION_IMPL *session,
-    const char *uri, int exclusive, const char *config, WT_DATA_SOURCE *dsrc)
+    const char *uri, const char *config, WT_DATA_SOURCE *dsrc)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
-	const char *cfg[4], *fileconf;
-
-	fileconf = NULL;
-
-	/* Check if the data-source already exists. */
-	if ((ret =
-	    __wt_metadata_read(session, uri, &fileconf)) != WT_NOTFOUND) {
-		__wt_free(session, fileconf);
-		if (exclusive)
-			WT_TRET(EEXIST);
-		return (ret);
-	}
+	const char *cfg[] = {
+	    WT_CONFIG_BASE(session, session_create), config, NULL };
 
 	/*
 	 * User-specified collators aren't supported for data-source objects.
@@ -479,34 +503,7 @@ __create_data_source(WT_SESSION_IMPL *session,
 		    "WT_DATA_SOURCE objects do not support WT_COLLATOR "
 		    "ordering");
 
-	/*
-	 * Set a default key/value format, and insert the configuration into
-	 * the metadata.
-	 *
-	 * XXX
-	 * Use the session_create information, even though it includes a ton of
-	 * things we don't care about (like checksum configuration).  We should
-	 * be stripping that information out.
-	 */
-	cfg[0] = WT_CONFIG_BASE(session, session_create);
-	cfg[1] = "key_format=u,value_format=u";
-	cfg[2] = config;
-	cfg[3] = NULL;
-	WT_RET(__wt_config_collapse(session, cfg, &fileconf));
-	if ((ret = __wt_metadata_insert(session, uri, fileconf)) == 0) {
-		cfg[0] = fileconf;
-		cfg[1] = NULL;
-		WT_ERR(dsrc->create(
-		    dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg));
-	} else if (ret == WT_DUPLICATE_KEY)
-		ret = EEXIST;
-
-	if (0) {
-err:		WT_TRET(__wt_metadata_remove(session, uri));
-	}
-
-	__wt_free(session, fileconf);
-	return (ret);
+	return (dsrc->create(dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg));
 }
 
 int
@@ -538,10 +535,12 @@ __wt_schema_create(
 		ret = __create_index(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __create_table(session, uri, exclusive, config);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->create == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    __create_data_source(session, uri, exclusive, config, dsrc);
+		    __create_data_source(session, uri, config, dsrc);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	session->dhandle = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));

@@ -504,10 +504,8 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	 * Make sure there is space to track exclusive access so we can unlock
 	 * to clean up.
 	 */
-	if (session->excl_next * sizeof(WT_REF *) == session->excl_allocated)
-		WT_RET(__wt_realloc(session, &session->excl_allocated,
-		    (session->excl_next + 50) * sizeof(WT_REF *),
-		    &session->excl));
+	WT_RET(__wt_realloc_def(session, &session->excl_allocated,
+	    session->excl_next + 1, &session->excl));
 
 	/*
 	 * Hazard pointers are acquired down the tree, which means we can't

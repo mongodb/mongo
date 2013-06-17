@@ -11,6 +11,50 @@ static int __checkpoint_sync(WT_SESSION_IMPL *, const char *[]);
 static int __checkpoint_write_leaves(WT_SESSION_IMPL *, const char *[]);
 
 /*
+ * __checkpoint_lsm_check --
+ *	Check for an attempt to name a checkpoint that includes an LSM tree.
+ */
+static int
+__checkpoint_lsm_check(WT_SESSION_IMPL *session, const char *uri)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	int cmp, fail;
+
+	cursor = NULL;
+	fail = 0;
+
+	/*
+	 * This function exists as a place to hang this comment: LSM trees don't
+	 * support named checkpoints.   If a target list for the checkpoint is
+	 * provided, this function is called with each target list entry; check
+	 * the entry to make sure it's not an LSM tree.  If no target list is
+	 * provided, confirm the metadata file contains no LSM trees.
+	 */
+	if (uri == NULL) {
+		WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+		cursor->set_key(cursor, "lsm:");
+		if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
+			ret = cursor->next(cursor);
+		if (ret == 0) {
+			WT_ERR(cursor->get_key(cursor, &uri));
+			if (WT_PREFIX_MATCH(uri, "lsm:"))
+				fail = 1;
+		} else
+			WT_ERR_NOTFOUND_OK(ret);
+	} else if (WT_PREFIX_MATCH(uri, "lsm:"))
+			fail = 1;
+
+	if (fail)
+		WT_ERR_MSG(session, EINVAL,
+		    "LSM trees do not support named checkpoints");
+
+err:	if (cursor != NULL)
+		WT_TRET(cursor->close(cursor));
+	return (ret);
+}
+
+/*
  * __checkpoint_apply --
  *	Apply an operation to all files involved in a checkpoint.
  */
@@ -22,9 +66,13 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	int ckpt_closed, target_list;
+	int ckpt_closed, named, target_list;
 
 	target_list = 0;
+
+	/* Flag if this is a named checkpoint. */
+	WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
+	named = cval.len != 0;
 
 	/* Step through the list of targets and checkpoint each one. */
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
@@ -37,22 +85,30 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 
 		if (v.len != 0)
 			WT_ERR_MSG(session, EINVAL,
-			    "invalid checkpoint target \"%s\": URIs may "
-			    "require quoting",
-			    (const char *)tmp->data);
+			    "invalid checkpoint target %.*s: URIs may require "
+			    "quoting",
+			    (int)cval.len, (char *)cval.str);
+
+		/* LSM trees don't support named checkpoints. */
+		if (named)
+			WT_ERR(__checkpoint_lsm_check(session, k.str));
 
 		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
 		if ((ret = __wt_schema_worker(
-		    session, tmp->data, op, cfg, 0)) != 0)
+		    session, tmp->data, op, NULL, cfg, 0)) != 0)
 			WT_ERR_MSG(session, ret, "%s", (const char *)tmp->data);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
 	if (!target_list) {
+		/* LSM trees don't support named checkpoints. */
+		if (named)
+			WT_ERR(__checkpoint_lsm_check(session, NULL));
+
 		/*
-		 * Possible checkpoint name.  If checkpoints are named or we're
-		 * dropping checkpoints, checkpoint both open and closed files;
-		 * else, we only checkpoint open files.
+		 * If the checkpoint is named or we're dropping checkpoints, we
+		 * checkpoint both open and closed files; else, only checkpoint
+		 * open files.
 		 *
 		 * XXX
 		 * We don't optimize unnamed checkpoints of a list of targets,
@@ -60,14 +116,11 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 		 * quiescent and don't need a checkpoint, believing applications
 		 * unlikely to checkpoint a list of closed targets.
 		 */
-		cval.len = 0;
-		ckpt_closed = 0;
-		WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
-		if (cval.len != 0)
-			ckpt_closed = 1;
-		WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
-		if (cval.len != 0)
-			ckpt_closed = 1;
+		ckpt_closed = named;
+		if (!ckpt_closed) {
+			WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
+			ckpt_closed = cval.len != 0;
+		}
 		WT_ERR(ckpt_closed ?
 		    __wt_meta_btree_apply(session, op, cfg) :
 		    __wt_conn_btree_apply(session, op, cfg));
@@ -94,21 +147,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	int tracking;
 
 	conn = S2C(session);
-	tracking = 0;
 	txn = &session->txn;
+	tracking = 0;
 
 	/*
-	 * Only one checkpoint can be active at a time, and checkpoints must
-	 * run in the same order as they update the metadata; we are using the
-	 * schema lock to determine that ordering, so we can't move this to
-	 * __session_checkpoint.
-	 *
-	 * Begin a transaction for the checkpoint.
+	 * Only one checkpoint can be active at a time, and checkpoints must run
+	 * in the same order as they update the metadata, also, there are other
+	 * operations (for example, Btree compaction) that must serialize with
+	 * checkpoints.
 	 */
-	WT_ASSERT(session,
-	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
-	    !F_ISSET(txn, TXN_RUNNING));
-	__wt_spin_lock(session, &conn->metadata_lock);
+	__wt_spin_lock(session, &conn->checkpoint_lock);
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	txn->isolation = TXN_ISO_READ_COMMITTED;
@@ -177,7 +225,7 @@ err:	/*
 
 	if (F_ISSET(txn, TXN_RUNNING))
 		__wt_txn_release(session);
-	__wt_spin_unlock(session, &conn->metadata_lock);
+	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
 	__wt_scr_free(&tmp);
 	return (ret);
@@ -680,8 +728,7 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	if (S2BT(session)->modified)
-		WT_RET(__wt_bt_cache_op(
-		    session, NULL, WT_SYNC_WRITE_LEAVES));
+		WT_RET(__wt_bt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
 
 	return (0);
 }

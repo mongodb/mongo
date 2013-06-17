@@ -64,7 +64,7 @@ source_meta = [
 		table.  By default, the data source URI is derived from the \c
 		type and the column group or index name.  Applications can
 		create tables from existing data sources by supplying a \c
-		source configuration'''),
+		source configuration''', undoc=True),
 	Config('type', 'file', r'''
 		set the type of data source used to store a column group, index
 		or simple table.  By default, a \c "file:" URI is derived from
@@ -94,14 +94,15 @@ format_meta = column_meta + [
 
 lsm_config = [
 	Config('lsm_auto_throttle', 'true', r'''
-		Throttle inserts into LSM trees if flushing to disk isn't keeping up''',
+		Throttle inserts into LSM trees if flushing to disk isn't
+		keeping up''',
 		type='boolean'),
 	Config('lsm_bloom', 'true', r'''
 		create bloom filters on LSM tree chunks as they are merged''',
 		type='boolean'),
 	Config('lsm_bloom_config', '', r'''
-		config string used when creating Bloom filter files, passed to
-		WT_SESSION::create'''),
+		config string used when creating Bloom filter files, passed
+		to WT_SESSION::create'''),
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters''',
 		min='2', max='1000'),
@@ -110,12 +111,12 @@ lsm_config = [
 		filters''',
 		min='2', max='100'),
 	Config('lsm_bloom_newest', 'false', r'''
-		create a bloom filter on an LSM tree chunk before it's first merge.
-		Only supported if bloom filters are enabled''',
+		create a bloom filter on an LSM tree chunk before it's first
+		merge.  Only supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_bloom_oldest', 'false', r'''
-		create a bloom filter on the oldest LSM tree chunk. Only supported if
-		bloom filters are enabled''',
+		create a bloom filter on the oldest LSM tree chunk. Only
+		supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_chunk_size', '2MB', r'''
 		the maximum size of the in-memory chunk of an LSM tree''',
@@ -130,10 +131,10 @@ lsm_config = [
 
 # Per-file configuration
 file_config = format_meta + [
-	Config('allocation_size', '512B', r'''
+	Config('allocation_size', '4KB', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
-		items, and the default value of 512B is a good choice absent
+		items, and the default value of 4KB is a good choice absent
 		requirements from the operating system or storage device''',
 		min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
@@ -145,15 +146,13 @@ file_config = format_meta + [
 		do not ever evict the object's pages; see @ref
 		tuning_cache_resident for more information''',
 		type='boolean'),
-	Config('checksum', 'on', r'''
-		configure file block checksums; permitted values are
-		<code>on</code> (checksum all file blocks),
-		<code>off</code> (checksum no file blocks) and
-		<code>uncompresssed</code> (checksum only file blocks
-		which are not compressed for some reason).  The \c
-		uncompressed value is for applications which can
-		reasonably rely on decompression to fail if a block has
-		been corrupted''',
+	Config('checksum', 'uncompressed', r'''
+		configure block checksums; permitted values are <code>on</code>
+		(checksum all blocks), <code>off</code> (checksum no blocks) and
+		<code>uncompresssed</code> (checksum only blocks which are not
+		compressed for any reason).  The \c uncompressed setting is for
+		applications which can rely on decompression to fail if a block
+		has been corrupted''',
 		choices=['on', 'off', 'uncompressed']),
 	Config('collator', '', r'''
 		configure custom collation for keys.  Value must be a collator
@@ -179,7 +178,7 @@ file_config = format_meta + [
 		trailing bytes on internal keys (ignored for custom
 		collators)''',
 		type='boolean'),
-	Config('internal_page_max', '2KB', r'''
+	Config('internal_page_max', '4KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size and is significant
 		for applications wanting to avoid excessive L2 cache misses
@@ -274,6 +273,9 @@ connection_runtime_config = [
 		shared cache configuration options. A database should configure
 		either a cache_size or a shared_cache not both''',
 		type='category', subconfig=[
+		Config('enable', 'false', r'''
+			whether the connection is using a shared cache''',
+			type='boolean'),
 		Config('chunk', '10MB', r'''
 			the granularity that a shared cache is redistributed''',
 			min='1MB', max='10TB'),
@@ -329,6 +331,7 @@ connection_runtime_config = [
 		    'reconcile',
 		    'salvage',
 		    'verify',
+		    'version',
 		    'write']),
 ]
 
@@ -495,11 +498,12 @@ methods = {
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
 	Config('force', 'false', r'''
-		checkpoints may be skipped if the underlying object has not
-		been modified, this option forces the checkpoint''',
+		by default, checkpoints may be skipped if the underlying object
+		has not been modified, this option forces the checkpoint''',
 		type='boolean'),
 	Config('name', '', r'''
-		if non-empty, specify a name for the checkpoint'''),
+		if non-empty, specify a name for the checkpoint (note that
+		checkpoints including LSM trees may not be named)'''),
 	Config('target', '', r'''
 		if non-empty, checkpoint the list of objects''', type='list'),
 ]),

@@ -296,6 +296,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->block_byte_read.desc = "bytes read by the block manager";
 	stats->block_byte_write.desc = "bytes written by the block manager";
 	stats->block_map_read.desc = "mapped blocks read by the block manager";
+	stats->block_preload.desc = "blocks pre-loaded by the block manager";
 	stats->block_read.desc = "blocks read by the block manager";
 	stats->block_write.desc = "blocks written by the block manager";
 	stats->cache_bytes_dirty.desc =
@@ -369,7 +370,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
 	stats->session_cursor_open.desc = "open cursor count";
-	stats->txn_ancient.desc = "ancient transactions";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_checkpoint.desc = "transaction checkpoints";
 	stats->txn_commit.desc = "transactions committed";
@@ -389,6 +389,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
 	stats->block_map_read.v = 0;
+	stats->block_preload.v = 0;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
 	stats->cache_bytes_dirty.v = 0;
@@ -440,7 +441,6 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->rec_skipped_update.v = 0;
 	stats->rwlock_read.v = 0;
 	stats->rwlock_write.v = 0;
-	stats->txn_ancient.v = 0;
 	stats->txn_begin.v = 0;
 	stats->txn_checkpoint.v = 0;
 	stats->txn_commit.v = 0;

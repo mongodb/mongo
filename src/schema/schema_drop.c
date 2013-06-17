@@ -183,10 +183,13 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		ret = __wt_lsm_tree_drop(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __drop_table(session, uri, force, cfg);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->drop == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    dsrc->drop(dsrc, &session->iface, uri, NULL);
+		    dsrc->drop(
+		    dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	/*
 	 * Map WT_NOTFOUND to ENOENT (or to 0 if "force" is set), based on the

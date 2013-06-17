@@ -25,6 +25,7 @@ static const WT_CONFIG_CHECK confchk_connection_open_session[] = {
 
 static const WT_CONFIG_CHECK confchk_shared_cache_subconfigs[] = {
 	{ "chunk", "int", "min=1MB,max=10TB", NULL },
+	{ "enable", "boolean", NULL, NULL },
 	{ "name", "string", NULL, NULL },
 	{ "reserve", "int", NULL, NULL },
 	{ "size", "int", "min=1MB,max=10TB", NULL },
@@ -44,7 +45,7 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\","
 	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
-	    "\"write\"]",
+	    "\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -257,7 +258,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\","
 	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
-	    "\"write\"]",
+	    "\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -299,7 +300,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "connection.reconfigure",
 	  "cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	  "name=pool,reserve=0,size=500MB),statistics=0,verbose=",
+	  "enable=0,name=pool,reserve=0,size=500MB),statistics=0,verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",
@@ -307,10 +308,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "file.meta",
-	  "allocation_size=512B,block_compressor=,cache_resident=0,checkpoint=,"
-	  "checksum=on,collator=,columns=,dictionary=0,format=btree,"
+	  "allocation_size=4KB,block_compressor=,cache_resident=0,checkpoint=,"
+	  "checksum=uncompressed,collator=,columns=,dictionary=0,format=btree,"
 	  "huffman_key=,huffman_value=,internal_item_max=0,"
-	  "internal_key_truncate=,internal_page_max=2KB,key_format=u,key_gap=10"
+	  "internal_key_truncate=,internal_page_max=4KB,key_format=u,key_gap=10"
 	  ",leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB,"
 	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,split_pct=75"
 	  ",value_format=u,version=(major=0,minor=0)",
@@ -341,16 +342,17 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_session_compact
 	},
 	{ "session.create",
-	  "allocation_size=512B,block_compressor=,cache_resident=0,checksum=on,"
-	  "colgroups=,collator=,columns=,dictionary=0,exclusive=0,format=btree,"
-	  "huffman_key=,huffman_value=,internal_item_max=0,"
-	  "internal_key_truncate=,internal_page_max=2KB,key_format=u,key_gap=10"
-	  ",leaf_item_max=0,leaf_page_max=1MB,lsm_auto_throttle=,lsm_bloom=,"
-	  "lsm_bloom_bit_count=8,lsm_bloom_config=,lsm_bloom_hash_count=4,"
-	  "lsm_bloom_newest=0,lsm_bloom_oldest=0,lsm_chunk_size=2MB,"
-	  "lsm_merge_max=15,lsm_merge_threads=1,memory_page_max=5MB,"
-	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,source=,"
-	  "split_pct=75,type=file,value_format=u",
+	  "allocation_size=4KB,block_compressor=,cache_resident=0,"
+	  "checksum=uncompressed,colgroups=,collator=,columns=,dictionary=0,"
+	  "exclusive=0,format=btree,huffman_key=,huffman_value=,"
+	  "internal_item_max=0,internal_key_truncate=,internal_page_max=4KB,"
+	  "key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
+	  "lsm_auto_throttle=,lsm_bloom=,lsm_bloom_bit_count=8,"
+	  "lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
+	  "lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
+	  "lsm_merge_threads=1,memory_page_max=5MB,os_cache_dirty_max=0,"
+	  "os_cache_max=0,prefix_compression=,source=,split_pct=75,type=file,"
+	  "value_format=u",
 	  confchk_session_create
 	},
 	{ "session.drop",
@@ -404,8 +406,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "direct_io=,error_prefix=,eviction_dirty_target=80,eviction_target=80"
 	  ",eviction_trigger=95,extensions=,file_extend=,hazard_max=1000,"
 	  "log=(archive=,enabled=,file_max=100MB,path=\"\"),lsm_merge=,mmap=,"
-	  "multiprocess=0,session_max=50,shared_cache=(chunk=10MB,name=pool,"
-	  "reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
+	  "multiprocess=0,session_max=50,shared_cache=(chunk=10MB,enable=0,"
+	  "name=pool,reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
 	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\","
 	  "wait=0),sync=,transactional=,use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open

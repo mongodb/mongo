@@ -630,9 +630,9 @@ struct __wt_session {
 	 * @configstart{session.create, see dist/api_data.py}
 	 * @config{allocation_size, the file unit allocation size\, in bytes\,
 	 * must a power-of-two; smaller values decrease the file space required
-	 * by overflow items\, and the default value of 512B is a good choice
+	 * by overflow items\, and the default value of 4KB is a good choice
 	 * absent requirements from the operating system or storage device., an
-	 * integer between 512B and 128MB; default \c 512B.}
+	 * integer between 512B and 128MB; default \c 4KB.}
 	 * @config{block_compressor, configure a compressor for file blocks.
 	 * Permitted values are empty (off) or \c "bzip2"\, \c "snappy" or
 	 * custom compression engine \c "name" created with
@@ -641,14 +641,13 @@ struct __wt_session {
 	 * @config{cache_resident, do not ever evict the object's pages; see
 	 * @ref tuning_cache_resident for more information., a boolean flag;
 	 * default \c false.}
-	 * @config{checksum, configure file block checksums; permitted values
-	 * are <code>on</code> (checksum all file blocks)\, <code>off</code>
-	 * (checksum no file blocks) and <code>uncompresssed</code> (checksum
-	 * only file blocks which are not compressed for some reason). The \c
-	 * uncompressed value is for applications which can reasonably rely on
-	 * decompression to fail if a block has been corrupted., a string\,
-	 * chosen from the following options: \c "on"\, \c "off"\, \c
-	 * "uncompressed"; default \c on.}
+	 * @config{checksum, configure block checksums; permitted values are
+	 * <code>on</code> (checksum all blocks)\, <code>off</code> (checksum no
+	 * blocks) and <code>uncompresssed</code> (checksum only blocks which
+	 * are not compressed for any reason). The \c uncompressed setting is
+	 * for applications which can rely on decompression to fail if a block
+	 * has been corrupted., a string\, chosen from the following options: \c
+	 * "on"\, \c "off"\, \c "uncompressed"; default \c uncompressed.}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
 	 * the table.  If no column groups are specified\, all columns are
@@ -697,7 +696,7 @@ struct __wt_session {
 	 * misses while searching the tree.  The page maximum is the bytes of
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
-	 * 2KB.}
+	 * 4KB.}
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * key_format is \c 'u' and applications use WT_ITEM structures to
@@ -761,11 +760,6 @@ struct __wt_session {
 	 * cache., an integer greater than or equal to 0; default \c 0.}
 	 * @config{prefix_compression, configure row-store format key prefix
 	 * compression., a boolean flag; default \c true.}
-	 * @config{source, set a custom data source URI for a column group\,
-	 * index or simple table.  By default\, the data source URI is derived
-	 * from the \c type and the column group or index name.  Applications
-	 * can create tables from existing data sources by supplying a \c source
-	 * configuration., a string; default empty.}
 	 * @config{split_pct, the Btree page split size as a percentage of the
 	 * maximum Btree page size\, that is\, when a Btree page is split\, it
 	 * will be split into smaller pages\, where each page is the specified
@@ -1040,11 +1034,12 @@ struct __wt_session {
 	 * drop all checkpoints before and including the named checkpoint.
 	 * Checkpoints cannot be dropped while a hot backup is in progress or if
 	 * open in a cursor., a list of strings; default empty.}
-	 * @config{force, checkpoints may be skipped if the underlying object
-	 * has not been modified\, this option forces the checkpoint., a boolean
-	 * flag; default \c false.}
-	 * @config{name, if non-empty\, specify a name for the checkpoint., a
-	 * string; default empty.}
+	 * @config{force, by default\, checkpoints may be skipped if the
+	 * underlying object has not been modified\, this option forces the
+	 * checkpoint., a boolean flag; default \c false.}
+	 * @config{name, if non-empty\, specify a name for the checkpoint (note
+	 * that checkpoints including LSM trees may not be named)., a string;
+	 * default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects., a
 	 * list of strings; default empty.}
 	 * @configend
@@ -1107,6 +1102,8 @@ struct __wt_connection {
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enable, whether the connection is
+	 * using a shared cache., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
 	 * cache is redistributed., an integer between 1MB and 10TB; default \c
 	 * 10MB.}
@@ -1129,7 +1126,7 @@ struct __wt_connection {
 	 * \c "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c
 	 * "hazard"\, \c "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c
 	 * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c
-	 * "write"; default empty.}
+	 * "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1276,7 +1273,7 @@ struct __wt_connection {
 	 * The application must first implement the WT_COMPRESSOR interface
 	 * and then register the implementation with WiredTiger:
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR register
+	 * @snippet nop_compress.c WT_COMPRESSOR initialization
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the compression function to be used in calls
@@ -1401,6 +1398,8 @@ struct __wt_connection {
  * @config{shared_cache = (, shared cache configuration options.  A database
  * should configure either a cache_size or a shared_cache not both., a set of
  * related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enable, whether the connection is using a
+ * shared cache., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is
  * redistributed., an integer between 1MB and 10TB; default \c 10MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database is
@@ -1455,7 +1454,8 @@ struct __wt_connection {
  * values chosen from the following options: \c "block"\, \c "shared_cache"\, \c
  * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
  * "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
- * "reconcile"\, \c "salvage"\, \c "verify"\, \c "write"; default empty.}
+ * "reconcile"\, \c "salvage"\, \c "verify"\, \c "version"\, \c "write"; default
+ * empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file
@@ -1869,7 +1869,7 @@ struct __wt_collator {
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_compressor.
  *
- * @snippet ex_all.c WT_COMPRESSOR register
+ * @snippet nop_compress.c WT_COMPRESSOR initialization
  */
 struct __wt_compressor {
 	/*!
@@ -1901,7 +1901,7 @@ struct __wt_compressor {
 	 * decrease the length of the data (compression may not have completed)
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR compress
+	 * @snippet nop_compress.c WT_COMPRESSOR compress
 	 */
 	int (*compress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len,
@@ -2014,7 +2014,7 @@ struct __wt_compressor {
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*compress_raw)(WT_COMPRESSOR *compressor, WT_SESSION *session,
-	    size_t page_max, u_int split_pct, size_t extra,
+	    size_t page_max, int split_pct, size_t extra,
 	    uint8_t *src, uint32_t *offsets, uint32_t slots,
 	    uint8_t *dst, size_t dst_len,
 	    int final,
@@ -2053,7 +2053,7 @@ struct __wt_compressor {
 	 * @param[out] result_lenp the length of the decompressed data
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR decompress
+	 * @snippet nop_compress.c WT_COMPRESSOR decompress
 	 */
 	int (*decompress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len,
@@ -2095,7 +2095,7 @@ struct __wt_compressor {
 	 * @param[out] result_lenp the required destination buffer size
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_all.c WT_COMPRESSOR presize
+	 * @snippet nop_compress.c WT_COMPRESSOR presize
 	 */
 	int (*pre_size)(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len, size_t *result_lenp);
@@ -2105,6 +2105,8 @@ struct __wt_compressor {
 	 *
 	 * The WT_COMPRESSOR::terminate callback is intended to allow cleanup,
 	 * the handle will not be subsequently accessed by WiredTiger.
+	 *
+	 * @snippet nop_compress.c WT_COMPRESSOR terminate
 	 */
 	int (*terminate)(WT_COMPRESSOR *compressor, WT_SESSION *session);
 };
@@ -2272,122 +2274,122 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_BLOCK_BYTE_WRITE			2
 /*! mapped blocks read by the block manager */
 #define	WT_STAT_CONN_BLOCK_MAP_READ			3
+/*! blocks pre-loaded by the block manager */
+#define	WT_STAT_CONN_BLOCK_PRELOAD			4
 /*! blocks read by the block manager */
-#define	WT_STAT_CONN_BLOCK_READ				4
+#define	WT_STAT_CONN_BLOCK_READ				5
 /*! blocks written by the block manager */
-#define	WT_STAT_CONN_BLOCK_WRITE			5
+#define	WT_STAT_CONN_BLOCK_WRITE			6
 /*! cache: tracked dirty bytes in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			6
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			7
 /*! cache: bytes currently in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			7
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			8
 /*! cache: maximum bytes configured */
-#define	WT_STAT_CONN_CACHE_BYTES_MAX			8
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			9
 /*! cache: bytes read into cache */
-#define	WT_STAT_CONN_CACHE_BYTES_READ			9
+#define	WT_STAT_CONN_CACHE_BYTES_READ			10
 /*! cache: bytes written from cache */
-#define	WT_STAT_CONN_CACHE_BYTES_WRITE			10
+#define	WT_STAT_CONN_CACHE_BYTES_WRITE			11
 /*! cache: checkpoint blocked page eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_CHECKPOINT		11
+#define	WT_STAT_CONN_CACHE_EVICTION_CHECKPOINT		12
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		12
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		13
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		13
+#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		14
 /*! cache: pages selected for eviction unable to be evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		14
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		15
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		15
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		16
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		16
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		17
 /*! cache: internal page merge operations completed */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE		17
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE		18
 /*! cache: internal page merge attempts that could not complete */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_FAIL		18
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_FAIL		19
 /*! cache: internal levels merged */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_LEVELS	19
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_LEVELS	20
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		20
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		21
 /*! cache: pages walked for eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK		21
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK		22
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			22
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			23
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			23
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			24
 /*! cache: pages read into cache */
-#define	WT_STAT_CONN_CACHE_READ				24
+#define	WT_STAT_CONN_CACHE_READ				25
 /*! cache: pages written from cache */
-#define	WT_STAT_CONN_CACHE_WRITE			25
+#define	WT_STAT_CONN_CACHE_WRITE			26
 /*! pthread mutex condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				26
+#define	WT_STAT_CONN_COND_WAIT				27
 /*! cursor creation */
-#define	WT_STAT_CONN_CURSOR_CREATE			27
+#define	WT_STAT_CONN_CURSOR_CREATE			28
 /*! Btree cursor insert calls */
-#define	WT_STAT_CONN_CURSOR_INSERT			28
+#define	WT_STAT_CONN_CURSOR_INSERT			29
 /*! Btree cursor next calls */
-#define	WT_STAT_CONN_CURSOR_NEXT			29
+#define	WT_STAT_CONN_CURSOR_NEXT			30
 /*! Btree cursor prev calls */
-#define	WT_STAT_CONN_CURSOR_PREV			30
+#define	WT_STAT_CONN_CURSOR_PREV			31
 /*! Btree cursor remove calls */
-#define	WT_STAT_CONN_CURSOR_REMOVE			31
+#define	WT_STAT_CONN_CURSOR_REMOVE			32
 /*! Btree cursor reset calls */
-#define	WT_STAT_CONN_CURSOR_RESET			32
+#define	WT_STAT_CONN_CURSOR_RESET			33
 /*! Btree cursor search calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH			33
+#define	WT_STAT_CONN_CURSOR_SEARCH			34
 /*! Btree cursor search near calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			34
+#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			35
 /*! Btree cursor update calls */
-#define	WT_STAT_CONN_CURSOR_UPDATE			35
+#define	WT_STAT_CONN_CURSOR_UPDATE			36
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				36
+#define	WT_STAT_CONN_FILE_OPEN				37
 /*! log: total log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			37
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			38
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			38
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			39
 /*! log: total log read operations */
-#define	WT_STAT_CONN_LOG_READS				39
+#define	WT_STAT_CONN_LOG_READS				40
 /*! log: total records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			40
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			41
 /*! log: total log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				41
+#define	WT_STAT_CONN_LOG_SCANS				42
 /*! log: total consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			42
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			43
 /*! log: total logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		43
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		44
 /*! log: total consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			44
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			45
 /*! log: total consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			45
+#define	WT_STAT_CONN_LOG_SLOT_RACES			46
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			46
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			47
 /*! log: total consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		47
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		48
 /*! log: total log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				48
+#define	WT_STAT_CONN_LOG_SYNC				49
 /*! log: total log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				49
+#define	WT_STAT_CONN_LOG_WRITES				50
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			50
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			51
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			51
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			52
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			52
+#define	WT_STAT_CONN_MEMORY_FREE			53
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			53
+#define	WT_STAT_CONN_MEMORY_GROW			54
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				54
+#define	WT_STAT_CONN_READ_IO				55
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				55
+#define	WT_STAT_CONN_REC_PAGES				56
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			56
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			57
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			57
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			58
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			58
+#define	WT_STAT_CONN_RWLOCK_READ			59
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			59
+#define	WT_STAT_CONN_RWLOCK_WRITE			60
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		60
-/*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			61
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		61
 /*! transactions */
 #define	WT_STAT_CONN_TXN_BEGIN				62
 /*! transaction checkpoints */

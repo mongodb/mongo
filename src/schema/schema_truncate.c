@@ -39,50 +39,26 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
  *	WT_SESSION::truncate for a table.
  */
 static int
-__truncate_table(WT_SESSION_IMPL *session, const char *name)
+__truncate_table(WT_SESSION_IMPL *session, const char *name, const char *cfg[])
 {
-	WT_DECL_ITEM(namebuf);
 	WT_DECL_RET;
 	WT_TABLE *table;
-	const char *hname;
 	u_int i;
 
-	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
-	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
+	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
 	/* Truncate the column groups. */
-	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		/*
-		 * Get an exclusive lock on the handle: it will be released by
-		 * __wt_conn_btree_close_all.
-		 */
-		WT_ERR(__wt_session_get_btree(session,
-		    table->cgroups[i]->source, NULL, NULL,
-		    WT_DHANDLE_EXCLUSIVE));
-		hname = session->dhandle->name;
-		WT_ERR(
-		    __wt_buf_set(session, namebuf, hname, strlen(hname) + 1));
-		WT_ERR(__truncate_file(session, namebuf->data));
-	}
+	for (i = 0; i < WT_COLGROUPS(table); i++)
+		WT_ERR(__wt_schema_truncate(
+		    session, table->cgroups[i]->source, cfg));
 
 	/* Truncate the indices. */
 	WT_ERR(__wt_schema_open_indices(session, table));
-	for (i = 0; i < table->nindices; i++) {
-		/*
-		 * Get an exclusive lock on the handle: it will be released by
-		 * __wt_conn_btree_close_all.
-		 */
-		WT_ERR(__wt_session_get_btree(session,
-		    table->indices[i]->source, NULL, NULL,
-		    WT_DHANDLE_EXCLUSIVE));
-		hname = session->dhandle->name;
-		WT_ERR(__wt_buf_set(
-		    session, namebuf, hname, strlen(hname) + 1));
-		WT_ERR(__truncate_file(session, namebuf->data));
-	}
+	for (i = 0; i < table->nindices; i++)
+		WT_ERR(__wt_schema_truncate(
+		    session, table->indices[i]->source, cfg));
 
-err:	__wt_scr_free(&namebuf);
-	__wt_schema_release_table(session, table);
+err:	__wt_schema_release_table(session, table);
 	return (ret);
 }
 
@@ -131,12 +107,14 @@ __wt_schema_truncate(
 	} else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_truncate(session, uri, cfg);
 	else if (WT_PREFIX_SKIP(tablename, "table:"))
-		ret = __truncate_table(session, tablename);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = __truncate_table(session, tablename, cfg);
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->truncate == NULL ?
 		    __truncate_dsrc(session, uri) :
 		    dsrc->truncate(
-			dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
+		    dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

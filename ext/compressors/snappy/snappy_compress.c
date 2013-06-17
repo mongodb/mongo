@@ -26,13 +26,12 @@
  */
 
 #include <snappy-c.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
-
-static WT_EXTENSION_API *wt_api;
 
 static int
 wt_snappy_compress(WT_COMPRESSOR *, WT_SESSION *,
@@ -42,32 +41,50 @@ wt_snappy_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 static int
 wt_snappy_pre_size(WT_COMPRESSOR *, WT_SESSION *, uint8_t *, size_t, size_t *);
+static int
+wt_snappy_terminate(WT_COMPRESSOR *, WT_SESSION *);
 
-static WT_COMPRESSOR wt_snappy_compressor = {
-    wt_snappy_compress, NULL, wt_snappy_decompress, wt_snappy_pre_size, NULL };
+/* Local compressor structure. */
+typedef struct {
+	WT_COMPRESSOR compressor;		/* Must come first */
+
+	WT_EXTENSION_API *wt_api;		/* Extension API */
+} SNAPPY_COMPRESSOR;
 
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
+	SNAPPY_COMPRESSOR *snappy_compressor;
+
 	(void)config;				/* Unused parameters */
 
-						/* Find the extension API */
-	wt_api = connection->get_extension_api(connection);
+	if ((snappy_compressor = calloc(1, sizeof(SNAPPY_COMPRESSOR))) == NULL)
+		return (errno);
 
-						/* Load the compressor */
+	snappy_compressor->compressor.compress = wt_snappy_compress;
+	snappy_compressor->compressor.compress_raw = NULL;
+	snappy_compressor->compressor.decompress = wt_snappy_decompress;
+	snappy_compressor->compressor.pre_size = wt_snappy_pre_size;
+	snappy_compressor->compressor.terminate = wt_snappy_terminate;
+
+	snappy_compressor->wt_api = connection->get_extension_api(connection);
+
 	return (connection->add_compressor(
-	    connection, "snappy", &wt_snappy_compressor, NULL));
+	    connection, "snappy", (WT_COMPRESSOR *)snappy_compressor, NULL));
 }
 
-/* Snappy WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 /*
  * wt_snappy_error --
  *	Output an error message, and return a standard error code.
  */
 static int
-wt_snappy_error(WT_SESSION *session, const char *call, snappy_status snret)
+wt_snappy_error(WT_COMPRESSOR *compressor,
+    WT_SESSION *session, const char *call, snappy_status snret)
 {
+	WT_EXTENSION_API *wt_api;
 	const char *msg;
+
+	wt_api = ((SNAPPY_COMPRESSOR *)compressor)->wt_api;
 
 	switch (snret) {
 	case SNAPPY_BUFFER_TOO_SMALL:
@@ -96,8 +113,6 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	size_t snaplen;
 	char *snapbuf;
 
-	(void)compressor;				/* Unused */
-
 	/*
 	 * dst_len was computed in wt_snappy_pre_size, so we know it's big
 	 * enough.  Skip past the space we'll use to store the final count
@@ -125,7 +140,7 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 			*compression_failed = 1;
 		return (0);
 	}
-	return (wt_snappy_error(session, "snappy_compress", snret));
+	return (wt_snappy_error(compressor, session, "snappy_compress", snret));
 }
 
 static int
@@ -134,10 +149,11 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
+	WT_EXTENSION_API *wt_api;
 	snappy_status snret;
 	size_t snaplen;
 
-	(void)compressor;				/* Unused */
+	wt_api = ((SNAPPY_COMPRESSOR *)compressor)->wt_api;
 
 	/* retrieve the saved length */
 	snaplen = *(size_t *)src;
@@ -157,7 +173,8 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		return (0);
 	}
 
-	return (wt_snappy_error(session, "snappy_decompress", snret));
+	return (
+	    wt_snappy_error(compressor, session, "snappy_decompress", snret));
 }
 
 static int
@@ -165,7 +182,7 @@ wt_snappy_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     size_t *result_lenp)
 {
-	(void)compressor;				/* Unused */
+	(void)compressor;			/* Unused parameters */
 	(void)session;
 	(void)src;
 
@@ -178,4 +195,12 @@ wt_snappy_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	*result_lenp = snappy_max_compressed_length(src_len) + sizeof(size_t);
 	return (0);
 }
-/* End Snappy WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
+
+static int
+wt_snappy_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
+{
+	(void)session;				/* Unused parameters */
+
+	free(compressor);
+	return (0);
+}

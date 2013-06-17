@@ -60,6 +60,7 @@ flags = {
 		'VERB_salvage',
 		'VERB_shared_cache',
 		'VERB_verify',
+		'VERB_version',
 		'VERB_write'
 	],
 

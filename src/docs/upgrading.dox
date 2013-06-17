@@ -1,5 +1,61 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_162 Upgrading to Version 1.6.2
+<dl>
+
+<dt>Table of WiredTiger extension methods</dt>
+<dd>
+New functionality was added to the list of WiredTiger extension methods;
+applications using the extension methods will require recompilation.
+</dd>
+
+<dt>WT_SESSION::create no longer accepts a "source" configuration</dt>
+<dd>
+The \c "source" configuration key has been removed from WT_SESSION::create.
+Normal applications should not have been using it, and there were a number of
+bugs associated with it.
+</dd>
+
+<dt>Default checksum configuration</dt>
+<dd>
+The default file checksum configuration was changed to \c uncompressed,
+which means blocks that are compressed will no longer also include a
+checksum, by default.  Applications using compression insufficient for
+the purposes of corrupted block identification should change their file
+checksum configuration to \c on.
+</dd>
+
+</dl>
+<hr>
+@section version_161 Upgrading to Version 1.6.1
+<dl>
+
+<dt>Default page sizes</dt>
+<dd>
+In the 1.6.1 release, the default for the WT_SESSION::create configuration
+string \c allocation_size changed from 512B to 4KB, and the default for the
+configuration string \c internal_page_max changed from 2KB to 4KB.
+Applications wanting to create files with smaller allocation or internal
+page sizes will need to set those configuration values explicitly.
+</dd>
+
+<dt>Shared cache configuration</dt>
+<dd>
+In the 1.6.1 release, an explicit shared_cache=(enable=boolean) option was
+added to the wiredtiger_open configuration options. Existing applications that
+use shared cache functionality will need to add the enable option to the
+configuration string. The default value for the option is false.
+</dd>
+
+<dt>WT_COMPRESSOR::compress_raw signature</dt>
+<dd>
+In the 1.6.1 release, the \c split_pct argument to the
+WT_COMPRESSOR::compress_raw function changed type from \c u_int to \c int,
+applications may require modification to avoid compiler warnings.
+</dd>
+
+</dl>
+<hr>
 @section version_160 Upgrading to Version 1.6.0
 <dl>
 

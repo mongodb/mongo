@@ -264,7 +264,13 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	wt_conn = &S2C(session)->iface;
 
-	WT_RET(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+	/*
+	 * All the LSM worker threads do their operations on read-only files.
+	 * Use read-uncommitted isolation to avoid keeping updates in cache
+	 * unnecessarily.
+	 */
+	WT_RET(wt_conn->open_session(
+	    wt_conn, NULL, "isolation=read-uncommitted", &wt_session));
 	lsm_tree->ckpt_session = (WT_SESSION_IMPL *)wt_session;
 	F_SET(lsm_tree->ckpt_session, WT_SESSION_INTERNAL);
 
@@ -274,7 +280,8 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 		for (i = 0; i < lsm_tree->merge_threads; i++) {
 			WT_RET(wt_conn->open_session(
-			    wt_conn, NULL, NULL, &wt_session));
+			    wt_conn, NULL, "isolation=read-uncommitted",
+			    &wt_session));
 			s = (WT_SESSION_IMPL *)wt_session;
 			F_SET(s, WT_SESSION_INTERNAL);
 			lsm_tree->worker_sessions[i] = s;
@@ -287,7 +294,8 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    __wt_lsm_merge_worker, wargs));
 		}
 	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
-		WT_RET(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+		WT_RET(wt_conn->open_session(
+		    wt_conn, NULL, "isolation=read-uncommitted", &wt_session));
 		lsm_tree->bloom_session = (WT_SESSION_IMPL *)wt_session;
 		F_SET(lsm_tree->bloom_session, WT_SESSION_INTERNAL);
 
@@ -330,7 +338,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * Use a local variable: we don't care what the existing configuration
 	 * is, but we don't want to overwrite the real config.
 	 */
-	if (__wt_metadata_read(session, uri, &tmpconfig) == 0) {
+	if (__wt_metadata_search(session, uri, &tmpconfig) == 0) {
 		__wt_free(session, tmpconfig);
 		return (exclusive ? EEXIST : 0);
 	}
@@ -561,13 +569,8 @@ __wt_lsm_tree_switch(
 	cache_sz = S2C(session)->cache_size;
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
-	    lsm_tree->chunk_alloc)
-		WT_ERR(__wt_realloc(session,
-		    &lsm_tree->chunk_alloc,
-		    WT_MAX(10 * sizeof(*lsm_tree->chunk),
-		    2 * lsm_tree->chunk_alloc),
-		    &lsm_tree->chunk));
+	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
+	    lsm_tree->nchunks + 1, &lsm_tree->chunk));
 
 	/*
 	 * In the steady state, we expect that the checkpoint worker thread
@@ -820,7 +823,8 @@ err:	if (locked)
 int
 __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
    const char *uri,
-   int (*func)(WT_SESSION_IMPL *, const char *[]),
+   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
+   int (*name_func)(WT_SESSION_IMPL *, const char *),
    const char *cfg[], uint32_t open_flags)
 {
 	WT_DECL_RET;
@@ -832,11 +836,11 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
-		if (func == __wt_checkpoint &&
+		if (file_func == __wt_checkpoint &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			continue;
-		WT_ERR(__wt_schema_worker(
-		    session, chunk->uri, func, cfg, open_flags));
+		WT_ERR(__wt_schema_worker(session, chunk->uri,
+		    file_func, name_func, cfg, open_flags));
 	}
 err:	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);

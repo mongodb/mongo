@@ -125,7 +125,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor)
 
 	key = &_key;
 
-	keyno = r() % nkeys;
+	keyno = r() % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -204,7 +204,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, STATS *s)
 	key = &_key;
 	value = &_value;
 
-	keyno = r() % nkeys;
+	keyno = r() % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)

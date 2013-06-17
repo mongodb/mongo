@@ -13,7 +13,7 @@ static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
-__wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
+__wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
 {
 	WT_TXN *txn;
 
@@ -22,10 +22,8 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
-	if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
-		WT_RET(__wt_realloc(session, &txn->mod_alloc,
-		    WT_MAX(10, 2 * txn->mod_count) *
-		    sizeof(wt_txnid_t *), &txn->mod));
+	WT_RET(__wt_realloc_def(
+	    session, &txn->mod_alloc, txn->mod_count + 1, &txn->mod));
 
 	txn->mod[txn->mod_count++] = id;
 	*id = txn->id;
@@ -46,11 +44,8 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
-	if (txn->modref_count *
-	    sizeof(WT_REF *) == txn->modref_alloc)
-		WT_RET(__wt_realloc(session, &txn->modref_alloc,
-		    WT_MAX(10, 2 * txn->modref_count) *
-		    sizeof(WT_REF *), &txn->modref));
+	WT_RET(__wt_realloc_def(
+	    session, &txn->modref_alloc, txn->modref_count + 1, &txn->modref));
 
 	txn->modref[txn->modref_count++] = ref;
 	ref->txnid = txn->id;
@@ -83,7 +78,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
  *	Can the current transaction see the given ID?
  */
 static inline int
-__wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
+__wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN *txn;
 
@@ -129,7 +124,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 		return (1);
 
 	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
-	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
+	    sizeof(uint64_t), __wt_txnid_cmp) == NULL);
 }
 
 /*
@@ -138,12 +133,14 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
  *	all sessions in the system will see the transaction ID.
  */
 static inline int
-__wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
+__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
-	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	uint64_t oldest_id;
 
-	txn = &session->txn;
-	return (TXNID_LT(id, txn->oldest_snap_min));
+	txn_global = &S2C(session)->txn_global;
+	oldest_id = txn_global->oldest_id;
+	return (TXNID_LT(id, oldest_id));
 }
 
 /*
@@ -200,38 +197,6 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_ancient --
- *	Check if a given transaction ID is "ancient".
- *
- *	Transaction IDs are 32 bit integers, and we use a 31 bit window when
- *	comparing them (in TXNID_LT).  As a result, updates from a transaction
- *	more than 2 billion transactions older than the current ID appear to be
- *	in the future and are no longer be visible to running transactions.
- *
- *	Call an update "ancient" if it will become invisible in under a million
- *	transactions, to give eviction time to write it.  Eviction is forced on
- *	pages with ancient transactions before they can be read.
- */
-static inline int
-__wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
-{
-	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t current;
-
-	txn_global = &S2C(session)->txn_global;
-	current = txn_global->current;
-
-#define	TXN_WRAP_BUFFER	1000000
-#define	TXN_WINDOW	((UINT32_MAX / 2) - TXN_WRAP_BUFFER)
-
-	if (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW)) {
-		WT_CSTAT_INCR(session, txn_ancient);
-		return (1);
-	}
-	return (0);
-}
-
-/*
  * __wt_txn_autocommit_check --
  *	If an auto-commit transaction is required, start one.
  */
@@ -276,7 +241,7 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
-		__wt_txn_get_snapshot(session, WT_TXN_NONE, WT_TXN_NONE, 0);
+		__wt_txn_refresh(session, WT_TXN_NONE, 1);
 	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = txn_global->current;
 }
@@ -314,8 +279,8 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
+	uint64_t id, my_id;
 	uint32_t i, session_cnt;
-	wt_txnid_t id, my_id;
 
 	/* Cache the result: if we're the oldest, don't keep checking. */
 	txn = &session->txn;

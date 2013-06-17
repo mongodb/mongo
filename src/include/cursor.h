@@ -52,14 +52,19 @@
 	0				/* uint32_t flags */		\
 }
 
+struct __wt_cursor_backup_entry {
+	char *name;			/* File name */
+	WT_DATA_HANDLE *handle;		/* Handle */
+};
 struct __wt_cursor_backup {
 	WT_CURSOR iface;
 
 	size_t next;			/* Cursor position */
+	FILE *bfp;			/* Backup file */
 
-	size_t list_allocated;		/* List of files */
+	WT_CURSOR_BACKUP_ENTRY *list;	/* List of files to be copied. */
+	size_t list_allocated;
 	size_t list_next;
-	char **list;
 };
 
 struct __wt_cursor_btree {

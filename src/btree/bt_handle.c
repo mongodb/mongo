@@ -10,11 +10,11 @@
 static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
+static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
-static int __btree_warm_cache(WT_SESSION_IMPL *);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
-static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
+static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, int);
 
 /*
  * __wt_btree_open --
@@ -69,8 +69,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
 
-	WT_ERR(__wt_block_manager_open(
-	    session, filename, dhandle->cfg, forced_salvage, &btree->bm));
+	WT_ERR(__wt_block_manager_open(session, filename,
+	    dhandle->cfg, forced_salvage, btree->allocsize, &btree->bm));
 	bm = btree->bm;
 
 	/*
@@ -108,7 +108,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 			    session, root_addr, root_addr_size));
 
 			/* Warm the cache, if possible. */
-			WT_ERR(__btree_warm_cache(session));
+			WT_ERR(__btree_preload(session));
 
 			/* Get the last record number in a column-store file. */
 			if (btree->type != BTREE_ROW)
@@ -177,6 +177,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
+	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
 	const char **cfg;
@@ -184,6 +185,16 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	btree = S2BT(session);
 	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
+
+	/* Dump out format information. */
+	if (WT_VERBOSE_ISSET(session, version)) {
+		WT_RET(__wt_config_gets(session, cfg, "version.major", &cval));
+		maj_version = cval.val;
+		WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
+		min_version = cval.val;
+		WT_VERBOSE_RET(session, version,
+		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
+	}
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
@@ -490,39 +501,27 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 }
 
 /*
- * __btree_warm_cache --
- *	Pre-load internal pages from a checkpoint.
+ * __btree_preload --
+ *	Pre-load internal pages.
  */
 static int
-__btree_warm_cache(WT_SESSION_IMPL *session)
+__btree_preload(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
 	WT_BM *bm;
-	WT_PAGE *page;
+	WT_BTREE *btree;
+	WT_REF *ref;
+	uint32_t addr_size, i;
+	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 
-	if (bm->map == NULL || btree->compressor != NULL)
-		return (0);
-
-	/*
-	 * If the file is memory mapped, find the first leaf page.  Assuming
-	 * the file was created with a bulk load, the internal pages will be at
-	 * the end of the file, starting with the parent of the left-most
-	 * child, ending with the root.
-	 */
-	page = NULL;
-	WT_RET(__wt_tree_walk(session, &page, 0));
-	if (page == NULL)
-		return (WT_NOTFOUND);
-
-	if (page->parent->dsk < btree->root_page->dsk)
-		WT_RET(__wt_mmap_preload(
-		    session, page->parent->dsk,
-		    WT_PTRDIFF(btree->root_page->dsk, page->parent->dsk)));
-
-	return (__wt_page_release(session, page));
+	/* Pre-load the second-level internal pages. */
+	WT_REF_FOREACH(btree->root_page, ref, i) {
+		__wt_get_addr(btree->root_page, ref, &addr, &addr_size);
+		WT_RET(bm->preload(bm, session, addr, addr_size));
+	}
+	return (0);
 }
 
 /*
@@ -562,19 +561,19 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 
-	WT_RET(__wt_config_gets(session, cfg, "allocation_size", &cval));
-	btree->allocsize = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(session, cfg, "internal_page_max", &cval));
-	btree->maxintlpage = (uint32_t)cval.val;
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "allocation_size", &btree->allocsize));
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "internal_page_max", &btree->maxintlpage));
 	WT_RET(__wt_config_gets(session, cfg, "internal_item_max", &cval));
 	btree->maxintlitem = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
-	btree->maxleafpage = (uint32_t)cval.val;
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "leaf_page_max", &btree->maxleafpage));
 	WT_RET(__wt_config_gets(session, cfg, "leaf_item_max", &cval));
 	btree->maxleafitem = (uint32_t)cval.val;
 
 	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
-	btree->split_pct = (u_int)cval.val;
+	btree->split_pct = (int)cval.val;
 
 	/*
 	 * When a page is forced to split, we want at least 50 entries on its
@@ -661,8 +660,8 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size =
-	    (uint32_t)WT_ALIGN((a * btree->split_pct) / 100, btree->allocsize);
+	split_size = (uint32_t)
+	    WT_ALIGN((a * (u_int)btree->split_pct) / 100, btree->allocsize);
 
 	/*
 	 * If the result of that calculation is the same as the allocation unit
@@ -670,7 +669,7 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * unit, use a percentage of the maximum page size).
 	 */
 	if (split_size == btree->allocsize)
-		split_size = (uint32_t)((a * btree->split_pct) / 100);
+		split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
 
 	return (split_size);
 }
@@ -686,11 +685,11 @@ pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 
 static int
 pse2(WT_SESSION_IMPL *session,
-    const char *type, uint32_t max, uint32_t ovfl, uint32_t pct)
+    const char *type, uint32_t max, uint32_t ovfl, int pct)
 {
 	WT_RET_MSG(session, EINVAL,
 	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
-	    "(%" PRIu32 "B), because of the split percentage (%" PRIu32
-	    "%%); a split page must be able to hold at least 2 items",
+	    "(%" PRIu32 "B), because of the split percentage (%d %%); a split "
+	    "page must be able to hold at least 2 items",
 	    type, max, ovfl, pct);
 }

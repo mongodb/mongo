@@ -165,26 +165,35 @@ def value_populate_complex(i):
 #    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
 def complex_populate(self, uri, config, rows):
+        complex_populate_type(self, uri, config, rows, '')
+def complex_populate_lsm(self, uri, config, rows):
+        complex_populate_type(self, uri, config, rows, 'type=lsm')
+def complex_populate_type(self, uri, config, rows, type):
     self.session.create(uri,
         config + ',value_format=SiSS,' +
         'columns=(record,column2,column3,column4,column5),' +
         'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
+
     cgname = 'colgroup:' + uri.split(":")[1]
-    self.session.create(cgname + ':cgroup1', 'columns=(column2)')
-    self.session.create(cgname + ':cgroup2', 'columns=(column3)')
-    self.session.create(cgname + ':cgroup3', 'columns=(column4)')
-    self.session.create(cgname + ':cgroup4', 'columns=(column2,column3)')
-    self.session.create(cgname + ':cgroup5', 'columns=(column3,column4)')
+    self.session.create(cgname + ':cgroup1', 'columns=(column2)' + ',' + type)
+    self.session.create(cgname + ':cgroup2', 'columns=(column3)' + ',' + type)
+    self.session.create(cgname + ':cgroup3', 'columns=(column4)' + ',' + type)
     self.session.create(
-        cgname + ':cgroup6', 'columns=(column2,column4,column5)')
+        cgname + ':cgroup4', 'columns=(column2,column3)' + ',' + type)
+    self.session.create(
+        cgname + ':cgroup5', 'columns=(column3,column4)' + ',' + type)
+    self.session.create(
+        cgname + ':cgroup6', 'columns=(column2,column4,column5)' + ',' + type)
     indxname = 'index:' + uri.split(":")[1]
-    self.session.create(indxname + ':indx1', 'columns=(column2)')
-    self.session.create(indxname + ':indx2', 'columns=(column3)')
-    self.session.create(indxname + ':indx3', 'columns=(column4)')
-    self.session.create(indxname + ':indx4', 'columns=(column2,column4)')
-    self.session.create(indxname + ':indx5', 'columns=(column3,column5)')
+    self.session.create(indxname + ':indx1', 'columns=(column2)' + ',' + type)
+    self.session.create(indxname + ':indx2', 'columns=(column3)' + ',' + type)
+    self.session.create(indxname + ':indx3', 'columns=(column4)' + ',' + type)
     self.session.create(
-        indxname + ':indx6', 'columns=(column3,column5,column4)')
+        indxname + ':indx4', 'columns=(column2,column4)' + ',' + type)
+    self.session.create(
+        indxname + ':indx5', 'columns=(column3,column5)' + ',' + type)
+    self.session.create(
+        indxname + ':indx6', 'columns=(column3,column5,column4)' + ',' + type)
     cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows + 1):
         cursor.set_key(key_populate(cursor, i))

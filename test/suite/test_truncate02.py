@@ -44,8 +44,9 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
     # Use a small page size and lots of keys because we want to create lots
     # of individual pages in the file.
     types = [
-        ('file', dict(type='file:',\
-            config='leaf_page_max=512,value_format=S,key_format=')),
+        ('file', dict(type='file:', config=\
+            'allocation_size=512,leaf_page_max=512,' +\
+            'value_format=S,key_format=')),
     ]
 
     # This is all about testing the btree layer, not the schema layer, test

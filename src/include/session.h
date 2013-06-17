@@ -62,6 +62,7 @@ struct __wt_session_impl {
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
+	WT_CURSOR_BACKUP *bkp_cursor;	/* Cursor for current backup */
 
 	WT_BTREE *metafile;		/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */

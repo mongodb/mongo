@@ -197,17 +197,19 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
-		ret = __wt_clsm_open(session, uri, cfg, cursorp);
+		ret = __wt_clsm_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __wt_curindex_open(session, uri, cfg, cursorp);
+		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
 		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->open_cursor == NULL ?
 		    __wt_object_unsupported(session, uri) :
 		    __wt_curds_create(session, uri, cfg, dsrc, cursorp);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	return (ret);
 }
@@ -294,7 +296,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 		/*
 		 * We can't disallow type entirely, a configuration string might
 		 * innocently include it, for example, a dump/load pair.  If the
-		 * URI type prefix and the and type are the same, let it go.
+		 * URI type prefix and the type are the same, let it go.
 		 */
 		if ((ret =
 		    __wt_config_getones(session, config, "type", &cval)) == 0 &&
@@ -371,7 +373,7 @@ __session_compact_worker(
 	SESSION_API_CALL(session, compact, config, cfg);
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_compact, cfg, 0));
+	    ret = __wt_schema_worker(session, uri, __wt_compact, NULL, cfg, 0));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -487,8 +489,8 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_salvage, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
+	    ret = __wt_schema_worker(session, uri, __wt_salvage,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -609,8 +611,8 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_upgrade, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
+	    ret = __wt_schema_worker(session, uri, __wt_upgrade,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -629,8 +631,8 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, verify, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_verify, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
+	    ret = __wt_schema_worker(session, uri, __wt_verify,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

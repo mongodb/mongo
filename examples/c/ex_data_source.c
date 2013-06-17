@@ -197,6 +197,30 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	{
+	/*! [WT_EXTENSION config_strget] */
+	WT_CONFIG_ITEM v;
+	int64_t my_data_source_page_size;
+
+	/*
+	 * Retrieve the value of the integer type configuration string
+	 * "page_size" from a local string (as opposed to the provided
+	 * WT_CONFIG_ARG reference).
+	 */
+	const char *config_string = "path=/dev/loop,page_size=1024";
+
+	if ((ret = wt_api->config_strget(
+	    wt_api, session, config_string, "page_size", &v)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
+		    "page_size configuration: %s", wiredtiger_strerror(ret));
+		return (ret);
+	}
+	my_data_source_page_size = v.val;
+	/*! [WT_EXTENSION config_strget] */
+
+	(void)my_data_source_page_size;
+	}
+
+	{
 	/*! [WT_EXTENSION config_get] */
 	WT_CONFIG_ITEM v;
 	const char *my_data_source_key;
@@ -261,6 +285,72 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		return (WT_ERROR);
 	}
 	/*! [WT_DATA_SOURCE error message] */
+
+	{
+	/*! [WT_EXTENSION metadata insert] */
+	/*
+	 * Insert a new WiredTiger metadata record.
+	 */
+	const char *key = "datasource_uri";
+	const char *value = "data source uri's record";
+
+	if ((ret = wt_api->metadata_insert(wt_api, session, key, value)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
+		    "%s: metadata insert: %s", key, wiredtiger_strerror(ret));
+		return (ret);
+	}
+	/*! [WT_EXTENSION metadata insert] */
+	}
+
+	{
+	/*! [WT_EXTENSION metadata remove] */
+	/*
+	 * Remove a WiredTiger metadata record.
+	 */
+	const char *key = "datasource_uri";
+
+	if ((ret = wt_api->metadata_remove(wt_api, session, key)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
+		    "%s: metadata remove: %s", key, wiredtiger_strerror(ret));
+		return (ret);
+	}
+	/*! [WT_EXTENSION metadata remove] */
+	}
+
+	{
+	/*! [WT_EXTENSION metadata search] */
+	/*
+	 * Insert a new WiredTiger metadata record.
+	 */
+	const char *key = "datasource_uri";
+	const char *value;
+
+	if ((ret =
+	    wt_api->metadata_search(wt_api, session, key, &value)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
+		    "%s: metadata search: %s", key, wiredtiger_strerror(ret));
+		return (ret);
+	}
+	printf("metadata: %s has a value of %s\n", key, value);
+	/*! [WT_EXTENSION metadata search] */
+	}
+
+	{
+	/*! [WT_EXTENSION metadata update] */
+	/*
+	 * Update a WiredTiger metadata record (insert it if it does not yet
+	 * exist, update it if it does).
+	 */
+	const char *key = "datasource_uri";
+	const char *value = "data source uri's record";
+
+	if ((ret = wt_api->metadata_update(wt_api, session, key, value)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
+		    "%s: metadata update: %s", key, wiredtiger_strerror(ret));
+		return (ret);
+	}
+	/*! [WT_EXTENSION metadata update] */
+	}
 
 	return (0);
 }

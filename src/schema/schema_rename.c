@@ -36,13 +36,13 @@ __rename_file(
 	 * WT_NOTFOUND when the renamed file doesn't exist (subsequently mapped
 	 * to ENOENT by the session layer).
 	 */
-	WT_ERR(__wt_metadata_read(session, uri, &oldvalue));
+	WT_ERR(__wt_metadata_search(session, uri, &oldvalue));
 
 	/*
 	 * Check to see if the proposed name is already in use, in either the
 	 * metadata or the filesystem.
 	 */
-	switch (ret = __wt_metadata_read(session, newuri, &newvalue)) {
+	switch (ret = __wt_metadata_search(session, newuri, &newvalue)) {
 	case 0:
 		WT_ERR_MSG(session, EEXIST, "%s", newuri);
 	case WT_NOTFOUND:
@@ -119,7 +119,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 		++suffix;
 
 	/* Read the old schema value. */
-	WT_ERR(__wt_metadata_read(session, name, &value));
+	WT_ERR(__wt_metadata_search(session, name, &value));
 
 	/*
 	 * Calculate the new data source URI.  Use the existing table structure
@@ -169,6 +169,24 @@ err:	__wt_scr_free(&nn);
 }
 
 /*
+ * __metadata_rename --
+ *	Rename an entry in the metadata table.
+ */
+static int
+__metadata_rename(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
+{
+	WT_DECL_RET;
+	const char *value;
+
+	WT_RET(__wt_metadata_search(session, uri, &value));
+	WT_ERR(__wt_metadata_remove(session, uri));
+	WT_ERR(__wt_metadata_insert(session, newuri, value));
+
+err:	__wt_free(session, value);
+	return (ret);
+}
+
+/*
  * __rename_table --
  *	WT_SESSION::rename for a table.
  */
@@ -176,11 +194,10 @@ static int
 __rename_table(WT_SESSION_IMPL *session,
     const char *uri, const char *newuri, const char *cfg[])
 {
-	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_TABLE *table;
 	u_int i;
-	const char *oldname, *value;
+	const char *oldname;
 
 	oldname = uri;
 	(void)WT_PREFIX_SKIP(oldname, "table:");
@@ -203,13 +220,9 @@ __rename_table(WT_SESSION_IMPL *session,
 	table = NULL;
 
 	/* Rename the table. */
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_metadata_read(session, uri, &value));
-	WT_ERR(__wt_metadata_remove(session, uri));
-	WT_ERR(__wt_metadata_insert(session, newuri, value));
+	WT_ERR(__metadata_rename(session, uri, newuri));
 
-err:	__wt_scr_free(&buf);
-	if (table != NULL)
+err:	if (table != NULL)
 		__wt_schema_release_table(session, table);
 	return (ret);
 }
@@ -245,11 +258,13 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 		ret = __wt_lsm_tree_rename(session, uri, newuri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __rename_table(session, uri, newuri, cfg);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->rename == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    dsrc->rename(dsrc, &session->iface,
-			uri, newuri, (WT_CONFIG_ARG *)cfg);
+		    dsrc->rename(dsrc,
+		    &session->iface, uri, newuri, (WT_CONFIG_ARG *)cfg);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;

@@ -30,7 +30,10 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_TXN *txn;
 	int busy, oldgen;
+
+	txn = &session->txn;
 
 	for (oldgen = 0;;) {
 		switch (ref->state) {
@@ -74,14 +77,14 @@ __wt_page_in_func(
 			    page != NULL && !WT_PAGE_IS_ROOT(page));
 
 			/*
-			 * Ensure the page doesn't have ancient updates on it.
-			 * If it did, reading the page could ignore committed
-			 * updates.  This should be extremely unlikely in real
-			 * applications, wait for eviction of the page to avoid
-			 * the issue.
+			 * Make sure the page isn't too big.  Only do this
+			 * check once per transaction: it is not a common case,
+			 * and we don't want to get stuck if it isn't possible
+			 * to evict the page.
 			 */
-			if (page->modify != NULL &&
-			    __wt_txn_ancient(session, page->modify->first_id)) {
+			if (!F_ISSET(txn, TXN_FORCE_EVICT) &&
+			    __wt_eviction_page_force(session, page)) {
+				F_SET(txn, TXN_FORCE_EVICT);
 				page->read_gen = WT_READ_GEN_OLDEST;
 				WT_RET(__wt_page_release(session, page));
 				break;
@@ -363,13 +366,13 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_PAGE_HEADER *dsk;
 	uint64_t recno, rle;
 	size_t bytes_allocated;
-	uint32_t i, indx, max_repeats, nrepeats;
+	uint32_t i, indx, nrepeats;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
 	repeats = NULL;
-	bytes_allocated = max_repeats = nrepeats = 0;
+	bytes_allocated = nrepeats = 0;
 	recno = page->u.col_var.recno;
 
 	/*
@@ -389,13 +392,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 		 */
 		rle = __wt_cell_rle(unpack);
 		if (rle > 1) {
-			if (nrepeats == max_repeats) {
-				max_repeats = (max_repeats == 0) ?
-				    10 : 2 * max_repeats;
-				WT_RET(__wt_realloc(session, &bytes_allocated,
-				    max_repeats * sizeof(WT_COL_RLE),
-				    &repeats));
-			}
+			WT_RET(__wt_realloc_def(session, &bytes_allocated,
+			    nrepeats + 1, &repeats));
 			repeats[nrepeats].indx = indx;
 			repeats[nrepeats].recno = recno;
 			repeats[nrepeats++].rle = rle;

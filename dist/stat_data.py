@@ -47,6 +47,7 @@ connection_stats = [
 	Stat('block_byte_read', 'bytes read by the block manager'),
 	Stat('block_byte_write', 'bytes written by the block manager'),
 	Stat('block_map_read', 'mapped blocks read by the block manager'),
+	Stat('block_preload', 'blocks pre-loaded by the block manager'),
 	Stat('block_read', 'blocks read by the block manager'),
 	Stat('block_write', 'blocks written by the block manager'),
 
@@ -115,7 +116,6 @@ connection_stats = [
 	##########################################
 	# Transaction statistics
 	##########################################
-	Stat('txn_ancient', 'ancient transactions'),
 	Stat('txn_begin', 'transactions'),
 	Stat('txn_checkpoint', 'transaction checkpoints'),
 	Stat('txn_commit', 'transactions committed'),

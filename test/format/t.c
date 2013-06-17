@@ -28,7 +28,6 @@
 #include "format.h"
 
 GLOBAL g;
-WT_EXTENSION_API *wt_api;
 
 static void onint(int);
 static void startup(void);
@@ -37,7 +36,7 @@ static void usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, reps;
+	int ch, reps, ret;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -96,6 +95,15 @@ main(int argc, char *argv[])
 	/* Use line buffering on stdout so status updates aren't buffered. */
 	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
+	/*
+	 * Initialize locks to single-thread named checkpoints and hot backups
+	 * and to single-thread last-record updates.
+	 */
+	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
+		die(ret, "pthread_rwlock_init: hot-backup lock");
+	if ((ret = pthread_rwlock_init(&g.table_extend_lock, NULL)) != 0)
+		die(ret, "pthread_rwlock_destroy: table_extend lock");
+
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
 
@@ -110,7 +118,8 @@ main(int argc, char *argv[])
 		track("starting up", 0ULL, NULL);
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
-		wts_open();
+		wts_open(RUNDIR, 1, &g.wts_conn);
+		wts_create();
 
 		wts_load();			/* Load initial records */
 		wts_verify("post-bulk verify");	/* Verify */
@@ -165,7 +174,7 @@ main(int argc, char *argv[])
 		 * against the Berkeley DB data set again, if possible).
 		 */
 		if (g.c_delete_pct == 0) {
-			wts_open();
+			wts_open(RUNDIR, 1, &g.wts_conn);
 			wts_salvage();
 			wts_verify("post-salvage verify");
 			wts_close();

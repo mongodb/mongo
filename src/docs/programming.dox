@@ -3,28 +3,40 @@
 This section covers topics of interest for programmers writing
 WiredTiger applications:
 
+@section programming_api Using the API
+
 - @subpage basic_api
 - @subpage config_strings
 - @subpage cursors
 - @subpage transactions
 - @subpage error_handling
+- @subpage name_space
+
+@section programming_storage Storage options
 
 - @subpage schema
 - @subpage lsm
 - @subpage file_formats
-
 - @subpage bulk_load
+- @subpage compression
+
+@section programming_deployment Deployment considerations
+
 - @subpage cache_configuration
 - @subpage checkpoints
-- @subpage compression
 - @subpage hot_backup
 - @subpage statistics
 - @subpage threads
 - @subpage tuning
 
+@section programming_extending Extending WiredTiger
+
+- @subpage custom_data_sources
+
+@section programming_admin Administering a WiredTiger database
+
 - @subpage home
 - @subpage database_config
-- @subpage name_space
 - @subpage security
 - @subpage signals
 

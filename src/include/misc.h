@@ -91,10 +91,21 @@
  */
 #define	__wt_calloc_def(session, number, addr)				\
 	__wt_calloc(session, (size_t)(number), sizeof(**(addr)), addr)
+
+/*
+ * __wt_realloc_def --
+ *	Common case allocate-and-grow function.
+ *	Starts by allocating the requested number of items (at least 10), then
+ *	doubles each time the list needs to grow.
+ */
+#define	__wt_realloc_def(session, sizep, number, addr)			\
+	(((number) * sizeof(**(addr)) <= *(sizep)) ? 0 :		\
+	    __wt_realloc(session, sizep, WT_MAX(*(sizep) * 2,		\
+		WT_MAX(10, (number)) * sizeof(**(addr))), addr))
 /*
  * Our internal free function clears the underlying address atomically so there
  * is a smaller chance of racing threads seeing intermediate results while a
- * structure is being free'd.   (That would be a bug, of course, but I'd rather
+ * structure is being free'd.	(That would be a bug, of course, but I'd rather
  * not drop core, just the same.)  That's a non-standard "free" API, and the
  * resulting bug is a mother to find -- make sure we get it right, don't make
  * the caller remember to put the & operator on the pointer.
@@ -153,13 +164,16 @@
 	memset(&(s), 0, sizeof(s))
 
 /* Check if a string matches a prefix. */
-#define	WT_PREFIX_MATCH(str, pre)					\
-	(strncmp((str), (pre), strlen(pre)) == 0)
+#define	WT_PREFIX_MATCH(str, pfx)					\
+	(strncmp((str), (pfx), strlen(pfx)) == 0)
+
+#define	WT_PREFIX_MATCH_LEN(str, len, pfx)				\
+	((len) >= strlen(pfx) && WT_PREFIX_MATCH(str, pfx))
 
 /* Check if a string matches a prefix, and move past it. */
-#define	WT_PREFIX_SKIP(str, pre)					\
-	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
-	    ((str) += strlen(pre), 1) : 0)
+#define	WT_PREFIX_SKIP(str, pfx)					\
+	((strncmp((str), (pfx), strlen(pfx)) == 0) ?			\
+	    ((str) += strlen(pfx), 1) : 0)
 
 /* Check if a string matches a byte string of len bytes. */
 #define	WT_STRING_MATCH(str, bytes, len)				\
@@ -168,13 +182,6 @@
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
-
-/*
- * Skip the default configuration string in an list of configurations. The
- * default config is always the first entry in the array, and the array always
- * has an explicit NULL terminator, so this is safe.
- */
-#define	WT_SKIP_DEFAULT_CONFIG(c) &(c)[1]
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

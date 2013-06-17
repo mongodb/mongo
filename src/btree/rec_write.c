@@ -26,9 +26,9 @@ typedef struct {
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
 	/* Track whether all changes to the page are written. */
-	wt_txnid_t max_txn;
+	uint64_t max_txn;
 	uint32_t orig_write_gen;
-	int upd_skipped;		/* Skipped a page's update */
+	int	 upd_skipped;		/* Skipped a page's update */
 
 	/*
 	 * Track if reconciliation has seen any overflow items.  Leaf pages with
@@ -599,7 +599,7 @@ static inline int
 __rec_txn_read(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
 {
-	wt_txnid_t txnid;
+	uint64_t txnid;
 	int skip;
 
 	*updp = __wt_txn_read_skip(session, upd, &skip);

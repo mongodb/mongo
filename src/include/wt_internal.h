@@ -99,6 +99,8 @@ struct __wt_connection_stats;
     typedef struct __wt_connection_stats WT_CONNECTION_STATS;
 struct __wt_cursor_backup;
     typedef struct __wt_cursor_backup WT_CURSOR_BACKUP;
+struct __wt_cursor_backup_entry;
+    typedef struct __wt_cursor_backup_entry WT_CURSOR_BACKUP_ENTRY;
 struct __wt_cursor_btree;
     typedef struct __wt_cursor_btree WT_CURSOR_BTREE;
 struct __wt_cursor_bulk;
@@ -209,7 +211,6 @@ struct __wt_update;
 #include "mutex.h"
 #include "posix.h"
 
-#include "txn.h"			/* typedef for wt_txnid_t */
 #include "stat.h"			/* required by dhandle.h */
 #include "dhandle.h"			/* required by btree.h */
 
@@ -229,6 +230,7 @@ struct __wt_update;
 #include "meta.h"
 #include "os.h"
 #include "schema.h"
+#include "txn.h"
 
 #include "session.h"			/* required by connection.h */
 #include "connection.h"

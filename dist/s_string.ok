@@ -133,12 +133,14 @@ Llqrt
 LoadLoad
 Lookup
 MALLOC
+MAXID
 MBUF
 MEM
 MERCHANTABILITY
 MVCC
 Manos
 Marsaglia's
+Memrata
 Metadata
 Mewhort
 Multi
@@ -359,6 +361,7 @@ cxa
 data's
 datalen
 datasets
+datasource
 dbc
 decl
 decr
@@ -536,6 +539,7 @@ lzo
 madvise
 majorp
 malloc
+maxid
 maxintlitem
 maxintlpage
 maxleafitem
@@ -602,6 +606,7 @@ nthread
 nul
 numSymbols
 numbare
+oc
 offpage
 ok
 oldname
@@ -710,6 +715,7 @@ strcmp
 strdup
 strerror
 strftime
+strget
 stringin
 strncpy
 strndup
@@ -783,6 +789,7 @@ txn
 txnid
 typedef
 uB
+uid
 uint
 unbare
 uncompressing
@@ -804,12 +811,14 @@ untyped
 upd
 upg
 uri
+uri's
 usedp
 usr
 utf
 util
 uu
 va
+valuep
 vanishingly
 vcell
 verrx

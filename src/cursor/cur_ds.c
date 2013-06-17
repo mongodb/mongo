@@ -286,7 +286,6 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor, *dsc;
 	WT_DECL_RET;
-	const char **cfgp, *dscfg[5];
 	const char *metaconf;
 
 	metaconf = NULL;
@@ -300,33 +299,18 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	 * XXX
 	 * We'll need the object's key and value formats.
 	 */
-	WT_ERR(__wt_metadata_read(session, uri, &metaconf));
+	WT_ERR(__wt_metadata_search(session, uri, &metaconf));
 	WT_ERR(__wt_config_getones(session, metaconf, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &cursor->key_format));
 	WT_ERR(__wt_config_getones(session, metaconf, "value_format", &cval));
 	WT_ERR(
 	    __wt_strndup(session, cval.str, cval.len, &cursor->value_format));
 
-	/*
-	 * And, we'll need to pass that information down to the underlying
-	 * data-source.
-	 */
-	cfgp = dscfg;
-	if (cfg[0] != NULL) {
-		*cfgp++ = cfg[0];
-		if (cfg[1] != NULL) {
-			*cfgp++ = cfg[1];
-			if (cfg[2] != NULL)
-				*cfgp++ = cfg[2];
-		}
-	}
-	*cfgp++ = metaconf;
-	*cfgp = NULL;
-
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	WT_ERR(dsrc->open_cursor(dsrc,
-	    &session->iface, uri, (WT_CONFIG_ARG *)dscfg, &dsc));
+	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &dsc));
+	dsc->session = (WT_SESSION *)session;
 	memset(&dsc->q, 0, sizeof(dsc->q));
 	dsc->recno = 0;
 	memset(dsc->raw_recno_buf, 0, sizeof(dsc->raw_recno_buf));

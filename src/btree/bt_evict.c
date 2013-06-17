@@ -361,9 +361,6 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	} else
 		__wt_txn_release_snapshot(session);
 
-	/* If the oldest transaction was updated, keep the newer value. */
-	saved_txn.oldest_snap_min = txn->oldest_snap_min;
-
 	*txn = saved_txn;
 	return (ret);
 }
@@ -527,8 +524,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			/* Write dirty pages if nobody beat us to it. */
 			if (__wt_page_is_modified(page)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
-					__wt_txn_get_snapshot(session,
-					    WT_TXN_NONE, WT_TXN_NONE, 0);
+					__wt_txn_refresh(
+					    session, WT_TXN_NONE, 1);
 				ret = __wt_rec_write(session, page, NULL, 0);
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_release_snapshot(session);
@@ -708,9 +705,6 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	cache = S2C(session)->cache;
 	retries = 0;
 
-	/* Update the oldest transaction ID -- we use it to filter pages. */
-	__wt_txn_get_oldest(session);
-
 	/*
 	 * NOTE: we don't hold the schema lock, so we have to take care
 	 * that the handles we see are open and valid.
@@ -804,7 +798,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	wt_txnid_t oldest_txn;
 	int modified, restarts, levels;
 
 	btree = S2BT(session);
@@ -813,7 +806,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	end = start + WT_EVICT_WALK_PER_FILE;
 	if (end > cache->evict + cache->evict_slots)
 		end = cache->evict + cache->evict_slots;
-	oldest_txn = session->txn.oldest_snap_min;
 
 	WT_ASSERT(session, btree->evict_page == NULL ||
 	    WT_PAGE_IS_ROOT(btree->evict_page) ||
@@ -924,8 +916,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			 * transaction that were running last time we wrote the
 			 * page has since rolled back.
 			 */
-			if (modified &&
-			    TXNID_LE(oldest_txn, page->modify->disk_txn) &&
+			if (modified && !__wt_txn_visible_all(session,
+			    page->modify->disk_txn) &&
 			    !F_ISSET(cache, WT_EVICT_STUCK))
 				continue;
 		}

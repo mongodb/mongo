@@ -121,7 +121,8 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	size_t len, remain, wlen;
-	const char *err, *prefix1, *prefix2;
+	int prefix_cnt;
+	const char *err, *prefix;
 	char *end, *p;
 
 	/*
@@ -138,20 +139,39 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	end = s + sizeof(s);
 
 	dhandle = session->dhandle;
-	prefix1 = (dhandle != NULL) ? dhandle->name : NULL;
-	prefix2 = session->name;
 
-	remain = WT_PTRDIFF(end, p);
-	if (prefix1 != NULL && prefix2 != NULL)
-		wlen =
-		    (size_t)snprintf(p, remain, "%s [%s]: ", prefix1, prefix2);
-	else if (prefix1 != NULL)
-		wlen = (size_t)snprintf(p, remain, "%s: ", prefix1);
-	else if (prefix2 != NULL)
-		wlen = (size_t)snprintf(p, remain, "%s: ", prefix2);
-	else
-		wlen = 0;
-	p = wlen >= remain ? end : p + wlen;
+	/*
+	 * We have several prefixes for the error message: the database error
+	 * prefix, the data-source's name, and the session's name.  Write them
+	 * as a comma-separate list, followed by a colon.
+	 */
+	prefix_cnt = 0;
+	if ((prefix = S2C(session)->error_prefix) != NULL) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain, "%s", prefix);
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
+	prefix = dhandle == NULL ? NULL : dhandle->name;
+	if (prefix != NULL) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain,
+		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
+	if ((prefix = session->name) != NULL) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain,
+		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
+	if (prefix_cnt != 0) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain, ": ");
+		p = wlen >= remain ? end : p + wlen;
+	}
 
 	if (file_name != NULL) {
 		remain = WT_PTRDIFF(end, p);
@@ -461,8 +481,7 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
 	    WT_PREFIX_MATCH(uri, "lsm:") ||
 	    WT_PREFIX_MATCH(uri, "statistics:") ||
 	    WT_PREFIX_MATCH(uri, "table:"))
-		WT_RET_MSG(session, ENOTSUP,
-		    "unsupported object type: %s", uri);
+		return (__wt_object_unsupported(session, uri));
 
 	WT_RET_MSG(session, ENOTSUP, "unknown object type: %s", uri);
 }

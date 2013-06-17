@@ -200,6 +200,7 @@ struct __wt_connection_stats {
 	WT_STATS block_byte_read;
 	WT_STATS block_byte_write;
 	WT_STATS block_map_read;
+	WT_STATS block_preload;
 	WT_STATS block_read;
 	WT_STATS block_write;
 	WT_STATS cache_bytes_dirty;
@@ -257,7 +258,6 @@ struct __wt_connection_stats {
 	WT_STATS rwlock_read;
 	WT_STATS rwlock_write;
 	WT_STATS session_cursor_open;
-	WT_STATS txn_ancient;
 	WT_STATS txn_begin;
 	WT_STATS txn_checkpoint;
 	WT_STATS txn_commit;
