@@ -578,6 +578,7 @@ mutexes
 myfile
 mytable
 mytxn
+namespace
 namespaces
 nbits
 nbsp
@@ -787,6 +788,7 @@ twiredtiger
 twrite
 txn
 txnid
+txnidp
 typedef
 uB
 uid
@@ -836,6 +838,7 @@ workFactor
 wrapup
 writelock
 wrlock
+ws
 wti
 wts
 xff

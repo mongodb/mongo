@@ -139,19 +139,69 @@ data_source_error(int v)
 	return (v == 0 ? "one" : "two");
 }
 
+static int my_cursor_next(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+static int my_cursor_prev(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+static int my_cursor_reset(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+static int my_cursor_search(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+static int my_cursor_search_near(WT_CURSOR *wtcursor, int *exactp)
+	{ (void)wtcursor; (void)exactp; return (0); }
+static int my_cursor_insert(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+static int my_cursor_update(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+static int my_cursor_remove(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+static int my_cursor_close(WT_CURSOR *wtcursor)
+	{ (void)wtcursor; return (0); }
+
 /*! [WT_DATA_SOURCE open_cursor] */
+typedef struct __my_cursor {
+	WT_CURSOR wtcursor;		/* WiredTiger cursor, must come first */
+
+	/*
+	 * Local cursor information: for example, we might want to have a
+	 * reference to the extension functions.
+	 */
+	WT_EXTENSION_API *wtext;	/* Extension functions */
+} MY_CURSOR;
+
 static int
 my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *uri, WT_CONFIG_ARG *config, WT_CURSOR **new_cursor)
-/*! [WT_DATA_SOURCE open_cursor] */
 {
-	int ret;
+	MY_CURSOR *cursor;
 
-	/* Unused parameters */
-	(void)dsrc;
+	/* Allocate and initialize a WiredTiger cursor. */
+	if ((cursor = calloc(1, sizeof(*cursor))) == NULL)
+		return (errno);
+
+	cursor->wtcursor.next = my_cursor_next;
+	cursor->wtcursor.prev = my_cursor_prev;
+	cursor->wtcursor.reset = my_cursor_reset;
+	cursor->wtcursor.search = my_cursor_search;
+	cursor->wtcursor.search_near = my_cursor_search_near;
+	cursor->wtcursor.insert = my_cursor_insert;
+	cursor->wtcursor.update = my_cursor_update;
+	cursor->wtcursor.remove = my_cursor_remove;
+	cursor->wtcursor.close = my_cursor_close;
+
+	/*
+	 * Configure local cursor information.
+	 */
+
+	/* Return combined cursor to WiredTiger. */
+	*new_cursor = (WT_CURSOR *)cursor;
+
+/*! [WT_DATA_SOURCE open_cursor] */
+	{
+	int ret = 0;
+	(void)dsrc;					/* Unused parameters */
 	(void)session;
 	(void)uri;
-	(void)config;
 	(void)new_cursor;
 
 	{
@@ -352,6 +402,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	/*! [WT_EXTENSION metadata update] */
 	}
 
+	}
 	return (0);
 }
 
@@ -432,9 +483,11 @@ int
 main(void)
 {
 	WT_CONNECTION *conn;
+	WT_SESSION *session;
 	int ret;
 
 	ret = wiredtiger_open(NULL, NULL, "create", &conn);
+	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	my_data_source_init(conn);
 
@@ -511,6 +564,23 @@ main(void)
 	/*! [WT_EXTENSION_API default_session] */
 	(void)wt_api->msg_printf(wt_api, NULL, "configuration complete");
 	/*! [WT_EXTENSION_API default_session] */
+
+	{
+	/*! [WT_EXTENSION transaction ID] */
+	uint64_t txnid;
+
+	ret = wt_api->txn_id(wt_api, session, &txnid);
+	/*! [WT_EXTENSION transaction ID] */
+	}
+
+	{
+	uint64_t txnid = 1;
+	int is_visible;
+	/*! [WT_EXTENSION transaction visible] */
+	is_visible = wt_api->txn_visible(wt_api, session, txnid);
+	/*! [WT_EXTENSION transaction visible] */
+	(void)is_visible;
+	}
 
 	(void)conn->close(conn, NULL);
 
