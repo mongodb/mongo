@@ -19,6 +19,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/fts/fts_matcher.h"
+#include "mongo/platform/strcasestr.h"
 
 namespace mongo {
 
@@ -226,20 +227,10 @@ namespace mongo {
         /*
          * Looks for phrase in a raw string
          * @param phrase, phrase to match
-         * @param raw, raw string to be parsed
+         * @param haystack, raw string to be parsed
          */
         bool FTSMatcher::_phraseMatches( const string& phrase, const string& haystack ) const {
-#ifdef _WIN32
-            // windows doesn't have strcasestr
-            // for now, doing something very slow, bu correct
-            string p = phrase;
-            string h = haystack;
-            makeLower( &p );
-            makeLower( &h );
-            return strstr( h.c_str(), p.c_str() ) > 0;
-#else
             return strcasestr( haystack.c_str(), phrase.c_str() ) > 0;
-#endif
         }
 
 
