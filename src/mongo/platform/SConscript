@@ -5,6 +5,7 @@ Import("env")
 env.Library('platform', [
         'process_id.cpp',
         'random.cpp',
+        'strcasestr.cpp',
         ])
 
 env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
