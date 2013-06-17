@@ -165,6 +165,39 @@ namespace mongo {
         getDur().writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
     }
 
+    /**
+     * @param newSpec the new index specification to check.
+     * @param existingDetails the currently existing index details to compare with.
+     *
+     * @return true if the given newSpec has the same options as the
+     *     existing index assuming the key spec matches.
+     */
+    bool areIndexOptionsEquivalent(const BSONObj& newSpec,
+                                   const IndexDetails& existingDetails) {
+        if (existingDetails.dropDups() != newSpec["dropDups"].trueValue()) {
+            return false;
+        }
+
+        const BSONElement sparseSpecs =
+                existingDetails.info.obj().getField("sparse");
+
+        if (sparseSpecs.trueValue() != newSpec["sparse"].trueValue()) {
+            return false;
+        }
+
+        // Note: { _id: 1 } or { _id: -1 } implies unique: true.
+        if (!existingDetails.isIdIndex() &&
+                existingDetails.unique() != newSpec["unique"].trueValue()) {
+            return false;
+        }
+
+        const BSONElement existingExpireSecs =
+                existingDetails.info.obj().getField("expireAfterSeconds");
+        const BSONElement newExpireSecs = newSpec["expireAfterSeconds"];
+
+        return existingExpireSecs == newExpireSecs;
+    }
+
     bool prepareToBuildIndex(const BSONObj& io,
                              bool mayInterrupt,
                              bool god,
@@ -214,16 +247,43 @@ namespace mongo {
             verify( sourceCollection );
         }
 
-        // Check both existing and in-progress indexes (2nd param = true)
-        if ( sourceCollection->findIndexByName(name, true) >= 0 ) {
-            // index already exists.
-            return false;
+        {
+            // Check both existing and in-progress indexes (2nd param = true)
+            const int idx = sourceCollection->findIndexByName(name, true);
+            if (idx >= 0) {
+                // index already exists.
+                const IndexDetails& indexSpec(sourceCollection->idx(idx));
+                BSONObj existingKeyPattern(indexSpec.keyPattern());
+                uassert(16850, str::stream() << "Trying to create an index "
+                        << "with same name " << name
+                        << " with different key spec " << key
+                        << " vs existing spec " << existingKeyPattern,
+                        existingKeyPattern.equal(key));
+
+                uassert(16851, str::stream() << "Index with name: " << name
+                        << " already exists with different options",
+                        areIndexOptionsEquivalent(io, indexSpec));
+
+                // Index already exists with the same options, so no need to build a new
+                // one (not an error). Most likely requested by a client using ensureIndex.
+                return false;
+            }
         }
 
-        // Check both existing and in-progress indexes (2nd param = true)
-        if( sourceCollection->findIndexByKeyPattern(key, true) >= 0 ) {
-            LOG(2) << "index already exists with diff name " << name << ' ' << key.toString() << endl;
-            return false;
+        {
+            // Check both existing and in-progress indexes (2nd param = true)
+            const int idx = sourceCollection->findIndexByKeyPattern(key, true);
+            if (idx >= 0) {
+                LOG(2) << "index already exists with diff name " << name
+                        << ' ' << key.toString() << endl;
+
+                const IndexDetails& indexSpec(sourceCollection->idx(idx));
+                uassert(16852, str::stream() << "Index with pattern: " << key
+                        << " already exists with different options",
+                        areIndexOptionsEquivalent(io, indexSpec));
+
+                return false;
+            }
         }
 
         if ( sourceCollection->getTotalIndexCount() >= NamespaceDetails::NIndexesMax ) {
