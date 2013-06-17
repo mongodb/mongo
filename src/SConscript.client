@@ -264,22 +264,20 @@ clientTests = staticClientEnv.Install("#/", staticClientPrograms)
 if buildShared:
     sharedClientEnv = clientEnv.Clone()
 
+    # Arrange for the tests to link against the mongoclient in the #/sharedclient directory.
+    sharedClientEnv.PrependUnique(
+        LIBS=['mongoclient'],
+        LIBPATH=["#/sharedclient"]
+    )
+
     # Deal with the different lookup models between regular UNIX and Darwin. For regular unix,
-    # we can just link against the shared lib wherever it lives, and set $ORIGIN to pull the
-    # copy we run against from the current directory (#/sharedclient). This won't work on
-    # Darwin though, so to work around, we link against the staged copy of the mongoclient
-    # dylib in #sharedclient, which has @executable path set as its install_name.
-    if nix:
-        if darwin:
-            sharedClientEnv.PrependUnique(
-                LIBS=['mongoclient'],
-                LIBPATH=["#/sharedclient"]
-            )
-        else:
-            sharedClientEnv.PrependUnique(
-                LIBS=[mongoClientSharedLib],
-                LINKFLAGS="-Wl,-z,origin",
-                RPATH=[sharedClientEnv.Literal("\\$$ORIGIN")])
+    # we set $ORIGIN to pull the copy we run against from the current directory
+    # (#/sharedclient). On Darwin, the staged copy of the mongoclient dylib in #sharedclient
+    # has @executable path set as its install_name, so we pick up the same behavior that way.
+    if nix and not darwin:
+        sharedClientEnv.PrependUnique(
+            LINKFLAGS="-Wl,-z,origin",
+            RPATH=[sharedClientEnv.Literal("\\$$ORIGIN")])
 
     sharedClientPrograms = [
         sharedClientEnv.Program("sharedclient/" + target, obj) for (target, obj) in exampleObjMap]
