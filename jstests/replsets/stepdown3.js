@@ -27,7 +27,7 @@ master.getDB("test").foo.insert({x:3});
 
 // step down the primary asyncronously
 print("stepdown");
-var command = "sleep(4000); tojson(rs.stepDown());"
+var command = "sleep(4000); tojson(db.adminCommand( { replSetStepDown : 60, force : 1 } ));"
 var waitfunc = startParallelShell(command, master.port);
 
 print("getlasterror; should assert or return an error, depending on timing");
