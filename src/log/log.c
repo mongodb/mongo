@@ -230,12 +230,21 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FH *close_fh;
 	WT_LOG *log;
 
 	conn = S2C(session);
 	log = conn->log;
 	/*
-	 * Wait for earlier groups to finish.  Slot_lsn is my beginning LSN.
+	 * If we're going to have to close our log file, make a local copy
+	 * of the file handle structure.
+	 */
+	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
+		close_fh = log->log_close_fh;
+		log->log_close_fh = NULL;
+	}
+	/*
+	 * Wait for earlier groups to finish.
 	 */
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
@@ -247,8 +256,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	}
 	log->write_lsn = slot->slot_end_lsn;
 	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
-		WT_ERR(__wt_close(session, log->log_close_fh));
-		log->log_close_fh = NULL;
+		WT_ERR(__wt_close(session, close_fh));
 		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
 #if 1
 		/*

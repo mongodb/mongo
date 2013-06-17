@@ -112,9 +112,11 @@ __log_archive_server(void *arg)
 		logcount = 0;
 
 		/*
-		 * Indicate what is our new earliest LSN.
+		 * Indicate what is our new earliest LSN.  It is the start
+		 * of the log file containing the last checkpoint.
 		 */
 		log->first_lsn = lsn;
+		log->first_lsn.offset = 0;
 
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 0));
