@@ -803,8 +803,10 @@ env.Install( '#/', [
         env.Program( "docgen", "tools/docgeneratormain.cpp", LIBDEPS=["alltools", "docgenerator"] ),
         env.Program( "loadgen", "tools/loadgenerator.cpp", LIBDEPS=["alltools", "docgenerator"] ),
         env.Program( "bsondump", "tools/bsondump.cpp", LIBDEPS=["alltools"]),
-        env.Program( "mongobridge", "tools/bridge.cpp", LIBDEPS=["alltools"]),
-        env.Program( "mongoperf", "client/examples/mongoperf.cpp", LIBDEPS=["alltools"] ),
+        env.Program( "mongobridge", "tools/bridge.cpp",
+                     LIBDEPS=["serveronly", "coreserver", "coredb"] ),
+        env.Program( "mongoperf", "client/examples/mongoperf.cpp",
+                     LIBDEPS=["serveronly", "coreserver", "coredb"] ),
         ] )
 
 # mongos

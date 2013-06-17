@@ -46,7 +46,9 @@ namespace mongo {
               string defaultCollection="", bool usesstdout=true, bool quiet=false);
         virtual ~Tool();
 
-        int main( int argc , char ** argv );
+        static auto_ptr<Tool> (*createInstance)();
+
+        int main( int argc , char ** argv, char ** envp );
 
         boost::program_options::options_description_easy_init add_options() {
             return _options->add_options();
@@ -162,3 +164,7 @@ namespace mongo {
     };
 
 }
+
+#define REGISTER_MONGO_TOOL(TYPENAME) \
+    auto_ptr<Tool> createInstanceOfThisTool() {return auto_ptr<Tool>(new TYPENAME());} \
+    auto_ptr<Tool> (*Tool::createInstance)() = createInstanceOfThisTool;
