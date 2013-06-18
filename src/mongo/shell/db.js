@@ -874,10 +874,10 @@ DB.prototype.printSlaveReplicationInfo = function() {
 
     function getReplLag(st) {
         assert( startOptimeDate , "how could this be null (getReplLag startOptimeDate)" );
-        print("\t syncedTo: " + st.toString() );
+        print("\tsyncedTo: " + st.toString() );
         var ago = (startOptimeDate-st)/1000;
         var hrs = Math.round(ago/36)/100;
-        print("\t\t = " + Math.round(ago) + " secs ago (" + hrs + "hrs)");
+        print("\t" + Math.round(ago) + " secs (" + hrs + " hrs) behind the primary ");
     };
 
     function getMaster(members) {
@@ -896,13 +896,13 @@ DB.prototype.printSlaveReplicationInfo = function() {
 
     function g(x) {
         assert( x , "how could this be null (printSlaveReplicationInfo gx)" )
-        print("source:   " + x.host);
+        print("source: " + x.host);
         if ( x.syncedTo ){
             var st = new Date( DB.tsToSeconds( x.syncedTo ) * 1000 );
             getReplLag(st);
         }
         else {
-            print( "\t doing initial sync" );
+            print( "\tdoing initial sync" );
         }
     };
 
@@ -912,12 +912,12 @@ DB.prototype.printSlaveReplicationInfo = function() {
             return;
         }
         
-        print("source:   " + x.name);
+        print("source: " + x.name);
         if ( x.optime ) {
             getReplLag(x.optimeDate);
         }
         else {
-            print( "\t no replication info, yet.  State: " + x.stateStr );
+            print( "\tno replication info, yet.  State: " + x.stateStr );
         }
     };
     
