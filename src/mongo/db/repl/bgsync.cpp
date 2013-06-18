@@ -245,11 +245,10 @@ namespace replset {
             try {
                 _producerThread();
             }
-            catch (DBException& e) {
-                sethbmsg(str::stream() << "db exception in producer: " << e.toString());
-                sleepsecs(10);
+            catch (const DBException& e) {
+                sethbmsg(str::stream() << "sync source problem: " << e.toString());
             }
-            catch (std::exception& e2) {
+            catch (const std::exception& e2) {
                 sethbmsg(str::stream() << "exception in producer: " << e2.what());
                 sleepsecs(60);
             }
@@ -325,86 +324,95 @@ namespace replset {
         }
 
         while (!inShutdown()) {
-            while (!inShutdown()) {
+            if (!r.moreInCurrentBatch()) {
+                // Check some things periodically
+                // (whenever we run out of items in the
+                // current cursor batch)
+
+                int bs = r.currentBatchMessageSize();
+                if( bs > 0 && bs < BatchIsSmallish ) {
+                    // on a very low latency network, if we don't wait a little, we'll be 
+                    // getting ops to write almost one at a time.  this will both be expensive
+                    // for the upstream server as well as potentially defeating our parallel 
+                    // application of batches on the secondary.
+                    //
+                    // the inference here is basically if the batch is really small, we are 
+                    // "caught up".
+                    //
+                    dassert( !Lock::isLocked() );
+                    sleepmillis(SleepToAllowBatchingMillis);
+                }
+  
+                if (theReplSet->gotForceSync()) {
+                    return;
+                }
+                // If we are transitioning to primary state, we need to leave
+                // this loop in order to go into bgsync-pause mode.
+                if (isAssumingPrimary() || theReplSet->isPrimary()) {
+                    return;
+                }
+
+                // re-evaluate quality of sync target
+                if (shouldChangeSyncTarget()) {
+                    return;
+                }
+
+
+                {
+                    //record time for each getmore
+                    TimerHolder batchTimer(&getmoreReplStats);
+                    
+                    // This calls receiveMore() on the oplogreader cursor.
+                    // It can wait up to five seconds for more data.
+                    r.more();
+                }
+                networkByteStats.increment(r.currentBatchMessageSize());
 
                 if (!r.moreInCurrentBatch()) {
-                    int bs = r.currentBatchMessageSize();
-                    if( bs > 0 && bs < BatchIsSmallish ) {
-                        // on a very low latency network, if we don't wait a little, we'll be 
-                        // getting ops to write almost one at a time.  this will both be expensive
-                        // for the upstream server as well as postentiallyd efating our parallel 
-                        // application of batches on the secondary.
-                        //
-                        // the inference here is basically if the batch is really small, we are 
-                        // "caught up".
-                        //
-                        dassert( !Lock::isLocked() );
-                        sleepmillis(SleepToAllowBatchingMillis);
-                    }
-  
-                    if (theReplSet->gotForceSync()) {
-                        return;
-                    }
-
-                    if (isAssumingPrimary() || theReplSet->isPrimary()) {
-                        return;
-                    }
-
-                    // re-evaluate quality of sync target
-                    if (shouldChangeSyncTarget()) {
-                        return;
-                    }
-                    //record time for each getmore
+                    // If there is still no data from upstream, check a few more things
+                    // and then loop back for another pass at getting more data
                     {
-                        TimerHolder batchTimer(&getmoreReplStats);
-                        r.more();
+                        boost::unique_lock<boost::mutex> lock(_mutex);
+                        if (_pause || 
+                            !_currentSyncTarget || 
+                            !_currentSyncTarget->hbinfo().hbstate.readable()) {
+                            return;
+                        }
                     }
-                    //increment
-                    networkByteStats.increment(r.currentBatchMessageSize());
 
+                    r.tailCheck();
+                    if( !r.haveCursor() ) {
+                        LOG(1) << "replSet end syncTail pass" << rsLog;
+                        return;
+                    }
+
+                    continue;
                 }
+            }
 
-                if (!r.more())
-                    break;
-
-                BSONObj o = r.nextSafe().getOwned();
-                opsReadStats.increment();
-
-                {
-                    boost::unique_lock<boost::mutex> lock(_mutex);
-                    _appliedBuffer = false;
-                }
-
-                OCCASIONALLY {
-                    LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes" << rsLog;
-                }
-                // the blocking queue will wait (forever) until there's room for us to push
-                _buffer.push(o);
-                bufferCountGauge.increment();
-                bufferSizeGauge.increment(getSize(o));
-
-                {
-                    boost::unique_lock<boost::mutex> lock(_mutex);
-                    _lastH = o["h"].numberLong();
-                    _lastOpTimeFetched = o["ts"]._opTime();
-                }
-            } // end while
+            // At this point, we are guaranteed to have at least one thing to read out
+            // of the oplogreader cursor.
+            BSONObj o = r.nextSafe().getOwned();
+            opsReadStats.increment();
 
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);
-                if (_pause || !_currentSyncTarget || !_currentSyncTarget->hbinfo().hbstate.readable()) {
-                    return;
-                }
+                _appliedBuffer = false;
             }
 
-
-            r.tailCheck();
-            if( !r.haveCursor() ) {
-                LOG(1) << "replSet end syncTail pass" << rsLog;
-                return;
+            OCCASIONALLY {
+                LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes" << rsLog;
             }
+            // the blocking queue will wait (forever) until there's room for us to push
+            _buffer.push(o);
+            bufferCountGauge.increment();
+            bufferSizeGauge.increment(getSize(o));
 
-            // looping back is ok because this is a tailable cursor
+            {
+                boost::unique_lock<boost::mutex> lock(_mutex);
+                _lastH = o["h"].numberLong();
+                _lastOpTimeFetched = o["ts"]._opTime();
+            }
         }
     }
 
