@@ -580,9 +580,6 @@
     <ClInclude Include="..\s\config.h">
       <Filter>s</Filter>
     </ClInclude>
-    <ClInclude Include="..\s\d_chunk_manager.h">
-      <Filter>s</Filter>
-    </ClInclude>
     <ClInclude Include="..\s\d_logic.h">
       <Filter>s</Filter>
     </ClInclude>
@@ -1053,9 +1050,6 @@
     </ClInclude>
     <ClInclude Include="..\db\server_parameters_inline.h">
       <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="..\s\collection_manager.h">
-      <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\s\metadata_loader.h">
       <Filter>s</Filter>
@@ -2544,6 +2538,12 @@
     <ClInclude Include="..\platform\process_id.h">
       <Filter>platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\platform\strcasestr.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\collection_metadata.h">
+      <Filter>s</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -2883,9 +2883,6 @@
     <ClCompile Include="..\db\dur_recover.cpp">
       <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
-    <ClCompile Include="d_chunk_manager_tests.cpp">
-      <Filter>dbtests</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\d_logic.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -3116,9 +3113,6 @@
     </ClCompile>
     <ClCompile Include="..\db\ops\count.cpp">
       <Filter>db\ops</Filter>
-    </ClCompile>
-    <ClCompile Include="..\s\d_chunk_manager.cpp">
-      <Filter>s</Filter>
     </ClCompile>
     <ClCompile Include="..\s\d_split.cpp">
       <Filter>s</Filter>
@@ -3389,9 +3383,6 @@
     </ClCompile>
     <ClCompile Include="..\db\server_parameters.cpp">
       <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="..\s\collection_manager.cpp">
-      <Filter>s</Filter>
     </ClCompile>
     <ClCompile Include="..\s\metadata_loader.cpp">
       <Filter>s</Filter>
@@ -4926,6 +4917,12 @@
     </ClCompile>
     <ClCompile Include="..\db\commands\user_management_commands.cpp">
       <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\collection_metadata.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -845,6 +845,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\platform\hash_namespace.h" />
     <ClInclude Include="..\platform\process_id.h" />
     <ClInclude Include="..\platform\random.h" />
+    <ClInclude Include="..\platform\strcasestr.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
     <ClInclude Include="..\platform\unordered_set.h" />
@@ -880,11 +881,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\server.h" />
     <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\cluster_client_internal.h" />
-    <ClInclude Include="..\s\collection_manager.h" />
+    <ClInclude Include="..\s\collection_metadata.h" />
     <ClInclude Include="..\s\config.h" />
     <ClInclude Include="..\s\config_upgrade.h" />
     <ClInclude Include="..\s\config_upgrade_helpers.h" />
-    <ClInclude Include="..\s\d_chunk_manager.h" />
     <ClInclude Include="..\s\d_logic.h" />
     <ClInclude Include="..\s\d_writeback.h" />
     <ClInclude Include="..\db\field_parser.h" />
@@ -3273,6 +3273,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -3310,7 +3311,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\scripting\v8_profiler.cpp" />
     <ClCompile Include="..\scripting\v8_utils.cpp" />
     <ClCompile Include="..\s\cluster_client_internal.cpp" />
-    <ClCompile Include="..\s\collection_manager.cpp" />
+    <ClCompile Include="..\s\collection_metadata.cpp" />
     <ClCompile Include="..\s\config_upgrade.cpp" />
     <ClCompile Include="..\s\config_upgrade_helpers.cpp" />
     <ClCompile Include="..\s\config_upgrade_v0_to_v4.cpp" />
@@ -3367,7 +3368,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
-    <ClCompile Include="..\s\d_chunk_manager.cpp" />
     <ClCompile Include="..\s\d_migrate.cpp" />
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
@@ -3616,7 +3616,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="directclienttests.cpp" />
     <ClCompile Include="documentsourcetests.cpp" />
     <ClCompile Include="documenttests.cpp" />
-    <ClCompile Include="d_chunk_manager_tests.cpp" />
     <ClCompile Include="expressiontests.cpp" />
     <ClCompile Include="extsorttests.cpp" />
     <ClCompile Include="framework.cpp" />

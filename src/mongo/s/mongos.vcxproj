@@ -2793,6 +2793,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator_test.cpp">
@@ -2885,7 +2886,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="chunk.cpp" />
     <ClCompile Include="client_info.cpp" />
     <ClCompile Include="cluster_client_internal.cpp" />
-    <ClCompile Include="collection_manager.cpp" />
+    <ClCompile Include="collection_metadata.cpp" />
     <ClCompile Include="commands_admin.cpp" />
     <ClCompile Include="commands_public.cpp" />
     <ClCompile Include="config.cpp" />
@@ -3552,6 +3553,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\platform\float_utils.h" />
     <ClInclude Include="..\platform\process_id.h" />
     <ClInclude Include="..\platform\random.h" />
+    <ClInclude Include="..\platform\strcasestr.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
     <ClInclude Include="..\platform\unordered_set.h" />
@@ -3669,12 +3671,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="chunk_version.h" />
     <ClInclude Include="client_info.h" />
     <ClInclude Include="cluster_client_internal.h" />
-    <ClInclude Include="collection_manager.h" />
+    <ClInclude Include="collection_metadata.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="config_upgrade.h" />
     <ClInclude Include="config_upgrade_helpers.h" />
     <ClInclude Include="cursors.h" />
-    <ClInclude Include="d_chunk_manager.h" />
     <ClInclude Include="d_logic.h" />
     <ClInclude Include="d_writeback.h" />
     <ClInclude Include="..\db\field_parser-inl.h" />

@@ -1073,6 +1073,9 @@
     <ClCompile Include="..\platform\process_id_test.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\v8\src\apinatives.js">
@@ -1224,9 +1227,6 @@
     </ClInclude>
     <ClInclude Include="..\client\constants.h">
       <Filter>client</Filter>
-    </ClInclude>
-    <ClInclude Include="..\s\d_chunk_manager.h">
-      <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\client\dbclient_rs.h">
       <Filter>client</Filter>
@@ -2465,6 +2465,9 @@
       <Filter>base</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\process_id.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\strcasestr.h">
       <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>

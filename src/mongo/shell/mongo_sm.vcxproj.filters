@@ -680,6 +680,9 @@
     <ClCompile Include="..\platform\process_id_test.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">
@@ -1535,6 +1538,9 @@
       <Filter>base</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\process_id.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\strcasestr.h">
       <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>

@@ -831,9 +831,6 @@
     <ClCompile Include="..\db\server_parameters.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="collection_manager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="metadata_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1815,6 +1812,12 @@
     <ClCompile Include="..\db\commands\user_management_commands.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="collection_metadata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1846,9 +1849,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="cursors.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="d_chunk_manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="d_logic.h">
@@ -2363,9 +2363,6 @@
     </ClInclude>
     <ClInclude Include="..\db\server_parameters_inline.h">
       <Filter>db\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="collection_manager.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="metadata_loader.h">
       <Filter>Header Files</Filter>
@@ -3494,6 +3491,12 @@
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\process_id.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="collection_metadata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\strcasestr.h">
       <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>

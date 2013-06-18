@@ -262,9 +262,6 @@
     <ClCompile Include="stats\counters.cpp">
       <Filter>db\stats</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\d_chunk_manager.cpp">
-      <Filter>s</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\d_logic.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -1349,9 +1346,6 @@
     <ClCompile Include="server_parameters.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\collection_manager.cpp">
-      <Filter>s</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\metadata_loader.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -2231,6 +2225,51 @@
     <ClCompile Include="commands\user_management_commands.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\metadata_loader_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\collection_metadata.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\collection_metadata_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_changelog_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_chunk_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_collection_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_config_version_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_database_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_lockpings_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_locks_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_mongos_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_settings_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_shard_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_tags_test.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -2907,9 +2946,6 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\s\config.h">
-      <Filter>s</Filter>
-    </ClInclude>
-    <ClInclude Include="..\s\d_chunk_manager.h">
       <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\s\grid.h">
@@ -3673,9 +3709,6 @@
     </ClInclude>
     <ClInclude Include="server_parameters_inline.h">
       <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="..\s\collection_manager.h">
-      <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\s\metadata_loader.h">
       <Filter>s</Filter>
@@ -4508,6 +4541,12 @@
     </ClInclude>
     <ClInclude Include="..\platform\process_id.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\strcasestr.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\collection_metadata.h">
+      <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
