@@ -1099,14 +1099,6 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
-	/*
-	 * LSM cursors default to overwrite: if no setting was supplied, turn
-	 * it on.
-	 */
-	if (cfg == NULL || cfg[1] == NULL || __wt_config_getones(
-	    session, cfg[1], "overwrite", &cval) == WT_NOTFOUND)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
-
 	if (0) {
 err:		if (lsm_tree != NULL)
 			__wt_lsm_tree_release(session, lsm_tree);

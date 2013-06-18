@@ -165,7 +165,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_DECL_RET;
 	int force;
 
-	WT_RET(__wt_config_gets_defno(session, cfg, "force", &cval));
+	WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
 	force = (cval.val != 0);
 
 	WT_RET(__wt_meta_track_on(session));

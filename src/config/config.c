@@ -685,30 +685,29 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_config_gets_defno --
- *	Given a NULL-terminated list of configuration strings, and if the
- * application supplied any configuration strings, find the final value for
- * a given string key
+ * __wt_config_gets_def --
+ *	Performance hack: skip parsing config strings by hard-coding defaults.
+ *
+ *	It's expensive to repeatedly parse configuration strings, so don't do
+ *	it unless it's necessary in performance paths like cursor creation.
+ *	Assume the second configuration string is the application's
+ *	configuration string, and if it's not set (which is true most of the
+ *	time), then use the supplied default value.  This makes it faster to
+ *	open cursors when checking for obscure open configuration strings like
+ *	"next_random".
  */
 int
-__wt_config_gets_defno(WT_SESSION_IMPL *session,
-    const char **cfg, const char *key, WT_CONFIG_ITEM *value)
+__wt_config_gets_def(WT_SESSION_IMPL *session,
+    const char **cfg, const char *key, int def, WT_CONFIG_ITEM *value)
 {
 	static const WT_CONFIG_ITEM false_value = {
 		"", 0, 0, WT_CONFIG_ITEM_NUM
 	};
 
 	/*
-	 * This is a performance hack: it's expensive to repeatedly parse
-	 * configuration strings, so don't do it unless it's necessary in
-	 * performance paths like cursor creation.  Assume the second
-	 * configuration string is the application's configuration string, and
-	 * if it's not set (which is true most of the time), then assume the
-	 * default answer is "false", and return that.  This makes it much
-	 * faster to open cursors when checking for obscure open configuration
-	 * strings like "next_random".
 	 */
 	*value = false_value;
+	value->val = def;
 	if (cfg == NULL || cfg[0] == NULL || cfg[1] == NULL)
 		return (0);
 	else if (cfg[2] == NULL)

@@ -294,13 +294,10 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 			cbt->iface.recno = 0;
 
 		/*
-		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair.
-		 *
-		 * If WT_CURSTD_OVERWRITE not set, fail if the key exists, else
-		 * insert the key/value pair.  Creating a record past the end
-		 * of the tree in a fixed-length column-store implicitly fills
-		 * the gap with empty records.  Fail in that case, the record
-		 * exists.
+		 * If not overwriting, fail if the key exists.  Creating a
+		 * record past the end of the tree in a fixed-length
+		 * column-store implicitly fills the gap with empty records.
+		 * Fail in that case, the record exists.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
 		    ((cbt->compare == 0 && !__cursor_invalid(cbt)) ||
@@ -312,13 +309,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 			cbt->iface.recno = cbt->recno;
 		break;
 	case BTREE_ROW:
-		/*
-		 * If WT_CURSTD_OVERWRITE not set, fail if the key exists, else
-		 * insert the key/value pair.
-		 *
-		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair.
-		 */
 		WT_ERR(__wt_row_search(session, cbt, 1));
+		/*
+		 * If not overwriting, fail if the key exists, else insert the
+		 * key/value pair.
+		 */
 		if (cbt->compare == 0 &&
 		    !__cursor_invalid(cbt) &&
 		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE))
@@ -396,6 +391,12 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
+	/*
+	 * If the cursor is configured to overwrite and the record is not
+	 * found, that is exactly what we want.
+	 */
+	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) && ret == WT_NOTFOUND)
+		ret = 0;
 	WT_TRET(__cursor_func_resolve(cbt, ret));
 	return (ret);
 }
@@ -438,20 +439,25 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		WT_ERR(__wt_col_search(session, cbt, 1));
 
 		/*
-		 * Update the record if it exists.  Creating a record past the
-		 * end of the tree in a fixed-length column-store implicitly
-		 * fills the gap with empty records.  Update the record in that
-		 * case, the record exists.
+		 * If not overwriting, fail if the key doesn't exist.  Update
+		 * the record if it exists.  Creating a record past the end of
+		 * the tree in a fixed-length column-store implicitly fills the
+		 * gap with empty records.  Update the record in that case, the
+		 * record exists.
 		 */
-		if ((cbt->compare != 0 || __cursor_invalid(cbt)) &&
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
+		    (cbt->compare != 0 || __cursor_invalid(cbt)) &&
 		    !__cursor_fix_implicit(btree, cbt))
 			WT_ERR(WT_NOTFOUND);
 		ret = __wt_col_modify(session, cbt, 3);
 		break;
 	case BTREE_ROW:
-		/* Update the record if it exists. */
 		WT_ERR(__wt_row_search(session, cbt, 1));
-		if (cbt->compare != 0 || __cursor_invalid(cbt))
+		/*
+		 * If not overwriting, fail if the key does not exist.
+		 */
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
+		    (cbt->compare != 0 || __cursor_invalid(cbt)))
 			WT_ERR(WT_NOTFOUND);
 		ret = __wt_row_modify(session, cbt, 0);
 		break;
