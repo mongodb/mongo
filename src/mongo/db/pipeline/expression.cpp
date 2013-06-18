@@ -1370,7 +1370,7 @@ namespace mongo {
     }
 
     void ExpressionFieldPath::addDependencies(set<string>& deps, vector<string>* path) const {
-        // TODO, consider state of variables
+        // TODO consider state of variables
         if (_baseVar == ROOT || _baseVar == CURRENT) {
             deps.insert(_fieldPath.tail().getPath(false));
         }
