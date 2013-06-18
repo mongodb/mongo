@@ -394,8 +394,9 @@ namespace mongo {
                 if ( fivePct > sz )
                     sz = fivePct;
                 // we use 5% of free space up to 50GB (1TB free)
-                if (fivePct > 50.0 * 1024 * 1024 * 1024)
-                    sz = 50.0 * 1024 * 1024 * 1024;
+                double upperBound = 50.0 * 1024 * 1024 * 1024;
+                if (fivePct > upperBound)
+                    sz = upperBound;
 #endif
             }
         }
