@@ -704,8 +704,6 @@ __wt_config_gets_def(WT_SESSION_IMPL *session,
 		"", 0, 0, WT_CONFIG_ITEM_NUM
 	};
 
-	/*
-	 */
 	*value = false_value;
 	value->val = def;
 	if (cfg == NULL || cfg[0] == NULL || cfg[1] == NULL)
