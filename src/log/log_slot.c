@@ -151,6 +151,13 @@ retry:
 	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
 	old_state = WT_ATOMIC_STORE(slot->slot_state, WT_LOG_SLOT_PENDING);
 	slot->slot_group_size = old_state - WT_LOG_SLOT_READY;
+	/*
+	 * Note that this statistic may be much bigger than in reality,
+	 * especially when compared with the total bytes written in
+	 * __log_fill.  The reason is that this size reflects any
+	 * rounding up that is needed and the total bytes in __log_fill
+	 * is the amount of user bytes.
+	 */
 	WT_CSTAT_INCRV(session, log_slot_consolidated, slot->slot_group_size);
 	return (0);
 }

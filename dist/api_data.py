@@ -583,7 +583,7 @@ methods = {
 		Config('enabled', 'true', r'''
 		enable logging subsystem''',
                 type='boolean'),
-                Config('file_max', '100MB', r''',
+                Config('file_max', '100MB', r'''
 		the maximum size of the log file''',
 		min='1MB', max='2GB'),
 		Config('path', '""', r'''
