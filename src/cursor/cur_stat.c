@@ -415,7 +415,8 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cst = NULL;
 	flags = 0;
 
-	WT_RET(__wt_config_gets_def(session, cfg, "statistics_clear", 0, &cval));
+	WT_RET(
+	    __wt_config_gets_def(session, cfg, "statistics_clear", 0, &cval));
 	if (cval.val != 0)
 		LF_SET(WT_STATISTICS_CLEAR);
 	WT_RET(__wt_config_gets_def(session, cfg, "statistics_fast", 0, &cval));
