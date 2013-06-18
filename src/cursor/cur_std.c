@@ -399,7 +399,6 @@ err:	API_END(session);
 static int
 __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 {
-	WT_DECL_RET;
 	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 

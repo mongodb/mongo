@@ -1062,7 +1062,6 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    __clsm_update,		/* update */
 	    __clsm_remove,		/* remove */
 	    __clsm_close);		/* close */
-	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
