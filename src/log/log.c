@@ -242,6 +242,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
 		close_fh = log->log_close_fh;
 		log->log_close_fh = NULL;
+		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
 	}
 	/*
 	 * Wait for earlier groups to finish.
@@ -255,21 +256,11 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		log->sync_lsn = slot->slot_end_lsn;
 	}
 	log->write_lsn = slot->slot_end_lsn;
-	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
+	/*
+	 * If we have a file to close, close it now.
+	 */
+	if (close_fh)
 		WT_ERR(__wt_close(session, close_fh));
-		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
-#if 1
-		/*
-		 * Update ckpt_lsn for archive testing purposes only.
-		 * Set it back an extra log file so that racing read ops
-		 * don't fail.
-		 */
-		if (log->write_lsn.file > 2)
-			log->ckpt_lsn.file = log->write_lsn.file - 1;
-		if (conn->arch_cond != NULL)
-			WT_ERR(__wt_cond_signal(session, conn->arch_cond));
-#endif
-	}
 
 err:	if (ret != 0 && slot->slot_error == 0)
 		slot->slot_error = ret;
@@ -621,26 +612,13 @@ err:
 	 */
 	if (LF_ISSET(WT_LOG_SYNC) && ret == 0)
 		ret = myslot.slot->slot_error;
+	if (LF_ISSET(WT_LOG_CKPT) && ret == 0) {
+		log->ckpt_lsn = tmp_lsn;
+		if (conn->arch_cond != NULL)
+			WT_ERR(__wt_cond_signal(session, conn->arch_cond));
+	}
 	return (ret);
 }
-
-#if 1
-static void
-__scan_call(
-    WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, void *cookie)
-{
-	WT_LOG_RECORD *logrec;
-
-	WT_UNUSED(session);
-	WT_UNUSED(cookie);
-	logrec = (WT_LOG_RECORD *)record->mem;
-	/*
-	 * Return if log file header record
-	 */
-	if (lsnp->offset == 0)
-		return;
-}
-#endif
 
 int
 __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
@@ -650,15 +628,8 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	WT_LOG_RECORD *logrec;
 	va_list ap_copy;
 	size_t len;
-WT_DECL_RET;
-WT_LOG *log;
-WT_LSN lsn;
-WT_ITEM rdbuf;
-uint32_t logsync;
 
 	conn = S2C(session);
-log = conn->log;
-WT_CLEAR(rdbuf);
 
 	if (!conn->logging)
 		return (0);
@@ -676,35 +647,7 @@ WT_CLEAR(rdbuf);
 
 	WT_VERBOSE_RET(session, log,
 	    "log_printf: %s", (char *)&logrec->record);
-#if 1
 	return (__wt_log_write(session, buf, NULL, 0));
-#else
-	if (len % 2 == 0)
-		logsync = WT_LOG_SYNC;
-	else
-		logsync = 0;
-	ret = __wt_log_write(session, buf, &lsn, logsync);
-	/*
-	 * Only read some records.  Randomize on logsync.
-	 */
-	if (ret == 0 && logsync) {
-		if (lsn.file == 2 && !F_ISSET(log, LOG_AUTOREMOVE)) {
-			F_SET(log, LOG_AUTOREMOVE);
-			ret = __wt_log_scan(
-			    session, &lsn, WT_LOGSCAN_ONE, __scan_call, NULL);
-			ret = __wt_log_scan(
-			    session, NULL, WT_LOGSCAN_FIRST, __scan_call, NULL);
-			ret = 0;
-		} else {
-			ret = __wt_log_read(session, &rdbuf, &lsn, 0);
-			if (ret == 0) {
-				logrec = (WT_LOG_RECORD *)rdbuf.mem;
-				__wt_buf_free(session, &rdbuf);
-			}
-		}
-	}
-	return (0);
-#endif
 }
 
 #if 0

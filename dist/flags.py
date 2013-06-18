@@ -25,6 +25,7 @@ flags = {
 		'LOGSCAN_ONE'
         ],
         'log_write' : [
+		'LOG_CKPT',
 		'LOG_SYNC'
         ],
 	'rec_write' : [
