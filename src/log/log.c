@@ -56,13 +56,9 @@ __wt_log_extract_lognum(
 static int
 __log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(path);
 	WT_DECL_RET;
-	WT_LOG *log;
 
-	conn = S2C(session);
-	log = conn->log;
 	WT_RET(__wt_scr_alloc(session, 0, &path));
 	WT_ERR(__wt_log_filename(session, id, path));
 	WT_VERBOSE_ERR(session, log, "opening log %s",
@@ -239,6 +235,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * If we're going to have to close our log file, make a local copy
 	 * of the file handle structure.
 	 */
+	close_fh = NULL;
 	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
 		close_fh = log->log_close_fh;
 		log->log_close_fh = NULL;
