@@ -43,7 +43,7 @@ namespace mongo {
     const int DefaultIndexVersionNumber = 1;
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
-        string system_indexes = cc().database()->name + ".system.indexes";
+        string system_indexes = cc().database()->name() + ".system.indexes";
         BSONObjBuilder b;
         b.append("ns", ns);
         b.append("name", idxName); // e.g.: { name: "ts_1", ns: "foo.coll" }
@@ -56,7 +56,7 @@ namespace mongo {
        partial option.  see dropIndexes()
     */
     int assureSysIndexesEmptied(const char *ns, IndexDetails *idIndex) {
-        string system_indexes = cc().database()->name + ".system.indexes";
+        string system_indexes = cc().database()->name() + ".system.indexes";
         BSONObjBuilder b;
         b.append("ns", ns);
         if( idIndex ) {
@@ -142,7 +142,7 @@ namespace mongo {
     }
 
     static void upgradeMinorVersionOrAssert(const string& newPluginName) {
-        const string systemIndexes = cc().database()->name + ".system.indexes";
+        const string systemIndexes = cc().database()->name() + ".system.indexes";
         shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
         for ( ; cursor && cursor->ok(); cursor->advance()) {
             const BSONObj index = cursor->current();
@@ -209,8 +209,9 @@ namespace mongo {
         // the collection for which we are building an index
         sourceNS = io.getStringField("ns");
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
-        massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS ,
-                cc().database()->name == nsToDatabase(sourceNS));
+        massert(10097, str::stream() << "bad table to index name on add index attempt current db: "
+                << cc().database()->name() << "  source: " << sourceNS,
+                cc().database()->name() == nsToDatabase(sourceNS));
 
         // logical name of the index.  todo: get rid of the name, we don't need it!
         const char *name = io.getStringField("name");

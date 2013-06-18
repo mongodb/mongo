@@ -36,14 +36,15 @@ namespace mongo {
     class Database {
     public:
         // you probably need to be in dbHolderMutex when constructing this
-        Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
-    private:
-        ~Database(); // closes files and other cleanup see below.
-    public:
+        Database(const char *nm, /*out*/ bool& newDb, const string& path = dbpath);
+
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
         */
-        static void closeDatabase( const char *db, const string& path );
+        static void closeDatabase( const string& db, const string& path );
+
+        const string& name() const { return _name; }
+        const string& path() const { return _path; }
 
         void openAllFiles();
         void clearTmpCollections();
@@ -51,9 +52,9 @@ namespace mongo {
         /**
          * tries to make sure that this hasn't been deleted
          */
-        bool isOk() const { return magic == 781231; }
+        bool isOk() const { return _magic == 781231; }
 
-        bool isEmpty() { return ! namespaceIndex.allocated(); }
+        bool isEmpty() { return ! _namespaceIndex.allocated(); }
 
         /**
          * total file size of Database in bytes
@@ -67,11 +68,6 @@ namespace mongo {
          */
         boost::filesystem::path fileName( int n ) const;
 
-    private:
-        bool exists(int n) const;
-        bool openExistingFile( int n );
-
-    public:
         /**
          * return file n.  if it doesn't exist, create it
          */
@@ -103,21 +99,22 @@ namespace mongo {
          *         ns=foo.bar, db=foo returns true
          */
         bool ownsNS( const string& ns ) const {
-            if ( ! startsWith( ns , name ) )
+            if ( ! startsWith( ns , _name ) )
                 return false;
-            return ns[name.size()] == '.';
+            return ns[_name.size()] == '.';
         }
 
         const RecordStats& recordStats() const { return _recordStats; }
         RecordStats& recordStats() { return _recordStats; }
 
-    private:
-        /**
-         * @throws DatabaseDifferCaseCode if the name is a duplicate based on
-         * case insensitive matching.
-         */
-        void checkDuplicateUncasedNames(bool inholderlockalready) const;
-    public:
+        int getProfilingLevel() const { return _profile; }
+        const char* getProfilingNS() const { return _profileName.c_str(); }
+
+        CCByLoc& ccByLoc() { return _ccByLoc; }
+
+        const NamespaceIndex& namespaceIndex() const { return _namespaceIndex; }
+        NamespaceIndex& namespaceIndex() { return _namespaceIndex; }
+
         /**
          * @return name of an existing database with same text name but different
          * casing, if one exists.  Otherwise the empty string is returned.  If
@@ -125,28 +122,37 @@ namespace mongo {
          */
         static string duplicateUncasedName( bool inholderlockalready, const string &name, const string &path, set< string > *duplicates = 0 );
 
-        const string name; // "alleyinsider"
-        const string path;
-
     private:
+
+        ~Database(); // closes files and other cleanup see below.
+
+        /**
+         * @throws DatabaseDifferCaseCode if the name is a duplicate based on
+         * case insensitive matching.
+         */
+        void checkDuplicateUncasedNames(bool inholderlockalready) const;
+
+        bool exists(int n) const;
+        bool openExistingFile( int n );
+
+        const string _name; // "alleyinsider"
+        const string _path; // "/data/db"
 
         // must be in the dbLock when touching this (and write locked when writing to of course)
         // however during Database object construction we aren't, which is ok as it isn't yet visible
         //   to others and we are in the dbholder lock then.
         vector<MongoDataFile*> _files;
 
-    public: // this should be private later
+        NamespaceIndex _namespaceIndex;
+        const string _profileName; // "alleyinsider.system.profile"
 
-        NamespaceIndex namespaceIndex;
-        const string profileName; // "alleyinsider.system.profile"
-        CCByLoc ccByLoc;
-        int magic; // used for making sure the object is still loaded in memory
+        CCByLoc _ccByLoc; // use by ClientCursor
 
-        int getProfilingLevel() const { return _profile; }
-
-    private:
         RecordStats _recordStats;
         int _profile; // 0=off.
+
+        int _magic; // used for making sure the object is still loaded in memory
+
     };
 
 } // namespace mongo

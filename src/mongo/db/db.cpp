@@ -371,7 +371,7 @@ namespace mongo {
             }
             else {
                 if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
-                    const string systemIndexes = cc().database()->name + ".system.indexes";
+                    const string systemIndexes = cc().database()->name() + ".system.indexes";
                     shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
                     for ( ; cursor && cursor->ok(); cursor->advance()) {
                         const BSONObj index = cursor->current();

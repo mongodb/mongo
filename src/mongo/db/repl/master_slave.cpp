@@ -374,7 +374,9 @@ namespace mongo {
             ReplInfo r("resync: cloning a database");
             string errmsg;
             int errCode = 0;
-            bool ok = Cloner::cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
+            bool ok = Cloner::cloneFrom(hostName.c_str(), errmsg, cc().database()->name(), false,
+                                        /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false,
+                                        /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
                     resyncDrop( db.c_str(), "internal" );
@@ -632,7 +634,7 @@ namespace mongo {
                 save();
                 Client::Context ctx(ns);
                 nClonedThisPass++;
-                resync(ctx.db()->name);
+                resync(ctx.db()->name());
                 addDbNextPass.erase(clientName);
                 incompleteCloneDbs.erase( clientName );
             }

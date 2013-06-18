@@ -973,7 +973,7 @@ namespace QueryTests {
             Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
-            ASSERT_EQUALS( "unittests", cc().database()->name );
+            ASSERT_EQUALS( "unittests", cc().database()->name() );
         }
         const char *ns;
     };

@@ -31,18 +31,18 @@
 
 namespace mongo {
 
-    void assertDbAtLeastReadLocked(const Database *db) { 
-        if( db ) { 
-            Lock::assertAtLeastReadLocked(db->name);
+    void assertDbAtLeastReadLocked(const Database *db) {
+        if( db ) {
+            Lock::assertAtLeastReadLocked(db->name());
         }
         else {
             verify( Lock::isLocked() );
         }
     }
 
-    void assertDbWriteLocked(const Database *db) { 
-        if( db ) { 
-            Lock::assertWriteLocked(db->name);
+    void assertDbWriteLocked(const Database *db) {
+        if( db ) {
+            Lock::assertWriteLocked(db->name());
         }
         else {
             verify( Lock::isW() );
@@ -51,18 +51,19 @@ namespace mongo {
 
     Database::~Database() {
         verify( Lock::isW() );
-        magic = 0;
+        _magic = 0;
         size_t n = _files.size();
         for ( size_t i = 0; i < n; i++ )
             delete _files[i];
-        if( ccByLoc.size() ) {
-            log() << "\n\n\nWARNING: ccByLoc not empty on database close! " << ccByLoc.size() << ' ' << name << endl;
+        if( _ccByLoc.size() ) {
+            log() << "\n\n\nWARNING: ccByLoc not empty on database close! "
+                  << _ccByLoc.size() << ' ' << _name << endl;
         }
     }
 
-    Database::Database(const char *nm, bool& newDb, const string& _path )
-        : name(nm), path(_path), namespaceIndex( path, name ),
-          profileName(name + ".system.profile")
+    Database::Database(const char *nm, bool& newDb, const string& path )
+        : _name(nm), _path(path), _namespaceIndex( _path, _name ),
+          _profileName(_name + ".system.profile")
     {
         try {
             {
@@ -88,17 +89,18 @@ namespace mongo {
                 }
 #endif
             }
-            newDb = namespaceIndex.exists();
+            newDb = _namespaceIndex.exists();
             _profile = cmdLine.defaultProfile;
             checkDuplicateUncasedNames(true);
             // If already exists, open.  Otherwise behave as if empty until
             // there's a write, then open.
             if (!newDb) {
-                namespaceIndex.init();
+                _namespaceIndex.init();
                 openAllFiles();
             }
-            magic = 781231;
-        } catch(std::exception& e) {
+            _magic = 781231;
+        }
+        catch(std::exception& e) {
             log() << "warning database " << path << " " << nm << " could not be opened" << endl;
             DBException* dbe = dynamic_cast<DBException*>(&e);
             if ( dbe != 0 ) {
@@ -115,12 +117,12 @@ namespace mongo {
             throw;
         }
     }
-    
+
     void Database::checkDuplicateUncasedNames(bool inholderlock) const {
-        string duplicate = duplicateUncasedName(inholderlock, name, path );
+        string duplicate = duplicateUncasedName(inholderlock, _name, _path );
         if ( !duplicate.empty() ) {
             stringstream ss;
-            ss << "db already exists with different case other: [" << duplicate << "] me [" << name << "]";
+            ss << "db already exists with different case other: [" << duplicate << "] me [" << _name << "]";
             uasserted( DatabaseDifferCaseCode , ss.str() );
         }
     }
@@ -130,22 +132,22 @@ namespace mongo {
         Lock::assertAtLeastReadLocked(name);
 
         if ( duplicates ) {
-            duplicates->clear();   
+            duplicates->clear();
         }
-        
+
         vector<string> others;
         getDatabaseNames( others , path );
-        
+
         set<string> allShortNames;
         dbHolder().getAllShortNames( allShortNames );
-        
+
         others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
-        
+
         for ( unsigned i=0; i<others.size(); i++ ) {
 
             if ( strcasecmp( others[i].c_str() , name.c_str() ) )
                 continue;
-            
+
             if ( strcmp( others[i].c_str() , name.c_str() ) == 0 )
                 continue;
 
@@ -160,31 +162,31 @@ namespace mongo {
         }
         return "";
     }
-    
+
     boost::filesystem::path Database::fileName( int n ) const {
         stringstream ss;
-        ss << name << '.' << n;
+        ss << _name << '.' << n;
         boost::filesystem::path fullName;
-        fullName = boost::filesystem::path(path);
+        fullName = boost::filesystem::path(_path);
         if ( directoryperdb )
-            fullName /= name;
+            fullName /= _name;
         fullName /= ss.str();
         return fullName;
     }
 
-    bool Database::openExistingFile( int n ) { 
+    bool Database::openExistingFile( int n ) {
         verify(this);
-        Lock::assertWriteLocked(name);
+        Lock::assertWriteLocked(_name);
         {
-            // must not yet be visible to others as we aren't in the db's write lock and 
+            // must not yet be visible to others as we aren't in the db's write lock and
             // we will write to _files vector - thus this assert.
-            bool loaded = dbHolder().__isLoaded(name, path);
+            bool loaded = dbHolder().__isLoaded(_name, _path);
             verify( !loaded );
         }
         // additionally must be in the dbholder mutex (no assert for that yet)
 
         // todo: why here? that could be bad as we may be read locked only here
-        namespaceIndex.init();
+        _namespaceIndex.init();
 
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
             massert( 15924 , str::stream() << "getFile(): bad file number value " << n << " (corrupt db?): run repair", false);
@@ -233,10 +235,10 @@ namespace mongo {
 
     void Database::clearTmpCollections() {
 
-        Lock::assertWriteLocked( name );
-        Client::Context ctx( name );
+        Lock::assertWriteLocked( _name );
+        Client::Context ctx( _name );
 
-        string systemNamespaces =  name + ".system.namespaces";
+        string systemNamespaces =  _name + ".system.namespaces";
 
         // Note: we build up a toDelete vector rather than dropping the collection inside the loop
         // to avoid modifying the system.namespaces collection while iterating over it since that
@@ -279,7 +281,7 @@ namespace mongo {
         verify(this);
         DEV assertDbAtLeastReadLocked(this);
 
-        namespaceIndex.init();
+        _namespaceIndex.init();
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
             out() << "getFile(): n=" << n << endl;
             massert( 10295 , "getFile(): bad file number value (corrupt db?): run repair", false);
@@ -293,7 +295,7 @@ namespace mongo {
         if ( !preallocateOnly ) {
             while ( n >= (int) _files.size() ) {
                 verify(this);
-                if( !Lock::isWriteLocked(this->name) ) {
+                if( !Lock::isWriteLocked(this->_name) ) {
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
                     log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
                     log() << "       context ns: " << cc().ns() << endl;

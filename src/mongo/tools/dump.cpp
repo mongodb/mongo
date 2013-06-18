@@ -389,10 +389,10 @@ public:
     int _repair( string dbname ) {
         Client::WriteContext cx( dbname );
         Database * db = cx.ctx().db();
-        
+
         list<string> namespaces;
-        db->namespaceIndex.getNamespaces( namespaces );
-        
+        db->namespaceIndex().getNamespaces( namespaces );
+
         boost::filesystem::path root = getParam( "out" );
         root /= dbname;
         boost::filesystem::create_directories( root );

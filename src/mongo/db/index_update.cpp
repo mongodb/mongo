@@ -304,7 +304,7 @@ namespace mongo {
             }
         }
 
-        string system_indexes = cc().database()->name + ".system.indexes";
+        string system_indexes = cc().database()->name() + ".system.indexes";
 
         BSONObjBuilder b;
         b.append("name", "_id_");

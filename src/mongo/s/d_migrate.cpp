@@ -529,7 +529,7 @@ namespace mongo {
 
         void aboutToDelete( const Database* db , const DiskLoc& dl ) {
             verify(db);
-            Lock::assertWriteLocked(db->name);
+            Lock::assertWriteLocked(db->name());
 
             if ( ! _getActive() )
                 return;
@@ -1489,7 +1489,7 @@ namespace mongo {
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
                     Client::WriteContext ct( ns );
-                    string system_indexes = cc().database()->name + ".system.indexes";
+                    string system_indexes = cc().database()->name() + ".system.indexes";
                     theDataFileMgr.insertAndLog( system_indexes.c_str(),
                                                  idx,
                                                  true, /* god mode */

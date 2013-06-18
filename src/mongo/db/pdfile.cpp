@@ -203,7 +203,7 @@ namespace mongo {
             if ( cx ) {
                 Database *database = cx->db();
                 if ( database ) {
-                    ss << database->name << ' ';
+                    ss << database->name() << ' ';
                     ss << cx->ns() << ' ';
                 }
             }
@@ -574,7 +574,7 @@ namespace mongo {
     }
 
     Extent* DataFileMgr::allocFromFreeList(const char *ns, int approxSize, bool capped) {
-        string s = cc().database()->name + FREELIST_NS;
+        string s = cc().database()->name() + FREELIST_NS;
         NamespaceDetails *f = nsdetails(s);
         if( f ) {
             int low, high;
@@ -928,7 +928,7 @@ namespace mongo {
     }
 
     void printFreeList() {
-        string s = cc().database()->name + FREELIST_NS;
+        string s = cc().database()->name() + FREELIST_NS;
         log() << "dump freelist " << s << endl;
         NamespaceDetails *freeExtents = nsdetails(s);
         if( freeExtents == 0 ) {
@@ -959,7 +959,7 @@ namespace mongo {
             verify( f==l || !l->xprev.isNull() );
         }
 
-        string s = cc().database()->name + FREELIST_NS;
+        string s = cc().database()->name() + FREELIST_NS;
         NamespaceDetails *freeExtents = nsdetails(s);
         if( freeExtents == 0 ) {
             string err;
@@ -990,7 +990,7 @@ namespace mongo {
         BackgroundOperation::assertNoBgOpInProgForNs(nsToDrop.c_str());
 
         NamespaceString s(nsToDrop);
-        verify( s.db == cc().database()->name );
+        verify( s.db == cc().database()->name() );
         if( s.isSystem() ) {
             if( s.coll == "system.profile" ) {
                 uassert( 10087,
@@ -1005,7 +1005,7 @@ namespace mongo {
         {
             // remove from the system catalog
             BSONObj cond = BSON( "name" << nsToDrop );   // { name: "colltodropname" }
-            string system_namespaces = cc().database()->name + ".system.namespaces";
+            string system_namespaces = cc().database()->name() + ".system.namespaces";
             /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, false, true);
             // no check of return code as this ns won't exist for some of the new storage engines
         }
@@ -1018,7 +1018,7 @@ namespace mongo {
         }
 
         // remove from the catalog hashtable
-        cc().database()->namespaceIndex.kill_ns(nsToDrop.c_str());
+        cc().database()->namespaceIndex().kill_ns(nsToDrop.c_str());
     }
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
@@ -1791,20 +1791,20 @@ namespace mongo {
         Lock::assertWriteLocked(db);
         Database *d = cc().database();
         verify( d );
-        verify( d->name == db );
+        verify( d->name() == db );
 
-        BackgroundOperation::assertNoBgOpInProgForDb(d->name.c_str());
+        BackgroundOperation::assertNoBgOpInProgForDb(d->name().c_str());
 
-        // Not sure we need this here, so removed.  If we do, we need to move it down 
-        // within other calls both (1) as they could be called from elsewhere and 
-        // (2) to keep the lock order right - groupcommitmutex must be locked before 
+        // Not sure we need this here, so removed.  If we do, we need to move it down
+        // within other calls both (1) as they could be called from elsewhere and
+        // (2) to keep the lock order right - groupcommitmutex must be locked before
         // mmmutex (if both are locked).
         //
         //  RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
 
         getDur().syncDataAndTruncateJournal();
 
-        Database::closeDatabase( d->name.c_str(), d->path );
+        Database::closeDatabase( d->name(), d->path() );
         d = 0; // d is now deleted
 
         _deleteDataFiles( db.c_str() );
@@ -1920,8 +1920,8 @@ namespace mongo {
         string localhost = ss.str();
 
         problem() << "repairDatabase " << dbName << endl;
-        verify( cc().database()->name == dbName );
-        verify( cc().database()->path == dbpath );
+        verify( cc().database()->name() == dbName );
+        verify( cc().database()->path() == dbpath );
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
@@ -2038,7 +2038,7 @@ namespace mongo {
 
         set< string > dbs;
         for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
-            wassert( i->second->path == path );
+            wassert( i->second->path() == path );
             dbs.insert( i->first );
         }
 

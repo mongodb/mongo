@@ -416,7 +416,7 @@ namespace mongo {
         if ( _planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( _query ) ) {
             Database *database = cc().database();
             verify( database );
-            NamespaceDetails *d = database->namespaceIndex.details( _ns );
+            NamespaceDetails *d = database->namespaceIndex().details( _ns );
             if ( d ) {
                 int idxNo = d->findIdIndex();
                 if ( idxNo >= 0 ) {

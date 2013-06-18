@@ -64,7 +64,7 @@ namespace mongo {
         if ( ! dbname ) {
             Database *database = cc().database();
             verify( database );
-            dbname = database->name.c_str();
+            dbname = database->name().c_str();
         }
         return strcmp( dbname , "local" ) == 0;
     }

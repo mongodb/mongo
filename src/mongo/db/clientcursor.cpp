@@ -79,7 +79,7 @@ namespace mongo {
         if ( L == _lastLoc )
             return;
 
-        CCByLoc& bl = byLoc();
+        CCByLoc& bl = _db->ccByLoc();
 
         if ( !_lastLoc.isNull() ) {
             bl.erase( ByLocKey( _lastLoc, _cursorid ) );
@@ -109,7 +109,7 @@ namespace mongo {
             //cout << "\nTEMP invalidate " << ns << endl;
             Database *db = cc().database();
             verify(db);
-            verify( str::startsWith(ns, db->name) );
+            verify( str::startsWith(ns, db->name()) );
 
             for( LockedIterator i; i.ok(); ) {
                 ClientCursor *cc = i.current();
@@ -213,7 +213,7 @@ namespace mongo {
     void ClientCursor::informAboutToDeleteBucket(const DiskLoc& b) {
         recursive_scoped_lock lock(ccmutex);
         Database *db = cc().database();
-        CCByLoc& bl = db->ccByLoc;
+        CCByLoc& bl = db->ccByLoc();
         RARELY if ( bl.size() > 70 ) {
             log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket" << endl;
         }
@@ -238,7 +238,7 @@ namespace mongo {
 
         aboutToDeleteForSharding( ns, db, nsd, dl );
 
-        CCByLoc& bl = db->ccByLoc;
+        CCByLoc& bl = db->ccByLoc();
         CCByLoc::iterator j = bl.lower_bound(ByLocKey::min(dl));
         CCByLoc::iterator stop = bl.upper_bound(ByLocKey::max(dl));
         if ( j == stop )
@@ -328,7 +328,7 @@ namespace mongo {
         Lock::assertAtLeastReadLocked(ns);
 
         verify( _db );
-        verify( str::startsWith(_ns, _db->name) );
+        verify( _db->ownsNS( _ns ) );
         if( queryOptions & QueryOption_NoCursorTimeout )
             noTimeout();
         recursive_scoped_lock lock(ccmutex);

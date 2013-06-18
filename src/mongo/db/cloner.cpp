@@ -76,7 +76,7 @@ namespace mongo {
                 uassert( 10024 , "bad ns field for index during dbcopy", e.type() == String);
                 const char *p = strchr(e.valuestr(), '.');
                 uassert( 10025 , "bad ns field for index during dbcopy [2]", p);
-                string newname = cc().database()->name + p;
+                string newname = cc().database()->name() + p;
                 b.append("ns", newname);
             }
             else
@@ -272,7 +272,7 @@ namespace mongo {
         Client::WriteContext ctx(ns);
 
         // config
-        string temp = ctx.ctx().db()->name + ".system.namespaces";
+        string temp = ctx.ctx().db()->name() + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
         if (config["options"].isABSONObj())
             if (!userCreateNS(ns.c_str(), config["options"].Obj(), errmsg, logForRepl, 0))
@@ -288,7 +288,7 @@ namespace mongo {
         }
 
         // indexes
-        temp = ctx.ctx().db()->name + ".system.indexes";
+        temp = ctx.ctx().db()->name() + ".system.indexes";
         copy(temp.c_str(), temp.c_str(), true, logForRepl, false, true, mayYield, mayBeInterrupted,
              BSON( "ns" << ns ));
 
@@ -323,13 +323,13 @@ namespace mongo {
         }
         massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
-        string todb = cc().database()->name;
+        string todb = cc().database()->name();
         stringstream a,b;
         a << "localhost:" << cmdLine.port;
         b << "127.0.0.1:" << cmdLine.port;
         bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
         if ( masterSameProcess ) {
-            if ( opts.fromDB == todb && cc().database()->path == dbpath ) {
+            if ( opts.fromDB == todb && cc().database()->path() == dbpath ) {
                 // guard against an "infinite" loop
                 /* if you are replicating, the local.sources config may be wrong if you get this */
                 errmsg = "can't clone from self (localhost).";

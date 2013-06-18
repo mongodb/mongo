@@ -384,8 +384,6 @@ namespace mongo {
         // setting this prevents timeout of the cursor in question.
         void noTimeout() { _pinValue++; }
 
-        CCByLoc& byLoc() { return _db->ccByLoc; }
-        
         Record* _recordForYield( RecordNeeds need );
         static bool _erase_inlock(ClientCursor* cursor);
 

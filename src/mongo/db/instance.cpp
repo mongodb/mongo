@@ -504,18 +504,18 @@ namespace mongo {
     /* db - database name
        path - db directory
     */
-    /*static*/ void Database::closeDatabase( const char *db, const string& path ) {
+    /*static*/ void Database::closeDatabase( const string& db, const string& path ) {
         verify( Lock::isW() );
 
         Client::Context * ctx = cc().getContext();
         verify( ctx );
         verify( ctx->inDB( db , path ) );
         Database *database = ctx->db();
-        verify( database->name == db );
+        verify( database->name() == db );
 
         oplogCheckCloseDatabase( database ); // oplog caches some things, dirty its caches
 
-        if( BackgroundOperation::inProgForDb(db) ) {
+        if( BackgroundOperation::inProgForDb(db.c_str()) ) {
             log() << "warning: bg op in prog during close db? " << db << endl;
         }
 

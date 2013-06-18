@@ -623,14 +623,14 @@ namespace mongo {
         memconcept::is(database, memconcept::concept::database, ns, sizeof(Database));
         DEV {
             StringData dbname = nsToDatabaseSubstring( ns );
-            if ( database->name != dbname ) {
+            if ( database->name() != dbname ) {
                 out() << "ERROR: attempt to write to wrong database\n";
                 out() << " ns:" << ns << '\n';
-                out() << " database->name:" << database->name << endl;
-                verify( database->name == dbname );
+                out() << " database->name:" << database->name() << endl;
+                verify( database->name() == dbname );
             }
         }
-        return &database->namespaceIndex;
+        return &database->namespaceIndex();
     }
 
     inline NamespaceDetails* nsdetails(const StringData& ns) {

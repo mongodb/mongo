@@ -1531,7 +1531,7 @@ namespace mongo {
             list<string> collections;
             Database* d = cc().database();
             if ( d )
-                d->namespaceIndex.getNamespaces( collections );
+                d->namespaceIndex().getNamespaces( collections );
 
             long long ncollections = 0;
             long long objects = 0;
@@ -1574,7 +1574,7 @@ namespace mongo {
             result.appendNumber( "indexSize" , indexSize / scale );
             result.appendNumber( "fileSize" , d->fileSize() / scale );
             if( d )
-                result.appendNumber( "nsSizeMB", (int) d->namespaceIndex.fileLength() / 1024 / 1024 );
+                result.appendNumber( "nsSizeMB", (int) d->namespaceIndex().fileLength() / 1024 / 1024 );
 
             BSONObjBuilder dataFileVersion( result.subobjStart( "dataFileVersion" ) );
             if ( d && !d->isEmpty() ) {
@@ -1821,7 +1821,7 @@ namespace mongo {
             list<string> colls;
             Database* db = cc().database();
             if ( db )
-                db->namespaceIndex.getNamespaces( colls );
+                db->namespaceIndex().getNamespaces( colls );
             colls.sort();
 
             result.appendNumber( "numCollections" , (long long)colls.size() );
