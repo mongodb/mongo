@@ -283,7 +283,6 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		 * maximum possible record number so the search ends on the
 		 * last page.  The real record number is assigned by the
 		 * serialized append operation.
-		 * __wt_col_append_serial_func
 		 */
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
 			cbt->iface.recno = UINT64_MAX;
@@ -314,9 +313,8 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		 * If not overwriting, fail if the key exists, else insert the
 		 * key/value pair.
 		 */
-		if (cbt->compare == 0 &&
-		    !__cursor_invalid(cbt) &&
-		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
+		    cbt->compare == 0 && !__cursor_invalid(cbt))
 			WT_ERR(WT_DUPLICATE_KEY);
 
 		ret = __wt_row_modify(session, cbt, 0);
