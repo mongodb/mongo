@@ -406,7 +406,7 @@ err:
 
 int
 __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
-    void (*func)(WT_SESSION_IMPL *session,
+    int (*func)(WT_SESSION_IMPL *session,
     WT_ITEM *record, WT_LSN *lsnp, void *cookie), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -503,6 +503,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		/*
 		 * We read in the record, verify checksum.
 		 */
+		buf.size = reclen;
 		logrec = (WT_LOG_RECORD *)buf.mem;
 		cksum = logrec->checksum;
 		logrec->checksum = 0;
@@ -513,21 +514,23 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		}
 
 		/*
-		 * We have a valid log record.  Invoke the callback.
+		 * We have a valid log record.  If it is not the log file
+		 * header, invoke the callback.
 		 */
-		(*func)(session, &buf, &rd_lsn, cookie);
+		if (rd_lsn.offset != 0)
+			WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
 
 		WT_CSTAT_INCR(session, log_scan_records);
 		rd_lsn.offset += rdup_len;
 	} while (!done);
-err:
-	WT_CSTAT_INCR(session, log_scans);
+
+err:	WT_CSTAT_INCR(session, log_scans);
 	__wt_buf_free(session, &buf);
 	if (ret == ENOENT)
 		ret = 0;
 	if (log_fh != NULL)
 		WT_RET(__wt_close(session, log_fh));
-	return (0);
+	return (ret);
 }
 
 int
