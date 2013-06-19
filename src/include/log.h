@@ -9,7 +9,6 @@
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
-#define	LOG_ALIGN_DIRECTIO	4096
 
 /*
  * The slot algorithm uses negative values, so we lose a bit.

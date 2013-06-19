@@ -234,10 +234,12 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
 	WT_STATS file_open;
+	WT_STATS log_bytes_user;
 	WT_STATS log_bytes_written;
 	WT_STATS log_max_filesize;
 	WT_STATS log_reads;
 	WT_STATS log_scan_records;
+	WT_STATS log_scan_rereads;
 	WT_STATS log_scans;
 	WT_STATS log_slot_closes;
 	WT_STATS log_slot_consolidated;

@@ -350,7 +350,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
-	uint32_t cksum, reclen;
+	uint32_t cksum, rdup_len, reclen;
 
 	WT_UNUSED(flags);
 	/*
@@ -369,18 +369,28 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	WT_RET(__log_openfile(session, 0, &log_fh, lsnp->file));
 	/*
-	 * Read in 4 bytes that is the total size of the log record.
-	 * Check for out of bounds values.
+	 * Read the minimum allocation size a record could be.
 	 */
+	WT_ERR(__wt_buf_init(session, record, log->allocsize));
 	WT_ERR(__wt_read(
-	    session, log_fh, lsnp->offset, sizeof(uint32_t), (void *)&reclen));
+	    session, log_fh, lsnp->offset, log->allocsize, record->mem));
+	/*
+	 * First 4 bytes is the real record length.  See if we
+	 * need to read more than the allocation size.  We expect
+	 * that we rarely will have to read more.  Most log records
+	 * will be fairly small.
+	 */
+	reclen = *(uint32_t *)record->mem;
 	if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}
-	WT_ERR(__wt_buf_init(session, record,
-	    __wt_rduppo2(reclen, log->allocsize)));
-	WT_ERR(__wt_read(session, log_fh, lsnp->offset, reclen, record->mem));
+	if (reclen > log->allocsize) {
+		rdup_len = __wt_rduppo2(reclen, log->allocsize);
+		WT_ERR(__wt_buf_grow(session, record, rdup_len));
+		WT_ERR(__wt_read(
+		    session, log_fh, lsnp->offset, rdup_len, record->mem));
+	}
 	/*
 	 * We read in the record, verify checksum.
 	 */
@@ -479,23 +489,29 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			continue;
 		}
 		/*
-		 * Read the record size
+		 * Read the minimum allocation size a record could be.
 		 */
-		WT_ERR(__wt_read(session, log_fh, rd_lsn.offset,
-		    sizeof(uint32_t), (void *)&reclen));
+		WT_ASSERT(session, buf.memsize >= log->allocsize);
+		WT_ERR(__wt_read(
+		    session, log_fh, rd_lsn.offset, log->allocsize, buf.mem));
+		/*
+		 * First 4 bytes is the real record length.  See if we
+		 * need to read more than the allocation size.  We expect
+		 * that we rarely will have to read more.  Most log records
+		 * will be fairly small.
+		 */
+		reclen = *(uint32_t *)buf.mem;
 		if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
 			ret = WT_NOTFOUND;
 			goto err;
 		}
 		rdup_len = __wt_rduppo2(reclen, log->allocsize);
-		if (reclen > buf.memsize)
+		if (reclen > log->allocsize) {
 			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
-
-		/*
-		 * Now read in the actual log record itself.
-		 */
-		WT_ERR(__wt_read(
-		    session, log_fh, rd_lsn.offset, reclen, buf.mem));
+			WT_ERR(__wt_read(
+			    session, log_fh, rd_lsn.offset, reclen, buf.mem));
+			WT_CSTAT_INCR(session, log_scan_rereads);
+		}
 		/*
 		 * We read in the record, verify checksum.
 		 */
@@ -549,12 +565,29 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	/*
 	 * Assume the WT_ITEM the user passed is a WT_LOG_RECORD, which has
 	 * a header at the beginning for us to fill in.
+	 *
+	 * If using direct_io, the caller should pass us an aligned record.
+	 * But we need to make sure it is big enough and zero-filled so
+	 * that we can write the full amount.  Do this whether or not
+	 * direct_io is in use because it makes the reading code cleaner.
 	 */
+	WT_CSTAT_INCRV(session, log_bytes_user, record->size);
+	rdup_len = __wt_rduppo2(record->size, log->allocsize);
+	WT_ERR(__wt_buf_grow(session, record, rdup_len));
+	WT_ASSERT(session, record->data == record->mem);
+	/*
+	 * If the caller's record only partially fills the necessary
+	 * space, we need to zero-fill the remainder.
+	 */
+	if (record->size != rdup_len) {
+		memset((uint8_t *)record->mem + record->size, 0,
+		    rdup_len - record->size);
+		record->size = rdup_len;
+	}
 	logrec = (WT_LOG_RECORD *)record->mem;
 	logrec->len = record->size;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, record->size);
-	rdup_len = __wt_rduppo2(record->size, log->allocsize);
 
 	memset(&tmp, 0, sizeof(tmp));
 	WT_CSTAT_INCR(session, log_writes);

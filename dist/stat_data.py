@@ -89,10 +89,12 @@ connection_stats = [
 	##########################################
 	# Logging statistics
 	##########################################
+	Stat('log_bytes_user', 'log: total user provided log bytes written'),
 	Stat('log_bytes_written', 'log: total log bytes written'),
 	Stat('log_max_filesize', 'log: maximum log file size', 'no_clear'),
 	Stat('log_reads', 'log: total log read operations'),
 	Stat('log_scan_records', 'log: total records processed by log scan'),
+	Stat('log_scan_rereads', 'log: log scan records requiring two reads'),
 	Stat('log_scans', 'log: total log scan operations'),
 	Stat('log_sync', 'log: total log sync operations'),
 	Stat('log_writes', 'log: total log write operations'),
