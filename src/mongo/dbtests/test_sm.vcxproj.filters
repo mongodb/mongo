@@ -2058,6 +2058,9 @@
     <ClInclude Include="..\db\ops\modifier_rename.h">
       <Filter>db\ops</Filter>
     </ClInclude>
+    <ClInclude Include="..\platform\posix_fadvise.h">
+      <Filter>platform</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -4101,6 +4104,9 @@
     </ClCompile>
     <ClCompile Include="..\db\ops\modifier_rename_test.cpp">
       <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\posix_fadvise.cpp">
+      <Filter>platform</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

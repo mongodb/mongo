@@ -1413,6 +1413,9 @@
     <ClCompile Include="collection_metadata.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\posix_fadvise.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -2625,6 +2628,9 @@
     </ClInclude>
     <ClInclude Include="collection_metadata.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\posix_fadvise.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
