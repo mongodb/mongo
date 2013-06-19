@@ -346,7 +346,8 @@ namespace mongo {
                 verify( d->getCompletedIndexCount() == 1 );
             }
 
-            verify( 0 == assureSysIndexesEmptied(ns, idIndex) );
+            //verify( 0 == assureSysIndexesEmptied(ns, idIndex) );// TODO(erh)
+            assureSysIndexesEmptied(ns, idIndex);
             anObjBuilder.append("msg", mayDeleteIdIndex ?
                                 "indexes dropped for collection" :
                                 "non-_id indexes dropped for collection");
