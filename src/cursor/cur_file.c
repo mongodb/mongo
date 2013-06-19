@@ -322,7 +322,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	 * random_retrieval
 	 * Random retrieval cursors only support next, reset and close.
 	 */
-	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
+	WT_ERR(__wt_config_gets_def(session, cfg, "next_random", 0, &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curfile_next_random;
@@ -358,7 +358,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 
 	flags = 0;
 
-	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
+	WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
 	if (cval.type == WT_CONFIG_ITEM_BOOL ||
 	    (cval.type == WT_CONFIG_ITEM_NUM &&
 	    (cval.val == 0 || cval.val == 1))) {

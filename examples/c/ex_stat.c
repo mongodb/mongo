@@ -25,7 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ex_stat.c
- *	This is an example demonstrating how to query a database's statistics.
+ *	This is an example demonstrating how to query database statistics.
  */
 
 #include <errno.h>

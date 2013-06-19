@@ -85,7 +85,7 @@ class test_index01(wttest.WiredTigerTestCase):
 
     def insert(self, *cols):
         self.pr('insert')
-        cursor = self.cursor()
+        cursor = self.cursor(config='overwrite=false')
         cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.insert(), 0)
@@ -101,7 +101,7 @@ class test_index01(wttest.WiredTigerTestCase):
 
     def update(self, *cols):
         self.pr('update')
-        cursor = self.cursor()
+        cursor = self.cursor(config='overwrite=false')
         cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.update(), 0)
@@ -109,7 +109,7 @@ class test_index01(wttest.WiredTigerTestCase):
 
     def update_nonexistent(self, *cols):
         self.pr('update')
-        cursor = self.cursor()
+        cursor = self.cursor(config='overwrite=false')
         cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.update(), wiredtiger.WT_NOTFOUND)
@@ -117,7 +117,7 @@ class test_index01(wttest.WiredTigerTestCase):
 
     def remove(self, name, ID):
         self.pr('remove')
-        cursor = self.cursor()
+        cursor = self.cursor(config='overwrite=false')
         cursor.set_key(name, ID)
         self.assertEqual(cursor.remove(), 0)
         cursor.close()

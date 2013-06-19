@@ -1,3 +1,31 @@
+WiredTiger release 1.6.2, 2013-06-18
+------------------------------------
+
+This is a bugfix and performance tuning release. The main changes are:
+
+* Fix a race in the WiredTiger pseudo random number generator that was leading
+  to poor distribution of numbers.
+
+* Change the default compression configuration to "uncompressed".
+
+* Fix a race between checkpoints and LSM that could result in a crash. [#543]
+
+* Add an option to output version information at runtime. Configure by
+  including "verbose=[version]" in the wiredtiger_open connection
+  configuration string. [#564]
+
+* Add a configurable prefix to error messages. [#527]
+
+* Add two new extension APIs, one to return a transaction ID, one to return
+  if a transaction ID is visible to the current transaction.
+
+* Add standard metadata functions to the extension API and make extension data
+  sources responsible for their own metadata entries.
+
+* Add a new extension function __wt_ext_config_strget that returns the
+  configuration value from a single string.
+
+
 WiredTiger release 1.6.1, 2013-05-31
 ------------------------------------
 

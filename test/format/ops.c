@@ -512,7 +512,7 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "%s", which);
-	*notfoundp = ret == WT_NOTFOUND;
+	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
 		return;
@@ -790,21 +790,19 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		    g.wt_api, session, "%-10s%" PRIu64, "remove", keyno);
 
 	cursor->set_key(cursor, key);
-	ret = cursor->remove(cursor);
+	/* We use the cursor in overwrite mode, check for existence. */
+	if ((ret = cursor->search(cursor)) == 0)
+		ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
-	*notfoundp = ret == WT_NOTFOUND;
+	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
 		return;
 
 	bdb_remove(keyno, &notfound);
 
-	/* LSM trees don't check for existence if "overwrite" is set. */
-	if (strncmp(cursor->uri, "lsm:", 4) == 0)
-		*notfoundp = notfound;
-	else
-		(void)notfound_chk("row_remove", ret, notfound, keyno);
+	(void)notfound_chk("row_remove", ret, notfound, keyno);
 }
 
 /*
@@ -825,10 +823,12 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		    g.wt_api, session, "%-10s%" PRIu64, "remove", keyno);
 
 	cursor->set_key(cursor, keyno);
-	ret = cursor->remove(cursor);
+	/* We use the cursor in overwrite mode, check for existence. */
+	if ((ret = cursor->search(cursor)) == 0)
+		ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
-	*notfoundp = ret == WT_NOTFOUND;
+	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
 		return;
