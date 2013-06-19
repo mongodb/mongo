@@ -106,6 +106,7 @@ namespace mongo {
 
 
             BSONObjBuilder userObjBuilder;
+            userObjBuilder.append("_id", OID::gen());
             userObjBuilder.append("user", args.userName);
             if (args.hasPassword) {
                 userObjBuilder.append("pwd", password);
