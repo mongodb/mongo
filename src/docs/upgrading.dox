@@ -15,7 +15,7 @@ methods, configuring all three methods to ignore the existing state of the
 record.
 
 In the 1.6.3 release, the \c overwrite configuration is consistent across both
-Btree and LSM tree data source.  For performance reasons, the default is the
+Btree and LSM tree data sources.  For performance reasons, the default is the
 behavior previously described for LSM trees: in other words, \c overwrite is
 \c true by default, causing WT_CURSOR::insert, WT_CURSOR::remove and
 WT_CURSOR::update to ignore the current state of the record, and these methods
