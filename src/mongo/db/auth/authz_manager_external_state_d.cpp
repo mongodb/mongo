@@ -33,11 +33,12 @@ namespace mongo {
     Status AuthzManagerExternalStateMongod::insertPrivilegeDocument(const string& dbname,
                                                                     const BSONObj& userObj) const {
         string userNS = dbname + ".system.users";
-        Client::GodScope gs;
-        Client::WriteContext ctx(userNS);
-
         DBDirectClient client;
-        client.insert(userNS, userObj);
+        {
+            Client::GodScope gs;
+            Client::WriteContext ctx(userNS);
+            client.insert(userNS, userObj);
+        }
 
         // 30 second timeout for w:majority
         BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
@@ -45,7 +46,7 @@ namespace mongo {
         if (errstr.empty()) {
             return Status::OK();
         }
-        if (res["code"].Int() == ASSERT_ID_DUPKEY) {
+        if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
             return Status(ErrorCodes::DuplicateKey,
                           mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
                                  "\" already exists on database \"" << dbname << "\"");
@@ -56,13 +57,14 @@ namespace mongo {
     Status AuthzManagerExternalStateMongod::updatePrivilegeDocument(
             const UserName& user, const BSONObj& updateObj) const {
         string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
-        Client::GodScope gs;
-        Client::WriteContext ctx(userNS);
-
         DBDirectClient client;
-        client.update(userNS,
-                      QUERY("user" << user.getUser() << "userSource" << BSONNULL),
-                      updateObj);
+        {
+            Client::GodScope gs;
+            Client::WriteContext ctx(userNS);
+            client.update(userNS,
+                          QUERY("user" << user.getUser() << "userSource" << BSONNULL),
+                          updateObj);
+        }
 
         // 30 second timeout for w:majority
         BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
