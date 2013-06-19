@@ -49,8 +49,6 @@ class test_config03(test_base03.test_base03):
         [50, 90, 95, 99], None)
     hazard_max_scenarios = wtscenario.quick_scenarios('s_hazard_max',
         [15, 50, 500], [0.4, 0.8, 0.8])
-    logging_scenarios = wtscenario.quick_scenarios('s_logging',
-        [True,False], [1.0,1.0])
     multiprocess_scenarios = wtscenario.quick_scenarios('s_multiprocess',
         [True,False], [1.0,1.0])
     session_max_scenarios = wtscenario.quick_scenarios('s_session_max',
@@ -67,14 +65,13 @@ class test_config03(test_base03.test_base03):
     verbose_scenarios = wtscenario.quick_scenarios('s_verbose', [None], None)
 
     config_vars = [ 'cache_size', 'create', 'error_prefix', 'eviction_target',
-                    'eviction_trigger', 'hazard_max', 'logging',
-                    'multiprocess', 'session_max', 'transactional', 'verbose' ]
+                    'eviction_trigger', 'hazard_max', 'multiprocess',
+                    'session_max', 'transactional', 'verbose' ]
 
     all_scenarios = wtscenario.multiply_scenarios('_',
         cache_size_scenarios, create_scenarios, error_prefix_scenarios,
         eviction_target_scenarios, eviction_trigger_scenarios,
-        hazard_max_scenarios, logging_scenarios,
-        multiprocess_scenarios, session_max_scenarios,
+        hazard_max_scenarios, multiprocess_scenarios, session_max_scenarios,
         transactional_scenarios, verbose_scenarios)
 
     scenarios = wtscenario.prune_scenarios(all_scenarios, 1000)
