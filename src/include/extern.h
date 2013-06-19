@@ -696,8 +696,6 @@ extern int __wt_log_write(WT_SESSION_IMPL *session,
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     const char *fmt,
     va_list ap);
-extern int __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...);
-extern WT_LOGREC_DESC __wt_logdesc_debug;
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
     int32_t mysize,

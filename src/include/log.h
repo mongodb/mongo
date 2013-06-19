@@ -143,9 +143,7 @@ typedef struct {
 	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
 	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
 
-#define	LOG_AUTOREMOVE		0x0001
-#define	LOG_RECOVER		0x0002
-	uint32_t	 flags;
+	uint32_t	 flags;			/* Currently unused */
 } WT_LOG;
 
 typedef struct {

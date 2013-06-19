@@ -579,17 +579,17 @@ methods = {
 		type='category', subconfig=[
 		Config('archive', 'true', r'''
 		automatically archive unneeded log files''',
-                type='boolean'),
+		type='boolean'),
 		Config('enabled', 'true', r'''
 		enable logging subsystem''',
-                type='boolean'),
-                Config('file_max', '100MB', r'''
+		type='boolean'),
+		Config('file_max', '100MB', r'''
 		the maximum size of the log file''',
 		min='1MB', max='2GB'),
 		Config('path', '""', r'''
 		the path to a directory into which the log files are written.
-                If the value is not an absolute path name, the files are created
-                relative to the database home'''),
+		If the value is not an absolute path name, the files are created
+		relative to the database home'''),
 		]),
 	Config('lsm_merge', 'true', r'''
 		merge LSM chunks where possible''',

@@ -186,7 +186,7 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t recsize)
 /*
  * __log_acquire --
  *	Called with the log slot lock held.  Can be called recursively
- *	from __log_newfile when we change log files.
+ *	from __wt_log_newfile when we change log files.
  */
 static int
 __log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
@@ -396,8 +396,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	record->size = logrec->len;
 	WT_CSTAT_INCR(session, log_reads);
 err:
-	WT_RET(__wt_close(session, log_fh));
-
+	WT_TRET(__wt_close(session, log_fh));
 	return (ret);
 }
 
@@ -453,7 +452,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	else
 		done = 0;
 	rd_lsn = start_lsn;
-	WT_RET(__wt_buf_initsize(session, &buf, LOG_ALIGN));
+	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
 	do {
 		/*
 		 * Read in 4 bytes that is the total size of the log record.
@@ -526,7 +525,7 @@ err:	WT_CSTAT_INCR(session, log_scans);
 	if (ret == ENOENT)
 		ret = 0;
 	if (log_fh != NULL)
-		WT_RET(__wt_close(session, log_fh));
+		WT_TRET(__wt_close(session, log_fh));
 	return (ret);
 }
 
@@ -649,29 +648,3 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	    "log_printf: %s", (char *)&logrec->record);
 	return (__wt_log_write(session, buf, NULL, 0));
 }
-
-#if 0
-int
-__wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
-{
-	WT_DECL_RET;
-	WT_ITEM *buf;
-	va_list ap;
-	size_t size;
-
-	buf = &session->logrec_buf;
-	size = 0;
-
-	va_start(ap, recdesc);
-	ret = __log_record_size(session, &size, recdesc, ap);
-	va_end(ap);
-	WT_RET(ret);
-
-	WT_RET(__wt_buf_initsize(session, buf, size));
-
-	va_start(ap, recdesc);
-	ret = __wt_struct_packv(session, buf->mem, size, recdesc->fmt, ap);
-	va_end(ap);
-	return (ret);
-}
-#endif
