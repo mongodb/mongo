@@ -3,6 +3,7 @@
 Import("env")
 
 env.Library('platform', [
+        'posix_fadvise.cpp',
         'process_id.cpp',
         'random.cpp',
         'strcasestr.cpp',

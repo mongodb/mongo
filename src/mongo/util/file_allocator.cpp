@@ -16,11 +16,13 @@
  */
 
 #include "mongo/pch.h"
+
 #include "mongo/util/file_allocator.h"
+
 #include <boost/thread.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <fcntl.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #if defined(__freebsd__) || defined(__openbsd__)
 #   include <sys/stat.h>
@@ -34,10 +36,11 @@
 #   include <io.h>
 #endif
 
-#include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
+#include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 using namespace mongoutils;
 
