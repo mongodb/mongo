@@ -797,6 +797,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\ops\modifier_pull_all.h" />
     <ClInclude Include="..\db\ops\modifier_push.h" />
     <ClInclude Include="..\db\ops\modifier_push_sorter.h" />
+    <ClInclude Include="..\db\ops\modifier_rename.h" />
     <ClInclude Include="..\db\ops\modifier_set.h" />
     <ClInclude Include="..\db\ops\modifier_table.h" />
     <ClInclude Include="..\db\ops\modifier_unset.h" />
@@ -3393,6 +3394,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\db\ops\modifier_rename.cpp" />
+    <ClCompile Include="..\db\ops\modifier_rename_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\db\ops\modifier_set.cpp" />
     <ClCompile Include="..\db\ops\modifier_set_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -3460,7 +3472,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\pipeline\accumulator_last.cpp" />
     <ClCompile Include="..\db\pipeline\accumulator_min_max.cpp" />
     <ClCompile Include="..\db\pipeline\accumulator_push.cpp" />
-    <ClCompile Include="..\db\pipeline\accumulator_single_value.cpp" />
     <ClCompile Include="..\db\pipeline\accumulator_sum.cpp" />
     <ClCompile Include="..\db\pipeline\builder.cpp" />
     <ClCompile Include="..\db\pipeline\document.cpp" />

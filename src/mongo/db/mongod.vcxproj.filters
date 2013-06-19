@@ -184,9 +184,6 @@
     <ClCompile Include="pipeline\accumulator_push.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\accumulator_single_value.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\accumulator_sum.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
@@ -2269,6 +2266,12 @@
     </ClCompile>
     <ClCompile Include="..\s\type_tags_test.cpp">
       <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_rename.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\modifier_rename_test.cpp">
+      <Filter>db\ops</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -4547,6 +4550,9 @@
     </ClInclude>
     <ClInclude Include="..\s\collection_metadata.h">
       <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_rename.h">
+      <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

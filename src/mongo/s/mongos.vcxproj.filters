@@ -600,9 +600,6 @@
     <ClCompile Include="..\db\pipeline\accumulator_push.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\pipeline\accumulator_single_value.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\pipeline\accumulator_sum.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
