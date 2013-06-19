@@ -254,12 +254,24 @@ namespace mongo {
 
     std::string getCertificateSubjectName(X509* cert) {
         std::string result;
-        //TODO: Use X509_NAME_print_ex() with the XN_FLAG_RFC2253 flag instead.
-        char* asciiName = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);
-        if (asciiName) {
-            result = asciiName;
-            free(asciiName);
+
+        BIO* out = BIO_new(BIO_s_mem());
+        uassert(16884, "unable to allocate BIO memory", NULL != out);
+        ON_BLOCK_EXIT(BIO_free, out);
+
+        if (X509_NAME_print_ex(out,
+                              X509_get_subject_name(cert),
+                              0,
+                              XN_FLAG_RFC2253) >= 0) {
+            if (BIO_number_written(out) > 0) {
+                result.resize(BIO_number_written(out));
+                BIO_read(out, &result[0], result.size());
+            }
         }
+        else {
+            log() << "failed to convert subject name to RFC2253 format" << endl;
+        }
+
         return result;
     }
 
