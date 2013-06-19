@@ -23,9 +23,7 @@ var rwUser = 'rwUser';
 var roUser = 'roUser';
 var password = 'password';
 
-try {
-    adminDB.addUser( rwUser, password, false, st.rs0.numNodes );
-} catch (e) {} // expected b/c of SERVER-6101.  TODO: remove try/catch once SERVER-6101 is fixed.
+adminDB.addUser( rwUser, password, false, st.rs0.numNodes );
 
 assert( adminDB.auth( rwUser, password ) );
 adminDB.addUser( roUser, password, true );
