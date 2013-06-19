@@ -18,20 +18,20 @@
 
 #include "mongo/tools/tool.h"
 
+#include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <iostream>
 
 #include "pcrecpp.h"
 
+#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/json.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/password.h"
 #include "mongo/util/version.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/db/json.h"
-
-#include <boost/filesystem/operations.hpp>
 
 using namespace std;
 using namespace mongo;
@@ -480,7 +480,7 @@ namespace mongo {
             return 0;
         }
 
-#if !defined(__sunos__) && defined(POSIX_FADV_SEQUENTIAL)
+#ifdef POSIX_FADV_SEQUENTIAL
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 

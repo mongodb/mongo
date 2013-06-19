@@ -33,6 +33,7 @@
 
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace-inl.h"
+#include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/file.h"
 
 namespace mongo {

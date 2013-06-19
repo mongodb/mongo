@@ -16,12 +16,16 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "logfile.h"
-#include "text.h"
-#include "mongoutils/str.h"
-#include "mongo/util/startup_test.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/logfile.h"
+
+#include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/text.h"
+
 
 using namespace mongoutils;
 
