@@ -49,3 +49,4 @@ assert.eq(1, result.ok, 'rsChaining3');
 cdb.foo.insert({a:1});
 assertGLEOK(cdb.getLastErrorObj());
 replTest.awaitReplication();
+replTest.stopSet();
