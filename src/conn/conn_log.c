@@ -70,7 +70,7 @@ __log_archive_server(void *arg)
 	 * created.  Wait for the wiredtiger_open call.
 	 */
 	while (!conn->connection_initialized)
-		__wt_sleep(1, 0);
+		__wt_sleep(0, 1);
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*
