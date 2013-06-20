@@ -47,9 +47,10 @@ namespace mongo {
             return false;
         }
 
-        if (internalSecurity.pwd.length() > 0) {
-            return authenticateInternalUser(_connection.get());  
+        if (isInternalAuthSet()) { 
+            return authenticateInternalUser(_connection.get()); 
         }
+
         BSONObj user;
         {
             Client::ReadContext ctxt("local.");
@@ -66,7 +67,8 @@ namespace mongo {
         massert(16889, "bad user object? [1]", !u.empty());
         massert(16887, "bad user object? [2]", !p.empty());
 
-        string err;
+        std::string err;
+
         if( !_connection->auth("local", u.c_str(), p.c_str(), err, false) ) {
             log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
             return false;

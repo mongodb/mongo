@@ -32,6 +32,8 @@
 #include "mongo/util/net/sock.h"
 #include "mongo/util/scopeguard.h"
 
+#include <openssl/evp.h>
+
 namespace mongo {
 
     namespace {
@@ -119,12 +121,16 @@ namespace mongo {
         struct Params {
             Params(const std::string& pemfile,
                    const std::string& pempwd,
+                   const std::string& clusterfile,
+                   const std::string& clusterpwd,
                    const std::string& cafile = "",
                    const std::string& crlfile = "",
                    bool weakCertificateValidation = false,
                    bool fipsMode = false) :
                 pemfile(pemfile),
                 pempwd(pempwd),
+                clusterfile(clusterfile),
+                clusterpwd(clusterpwd),
                 cafile(cafile),
                 crlfile(crlfile),
                 weakCertificateValidation(weakCertificateValidation),
@@ -132,6 +138,8 @@ namespace mongo {
 
             std::string pemfile;
             std::string pempwd;
+            std::string clusterfile;
+            std::string clusterpwd;
             std::string cafile;
             std::string crlfile;
             bool weakCertificateValidation;
@@ -140,7 +148,7 @@ namespace mongo {
 
         class SSLManager : public SSLManagerInterface {
         public:
-            explicit SSLManager(const Params& params);
+            explicit SSLManager(const Params& params, bool isServer);
 
             virtual ~SSLManager();
 
@@ -152,8 +160,12 @@ namespace mongo {
 
             virtual void cleanupThreadLocals();
 
-            virtual std::string getSubjectName() {
-                return _subjectName;
+            virtual std::string getServerSubjectName() {
+                return _serverSubjectName;
+            }
+
+            virtual std::string getClientSubjectName() {
+                return _clientSubjectName;
             }
 
             virtual int SSL_read(SSL* ssl, void* buf, int num);
@@ -171,17 +183,19 @@ namespace mongo {
             virtual void SSL_free(SSL* ssl);
 
         private:
-            SSL_CTX* _context;
+            SSL_CTX* _serverContext;  // SSL context for incoming connections
+            SSL_CTX* _clientContext;  // SSL context for outgoing connections
             std::string _password;
             bool _validateCertificates;
             bool _weakValidation;
-            std::string _subjectName;
+            std::string _serverSubjectName;
+            std::string _clientSubjectName;
 
             /**
-             * creates an SSL context to be used for this file descriptor.
+             * creates an SSL object to be used for this file descriptor.
              * caller must SSL_free it.
              */
-            SSL* _secure(int fd);
+            SSL* _secure(SSL_CTX* context, int fd);
 
             /**
              * Fetches the error text for an error code, in a thread-safe manner.
@@ -194,19 +208,31 @@ namespace mongo {
              */
             void _handleSSLError(int code);
 
-            /** @return true if was successful, otherwise false */
-            bool _setupPEM( const std::string& keyFile , const std::string& password );
-
             /*
-             * Set up SSL for certificate validation by loading a CA
+             * Init the SSL context using parameters provided in params.
              */
-            bool _setupCA(const std::string& caFile);
+            bool _initSSLContext(SSL_CTX** context, const Params& params);
 
             /*
-             * Import a certificate revocation list into our SSL context
+             * Parse the x509 subject name from the PEM keyfile and store it 
+             */
+            bool _setSubjectName(const std::string& keyFile, std::string& subjectName);
+
+            /** @return true if was successful, otherwise false */
+            bool _setupPEM(SSL_CTX* context,
+                           const std::string& keyFile,
+                           const std::string& password);
+
+            /*
+             * Set up an SSL context for certificate validation by loading a CA
+             */
+            bool _setupCA(SSL_CTX* context, const std::string& caFile);
+
+            /*
+             * Import a certificate revocation list into an SSL context
              * for use with validating certificates
              */
-            bool _setupCRL(const std::string& crlFile);
+            bool _setupCRL(SSL_CTX* context, const std::string& crlFile);
 
             /*
              * Activate FIPS 140-2 mode, if the server started with a command line
@@ -230,17 +256,22 @@ namespace mongo {
 
     } // namespace
 
+    // Global variable indicating if this is a server or a client instance
+    bool isSSLServer = false;
+    
     MONGO_INITIALIZER(SSLManager)(InitializerContext* context) {
         SimpleMutex::scoped_lock lck(sslManagerMtx);
         if (cmdLine.sslOnNormalPorts) {
             const Params params(
                 cmdLine.sslPEMKeyFile,
                 cmdLine.sslPEMKeyPassword,
+                cmdLine.sslClusterFile,
+                cmdLine.sslClusterPassword,
                 cmdLine.sslCAFile,
                 cmdLine.sslCRLFile,
                 cmdLine.sslWeakCertificateValidation,
                 cmdLine.sslFIPSMode);
-            theSSLManager = new SSLManager(params);
+            theSSLManager = new SSLManager(params, isSSLServer);
         }
         return Status::OK();
     }
@@ -277,7 +308,7 @@ namespace mongo {
 
     SSLManagerInterface::~SSLManagerInterface() {}
 
-    SSLManager::SSLManager(const Params& params) :
+    SSLManager::SSLManager(const Params& params, bool isServer) :
         _validateCertificates(false),
         _weakValidation(params.weakCertificateValidation) {
 
@@ -292,51 +323,57 @@ namespace mongo {
         // Add all digests and ciphers to OpenSSL's internal table
         // so that encryption/decryption is backwards compatible
         OpenSSL_add_all_algorithms();
-
-        _context = SSL_CTX_new(SSLv23_method());
-        massert(15864,
-                mongoutils::str::stream() << "can't create SSL Context: " <<
-                _getSSLErrorMessage(ERR_get_error()),
-                _context);
-
-        // Activate all bug workaround options, to support buggy client SSL's.
-        SSL_CTX_set_options(_context, SSL_OP_ALL);
-
-        // If renegotiation is needed, don't return from recv() or send() until it's successful.
-        // Note: this is for blocking sockets only.
-        SSL_CTX_set_mode(_context, SSL_MODE_AUTO_RETRY);
-
-        // Set context within which session can be reused
-        int status = SSL_CTX_set_session_id_context(
-            _context,
-            static_cast<unsigned char*>(static_cast<void*>(&_context)),
-            sizeof(_context));
-        if (!status) {
-            uasserted(16768,"ssl initialization problem");
-        }
-
+ 
         SSLThreadInfo::init();
         SSLThreadInfo::get();
 
-        if (!params.pemfile.empty()) {
-            if (!_setupPEM(params.pemfile, params.pempwd)) {
+        if (!_initSSLContext(&_clientContext, params)) {
+            uasserted(16768, "ssl initialization problem"); 
+        }
+
+        // SSL client specific initialization
+        if (!isServer) {
+            _serverContext = NULL;
+
+            if (!params.pemfile.empty()) {
+                if (!_setSubjectName(params.pemfile, _clientSubjectName)) {
+                    uasserted(16941, "ssl initialization problem"); 
+                }
+            }
+        }
+        // SSL server specific initialization
+        if (isServer) {
+            if (!_initSSLContext(&_serverContext, params)) {
                 uasserted(16562, "ssl initialization problem"); 
             }
-        }
-        if (!params.cafile.empty()) {
-            // Set up certificate validation with a certificate authority
-            if (!_setupCA(params.cafile)) {
-                uasserted(16563, "ssl initialization problem"); 
+
+            if (!_setSubjectName(params.pemfile, _serverSubjectName)) {
+                uasserted(16942, "ssl initialization problem"); 
             }
-        }
-        if (!params.crlfile.empty()) {
-            if (!_setupCRL(params.crlfile)) {
-                uasserted(16582, "ssl initialization problem");
+            // use the cluster certificate for outgoing connections if specified
+            if (!params.clusterfile.empty()) {
+                if (!_setSubjectName(params.clusterfile, _clientSubjectName)) {
+                    uasserted(16943, "ssl initialization problem"); 
+                }
+            }
+            else { 
+                if (!_setSubjectName(params.pemfile, _clientSubjectName)) {
+                    uasserted(16944, "ssl initialization problem"); 
+                }
             }
         }
     }
 
     SSLManager::~SSLManager() {
+        ERR_free_strings();
+        EVP_cleanup();
+
+        if (NULL != _serverContext) {
+            SSL_CTX_free(_serverContext);
+        }
+        if (NULL != _clientContext) {
+            SSL_CTX_free(_clientContext);
+        }
     }
 
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
@@ -389,38 +426,67 @@ namespace mongo {
         log() << "FIPS 140-2 mode activated" << endl;
     }
 
-    bool SSLManager::_setupPEM(const std::string& keyFile , const std::string& password) {
-        _password = password;
-        
-        if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
-            error() << "cannot read certificate file: " << keyFile << ' ' <<
+    bool SSLManager::_initSSLContext(SSL_CTX** context, const Params& params) {
+        *context = SSL_CTX_new(SSLv23_method());
+        massert(15864,
+                mongoutils::str::stream() << "can't create SSL Context: " <<
+                _getSSLErrorMessage(ERR_get_error()),
+                context);
+
+        // Activate all bug workaround options, to support buggy client SSL's.
+        SSL_CTX_set_options(*context, SSL_OP_ALL);
+
+        // If renegotiation is needed, don't return from recv() or send() until it's successful.
+        // Note: this is for blocking sockets only.
+        SSL_CTX_set_mode(*context, SSL_MODE_AUTO_RETRY);
+
+        // Set context within which session can be reused
+        int status = SSL_CTX_set_session_id_context(
+            *context,
+            static_cast<unsigned char*>(static_cast<void*>(context)),
+            sizeof(*context));
+ 
+        if (!status) {
+            error() << "failed to set session id context: " << 
                 _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
 
-        // If password is empty, use default OpenSSL callback, which uses the terminal
-        // to securely request the password interactively from the user.
-        if (!password.empty()) {
-            SSL_CTX_set_default_passwd_cb_userdata( _context , this );
-            SSL_CTX_set_default_passwd_cb( _context, &SSLManager::password_cb );
+        // Use the clusterfile for internal outgoing SSL connections if specified 
+        if (context == &_clientContext && !params.clusterfile.empty()) {
+            EVP_set_pw_prompt("Enter cluster certificate passphrase");
+            if (!_setupPEM(*context, params.clusterfile, params.clusterpwd)) {
+                return false;
+            }
         }
-        
-        if ( SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) != 1 ) {
-            error() << "cannot read key file: " << keyFile << ' ' <<
-                _getSSLErrorMessage(ERR_get_error()) << endl;
-            return false;
+        // Use the pemfile for everything else
+        else if (!params.pemfile.empty()) {
+            EVP_set_pw_prompt("Enter PEM passphrase");
+            if (!_setupPEM(*context, params.pemfile, params.pempwd)) {
+                return false;
+            }
         }
-        
-        // Verify that the certificate and the key go together.
-        if (SSL_CTX_check_private_key(_context) != 1) {
-            error() << "SSL certificate validation: " << _getSSLErrorMessage(ERR_get_error()) 
-                    << endl;
-            return false;
+
+        if (!params.cafile.empty()) {
+            // Set up certificate validation with a certificate authority
+            if (!_setupCA(*context, params.cafile)) {
+                return false;
+            }
         }
- 
+
+        if (!params.crlfile.empty()) {
+            if (!_setupCRL(*context, params.crlfile)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool SSLManager::_setSubjectName(const std::string& keyFile, std::string& subjectName) {
         // Read the certificate subject name and store it 
         BIO *in = BIO_new(BIO_s_file_internal());
-        if(NULL == in){
+        if (NULL == in){
             error() << "failed to allocate BIO object: " << 
                 _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
@@ -428,7 +494,7 @@ namespace mongo {
         ON_BLOCK_EXIT(BIO_free, in);
 
         if (BIO_read_filename(in, keyFile.c_str()) <= 0){
-            error() << "cannot read key file: " << keyFile << ' ' <<
+            error() << "cannot read key file when setting subject name: " << keyFile << ' ' <<
                 _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
@@ -440,27 +506,61 @@ namespace mongo {
             return false;
         }
         ON_BLOCK_EXIT(X509_free, x509);
-        _subjectName = getCertificateSubjectName(x509);
+        subjectName = getCertificateSubjectName(x509);
+
+        return true;
+    }
+
+    bool SSLManager::_setupPEM(SSL_CTX* context, 
+                               const std::string& keyFile, 
+                               const std::string& password) {
+        _password = password;
+ 
+        if ( SSL_CTX_use_certificate_chain_file( context , keyFile.c_str() ) != 1 ) {
+            error() << "cannot read certificate file: " << keyFile << ' ' <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+
+        // If password is empty, use default OpenSSL callback, which uses the terminal
+        // to securely request the password interactively from the user.
+        if (!password.empty()) {
+            SSL_CTX_set_default_passwd_cb_userdata( context , this );
+            SSL_CTX_set_default_passwd_cb( context, &SSLManager::password_cb );
+        }
+ 
+        if ( SSL_CTX_use_PrivateKey_file( context , keyFile.c_str() , SSL_FILETYPE_PEM ) != 1 ) {
+            error() << "cannot read PEM key file: " << keyFile << ' ' <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+ 
+        // Verify that the certificate and the key go together.
+        if (SSL_CTX_check_private_key(context) != 1) {
+            error() << "SSL certificate validation: " << _getSSLErrorMessage(ERR_get_error()) 
+                    << endl;
+            return false;
+        }
  
         return true;
     }
 
-    bool SSLManager::_setupCA(const std::string& caFile) {
+    bool SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
         // Load trusted CA
-        if (SSL_CTX_load_verify_locations(_context, caFile.c_str(), NULL) != 1) {
+        if (SSL_CTX_load_verify_locations(context, caFile.c_str(), NULL) != 1) {
             error() << "cannot read certificate authority file: " << caFile << " " <<
                 _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
         // Set SSL to require peer (client) certificate verification
         // if a certificate is presented
-        SSL_CTX_set_verify(_context, SSL_VERIFY_PEER, &SSLManager::verify_cb);
+        SSL_CTX_set_verify(context, SSL_VERIFY_PEER, &SSLManager::verify_cb);
         _validateCertificates = true;
         return true;
     }
 
-    bool SSLManager::_setupCRL(const std::string& crlFile) {
-        X509_STORE *store = SSL_CTX_get_cert_store(_context);
+    bool SSLManager::_setupCRL(SSL_CTX* context, const std::string& crlFile) {
+        X509_STORE *store = SSL_CTX_get_cert_store(context);
         fassert(16583, store);
         
         X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK);
@@ -479,16 +579,17 @@ namespace mongo {
         return true;
     }
 
-    SSL* SSLManager::_secure(int fd) {
+    SSL* SSLManager::_secure(SSL_CTX* context, int fd) {
         // This just ensures that SSL multithreading support is set up for this thread,
         // if it's not already.
         SSLThreadInfo::get();
 
-        SSL * ssl = SSL_new(_context);
+        SSL * ssl = SSL_new(context);
+        
         massert(15861,
                 _getSSLErrorMessage(ERR_get_error()),
                 ssl);
-        
+
         int status = SSL_set_fd( ssl , fd );
         massert(16510,
                 _getSSLErrorMessage(ERR_get_error()), 
@@ -513,7 +614,7 @@ namespace mongo {
         return ret;
     }
     SSL* SSLManager::connect(int fd) {
-        SSL* ssl = _secure(fd);
+        SSL* ssl = _secure(_clientContext, fd);
         ScopeGuard guard = MakeGuard(::SSL_free, ssl);
         int ret = _ssl_connect(ssl);
         if (ret != 1)
@@ -523,7 +624,7 @@ namespace mongo {
     }
 
     SSL* SSLManager::accept(int fd) {
-        SSL* ssl = _secure(fd);
+        SSL* ssl = _secure(_serverContext, fd);
         ScopeGuard guard = MakeGuard(::SSL_free, ssl);
         int ret = SSL_accept(ssl);
         if (ret != 1)

@@ -22,9 +22,14 @@
 
 namespace mongo {
     /**
+     * @return true if internal authentication parameters has been set up
+     */
+    extern bool isInternalAuthSet();
+
+    /**
      * This method initializes the internalSecurity object with authentication
-     * credentials to be used by authenticateInternalUser
-     *
+     * credentials to be used by authenticateInternalUser. This method should 
+     * only be called once when setting up authentication method for the system.
      */
     extern bool setInternalUserAuthParams(BSONObj authParams);
 

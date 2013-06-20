@@ -129,10 +129,7 @@ namespace mongo {
           // be rebooting. if their file has to change, they'll be rebooted so the
           // connection created above will go dead, reconnect, and reauth.
           if (AuthorizationManager::isAuthEnabled()) {
-              if (!authenticateInternalUser(connInfo->cc.get())) {
-                  log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
-                  return false;
-              }
+                return authenticateInternalUser(connInfo->cc.get()); 
           }
 
           return true;

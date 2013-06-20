@@ -250,7 +250,7 @@ namespace mongo {
                 return false;
             }
 
-            if (AuthorizationManager::isAuthEnabled() && !cmdLine.keyFile.empty() ) {
+            if (AuthorizationManager::isAuthEnabled() && isInternalAuthSet()) {
                 if (!authenticateInternalUser(&conn)) {
                     return false;
                 }

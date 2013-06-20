@@ -58,9 +58,10 @@ namespace mongo {
             return false;
         }
 
-        if (internalSecurity.pwd.length() > 0) {
+        if (isInternalAuthSet()) { 
             return authenticateInternalUser(conn); 
         }
+
         BSONObj user;
         {
             Client::ReadContext ctxt("local.");

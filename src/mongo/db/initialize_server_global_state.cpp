@@ -28,6 +28,7 @@
 #endif
 
 #include "mongo/base/init.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/cmdline.h"
@@ -41,6 +42,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 
 namespace fs = boost::filesystem;
@@ -241,8 +243,7 @@ namespace mongo {
             writePidFile(cmdLine.pidFile);
         }
 
-        if (!cmdLine.keyFile.empty()) {
-
+        if (!cmdLine.keyFile.empty() && cmdLine.clusterAuthMode != "x509") {
             if (!setUpSecurityKey(cmdLine.keyFile)) {
                 // error message printed in setUpPrivateKey
                 return false;
@@ -250,7 +251,15 @@ namespace mongo {
 
             AuthorizationManager::setAuthEnabled(true);
         }
-
+ 
+#ifdef MONGO_SSL
+        if (cmdLine.clusterAuthMode == "x509" || cmdLine.clusterAuthMode == "sendX509") {
+            setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-X509" <<
+                                           saslCommandUserSourceFieldName << "$external" <<
+                                           saslCommandUserFieldName << 
+                                           getSSLManager()->getClientSubjectName()));
+        }
+#endif
         return true;
     }
 

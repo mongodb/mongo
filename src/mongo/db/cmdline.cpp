@@ -88,6 +88,9 @@ namespace {
         ("setParameter", po::value< std::vector<std::string> >()->composing(),
                 "Set a configurable parameter")
         ("httpinterface", "enable http interface")
+        ("clusterAuthMode", po::value<std::string>(&cmdLine.clusterAuthMode),
+         "Authentication mode used for cluster authentication."
+         " Alternatives are (keyfile|sendKeyfile|sendX509|x509)")
 #ifndef _WIN32
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
@@ -415,6 +418,9 @@ namespace {
                 }
             }
         }
+        if (!params.count("clusterAuthMode")){
+            cmdLine.clusterAuthMode = "keyfile";
+        }
 
 #ifdef MONGO_SSL
         if (params.count("sslWeakCertificateValidation")) {
@@ -449,6 +455,24 @@ namespace {
                  cmdLine.sslWeakCertificateValidation ||
                  cmdLine.sslFIPSMode) {
             log() << "need to enable sslOnNormalPorts" << endl;
+            return false;
+        }
+        if (cmdLine.clusterAuthMode == "sendKeyfile" || 
+            cmdLine.clusterAuthMode == "sendX509" || 
+            cmdLine.clusterAuthMode == "x509") {
+            if (!cmdLine.sslOnNormalPorts){
+                log() << "need to enable sslOnNormalPorts" << endl;
+                return false;
+            }
+        }
+        else if (cmdLine.clusterAuthMode != "keyfile") {
+            log() << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode << endl;
+            return false;
+        }
+#else // ifdef MONGO_SSL
+        // Keyfile is currently the only supported value if not using SSL 
+        if (cmdLine.clusterAuthMode != "keyfile") {
+            log() << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode << endl;
             return false;
         }
 #endif

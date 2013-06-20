@@ -119,6 +119,12 @@ namespace mongo {
         
         string user = cmdObj.getStringField("user");
 
+        if (user == internalSecurity.user && cmdLine.clusterAuthMode == "x509") {
+            errmsg = "Mechanism x509 is required for internal cluster authentication";
+            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
+            return false;
+        }
+
         if (!_areNonceAuthenticateCommandsEnabled) {
             // SERVER-8461, MONGODB-CR must be enabled for authenticating the internal user, so that
             // cluster members may communicate with each other.
@@ -237,15 +243,20 @@ namespace mongo {
             return false;
         }
         else {
-            StringData srvSubjectName = getSSLManager()->getSubjectName();
+            StringData srvSubjectName = getSSLManager()->getServerSubjectName();
             StringData srvClusterId = srvSubjectName.substr(0, srvSubjectName.find("/CN")+1);
             StringData peerClusterId = subjectName.substr(0, subjectName.find("/CN")+1);
 
-            // Handle internal cluster member 
+            // Handle internal cluster member auth, only applies to server-server connections 
             if (srvClusterId == peerClusterId) {
+                if (cmdLine.clusterAuthMode == "keyfile") {
+                    errmsg = "X509 authentication is not allowed for cluster authentication";
+                    result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
+                    return false;
+                }
                 authorizationSession->grantInternalAuthorization(UserName(user, "$external"));
             }
-            // Handle normal client authentication
+            // Handle normal client authentication, only applies to client-server connections
             else {
                 Principal* principal = new Principal(UserName(user, "$external"));
                 principal->setImplicitPrivilegeAcquisition(true);

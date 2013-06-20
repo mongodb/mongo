@@ -57,10 +57,17 @@ namespace mongo {
         virtual void cleanupThreadLocals() = 0;
 
         /**
-         * Get the subject name of our own server certificate
+         * Gets the subject name of our own server certificate
          * @return the subject name.
          */
-        virtual std::string getSubjectName() = 0;
+        virtual std::string getServerSubjectName() = 0;
+
+        /**
+         * Gets the subject name of our own client certificate
+         * used for cluster authentiation
+         * @return the subject name.
+         */
+        virtual std::string getClientSubjectName() = 0;
 
         /**
          * ssl.h shims
@@ -83,5 +90,6 @@ namespace mongo {
     // Access SSL functions through this instance.
     SSLManagerInterface* getSSLManager();
 
+    extern bool isSSLServer;
 }
 #endif
