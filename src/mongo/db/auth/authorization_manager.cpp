@@ -394,9 +394,21 @@ namespace {
         _authenticatedPrincipals.add(principal);
         if (!principal->isImplicitPrivilegeAcquisitionEnabled())
             return;
+
+        const std::string dbname = principal->getName().getDB().toString();
+        if (dbname == StringData("local", StringData::LiteralTag()) &&
+            principal->getName().getUser() == internalSecurity.user) {
+
+            // Grant full access to internal user
+            ActionSet allActions;
+            allActions.addAllActions();
+            acquirePrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, allActions),
+                             principal->getName());
+            return;
+        }
+
         _acquirePrivilegesForPrincipalFromDatabase(ADMIN_DBNAME, principal->getName());
         principal->markDatabaseAsProbed(ADMIN_DBNAME);
-        const std::string dbname = principal->getName().getDB().toString();
         _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());
         principal->markDatabaseAsProbed(dbname);
     }
@@ -490,13 +502,6 @@ namespace {
                                   << " from database "
                                   << principal.getDB(),
                           0);
-        }
-        if (principal.getUser() == internalSecurity.user) {
-            // Grant full access to internal user
-            ActionSet allActions;
-            allActions.addAllActions();
-            return acquirePrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, allActions),
-                                    principal);
         }
         return buildPrivilegeSet(dbname, principal, privilegeDocument, &_acquiredPrivileges);
     }
