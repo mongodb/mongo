@@ -236,8 +236,6 @@ namespace mongo {
                                          tempElem == doc.end() ? 0 : tempIdx + 1,
                                          tempElem == doc.end() ? doc.root() : tempElem,
                                          elemToSet);
-
-        return Status::OK();
     }
 
     Status ModifierRename::log(mutablebson::Element logRoot) const {
