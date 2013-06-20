@@ -16,14 +16,15 @@ var userObj = db.system.users.findOne();
 assert.eq('spencer', userObj['user']);
 assert.eq(passwordHash('spencer', 'password'), userObj['pwd']);
 
-// Should replace previous entry
-db.addUser('spencer', 'newpassword', true);
+// Test re-adding the same user fails
+assert.throws(function() { db.addUser("spencer", "password2"); });
+
+// test changing password
+db.changeUserPassword('spencer', 'newpassword');
 assert.eq(1, db.system.users.count());
 userObj = db.system.users.findOne();
 assert.eq('spencer', userObj['user']);
 assert.eq(passwordHash('spencer', 'newpassword'), userObj['pwd']);
-assert(userObj['readOnly']);
-
 
 
 jsTest.log("Testing new form of addUser");

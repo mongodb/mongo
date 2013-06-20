@@ -72,8 +72,7 @@ assert.throws(function(){dbRO.system.users.count()});
 
 assert.eq( 2, db.system.users.count() , "B7" ); // rw connection
 assert.throws(function(){dbRO.addUser( "a", "b" )});
-assert( dbRO.getLastError() , "B9" );
-assert.eq( 2, db.system.users.count() , "B10"); // rw connection
+assert.eq( 2, db.system.users.count() , "B8"); // rw connection
 
 assert.eq( 1000, tRO.group( p ).length , "C1" );
 
