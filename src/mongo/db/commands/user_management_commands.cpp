@@ -230,130 +230,130 @@ namespace mongo {
     } cmdCreateUser;
 
     class CmdUpdateUser : public Command {
-        public:
+    public:
 
-            virtual bool logTheOp() {
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        CmdUpdateUser() : Command("updateUser") {}
+
+        virtual void help(stringstream& ss) const {
+            ss << "Used to update a user, for example to change its password" << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(dbname, actions));
+        }
+
+        struct UpdateUserArgs {
+            std::string userName;
+            std::string clearTextPassword;
+            BSONObj extraData; // Owned by the owner of the command object given to updateUser
+            bool hasPassword;
+            bool hasExtraData;
+            UpdateUserArgs() : hasPassword(false), hasExtraData(false) {}
+        };
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            UpdateUserArgs args;
+            Status status = _parseAndValidateInput(cmdObj, &args);
+            if (!status.isOK()) {
+                addStatus(status, result);
                 return false;
             }
 
-            virtual bool slaveOk() const {
+            // TODO: This update will have to change once we're using the new v2 user
+            // storage format.
+            BSONObjBuilder setBuilder;
+            if (args.hasPassword) {
+                std::string password = DBClientWithCommands::createPasswordDigest(
+                        args.userName, args.clearTextPassword);
+                setBuilder.append("pwd", password);
+            }
+            if (args.hasExtraData) {
+                setBuilder.append("extraData", args.extraData);
+            }
+            BSONObj updateObj = BSON("$set" << setBuilder.obj());
+
+            status = getGlobalAuthorizationManager()->updatePrivilegeDocument(
+                    UserName(args.userName, dbname), updateObj);
+
+            if (!status.isOK()) {
+                addStatus(status, result);
                 return false;
             }
 
-            virtual LockType locktype() const {
-                return NONE;
+            return true;
+        }
+
+    private:
+
+        Status _parseAndValidateInput(BSONObj cmdObj, UpdateUserArgs* parsedArgs) const {
+            unordered_set<std::string> validFieldNames;
+            validFieldNames.insert("updateUser");
+            validFieldNames.insert("user");
+            validFieldNames.insert("pwd");
+            validFieldNames.insert("extraData");
+
+            // Iterate through all fields in command object and make sure there are no
+            // unexpected ones.
+            for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
+                StringData fieldName = (*iter).fieldNameStringData();
+                if (!validFieldNames.count(fieldName.toString())) {
+                    return Status(ErrorCodes::BadValue,
+                                  mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                                          "a valid argument to updateUser");
+                }
             }
 
-            CmdUpdateUser() : Command("updateUser") {}
-
-            virtual void help(stringstream& ss) const {
-                ss << "Used to update a user, for example to change its password" << endl;
+            Status status = bsonExtractStringField(cmdObj, "user", &parsedArgs->userName);
+            if (!status.isOK()) {
+                return status;
             }
 
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                // TODO: update this with the new rules around user creation in 2.6.
-                ActionSet actions;
-                actions.addAction(ActionType::userAdmin);
-                out->push_back(Privilege(dbname, actions));
-            }
-
-            struct UpdateUserArgs {
-                std::string userName;
-                std::string clearTextPassword;
-                BSONObj extraData; // Owned by the owner of the command object given to updateUser
-                bool hasPassword;
-                bool hasExtraData;
-                UpdateUserArgs() : hasPassword(false), hasExtraData(false) {}
-            };
-
-            bool run(const string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     string& errmsg,
-                     BSONObjBuilder& result,
-                     bool fromRepl) {
-                UpdateUserArgs args;
-                Status status = _parseAndValidateInput(cmdObj, &args);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-
-                // TODO: This update will have to change once we're using the new v2 user
-                // storage format.
-                BSONObjBuilder setBuilder;
-                if (args.hasPassword) {
-                    std::string password = DBClientWithCommands::createPasswordDigest(
-                            args.userName, args.clearTextPassword);
-                    setBuilder.append("pwd", password);
-                }
-                if (args.hasExtraData) {
-                    setBuilder.append("extraData", args.extraData);
-                }
-                BSONObj updateObj = BSON("$set" << setBuilder.obj());
-
-                status = getGlobalAuthorizationManager()->updatePrivilegeDocument(
-                        UserName(args.userName, dbname), updateObj);
-
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-
-                return true;
-            }
-
-        private:
-
-            Status _parseAndValidateInput(BSONObj cmdObj, UpdateUserArgs* parsedArgs) const {
-                unordered_set<std::string> validFieldNames;
-                validFieldNames.insert("updateUser");
-                validFieldNames.insert("user");
-                validFieldNames.insert("pwd");
-                validFieldNames.insert("extraData");
-
-                // Iterate through all fields in command object and make sure there are no
-                // unexpected ones.
-                for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-                    StringData fieldName = (*iter).fieldNameStringData();
-                    if (!validFieldNames.count(fieldName.toString())) {
-                        return Status(ErrorCodes::BadValue,
-                                      mongoutils::str::stream() << "\"" << fieldName << "\" is not "
-                                              "a valid argument to updateUser");
-                    }
-                }
-
-                Status status = bsonExtractStringField(cmdObj, "user", &parsedArgs->userName);
+            if (cmdObj.hasField("pwd")) {
+                parsedArgs->hasPassword = true;
+                status = bsonExtractStringField(cmdObj, "pwd", &parsedArgs->clearTextPassword);
                 if (!status.isOK()) {
                     return status;
                 }
-
-                if (cmdObj.hasField("pwd")) {
-                    parsedArgs->hasPassword = true;
-                    status = bsonExtractStringField(cmdObj, "pwd", &parsedArgs->clearTextPassword);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                }
-
-                if (cmdObj.hasField("extraData")) {
-                    parsedArgs->hasExtraData = true;
-                    BSONElement element;
-                    status = bsonExtractTypedField(cmdObj, "extraData", Object, &element);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                    parsedArgs->extraData = element.Obj();
-                }
-
-
-                if (!parsedArgs->hasPassword && !parsedArgs->hasExtraData) {
-                    return Status(ErrorCodes::BadValue,
-                                  "Must specify at least one of 'pwd' and 'extraData'");
-                }
-                return Status::OK();
             }
-        } cmdUpdateUser;
+
+            if (cmdObj.hasField("extraData")) {
+                parsedArgs->hasExtraData = true;
+                BSONElement element;
+                status = bsonExtractTypedField(cmdObj, "extraData", Object, &element);
+                if (!status.isOK()) {
+                    return status;
+                }
+                parsedArgs->extraData = element.Obj();
+            }
+
+
+            if (!parsedArgs->hasPassword && !parsedArgs->hasExtraData) {
+                return Status(ErrorCodes::BadValue,
+                              "Must specify at least one of 'pwd' and 'extraData'");
+            }
+            return Status::OK();
+        }
+    } cmdUpdateUser;
 }
