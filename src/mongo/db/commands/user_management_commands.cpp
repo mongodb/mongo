@@ -77,13 +77,18 @@ namespace mongo {
             bool readOnly; // TODO(spencer): remove this once we're using the new v2 user format
             BSONObj extraData; // Owned by the owner of the command object used to call createUser
             BSONArray roles; // Owned by the owner of the command object used to call createUser
+            // Owned by the owner of the command object used to call createUser
+            // TODO(spencer): remove otherDBRoles once we're using the new v2 user format
+            BSONObj otherDBRoles;
             bool hasPassword;
             bool hasUserSource;
             bool hasReadOnly;
             bool hasExtraData;
             bool hasRoles;
+            bool hasOtherDBRoles;
             CreateUserArgs() : readOnly(false), hasPassword(false), hasUserSource(false),
-                    hasReadOnly(false), hasExtraData(false), hasRoles(false) {}
+                    hasReadOnly(false), hasExtraData(false), hasRoles(false),
+                    hasOtherDBRoles(false) {}
         };
 
         // TODO: The bulk of the implementation of this will need to change once we're using the
@@ -128,6 +133,10 @@ namespace mongo {
                 userObjBuilder.append("roles", args.roles);
             }
 
+            if (args.hasOtherDBRoles) {
+                userObjBuilder.append("otherDBRoles", args.otherDBRoles);
+            }
+
             status = getGlobalAuthorizationManager()->insertPrivilegeDocument(dbname,
                                                                               userObjBuilder.obj());
             if (!status.isOK()) {
@@ -148,7 +157,8 @@ namespace mongo {
             validFieldNames.insert("userSource");
             validFieldNames.insert("roles");
             validFieldNames.insert("readOnly");
-            validFieldNames.insert("extraData");
+            validFieldNames.insert("otherDBRoles");
+
 
             // Iterate through all fields in command object and make sure there are no unexpected
             // ones.
@@ -209,6 +219,16 @@ namespace mongo {
                     return status;
                 }
                 parsedArgs->roles = BSONArray(element.Obj());
+            }
+
+            if (cmdObj.hasField("otherDBRoles")) {
+                parsedArgs->hasOtherDBRoles = true;
+                BSONElement element;
+                status = bsonExtractTypedField(cmdObj, "otherDBRoles", Object, &element);
+                if (!status.isOK()) {
+                    return status;
+                }
+                parsedArgs->otherDBRoles = element.Obj();
             }
 
             if (parsedArgs->hasPassword && parsedArgs->hasUserSource) {
