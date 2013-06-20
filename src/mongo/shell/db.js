@@ -139,9 +139,9 @@ DB.prototype._addUserV22 = function( username , pass, readOnly, replicatedTo, ti
 
     readOnly = readOnly || false;
     var c = this.getCollection( "system.users" );
-    var u = c.findOne({user : username, userSource:null}) || { user : username };
-    u.readOnly = readOnly;
-    u.pwd = _hashPassword(username, pass);
+    var u = { user : username,
+              readOnly : readOnly,
+              pwd : _hashPassword(username, pass) };
 
     this._createUser(u, replicatedTo, timeout);
 }
