@@ -124,7 +124,7 @@ namespace mongo {
         // Load or generate default chunks for collection config.
         //
 
-        if ( !collDoc.getKeyPattern().isEmpty() ) {
+        if ( collDoc.isKeyPatternSet() && !collDoc.getKeyPattern().isEmpty() ) {
 
             metadata->_keyPattern = collDoc.getKeyPattern();
             metadata->_shardVersion = ChunkVersion( 0, 0, collDoc.getEpoch() );
@@ -132,7 +132,7 @@ namespace mongo {
 
             return Status::OK();
         }
-        else if ( collDoc.getPrimary() == shard ) {
+        else if ( collDoc.isPrimarySet() && collDoc.getPrimary() == shard ) {
 
             if ( shard == "" ) {
                 warning() << "shard not verified, assuming collection " << ns
@@ -147,8 +147,8 @@ namespace mongo {
         }
         else {
             errMsg = str::stream() << "collection " << ns << " does not have a shard key "
-                                   << "and primary " << collDoc.getPrimary()
-                                   << " does not match this shard " << shard;
+                    << "and primary " << ( collDoc.isPrimarySet() ? collDoc.getPrimary() : "" )
+                    << " does not match this shard " << shard;
             return Status( ErrorCodes::RemoteChangeDetected, errMsg );
         }
     }
