@@ -73,7 +73,7 @@ typedef struct {
 			int32_t	 error;		/* Error value */
 #undef	slot_group_size
 #define	slot_group_size		u.slot.group_size
-			int32_t	 group_size;	/* Group size */
+			uint32_t group_size;	/* Group size */
 #undef	slot_index
 #define	slot_index		u.slot.index
 #define	SLOT_INVALID_INDEX	0xffffffff

@@ -55,7 +55,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
  *	Join a consolidated logging slot.
  */
 int
-__wt_log_slot_join(WT_SESSION_IMPL *session, int32_t mysize,
+__wt_log_slot_join(WT_SESSION_IMPL *session, uint32_t mysize,
     uint32_t flags, WT_MYSLOT *myslotp)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -84,7 +84,7 @@ join_slot:
 	 * Add in our size to the state and then atomically swap that
 	 * into place if it is still the same value.
 	 */
-	new_state = old_state + mysize;
+	new_state = old_state + (int32_t)mysize;
 	if (new_state < old_state) {
 		/* Our size doesn't fit here. */
 		WT_CSTAT_INCR(session, log_slot_toobig);
@@ -150,7 +150,7 @@ retry:
 	newslot->slot_index = slot->slot_index;
 	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
 	old_state = WT_ATOMIC_STORE(slot->slot_state, WT_LOG_SLOT_PENDING);
-	slot->slot_group_size = old_state - WT_LOG_SLOT_READY;
+	slot->slot_group_size = (uint32_t)(old_state - WT_LOG_SLOT_READY);
 	/*
 	 * Note that this statistic may be much bigger than in reality,
 	 * especially when compared with the total bytes written in
@@ -158,7 +158,8 @@ retry:
 	 * rounding up that is needed and the total bytes in __log_fill
 	 * is the amount of user bytes.
 	 */
-	WT_CSTAT_INCRV(session, log_slot_consolidated, slot->slot_group_size);
+	WT_CSTAT_INCRV(session,
+	    log_slot_consolidated, (uint64_t)slot->slot_group_size);
 	return (0);
 }
 
@@ -169,7 +170,7 @@ retry:
 int
 __wt_log_slot_notify(WT_LOGSLOT *slot)
 {
-	slot->slot_state = WT_LOG_SLOT_DONE - slot->slot_group_size;
+	slot->slot_state = (int32_t)(WT_LOG_SLOT_DONE - slot->slot_group_size);
 	return (0);
 }
 
@@ -191,7 +192,7 @@ __wt_log_slot_wait(WT_LOGSLOT *slot)
  *	signal it has completed writing its piece of the log.
  */
 int32_t
-__wt_log_slot_release(WT_LOGSLOT *slot, int32_t size)
+__wt_log_slot_release(WT_LOGSLOT *slot, uint32_t size)
 {
 	int32_t newsize;
 
@@ -199,7 +200,7 @@ __wt_log_slot_release(WT_LOGSLOT *slot, int32_t size)
 	 * Add my size into the state.  When it reaches WT_LOG_SLOT_DONE
 	 * all participatory threads have completed copying their piece.
 	 */
-	newsize = WT_ATOMIC_ADD(slot->slot_state, size);
+	newsize = WT_ATOMIC_ADD(slot->slot_state, (int32_t)size);
 	return (newsize);
 }
 

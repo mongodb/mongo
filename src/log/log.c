@@ -84,7 +84,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	WT_FH *log_fh;
 	WT_LOG *log;
 	uint32_t firstlog, lastlog, lognum;
-	int i, logcount;
+	u_int i, logcount;
 	char **logfiles;
 
 	conn = S2C(session);

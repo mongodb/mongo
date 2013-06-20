@@ -54,7 +54,7 @@ __log_archive_server(void *arg)
 	WT_LSN lsn;
 	WT_SESSION_IMPL *session;
 	uint32_t lognum;
-	int i, logcount;
+	u_int i, logcount;
 	char **logfiles;
 
 	session = arg;

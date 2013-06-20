@@ -699,13 +699,13 @@ extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     va_list ap);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
-    int32_t mysize,
+    uint32_t mysize,
     uint32_t flags,
     WT_MYSLOT *myslotp);
 extern int __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
 extern int __wt_log_slot_notify(WT_LOGSLOT *slot);
 extern int __wt_log_slot_wait(WT_LOGSLOT *slot);
-extern int32_t __wt_log_slot_release(WT_LOGSLOT *slot, int32_t size);
+extern int32_t __wt_log_slot_release(WT_LOGSLOT *slot, uint32_t size);
 extern int __wt_log_slot_free(WT_LOGSLOT *slot);
 extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
     u_int start_chunk,
@@ -883,7 +883,7 @@ extern int __wt_dirlist(WT_SESSION_IMPL *session,
     const char *prefix,
     uint32_t flags,
     char ***dirlist,
-    int *countp);
+    u_int *countp);
 extern int __wt_errno(void);
 extern int __wt_exist(WT_SESSION_IMPL *session,
     const char *filename,

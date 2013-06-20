@@ -16,7 +16,7 @@
  */
 int
 __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
-    uint32_t flags, char ***dirlist, int *countp)
+    uint32_t flags, char ***dirlist, u_int *countp)
 {
 	WT_DECL_RET;
 	struct dirent *dp;
@@ -24,7 +24,8 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	const char *path;
 	char **entries;
 	size_t dirallocsz;
-	int count, dirsz, match;
+	u_int count, dirsz;
+	int match;
 
 	WT_RET(__wt_filename(session, dir, &path));
 
@@ -39,7 +40,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	*dirlist = NULL;
-	for (dirsz = count = 0; (dp = readdir(dirp)) != NULL;) {
+	for (dirsz = 0, count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
 		 * Skip . and ..
 		 */
@@ -60,8 +61,8 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 			count++;
 			if (count > dirsz) {
 				dirsz += WT_DIR_ENTRY;
-				WT_ERR(__wt_realloc(session, &dirallocsz,
-				    sizeof(entries[0]) * dirsz, &entries));
+				WT_ERR(__wt_realloc_def(
+				    session, &dirallocsz, dirsz, &entries));
 			}
 			WT_ERR(__wt_strdup(
 			    session, dp->d_name, &entries[count-1]));
