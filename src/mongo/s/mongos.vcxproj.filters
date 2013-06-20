@@ -1818,6 +1818,9 @@
     <ClCompile Include="..\platform\posix_fadvise.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\backtrace.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3500,6 +3503,9 @@
       <Filter>platform</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\posix_fadvise.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\backtrace.h">
       <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
