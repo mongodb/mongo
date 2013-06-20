@@ -73,23 +73,13 @@ namespace mongo {
         pm.finished();
     }
 
-#if defined(__linux__)    
-    void touch_pages( HANDLE fd, int offset, size_t length, const Extent* ext ) {
-        if ( -1 == readahead(fd, offset, length) ) {
-            massert( 16237, str::stream() << "readahead failed on fd " << fd 
-                     << " offset " << offset << " len " << length 
-                     << " : " << errnoWithDescription(errno), 0 );
-        }
-    }
-#else // if defined __linux__
     char _touch_pages_char_reader; // goes in .bss
+  
     void touch_pages( HANDLE fd, int offset, size_t length, const Extent* ext ) {
         // read first byte of every page, in order
         const char *p = static_cast<const char *>(static_cast<const void *> (ext));
         for( size_t i = 0; i < length; i += g_minOSPageSizeBytes ) { 
             _touch_pages_char_reader += p[i];
         }
-  
     }
-#endif // if defined __linux__
 }
