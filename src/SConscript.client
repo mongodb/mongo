@@ -51,6 +51,7 @@ clientSourceBasic = [
     'mongo/db/namespace.cpp',
     'mongo/db/dbmessage.cpp',
     'mongo/pch.cpp',
+    'mongo/platform/backtrace.cpp',
     'mongo/platform/posix_fadvise.cpp',
     'mongo/platform/process_id.cpp',
     'mongo/platform/random.cpp',

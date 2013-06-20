@@ -1224,7 +1224,8 @@ def doConfigure(myenv):
 
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
-        conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
+        conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>') and
+        conf.CheckDeclaration('backtrace_symbols_fd', includes='#include <execinfo.h>')):
 
         conf.env.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
 

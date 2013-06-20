@@ -3,6 +3,7 @@
 Import("env")
 
 env.Library('platform', [
+        'backtrace.cpp',
         'posix_fadvise.cpp',
         'process_id.cpp',
         'random.cpp',

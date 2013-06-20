@@ -24,53 +24,18 @@
 #include "mongo/util/log.h"
 
 #ifdef _WIN32
-#include <sstream>
-#include <stdio.h>
 #include <boost/filesystem/operations.hpp>
 #include <boost/smart_ptr/scoped_array.hpp>
+#include <sstream>
+#include <stdio.h>
 #include "mongo/platform/windows_basic.h"
 #include <DbgHelp.h>
 #include "mongo/util/assert_util.h"
+#else
+#include "mongo/platform/backtrace.h"
 #endif
 
-#ifdef MONGO_HAVE_EXECINFO_BACKTRACE
-
-#include <execinfo.h>
-
-namespace mongo {
-    static const int maxBackTraceFrames = 20;
-
-    /**
-     * Print a stack backtrace for the current thread to the specified ostream.
-     * 
-     * @param os    ostream& to receive printed stack backtrace
-     */
-    void printStackTrace( std::ostream& os ) {
-        
-        void *b[maxBackTraceFrames];
-        
-        int size = ::backtrace( b, maxBackTraceFrames );
-        for ( int i = 0; i < size; i++ )
-            os << std::hex << b[i] << std::dec << ' ';
-        os << std::endl;
-        
-        char **strings;
-        
-        strings = ::backtrace_symbols( b, size );
-        if (strings == NULL) {
-            const int err = errno;
-            os << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
-               << std::endl;
-            return;
-        }
-        for ( int i = 0; i < size; i++ )
-            os << ' ' << strings[i] << '\n';
-        os.flush();
-        ::free( strings );
-    }
-}
-
-#elif defined(_WIN32)
+#if defined(_WIN32)
 
 namespace mongo {
 
@@ -319,12 +284,43 @@ namespace mongo {
     }
 
 }
-
 #else
 
 namespace mongo {
-    void printStackTrace( std::ostream &os ) {}
+    static const int maxBackTraceFrames = 20;
+
+    /**
+     * Print a stack backtrace for the current thread to the specified ostream.
+     * 
+     * @param os    ostream& to receive printed stack backtrace
+     */
+    void printStackTrace( std::ostream& os ) {
+
+        void* addresses[maxBackTraceFrames];
+
+        int addressCount = backtrace(addresses, maxBackTraceFrames);
+        if (addressCount == 0) {
+            const int err = errno;
+            os << "Unable to collect backtrace addresses (" << errnoWithDescription(err) << ")"
+               << std::endl;
+            return;
+        }
+        for (int i = 0; i < addressCount; i++)
+            os << std::hex << addresses[i] << std::dec << ' ';
+        os << std::endl;
+
+        char** backtraceStrings = backtrace_symbols(addresses, addressCount);
+        if (backtraceStrings == NULL) {
+            const int err = errno;
+            os << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
+               << std::endl;
+            return;
+        }
+        for (int i = 0; i < addressCount; i++)
+            os << ' ' << backtraceStrings[i] << '\n';
+        os.flush();
+        free(backtraceStrings);
+    }
 }
 
 #endif
-
