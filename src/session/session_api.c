@@ -154,7 +154,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 
 	WT_TRET(__session_reset_cursors(session));
 
-	WT_ERR(__wt_config_gets_defno(session, cfg, "isolation", &cval));
+	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
 	if (cval.len != 0) {
 		if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
 			WT_ERR_MSG(session, EINVAL,
