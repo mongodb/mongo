@@ -67,7 +67,7 @@ namespace mongo {
         if (errstr.empty()) {
             return Status::OK();
         }
-        if (res["code"].Int() == ASSERT_ID_DUPKEY) {
+        if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
             return Status(ErrorCodes::DuplicateKey,
                           mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
                                  "\" already exists on database \"" << dbname << "\"");
