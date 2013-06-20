@@ -102,22 +102,27 @@ class test_config03(test_base03.test_base03):
         if self.s_create == False:
             successargs = successargs.replace(',create=false,',',create,')
             expect_fail = True
+            fail_msg = '/No such file or directory/'
         elif self.s_create == None:
             successargs = successargs + 'create=true,'
             expect_fail = True
+            fail_msg = '/No such file or directory/'
+        
         if self.s_eviction_target >= self.s_eviction_trigger:
             # construct args that guarantee that target < trigger
             # we know that trigger >= 1
             repfrom = ',eviction_target=' + str(self.s_eviction_target)
             repto = ',eviction_target=' + str(self.s_eviction_trigger - 1)
             successargs = successargs.replace(repfrom, repto)
-            expect_fail = True
+            if not expect_fail:
+                expect_fail = True
+                fail_msg = \
+                    '/eviction target must be lower than the eviction trigger/'
 
         if expect_fail:
             self.verbose(3, 'wiredtiger_open (should fail) with args: ' + args)
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: wiredtiger.wiredtiger_open(dir, args),
-                "/eviction target must be lower than the eviction trigger/")
+                lambda: wiredtiger.wiredtiger_open(dir, args), fail_msg)
             args = successargs
 
         self.verbose(3, 'wiredtiger_open with args: ' + args)
