@@ -282,7 +282,7 @@ __statlog_server(void *arg)
 	 * the wiredtiger_open call.
 	 */
 	while (!conn->connection_initialized)
-		__wt_sleep(1, 0);
+		__wt_sleep(0, 1000);
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*
