@@ -439,6 +439,10 @@ namespace mongo {
             if (info.hasElement("syncingTo")) {
                 mem.syncingTo = info["syncingTo"].String();
             }
+            else {
+                // empty out syncingTo since they are no longer syncing to anyone
+                mem.syncingTo = "";
+            }
 
             if( info.hasElement("opTime") )
                 mem.opTime = info["opTime"].Date();
