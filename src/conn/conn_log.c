@@ -224,23 +224,23 @@ __wt_logger_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (!conn->logging)
 		return (0);
-	if (conn->log != NULL)
-		WT_TRET(__wt_log_close(session));
 	if (conn->arch_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->arch_cond));
 		WT_TRET(__wt_thread_join(session, conn->arch_tid));
 		conn->arch_tid_set = 0;
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->arch_cond));
+	if ((log = conn->log) != NULL)
+		WT_TRET(__wt_log_close(session));
 
 	__wt_free(session, conn->log_path);
-	log = conn->log;
 
 	/* Close the server thread's session, free its hazard array. */
 	if (conn->arch_session != NULL) {
 		wt_session = &conn->arch_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 		__wt_free(session, conn->arch_session->hazard);
+		conn->arch_session = NULL;
 	}
 	__wt_spin_destroy(session, &log->log_lock);
 	__wt_spin_destroy(session, &log->log_slot_lock);
