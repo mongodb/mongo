@@ -208,7 +208,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
-	WT_RET(__wt_config_gets_defno(session, cfg, "isolation", &cval));
+	WT_RET(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
 	if (cval.len == 0)
 		txn->isolation = session->isolation;
 	else

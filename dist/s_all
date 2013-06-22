@@ -29,18 +29,22 @@ run()
 
 echo 'dist/s_all run started...'
 
+force=
 reconf=0
 while :
 	do case "$1" in
 	-A)	# Reconfigure the library build.
 		reconf=1
 		shift;;
+	-f)	# Force versions to be updated
+		force="-f"
+		shift;;
 	*)
 		break;;
 	esac
 done
 
-run "sh ./s_version" "Updating files that include the package version"
+run "sh ./s_version $force" "Updating files that include the package version"
 
 test "$reconf" -eq 0 || {
 	(cd ../build_posix &&
@@ -58,7 +62,7 @@ run "python java_doc.py" "building Java documentation index"
 
 run "sh ./s_typedef -b" "building standard typedefs"
 run "sh ./s_prototypes" "building function prototypes"
-run "sh ./s_readme" "building README file"
+run "sh ./s_readme $force" "building README file"
 run "sh ./s_tags" "building tags files"
 
 run "sh ./s_copyright" "checking copyright notices"

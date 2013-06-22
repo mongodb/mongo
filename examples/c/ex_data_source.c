@@ -567,17 +567,18 @@ main(void)
 
 	{
 	/*! [WT_EXTENSION transaction ID] */
-	uint64_t txnid;
+	uint64_t transaction_id;
 
-	ret = wt_api->txn_id(wt_api, session, &txnid);
+	ret = wt_api->transaction_id(wt_api, session, &transaction_id);
 	/*! [WT_EXTENSION transaction ID] */
 	}
 
 	{
-	uint64_t txnid = 1;
+	uint64_t transaction_id = 1;
 	int is_visible;
 	/*! [WT_EXTENSION transaction visible] */
-	is_visible = wt_api->txn_visible(wt_api, session, txnid);
+	is_visible =
+	    wt_api->transaction_visible(wt_api, session, transaction_id);
 	/*! [WT_EXTENSION transaction visible] */
 	(void)is_visible;
 	}

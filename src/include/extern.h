@@ -490,9 +490,10 @@ extern  int __wt_config_getones(WT_SESSION_IMPL *session,
     const char *config,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_config_gets_defno(WT_SESSION_IMPL *session,
+extern int __wt_config_gets_def(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
+    int def,
     WT_CONFIG_ITEM *value);
 extern  int __wt_config_subgetraw(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg,
@@ -1285,9 +1286,9 @@ extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_ext_txn_id( WT_EXTENSION_API *wt_api,
+extern int __wt_ext_transaction_id(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
-    uint64_t *txnidp);
-extern int __wt_ext_txn_visible( WT_EXTENSION_API *wt_api,
+    uint64_t *transaction_idp);
+extern int __wt_ext_transaction_visible(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
-    uint64_t txnid);
+    uint64_t transaction_id);

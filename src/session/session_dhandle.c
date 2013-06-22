@@ -169,7 +169,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
 	 * that never open a checkpoint call the underlying function directly.
 	 */
 	WT_RET_NOTFOUND_OK(
-	    __wt_config_gets_defno(session, cfg, "checkpoint", &cval));
+	    __wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len != 0) {
 		/*
 		 * The internal checkpoint name is special, find the last

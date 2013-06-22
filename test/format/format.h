@@ -158,8 +158,8 @@ typedef struct {
 	u_int c_value_min;
 	u_int c_write_pct;
 
-	uint32_t key_cnt;			/* Keys loaded so far */
-	uint32_t rows;				/* Total rows */
+	uint64_t key_cnt;			/* Keys loaded so far */
+	uint64_t rows;				/* Total rows */
 
 	/*
 	 * We don't want to get to far past the end of the original bulk

@@ -1,5 +1,37 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_163 Upgrading to Version 1.6.3
+<dl>
+
+<dt>Cursor overwrite configuration</dt>
+<dd>
+In previous releases, the WT_SESSION::open_cursor \c overwrite configuration
+string behaved inconsistently across Btree and LSM data sources.  In Btree,
+\c overwrite was \c false by default and was limited to the WT_CURSOR::insert
+method, changing an insert to succeed regardless of whether or not the record
+previously existed.   In LSM trees, \c overwrite was \c true by default, and
+applied to the WT_CURSOR::insert, WT_CURSOR::remove and WT_CURSOR::update
+methods, configuring all three methods to ignore the existing state of the
+record.
+
+In the 1.6.3 release, the \c overwrite configuration is consistent across both
+Btree and LSM tree data sources.  For performance reasons, the default is the
+behavior previously described for LSM trees: in other words, \c overwrite is
+\c true by default, causing WT_CURSOR::insert, WT_CURSOR::remove and
+WT_CURSOR::update to ignore the current state of the record, and these methods
+will succeed regardless of whether or not the record previously exists.  When
+an application configures \c overwrite to \c false, WT_CURSOR::insert will fail
+with ::WT_DUPLICATE_KEY if the record previously exists, and WT_CURSOR::update
+and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the record does not
+previously exist.
+
+<b>This is a potentially serious API change that will not be detected by
+compilation.</b>  Application cursors should be reviewed to confirm they are
+configured for the desired behavior.
+</dd>
+
+</dl>
+<hr>
 @section version_162 Upgrading to Version 1.6.2
 <dl>
 
