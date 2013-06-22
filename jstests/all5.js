@@ -6,6 +6,7 @@ t.drop();
 function checkMatch( doc ) {
     t.drop();
     t.save( doc );
+    assert.eq( 1, t.count( {a:{$elemMatch:{b:null}}} ) );
     assert.eq( 1, t.count( {a:{$all:[{$elemMatch:{b:null}}]}} ) );
 }
 
@@ -18,10 +19,8 @@ function checkNoMatch( doc ) {
 checkNoMatch( {} );
 checkNoMatch( {a:1} );
 
-if ( 0 ) { // SERVER-4517
-checkMatch( {a:[]} );
-checkMatch( {a:[1]} );
-}
+checkNoMatch( {a:[]} );
+checkNoMatch( {a:[1]} );
 
 checkMatch( {a:[{}]} );
 checkMatch( {a:[{c:1}]} );
