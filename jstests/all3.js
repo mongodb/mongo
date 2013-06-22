@@ -1,7 +1,5 @@
 // Check that $all matching null is consistent with $in - SERVER-3820
 
-if ( 0 ) { // SERVER-3820
-
 t = db.jstests_all3;
 t.drop();
 
@@ -28,5 +26,3 @@ t.remove();
 t.save( {foo:[]} );
 assert.eq( 1, t.count( {foo:{$in:[[]]}} ) );
 assert.eq( 1, t.count( {foo:{$all:[[]]}} ) );
-
-}
