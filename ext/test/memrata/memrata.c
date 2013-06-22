@@ -37,9 +37,6 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-#undef	INLINE
-#define	INLINE	inline				/* Turn off inline */
-
 /*
  * Macros to output an error message and set or return an error.
  * Requires local variables:
@@ -174,7 +171,7 @@ lock_destroy(
  * writelock --
  *	Acquire a write lock.
  */
-static INLINE int
+static inline int
 writelock(
     WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
@@ -190,7 +187,7 @@ writelock(
  * unlock --
  *	Release a lock.
  */
-static INLINE int
+static inline int
 unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
 	int ret = 0;
@@ -204,7 +201,7 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
  * copyin_key --
  *	Copy a WT_CURSOR key to a struct kvs_record key.
  */
-static INLINE int
+static inline int
 copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 {
 	struct kvs_record *r;
@@ -281,7 +278,7 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
  * copyout_key --
  *	Copy a struct kvs_record key to a WT_CURSOR key.
  */
-static INLINE int
+static inline int
 copyout_key(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
@@ -312,7 +309,7 @@ copyout_key(WT_CURSOR *wtcursor)
  * copyin_val --
  *	Copy a WT_CURSOR value to a struct kvs_record value .
  */
-static INLINE int
+static inline int
 copyin_val(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
@@ -334,7 +331,7 @@ copyin_val(WT_CURSOR *wtcursor)
  * copyout_val --
  *	Copy a struct kvs_record value to a WT_CURSOR value.
  */
-static INLINE int
+static inline int
 copyout_val(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
@@ -352,7 +349,7 @@ copyout_val(WT_CURSOR *wtcursor)
  * copy_key --
  *	Copy the key for methods where the underlying KVS call returns a key.
  */
-static INLINE int
+static inline int
 copy_key(WT_CURSOR *wtcursor)
 {
 	struct kvs_record *r;
@@ -420,7 +417,7 @@ kvs_dump(
  * kvs_call --
  *	Call a KVS key retrieval function, handling overflow.
  */
-static INLINE int
+static inline int
 kvs_call(WT_CURSOR *wtcursor, const char *fname,
     int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
 {
