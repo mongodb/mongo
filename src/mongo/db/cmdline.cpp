@@ -16,6 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <boost/algorithm/string.hpp>
+
 #include "mongo/pch.h"
 
 #include "mongo/db/cmdline.h"

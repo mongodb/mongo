@@ -16,6 +16,8 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <iomanip>
+
 #include "stat_util.h"
 #include "mongo/util/mongoutils/str.h"
 

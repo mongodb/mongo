@@ -15,6 +15,8 @@
  *    limitations under the License.
  */
 
+#include <iomanip>
+
 #include "pch.h"
 #include "goodies.h"
 #include "mongo/util/stacktrace.h"

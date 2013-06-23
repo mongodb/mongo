@@ -18,6 +18,7 @@
 #include "mongo/scripting/v8_db.h"
 
 #include <iostream>
+#include <iomanip>
 #include <boost/scoped_array.hpp>
 
 #include "mongo/base/init.h"
