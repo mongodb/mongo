@@ -271,14 +271,8 @@ clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
 # Compile the example files to .o so that we can link them twice: once statically, once shared.
 exampleObjMap = [(target, clientEnv.Object(source)) for (target, source) in exampleSourceMap]
 
-# Create an environment for linking the examples to the static library. For out of tree builds,
-# we need to use LIBS. For in-tree builds we need LIBDEPS.
 staticClientEnv = clientEnv.Clone()
-if '_LIBDEPS' in clientEnv:
-    staticClientEnv.PrependUnique(LIBDEPS=[mongoClientStaticLib])
-else:
-    # We need the mongo client library to preceed the boost libraries.
-    staticClientEnv.PrependUnique(LIBS=[mongoClientStaticLib])
+staticClientEnv.PrependUnique(LIBDEPS=[mongoClientStaticLib])
 
 # Build each statically linked client program
 staticClientPrograms = [staticClientEnv.Program(target, obj) for (target, obj) in exampleObjMap]
@@ -313,26 +307,3 @@ if buildShared:
     clientTests.append(sharedClientProgramInstalls)
 
 clientEnv.Alias('clientTests', clientTests, [])
-
-env.Install(
-    '#/',
-    env.Command('$CLIENT_ARCHIVE',
-                ['#buildscripts/make_archive.py',
-                 '$CLIENT_SCONSTRUCT',
-                 '$CLIENT_LICENSE',
-                 'SConscript.client',
-                 'mongo/base/generate_error_codes.py',
-                 'mongo/base/error_codes.err',
-                 'mongo/db/auth/generate_action_types.py',
-                 'mongo/db/auth/action_types.txt',
-                 'third_party/murmurhash3/MurmurHash3.h',
-                 '#buildscripts/make_archive.py',
-                 clientSourceAll,
-                 clientHeaders,
-                 [source for (target, source) in exampleSourceMap]],
-                '${PYTHON} ${SOURCES[0]} -o $TARGET '
-                '--transform ${str(Dir(BUILD_DIR))}/client_build=$CLIENT_DIST_BASENAME/src '
-                '--transform ${str(Dir(BUILD_DIR))}=$CLIENT_DIST_BASENAME/src '
-                '--transform distsrc/client=$CLIENT_DIST_BASENAME '
-                '--transform =$CLIENT_DIST_BASENAME/ '
-                '${TEMPFILE(SOURCES[1:])}'))

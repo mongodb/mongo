@@ -1020,10 +1020,3 @@ env.Command(
 
 #final alias
 env.Alias( "install", "$INSTALL_DIR" )
-
-env.Alias("clientBuild", ['#buildscripts/build_and_test_client.py',
-                          '#/${PROGPREFIX}mongod${PROGSUFFIX}',
-                          '#$CLIENT_ARCHIVE'],
-          '$PYTHON ${SOURCES[0]} ${SOURCES[2]} ${EXTRAPATH and "--extrapath"} $EXTRAPATH'
-          )
-env.AlwaysBuild("clientBuild")

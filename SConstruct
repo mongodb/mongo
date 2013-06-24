@@ -257,9 +257,6 @@ add_option( "use-cpu-profiler",
 add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\"", 1, True,
            type="choice", choices=["global", "db"])
 
-add_option('client-dist-basename', "Name of the client source archive.", 1, False,
-           default='mongo-cxx-driver')
-
 add_option('build-fast-and-loose', "NEVER for production builds", 0, False)
 
 add_option('propagate-shell-environment',
@@ -319,10 +316,6 @@ usePCH = has_option( "usePCH" )
 justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
 
 env = Environment( BUILD_DIR=variantDir,
-                   CLIENT_ARCHIVE='${CLIENT_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
-                   CLIENT_DIST_BASENAME=get_option('client-dist-basename'),
-                   CLIENT_LICENSE='#distsrc/client/LICENSE.txt',
-                   CLIENT_SCONSTRUCT='#distsrc/client/SConstruct',
                    DIST_ARCHIVE_SUFFIX='.tgz',
                    EXTRAPATH=get_option("extrapath"),
                    MODULE_BANNERS=[],
@@ -1506,13 +1499,8 @@ env.AlwaysBuild( "s3shell" )
 def s3dist( env , target , source ):
     s3push( str(source[0]) , "mongodb" )
 
-def s3distclient(env, target, source):
-    s3push(str(source[0]), "cxx-driver/mongodb", platformDir=False)
-
 env.Alias( "dist" , '$SERVER_ARCHIVE' )
-env.Alias( "distclient", "$CLIENT_ARCHIVE")
 env.AlwaysBuild(env.Alias( "s3dist" , [ '$SERVER_ARCHIVE' ] , [ s3dist ] ))
-env.AlwaysBuild(env.Alias( "s3distclient" , [ '$CLIENT_ARCHIVE' ] , [ s3distclient ] ))
 
 # --- an uninstall target ---
 if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:

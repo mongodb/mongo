@@ -19,13 +19,9 @@
 
    How to build and run:
 
-   (1) Using the mongoclient:
     g++ simple_client_demo.cpp -lmongoclient -lboost_thread-mt -lboost_filesystem -lboost_program_options
     ./a.out
 
-   (2) using client_lib.cpp:
-    g++ -I .. simple_client_demo.cpp mongo_client_lib.cpp -lboost_thread-mt -lboost_filesystem
-    ./a.out
 */
 
 #include <iostream>
