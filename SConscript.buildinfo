@@ -8,7 +8,7 @@ import sys
 
 import buildscripts.utils
 
-Import('env windows usev8 usesm')
+Import('env windows usev8')
 
 def getSysInfo():
     if windows:
@@ -41,8 +41,6 @@ def generate_buildinfo(env, target, source, **kw):
 
     if usev8:
         js_engine = "V8"
-    elif usesm:
-        js_engine = "SpiderMonkey"
     else:
         js_engine = "Unknown"
 

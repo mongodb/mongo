@@ -10,7 +10,7 @@ Import("env")
 Import("shellEnv")
 Import("testEnv")
 Import("has_option")
-Import("usesm usev8")
+Import("usev8")
 Import("installSetup")
 Import("enforce_glibc")
 Import("darwin windows solaris linux nix")
@@ -368,12 +368,7 @@ env.StaticLibrary('bson_template_evaluator', ["scripting/bson_template_evaluator
 env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evaluator_test.cpp'],
                 LIBDEPS=['bson_template_evaluator'])
 
-if usesm:
-    env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_spidermonkey.cpp',
-                                                             'scripting/sm_db.cpp'],
-                      LIBDEPS=['$BUILD_DIR/third_party/shim_spidermonkey',
-                               'bson_template_evaluator'])
-elif usev8:
+if usev8:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_v8.cpp',
                                                              'scripting/v8_db.cpp',
                                                              'scripting/v8_utils.cpp',

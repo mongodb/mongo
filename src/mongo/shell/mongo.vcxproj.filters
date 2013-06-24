@@ -989,12 +989,6 @@
     <ClCompile Include="..\scripting\engine_none.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\scripting\engine_spidermonkey.cpp">
-      <Filter>scripting</Filter>
-    </ClCompile>
-    <ClCompile Include="..\scripting\sm_db.cpp">
-      <Filter>scripting</Filter>
-    </ClCompile>
     <ClCompile Include="..\scripting\v8_deadline_monitor_test.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -2405,12 +2399,6 @@
       <Filter>bson</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\bench.h">
-      <Filter>scripting</Filter>
-    </ClInclude>
-    <ClInclude Include="..\scripting\engine_spidermonkey.h">
-      <Filter>scripting</Filter>
-    </ClInclude>
-    <ClInclude Include="..\scripting\engine_spidermonkey_internal.h">
       <Filter>scripting</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\v8_deadline_monitor.h">

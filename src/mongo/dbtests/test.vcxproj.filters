@@ -643,9 +643,6 @@
     <ClInclude Include="..\scripting\engine.h">
       <Filter>scripting</Filter>
     </ClInclude>
-    <ClInclude Include="..\scripting\engine_spidermonkey.h">
-      <Filter>scripting</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\safe_num.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -1125,9 +1122,6 @@
     </ClInclude>
     <ClInclude Include="..\util\exception_filter_win32.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\scripting\engine_spidermonkey_internal.h">
-      <Filter>scripting</Filter>
     </ClInclude>
     <ClInclude Include="..\s\type_changelog.h">
       <Filter>s</Filter>
@@ -2591,9 +2585,6 @@
     <ClCompile Include="..\scripting\engine.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\scripting\engine_spidermonkey.cpp">
-      <Filter>scripting</Filter>
-    </ClCompile>
     <ClCompile Include="..\scripting\utils.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -3248,9 +3239,6 @@
     </ClCompile>
     <ClCompile Include="..\db\hasher.cpp">
       <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\scripting\sm_db.cpp">
-      <Filter>scripting</Filter>
     </ClCompile>
     <ClCompile Include="..\db\index_update.cpp">
       <Filter>db\Source Files\e to n</Filter>

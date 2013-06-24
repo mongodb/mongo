@@ -1,7 +1,0 @@
-*.pdb
-*.ncb
-*.opt
-*.plg
-Debug
-Release
-Makefile

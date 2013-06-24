@@ -193,7 +193,6 @@ add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
 
 # library choices
-add_option( "usesm" , "use spider monkey for javascript" , 0 , True )
 add_option( "usev8" , "use v8 for javascript" , 0 , True )
 add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
@@ -312,7 +311,6 @@ debugBuild = has_option( "debugBuild" ) or has_option( "debugBuildAndLogging" )
 debugLogging = has_option( "debugBuildAndLogging" )
 noshell = has_option( "noshell" ) 
 
-usesm = has_option( "usesm" )
 usev8 = has_option( "usev8" ) 
 
 asio = has_option( "asio" )
@@ -478,7 +476,7 @@ if boostVersion is None:
 else:
     boostVersion = "-" + boostVersion
 
-if ( not ( usesm or usev8 or justClientLib) ):
+if ( not ( usev8 or justClientLib) ):
     usev8 = True
     options_topass["usev8"] = True
 
@@ -797,9 +795,6 @@ if nix:
 
     if has_option( "gdbserver" ):
         env.Append( CPPDEFINES=["USE_GDBSERVER"] )
-
-if usesm:
-    env.Append( CPPDEFINES=["JS_C_STRINGS_ARE_UTF8"] )
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
@@ -1532,7 +1527,7 @@ Export("shellEnv")
 Export("testEnv")
 Export("has_option use_system_version_of_library")
 Export("installSetup")
-Export("usesm usev8")
+Export("usev8")
 Export("darwin windows solaris linux freebsd nix")
 Export('module_sconscripts')
 Export("debugBuild")

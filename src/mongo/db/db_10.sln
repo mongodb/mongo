@@ -21,19 +21,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other", "other", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongod", "mongod.vcxproj", "{215B2D68-0A70-4D10-8E75-B31010C62A91}"
-	ProjectSection(ProjectDependencies) = postProject
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A} = {7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongos", "..\s\mongos.vcxproj", "{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
-	ProjectSection(ProjectDependencies) = postProject
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A} = {7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "..\dbtests\test.vcxproj", "{215B2D68-0A70-4D10-8E75-B33010C62A91}"
-	ProjectSection(ProjectDependencies) = postProject
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A} = {7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bsondemo", "..\bson\bsondemo\bsondemo.vcxproj", "{C9DB5EB7-81AA-4185-BAA1-DA035654402F}"
 EndProject
@@ -42,13 +33,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_client_demo", "..\client\examples\simple_client_demo.vcxproj", "{89C30BC3-2874-4F2C-B4DA-EB04E9782236}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongo", "..\shell\mongo.vcxproj", "{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}"
-	ProjectSection(ProjectDependencies) = postProject
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A} = {7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongoperf", "..\client\examples\mongoperf.vcxproj", "{79D4E297-BFB7-4FF2-9B13-08A146582E46}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SpiderMonkey pre-build step", "..\..\third_party\js-1.7\SpiderMonkey-prebuild.vcxproj", "{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -230,30 +216,6 @@ Global
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|Mixed Platforms.ActiveCfg = Win2008PlusRelease|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|Win32.ActiveCfg = Win2008PlusRelease|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|Mixed Platforms.Build.0 = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|Win32.ActiveCfg = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|Win32.Build.0 = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|x64.ActiveCfg = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Debug|x64.Build.0 = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|Mixed Platforms.ActiveCfg = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|Mixed Platforms.Build.0 = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|Win32.ActiveCfg = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|Win32.Build.0 = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|x64.ActiveCfg = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Release|x64.Build.0 = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|Mixed Platforms.ActiveCfg = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|Mixed Platforms.Build.0 = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|Win32.ActiveCfg = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|Win32.Build.0 = Debug|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|x64.ActiveCfg = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusDebug|x64.Build.0 = Debug|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|Mixed Platforms.ActiveCfg = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|Mixed Platforms.Build.0 = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|Win32.ActiveCfg = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|Win32.Build.0 = Release|Win32
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|x64.ActiveCfg = Release|x64
-		{7FA15DF8-14C8-4FD5-897B-6FACE8FDCF2A}.Win2008PlusRelease|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

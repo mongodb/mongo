@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library windows darwin usesm usev8")
+Import("env use_system_version_of_library windows darwin usev8")
 
 env.SConscript( [
         "murmurhash3/SConscript",
@@ -34,18 +34,7 @@ else:
     env.SConscript('snappy/SConscript')
     env.StaticLibrary('shim_snappy', ['shim_snappy.cpp'], LIBDEPS=['snappy/snappy'])
 
-if usesm:
-    if use_system_version_of_library("sm"):
-        env.StaticLibrary("shim_spidermonkey", ['shim_spidermonkey.cpp'], SYSLIBDEPS=['js'])
-    else:
-        if windows:
-            env.Append(CPPDEFINES=['XP_WIN'])
-        else:
-            env.Append(CPPDEFINES=['XP_UNIX'])
-        env.Append(CPPPATH='$BUILD_DIR/third_party/js-1.7')
-        env.SConscript('js-1.7/SConscript')
-        env.StaticLibrary('shim_spidermonkey', ['shim_spidermonkey.cpp'], LIBDEPS=['js-1.7/js'])
-elif usev8:
+if usev8:
     if use_system_version_of_library("v8"):
         env.StaticLibrary("shim_v8", ['shim_v8.cpp'], SYSLIBDEPS=['v8'])
     else:
