@@ -910,8 +910,8 @@ int _main( int argc, char* argv[], char **envp ) {
 #ifndef _WIN32
     rcGlobalLocation = "/etc/mongorc.js" ;
 #else
-	wchar_t programDataPath[MAX_PATH];
-	if ( S_OK == SHGetFolderPathW(NULL,
+    wchar_t programDataPath[MAX_PATH];
+    if ( S_OK == SHGetFolderPathW(NULL,
                                 CSIDL_COMMON_APPDATA,
                                 NULL,
                                 0,
