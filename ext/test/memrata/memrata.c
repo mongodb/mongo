@@ -667,8 +667,11 @@ kvs_cursor_update(WT_CURSOR *wtcursor)
 		return (ret);
 
 	/*
-	 * WT_CURSOR::update (update the record if it does exist, fail if it
-	 * does not exist), maps to kvs_replace.
+	 * WT_CURSOR::update without overwrite set (update the record if it
+	 * does exist, fail if it does not exist), maps to kvs_replace.  We
+	 * only implement the overwrite not-set path here: if overwrite was
+	 * set, we pointed the cursor update function at the insert function
+	 * when it was configured, because they're identical.
 	 */
 	if ((ret = kvs_replace(ws->kvs, &cursor->record)) != 0)
 		ERET(wtext,
@@ -702,7 +705,7 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 	if (ws->config_bitfield) {
 		wtcursor->value.size = 1;
 		wtcursor->value.data = "\0";
-		return (kvs_cursor_update(wtcursor));
+		return (wtcursor->update(wtcursor));
 	}
 
 	if ((ret = copyin_key(wtcursor, 0)) != 0)
@@ -710,7 +713,7 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 	if ((ret = kvs_del(ws->kvs, &cursor->record)) == 0)
 		return (0);
 	if (ret == KVS_E_KEY_NOT_FOUND)
-		return (WT_NOTFOUND);
+		return (cursor->config_overwrite ? 0 : WT_NOTFOUND);
 	ERET(wtext, session, WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
 }
 
@@ -1541,24 +1544,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((cursor = calloc(1, sizeof(CURSOR))) == NULL)
 		return (os_errno());
 
-	cursor->wtcursor.next = kvs_cursor_next;
-	cursor->wtcursor.prev = kvs_cursor_prev;
-	cursor->wtcursor.reset = kvs_cursor_reset;
-	cursor->wtcursor.search = kvs_cursor_search;
-	cursor->wtcursor.search_near = kvs_cursor_search_near;
-	cursor->wtcursor.insert = kvs_cursor_insert;
-	cursor->wtcursor.update = kvs_cursor_update;
-	cursor->wtcursor.remove = kvs_cursor_remove;
-	cursor->wtcursor.close = kvs_cursor_close;
-
-	cursor->wtext = ds->wtext;
-
-	cursor->record.key = cursor->key;
-	if ((cursor->val = malloc(128)) == NULL)
-		goto err;
-	cursor->val_len = 128;
-						/* Parse configuration */
-	if ((ret = wtext->config_get(
+	if ((ret = wtext->config_get(		/* Parse configuration */
 	    wtext, session, config, "append", &v)) != 0) {
 		ESET(wtext, session, ret,
 		    "append configuration: %s", wtext->strerror(ret));
@@ -1574,15 +1560,29 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	}
 	cursor->config_overwrite = v.val != 0;
 
+	/* Finish initializing the cursor. */
+	cursor->wtcursor.next = kvs_cursor_next;
+	cursor->wtcursor.prev = kvs_cursor_prev;
+	cursor->wtcursor.reset = kvs_cursor_reset;
+	cursor->wtcursor.search = kvs_cursor_search;
+	cursor->wtcursor.search_near = kvs_cursor_search_near;
+	cursor->wtcursor.insert = kvs_cursor_insert;
+	cursor->wtcursor.update =
+	    cursor->config_overwrite ? kvs_cursor_insert : kvs_cursor_update;
+	cursor->wtcursor.remove = kvs_cursor_remove;
+	cursor->wtcursor.close = kvs_cursor_close;
+
+	cursor->wtext = wtext;
+
+	cursor->record.key = cursor->key;
+	if ((cursor->val = malloc(128)) == NULL)
+		goto err;
+	cursor->val_len = 128;
+
 	/* Get a locked reference to the WiredTiger source. */
 	if ((ret = ws_source_open(wtds, session, uri, config, 0, &ws)) != 0)
 		goto err;
 	locked = 1;
-
-	/*
-	 * Finish initializing the cursor (if the WT_SOURCE structure requires
-	 * initialization, we're going to use the cursor as part of that work).
-	 */
 	cursor->ws = ws;
 
 	/*
