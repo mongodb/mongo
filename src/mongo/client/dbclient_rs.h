@@ -669,6 +669,8 @@ namespace mongo {
          */
         bool equals(const TagSet& other) const;
 
+        const BSONArray& getTagBSON() const;
+
     private:
         /**
          * This is purposely undefined as the semantics for assignment can be
@@ -699,6 +701,8 @@ namespace mongo {
         inline bool equals(const ReadPreferenceSetting& other) const {
             return pref == other.pref && tags.equals(other.tags);
         }
+
+        BSONObj toBSON() const;
 
         const ReadPreference pref;
         TagSet tags;

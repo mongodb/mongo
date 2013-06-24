@@ -265,7 +265,8 @@ var testAllModes = function(conn, hostList, isMongos) {
     });
 };
 
-var st = new ShardingTest({ shards: { rs0: { nodes: NODE_COUNT }}});
+var st = new ShardingTest({shards : {rs0 : {nodes : NODE_COUNT, verbose : 1}},
+                           other : {mongosOptions : {verbose : 3}}});
 st.stopBalancer();
 
 ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
