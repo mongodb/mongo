@@ -140,11 +140,13 @@ namespace mongo {
             _maintenanceMode++;
             changeState(MemberState::RS_RECOVERING);
         }
-        else {
+        else if (_maintenanceMode > 0) {
             _maintenanceMode--;
             // no need to change state, syncTail will try to go live as a secondary soon
 
             log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+        } else {
+            log() << "leaving maintenance mode (no other tasks)" << rsLog;
         }
 
         fassert(16844, _maintenanceMode >= 0);
