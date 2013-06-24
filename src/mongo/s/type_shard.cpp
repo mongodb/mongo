@@ -87,7 +87,7 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isDrainingSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, maxSize, &_maxSize, errMsg);
+        fieldState = FieldParser::extractNumber(source, maxSize, &_maxSize, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isMaxSizeSet = fieldState == FieldParser::FIELD_SET;
 

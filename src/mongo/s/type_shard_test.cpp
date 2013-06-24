@@ -74,6 +74,17 @@ namespace {
         ASSERT_TRUE(shard.isValid(NULL));
     }
 
+    TEST(Validity, MaxSizeAsFloat) {
+        ShardType shard;
+        BSONObj obj = BSON(ShardType::name("shard0000") <<
+                           ShardType::host("localhost:27017") <<
+                           ShardType::maxSize() << 100.0);
+        string errMsg;
+        ASSERT(shard.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_TRUE(shard.isValid(NULL));
+    }
+
     TEST(Validity, BadType) {
         ShardType shard;
         BSONObj obj = BSON(ShardType::name() << 0);
