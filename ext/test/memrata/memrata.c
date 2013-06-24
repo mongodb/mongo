@@ -363,6 +363,13 @@ copy_key(WT_CURSOR *wtcursor)
 
 	r = &cursor->record;
 
+	/*
+	 * If the underlying KVS function is going to return a key, we have to
+	 * be sure the key buffer is large enough into which to copy any key,
+	 * that is, the key can't reference the WT_CURSOR key.  If the previous
+	 * call was set up so the key referenced the WT_CURSOR key, copy it to
+	 * the CURSOR key buffer.
+	 */
 	if (r->key == cursor->key)
 		return (0);
 
