@@ -423,16 +423,16 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	WT_RET(__cursor_size_chk(session, &cursor->value));
 
+	/*
+	 * The tree is no longer empty: eviction should pay attention to it,
+	 * and it's no longer possible to bulk-load into it.
+	 */
+	btree->bulk_load_ok = 0;
+
 retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		if (cursor->value.size != 1)
-			WT_RET_MSG(session, EINVAL,
-			    "item size of %" PRIu32 " does not match "
-			    "fixed-length file requirement of 1 byte",
-			    cursor->value.size);
-		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		WT_ERR(__wt_col_search(session, cbt, 1));
 
