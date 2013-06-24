@@ -20,6 +20,7 @@
 #include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -96,6 +97,7 @@ namespace mongo {
 
     /** Base class implementing ordered iteration through BSONElements. */
     class BSONIteratorSorted {
+        MONGO_DISALLOW_COPYING(BSONIteratorSorted);
     public:
         ~BSONIteratorSorted() {
             verify( _fields );

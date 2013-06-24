@@ -1037,6 +1037,7 @@ namespace mongo {
             // mimic checkMaster behavior, which refreshes the local view of the replica set
             _check();
 
+            tags->reset();
             scoped_lock lk(_lock);
             return ReplicaSetMonitor::selectNode(_nodes, preference, tags, _localThresholdMillis,
                     &_lastReadPrefHost, isPrimarySelected);
@@ -1901,32 +1902,40 @@ namespace mongo {
         _lastSlaveOkConn.reset();
     }
 
-    TagSet::TagSet() : _isExhausted(true), _tagIterator(_tags) {
+    TagSet::TagSet():
+            _isExhausted(true),
+            _tagIterator(new BSONArrayIteratorSorted(_tags)) {
     }
 
     TagSet::TagSet(const TagSet& other) :
             _isExhausted(false),
             _tags(other._tags.getOwned()),
-            _tagIterator(_tags) {
+            _tagIterator(new BSONArrayIteratorSorted(_tags)) {
         next();
     }
 
     TagSet::TagSet(const BSONArray& tags) :
             _isExhausted(false),
             _tags(tags.getOwned()),
-            _tagIterator(_tags) {
+            _tagIterator(new BSONArrayIteratorSorted(_tags)) {
         next();
     }
 
     void TagSet::next() {
-        if (_tagIterator.more()) {
-            const BSONElement& nextTag = _tagIterator.next();
+        if (_tagIterator->more()) {
+            const BSONElement& nextTag = _tagIterator->next();
             uassert(16357, "Tags should be a BSON object", nextTag.isABSONObj());
             _currentTag = nextTag.Obj();
         }
         else {
             _isExhausted = true;
         }
+    }
+
+    void TagSet::reset() {
+        _isExhausted = false;
+        _tagIterator.reset(new BSONArrayIteratorSorted(_tags));
+        next();
     }
 
     const BSONObj& TagSet::getCurrentTag() const {

@@ -66,7 +66,7 @@ namespace mongo {
     MockDBClientConnection* MockConnRegistry::connect(const std::string& connStr) {
         scoped_lock sl(_registryMutex);
         fassert(16534, _registry.count(connStr) == 1);
-        return new MockDBClientConnection(_registry[connStr]);
+        return new MockDBClientConnection(_registry[connStr], true);
     }
 
     MockConnRegistry::MockConnHook::MockConnHook(MockConnRegistry* registry):

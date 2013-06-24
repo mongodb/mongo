@@ -28,6 +28,7 @@
 
 #include <vector>
 
+using std::map;
 using std::vector;
 using std::string;
 using boost::scoped_ptr;
@@ -1514,6 +1515,20 @@ namespace mongo_test {
 #endif
     }
 
+    TEST(TagSet, Reset) {
+        BSONArrayBuilder builder;
+        builder.append(BSON("dc" << "nyc"));
+
+        TagSet tags(BSONArray(builder.done()));
+        tags.next();
+        ASSERT(tags.isExhausted());
+
+        tags.reset();
+
+        ASSERT(!tags.isExhausted());
+        ASSERT(tags.getCurrentTag().equal(BSON("dc" << "nyc")));
+    }
+
     // TODO: Port these existing tests here: replmonitor_bad_seed.js, repl_monitor_refresh.js
 
     /**
@@ -1614,5 +1629,104 @@ namespace mongo_test {
         ReplicaSetMonitor::remove(replSet.getSetName(), true);
         ConnectionString::setConnectionHook(originalConnHook);
         mongo::ScopedDbConnection::clearPool();
+    }
+
+    /**
+     * Warning: Tests running this fixture cannot be run in parallel with other tests
+     * that use ConnectionString::setConnectionHook.
+     */
+    class TwoNodeWithTags: public mongo::unittest::Test {
+    protected:
+        void setUp() {
+            _replSet.reset(new MockReplicaSet("test", 2));
+            _originalConnectionHook = ConnectionString::getConnectionHook();
+            ConnectionString::setConnectionHook(
+                    mongo::MockConnRegistry::get()->getConnStrHook());
+
+            mongo::MockReplicaSet::ReplConfigMap config = _replSet->getReplConfig();
+
+            {
+                const string host(_replSet->getPrimary());
+                map<string, string>& tag = config[host].tags;
+                tag.clear();
+                tag["dc"] = "ny";
+                tag["num"] = "1";
+            }
+
+            {
+                const string host(_replSet->getSecondaries().front());
+                map<string, string>&  tag = config[host].tags;
+                tag.clear();
+                tag["dc"] = "ny";
+                tag["num"] = "2";
+            }
+
+            _replSet->setConfig(config);
+
+        }
+
+        void tearDown() {
+            ConnectionString::setConnectionHook(_originalConnectionHook);
+            ReplicaSetMonitor::remove(_replSet->getSetName(), true);
+            _replSet.reset();
+        }
+
+        MockReplicaSet* getReplSet() {
+            return _replSet.get();
+        }
+
+    private:
+        ConnectionString::ConnectionHook* _originalConnectionHook;
+        boost::scoped_ptr<MockReplicaSet> _replSet;
+    };
+
+    // Tests the node selection retry logic when the connection went bad.
+    TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
+        MockReplicaSet* replSet = getReplSet();
+
+        vector<HostAndPort> seedList;
+        seedList.push_back(HostAndPort(replSet->getPrimary()));
+        ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+
+        const string secHost(replSet->getSecondaries().front());
+        replSet->kill(secHost);
+
+        ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
+        // Make sure monitor sees the dead secondary
+        monitor->check();
+
+        replSet->restore(secHost);
+
+        TagSet tags(BSON_ARRAY(BSONObj()));
+        bool isPrimary;
+        HostAndPort node = monitor->selectAndCheckNode(mongo::ReadPreference_SecondaryOnly,
+                                                       &tags, &isPrimary);
+        ASSERT_FALSE(isPrimary);
+        ASSERT_EQUALS(secHost, node.toString(true));
+    }
+
+    // Tests the node selection retry logic with tags when the connection went bad.
+    TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
+        MockReplicaSet* replSet = getReplSet();
+
+        vector<HostAndPort> seedList;
+        seedList.push_back(HostAndPort(replSet->getPrimary()));
+        ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+
+        const string secHost(replSet->getSecondaries().front());
+        replSet->kill(secHost);
+
+        ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
+        // Make sure monitor sees the dead secondary
+        monitor->check();
+
+        replSet->restore(secHost);
+
+        TagSet tags(BSON_ARRAY(BSON("dc" << "ny")));
+        bool isPrimary;
+        HostAndPort node = monitor->selectAndCheckNode(mongo::ReadPreference_SecondaryOnly,
+                                                       &tags, &isPrimary);
+        ASSERT_FALSE(isPrimary);
+        ASSERT_EQUALS(secHost, node.toString(true));
     }
 }
