@@ -54,42 +54,6 @@
 
 namespace mongo {
 
-    class CleanCmd : public Command {
-    public:
-        CleanCmd() : Command( "clean" ) {}
-
-        virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return WRITE; }
-
-        virtual void help(stringstream& h) const { h << "internal"; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::clean);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
-        }
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            string dropns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-
-            if ( !cmdLine.quiet )
-                tlog() << "CMD: clean " << dropns << endl;
-
-            NamespaceDetails *d = nsdetails(dropns);
-
-            if ( ! d ) {
-                errmsg = "ns not found";
-                return 0;
-            }
-
-            d->orphanDeletedList();
-
-            result.append("ns", dropns.c_str());
-            return 1;
-        }
-
-    } cleanCmd;
-
     namespace dur {
         boost::filesystem::path getJournalDir();
     }
