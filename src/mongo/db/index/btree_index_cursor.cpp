@@ -103,21 +103,21 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeIndexCursor::skip(const vector<const BSONElement*>& position,
-            const vector<bool>& inclusive) {
+    Status BtreeIndexCursor::skip(const BSONObj &keyBegin, int keyBeginLen, bool afterKey,
+                                  const vector<const BSONElement*>& keyEnd,
+                                  const vector<bool>& keyEndInclusive) {
         _interface->advanceTo(
-                _bucket,
-                _keyOffset,
-                _emptyObj,
-                0,
-                false,
-                position,
-                inclusive,
-                _ordering,
-                (int)_direction);
+            _bucket,
+            _keyOffset,
+            keyBegin,
+            keyBeginLen,
+            afterKey,
+            keyEnd,
+            keyEndInclusive,
+            _ordering,
+            (int)_direction);
 
         skipUnusedKeys();
-
         return Status::OK();
     }
 

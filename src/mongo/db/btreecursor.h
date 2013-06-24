@@ -23,6 +23,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 
 namespace mongo {
@@ -206,7 +207,7 @@ namespace mongo {
         long long _nscanned;
 
         // These variables are for index traversal.
-        scoped_ptr<IndexCursor> _indexCursor;
+        scoped_ptr<BtreeIndexCursor> _indexCursor;
         scoped_ptr<IndexAccessMethod> _indexAM;
         scoped_ptr<IndexDescriptor> _indexDescriptor;
         bool _hitEnd;

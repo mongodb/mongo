@@ -37,14 +37,6 @@ namespace mongo {
 
         virtual Status seek(const BSONObj &position);
 
-        // Returns an error.
-        virtual Status seek(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
-
-        // Returns an error.
-        virtual Status skip(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
-
         bool isEOF() const;
         BSONObj getKey() const;
         DiskLoc getValue() const;

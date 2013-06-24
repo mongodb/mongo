@@ -46,11 +46,13 @@ namespace mongo {
 
         virtual Status seek(const BSONObj& position);
 
-        virtual Status seek(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
+        // Btree-specific seeking functions.
+        Status seek(const vector<const BSONElement*>& position,
+                    const vector<bool>& inclusive);
 
-        virtual Status skip(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
+        Status skip(const BSONObj &keyBegin, int keyBeginLen, bool afterKey,
+                    const vector<const BSONElement*>& keyEnd,
+                    const vector<bool>& keyEndInclusive);
 
         virtual BSONObj getKey() const;
         virtual DiskLoc getValue() const;

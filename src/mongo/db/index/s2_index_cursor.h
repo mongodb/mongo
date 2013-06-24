@@ -46,11 +46,6 @@ namespace mongo {
         // appropriate sub-cursor.
         virtual Status seek(const BSONObj& position);
 
-        // Not implemented:
-        virtual Status seek(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
-        virtual Status skip(const vector<const BSONElement*>& position,
-                            const vector<bool>& inclusive);
         virtual Status setOptions(const CursorOptions& options);
 
         // Implemented:

@@ -105,16 +105,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status S2IndexCursor::seek(const vector<const BSONElement*>& position,
-                                 const vector<bool> &inclusive) {
-        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2Cursor");
-    }
-
-    Status S2IndexCursor::skip(const vector<const BSONElement*>& position,
-                                 const vector<bool> &inclusive) {
-        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2Cursor");
-    }
-
     Status S2IndexCursor::setOptions(const CursorOptions& options) { return Status::OK(); }
 
     bool S2IndexCursor::isEOF() const { return _underlyingCursor->isEOF(); }

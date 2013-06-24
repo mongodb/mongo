@@ -81,7 +81,7 @@ namespace mongo {
 
         IndexCursor *cursor;
         _indexAM->newCursor(&cursor);
-        _indexCursor.reset(cursor);
+        _indexCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
 
         CursorOptions opts;
         opts.direction = _direction == 1 ? CursorOptions::INCREASING : CursorOptions::DECREASING;
@@ -108,7 +108,7 @@ namespace mongo {
 
         IndexCursor *cursor;
         _indexAM->newCursor(&cursor);
-        _indexCursor.reset(cursor);
+        _indexCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
 
         CursorOptions opts;
         opts.direction = _direction == 1 ? CursorOptions::INCREASING : CursorOptions::DECREASING;
@@ -232,42 +232,7 @@ namespace mongo {
     }
 
     void BtreeCursor::advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive) {
-        verify(keyEnd.size() == keyEndInclusive.size());
-
-        if (keyBeginLen != 0) {
-            // We package up the combination of keyBegin and keyEnd into one vector of elements.
-            vector<BSONElement> elts;
-            BSONObjIterator it(keyBegin);
-            for (int i = 0; i < keyBeginLen; ++i) {
-                elts.push_back(it.next(true));
-            }
-
-            verify((size_t)keyBeginLen <= keyEnd.size());
-
-            size_t size = (afterKey) ? keyBeginLen : keyEnd.size();
-
-            vector<const BSONElement*> key;
-            vector<bool> inclusive;
-
-            key.resize(size);
-            inclusive.resize(size);
-
-            for (int i = 0; i < keyBeginLen; ++i) {
-                key[i] = &elts[i];
-                inclusive[i] = true;
-            }
-
-            inclusive[keyBeginLen - 1] = !afterKey;
-
-            for (size_t i = keyBeginLen; i < size; ++i) {
-                key[i] = keyEnd[i];
-                inclusive[i] = keyEndInclusive[i];
-            }
-
-            _indexCursor->skip(key, inclusive);
-        } else {
-            _indexCursor->skip(keyEnd, keyEndInclusive);
-        }
+        _indexCursor->skip(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
     }
 
     bool BtreeCursor::advance() {

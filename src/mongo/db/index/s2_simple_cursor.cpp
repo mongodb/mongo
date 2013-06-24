@@ -88,16 +88,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status S2SimpleCursor::seek(const vector<const BSONElement*>& position,
-                                         const vector<bool>& inclusive) {
-        return Status::OK();
-    }
-
-    Status S2SimpleCursor::skip(const vector<const BSONElement*>& position,
-                                         const vector<bool> &inclusive) {
-        return Status::OK();
-    }
-
     Status S2SimpleCursor::setOptions(const CursorOptions& options) {
         return Status::OK();
     }

@@ -87,16 +87,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status S2NearIndexCursor::seek(const vector<const BSONElement*>& position,
-                                   const vector<bool>& inclusive) {
-        return Status::OK();
-    }
-
-    Status S2NearIndexCursor::skip(const vector<const BSONElement*>& position,
-                                   const vector<bool>& inclusive) {
-        return Status::OK();
-    }
-
     Status S2NearIndexCursor::setOptions(const CursorOptions& options) {
         return Status::OK();
     }
