@@ -629,9 +629,6 @@
     <ClCompile Include="lasterror.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
-    <ClCompile Include="matcher.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="matcher_covered.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -1957,9 +1954,6 @@
     </ClCompile>
     <ClCompile Include="ops\modifier_unset_test.cpp">
       <Filter>db\ops</Filter>
-    </ClCompile>
-    <ClCompile Include="matcher_old.cpp">
-      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="ops\modifier_inc.cpp">
       <Filter>db\ops</Filter>
@@ -4420,9 +4414,6 @@
       <Filter>db\ops</Filter>
     </ClInclude>
     <ClInclude Include="matcher_covered.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="matcher_old.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\util\safe_num-inl.h">

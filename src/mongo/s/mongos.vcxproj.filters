@@ -684,9 +684,6 @@
     <ClCompile Include="..\db\lasterror.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\matcher.cpp">
-      <Filter>db\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\projection.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>

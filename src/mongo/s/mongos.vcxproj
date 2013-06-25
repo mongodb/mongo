@@ -2959,7 +2959,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\jsobj.cpp" />
     <ClCompile Include="..\db\json.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
-    <ClCompile Include="..\db\matcher.cpp" />
     <ClCompile Include="..\util\md5.cpp" />
     <ClCompile Include="..\util\md5main.cpp" />
     <ClCompile Include="..\util\net\message.cpp" />
