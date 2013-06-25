@@ -298,7 +298,6 @@ env.StaticLibrary("coredb", [
         "db/index_names.cpp",
         "db/index/btree_key_generator.cpp",
         "db/keypattern.cpp",
-        "db/matcher.cpp",
         "db/matcher/matcher.cpp",
         "db/pipeline/accumulator.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",

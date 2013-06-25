@@ -449,7 +449,6 @@ namespace MatcherTests {
         }
 
 #define ADD_BOTH(TEST) \
-        add< TEST<MatcherOld> >(); \
         add< TEST<Matcher2> >();
 
         void setupTests() {

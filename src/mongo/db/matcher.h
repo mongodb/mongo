@@ -38,7 +38,6 @@ namespace mongo {
     };
 }
 
-#include "matcher_old.h"
 #include "mongo/db/matcher/matcher.h"
 
 namespace mongo {
