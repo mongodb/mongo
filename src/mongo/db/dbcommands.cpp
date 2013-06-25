@@ -206,12 +206,11 @@ namespace mongo {
                 else if ( e.type() == String ) {
                     doTiming = true;
                 }
-                TimerStats t;
                 if ( doTiming ) {
                     gleTimerHolder.reset( new TimerHolder( &gleWtimeStats ) );
                 }
                 else {
-                    gleTimerHolder.reset( new TimerHolder( &t ) );
+                    gleTimerHolder.reset( new TimerHolder( NULL ) );
                 }
 
                 long long passes = 0;
