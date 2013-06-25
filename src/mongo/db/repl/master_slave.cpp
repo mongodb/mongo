@@ -26,6 +26,8 @@
 
 #include "mongo/db/repl/master_slave.h"
 
+#include <pcrecpp.h>
+
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/cloner.h"
