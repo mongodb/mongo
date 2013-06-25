@@ -185,6 +185,12 @@ DB.prototype.updateUser = function(updateObject) {
     if (res.ok) {
         return;
     }
+
+    if (res.errmsg == "noreplset") {
+        // nothing we can do
+        return;
+    }
+
     throw Error("Updating user failed: " + res.errmsg);
 };
 
