@@ -1722,7 +1722,7 @@ namespace mongo {
 
         // Assert here instead of returning NULL since the contract of this method is such
         // that returning NULL means none of the nodes were good, which is not the case here.
-        uassert(16532, str::stream() << "Failed to connect to " << _lastSlaveOkHost,
+        uassert(16532, str::stream() << "Failed to connect to " << _lastSlaveOkHost.toString(),
                 newConn != NULL);
 
         _lastSlaveOkConn.reset(newConn);
