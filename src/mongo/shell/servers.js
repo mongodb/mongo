@@ -698,7 +698,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     conn.name = (useHostname ? getHostName() : "localhost") + ":" + port;
 
     if (options['auth'] || options['keyFile']) {
-        if (!this.shardsvr && !options.replSet) {
+        if (!this.shardsvr && !options.replSet && !restart) {
             jsTest.addAuth(conn);
         }
         jsTest.authenticate(conn);
