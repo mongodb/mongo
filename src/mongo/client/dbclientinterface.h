@@ -22,6 +22,8 @@
 
 #include "mongo/pch.h"
 
+#include <boost/function.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/message.h"

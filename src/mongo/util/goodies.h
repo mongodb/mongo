@@ -18,11 +18,11 @@
 
 #pragma once
 
+#include <sstream>
+
 #include <boost/detail/endian.hpp>
-#include <boost/thread/condition_variable.hpp>
 
 #include "mongo/bson/util/misc.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -228,3 +228,4 @@ namespace mongo {
     using boost::intrusive_ptr;
     using boost::dynamic_pointer_cast;
 } // namespace mongo
+

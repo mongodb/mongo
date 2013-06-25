@@ -21,6 +21,8 @@
 #include <deque>
 
 #include <boost/thread/condition.hpp>
+#include <boost/function.hpp>
+
 #include "task.h"
 
 namespace mongo {
