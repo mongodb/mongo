@@ -26,14 +26,8 @@
 
 namespace mongo {
 
-    DocumentSourceCursor::CursorWithContext::CursorWithContext( const string& ns )
-        : _readContext( ns ) // Take a read lock.
-        , _collMetadata(shardingState.needCollectionMetadata( ns )
-                    ? shardingState.getCollectionMetadata( ns )
-                    : CollectionMetadataPtr())
-    {}
-
     DocumentSourceCursor::~DocumentSourceCursor() {
+        dispose();
     }
 
     bool DocumentSourceCursor::eof() {
@@ -61,26 +55,27 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::dispose() {
-        _cursorWithContext.reset();
+        if (_cursorId) {
+            ClientCursor::erase(_cursorId);
+            _cursorId = 0;
+        }
+
+        _collMetadata.reset();
+        hasCurrent = false;
+        pCurrent = Document();
     }
 
-    ClientCursor::Holder& DocumentSourceCursor::cursor() {
-        verify( _cursorWithContext );
-        verify( _cursorWithContext->_cursor );
-        return _cursorWithContext->_cursor;
-    }
-
-    bool DocumentSourceCursor::canUseCoveredIndex() {
+    bool DocumentSourceCursor::canUseCoveredIndex(ClientCursor* cursor) {
         // We can't use a covered index when we have collection metadata because we
         // need to examine the object to see if it belongs on this shard
-        return (!collMetadata() &&
-                cursor()->ok() && cursor()->c()->keyFieldsOnly());
+        return (!_collMetadata &&
+                cursor->ok() && cursor->c()->keyFieldsOnly());
     }
 
-    void DocumentSourceCursor::yieldSometimes() {
+    void DocumentSourceCursor::yieldSometimes(ClientCursor* cursor) {
         try { // SERVER-5752 may make this try unnecessary
             // if we are index only we don't need the recored
-            bool cursorOk = cursor()->yieldSometimes(canUseCoveredIndex()
+            bool cursorOk = cursor->yieldSometimes(canUseCoveredIndex(cursor)
                                                      ? ClientCursor::DontNeed
                                                      : ClientCursor::WillNeed);
             uassert( 16028, "collection or database disappeared when cursor yielded", cursorOk );
@@ -98,37 +93,49 @@ namespace mongo {
     void DocumentSourceCursor::findNext() {
         unstarted = false;
 
-        if ( !_cursorWithContext ) {
-            pCurrent = Document();
-            hasCurrent = false;
+        if (!_cursorId) {
+            dispose();
             return;
         }
 
-        for( ; cursor()->ok(); cursor()->advance() ) {
+        // We have already validated the sharding version when we constructed the cursor
+        // so we shouldn't check it again.
+        Lock::DBRead lk(ns);
+        Client::Context ctx(ns, dbpath, /*doVersion=*/false);
 
-            yieldSometimes();
-            if ( !cursor()->ok() ) {
+        ClientCursor::Pin pin(_cursorId);
+        ClientCursor* cursor = pin.c();
+
+        uassert(16950, "Cursor deleted. Was the collection or database dropped?",
+                cursor);
+
+        cursor->c()->recoverFromYield();
+
+        for( ; cursor->ok(); cursor->advance() ) {
+
+            yieldSometimes(cursor);
+            if ( !cursor->ok() ) {
                 // The cursor was exhausted during the yield.
                 break;
             }
 
-            if ( !cursor()->currentMatches() || cursor()->currentIsDup() )
+            if ( !cursor->currentMatches() || cursor->currentIsDup() )
                 continue;
 
             // grab the matching document
-            if (canUseCoveredIndex()) {
+            if (canUseCoveredIndex(cursor)) {
                 // Can't have collection metadata if we are here
-                BSONObj indexKey = cursor()->currKey();
-                pCurrent = Document(cursor()->c()->keyFieldsOnly()->hydrate(indexKey));
+                BSONObj indexKey = cursor->currKey();
+                pCurrent = Document(cursor->c()->keyFieldsOnly()->hydrate(indexKey));
             }
             else {
-                BSONObj next = cursor()->current();
+                BSONObj next = cursor->current();
 
                 // check to see if this is a new object we don't own yet
                 // because of a chunk migration
-                if (collMetadata()) {
-                    KeyPattern kp( collMetadata()->getKeyPattern() );
-                    if ( !collMetadata()->keyBelongsToMe( kp.extractSingleKey( next ) ) ) continue;
+                if (_collMetadata) {
+                    KeyPattern kp( _collMetadata->getKeyPattern() );
+                    if ( !_collMetadata->keyBelongsToMe( kp.extractSingleKey( next ) ) ) continue;
                 }
 
                 if (!_projection) {
@@ -165,16 +172,22 @@ namespace mongo {
             }
 
             hasCurrent = true;
-            cursor()->advance();
+            cursor->advance();
+
+            if (cursor->c()->supportYields()) {
+                ClientCursor::YieldData data;
+                cursor->prepareToYield(data);
+            } else {
+                cursor->c()->noteLocation();
+            }
 
             return;
         }
 
         // If we got here, there aren't any more documents.
-        // The CursorWithContext (and its read lock) must be released, see SERVER-6123.
-        dispose();
-        pCurrent = Document();
-        hasCurrent = false;
+        // The Cursor must be released, see SERVER-6123.
+        pin.release();
+        dispose(); // sets into eof state
     }
 
     void DocumentSourceCursor::setSource(DocumentSource *pSource) {
@@ -219,34 +232,34 @@ namespace mongo {
         }
     }
 
-    DocumentSourceCursor::DocumentSourceCursor(
-        const shared_ptr<CursorWithContext>& cursorWithContext,
-        const intrusive_ptr<ExpressionContext> &pCtx):
-        DocumentSource(pCtx),
-        unstarted(true),
-        hasCurrent(false),
-        _cursorWithContext( cursorWithContext )
+    DocumentSourceCursor::DocumentSourceCursor(const string& ns,
+                                               CursorId cursorId,
+                                               const intrusive_ptr<ExpressionContext> &pCtx)
+        : DocumentSource(pCtx)
+        , unstarted(true)
+        , hasCurrent(false)
+        , ns(ns)
+        , _cursorId(cursorId)
+        , _collMetadata(shardingState.needCollectionMetadata( ns )
+                        ? shardingState.getCollectionMetadata( ns )
+                        : CollectionMetadataPtr())
     {}
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-        const shared_ptr<CursorWithContext>& cursorWithContext,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        verify( cursorWithContext );
-        verify( cursorWithContext->_cursor );
-        intrusive_ptr<DocumentSourceCursor> pSource(
-            new DocumentSourceCursor( cursorWithContext, pExpCtx ) );
-        return pSource;
-    }
-
-    void DocumentSourceCursor::setNamespace(const string &n) {
-        ns = n;
+            const string& ns,
+            CursorId cursorId,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
+        return new DocumentSourceCursor(ns, cursorId, pExpCtx);
     }
 
     void DocumentSourceCursor::setProjection(const BSONObj& projection, const ParsedDeps& deps) {
         verify(!_projection);
         _projection.reset(new Projection);
         _projection->init(projection);
-        cursor()->fields = _projection;
+
+        ClientCursor::Pin pin (_cursorId);
+        verify(pin.c());
+        pin.c()->fields = _projection;
 
         _dependencies = deps;
     }

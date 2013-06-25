@@ -363,21 +363,6 @@ namespace mongo {
     class DocumentSourceCursor :
         public DocumentSource {
     public:
-        /**
-         * Holds a Cursor and all associated state required to access the cursor.  An object of this
-         * type may only be used by one thread.
-         */
-        struct CursorWithContext {
-            /** Takes a read lock that will be held for the lifetime of the object. */
-            CursorWithContext( const string& ns );
-
-            // Must be the first struct member for proper construction and destruction, as other
-            // members may depend on the read lock it acquires.
-            Client::ReadContext _readContext;
-            CollectionMetadataPtr _collMetadata;
-            ClientCursor::Holder _cursor;
-        };
-
         // virtuals from DocumentSource
         virtual ~DocumentSourceCursor();
         virtual bool eof();
@@ -393,16 +378,22 @@ namespace mongo {
         virtual void dispose();
 
         /**
-          Create a document source based on a cursor.
-
-          This is usually put at the beginning of a chain of document sources
-          in order to fetch data from the database.
-
-          @param pCursor the cursor to use to fetch data
-          @param pExpCtx the expression context for the pipeline
-        */
+         * Create a document source based on a passed-in cursor.
+         *
+         * This is usually put at the beginning of a chain of document sources
+         * in order to fetch data from the database.
+         *
+         * The DocumentSource takes ownership of the cursor and will destroy it
+         * when the DocumentSource is finished with the cursor, if it hasn't
+         * already been destroyed.
+         *
+         * @param ns the namespace the cursor is over
+         * @param cursorId the id of the cursor to use
+         * @param pExpCtx the expression context for the pipeline
+         */
         static intrusive_ptr<DocumentSourceCursor> create(
-            const shared_ptr<CursorWithContext>& cursorWithContext,
+            const string& ns,
+            CursorId cursorId,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /*
@@ -410,7 +401,6 @@ namespace mongo {
 
           @param namespace the namespace
         */
-        void setNamespace(const string &ns);
 
         /*
           Record the query that was specified for the cursor this wraps, if
@@ -445,7 +435,8 @@ namespace mongo {
 
     private:
         DocumentSourceCursor(
-            const shared_ptr<CursorWithContext>& cursorWithContext,
+            const string& ns,
+            CursorId cursorId,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         void findNext();
@@ -454,24 +445,17 @@ namespace mongo {
         bool hasCurrent;
         Document pCurrent;
 
-        string ns; // namespace
-
-        /*
-          The bson dependencies must outlive the Cursor wrapped by this
-          source.  Therefore, bson dependencies must appear before pCursor
-          in order cause its destructor to be called *after* pCursor's.
-         */
+        // BSONObj members must outlive _projection and cursor.
         BSONObj _query;
         BSONObj _sort;
         shared_ptr<Projection> _projection; // shared with pClientCursor
         ParsedDeps _dependencies;
 
-        shared_ptr<CursorWithContext> _cursorWithContext;
+        string ns; // namespace
+        CursorId _cursorId;
+        CollectionMetadataPtr _collMetadata;
 
-        ClientCursor::Holder& cursor();
-        const CollectionMetadata* collMetadata() { return _cursorWithContext->_collMetadata.get(); }
-
-        bool canUseCoveredIndex();
+        bool canUseCoveredIndex(ClientCursor* cursor);
 
         /*
           Yield the cursor sometimes.
@@ -481,7 +465,7 @@ namespace mongo {
           client cursor, and throw an error.  NOTE This differs from the
           behavior of most other operations, see SERVER-2454.
          */
-        void yieldSometimes();
+        void yieldSometimes(ClientCursor* cursor);
     };
 
 

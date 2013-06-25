@@ -130,8 +130,7 @@ namespace mongo {
         // Create the necessary context to use a Cursor, including taking a namespace read lock,
         // see SERVER-6123.
         // Note: this may throw if the sharding version for this connection is out of date.
-        shared_ptr<DocumentSourceCursor::CursorWithContext> cursorWithContext
-                ( new DocumentSourceCursor::CursorWithContext( fullName ) );
+        Client::ReadContext context(fullName);
 
         /*
           Create the cursor.
@@ -194,15 +193,30 @@ namespace mongo {
             pCursor = pUnsortedCursor;
         }
 
-        // Now add the Cursor to cursorWithContext.
-        cursorWithContext->_cursor.reset
-                ( new ClientCursor( QueryOption_NoCursorTimeout, pCursor, fullName ) );
+        // Now wrap the Cursor in ClientCursor
+        ClientCursor::Holder cursor(
+                new ClientCursor(QueryOption_NoCursorTimeout, pCursor, fullName));
+        CursorId cursorId = cursor->cursorid();
+
+        // Prepare the cursor for data to change under it when we unlock
+        if (cursor->c()->supportYields()) {
+            ClientCursor::YieldData data;
+            cursor->prepareToYield(data);
+        }
+        else {
+            massert(16915, str::stream()
+                                << "cursor " << cursor->c()->toString()
+                                << " supports neither yields nor getMore, one of which"
+                                << " must be supported in an aggregation source",
+                    cursor->c()->supportGetMore());
+
+            cursor->c()->noteLocation();
+        }
+        cursor.release(); // it is now owned by the client cursor manager
 
         /* wrap the cursor with a DocumentSource and return that */
         intrusive_ptr<DocumentSourceCursor> pSource(
-            DocumentSourceCursor::create( cursorWithContext, pExpCtx ) );
-
-        pSource->setNamespace(fullName);
+            DocumentSourceCursor::create( fullName, cursorId, pExpCtx ) );
 
         /*
           Note the query and sort

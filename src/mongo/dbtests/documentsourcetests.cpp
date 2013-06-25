@@ -109,12 +109,14 @@ namespace DocumentSourceTests {
             }
         protected:
             void createSource() {
-                boost::shared_ptr<DocumentSourceCursor::CursorWithContext> cursorWithContext
-                        ( new DocumentSourceCursor::CursorWithContext( ns ) );
+                Client::ReadContext ctx (ns);
                 boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
-                cursorWithContext->_cursor.reset
-                        ( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
-                _source = DocumentSourceCursor::create( cursorWithContext, _ctx );
+                ClientCursor::Holder cc(
+                        new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
+                CursorId cursorId = cc->cursorid();
+                cc->c()->prepareToYield();
+                cc.release(); // it is now owned by the client cursor manager
+                _source = DocumentSourceCursor::create(ns, cursorId, _ctx);
             }
             intrusive_ptr<ExpressionContext> ctx() { return _ctx; }
             DocumentSourceCursor* source() { return _source.get(); }
@@ -128,9 +130,9 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createSource();
-                // The CursorWithContext creates a read lock.
-                ASSERT( Lock::isReadLocked() );
-                // The CursorWithContext holds a ClientCursor.
+                // The DocumentSourceCursor doesn't hold a read lock.
+                ASSERT( !Lock::isReadLocked() );
+                // The DocumentSourceCursor holds a ClientCursor.
                 assertNumClientCursors( 1 );
                 // The collection is empty, so the source produces no results.
                 ASSERT( source()->eof() );
@@ -153,12 +155,12 @@ namespace DocumentSourceTests {
             void run() {
                 client.insert( ns, BSON( "a" << 1 ) );
                 createSource();
-                // The CursorWithContext creates a read lock.
-                ASSERT( Lock::isReadLocked() );
+                // The DocumentSourceCursor doesn't hold a read lock.
+                ASSERT( !Lock::isReadLocked() );
                 // The cursor will produce a result.
                 ASSERT( !source()->eof() );
-                // The read lock is still held.
-                ASSERT( Lock::isReadLocked() );
+                // The DocumentSourceCursor doesn't hold a read lock.
+                ASSERT( !Lock::isReadLocked() );
                 // The result is as expected.
                 ASSERT_EQUALS( 1, source()->getCurrent()->getValue( "a" ).coerceToInt() );
                 // There are no more results.
@@ -173,8 +175,8 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createSource();
-                // The CursorWithContext creates a read lock.
-                ASSERT( Lock::isReadLocked() );
+                // The DocumentSourceCursor doesn't hold a read lock.
+                ASSERT( !Lock::isReadLocked() );
                 source()->dispose();
                 // Releasing the cursor releases the read lock.
                 ASSERT( !Lock::isReadLocked() );
@@ -198,8 +200,8 @@ namespace DocumentSourceTests {
                 ASSERT( source()->advance() );
                 // The result is as expected.
                 ASSERT_EQUALS( 2, source()->getCurrent()->getValue( "a" ).coerceToInt() );
-                // The source still holds the lock.
-                ASSERT( Lock::isReadLocked() );
+                // The DocumentSourceCursor doesn't hold a read lock.
+                ASSERT( !Lock::isReadLocked() );
                 source()->dispose();
                 // Disposing of the source releases the lock.
                 ASSERT( !Lock::isReadLocked() );
@@ -310,8 +312,8 @@ namespace DocumentSourceTests {
                 client.insert( ns, BSON( "a" << 1 ) );
                 client.insert( ns, BSON( "a" << 2 ) );
                 createSource();
-                // The source holds a read lock.
-                ASSERT( Lock::isReadLocked() );
+                // The DocumentSourceCursor doesn't hold a read lock.
+                ASSERT( !Lock::isReadLocked() );
                 createLimit( 1 );
                 limit()->setSource( source() );
                 // The limit is not exhauted.
