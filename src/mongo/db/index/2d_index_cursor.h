@@ -68,7 +68,6 @@ namespace mongo {
         virtual Status savePosition();
         virtual Status restorePosition();
 
-        virtual void aboutToDeleteBucket(const DiskLoc& bucket);
         virtual void explainDetails(BSONObjBuilder* b);
 
     private:

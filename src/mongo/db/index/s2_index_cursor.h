@@ -59,8 +59,6 @@ namespace mongo {
         virtual Status savePosition();
         virtual Status restorePosition();
 
-        virtual void aboutToDeleteBucket(const DiskLoc& bucket);
-
     private:
         S2IndexingParams _params;
         IndexDescriptor *_descriptor;

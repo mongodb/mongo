@@ -1968,7 +1968,6 @@ namespace mongo {
         _underlyingCursor->checkLocation();
         return Status::OK();
     }
-    void TwoDIndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) { }
     void TwoDIndexCursor::explainDetails(BSONObjBuilder* b) {
         _underlyingCursor->explainDetails(*b);
     }

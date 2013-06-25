@@ -134,10 +134,6 @@ namespace mongo {
             }
         }
 
-        virtual void aboutToDeleteBucket(const DiskLoc& b) {
-            _indexCursor->aboutToDeleteBucket(b);
-        }
-
     private:
         EmulatedCursor(IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod,
                        const BSONObj& order, int numWanted, const BSONObj& keyPattern)

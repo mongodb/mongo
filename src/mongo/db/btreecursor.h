@@ -137,9 +137,6 @@ namespace mongo {
         virtual const DiskLoc getBucket() const;
         // XXX(hk): geo uses this too.  :(
         virtual int getKeyOfs() const;
-        // XXX(hk): deletions go through a lengthy, scary path (btree.cpp -> clientcursor.cpp ->
-        // cursor.cpp -> btreecursor.cpp) and this is part of it...for now.
-        virtual void aboutToDeleteBucket(const DiskLoc& b);
 
     private:
         BtreeCursor( NamespaceDetails* nsd, int theIndexNo, const IndexDetails& idxDetails );

@@ -29,18 +29,18 @@ namespace mongo {
 
     class BtreeIndexCursor : public IndexCursor {
     public:
-        virtual ~BtreeIndexCursor() { }
+        virtual ~BtreeIndexCursor();
 
         bool isEOF() const;
 
-        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
+        // See nasty comment in .cpp
         virtual DiskLoc getBucket() const;
-
-        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
         virtual int getKeyOfs() const;
 
-        // XXX SHORT TERM HACKS THAT MUST DIE: btree deletion
-        virtual void aboutToDeleteBucket(const DiskLoc& bucket);
+        /**
+         * Called from btree.cpp when we're about to delete a Btree bucket.
+         */
+        static void aboutToDeleteBucket(const DiskLoc& bucket);
 
         virtual Status setOptions(const CursorOptions& options);
 
@@ -67,6 +67,10 @@ namespace mongo {
     private:
         // We keep the constructor private and only allow the AM to create us.
         friend class BtreeAccessMethod;
+
+        // For handling bucket deletion.
+        static unordered_set<BtreeIndexCursor*> _activeCursors;
+        static SimpleMutex _activeCursorsMutex;
 
         // Go forward by default.
         BtreeIndexCursor(IndexDescriptor *descriptor, Ordering ordering, BtreeInterface *interface);

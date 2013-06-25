@@ -23,6 +23,9 @@
 
 namespace mongo {
 
+    unordered_set<IntervalBtreeCursor*> IntervalBtreeCursor::_activeCursors;
+    SimpleMutex IntervalBtreeCursor::_activeCursorsMutex("active_interval_btree_cursors");
+
     /**
      * Advance 'loc' until it does not reference an unused key, or the end of the btree is reached.
      */
@@ -77,6 +80,26 @@ namespace mongo {
         _currRecoverable( _indexDetails, _ordering, _curr ),
         _nscanned(),
         _multikeyFlag() {
+
+        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
+        _activeCursors.insert(this);
+    }
+
+    IntervalBtreeCursor::~IntervalBtreeCursor() {
+        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
+        _activeCursors.erase(this);
+    }
+
+    void IntervalBtreeCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
+        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
+        for (unordered_set<IntervalBtreeCursor*>::iterator i = _activeCursors.begin();
+             i != _activeCursors.end(); ++i) {
+
+            IntervalBtreeCursor* ic = *i;
+            if (bucket == ic->_curr.bucket) {
+                ic->_currRecoverable.invalidateInitialLocation();
+            }
+        }
     }
 
     void IntervalBtreeCursor::init() {
@@ -128,11 +151,6 @@ namespace mongo {
         return _curr.bucket.btree<V1>()->keyNode( _curr.pos ).key.toBson();
     }
 
-    void IntervalBtreeCursor::aboutToDeleteBucket( const DiskLoc& b ) {
-        if ( b == _curr.bucket ) {
-            _currRecoverable.invalidateInitialLocation();
-        }
-    }
 
     void IntervalBtreeCursor::noteLocation() {
         _currRecoverable = LogicalBtreePosition( _indexDetails, _ordering, _curr );

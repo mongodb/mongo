@@ -48,8 +48,6 @@ namespace mongo {
 
         virtual Status newCursor(IndexCursor** out);
 
-        // TODO(hk): Keep bucket deletion internal to this class.
-
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 

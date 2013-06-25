@@ -139,10 +139,6 @@ namespace mongo {
         return _indexCursor->getKeyOfs();
     }
 
-    void BtreeCursor::aboutToDeleteBucket(const DiskLoc& b) {
-        _indexCursor->aboutToDeleteBucket(b);
-    }
-
     BSONObj BtreeCursor::currKey() const { 
         return _indexCursor->getKey();
     }

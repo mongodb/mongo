@@ -96,10 +96,6 @@ namespace mongo {
     BSONObj S2SimpleCursor::getKey() const { return _btreeCursor->currKey(); }
     DiskLoc S2SimpleCursor::getValue() const { return _btreeCursor->currLoc(); }
 
-    void S2SimpleCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
-        _btreeCursor->aboutToDeleteBucket(bucket);
-    }
-
     void S2SimpleCursor::next() {
         for (; _btreeCursor->ok(); _btreeCursor->advance()) {
             ++_nscanned;

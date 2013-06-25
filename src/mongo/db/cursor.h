@@ -108,8 +108,6 @@ namespace mongo {
             return false;
         }
 
-        virtual void aboutToDeleteBucket(const DiskLoc& b) { }
-
         /* optional to implement.  if implemented, means 'this' is a prototype */
         virtual Cursor* clone() {
             return 0;

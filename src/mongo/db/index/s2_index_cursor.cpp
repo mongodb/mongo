@@ -115,8 +115,4 @@ namespace mongo {
     Status S2IndexCursor::savePosition() { return _underlyingCursor->savePosition(); }
     Status S2IndexCursor::restorePosition() { return _underlyingCursor->restorePosition(); }
 
-    void S2IndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
-        _underlyingCursor->aboutToDeleteBucket(bucket);
-    }
-
 }  // namespace mongo

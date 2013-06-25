@@ -73,7 +73,7 @@ namespace mongo {
 
         virtual DiskLoc refLoc() { return currLoc(); }
 
-        virtual void aboutToDeleteBucket( const DiskLoc& b );
+        static void aboutToDeleteBucket( const DiskLoc& b );
 
         virtual BSONObj indexKeyPattern() { return _indexDetails.keyPattern(); }
 
@@ -101,6 +101,8 @@ namespace mongo {
 
         virtual void setMatcher( shared_ptr<CoveredIndexMatcher> matcher ) { _matcher = matcher; }
 
+        virtual ~IntervalBtreeCursor();
+
     private:
         IntervalBtreeCursor( NamespaceDetails* namespaceDetails,
                              const IndexDetails& indexDetails,
@@ -108,6 +110,10 @@ namespace mongo {
                              bool lowerBoundInclusive,
                              const BSONObj& upperBound,
                              bool upperBoundInclusive );
+
+        // For handling bucket deletion.
+        static unordered_set<IntervalBtreeCursor*> _activeCursors;
+        static SimpleMutex _activeCursorsMutex;
 
         void init();
 
