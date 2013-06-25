@@ -234,17 +234,18 @@ namespace {
     Privilege AuthorizationSession::_modifyPrivilegeForSpecialCases(const Privilege& privilege) {
         ActionSet newActions;
         newActions.addAllActionsFromSet(privilege.getActions());
-        std::string collectionName = NamespaceString(privilege.getResource()).coll;
-        if (collectionName == "system.users") {
+        NamespaceString ns( privilege.getResource() );
+
+        if (ns.coll() == "system.users") {
             newActions.removeAction(ActionType::find);
             newActions.removeAction(ActionType::insert);
             newActions.removeAction(ActionType::update);
             newActions.removeAction(ActionType::remove);
             newActions.addAction(ActionType::userAdmin);
-        } else if (collectionName == "system.profile") {
+        } else if (ns.coll() == "system.profile") {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::profileRead);
-        } else if (collectionName == "system.indexes" && newActions.contains(ActionType::find)) {
+        } else if (ns.coll() == "system.indexes" && newActions.contains(ActionType::find)) {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::indexRead);
         }

@@ -1867,7 +1867,7 @@ namespace mongo {
         // this function with any other collection name.
         uassert(16618,
                 "Illegal attempt to run a command against a namespace other than $cmd.",
-                NamespaceString(ns).coll == "$cmd");
+                nsToCollectionSubstring(ns) == "$cmd");
 
         BSONElement e = jsobj.firstElement();
         std::string commandName = e.fieldName();

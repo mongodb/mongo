@@ -21,16 +21,50 @@
 
 namespace mongo {
 
+    TEST( NamespaceStringTest, Normal ) {
+        ASSERT( NamespaceString::normal( "a" ) );
+        ASSERT( NamespaceString::normal( "a.b" ) );
+        ASSERT( NamespaceString::normal( "a.b.c" ) );
+
+        ASSERT( !NamespaceString::normal( "a.b.$c" ) );
+        ASSERT( !NamespaceString::normal( "a.b.$.c" ) );
+
+        ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
+        ASSERT( NamespaceString::normal( "local.oplog.rs" ) );
+    }
+
+    TEST( NamespaceStringTest, Oplog ) {
+        ASSERT( !NamespaceString::oplog( "a" ) );
+        ASSERT( !NamespaceString::oplog( "a.b" ) );
+
+        ASSERT( NamespaceString::oplog( "local.oplog.rs" ) );
+        ASSERT( !NamespaceString::oplog( "local.oplog.foo" ) );
+        ASSERT( NamespaceString::oplog( "local.oplog.$main" ) );
+        ASSERT( !NamespaceString::oplog( "local.oplog.$foo" ) );
+    }
+
+    TEST( NamespaceStringTest, Special ) {
+        ASSERT( NamespaceString::special( "a.$.b" ) );
+        ASSERT( NamespaceString::special( "a.system.foo" ) );
+        ASSERT( !NamespaceString::special( "a.foo" ) );
+    }
 
     TEST( NamespaceStringTest, DatabaseValidNames ) {
         ASSERT( NamespaceString::validDBName( "foo" ) );
         ASSERT( !NamespaceString::validDBName( "foo/bar" ) );
         ASSERT( !NamespaceString::validDBName( "foo bar" ) );
         ASSERT( !NamespaceString::validDBName( "foo.bar" ) );
-        
+
         ASSERT( NamespaceString::normal( "asdads" ) );
         ASSERT( !NamespaceString::normal( "asda$ds" ) );
         ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
+    }
+
+    TEST( NamespaceStringTest, CollectionValidNames ) {
+        ASSERT( NamespaceString::validCollectionName( "a.b" ) );
+        ASSERT( NamespaceString::validCollectionName( "a.b" ) );
+        ASSERT( !NamespaceString::validCollectionName( "a." ) );
+        ASSERT( NamespaceString::validCollectionName( "a.b." ) ); // TODO: should this change?
     }
 
     TEST( NamespaceStringTest, DBHash ) {
@@ -41,7 +75,7 @@ namespace mongo {
         ASSERT_EQUALS( nsDBHash( "" ), nsDBHash( "" ) );
         ASSERT_EQUALS( nsDBHash( "" ), nsDBHash( ".a" ) );
         ASSERT_EQUALS( nsDBHash( "" ), nsDBHash( "." ) );
-        
+
         ASSERT_NOT_EQUALS( nsDBHash( "foo" ), nsDBHash( "food" ) );
         ASSERT_NOT_EQUALS( nsDBHash( "foo." ), nsDBHash( "food" ) );
         ASSERT_NOT_EQUALS( nsDBHash( "foo.d" ), nsDBHash( "food" ) );
@@ -98,5 +132,30 @@ namespace mongo {
 
 
     }
+
+    TEST( NamespaceStringTest, NamespaceStringParse1 ) {
+        NamespaceString ns( "a.b" );
+        ASSERT_EQUALS( (string)"a", ns.db() );
+        ASSERT_EQUALS( (string)"b", ns.coll() );
+    }
+
+    TEST( NamespaceStringTest, NamespaceStringParse2 ) {
+        NamespaceString ns( "a.b.c" );
+        ASSERT_EQUALS( (string)"a", ns.db() );
+        ASSERT_EQUALS( (string)"b.c", ns.coll() );
+    }
+
+    TEST( NamespaceStringTest, NamespaceStringParse3 ) {
+        NamespaceString ns( "abc" );
+        ASSERT_EQUALS( (string)"", ns.db() );
+        ASSERT_EQUALS( (string)"", ns.coll() );
+    }
+
+    TEST( NamespaceStringTest, NamespaceStringParse4 ) {
+        NamespaceString ns( "abc." );
+        ASSERT_EQUALS( (string)"abc", ns.db() );
+        ASSERT_EQUALS( (string)"", ns.coll() );
+    }
+
 }
 

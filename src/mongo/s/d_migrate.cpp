@@ -1463,7 +1463,7 @@ namespace mongo {
                 Client::WriteContext ctx( ns );
                 // Only copy if ns doesn't already exist
                 if ( ! nsdetails( ns ) ) {
-                    string system_namespaces = NamespaceString( ns ).db + ".system.namespaces";
+                    string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
                     if ( entry["options"].isABSONObj() ) {
                         string errmsg;

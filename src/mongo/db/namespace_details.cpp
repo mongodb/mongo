@@ -850,7 +850,7 @@ namespace mongo {
     void NamespaceDetails::syncUserFlags( const string& ns ) {
         Lock::assertWriteLocked( ns );
         
-        string system_namespaces = NamespaceString( ns ).db + ".system.namespaces";
+        string system_namespaces = nsToDatabaseSubstring(ns).toString() + ".system.namespaces";
 
         BSONObj oldEntry;
         verify( Helpers::findOne( system_namespaces , BSON( "name" << ns ) , oldEntry ) );

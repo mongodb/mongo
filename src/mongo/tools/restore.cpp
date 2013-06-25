@@ -360,8 +360,8 @@ public:
         }
 
         _curns = ns.c_str();
-        _curdb = NamespaceString(_curns).db;
-        _curcoll = NamespaceString(_curns).coll;
+        _curdb = nsToDatabase(_curns);
+        _curcoll = nsToCollectionSubstring(_curns).toString();
 
         // If drop is not used, warn if the collection exists.
          if (!_drop) {
@@ -425,16 +425,19 @@ public:
                 }
             }
         }
-        else if (NamespaceString(_curns).coll == "system.indexes") {
+        else if (nsToCollectionSubstring(_curns) == "system.indexes") {
             createIndex(obj, true);
         }
-        else if (_drop && endsWith(_curns.c_str(), ".system.users") && _users.count(obj["user"].String())) {
+        else if (_drop &&
+                 nsToCollectionSubstring(_curns) == ".system.users" &&
+                 _users.count(obj["user"].String())) {
             // Since system collections can't be dropped, we have to manually
             // replace the contents of the system.users collection
             BSONObj userMatch = BSON("user" << obj["user"].String());
             conn().update(_curns, Query(userMatch), obj);
             _users.erase(obj["user"].String());
-        } else {
+        }
+        else {
             conn().insert( _curns , obj );
 
             // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
@@ -546,7 +549,7 @@ private:
             BSONElement e = i.next();
             if (strcmp(e.fieldName(), "ns") == 0) {
                 NamespaceString n(e.String());
-                string s = _curdb + "." + (keepCollName ? n.coll : _curcoll);
+                string s = _curdb + "." + (keepCollName ? n.coll().toString() : _curcoll);
                 bo.append("ns", s);
             }
             else if (strcmp(e.fieldName(), "v") != 0 || _keepIndexVersion) { // Remove index version number

@@ -49,12 +49,14 @@ namespace mongo {
                                                            false);
     }
 
-    string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const { 
+    string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const {
         string s = cmdObj.firstElement().valuestr();
         NamespaceString nss(s);
         // these are for security, do not remove:
-        massert(15962, "need to specify namespace" , !nss.db.empty() );
-        massert(15966, str::stream() << "dbname not ok in Command::parseNsFullyQualified: " << dbname , dbname == nss.db || dbname == "admin" );
+        massert(15962, "need to specify namespace" , !nss.db().empty() );
+        massert(15966,
+                str::stream() << "dbname not ok in Command::parseNsFullyQualified: "
+                << dbname , dbname == nss.db() || dbname == "admin" );
         return s;
     }
 

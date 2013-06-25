@@ -357,7 +357,7 @@ namespace mongo {
                     // is of the form "db.collection".  Therefore, the following expression must
                     // always be valid.  "system.users" updates must never be done in place, in
                     // order to ensure that they are validated inside DataFileMgr::updateRecord(.).
-                    bool isSystemUsersMod = (NamespaceString(ns).coll == "system.users");
+                    bool isSystemUsersMod = nsToCollectionSubstring(ns) == "system.users";
 
                     BSONObj newObj;
                     if ( !mss->isUpdateIndexed() && mss->canApplyInPlace() && !isSystemUsersMod ) {

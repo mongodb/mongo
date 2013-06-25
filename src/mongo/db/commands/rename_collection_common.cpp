@@ -35,7 +35,7 @@ namespace rename_collection {
         ActionSet sourceActions;
         ActionSet targetActions;
 
-        if (sourceNS.db == targetNS.db) {
+        if (sourceNS.db() == targetNS.db()) {
             sourceActions.addAction(ActionType::renameCollectionSameDB);
             targetActions.addAction(ActionType::renameCollectionSameDB);
         } else {

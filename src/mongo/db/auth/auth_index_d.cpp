@@ -50,9 +50,10 @@ namespace {
         std::string systemUsers = dbname.toString() + ".system.users";
         Client::WriteContext wctx(systemUsers);
 
-        createSystemIndexes(systemUsers);
+        NamespaceString systemUsersNS( systemUsers );
+        createSystemIndexes(systemUsersNS);
 
-        NamespaceDetails* nsd = nsdetails(systemUsers.c_str());
+        NamespaceDetails* nsd = nsdetails(systemUsers);
         if (nsd == NULL)
             return;
 
@@ -90,7 +91,7 @@ namespace {
     }
 
     void createSystemIndexes(const NamespaceString& ns) {
-        if (ns.coll == "system.users") {
+        if (ns.coll() == "system.users") {
             try {
                 Helpers::ensureIndex(ns.ns().c_str(),
                                      extendedSystemUsersKeyPattern,

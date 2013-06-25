@@ -347,7 +347,7 @@ namespace mongo {
             // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
             // rejecting an index insert after inserting the main record.
             !NamespaceString::special( ns ) &&
-            NamespaceString( ns ).db != "local";
+            nsToDatabaseSubstring( ns ) != "local";
     }
     
     MongoDataFile* Database::suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota ) {

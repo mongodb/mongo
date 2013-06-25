@@ -515,7 +515,7 @@ namespace mongo {
 
         oplogCheckCloseDatabase( database ); // oplog caches some things, dirty its caches
 
-        if( BackgroundOperation::inProgForDb(db.c_str()) ) {
+        if( BackgroundOperation::inProgForDb(db) ) {
             log() << "warning: bg op in prog during close db? " << db << endl;
         }
 
@@ -808,7 +808,7 @@ namespace mongo {
         const char *ns = d.getns();
         op.debug().ns = ns;
 
-        bool isIndexWrite = NamespaceString(ns).coll == "system.indexes";
+        bool isIndexWrite = nsToCollectionSubstring(ns) == "system.indexes";
 
         // Auth checking for index writes happens further down in this function.
         if (!isIndexWrite) {

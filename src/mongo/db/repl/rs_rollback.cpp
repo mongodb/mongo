@@ -144,19 +144,19 @@ namespace mongo {
                     /* Create collection operation
                        { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
                     */
-                    string ns = s.db + '.' + o["create"].String(); // -> foo.abc
+                    string ns = s.db().toString() + '.' + o["create"].String(); // -> foo.abc
                     h.toDrop.insert(ns);
                     return;
                 }
                 else if( cmdname == "drop" ) {
-                    string ns = s.db + '.' + first.valuestr();
+                    string ns = s.db().toString() + '.' + first.valuestr();
                     h.collectionsToResync.insert(ns);
                     return;
                 }
                 else if( cmdname == "dropIndexes" || cmdname == "deleteIndexes" ) {
                     /* TODO: this is bad.  we simply full resync the collection here, which could be very slow. */
                     log() << "replSet info rollback of dropIndexes is slow in this version of mongod" << rsLog;
-                    string ns = s.db + '.' + first.valuestr();
+                    string ns = s.db().toString() + '.' + first.valuestr();
                     h.collectionsToResync.insert(ns);
                     return;
                 }

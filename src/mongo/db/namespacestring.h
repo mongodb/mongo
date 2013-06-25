@@ -20,6 +20,7 @@
 
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -36,86 +37,60 @@ namespace mongo {
     */
     class NamespaceString {
     public:
-        string db;
-        string coll; // note collection names can have periods in them for organizing purposes (e.g. "system.indexes")
+        NamespaceString( const StringData& ns );
 
-        NamespaceString( const char * ns ) { init(ns); }
-        NamespaceString( const string& ns ) { init(ns.c_str()); }
+        StringData db() const;
+        StringData coll() const;
 
-        string ns() const { return db + '.' + coll; }
+        const string& ns() const { return _ns; }
 
-        bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
-        bool isCommand() const { return coll == "$cmd"; }
+        operator string() const { return _ns; }
+        string toString() const { return _ns; }
+
+        size_t size() const { return _ns.size(); }
+
+        bool isSystem() const { return coll().startsWith( "system." ); }
+        bool isCommand() const { return coll() == "$cmd"; }
 
         /**
          * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.
          */
-        bool isValid() const {
-            return validDBName( db ) && !coll.empty();
-        }
+        bool isValid() const { return validDBName( db() ) && !coll().empty(); }
 
-        operator string() const { return ns(); }
+        bool operator==( const string& nsIn ) const { return nsIn == _ns; }
+        bool operator==( const NamespaceString& nsIn ) const { return nsIn._ns == _ns; }
 
-        bool operator==( const string& nsIn ) const { return nsIn == ns(); }
-        bool operator==( const char* nsIn ) const { return (string)nsIn == ns(); }
-        bool operator==( const NamespaceString& nsIn ) const { return nsIn.db == db && nsIn.coll == coll; }
-
-        bool operator!=( const string& nsIn ) const { return nsIn != ns(); }
-        bool operator!=( const char* nsIn ) const { return (string)nsIn != ns(); }
-        bool operator!=( const NamespaceString& nsIn ) const { return nsIn.db != db || nsIn.coll != coll; }
-
-        size_t size() const { return ns().size(); }
-
-        string toString() const { return ns(); }
+        bool operator!=( const string& nsIn ) const { return nsIn != _ns; }
+        bool operator!=( const NamespaceString& nsIn ) const { return nsIn._ns != _ns; }
 
         /**
          * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
          * which do not contain BSON objects in their records. ("oplog.$main" is the exception)
          */
-        static bool normal(const char* ns) {
-            const char *p = strchr(ns, '$');
-            if( p == 0 )
-                return true;
-            return oplog(ns);
-        }
+        static bool normal(const StringData& ns);
 
         /**
          * @return true if the ns is an oplog one, otherwise false.
          */
-        static bool oplog(const char* ns) {
-            return StringData(ns) == StringData("local.oplog.rs") || StringData(ns) == StringData("local.oplog.$main");
-        }
+        static bool oplog(const StringData& ns);
 
-        static bool special(const char *ns) { 
-            return !normal(ns) || strstr(ns, ".system.");
-        }
+        static bool special(const StringData& ns);
 
         /**
          * samples:
-         *   good:  
-         *      foo  
+         *   good
+         *      foo
          *      bar
          *      foo-bar
          *   bad:
          *      foo bar
          *      foo.bar
          *      foo"bar
-         *        
+         *
          * @param db - a possible database name
          * @return if db is an allowed database name
          */
-        static bool validDBName( const string& db ) {
-            if ( db.size() == 0 || db.size() > 64 )
-                return false;
-#ifdef _WIN32
-            // We prohibit all FAT32-disallowed characters on Windows
-            size_t good = strcspn( db.c_str() , "/\\. \"*<>:|?" );
-#else
-            // For non-Windows platforms we are much more lenient
-            size_t good = strcspn( db.c_str() , "/\\. \"" );
-#endif
-            return good == db.size();
-        }
+        static bool validDBName( const StringData& dbin );
 
         /**
          * samples:
@@ -124,22 +99,17 @@ namespace mongo {
          *   bad:
          *      foo.
          *
-         * @param dbcoll - a possible collection name of the form db.coll
+         * @param ns - a full namesapce (a.b)
          * @return if db.coll is an allowed collection name
          */
-        static bool validCollectionName(const char* dbcoll){
-            const char *c = strchr( dbcoll, '.' );
-            return (c != NULL) && (c[1] != '\0') && normal(dbcoll);
-        }
+        static bool validCollectionName(const StringData& ns);
 
     private:
-        void init(const char *ns) {
-            const char *p = strchr(ns, '.');
-            if( p == 0 ) return;
-            db = string(ns, p - ns);
-            coll = p + 1;
-        }
+
+        string _ns;
+        size_t _dotIndex;
     };
+
 
     // "database.a.b.c" -> "database"
     inline StringData nsToDatabaseSubstring( const StringData& ns ) {
@@ -163,59 +133,28 @@ namespace mongo {
         return nsToDatabaseSubstring( ns ).toString();
     }
 
+    // "database.a.b.c" -> "database"
+    inline StringData nsToCollectionSubstring( const StringData& ns ) {
+        size_t i = ns.find( '.' );
+        massert(16886, "nsToCollectionSubstring: no .", i != string::npos );
+        return ns.substr( i + 1 );
+    }
+
+
     /**
      * NamespaceDBHash and NamespaceDBEquals allow you to do something like
      * unordered_map<string,int,NamespaceDBHash,NamespaceDBEquals>
      * and use the full namespace for the string
      * but comparisons are done only on the db piece
      */
-    
+
     /**
      * this can change, do not store on disk
      */
-    inline int nsDBHash( const string& ns ) {
-        int hash = 7;
-        for ( size_t i = 0; i < ns.size(); i++ ) {
-            if ( ns[i] == '.' )
-                break;
-            hash += 11 * ( ns[i] );
-            hash *= 3;
-        }
-        return hash;
-    }
+    int nsDBHash( const string& ns );
 
-    inline bool nsDBEquals( const string& a, const string& b ) {
-        for ( size_t i = 0; i < a.size(); i++ ) {
-            
-            if ( a[i] == '.' ) {
-                // b has to either be done or a '.'
-                
-                if ( b.size() == i )
-                    return true;
+    bool nsDBEquals( const string& a, const string& b );
 
-                if ( b[i] == '.' ) 
-                    return true;
-
-                return false;
-            }
-            
-            // a is another character
-            if ( b.size() == i )
-                return false;
-            
-            if ( b[i] != a[i] )
-                    return false;
-        }
-        
-        // a is done
-        // make sure b is done 
-        if ( b.size() == a.size() || 
-             b[a.size()] == '.' )
-            return true;
-
-        return false;
-    }
-    
     struct NamespaceDBHash {
         int operator()( const string& ns ) const {
             return nsDBHash( ns );
@@ -227,5 +166,8 @@ namespace mongo {
             return nsDBEquals( a, b );
         }
     };
-    
+
 }
+
+
+#include "mongo/db/namespacestring-inl.h"

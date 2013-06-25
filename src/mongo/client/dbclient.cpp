@@ -436,10 +436,9 @@ namespace mongo {
     }
 
     unsigned long long DBClientWithCommands::count(const string &myns, const BSONObj& query, int options, int limit, int skip ) {
-        NamespaceString ns(myns);
         BSONObj cmd = _countCmd( myns , query , options , limit , skip );
         BSONObj res;
-        if( !runCommand(ns.db.c_str(), cmd, res, options) )
+        if( !runCommand(nsToDatabase(myns), cmd, res, options) )
             uasserted(11010,string("count fails:") + res.toString());
         return res["n"].numberLong();
     }
@@ -447,7 +446,7 @@ namespace mongo {
     BSONObj DBClientWithCommands::_countCmd(const string &myns, const BSONObj& query, int options, int limit, int skip ) {
         NamespaceString ns(myns);
         BSONObjBuilder b;
-        b.append( "count" , ns.coll );
+        b.append( "count" , ns.coll() );
         b.append( "query" , query );
         if ( limit )
             b.append( "limit" , limit );
@@ -1198,7 +1197,7 @@ namespace mongo {
     void DBClientWithCommands::dropIndex( const string& ns , const string& indexName ) {
         BSONObj info;
         if ( ! runCommand( nsToDatabase( ns ) ,
-                           BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) ,
+                           BSON( "deleteIndexes" << nsToCollectionSubstring(ns) << "index" << indexName ) ,
                            info ) ) {
             LOG(_logLevel) << "dropIndex failed: " << info << endl;
             uassert( 10007 ,  "dropIndex failed" , 0 );
@@ -1208,9 +1207,12 @@ namespace mongo {
 
     void DBClientWithCommands::dropIndexes( const string& ns ) {
         BSONObj info;
-        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns ) ,
-                 BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") ,
-                 info ) );
+        uassert( 10008,
+                 "dropIndexes failed",
+                 runCommand( nsToDatabase( ns ),
+                             BSON( "deleteIndexes" << nsToCollectionSubstring(ns) << "index" << "*"),
+                             info )
+                 );
         resetIndexCache();
     }
 

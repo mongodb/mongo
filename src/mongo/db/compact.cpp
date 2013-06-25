@@ -259,7 +259,7 @@ namespace mongo {
 
         // build indexes
         NamespaceString s(ns);
-        string si = s.db + ".system.indexes";
+        string si = s.db().toString() + ".system.indexes";
         for( int i = 0; i < nidx; i++ ) {
             killCurrentOp.checkForInterrupt(false);
             BSONObj info = indexSpecs[i];

@@ -38,12 +38,8 @@ namespace mongo {
 
     MONGO_FP_DECLARE(neverBalance);
 
-    DBConfigPtr Grid::getDBConfig( string database , bool create , const string& shardNameHint ) {
-        {
-            string::size_type i = database.find( "." );
-            if ( i != string::npos )
-                database = database.substr( 0 , i );
-        }
+    DBConfigPtr Grid::getDBConfig( const StringData& ns , bool create , const string& shardNameHint ) {
+        string database = nsToDatabase( ns );
 
         if ( database == "config" )
             return configServerPtr;

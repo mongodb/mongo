@@ -140,7 +140,7 @@ namespace mongo {
 
                 BSONObj js = tmp;
                 if ( isindex ) {
-                    verify(NamespaceString(from_collection).coll == "system.indexes");
+                    verify(nsToCollectionSubstring(from_collection) == "system.indexes");
                     js = fixindex(tmp);
                     storedForLater->push_back( js.getOwned() );
                     continue;

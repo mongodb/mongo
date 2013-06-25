@@ -21,7 +21,14 @@
 
 #pragma once
 
+#include <map>
+#include <set>
+#include <string>
+#include <sstream>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -37,21 +44,21 @@ namespace mongo {
     */
     class BackgroundOperation : public boost::noncopyable {
     public:
-        static bool inProgForDb(const char *db);
-        static bool inProgForNs(const char *ns);
-        static void assertNoBgOpInProgForDb(const char *db);
-        static void assertNoBgOpInProgForNs(const char *ns);
-        static void dump(stringstream&);
+        static bool inProgForDb(const StringData& db);
+        static bool inProgForNs(const StringData& ns);
+        static void assertNoBgOpInProgForDb(const StringData& db);
+        static void assertNoBgOpInProgForNs(const StringData& ns);
+        static void dump(std::stringstream&);
 
         /* check for in progress before instantiating */
-        BackgroundOperation(const char *ns);
+        BackgroundOperation(const StringData& ns);
 
         virtual ~BackgroundOperation();
 
     private:
         NamespaceString _ns;
-        static map<string, unsigned> dbsInProg;
-        static set<string> nsInProg;
+        static std::map<std::string, unsigned> dbsInProg;
+        static std::set<std::string> nsInProg;
         static SimpleMutex m;
     };
 

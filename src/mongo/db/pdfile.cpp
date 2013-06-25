@@ -111,55 +111,6 @@ namespace mongo {
         }
     };
 
-    SimpleMutex BackgroundOperation::m("bg");
-    map<string, unsigned> BackgroundOperation::dbsInProg;
-    set<string> BackgroundOperation::nsInProg;
-
-    bool BackgroundOperation::inProgForDb(const char *db) {
-        SimpleMutex::scoped_lock lk(m);
-        return dbsInProg[db] != 0;
-    }
-
-    bool BackgroundOperation::inProgForNs(const char *ns) {
-        SimpleMutex::scoped_lock lk(m);
-        return nsInProg.count(ns) != 0;
-    }
-
-    void BackgroundOperation::assertNoBgOpInProgForDb(const char *db) {
-        uassert(12586, "cannot perform operation: a background operation is currently running for this database",
-                !inProgForDb(db));
-    }
-
-    void BackgroundOperation::assertNoBgOpInProgForNs(const char *ns) {
-        uassert(12587, "cannot perform operation: a background operation is currently running for this collection",
-                !inProgForNs(ns));
-    }
-
-    BackgroundOperation::BackgroundOperation(const char *ns) : _ns(ns) {
-        SimpleMutex::scoped_lock lk(m);
-        dbsInProg[_ns.db]++;
-        nsInProg.insert(_ns.ns());
-    }
-
-    BackgroundOperation::~BackgroundOperation() {
-        SimpleMutex::scoped_lock lk(m);
-        dbsInProg[_ns.db]--;
-        nsInProg.erase(_ns.ns());
-    }
-
-    void BackgroundOperation::dump(stringstream& ss) {
-        SimpleMutex::scoped_lock lk(m);
-        if( nsInProg.size() ) {
-            ss << "\n<b>Background Jobs in Progress</b>\n";
-            for( set<string>::iterator i = nsInProg.begin(); i != nsInProg.end(); i++ )
-                ss << "  " << *i << '\n';
-        }
-        for( map<string,unsigned>::iterator i = dbsInProg.begin(); i != dbsInProg.end(); i++ ) {
-            if( i->second )
-                ss << "database " << i->first << ": " << i->second << '\n';
-        }
-    }
-
     /* ----------------------------------------- */
 #ifdef _WIN32
     string dbpath = "\\data\\db\\";
@@ -190,7 +141,7 @@ namespace mongo {
 
     static void _ensureSystemIndexes(const char* ns) {
         NamespaceString nsstring(ns);
-        if (StringData(nsstring.coll).substr(0, 7) == "system.") {
+        if ( nsstring.coll().startsWith( "system." ) ) {
             authindex::createSystemIndexes(nsstring);
         }
     }
@@ -990,9 +941,9 @@ namespace mongo {
         BackgroundOperation::assertNoBgOpInProgForNs(nsToDrop.c_str());
 
         NamespaceString s(nsToDrop);
-        verify( s.db == cc().database()->name() );
+        verify( s.db() == cc().database()->name() );
         if( s.isSystem() ) {
-            if( s.coll == "system.profile" ) {
+            if( s.coll() == "system.profile" ) {
                 uassert( 10087,
                          "turn off profiling before dropping system.profile collection",
                          cc().database()->getProfilingLevel() == 0 );
@@ -1082,7 +1033,7 @@ namespace mongo {
         {
             d->incrementStats( -1 * todelete->netLength(), -1 );
 
-            if (NamespaceString(ns).coll ==  "system.indexes") {
+            if ( nsToCollectionSubstring(ns) == "system.indexes") {
                 /* temp: if in system.indexes, don't reuse, and zero out: we want to be
                    careful until validated more, as IndexDetails has pointers
                    to this disk location.  so an incorrectly done remove would cause
@@ -1168,9 +1119,8 @@ namespace mongo {
         }
 
         NamespaceString nsstring(ns);
-        if (nsstring.coll == "system.users") {
-            uassertStatusOK(getGlobalAuthorizationManager()->checkValidPrivilegeDocument(
-                    nsstring.db, objNew));
+        if (nsstring.coll() == "system.users") {
+            uassertStatusOK(getGlobalAuthorizationManager()->checkValidPrivilegeDocument(nsstring.db(), objNew));
         }
 
         uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew,
@@ -1404,7 +1354,7 @@ namespace mongo {
         uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
         if ( strstr(ns, ".system.") ) {
             // later:check for dba-type permissions here if have that at some point separate
-            if (NamespaceString(ns).coll == "system.indexes")
+            if (nsToCollectionSubstring(ns) == "system.indexes")
                 wouldAddIndex = true;
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
@@ -1449,7 +1399,7 @@ namespace mongo {
                                         bool mayInterrupt) {
         uassert(13143,
                 "can't create index on system.indexes",
-                NamespaceString(tabletoidxns).coll != "system.indexes");
+                nsToCollectionSubstring(tabletoidxns) != "system.indexes");
 
         BSONObj info = loc.obj();
         std::string idxName = info["name"].valuestr();
@@ -2051,7 +2001,7 @@ namespace mongo {
             string name = *i;
             LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
             Client::Context ctx( name , path );
-            if( !force && BackgroundOperation::inProgForDb(name.c_str()) ) {
+            if( !force && BackgroundOperation::inProgForDb(name) ) {
                 log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;
                 nNotClosed++;
             }
