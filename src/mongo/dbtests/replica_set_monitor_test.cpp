@@ -1680,7 +1680,9 @@ namespace mongo_test {
         boost::scoped_ptr<MockReplicaSet> _replSet;
     };
 
-    // Tests the node selection retry logic when the connection went bad.
+    // Tests the case where the connection to secondary went bad and the replica set
+    // monitor needs to perform a refresh of it's local view then retry the node selection
+    // again after the refresh.
     TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
         MockReplicaSet* replSet = getReplSet();
 
@@ -1705,7 +1707,9 @@ namespace mongo_test {
         ASSERT_EQUALS(secHost, node.toString(true));
     }
 
-    // Tests the node selection retry logic with tags when the connection went bad.
+    // Tests the case where the connection to secondary went bad and the replica set
+    // monitor needs to perform a refresh of it's local view then retry the node selection
+    // with tags again after the refresh.
     TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
         MockReplicaSet* replSet = getReplSet();
 
