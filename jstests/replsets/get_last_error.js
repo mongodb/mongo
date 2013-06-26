@@ -41,7 +41,7 @@ printjson(gle);
 assert.eq(gle.err, "timeout");
 assert.eq(gle.writtenTo.length, 2);
 assert.eq(gle.wtime, null);
-assert.eq(gle.waited, 100);
+assert.gte(gle.waited, 100);
 assert.eq(gle.wtimeout, true);
 
 gle = mdb.getLastErrorObj("majority", 100);
