@@ -198,9 +198,10 @@ namespace mongo {
                     // the cursor, but make the exception more informative
                     //
 
-                    uasserted( 16336,
-                               str::stream() << "could not find cursor in cache for id " << id
-                                             << " over collection " << ns );
+                    LOG(6) << "could not find cursor in cache for id " << id
+                           << " over collection " << ns << endl;
+                    replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
+                    return;
                 }
 
                 // we used ScopedDbConnection because we don't get about config versions
