@@ -28,8 +28,8 @@ assert.eq(gle.wtimeout, null);
 
 // Await replication to ensure this will succeed
 replTest.awaitReplication();
-gle = mdb.getLastErrorObj(2, 5);
-print('Trying w=2, 5ms timeout.');
+gle = mdb.getLastErrorObj(2, 500);
+print('Trying w=2, 500ms timeout.');
 printjson(gle);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
