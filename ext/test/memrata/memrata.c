@@ -1785,8 +1785,6 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	    wtds, session, uri, NULL, ks->kvs_device));
 	ETRET(ws_source_drop_namespace(
 	    wtds, session, uri, "cache", ks->kvs_device));
-	ETRET(ws_source_drop_namespace(
-	    wtds, session, uri, "txn", ks->kvs_device));
 
 	/* Push the change. */
 	if ((ret = kvs_commit(ks->kvs_device)) != 0)
@@ -1849,8 +1847,6 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	    wtds, session, uri, newuri, NULL, ks->kvs_device));
 	ETRET(ws_source_rename_namespace(
 	    wtds, session, uri, newuri, "cache", ks->kvs_device));
-	ETRET(ws_source_rename_namespace(
-	    wtds, session, uri, newuri, "txn", ks->kvs_device));
 
 	/* Push the change. */
 	if ((ret = kvs_commit(ws->kvs)) != 0)
