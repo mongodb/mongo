@@ -5,8 +5,13 @@ var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getMaster();
 var mdb = master.getDB("test");
-mdb.foo.insert({ _id: "1" });
 
+// synchronize replication
+mdb.foo.insert({ _id: "1" });
+replTest.awaitReplication();
+
+// do a second write to do gle tests on
+mdb.foo.insert({ _id: "2" });
 var gle = master.getDB("test").runCommand({getLastError : 1, j : true, wtimeout : 60000});
 
 print('Trying j=true, 60000ms timeout');
@@ -26,8 +31,6 @@ assert.eq(gle.wtime, null);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
-// Await replication to ensure this will succeed
-replTest.awaitReplication();
 gle = mdb.getLastErrorObj(2, 500);
 print('Trying w=2, 500ms timeout.');
 printjson(gle);
