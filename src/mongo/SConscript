@@ -457,6 +457,9 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/prefetch.cpp",
                     "db/repl/write_concern.cpp",
                     "db/btreecursor.cpp",
+                    "db/exec/index_scan.cpp",
+                    "db/exec/stagedebug_cmd.cpp",
+                    "db/exec/working_set_common.cpp",
                     "db/index_legacy.cpp",
                     "db/index_selection.cpp",
                     "db/index/2d_access_method.cpp",
@@ -643,6 +646,10 @@ serverOnlyFiles += [ "s/d_logic.cpp",
 
 env.StaticLibrary("defaultversion", "s/default_version.cpp")
 
+env.StaticLibrary("working_set", [ "db/exec/working_set.cpp", ],
+                  LIBDEPS = [ "bson",])
+env.CppUnitTest("working_set_test", [ "db/exec/working_set_test.cpp" ], LIBDEPS = ["working_set"])
+
 env.StaticLibrary("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], LIBDEPS = [ "bson" ])
 env.StaticLibrary("geoparser", [ "db/geo/geoparser.cpp", ],
                   LIBDEPS = [ "bson",
@@ -690,7 +697,9 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "index_set",
                            'range_deleter',
                            's/metadata',
+                           "working_set",
                            '$BUILD_DIR/third_party/shim_snappy'])
+
 
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [

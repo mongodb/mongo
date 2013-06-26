@@ -19,9 +19,12 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/matcher/path.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 
@@ -48,7 +51,6 @@ namespace mongo {
 
         BSONObj _pattern;
         BSONObj _doc;
-
     };
 
     ElementIterator* IndexKeyMatchableDocument::getIterator( const ElementPath& path ) const {
@@ -77,6 +79,59 @@ namespace mongo {
     }
 
 
+    class WorkingSetMatchableDocument : public MatchableDocument {
+    public:
+        WorkingSetMatchableDocument(WorkingSetMember* wsm) : _wsm(wsm) { }
+        virtual ~WorkingSetMatchableDocument() { }
+
+        // This is only called by a $where query.  The query system must be smart enough to realize
+        // that it should do a fetch beforehand.
+        BSONObj toBSON() const {
+            verify(_wsm->hasObj());
+            return _wsm->obj;
+        }
+
+        virtual ElementIterator* getIterator(const ElementPath& path) const {
+            // BSONElementIterator does some interesting things with arrays that I don't think
+            // SimpleArrayElementIterator does.
+            if (_wsm->hasObj()) {
+                return new BSONElementIterator(path, _wsm->obj);
+            }
+
+            // NOTE: This (kind of) duplicates code in WorkingSetMember::getFieldDotted.
+            // Keep in sync w/that.
+            // Find the first field in the index key data described by path and return an iterator
+            // over it.
+            for (size_t i = 0; i < _wsm->keyData.size(); ++i) {
+                BSONObjIterator keyPatternIt(_wsm->keyData[i].indexKeyPattern);
+                BSONObjIterator keyDataIt(_wsm->keyData[i].keyData);
+
+                while (keyPatternIt.more()) {
+                    BSONElement keyPatternElt = keyPatternIt.next();
+                    verify(keyDataIt.more());
+                    BSONElement keyDataElt = keyDataIt.next();
+
+                    if (path.fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
+                        if (Array == keyDataElt.type()) {
+                            return new SimpleArrayElementIterator(keyDataElt, true);
+                        }
+                        else {
+                            return new SingleElementElementIterator(keyDataElt);
+                        }
+                    }
+                }
+            }
+
+            // This is bad.
+            verify(0);
+
+            return new SingleElementElementIterator(BSONElement());
+        }
+
+    private:
+        WorkingSetMember* _wsm;
+    };
+
     // -----------------
 
     Matcher2::Matcher2( const BSONObj& pattern, bool nested )
@@ -99,6 +154,12 @@ namespace mongo {
         if ( indexExpression ) {
             _expression.reset( indexExpression );
         }
+    }
+
+    bool Matcher2::matches(WorkingSetMember* wsm, MatchDetails* details) const {
+        if (!_expression) { return true; }
+        WorkingSetMatchableDocument doc(wsm);
+        return _expression->matches(&doc, details);
     }
 
     bool Matcher2::matches(const BSONObj& doc, MatchDetails* details ) const {
