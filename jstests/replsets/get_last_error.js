@@ -6,9 +6,9 @@ replTest.initiate();
 var master = replTest.getMaster();
 var mdb = master.getDB("test");
 mdb.foo.insert({ _id: "1" });
-replTest.awaitReplication();
 
 var gle = master.getDB("test").runCommand({getLastError : 1, j : true, wtimeout : 60000});
+
 print('Trying j=true, 60000ms timeout');
 printjson(gle);
 assert.eq(gle.err, null);
@@ -26,8 +26,10 @@ assert.eq(gle.wtime, null);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
-gle = mdb.getLastErrorObj(2, 100);
-print('Trying w=2, 100ms timeout.');
+// Await replication to ensure this will succeed
+replTest.awaitReplication();
+gle = mdb.getLastErrorObj(2, 5);
+print('Trying w=2, 5ms timeout.');
 printjson(gle);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
@@ -35,17 +37,18 @@ assert.gte(gle.wtime, 0);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
-gle = mdb.getLastErrorObj(3, 100);
-print('Trying w=3, 100ms timeout.  Should timeout.');
+// only two members in the set, this must fail fast
+gle = mdb.getLastErrorObj(3, 5);
+print('Trying w=3, 5ms timeout.  Should timeout.');
 printjson(gle);
 assert.eq(gle.err, "timeout");
 assert.eq(gle.writtenTo.length, 2);
 assert.eq(gle.wtime, null);
-assert.gte(gle.waited, 100);
+assert.gte(gle.waited, 5);
 assert.eq(gle.wtimeout, true);
 
-gle = mdb.getLastErrorObj("majority", 100);
-print('Trying w=majority, 100ms timeout.');
+gle = mdb.getLastErrorObj("majority", 5);
+print('Trying w=majority, 5ms timeout.');
 printjson(gle);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
