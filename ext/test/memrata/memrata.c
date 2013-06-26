@@ -85,11 +85,11 @@ typedef struct __wt_source {
 
 	/*
 	 * Each WiredTiger object has a "permanent" namespace in the KVS store,
-	 * plus a "log" namespace, which has the not-yet-resolved updates for
+	 * plus a "cache" namespace, which has the not-yet-resolved updates for
 	 * the object.
 	 */
 	kvs_t kvs;				/* Underlying KVS object */
-	kvs_t kvslog;				/* Underlying KVS log */
+	kvs_t kvscache;				/* Underlying KVS cache */
 	struct __kvs_source *ks;		/* Underlying KVS source */
 
 	struct __wt_source *next;		/* List of WiredTiger objects */
@@ -1287,10 +1287,10 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_close: %s: %s", ws->uri, kvs_strerror(ret));
 	ws->kvs = NULL;
-	if (ws->kvslog != NULL && (ret = kvs_close(ws->kvslog)) != 0)
+	if (ws->kvscache != NULL && (ret = kvs_close(ws->kvscache)) != 0)
 		ESET(wtext, session, WT_ERROR,
-		    "kvs_close: %s.log: %s", ws->uri, kvs_strerror(ret));
-	ws->kvslog = NULL;
+		    "kvs_close: %s.cache: %s", ws->uri, kvs_strerror(ret));
+	ws->kvscache = NULL;
 
 	if (ws->lockinit)
 		ETRET(lock_destroy(wtext, session, &ws->lock));
@@ -1401,13 +1401,13 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	 * push the change.
 	 *
 	 * The naming scheme is simple: the URI names the primary store, and the
-	 * URI with a trailing suffix names the associated logging/txn stores.
+	 * URI with a trailing suffix names the associated caching store.
 	 */
 	if ((ret = ws_source_open_namespace(
 	    wtds, session, uri, NULL, ks->kvs_device, &ws->kvs)) != 0)
 		goto err;
 	if ((ret = ws_source_open_namespace(
-	    wtds, session, uri, "log", ks->kvs_device, &ws->kvslog)) != 0)
+	    wtds, session, uri, "cache", ks->kvs_device, &ws->kvscache)) != 0)
 		goto err;
 	if ((ret = kvs_commit(ws->kvs)) != 0) {
 		ESET(wtext, session, WT_ERROR,
@@ -1784,7 +1784,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	ETRET(ws_source_drop_namespace(
 	    wtds, session, uri, NULL, ks->kvs_device));
 	ETRET(ws_source_drop_namespace(
-	    wtds, session, uri, "log", ks->kvs_device));
+	    wtds, session, uri, "cache", ks->kvs_device));
 	ETRET(ws_source_drop_namespace(
 	    wtds, session, uri, "txn", ks->kvs_device));
 
@@ -1848,7 +1848,7 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	ETRET(ws_source_rename_namespace(
 	    wtds, session, uri, newuri, NULL, ks->kvs_device));
 	ETRET(ws_source_rename_namespace(
-	    wtds, session, uri, newuri, "log", ks->kvs_device));
+	    wtds, session, uri, newuri, "cache", ks->kvs_device));
 	ETRET(ws_source_rename_namespace(
 	    wtds, session, uri, newuri, "txn", ks->kvs_device));
 
@@ -1897,7 +1897,7 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 	if ((ret = kvs_truncate(ws->kvs)) != 0)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
-	if ((ret = kvs_truncate(ws->kvslog)) != 0)
+	if ((ret = kvs_truncate(ws->kvscache)) != 0)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
 
