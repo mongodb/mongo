@@ -562,6 +562,7 @@ mongosLibraryFiles = [
     "s/commands_public.cpp",
     "s/request.cpp",
     "s/client_info.cpp",
+    "s/config_server_checker_service.cpp",
     "s/cursors.cpp",
     "s/s_only.cpp",
     "s/balance.cpp",
