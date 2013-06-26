@@ -45,6 +45,7 @@
 #include "cursors.h"
 #include "../util/processinfo.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/config_upgrade.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/exception_filter_win32.h"
@@ -292,14 +293,7 @@ static bool runMongosServer( bool doUpgrade ) {
         return false;
     }
 
-    {
-        class CheckConfigServers : public task::Task {
-            virtual string name() const { return "CheckConfigServers"; }
-            virtual void doWork() { configServer.ok(true); }
-        };
-
-        task::repeat(new CheckConfigServers, 60*1000);
-    }
+    startConfigServerChecker();
 
     VersionType initVersionInfo;
     VersionType versionInfo;
