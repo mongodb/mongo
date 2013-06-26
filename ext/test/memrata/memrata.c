@@ -83,9 +83,13 @@ typedef struct __wt_source {
 	int	 config_recno;			/* config "key_format=r" */
 	int	 config_bitfield;		/* config "value_format=#t" */
 
-	kvs_t kvs;				/* Underlying KVS namespace */
-	kvs_t kvslog;				/* Underlying KVS namespace */
-	kvs_t kvstxn;				/* Underlying KVS namespace */
+	/*
+	 * Each WiredTiger object has a "permanent" namespace in the KVS store,
+	 * plus a "log" namespace, which has the not-yet-resolved updates for
+	 * the object.
+	 */
+	kvs_t kvs;				/* Underlying KVS object */
+	kvs_t kvslog;				/* Underlying KVS log */
 	struct __kvs_source *ks;		/* Underlying KVS source */
 
 	struct __wt_source *next;		/* List of WiredTiger objects */
@@ -93,7 +97,14 @@ typedef struct __wt_source {
 
 typedef struct __kvs_source {
 	char *name;				/* Unique name */
+
 	kvs_t kvs_device;			/* Underlying KVS store */
+
+	/*
+	 * Each underlying KVS source has a txn namespace which has the list of
+	 * active transactions with their committed or aborted state.
+	 */
+	kvs_t kvstxn;				/* Underlying KVS txn store */
 
 	struct __wt_source *ws_head;		/* List of WiredTiger sources */
 
@@ -1013,6 +1024,31 @@ device_string(char **device_list, char **devicesp)
 }
 
 /*
+ * kvs_source_close --
+ *	Kill a KVS_SOURCE structure.
+ */
+static int
+kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
+{
+	int ret = 0;
+
+	if (ks->kvstxn != NULL && (ret = kvs_close(ks->kvstxn)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_close: %s.txn: %s", ks->name, kvs_strerror(ret));
+	ks->kvstxn = NULL;
+
+	if (ks->kvs_device != NULL && (ret = kvs_close(ks->kvs_device)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_close: %s: %s", ks->name, kvs_strerror(ret));
+	ks->kvs_device = NULL;
+
+	free(ks->name);
+	free(ks);
+
+	return (ret);
+}
+
+/*
  * kvs_source_open --
  *	Return a locked KVS source, allocating and opening if it doesn't already
  * exist.
@@ -1082,10 +1118,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	ks->name = devices;
 	devices = NULL;
 
-	/*
-	 * Open the underlying KVS store (creating it if necessary), then push
-	 * the change.
-	 */
+	/* Open the underlying KVS store (creating it if necessary). */
 	ks->kvs_device =
 	    kvs_open(device_list, &kvs_config, flags | KVS_O_CREATE);
 	if (ks->kvs_device == NULL) {
@@ -1093,6 +1126,29 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
 		goto err;
 	}
+
+	/*
+	 * Open the global txn namespace.
+	 *
+	 * XXX
+	 * This is not quite correct: if there are multiple KVS devices, we'd
+	 * only want to open one of the transaction namespaces, and subsequent
+	 * KVS device opens would reference the same transaction name space.
+	 *
+	 * XXX
+	 * This is where we'll handle recovery of the global txn namespace, we
+	 * have to review any list of committed transactions in the txn store
+	 * and update the primary as necessary.
+	 */
+	if ((ks->kvstxn =
+	    kvs_open_namespace(ks->kvs_device, "txn", KVS_O_CREATE)) == NULL) {
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_open_namespace: %s.txn: %s",
+		    ks->name, kvs_strerror(os_errno()));
+		goto err;
+	}
+
+	/* Push the change. */
 	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
@@ -1112,11 +1168,9 @@ err:		if (locked)
 			ETRET(unlock(wtext, session, &ds->global_lock));
 	}
 
-	if (ks != NULL) {
-		if (ks->kvs_device != NULL)
-			(void)kvs_close(ks->kvs_device);
-		free(ks);
-	}
+	if (ks != NULL)
+		ETERT(kvs_source_close(wtext, session, ks));
+
 	if (device_list != NULL) {
 		for (p = device_list; *p != NULL; ++p)
 			free(*p);
@@ -1237,10 +1291,6 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_close: %s.log: %s", ws->uri, kvs_strerror(ret));
 	ws->kvslog = NULL;
-	if (ws->kvstxn != NULL && (ret = kvs_close(ws->kvstxn)) != 0)
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_close: %s.txn: %s", ws->uri, kvs_strerror(ret));
-	ws->kvstxn = NULL;
 
 	if (ws->lockinit)
 		ETRET(lock_destroy(wtext, session, &ws->lock));
@@ -1358,9 +1408,6 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		goto err;
 	if ((ret = ws_source_open_namespace(
 	    wtds, session, uri, "log", ks->kvs_device, &ws->kvslog)) != 0)
-		goto err;
-	if ((ret = ws_source_open_namespace(
-	    wtds, session, uri, "txn", ks->kvs_device, &ws->kvstxn)) != 0)
 		goto err;
 	if ((ret = kvs_commit(ws->kvs)) != 0) {
 		ESET(wtext, session, WT_ERROR,
@@ -1853,9 +1900,6 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 	if ((ret = kvs_truncate(ws->kvslog)) != 0)
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
-	if ((ret = kvs_commit(ws->kvstxn)) != 0)
-		ESET(wtext, session, WT_ERROR,
-		    "kvs_commit: %s", kvs_strerror(ret));
 
 err:	ETRET(unlock(wtext, session, &ws->lock));
 	return (ret);
@@ -1912,13 +1956,8 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 			ETRET(ws_source_close(wtext, session, ws));
 		}
 
-		if ((tret = kvs_close(ks->kvs_device)) != 0)
-			ESET(wtext, session, WT_ERROR,
-			    "kvs_close: %s: %s", ks->name, kvs_strerror(tret));
-
 		ds->kvs_head = ks->next;
-		free(ks->name);
-		free(ks);
+		ETRET(kvs_source_close(wtext, session, ks));
 	}
 
 	ETRET(unlock(wtext, session, &ds->global_lock));
