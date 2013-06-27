@@ -992,10 +992,31 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             }
             httpInterface = true;
         }
+        // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in the future 
         if (params.count("rest")) {
+            if (params.count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --rest and --nohttpinterface" << 
+                    startupWarningsLog;
+            }
+            else if (!params.count("httpinterface")) {
+                log() << "** WARNING: --rest is specified without --httpinterface," << 
+                    startupWarningsLog;
+                log() << "**          enabling http interface" << startupWarningsLog;
+                httpInterface = true;
+            }
             cmdLine.rest = true;
         }
         if (params.count("jsonp")) {
+            if (params.count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface" << 
+                    startupWarningsLog;
+            }
+            else if (!params.count("httpinterface")) {
+                log() << "** WARNING --jsonp is specified without --httpinterface," << 
+                    startupWarningsLog;
+                log() << "**         enabling http interface" << startupWarningsLog;
+                httpInterface = true;
+            }
             cmdLine.jsonp = true;
         }
         if (params.count("noscripting")) {
