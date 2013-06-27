@@ -938,7 +938,7 @@ int _main( int argc, char* argv[], char **envp ) {
         if ( files.size() > 1 )
             cout << "loading file: " << files[i] << endl;
 
-        if ( ! scope->execFile( files[i] , false , true , false ) ) {
+        if ( ! scope->execFile( files[i] , false , true ) ) {
             cout << "failed to load: " << files[i] << endl;
             return -3;
         }

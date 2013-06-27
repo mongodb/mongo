@@ -560,7 +560,7 @@ namespace mongo {
         v8::Context::Scope context_scope(scope->_context);
         for (int i = 0; i < args.Length(); ++i) {
             std::string filename(toSTLString(args[i]));
-            if (!scope->execFile(filename, false, true, false)) {
+            if (!scope->execFile(filename, false, true)) {
                 return v8AssertionException(string("error loading js file: ") + filename);
             }
         }
