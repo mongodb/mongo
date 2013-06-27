@@ -22,6 +22,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
@@ -35,21 +36,25 @@ namespace mongo {
 
         AuthzManagerExternalStateMock() {};
 
+        // no-op for the mock
         virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj) const {
-            return Status::OK();
-        }
+                                               const BSONObj& userObj) const;
 
+        // no-op for the mock
         virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj) const {
-            return Status::OK();
-        }
+                                               const BSONObj& updateObj) const;
+
+        // Non-const version that puts document into a vector that can be accessed later
+        Status insertPrivilegeDocument(const std::string& dbname, const BSONObj& userObj);
+
+        void clearPrivilegeDocuments();
 
         virtual bool _findUser(const std::string& usersNamespace,
                                const BSONObj& query,
-                               BSONObj* result) const {
-            return false;
-        }
+                               BSONObj* result) const;
+
+    private:
+        unordered_map<std::string, BSONObj> _userDocuments; // dbname to user document
     };
 
 } // namespace mongo

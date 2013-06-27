@@ -18,6 +18,8 @@
  */
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -36,8 +38,10 @@ namespace {
     class AuthorizationManagerTest : public ::mongo::unittest::Test {
     public:
         scoped_ptr<AuthorizationManager> authzManager;
+        AuthzManagerExternalStateMock* externalState;
         void setUp() {
-            authzManager.reset(new AuthorizationManager(new AuthzManagerExternalStateMock()));
+            externalState = new AuthzManagerExternalStateMock();
+            authzManager.reset(new AuthorizationManager(externalState));
         }
     };
 
@@ -493,5 +497,97 @@ namespace {
                      "roles" << BSONArrayBuilder().arr())));
     }
 
+    TEST_F(AuthorizationManagerTest, testAquireV0User) {
+        externalState->insertPrivilegeDocument("test",
+                                               BSON("user" << "v0RW" <<
+                                                    "pwd" << "password"));
+        externalState->insertPrivilegeDocument("admin",
+                                               BSON("user" << "v0AdminRO" <<
+                                                    "pwd" << "password" <<
+                                                    "readOnly" << true));
+
+        User* v0RW;
+        ASSERT_OK(authzManager->acquireUser(UserName("v0RW", "test"), &v0RW));
+        ASSERT(UserName("v0RW", "test") == v0RW->getName());
+        ASSERT(v0RW->isValid());
+        ASSERT_EQUALS((uint32_t)1, v0RW->getRefCount());
+        RoleNameIterator it = v0RW->getRoles();
+        ASSERT(it.more());
+        RoleName roleName = it.next();
+        ASSERT_EQUALS("test", roleName.getDB());
+        ASSERT_EQUALS("oldReadWrite", roleName.getRole());
+        ASSERT_FALSE(it.more());
+        ActionSet actions = v0RW->getActionsForResource("test");
+        ASSERT(actions.contains(ActionType::find));
+        ASSERT(actions.contains(ActionType::insert));
+        ASSERT_FALSE(actions.contains(ActionType::shutdown));
+        actions = v0RW->getActionsForResource("test2");
+        ASSERT(actions.empty());
+        actions = v0RW->getActionsForResource("admin");
+        ASSERT(actions.empty());
+
+        User* v0AdminRO;
+        ASSERT_OK(authzManager->acquireUser(UserName("v0AdminRO", "admin"), &v0AdminRO));
+        ASSERT(UserName("v0AdminRO", "admin") == v0AdminRO->getName());
+        ASSERT(v0AdminRO->isValid());
+        ASSERT_EQUALS((uint32_t)1, v0AdminRO->getRefCount());
+        it = v0AdminRO->getRoles();
+        ASSERT(it.more());
+        roleName = it.next();
+        ASSERT_EQUALS("admin", roleName.getDB());
+        ASSERT_EQUALS("oldAdminRead", roleName.getRole());
+        ASSERT_FALSE(it.more());
+        actions = v0AdminRO->getActionsForResource("*");
+        ASSERT(actions.contains(ActionType::find));
+        ASSERT(actions.contains(ActionType::listDatabases));
+        ASSERT_FALSE(actions.contains(ActionType::insert));
+        ASSERT_FALSE(actions.contains(ActionType::dropDatabase));
+    }
+
+    TEST_F(AuthorizationManagerTest, testAquireV1User) {
+        externalState->insertPrivilegeDocument("test",
+                                               BSON("user" << "v1read" <<
+                                                    "pwd" << "password" <<
+                                                    "roles" << BSON_ARRAY("read")));
+        externalState->insertPrivilegeDocument("admin",
+                                               BSON("user" << "v1cluster" <<
+                                                    "pwd" << "password" <<
+                                                    "roles" << BSON_ARRAY("clusterAdmin")));
+
+        User* v1read;
+        ASSERT_OK(authzManager->acquireUser(UserName("v1read", "test"), &v1read));
+        ASSERT(UserName("v1read", "test") == v1read->getName());
+        ASSERT(v1read->isValid());
+        ASSERT_EQUALS((uint32_t)1, v1read->getRefCount());
+        RoleNameIterator it = v1read->getRoles();
+        ASSERT(it.more());
+        RoleName roleName = it.next();
+        ASSERT_EQUALS("test", roleName.getDB());
+        ASSERT_EQUALS("read", roleName.getRole());
+        ASSERT_FALSE(it.more());
+        ActionSet actions = v1read->getActionsForResource("test");
+        ASSERT(actions.contains(ActionType::find));
+        ASSERT_FALSE(actions.contains(ActionType::insert));
+        actions = v1read->getActionsForResource("test2");
+        ASSERT(actions.empty());
+        actions = v1read->getActionsForResource("admin");
+        ASSERT(actions.empty());
+
+        User* v1cluster;
+        ASSERT_OK(authzManager->acquireUser(UserName("v1cluster", "admin"), &v1cluster));
+        ASSERT(UserName("v1cluster", "admin") == v1cluster->getName());
+        ASSERT(v1cluster->isValid());
+        ASSERT_EQUALS((uint32_t)1, v1cluster->getRefCount());
+        it = v1cluster->getRoles();
+        ASSERT(it.more());
+        roleName = it.next();
+        ASSERT_EQUALS("admin", roleName.getDB());
+        ASSERT_EQUALS("clusterAdmin", roleName.getRole());
+        ASSERT_FALSE(it.more());
+        actions = v1cluster->getActionsForResource("*");
+        ASSERT(actions.contains(ActionType::listDatabases));
+        ASSERT(actions.contains(ActionType::dropDatabase));
+        ASSERT_FALSE(actions.contains(ActionType::find));
+    }
 }  // namespace
 }  // namespace mongo

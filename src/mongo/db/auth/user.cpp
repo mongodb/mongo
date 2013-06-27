@@ -22,6 +22,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

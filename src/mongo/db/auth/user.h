@@ -46,6 +46,7 @@ namespace mongo {
     public:
         struct CredentialData {
             std::string password;
+            bool isExternal;
         };
 
         explicit User(const UserName& name);
@@ -153,6 +154,8 @@ namespace mongo {
 
 
         // _refCount and _isInvalidated are modified exclusively by the AuthorizationManager
+        // _isInvalidated can be read by any consumer of User, but _refCount can only be
+        // meaningfully read by the AuthorizationManager, as _refCount is guarded by the AM's _lock
         uint32_t _refCount;
         AtomicUInt32 _isValid; // Using as a boolean
 
