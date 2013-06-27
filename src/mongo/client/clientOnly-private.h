@@ -14,7 +14,10 @@
  */
 
 #pragma once
+
 namespace mongo {
+    class mutex;
+
     namespace shell_utils {
         extern mongo::mutex &mongoProgramOutputMutex;
     }

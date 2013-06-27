@@ -19,6 +19,7 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

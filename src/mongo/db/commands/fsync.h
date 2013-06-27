@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "mongo/util/concurrency/mutex.h"
+
 namespace mongo {
     // Use this for blocking during an fsync-and-lock
     extern SimpleMutex filesLockedFsync;

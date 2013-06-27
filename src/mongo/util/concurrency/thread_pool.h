@@ -23,6 +23,8 @@
 #include <boost/function.hpp>
 #include <boost/thread/condition.hpp>
 
+#include "mongo/util/concurrency/mutex.h"
+
 namespace mongo {
 
     namespace threadpool {

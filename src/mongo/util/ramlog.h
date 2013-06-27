@@ -17,7 +17,8 @@
 
 #pragma once
 
-#include "log.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

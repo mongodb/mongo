@@ -24,6 +24,7 @@
 
 #include "mongo/db/lasterror.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/startup_test.h"
 

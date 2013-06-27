@@ -21,6 +21,8 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/thread/condition.hpp>
 
+#include "mongo/util/concurrency/mutex.h"
+
 namespace mongo {
 
     /*
