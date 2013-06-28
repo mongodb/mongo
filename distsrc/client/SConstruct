@@ -93,6 +93,13 @@ for lib in boostLibs:
 env['MONGO_BUILD_SASL_CLIENT'] = conf.CheckLibWithHeader(
     "sasl2", "sasl/sasl.h", "C", "sasl_version_info(0, 0, 0, 0, 0, 0);", autoadd=False)
 
+if (conf.CheckCXXHeader( "execinfo.h" ) and
+    conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
+    conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>') and
+    conf.CheckDeclaration('backtrace_symbols_fd', includes='#include <execinfo.h>')):
+
+    env.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
+
 conf.Finish()
 
 class InstallSetup:
