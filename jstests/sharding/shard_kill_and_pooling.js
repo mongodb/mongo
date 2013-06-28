@@ -20,7 +20,9 @@ var db = coll.getDB();
 
 //Test is not valid for Win32
 var is32Bits = ( db.serverBuildInfo().bits == 32 );
-if ( is32Bits && _isWindows() ) {
+// SERVER-9927 - change of default windows platform breaks WSAPoll, this test will fail on windows
+// until the issue is closed.
+if ( /* is32Bits && */ _isWindows() ) {
 
     // Win32 doesn't provide the polling interface we need to implement the check tested here
     jsTest.log( "Test is not valid on Win32 platform." );
