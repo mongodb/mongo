@@ -31,8 +31,8 @@ assert.eq(gle.wtime, null);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
-gle = mdb.getLastErrorObj(2, 500);
-print('Trying w=2, 500ms timeout.');
+gle = mdb.getLastErrorObj(2, 2000);
+print('Trying w=2, 2000ms timeout.');
 printjson(gle);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
