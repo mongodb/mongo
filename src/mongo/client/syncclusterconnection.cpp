@@ -385,7 +385,7 @@ namespace mongo {
         if ( _writeConcern ) {
             string errmsg;
             if ( ! prepare( errmsg ) )
-                throw UserException( 8005 , (string)"SyncClusterConnection::udpate prepare failed: " + errmsg );
+                throw UserException( 8005 , (string)"SyncClusterConnection::update prepare failed: " + errmsg );
         }
 
         for ( size_t i = 0; i < _conns.size(); i++ ) {
