@@ -1,5 +1,12 @@
 // perform basic js tests in parallel & some other tasks as well
 
+// Drop all databases before running tests
+var databases = db.adminCommand('listDatabases').databases;
+for (var i = 0; i < databases.length; ++i) {
+    if (databases[i].name != "local")
+        db.getSiblingDB(databases[i].name).dropDatabase();
+}
+
 var c = db.jstests_parallel_basicPlus;
 c.drop();
 
