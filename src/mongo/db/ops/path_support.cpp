@@ -53,11 +53,13 @@ namespace pathsupport {
             }
 
             size_t currSize = mutablebson::countChildren(*elemArray);
-            size_t toPad = sizeRequired - currSize;
-            for (size_t i = 0; i < toPad; i++) {
-                Status status = elemArray->appendNull("");
-                if (!status.isOK()) {
-                    return status;
+            if (sizeRequired > currSize) {
+                size_t toPad = sizeRequired - currSize;
+                for (size_t i = 0; i < toPad; i++) {
+                    Status status = elemArray->appendNull("");
+                    if (!status.isOK()) {
+                        return status;
+                    }
                 }
             }
             return Status::OK();
