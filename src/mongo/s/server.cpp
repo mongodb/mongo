@@ -531,8 +531,7 @@ static int _main() {
     }
 #endif
 
-    runMongosServer(_isUpgradeSwitchSet);
-    return 0;
+    return !runMongosServer(_isUpgradeSwitchSet);
 }
 
 #if defined(_WIN32)
@@ -558,6 +557,7 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     mongosCommand = argv[0];
 
     processCommandLineOptions(std::vector<std::string>(argv, argv + argc));
+    mongo::forkServerOrDie();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     CmdLine::censor(argc, argv);
     try {

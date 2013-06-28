@@ -1321,6 +1321,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
 
     processCommandLineOptions(std::vector<std::string>(argv, argv + argc));
+    mongo::forkServerOrDie();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     CmdLine::censor(argc, argv);
 

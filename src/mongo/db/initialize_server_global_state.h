@@ -25,6 +25,13 @@ namespace mongo {
      */
     bool initializeServerGlobalState();
 
+    /**
+     * Forks and detaches the server, on platforms that support it, if cmdLine.doFork is true.
+     *
+     * Call after processing the command line but before running mongo initializers.
+     */
+    void forkServerOrDie();
+
     void setupCoreSignals();
 
 }  // namespace mongo
