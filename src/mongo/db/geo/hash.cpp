@@ -490,7 +490,7 @@ namespace mongo {
 
         BSONElement y = i.next();
         uassert(13026, 
-                str::stream() << "geo values have to be numbers"
+                str::stream() << "geo values must be 'legacy coordinate pairs' for 2d indexes"
                               << causedBy(src ? (*src).toString() :
                                            BSON_ARRAY(x << y).toString()),
                 x.isNumber() && y.isNumber());
