@@ -2,6 +2,8 @@
 
 # This SConscript describes build and install rules for the Mongo C++ driver and associated exmaple
 # programs.
+import os
+
 Import('env has_option installSetup use_system_version_of_library')
 
 Import('nix linux darwin windows')
@@ -85,7 +87,6 @@ clientSourceBasic = [
     'mongo/util/net/ssl_manager.cpp',
     'mongo/util/password.cpp',
     'mongo/util/processinfo.cpp',
-    env.File('mongo/util/processinfo_${PYSYSPLATFORM}.cpp'),
     'mongo/util/ramlog.cpp',
     'mongo/util/signal_handlers.cpp',
     'mongo/util/stringutils.cpp',
@@ -101,14 +102,28 @@ clientSourceBasic = [
 clientSourceSasl = ['mongo/client/sasl_client_authenticate_impl.cpp',
                     'mongo/client/sasl_client_session.cpp']
 
-clientSourceAll = clientSourceBasic + clientSourceSasl
+clientSourceProcessInfo = [
+    'mongo/util/processinfo_darwin.cpp',
+    'mongo/util/processinfo_freebsd.cpp',
+    'mongo/util/processinfo_linux2.cpp',
+    'mongo/util/processinfo_none.cpp',
+    'mongo/util/processinfo_sunos5.cpp',
+    'mongo/util/processinfo_win32.cpp'
+]
+
+clientSourceAll = clientSourceBasic + clientSourceSasl + clientSourceProcessInfo
 
 usingSasl = env['MONGO_BUILD_SASL_CLIENT']
 
+clientSource = list(clientSourceBasic)
 if usingSasl:
-    clientSource = clientSourceAll
-else:
-    clientSource = clientSourceBasic
+    clientSource += clientSourceSasl
+
+processInfoPlatformFile = env.File( "mongo/util/processinfo_${PYSYSPLATFORM}.cpp" )
+# NOTE: See comment about similar code in src/mongo/SConscript
+if not os.path.exists( str( processInfoPlatformFile ) ):
+    processInfoPlatformFile = env.File( "mongo/util/processinfo_none.cpp" )
+clientSource += [processInfoPlatformFile]
 
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),
