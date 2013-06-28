@@ -514,17 +514,21 @@ namespace mongo {
     }
     SSL* SSLManager::connect(int fd) {
         SSL* ssl = _secure(fd);
+        ScopeGuard guard = MakeGuard(::SSL_free, ssl);
         int ret = _ssl_connect(ssl);
         if (ret != 1)
             _handleSSLError(SSL_get_error(ssl, ret));
+        guard.Dismiss();
         return ssl;
     }
 
     SSL* SSLManager::accept(int fd) {
         SSL* ssl = _secure(fd);
+        ScopeGuard guard = MakeGuard(::SSL_free, ssl);
         int ret = SSL_accept(ssl);
         if (ret != 1)
             _handleSSLError(SSL_get_error(ssl, ret));
+        guard.Dismiss();
         return ssl;
     }
 
@@ -579,35 +583,32 @@ namespace mongo {
             // accepts the socket connection but fails to do the SSL handshake in a timely
             // manner.
             error() << "SSL error: " << code << ", possibly timed out during connect" << endl;
-            throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
 
         case SSL_ERROR_SYSCALL:
             if (code < 0) {
                 error() << "socket error: " << errnoWithDescription() << endl;
-                throw SocketException(SocketException::CONNECT_ERROR, "");
             }
-            error() << "could not negotiate SSL connection: EOF detected" << endl;
-            throw SocketException(SocketException::CONNECT_ERROR, "");
+            else {
+                error() << "could not negotiate SSL connection: EOF detected" << endl;
+            }
             break;
 
         case SSL_ERROR_SSL:
         {
             int ret = ERR_get_error();
             error() << _getSSLErrorMessage(ret) << endl;
-            throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
         }
         case SSL_ERROR_ZERO_RETURN:
             error() << "could not negotiate SSL connection: EOF detected" << endl;
-            throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
         
         default:
             error() << "unrecognized SSL error" << endl;
-            throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
         }
+        throw SocketException(SocketException::CONNECT_ERROR, "");
     }
 }
 
