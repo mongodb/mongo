@@ -133,7 +133,7 @@ namespace mongo {
         return nsToDatabaseSubstring( ns ).toString();
     }
 
-    // "database.a.b.c" -> "database"
+    // "database.a.b.c" -> "a.b.c"
     inline StringData nsToCollectionSubstring( const StringData& ns ) {
         size_t i = ns.find( '.' );
         massert(16886, "nsToCollectionSubstring: no .", i != string::npos );

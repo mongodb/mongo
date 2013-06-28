@@ -498,11 +498,13 @@ namespace replset {
             return true;
         }
 
+	const char* ns = op["ns"].valuestrsafe();
+
         // check for commands
         if ((op["op"].valuestrsafe()[0] == 'c') ||
             // Index builds are acheived through the use of an insert op, not a command op.
             // The following line is the same as what the insert code uses to detect an index build.
-            nsToCollectionSubstring( op["ns"].valuestrsafe() ) == "system.indexes" ) {
+            ( *ns != '\0' && nsToCollectionSubstring(ns) == "system.indexes" )) {
 
             if (ops->empty()) {
                 // apply commands one-at-a-time
