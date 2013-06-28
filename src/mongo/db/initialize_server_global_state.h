@@ -22,13 +22,8 @@ namespace mongo {
      * Perform initialization activity common across all mongo server types.
      *
      * Set up logging, daemonize the process, configure SSL, etc.
-     *
-     * If isMongodShutdownSpecialCase, perform this processing knowing that
-     * we're only bringing this process up to kill another mongod.
-     *
-     * TODO: Untie the knot that requires the isMongodShutdownSpecialCase parameter.
      */
-    bool initializeServerGlobalState(bool isMongodShutdownSpecialCase = false);
+    bool initializeServerGlobalState();
 
     void setupCoreSignals();
 

@@ -62,7 +62,7 @@ namespace mongo {
     }
 #endif
 
-    bool initializeServerGlobalState(bool isMongodShutdownSpecialCase) {
+    bool initializeServerGlobalState() {
 
         Listener::globalTicketHolder.resize( cmdLine.maxConns );
 
@@ -165,7 +165,7 @@ namespace mongo {
             Logstream::useSyslog( sb.str().c_str() );
         }
 #endif
-        if (!cmdLine.logpath.empty() && !isMongodShutdownSpecialCase) {
+        if (!cmdLine.logpath.empty()) {
             fassert(16448, !cmdLine.logWithSyslog);
             string absoluteLogpath = boost::filesystem::absolute(
                     cmdLine.logpath, cmdLine.cwd).string();
