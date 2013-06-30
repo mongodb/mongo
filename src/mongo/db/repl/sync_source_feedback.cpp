@@ -67,7 +67,7 @@ namespace mongo {
             }
             u = user.getStringField("user");
             p = user.getStringField("pwd");
-            massert(16886, "bad user object? [1]", !u.empty());
+            massert(16889, "bad user object? [1]", !u.empty());
             massert(16887, "bad user object? [2]", !p.empty());
         }
 
