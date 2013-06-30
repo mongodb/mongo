@@ -25,6 +25,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/repl/health.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
@@ -392,6 +393,44 @@ namespace mongo {
             return theReplSet->forceSyncFrom(newTarget, errmsg, result);
         }
     } cmdReplSetSyncFrom;
+
+    class CmdReplSetUpdatePosition: public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "internal";
+        }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetUpdatePosition);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
+        CmdReplSetUpdatePosition() : ReplSetCommand("replSetUpdatePosition") { }
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg,
+                         BSONObjBuilder& result, bool fromRepl) {
+            if (!check(errmsg, result))
+                return false;
+
+            if (cmdObj.hasField("handshake")) {
+                // we have received a handshake, not an update message
+                // handshakes are done here to ensure the receiving end supports the update command
+                cc().gotHandshake(cmdObj["handshake"].embeddedObject());
+                // if we aren't primary, pass the handshake along
+                if (!theReplSet->isPrimary() && theReplSet->syncSourceFeedback.supportsUpdater()) {
+                    theReplSet->syncSourceFeedback.forwardSlaveHandshake();
+                }
+                return true;
+            }
+
+            uassert(16888, "optimes field should be an array with an object for each secondary",
+                    cmdObj["optimes"].type() == Array);
+            BSONArray newTimes = BSONArray(cmdObj["optimes"].Obj());
+            updateSlaveLocations(newTimes);
+
+            return true;
+        }
+    } cmdReplSetUpdatePosition;
 
     using namespace bson;
     using namespace mongoutils::html;

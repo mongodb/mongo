@@ -349,6 +349,15 @@ namespace mongo {
         return 0;
     }
 
+    Member* ReplSetImpl::getMutableMember(unsigned id) {
+        if( _self && id == _self->id() ) return _self;
+
+        for( Member *m = head(); m; m = m->next() )
+            if( m->id() == id )
+                return m;
+        return 0;
+    }
+
     Member* ReplSetImpl::findByName(const std::string& hostname) const {
         if (_self && hostname == _self->fullName()) {
             return _self;

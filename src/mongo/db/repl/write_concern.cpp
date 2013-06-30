@@ -122,20 +122,22 @@ namespace mongo {
 
             scoped_lock mylk(_mutex);
 
-            _slaves[ident] = last;
-            _dirty = true;
+            if (last > _slaves[ident]) {
+                _slaves[ident] = last;
+                _dirty = true;
 
-            if (theReplSet && theReplSet->isPrimary()) {
-                theReplSet->ghost->updateSlave(ident.obj["_id"].OID(), last);
-            }
+                if (theReplSet && theReplSet->isPrimary()) {
+                    theReplSet->ghost->updateSlave(ident.obj["_id"].OID(), last);
+                }
 
-            if ( ! _started ) {
-                // start background thread here since we definitely need it
-                _started = true;
-                go();
+                if ( ! _started ) {
+                    // start background thread here since we definitely need it
+                    _started = true;
+                    go();
+                }
+
+                _threadsWaitingForReplication.notify_all();
             }
-            
-            _threadsWaitingForReplication.notify_all();
         }
 
         bool opReplicatedEnough( OpTime op , BSONElement w ) {
@@ -252,6 +254,28 @@ namespace mongo {
     } slaveTracking;
 
     const char * SlaveTracking::NS = "local.slaves";
+
+    // parse optimes from replUpdatePositionCommand and pass them to SyncSourceFeedback
+    void updateSlaveLocations(BSONArray optimes) {
+        BSONForEach(elem, optimes) {
+            BSONObj entry = elem.Obj();
+            BSONObj id = BSON("_id" << entry["_id"].OID());
+            OpTime ot = entry["optime"]._opTime();
+            BSONObj config = entry["config"].Obj();
+
+            // update locally
+            slaveTracking.update(id, config, "local.oplog.rs", ot);
+            if (theReplSet && !theReplSet->isPrimary()) {
+                // pass along if we are not primary
+                theReplSet->syncSourceFeedback.updateMap(entry["_id"].OID(), ot);
+                // for to be backwards compatible
+                theReplSet->ghost->send(boost::bind(&GhostSync::percolate,
+                                                    theReplSet->ghost,
+                                                    id,
+                                                    ot));
+            }
+        }
+    }
 
     void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ) {
         if ( lastOp.isNull() )

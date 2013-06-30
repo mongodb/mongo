@@ -71,6 +71,7 @@
 "replSetReconfig",
 "replSetStepDown",
 "replSetSyncFrom",
+"replSetUpdatePosition",
 "resync",
 "serverStatus",
 "setParameter",
