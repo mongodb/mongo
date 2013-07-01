@@ -71,7 +71,7 @@ int run() {
 }
 
 int main() {
-   int ret = EXIT_SUCCESS;
+    int ret = EXIT_SUCCESS;
     try {
         ret = run();
     }
