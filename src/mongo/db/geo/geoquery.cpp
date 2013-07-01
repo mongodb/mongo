@@ -28,9 +28,24 @@ namespace mongo {
         // The CRS for the legacy points dictates that distances are in radians.
         fromRadians = (FLAT == centroid.crs);
 
+        if (!obj["minDistance"].eoo()) {
+            if (obj["minDistance"].isNumber()) {
+                double distArg = obj["minDistance"].number();
+                uassert(16901, "minDistance must be non-negative", distArg >= 0.0);
+                if (fromRadians) {
+                    minDistance = distArg * radius;
+                } else {
+                    minDistance = distArg;
+                }
+            } else {
+                return false;
+            }
+        }
+
         if (!obj["maxDistance"].eoo()) {
             if (obj["maxDistance"].isNumber()) {
                 double distArg = obj["maxDistance"].number();
+                uassert(16902, "maxDistance must be non-negative", distArg >= 0.0);
                 if (fromRadians) {
                     maxDistance = distArg * radius;
                 } else {
@@ -46,14 +61,15 @@ namespace mongo {
     bool NearQuery::parseFrom(const BSONObj &obj, double radius) {
         bool hasGeometry = false;
 
-        // First, try legacy near.
-        // Legacy near parsing: t.find({ loc : { $nearSphere: [0,0], $maxDistance: 3 }})
-        // Legacy near parsing: t.find({ loc : { $nearSphere: [0,0] }})
-        // Legacy near parsing: t.find({ loc : { $near: { someGeoJSONPoint}})
+        // First, try legacy near, e.g.:
+        // t.find({ loc : { $nearSphere: [0,0], $minDistance: 1, $maxDistance: 3 }})
+        // t.find({ loc : { $nearSphere: [0,0] }})
+        // t.find({ loc : { $near: { someGeoJSONPoint}})
         BSONObjIterator it(obj);
         while (it.more()) {
             BSONElement e = it.next();
             bool isNearSphere = mongoutils::str::equals(e.fieldName(), "$nearSphere");
+            bool isMinDistance = mongoutils::str::equals(e.fieldName(), "$minDistance");
             bool isMaxDistance = mongoutils::str::equals(e.fieldName(), "$maxDistance");
             bool isNear = mongoutils::str::equals(e.fieldName(), "$near")
                           || mongoutils::str::equals(e.fieldName(), "$geoNear");
@@ -71,19 +87,26 @@ namespace mongo {
                     // We don't accept $near : [oldstylepoint].
                     hasGeometry = true;
                 }
+            } else if (isMinDistance) {
+                uassert(16893, "$minDistance must be a number", e.isNumber());
+                minDistance = e.Number();
+                uassert(16894, "$minDistance must be non-negative", minDistance >= 0.0);
             } else if (isMaxDistance) {
+                uassert(16895, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
+                uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
             }
         }
 
         if (fromRadians) {
+            minDistance *= radius;
             maxDistance *= radius;
         }
 
         if (hasGeometry) { return true; }
 
-        // Next, try "new" near
-        // New near: t.find({ "geo" : { "$near" : { "$geometry" : pointA, $maxDistance : 20 }}})
+        // Next, try "new" near:
+        // t.find({"geo" : {"$near" : {"$geometry": pointA, $minDistance: 1, $maxDistance: 3}}})
         BSONElement e = obj.firstElement();
         if (!e.isABSONObj()) { return false; }
         BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
@@ -103,10 +126,14 @@ namespace mongo {
                             (SPHERE == centroid.crs));
                     hasGeometry = true;
                 }
+            } else if (mongoutils::str::equals(e.fieldName(), "$minDistance")) {
+                uassert(16897, "$minDistance must be a number", e.isNumber());
+                minDistance = e.Number();
+                uassert(16898, "$minDistance must be non-negative", minDistance >= 0.0);
             } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
-                if (e.isNumber()) {
-                    maxDistance = e.Number();
-                }
+                uassert(16899, "$maxDistance must be a number", e.isNumber());
+                maxDistance = e.Number();
+                uassert(16900, "$maxDistance must be non-negative", maxDistance >= 0.0);
             }
         }
         return hasGeometry;

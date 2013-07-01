@@ -116,6 +116,8 @@ namespace mongo {
         BSONObj _specForFRV;
 
         // Geo-related variables.
+        // At what min distance (arc length) do we start looking for results?
+        double _minDistance;
         // What's the max distance (arc length) we're willing to look for results?
         double _maxDistance;
 

@@ -86,14 +86,17 @@ namespace mongo {
 
     class NearQuery {
     public:
-        NearQuery() : maxDistance(std::numeric_limits<double>::max()), fromRadians(false) {}
-        NearQuery(const string& f) : field(f), maxDistance(std::numeric_limits<double>::max()),
+        NearQuery() : minDistance(0), maxDistance(std::numeric_limits<double>::max()),
+                      fromRadians(false) {}
+        NearQuery(const string& f) : field(f), minDistance(0),
+                                     maxDistance(std::numeric_limits<double>::max()),
                                      fromRadians(false) {}
         bool parseFrom(const BSONObj &obj, double radius);
         bool parseFromGeoNear(const BSONObj &obj, double radius);
         string field;
         PointWithCRS centroid;
-        // Distance IN METERS that we're willing to search.
+        // Min and max distance IN METERS from centroid that we're willing to search.
+        double minDistance;
         double maxDistance;
         // Did we convert to this distance from radians?  (If so, we output distances in radians.)
         bool fromRadians;
