@@ -222,7 +222,7 @@ namespace replset {
                       << _currentSyncTarget->fullName() << rsLog;
                 _oplogMarkerTarget = _currentSyncTarget;
 
-                if (!theReplSet->syncSourceFeedback.connect(_oplogMarkerTarget->fullName())) {
+                if (!theReplSet->syncSourceFeedback.connect(_oplogMarkerTarget)) {
                     _oplogMarkerTarget = NULL;
                     return false;
                 }
@@ -530,7 +530,7 @@ namespace replset {
                 _currentSyncTarget = target;
             }
 
-            theReplSet->syncSourceFeedback.connect(current);
+            theReplSet->syncSourceFeedback.connect(target);
 
             return;
         }

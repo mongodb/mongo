@@ -28,6 +28,7 @@ namespace mongo {
     class SyncSourceFeedback : public BackgroundJob {
     public:
         SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
+                              _syncTarget(NULL),
                               _oplogReader(new OplogReader(true)),
                               _supportsUpdater(true) {}
 
@@ -47,7 +48,7 @@ namespace mongo {
         }
 
         /// Connect to sync target and create OplogReader if needed.
-        bool connect(const std::string& hostName);
+        bool connect(const Member* target);
 
         void resetConnection() {
             _connection.reset();
@@ -143,6 +144,8 @@ namespace mongo {
 
         // stores our OID to be passed along in commands
         BSONObj _me;
+        // the member we are currently syncing from
+        const Member* _syncTarget;
         // holds the oplogReader for use when we fall back to old style updates
         OplogReader* _oplogReader;
         // our connection to our sync target

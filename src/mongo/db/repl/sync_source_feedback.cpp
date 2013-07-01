@@ -186,11 +186,12 @@ namespace mongo {
         return true;
     }
 
-    bool SyncSourceFeedback::connect(const std::string& hostName) {
+    bool SyncSourceFeedback::connect(const Member* target) {
         boost::unique_lock<boost::mutex> lock(_connmtx);
         resetConnection();
         resetOplogReaderConnection();
-        if (_connect(hostName)) {
+        _syncTarget = target;
+        if (_connect(target->fullName())) {
             if (!supportsUpdater()) {
                 return true;
             }
@@ -269,9 +270,13 @@ namespace mongo {
                     _cond.wait(lock);
                 }
                 boost::unique_lock<boost::mutex> conlock(_connmtx);
+                const Member* target = replset::BackgroundSync::get()->getSyncTarget();
+                if (_syncTarget != target) {
+                    resetConnection();
+                    _syncTarget = target;
+                }
                 if (!hasConnection()) {
                     // fix connection if need be
-                    const Member* target = replset::BackgroundSync::get()->getSyncTarget();
                     if (!target) {
                         continue;
                     }
