@@ -62,7 +62,7 @@ failfile.smoke
 
 #temp dirs
 dump
-log
+/log
 logs
 docs/html
 docs/latex

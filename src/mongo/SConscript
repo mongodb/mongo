@@ -20,6 +20,7 @@ env.SConscript(['base/SConscript',
                 'db/fts/SConscript',
                 'db/ops/SConscript',
                 'db/SConscript',
+                'logger/SConscript',
                 'platform/SConscript',
                 's/SConscript',
                 'unittest/SConscript'])

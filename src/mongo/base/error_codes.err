@@ -37,5 +37,8 @@ error_code("PrivilegeNotFound", 33)
 error_code("CannotBackfillArray", 34)
 error_code("UserModificationFailed", 35)
 error_code("RemoteChangeDetected", 36)
+error_code("FileRenameFailed", 37)
+error_code("FileNotOpen", 38)
+error_code("FileStreamFailed", 39)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

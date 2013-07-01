@@ -1,0 +1,14 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary('logger',
+                  [
+                   'rotatable_file_writer.cpp',
+                   ],
+                  LIBDEPS=['$BUILD_DIR/mongo/base/base'])
+
+env.CppUnitTest('rotatable_file_writer_test',
+                'rotatable_file_writer_test.cpp',
+                LIBDEPS=['logger'])
+
