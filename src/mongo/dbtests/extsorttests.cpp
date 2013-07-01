@@ -488,7 +488,8 @@ namespace ExtSortTests {
             }
 
         } catch (...) {
-            log() << "Failure from line " << line << " on iteration " << iteration << endl;
+            mongo::unittest::log() <<
+                "Failure from line " << line << " on iteration " << iteration << endl;
             throw;
         }
     }

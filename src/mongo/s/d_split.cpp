@@ -624,8 +624,8 @@ namespace mongo {
                     result.append( "requestedMin" , min );
                     result.append( "requestedMax" , max );
 
-                    LOG( LL_WARNING ) << "aborted split because " << errmsg << ": " << min << "->" << max
-                                      << " is now " << currMin << "->" << currMax << endl;
+                    warning() << "aborted split because " << errmsg << ": " << min << "->" << max
+                              << " is now " << currMin << "->" << currMax << endl;
                     return false;
                 }
 
@@ -634,8 +634,8 @@ namespace mongo {
                     result.append( "from" , myShard.getName() );
                     result.append( "official" , shard );
 
-                    LOG( LL_WARNING ) << "aborted split because " << errmsg << ": chunk is at " << shard
-                                      << " and not at " << myShard.getName() << endl;
+                    warning() << "aborted split because " << errmsg << ": chunk is at " << shard
+                              << " and not at " << myShard.getName() << endl;
                     return false;
                 }
 
@@ -644,8 +644,8 @@ namespace mongo {
                     maxVersion.addToBSON( result, "officialVersion" );
                     shardingState.getVersion( ns ).addToBSON( result, "myVersion" );
 
-                    LOG( LL_WARNING ) << "aborted split because " << errmsg << ": official " << maxVersion
-                                      << " mine: " << shardingState.getVersion(ns) << endl;
+                    warning() << "aborted split because " << errmsg << ": official " << maxVersion
+                              << " mine: " << shardingState.getVersion(ns) << endl;
                     return false;
                 }
 

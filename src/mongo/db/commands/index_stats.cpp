@@ -501,7 +501,7 @@ namespace mongo {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             const NamespaceDetails* nsd = nsdetails(ns);
             if (!cmdLine.quiet) {
-                tlog() << "CMD: indexStats " << ns << endl;
+                MONGO_TLOG(0) << "CMD: indexStats " << ns << endl;
             }
             if (!nsd) {
                 errmsg = "ns not found";

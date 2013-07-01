@@ -132,35 +132,39 @@ namespace JSTests {
         }
     };
 
-    /** Installs a tee for auditing log messages, including those logged with tlog(). */
+    /** Installs a tee for auditing log messages, including those logged with MONGO_TLOG(0)(). */
     class LogRecordingScope {
     public:
         LogRecordingScope() :
-            _oldTLogLevel( tlogLevel ) {
+            _oldTLogLevel(tlogLevel),
+            _logged(false),
+            _handle(mongo::logger::globalLogDomain()->attachAppender(
+                            mongo::logger::MessageLogDomain::AppenderAutoPtr(new Tee(this)))) {
             tlogLevel = 0;
-            Logstream::get().addGlobalTee( &_tee );
         }
         ~LogRecordingScope() {
-            Logstream::get().removeGlobalTee( &_tee );
+            mongo::logger::globalLogDomain()->detachAppender(_handle);
             tlogLevel = _oldTLogLevel;
         }
         /** @return most recent log entry. */
-        bool logged() const { return _tee.logged(); }
+        bool logged() const { return _logged; }
     private:
-        class Tee : public mongo::Tee {
+        class Tee : public mongo::logger::MessageLogDomain::EventAppender {
         public:
-            Tee() :
-                _logged() {
+            Tee(LogRecordingScope* scope) : _scope(scope) {}
+            virtual ~Tee() {}
+            virtual Status append(const logger::MessageEventEphemeral& event) {
+                _scope->_logged = true;
+                return Status::OK();
             }
-            virtual void write( LogLevel level, const string &str ) { _logged = true; }
-            bool logged() const { return _logged; }
         private:
-            bool _logged;
+            LogRecordingScope* _scope;
         };
         int _oldTLogLevel;
-        Tee _tee;
+        bool _logged;
+        mongo::logger::MessageLogDomain::AppenderHandle _handle;
     };
-    
+
     /** Error logging in Scope::exec(). */
     class ExecLogError {
     public:
@@ -870,7 +874,7 @@ namespace JSTests {
         ~Utf8Check() { reset(); }
         void run() {
             if( !globalScriptEngine->utf8Ok() ) {
-                log() << "warning: utf8 not supported" << endl;
+                mongo::unittest::log() << "warning: utf8 not supported" << endl;
                 return;
             }
             string utf8ObjSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";

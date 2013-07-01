@@ -45,9 +45,6 @@ namespace {
     TEST_F(RotatableFileWriterTest, RotationTest) {
         using namespace logger;
 
-        const std::string logFileName("LogTest_RotatableFileAppender.txt");
-        const std::string logFileNameRotated("LogTest_RotatableFileAppender_Rotated.txt");
-
         {
             RotatableFileWriter writer;
             RotatableFileWriter::Use writerUse(&writer);

@@ -15,9 +15,11 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "mutex.h"
-#include "value.h"
+#include "mongo/pch.h"
+
+#include "mongo/logger/logger.h"
+#include "mongo/util/concurrency/mutex.h"
+
 
 namespace mongo {
 
@@ -43,7 +45,8 @@ namespace mongo {
     }
 
     void MutexDebugger::programEnding() {
-        if( logLevel>=1 && followers.size() ) {
+        using logger::LogSeverity;
+        if(logger::globalLogDomain()->shouldLog(LogSeverity::Debug(1)) && followers.size()) {
             std::cout << followers.size() << " mutexes in program" << endl;
             for( map< mid, set<mid> >::iterator i = followers.begin(); i != followers.end(); i++ ) {
                 cout << i->first;

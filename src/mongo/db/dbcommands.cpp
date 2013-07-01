@@ -599,8 +599,9 @@ namespace mongo {
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
             _diaglog.flush();
-            if ( !cmdLine.quiet )
-                tlog() << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
+            if ( !cmdLine.quiet ) {
+                MONGO_TLOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
+            }
             result.append( "was" , was );
             return true;
         }
@@ -643,8 +644,9 @@ namespace mongo {
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
             NamespaceDetails *d = nsdetails(nsToDrop);
-            if ( !cmdLine.quiet )
-                tlog() << "CMD: drop " << nsToDrop << endl;
+            if ( !cmdLine.quiet ) {
+                MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
+            }
             if ( d == 0 ) {
                 errmsg = "ns not found";
                 return false;
@@ -817,8 +819,9 @@ namespace mongo {
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs);
-            if ( !cmdLine.quiet )
-                tlog() << "CMD: dropIndexes " << toDeleteNs << endl;
+            if ( !cmdLine.quiet ) {
+                MONGO_TLOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
+            }
             if ( d ) {
                 stopIndexBuilds(dbname, jsobj);
 
@@ -883,7 +886,7 @@ namespace mongo {
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs);
-            tlog() << "CMD: reIndex " << toDeleteNs << endl;
+            MONGO_TLOG(0) << "CMD: reIndex " << toDeleteNs << endl;
             BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs.c_str());
 
             if ( ! d ) {
@@ -2165,8 +2168,9 @@ namespace mongo {
             return;
         }
 
-        if ( c->adminOnly() )
+        if ( c->adminOnly() ) {
             LOG( 2 ) << "command: " << cmdObj << endl;
+        }
 
         if (c->maintenanceMode() && theReplSet) {
             mmSetter.reset(new MaintenanceModeSetter());
@@ -2241,8 +2245,7 @@ namespace mongo {
     bool _runCommands(const char *ns, BSONObj& _cmdobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
         string dbname = nsToDatabase( ns );
 
-        if( logLevel >= 1 )
-            log() << "run command " << ns << ' ' << _cmdobj << endl;
+        LOG(1) << "run command " << ns << ' ' << _cmdobj << endl;
 
         const char *p = strchr(ns, '.');
         if ( !p ) return false;

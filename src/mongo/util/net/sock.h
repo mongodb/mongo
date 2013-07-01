@@ -39,6 +39,7 @@
 #include <openssl/ssl.h>
 #endif
 
+#include "mongo/logger/log_severity.h"
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
@@ -188,7 +189,7 @@ namespace mongo {
 
             Generally you don't want a timeout, you should be very prepared for errors if you set one.
         */
-        Socket(double so_timeout = 0, int logLevel = 0 );
+        Socket(double so_timeout = 0, logger::LogSeverity logLevel = logger::LogSeverity::Log() );
 
         ~Socket();
 
@@ -202,8 +203,8 @@ namespace mongo {
         void recv( char * data , int len );
         int unsafe_recv( char *buf, int max );
         
-        int getLogLevel() const { return _logLevel; }
-        void setLogLevel( int ll ) { _logLevel = ll; }
+        logger::LogSeverity getLogLevel() const { return _logLevel; }
+        void setLogLevel( logger::LogSeverity ll ) { _logLevel = ll; }
 
         SockAddr remoteAddr() const { return _remote; }
         string remoteString() const { return _remote.toString(); }
@@ -267,7 +268,7 @@ namespace mongo {
         SSL* _ssl;
         SSLManagerInterface* _sslManager;
 #endif
-        int _logLevel; // passed to log() when logging errors
+        logger::LogSeverity _logLevel; // passed to log() when logging errors
 
     };
 

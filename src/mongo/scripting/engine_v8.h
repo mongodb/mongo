@@ -73,9 +73,10 @@ namespace mongo {
          * V8Scope is destructed.
          */
         ~ObjTracker() {
-            if (!_container.empty())
+            if (!_container.empty()) {
                 LOG(1) << "freeing " << _container.size() << " uncollected "
                        << typeid(_ObjType).name() << " objects" << endl;
+            }
             typename set<TrackedPtr*>::iterator it = _container.begin();
             while (it != _container.end()) {
                 delete *it;

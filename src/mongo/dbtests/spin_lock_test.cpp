@@ -92,7 +92,7 @@ namespace {
             }
       
             int ms = timer.millis();
-            log() << "spinlock ConcurrentIncs time: " << ms << endl;
+            mongo::unittest::log() << "spinlock ConcurrentIncs time: " << ms << endl;
             
             ASSERT_EQUALS( counter, threads*incs );
 #if defined(__linux__)

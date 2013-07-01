@@ -209,7 +209,7 @@ namespace ReplSetTests {
                     }
                 }
             }
-            log() << "index build ending" << endl;
+            mongo::unittest::log() << "index build ending" << endl;
             killCurrentOp.notifyAllWaiters();
             cc().shutdown();
 

@@ -120,11 +120,11 @@ namespace mongo {
         /* for debugging purposes, show what the query and sort are */
         DEV {
             (log() << "\n---- query BSON\n" <<
-             queryObj.jsonString(Strict, 1) << "\n----\n").flush();
+             queryObj.jsonString(Strict, 1) << "\n----\n");
             (log() << "\n---- sort BSON\n" <<
-             sortObj.jsonString(Strict, 1) << "\n----\n").flush();
+             sortObj.jsonString(Strict, 1) << "\n----\n");
             (log() << "\n---- fullName\n" <<
-             fullName << "\n----\n").flush();
+             fullName << "\n----\n");
         }
 
         // Create the necessary context to use a Cursor, including taking a namespace read lock,

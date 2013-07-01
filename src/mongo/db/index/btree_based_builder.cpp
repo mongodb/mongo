@@ -162,7 +162,7 @@ namespace mongo {
             phaseOne->addKeys(keys, loc, mayInterrupt);
             cursor->advance();
             progressMeter->hit();
-            if ( logLevel > 1 && phaseOne->n % 10000 == 0 ) {
+            if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) && phaseOne->n % 10000 == 0 ) {
                 printMemInfo( "\t iterating objects" );
             }
         }
@@ -175,7 +175,7 @@ namespace mongo {
 
         Timer t;
 
-        tlog(1) << "fastBuildIndex " << ns << ' ' << idx.info.obj().toString() << endl;
+        MONGO_TLOG(1) << "fastBuildIndex " << ns << ' ' << idx.info.obj().toString() << endl;
 
         bool dupsAllowed = !idx.unique() || ignoreUniqueIndex(idx);
         bool dropDups = idx.dropDups() || inDBRepair;
@@ -183,7 +183,8 @@ namespace mongo {
 
         getDur().writingDiskLoc(idx.head).Null();
 
-        if ( logLevel > 1 ) printMemInfo( "before index start" );
+        if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
+            printMemInfo( "before index start" );
 
         /* get and sort all the keys ----- */
         ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
@@ -201,9 +202,11 @@ namespace mongo {
             d->setIndexIsMultikey(ns, idxNo);
         }
 
-        if ( logLevel > 1 ) printMemInfo( "before final sort" );
+        if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
+            printMemInfo( "before final sort" );
         phase1.sorter->sort( mayInterrupt );
-        if ( logLevel > 1 ) printMemInfo( "after final sort" );
+        if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
+            printMemInfo( "after final sort" );
 
         LOG(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles()
                                      << " files " << " in " << t.seconds() << " secs" << endl;

@@ -243,7 +243,7 @@ namespace mongo {
                 return false;
             }
             sourceCollection = nsdetails(sourceNS);
-            tlog() << "info: creating collection " << sourceNS << " on add index" << endl;
+            MONGO_TLOG(0) << "info: creating collection " << sourceNS << " on add index" << endl;
             verify( sourceCollection );
         }
 

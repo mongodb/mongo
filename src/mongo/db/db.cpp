@@ -60,6 +60,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/net/message_server.h"
@@ -446,12 +447,15 @@ namespace mongo {
 
         void run() {
             Client::initThread( name().c_str() );
-            if( cmdLine.syncdelay == 0 )
+            if( cmdLine.syncdelay == 0 ) {
                 log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
-            else if( cmdLine.syncdelay == 1 )
+            }
+            else if( cmdLine.syncdelay == 1 ) {
                 log() << "--syncdelay 1" << endl;
-            else if( cmdLine.syncdelay != 60 )
+            }
+            else if( cmdLine.syncdelay != 60 ) {
                 LOG(1) << "--syncdelay " << cmdLine.syncdelay << endl;
+            }
             int time_flushing = 0;
             while ( ! inShutdown() ) {
                 _diaglog.flush();
@@ -474,7 +478,7 @@ namespace mongo {
 
                 _flushed(time_flushing);
 
-                if( logLevel >= 1 || time_flushing >= 10000 ) {
+                if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || time_flushing >= 10000 ) {
                     log() << "flushing mmaps took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
                 }
             }
@@ -577,13 +581,15 @@ namespace mongo {
 
         Client::initThread("initandlisten");
 
-        Logstream::get().addGlobalTee( new RamLog("global") );
+        logger::globalLogDomain()->attachAppender(
+                logger::MessageLogDomain::AppenderAutoPtr(
+                        new RamLogAppender(new RamLog("global"))));
 
         bool is32bit = sizeof(int*) == 4;
 
         {
             ProcessId pid = ProcessId::getCurrent();
-            Nullstream& l = log();
+            LogstreamBuilder l = log();
             l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
             if( replSettings.master ) l << " master=" << replSettings.master;
             if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;

@@ -762,7 +762,7 @@ namespace Misc {
 int main( int argc, char **argv, char** envp ) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
-    logLevel = -1;
+    mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(mongo::logger::LogSeverity::Log());
     client_ = new DBDirectClient();
 
     return mongo::dbtests::runDbTests(argc, argv, "/data/db/perftest");

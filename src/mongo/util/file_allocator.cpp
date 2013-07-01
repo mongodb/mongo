@@ -37,6 +37,7 @@
 #endif
 
 #include "mongo/platform/posix_fadvise.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
 #include "mongo/util/time_support.h"

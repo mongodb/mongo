@@ -910,7 +910,7 @@ namespace mongo {
             {
                 dbtempreleasecond tl;
                 if ( ! tl.unlocked() )
-                    LOG( LL_WARNING ) << "map/reduce can't temp release" << endl;
+                    warning() << "map/reduce can't temp release" << endl;
                 // reduce and finalize last array
                 finalReduce( all );
             }

@@ -825,14 +825,14 @@ namespace PerfTests {
         if( dontOptimizeOutHopefully ) { 
             throw TestException();
         }
-        log() << "hmmm" << endl;
+        mongo::unittest::log() << "hmmm" << endl;
     }
     void thr2(int n) { 
         if( --n <= 0 ) {
             if( dontOptimizeOutHopefully ) { 
                 throw TestException();
             }
-            log() << "hmmm" << endl;
+            mongo::unittest::log() << "hmmm" << endl;
         }
         Z z;
         try { 
@@ -846,7 +846,7 @@ namespace PerfTests {
             if( dontOptimizeOutHopefully ) { 
                 throw TestException();
             }
-            log() << "hmmm" << endl;
+            mongo::unittest::log() << "hmmm" << endl;
         }
         try { 
             Z z;
@@ -860,7 +860,7 @@ namespace PerfTests {
             if( dontOptimizeOutHopefully ) { 
                 throw TestException();
             }
-            log() << "hmmm" << endl;
+            mongo::unittest::log() << "hmmm" << endl;
         }
         Z z;
         thr4(n-1);

@@ -97,12 +97,15 @@ namespace mongo {
         freeifaddrs( addrs );
         addrs = NULL;
 
-        if (logLevel >= 1) {
-            LOG(1) << "getMyAddrs():";
+        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+            LogstreamBuilder builder(logger::globalLogDomain(),
+                                     getThreadName(),
+                                     logger::LogSeverity::Debug(1));
+            builder << "getMyAddrs():";
             for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                LOG(1) << " [" << *it << ']';
+                builder << " [" << *it << ']';
             }
-            LOG(1) << endl;
+            builder << endl;
         }
 
         return out;
@@ -141,12 +144,15 @@ namespace mongo {
 
         freeaddrinfo(addrs);
 
-        if (logLevel >= 1) {
-            LOG(1) << "getallIPs(\"" << iporhost << "\"):";
+        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+            LogstreamBuilder builder(logger::globalLogDomain(),
+                                     getThreadName(),
+                                     logger::LogSeverity::Debug(1));
+            builder << "getallIPs(\"" << iporhost << "\"):";
             for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                LOG(1) << " [" << *it << ']';
+                builder << " [" << *it << ']';
             }
-            LOG(1) << endl;
+            builder << endl;
         }
 
         return out;

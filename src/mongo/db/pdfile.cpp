@@ -399,7 +399,7 @@ namespace mongo {
         if( !boost::filesystem::exists(filename) )
             return false;
         if( !mmf.open(filename,false) ) {
-            dlog(2) << "info couldn't open " << filename << " probably end of datafile list" << endl;
+            MONGO_DLOG(2) << "info couldn't open " << filename << " probably end of datafile list" << endl;
             return false;
         }
         _mb = mmf.getView(); verify(_mb);
@@ -518,8 +518,11 @@ namespace mongo {
 
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
-        DEV tlog(1) << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
-                    << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
+        DEV {
+            MONGO_TLOG(1) << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x"
+                          << hex << offset << " emptyLoc:" << hex << emptyLoc.getOfs() << dec
+                          << endl;
+        }
         return e;
     }
 
@@ -586,7 +589,7 @@ namespace mongo {
                 }
             }
 
-            if( n > 128 ) LOG( n < 512 ? 1 : 0 ) << "warning: newExtent " << n << " scanned\n";
+            if( n > 128 ) { LOG( n < 512 ? 1 : 0 ) << "warning: newExtent " << n << " scanned\n"; }
 
             if( best ) {
                 Extent *e = best;
@@ -1953,8 +1956,9 @@ namespace mongo {
         q = p / (c+"ns");
         bool ok = false;
         MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply( q ) );
-        if ( ok )
+        if ( ok ) {
             LOG(2) << fo.op() << " file " << q.string() << endl;
+        }
         int i = 0;
         int extra = 10; // should not be necessary, this is defensive in case there are missing files
         while ( 1 ) {

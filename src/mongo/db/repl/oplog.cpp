@@ -229,9 +229,7 @@ namespace mongo {
 
         append_O_Obj(r->data(), partial, obj);
 
-        if ( logLevel >= 6 ) {
-            LOG( 6 ) << "logOp:" << BSONObj::make(r) << endl;
-        }
+        LOG( 6 ) << "logOp:" << BSONObj::make(r) << endl;
     }
 
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {

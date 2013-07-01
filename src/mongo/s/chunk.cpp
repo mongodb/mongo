@@ -417,11 +417,11 @@ namespace mongo {
                 ChunkPtr toMove = cm->findIntersectingChunk(min);
 
                 if ( ! (toMove->getMin() == min && toMove->getMax() == max) ){
-                    LOG(1) << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
+                    LOG(1).stream() << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
                     return true;
                 }
 
-                log() << "moving chunk (auto): " << toMove << " to: " << newLocation.toString() << endl;
+                log().stream() << "moving chunk (auto): " << toMove << " to: " << newLocation.toString() << endl;
 
                 BSONObj res;
                 massert( 10412 ,
@@ -1346,7 +1346,7 @@ namespace mongo {
 
         }
         catch (...) {
-            LOG( LL_ERROR ) << "\t invalid ChunkRangeMap! printing ranges:" << endl;
+            error() << "\t invalid ChunkRangeMap! printing ranges:" << endl;
 
             for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it)
                 cout << it->first << ": " << *it->second << endl;
@@ -1456,7 +1456,8 @@ namespace mongo {
         cmdBuilder.append( "shardHost" , s.getConnString() );
         BSONObj cmd = cmdBuilder.obj();
 
-        LOG(1) << "    setShardVersion  " << s.getName()
+        LOG(1).stream()
+               << "    setShardVersion  " << s.getName()
                << " " << conn.getServerAddress()
                << "  " << ns
                << "  " << cmd

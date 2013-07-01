@@ -176,13 +176,13 @@ namespace mongo {
             ::_exit(0);
         }
 
-        if ( _params.count( "verbose" ) ) {
-            logLevel = 1;
+        if (_params.count("verbose")) {
+            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
         }
 
-        for (string s = "vv"; s.length() <= 10; s.append("v")) {
+        for (string s = "vv"; s.length() <= 12; s.append("v")) {
             if (_params.count(s)) {
-                logLevel = s.length();
+                logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(s.length()));
             }
         }
 
@@ -498,7 +498,7 @@ namespace mongo {
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        if (!_quiet && logLevel >= 1) {
+        if (!_quiet && logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
             (_usesstdout ? cout : cerr ) << "\t file size: " << fileLength << endl;
         }
 

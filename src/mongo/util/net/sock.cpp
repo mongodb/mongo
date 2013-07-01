@@ -56,7 +56,7 @@ namespace mongo {
         struct timeval tv;
         tv.tv_sec = (int)secs;
         tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
-        bool report = logLevel > 3; // solaris doesn't provide these
+        bool report = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(4));
         DEV report = true;
 #if defined(_WIN32)
         tv.tv_sec *= 1000; // Windows timeout is a DWORD, in milliseconds.
@@ -194,7 +194,7 @@ namespace mongo {
                 if( target != "0.0.0.0" ) { // don't log if this as it is a 
                                             // CRT construction and log() may not work yet.
                     log() << "getaddrinfo(\"" << target << "\") failed: " << 
-                        gai_strerror(ret) << endl;
+                        getAddrInfoStrError(ret) << endl;
                 }
                 *this = SockAddr(port);
             }
@@ -392,13 +392,11 @@ namespace mongo {
     // ------------ Socket -----------------
     
     Socket::Socket(int fd , const SockAddr& remote) : 
-        _fd(fd), _remote(remote), _timeout(0), _lastValidityCheckAtSecs(time(0)) {
-        _logLevel = 0;
+        _fd(fd), _remote(remote), _timeout(0), _lastValidityCheckAtSecs(time(0)), _logLevel(logger::LogSeverity::Log()) {
         _init();
     }
 
-    Socket::Socket( double timeout, int ll ) {
-        _logLevel = ll;
+    Socket::Socket( double timeout, logger::LogSeverity ll ) : _logLevel(ll) {
         _fd = -1;
         _timeout = timeout;
         _lastValidityCheckAtSecs = time(0);
@@ -657,9 +655,10 @@ namespace mongo {
                 continue;
             }
 
-            if ( len <= 4 && ret != len )
+            if ( len <= 4 && ret != len ) {
                 LOG(_logLevel) << "Socket recv() got " << ret <<
                     " bytes wanted len=" << len << endl;
+            }
             fassert(16508, ret <= len);
             len -= ret;
             buf += ret;

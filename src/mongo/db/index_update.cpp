@@ -269,7 +269,7 @@ namespace mongo {
 
         bool background = idx.info.obj()["background"].trueValue();
 
-        tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
+        MONGO_TLOG(0) << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;
 
@@ -284,7 +284,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx);
         }
-        tlog() << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
+        MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
     }
 
     extern BSONObj id_obj;  // { _id : 1 }

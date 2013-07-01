@@ -17,6 +17,7 @@
 
 #include "mongo/scripting/engine_v8.h"
 
+#include "mongo/base/init.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
@@ -303,78 +304,77 @@ namespace mongo {
 
     template <typename _GCState>
     void gcCallback(v8::GCType type, v8::GCCallbackFlags flags) {
-        const int verbosity = 1;    // log level for stat collection
-        if (logLevel < verbosity)
-            // don't collect stats unless verbose
-            return;
+        if (!logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)))
+             // don't collect stats unless verbose
+             return;
 
-        v8::HeapStatistics stats;
-        v8::V8::GetHeapStatistics(&stats);
-        log() << "V8 GC " << _GCState::name
-              << " heap stats - "
-              << " total: " << stats.total_heap_size()
-              << " exec: " << stats.total_heap_size_executable()
-              << " used: " << stats.used_heap_size()<< " limit: "
-              << stats.heap_size_limit()
-              << endl;
-    }
+         v8::HeapStatistics stats;
+         v8::V8::GetHeapStatistics(&stats);
+         log() << "V8 GC " << _GCState::name
+               << " heap stats - "
+               << " total: " << stats.total_heap_size()
+               << " exec: " << stats.total_heap_size_executable()
+               << " used: " << stats.used_heap_size()<< " limit: "
+               << stats.heap_size_limit()
+               << endl;
+     }
 
-    V8ScriptEngine::V8ScriptEngine() :
-        _globalInterruptLock("GlobalV8InterruptLock"),
-        _opToScopeMap(),
-        _deadlineMonitor() {
-    }
+     V8ScriptEngine::V8ScriptEngine() :
+         _globalInterruptLock("GlobalV8InterruptLock"),
+         _opToScopeMap(),
+         _deadlineMonitor() {
+     }
 
-    V8ScriptEngine::~V8ScriptEngine() {
-    }
+     V8ScriptEngine::~V8ScriptEngine() {
+     }
 
-    void ScriptEngine::setup() {
-        if (!globalScriptEngine) {
-            globalScriptEngine = new V8ScriptEngine();
-        }
-    }
+     void ScriptEngine::setup() {
+         if (!globalScriptEngine) {
+             globalScriptEngine = new V8ScriptEngine();
+         }
+     }
 
-    std::string ScriptEngine::getInterpreterVersionString() {
-        return "V8 3.12.19";
-    }
+     std::string ScriptEngine::getInterpreterVersionString() {
+         return "V8 3.12.19";
+     }
 
-    void V8ScriptEngine::interrupt(unsigned opId) {
-        mongo::mutex::scoped_lock intLock(_globalInterruptLock);
-        OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
-        if (iScope == _opToScopeMap.end()) {
-            // got interrupt request for a scope that no longer exists
-            LOG(1) << "received interrupt request for unknown op: " << opId
-                   << printKnownOps_inlock() << endl;
-            return;
-        }
-        LOG(1) << "interrupting op: " << opId << printKnownOps_inlock() << endl;
-        iScope->second->kill();
-    }
+     void V8ScriptEngine::interrupt(unsigned opId) {
+         mongo::mutex::scoped_lock intLock(_globalInterruptLock);
+         OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
+         if (iScope == _opToScopeMap.end()) {
+             // got interrupt request for a scope that no longer exists
+             LOG(1) << "received interrupt request for unknown op: " << opId
+                    << printKnownOps_inlock() << endl;
+             return;
+         }
+         LOG(1) << "interrupting op: " << opId << printKnownOps_inlock() << endl;
+         iScope->second->kill();
+     }
 
-    void V8ScriptEngine::interruptAll() {
-        mongo::mutex::scoped_lock interruptLock(_globalInterruptLock);
-        for (OpIdToScopeMap::iterator iScope = _opToScopeMap.begin();
-             iScope != _opToScopeMap.end(); ++iScope) {
-            iScope->second->kill();
-        }
-    }
+     void V8ScriptEngine::interruptAll() {
+         mongo::mutex::scoped_lock interruptLock(_globalInterruptLock);
+         for (OpIdToScopeMap::iterator iScope = _opToScopeMap.begin();
+              iScope != _opToScopeMap.end(); ++iScope) {
+             iScope->second->kill();
+         }
+     }
 
-    void V8Scope::registerOpId() {
-        scoped_lock giLock(_engine->_globalInterruptLock);
-        if (_engine->haveGetCurrentOpIdCallback()) {
-            // this scope has an associated operation
-            _opId = _engine->getCurrentOpId();
-            _engine->_opToScopeMap[_opId] = this;
-        }
-        else
-            // no associated op id (e.g. running from shell)
-            _opId = 0;
-        LOG(2) << "V8Scope " << this << " registered for op " << _opId << endl;
-    }
+     void V8Scope::registerOpId() {
+         scoped_lock giLock(_engine->_globalInterruptLock);
+         if (_engine->haveGetCurrentOpIdCallback()) {
+             // this scope has an associated operation
+             _opId = _engine->getCurrentOpId();
+             _engine->_opToScopeMap[_opId] = this;
+         }
+         else
+             // no associated op id (e.g. running from shell)
+             _opId = 0;
+         LOG(2) << "V8Scope " << static_cast<const void*>(this) << " registered for op " << _opId << endl;
+     }
 
-    void V8Scope::unregisterOpId() {
-        scoped_lock giLock(_engine->_globalInterruptLock);
-        LOG(2) << "V8Scope " << this << " unregistered for op " << _opId << endl;
+     void V8Scope::unregisterOpId() {
+         scoped_lock giLock(_engine->_globalInterruptLock);
+         LOG(2) << "V8Scope " << static_cast<const void*>(this) << " unregistered for op " << _opId << endl;
         if (_engine->haveGetCurrentOpIdCallback() || _opId != 0) {
             // scope is currently associated with an operation id
             V8ScriptEngine::OpIdToScopeMap::iterator it = _engine->_opToScopeMap.find(_opId);
@@ -387,12 +387,12 @@ namespace mongo {
         v8::Locker l(_isolate);
         mongo::mutex::scoped_lock cbEnterLock(_interruptLock);
         if (v8::V8::IsExecutionTerminating(_isolate)) {
-            LOG(2) << "v8 execution interrupted.  isolate: " << _isolate << endl;
+            LOG(2) << "v8 execution interrupted.  isolate: " << static_cast<const void*>(_isolate) << endl;
             return false;
         }
         if (_pendingKill || globalScriptEngine->interrupted()) {
             // kill flag was set before entering our callback
-            LOG(2) << "marked for death while leaving callback.  isolate: " << _isolate << endl;
+            LOG(2) << "marked for death while leaving callback.  isolate: " << static_cast<const void*>(_isolate) << endl;
             v8::V8::TerminateExecution(_isolate);
             return false;
         }
@@ -405,11 +405,11 @@ namespace mongo {
         mongo::mutex::scoped_lock cbLeaveLock(_interruptLock);
         _inNativeExecution = false;
         if (v8::V8::IsExecutionTerminating(_isolate)) {
-            LOG(2) << "v8 execution interrupted.  isolate: " << _isolate << endl;
+            LOG(2) << "v8 execution interrupted.  isolate: " << static_cast<const void*>(_isolate) << endl;
             return false;
         }
         if (_pendingKill || globalScriptEngine->interrupted()) {
-            LOG(2) << "marked for death while leaving callback.  isolate: " << _isolate << endl;
+            LOG(2) << "marked for death while leaving callback.  isolate: " << static_cast<const void*>(_isolate) << endl;
             v8::V8::TerminateExecution(_isolate);
             return false;
         }
@@ -422,9 +422,9 @@ namespace mongo {
             // Set the TERMINATE flag on the stack guard for this isolate.
             // This won't happen between calls to nativePrologue and nativeEpilogue().
             v8::V8::TerminateExecution(_isolate);
-            LOG(1) << "killing v8 scope.  isolate: " << _isolate << endl;
+            LOG(1) << "killing v8 scope.  isolate: " << static_cast<const void*>(_isolate) << endl;
         }
-        LOG(1) << "marking v8 scope for death.  isolate: " << _isolate << endl;
+        LOG(1) << "marking v8 scope for death.  isolate: " << static_cast<const void*>(_isolate) << endl;
         _pendingKill = true;
     }
 
@@ -438,7 +438,7 @@ namespace mongo {
      */
     std::string V8ScriptEngine::printKnownOps_inlock() {
         stringstream out;
-        if (logLevel > 1) {
+        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
             out << "  known ops: " << endl;
             for(OpIdToScopeMap::iterator iSc = _opToScopeMap.begin();
                 iSc != _opToScopeMap.end(); ++iSc) {
@@ -1665,8 +1665,10 @@ namespace mongo {
 
     // --- random utils ----
 
+    static logger::MessageLogDomain* jsPrintLogDomain;
     v8::Handle<v8::Value> V8Scope::Print(V8Scope* scope, const v8::Arguments& args) {
-        stringstream ss;
+        LogstreamBuilder builder(jsPrintLogDomain, getThreadName(), logger::LogSeverity::Log());
+        std::ostream& ss = builder.stream();
         v8::HandleScope handle_scope;
         bool first = true;
         for (int i = 0; i < args.Length(); i++) {
@@ -1690,7 +1692,6 @@ namespace mongo {
             ss << *str;
         }
         ss << "\n";
-        Logstream::logLockless(ss.str());
         return handle_scope.Close(v8::Undefined());
     }
 
@@ -1728,6 +1729,11 @@ namespace mongo {
         }
         return scope->mongoToLZV8(scope->_cpuProfiler.fetch(
                 *v8::String::Utf8Value(args[0]->ToString())));
+    }
+
+    MONGO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {
+        jsPrintLogDomain = logger::globalLogManager()->getNamedDomain("javascriptOutput");
+        return Status::OK();
     }
 
 } // namespace mongo

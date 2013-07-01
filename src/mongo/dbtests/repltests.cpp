@@ -126,7 +126,7 @@ namespace ReplTests {
                 ReplSource a(b.obj());
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                     if ( 0 ) {
-                        log() << "op: " << *i << endl;
+                        mongo::unittest::log() << "op: " << *i << endl;
                     }
                     a.applyOperation( *i );
                 }

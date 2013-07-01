@@ -151,8 +151,9 @@ namespace mongo {
             mayCommitProgressDurably();
         }
 
-        if( levels > 1 )
+        if( levels > 1 ) {
             LOG(2) << "btree levels: " << levels << endl;
+        }
     }
 
     /** when all addKeys are done, we then build the higher levels of the tree */

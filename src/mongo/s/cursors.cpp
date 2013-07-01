@@ -167,16 +167,16 @@ namespace mongo {
 
     CursorCache::~CursorCache() {
         // TODO: delete old cursors?
-        bool print = logLevel > 0;
+        bool print = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
         if ( _cursors.size() || _refs.size() )
             print = true;
         verify(_refs.size() == _refsNS.size());
         
         if ( print ) 
-            cout << " CursorCache at shutdown - "
-                 << " sharded: " << _cursors.size()
-                 << " passthrough: " << _refs.size()
-                 << endl;
+            log() << " CursorCache at shutdown - "
+                  << " sharded: " << _cursors.size()
+                  << " passthrough: " << _refs.size()
+                  << endl;
     }
 
     ShardedClientCursorPtr CursorCache::get( long long id ) const {
@@ -276,7 +276,7 @@ namespace mongo {
         int n = *x++;
 
         if ( n > 2000 ) {
-            LOG( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
+            ( n < 30000 ? warning() : error() ) << "receivedKillCursors, n=" << n << endl;
         }
 
 
@@ -291,7 +291,7 @@ namespace mongo {
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
 
             if ( ! id ) {
-                LOG( LL_WARNING ) << " got cursor id of 0 to kill" << endl;
+                warning() << " got cursor id of 0 to kill" << endl;
                 continue;
             }
 
@@ -311,7 +311,7 @@ namespace mongo {
                 MapNormal::iterator refsIt = _refs.find(id);
                 MapNormal::iterator refsNSIt = _refsNS.find(id);
                 if (refsIt == _refs.end()) {
-                    LOG( LL_WARNING ) << "can't find cursor: " << id << endl;
+                    warning() << "can't find cursor: " << id << endl;
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());

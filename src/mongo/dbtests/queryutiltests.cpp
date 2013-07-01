@@ -75,7 +75,7 @@ namespace QueryUtilTests {
             virtual bool isPointIntervalSet() { return false; }
             static void checkElt( BSONElement expected, BSONElement actual ) {
                 if ( expected.woCompare( actual, false ) ) {
-                    log() << "expected: " << expected << ", got: " << actual;
+                    mongo::unittest::log() << "expected: " << expected << ", got: " << actual;
                     ASSERT( false );
                 }
             }
@@ -2123,7 +2123,7 @@ namespace QueryUtilTests {
             }
             static void assertEqualWithoutFieldNames( const BSONObj &one, const BSONObj &two ) {
                 if ( !equalWithoutFieldNames( one, two ) ) {
-                    log() << one << " != " << two << endl;
+                    mongo::unittest::log() << one << " != " << two << endl;
                     ASSERT( equalWithoutFieldNames( one, two ) );
                 }
             }

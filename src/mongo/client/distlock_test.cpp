@@ -29,6 +29,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/util/bson_util.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/timer.h"
 
 // Modify some config options for the RNG, since they cause MSVC to fail

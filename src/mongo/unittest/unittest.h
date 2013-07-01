@@ -33,6 +33,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/logger/logstream_builder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -168,6 +169,12 @@ namespace mongo {
     namespace unittest {
 
         class Result;
+
+        /**
+         * Gets a LogstreamBuilder for logging to the unittest log domain, which may have
+         * different target from the global log domain.
+         */
+        mongo::logger::LogstreamBuilder log();
 
         /**
          * Type representing the function composing a test.

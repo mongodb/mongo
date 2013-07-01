@@ -32,8 +32,8 @@ namespace mongo {
      *
      * Wed Oct 31 13:34:47.996
      *
-     * @param timeStr pointer to the buffer to set the string - should at least be
-     *     24 bytes big.
+     * @param timeStr pointer to the buffer to set the string - empirically, 64 bytes is enough for
+     * the buffer, 26 is not.
      */
     void curTimeString(char* timeStr);
 

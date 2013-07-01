@@ -587,7 +587,7 @@ namespace mongo {
                                 << "inserting "
                                 << group.inserts.size()
                                 << " documents to shard "
-                                << group.shard
+                                << group.shard->toString()
                                 << " at version "
                                 << (group.manager.get() ?
                                     group.manager->getVersion().toString() :

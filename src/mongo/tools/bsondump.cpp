@@ -109,7 +109,7 @@ public:
                     else if ( e.type() == String && ! isValidUTF8( e.valuestr() ) ) {
                         cout << prefix << "\t\t\t" << "bad utf8 String!" << endl;
                     }
-                    else if ( logLevel > 0 ) {
+                    else if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) ) {
                         cout << prefix << "\t\t\t" << e << endl;
                     }
 

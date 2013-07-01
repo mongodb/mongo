@@ -167,7 +167,7 @@ namespace mongo {
             }
 
             if (params.count("debug") || params.count("verbose") ) {
-                logLevel = 1;
+                logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
             }
 
             if (params.count("list")) {
@@ -254,7 +254,7 @@ namespace mongo {
             TestWatchDog twd;
             twd.go();
 
-            // set tlogLevel to -1 to suppress tlog() output in a test program
+            // set tlogLevel to -1 to suppress MONGO_TLOG(0) output in a test program
             tlogLevel = -1;
 
             int ret = ::mongo::unittest::Suite::run(suites,filter,runsPerTest);

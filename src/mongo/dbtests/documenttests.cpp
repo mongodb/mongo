@@ -1285,7 +1285,8 @@ namespace DocumentTests {
                 assertComparison(expectedResult, fromBson(a), fromBson(b));
             }
             void assertComparison(int expectedResult, const Value& a, const Value& b) {
-                log() << "testing " << a.toString() << " and " << b.toString() << endl;
+                mongo::unittest::log() <<
+                    "testing " << a.toString() << " and " << b.toString() << endl;
                 // reflexivity
                 ASSERT_EQUALS(0, cmp(a, a));
                 ASSERT_EQUALS(0, cmp(b, b));

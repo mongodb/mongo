@@ -26,6 +26,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <pcrecpp.h>
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -334,7 +335,8 @@ namespace mongo {
             _log = RamLog::get( "global" );
             if ( ! _log ) {
                 _log = new RamLog("global");
-                Logstream::get().addGlobalTee( _log );
+                logger::globalLogDomain()->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
+                                                                  new RamLogAppender(_log)));
             }
         }
 
@@ -344,7 +346,12 @@ namespace mongo {
         RamLog * _log;
     };
 
-    LogPlugin * logPlugin = new LogPlugin();
+    MONGO_INITIALIZER_GENERAL(WebStatusLogPlugin, ("ServerLogRedirection"), ("default"))(
+            InitializerContext*) {
+
+        new LogPlugin;
+        return Status::OK();
+    }
 
     // -- handler framework ---
 

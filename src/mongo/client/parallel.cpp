@@ -776,7 +776,7 @@ namespace mongo {
         ShardPtr primary;
 
         string prefix;
-        if (MONGO_unlikely(logLevel >= pc)) {
+        if (MONGO_unlikely(logger::globalLogDomain()->shouldLog(pc))) {
             if( _totalTries > 0 ) {
                 prefix = str::stream() << "retrying (" << _totalTries << " tries)";
             }
@@ -798,7 +798,7 @@ namespace mongo {
             // Try to get either the chunk manager or the primary shard
             config->getChunkManagerOrPrimary( ns, manager, primary );
 
-            if (MONGO_unlikely(logLevel >= pc)) {
+            if (MONGO_unlikely(logger::globalLogDomain()->shouldLog(pc))) {
                 if (manager) {
                     vinfo = str::stream() << "[" << manager->getns() << " @ "
                         << manager->getVersion().toString() << "]";
@@ -826,7 +826,7 @@ namespace mongo {
 
             // Don't use version to get shards here
             todo = _qShards;
-            if (MONGO_unlikely(logLevel >= pc)) {
+            if (MONGO_unlikely(logger::globalLogDomain()->shouldLog(pc))) {
                 vinfo = str::stream() << "[" << _qShards.size() << " shards specified]";
             }
         }

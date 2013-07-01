@@ -205,7 +205,10 @@ again:
 
         }
         catch ( const SocketException & e ) {
-            LOG(psock->getLogLevel() + (e.shouldPrint() ? 0 : 1) ) << "SocketException: remote: " << remote() << " error: " << e << endl;
+            logger::LogSeverity severity = psock->getLogLevel();
+            if (!e.shouldPrint())
+                severity = severity.lessSevere();
+            LOG(severity) << "SocketException: remote: " << remote() << " error: " << e << endl;
             m.reset();
             return false;
         }

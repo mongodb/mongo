@@ -78,8 +78,7 @@ namespace mongo {
             BSONObj o = next();
             if( strcmp(o.firstElementFieldName(), "$err") == 0 ) {
                 string s = "nextSafe(): " + o.toString();
-                if( logLevel >= 5 )
-                    log() << s << endl;
+                LOG(5) << s;
                 uasserted(13106, s);
             }
             return o;

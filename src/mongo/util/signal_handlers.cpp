@@ -104,14 +104,12 @@ namespace mongo {
     }
 
     void printStackAndExit( int signalNum ) {
-        int fd = Logstream::getLogDesc();
+        const int fd = 0;
 
-        if ( fd >= 0 ) {
-            formattedWrite( fd , "Received signal %d\n" , signalNum );
-            formattedWrite( fd , "Backtrace: " );
-            formattedBacktrace( fd );
-            formattedWrite( fd , "===\n" );
-        }
+        formattedWrite( fd , "Received signal %d\n" , signalNum );
+        formattedWrite( fd , "Backtrace: " );
+        formattedBacktrace( fd );
+        formattedWrite( fd , "===\n" );
 
         ::_exit( EXIT_ABRUPT );
     }

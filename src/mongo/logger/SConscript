@@ -4,11 +4,23 @@ Import("env")
 
 env.StaticLibrary('logger',
                   [
+                   'console.cpp',
+                   'log_manager.cpp',
+                   'log_severity.cpp',
+                   'logger.cpp',
+                   'logstream_builder.cpp',
+                   'message_event_utf8_encoder.cpp',
+                   'message_log_domain.cpp',
+                   'ramlog.cpp',
+                   'rotatable_file_manager.cpp',
                    'rotatable_file_writer.cpp',
                    ],
-                  LIBDEPS=['$BUILD_DIR/mongo/base/base'])
+                  LIBDEPS=['$BUILD_DIR/mongo/base/base',
+                           '$BUILD_DIR/mongo/util/concurrency/thread_name'])
+
+env.CppUnitTest('log_test', 'log_test.cpp',
+                LIBDEPS=['logger', '$BUILD_DIR/mongo/foundation'])
 
 env.CppUnitTest('rotatable_file_writer_test',
                 'rotatable_file_writer_test.cpp',
                 LIBDEPS=['logger'])
-

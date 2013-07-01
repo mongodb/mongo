@@ -1823,7 +1823,7 @@ namespace mongo {
             return _lazyState._lastClient->recv( m );
         }
         catch( DBException& e ){
-            log() << "could not receive data from " << _lazyState._lastClient << causedBy( e ) << endl;
+            log() << "could not receive data from " << _lazyState._lastClient->toString() << causedBy( e ) << endl;
             return false;
         }
     }

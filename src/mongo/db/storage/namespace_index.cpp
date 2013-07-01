@@ -70,7 +70,7 @@ namespace mongo {
                 _ht->kill(extra);
             }
             catch(DBException&) {
-                dlog(3) << "caught exception in kill_ns" << endl;
+                MONGO_DLOG(3) << "caught exception in kill_ns" << endl;
             }
         }
     }

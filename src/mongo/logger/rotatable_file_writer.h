@@ -34,6 +34,9 @@ namespace logger {
      * manipulation methods for the stream.  For any instance of RotatableFileWriter, at most one
      * fully constructed instance of RotatableFileWriter::Use exists at a time, providing mutual
      * exclusion.
+     *
+     * Behavior is undefined if two instances of RotatableFileWriter should simultaneously have the
+     * same value for their fileName.
      */
     class RotatableFileWriter {
         MONGO_DISALLOW_COPYING(RotatableFileWriter);

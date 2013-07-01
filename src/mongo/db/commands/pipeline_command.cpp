@@ -127,7 +127,7 @@ namespace mongo {
             BSONObj shardBson(shardBuilder.done());
 
             DEV (log() << "\n---- shardBson\n" <<
-                shardBson.jsonString(Strict, 1) << "\n----\n").flush();
+                 shardBson.jsonString(Strict, 1) << "\n----\n");
 
             /* for debugging purposes, show what the pipeline now looks like */
             DEV {
@@ -135,7 +135,7 @@ namespace mongo {
                 pPipeline->toBson(&pipelineBuilder);
                 BSONObj pipelineBson(pipelineBuilder.done());
                 (log() << "\n---- pipelineBson\n" <<
-                pipelineBson.jsonString(Strict, 1) << "\n----\n").flush();
+                 pipelineBson.jsonString(Strict, 1) << "\n----\n");
             }
 
             /* on the shard servers, create the local pipeline */

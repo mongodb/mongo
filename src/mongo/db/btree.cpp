@@ -146,7 +146,7 @@ namespace mongo {
         this->assertValid(order, true);
 
         if ( bt_dmp ) {
-            _log() << thisLoc.toString() << ' ';
+            log() << thisLoc.toString() << ' ';
             ((BtreeBucket *) this)->dump(depth);
         }
 
@@ -1761,18 +1761,19 @@ namespace mongo {
     template< class V >
     void BtreeBucket<V>::dump(unsigned depth) const {
         string indent = string(depth, ' ');
-        _log() << "BUCKET n:" << this->n;
-        _log() << " parent:" << hex << this->parent.getOfs() << dec;
+        LogstreamBuilder l = log();
+        l << "BUCKET n:" << this->n;
+        l << " parent:" << hex << this->parent.getOfs() << dec;
         for ( int i = 0; i < this->n; i++ ) {
-            _log() << '\n' << indent;
+            l << '\n' << indent;
             KeyNode k = keyNode(i);
             string ks = k.key.toString();
-            _log() << "  " << hex << k.prevChildBucket.getOfs() << '\n';
-            _log() << indent << "    " << i << ' ' << ks.substr(0, 30) << " Loc:" << k.recordLoc.toString() << dec;
+            l << "  " << hex << k.prevChildBucket.getOfs() << '\n';
+            l << indent << "    " << i << ' ' << ks.substr(0, 30) << " Loc:" << k.recordLoc.toString() << dec;
             if ( this->k(i).isUnused() )
-                _log() << " UNUSED";
+                l << " UNUSED";
         }
-        _log() << "\n" << indent << "  " << hex << this->nextChild.getOfs() << dec << endl;
+        l << "\n" << indent << "  " << hex << this->nextChild.getOfs() << dec << endl;
     }
 
     /** todo: meaning of return code unclear clean up */

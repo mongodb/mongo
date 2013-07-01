@@ -61,7 +61,7 @@ namespace {
         if (!logUserIds)
             return Status::OK();
 
-        return Logstream::registerExtraLogContextFn(appendServerExtraLogContext);
+        return logger::registerExtraLogContextFn(appendServerExtraLogContext);
     }
 
 }  // namespace

@@ -28,6 +28,9 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/repl/rs_member.h"
+#include "mongo/logger/console_appender.h"
+#include "mongo/logger/logger.h"
+#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
 #include "mongo/shell/shell_utils.h"
@@ -844,7 +847,7 @@ int _main( int argc, char* argv[], char **envp ) {
         mongo::enableIPv6();
     }
     if ( params.count( "verbose" ) ) {
-        logLevel = 1;
+        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
     }
 
     if ( url == "*" ) {
@@ -858,6 +861,11 @@ int _main( int argc, char* argv[], char **envp ) {
 
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::StartupTest::runTests();
+
+    logger::globalLogManager()->getNamedDomain("javascriptOutput")->attachAppender(
+            logger::MessageLogDomain::AppenderAutoPtr(
+                    new logger::ConsoleAppender<logger::MessageEventEphemeral>(
+                            new logger::MessageEventUnadornedEncoder)));
 
     if ( !nodb ) { // connect to db
         //if ( ! mongo::cmdLine.quiet ) cout << "url: " << url << endl;

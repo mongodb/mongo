@@ -24,6 +24,7 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 

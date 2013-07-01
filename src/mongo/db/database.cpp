@@ -194,7 +194,7 @@ namespace mongo {
 
         {
             if( n < (int) _files.size() && _files[n] ) {
-                dlog(2) << "openExistingFile " << n << " is already open" << endl;
+                MONGO_DLOG(2) << "openExistingFile " << n << " is already open" << endl;
                 return true;
             }
         }
@@ -474,7 +474,7 @@ namespace mongo {
             //       that would make the DBs map very large.  not clear what to do to handle though, 
             //       perhaps just log it, which is what we do here with the "> 40" : 
             bool cant = !Lock::isWriteLocked(ns);
-            if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
+            if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || m.size() > 40 || cant || DEBUG_BUILD ) {
                 log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
             }
             massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);

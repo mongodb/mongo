@@ -23,6 +23,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -162,11 +163,41 @@ namespace mongo {
     } cmdSet;
 
     namespace {
-        ExportedServerParameter<int> LogLevelSetting( ServerParameterSet::getGlobal(),
-                                                      "logLevel",
-                                                      &logLevel,
-                                                      true,
-                                                      true );
+        class LogLevelSetting : public ServerParameter {
+        public:
+            LogLevelSetting() : ServerParameter(ServerParameterSet::getGlobal(), "logLevel") {}
+
+            virtual void append(BSONObjBuilder& b, const std::string& name) {
+                b << name << logger::globalLogDomain()->getMinimumLogSeverity().toInt();
+            }
+
+            virtual Status set(const BSONElement& newValueElement) {
+                typedef logger::LogSeverity LogSeverity;
+                int newValue;
+                if (!newValueElement.coerce(&newValue) || newValue < 0)
+                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                  "Invalid value for logLevel: " << newValueElement);
+                LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
+                    LogSeverity::Log();
+                logger::globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+                return Status::OK();
+            }
+
+            virtual Status setFromString(const std::string& str) {
+                typedef logger::LogSeverity LogSeverity;
+                int newValue;
+                Status status = parseNumberFromString(str, &newValue);
+                if (!status.isOK())
+                    return status;
+                if (newValue < 0)
+                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                  "Invalid value for logLevel: " << newValue);
+                LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
+                    LogSeverity::Log();
+                logger::globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+                return Status::OK();
+            }
+        } logLevelSetting;
 
         ExportedServerParameter<bool> NoTableScanSetting( ServerParameterSet::getGlobal(),
                                                           "notablescan",

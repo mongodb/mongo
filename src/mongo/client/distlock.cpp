@@ -24,6 +24,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/s/type_lockpings.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -173,8 +174,9 @@ namespace mongo {
                     scoped_lock lk( _mutex );
 
                     int numOldLocks = _oldLockOIDs.size();
-                    if( numOldLocks > 0 )
+                    if( numOldLocks > 0 ) {
                         LOG( DistributedLock::logLvl - 1 ) << "trying to delete " << _oldLockOIDs.size() << " old lock entries for process " << process << endl;
+                    }
 
                     bool removed = false;
                     for( list<OID>::iterator i = _oldLockOIDs.begin(); i != _oldLockOIDs.end();
@@ -532,6 +534,20 @@ namespace mongo {
         return true;
     }
 
+    static void logErrMsgOrWarn(const StringData& messagePrefix,
+                                const StringData& lockName,
+                                const StringData& errMsg,
+                                const StringData& altErrMsg) {
+
+        if (errMsg.empty()) {
+            LOG(DistributedLock::logLvl - 1) << messagePrefix << " '" << lockName << "' " <<
+                altErrMsg << std::endl;
+        }
+        else {
+            warning() << messagePrefix << " '" << lockName << "' " << causedBy(errMsg.toString());
+        }
+    }
+
     // Semantics of this method are basically that if the lock cannot be acquired, returns false, can be retried.
     // If the lock should not be tried again (some unexpected error) a LockException is thrown.
     // If we are only trying to re-enter a currently held lock, reenter should be true.
@@ -704,8 +720,7 @@ namespace mongo {
 
                         // TODO: Clean up all the extra code to exit this method, probably with a refactor
                         if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
-                            ( errMsg.empty() ? LOG( logLvl - 1 ) : warning() ) << "Could not force lock '" << lockName << "' "
-                                    << ( !errMsg.empty() ? causedBy(errMsg) : string("(another force won)") ) << endl;
+                            logErrMsgOrWarn("Could not force lock", lockName, errMsg, "(another force won");
                             *other = o; other->getOwned(); conn.done();
                             return false;
                         }
@@ -749,10 +764,7 @@ namespace mongo {
 
                         // TODO: Clean up all the extra code to exit this method, probably with a refactor
                         if ( ! errMsg.empty() || ! err["n"].type() || err["n"].numberInt() < 1 ) {
-                            ( errMsg.empty() ? LOG( logLvl - 1 ) : warning() ) << "Could not re-enter lock '" << lockName << "' "
-                                                                               << ( !errMsg.empty() ? causedBy(errMsg) : string("(not sure lock is held)") ) 
-                                                                               << " gle: " << err
-                                                                               << endl;
+                            logErrMsgOrWarn("Could not re-enter lock", lockName, errMsg, "(not sure lock is held");
                             *other = o; other->getOwned(); conn.done();
                             return false;
                         }
@@ -822,8 +834,7 @@ namespace mongo {
             currLock = conn->findOne( LocksType::ConfigNS , BSON( LocksType::name(_name) ) );
 
             if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
-                ( errMsg.empty() ? LOG( logLvl - 1 ) : warning() ) << "could not acquire lock '" << lockName << "' "
-                        << ( !errMsg.empty() ? causedBy( errMsg ) : string("(another update won)") ) << endl;
+                logErrMsgOrWarn("could not acquire lock", lockName, errMsg, "(another update won");
                 *other = currLock;
                 other->getOwned();
                 gotLock = false;

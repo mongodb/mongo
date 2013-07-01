@@ -210,7 +210,7 @@ namespace mongo {
                 b.append( "err" , "can't do unlock through mongos" );
             }
             else {
-                LOG( LL_WARNING ) << "unknown sys command [" << ns << "]" << endl;
+                warning() << "unknown sys command [" << ns << "]" << endl;
                 return false;
             }
 

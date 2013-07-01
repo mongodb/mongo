@@ -777,7 +777,7 @@ namespace {
         const string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
         const NamespaceDetails* nsd = nsdetails(ns);
         if (!cmdLine.quiet) {
-            tlog() << "CMD: storageDetails " << ns << ", analyze " << subCommandStr << endl;
+            MONGO_TLOG(0) << "CMD: storageDetails " << ns << ", analyze " << subCommandStr << endl;
         }
         if (!nsd) {
             errmsg = "ns not found";

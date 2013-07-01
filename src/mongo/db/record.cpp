@@ -190,7 +190,7 @@ namespace mongo {
                 if ( rarely_count++ % ( 2048 / BigHashSize ) == 0 ) {
                     long long now = Listener::getElapsedTimeMillis();
                     RARELY if ( now == 0 ) {
-                        tlog() << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
+                        MONGO_TLOG(0) << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
                     }
                     
                     if ( now - _lastRotate > ( 1000 * RotateTimeSecs ) ) {

@@ -800,7 +800,7 @@ namespace mongo {
             ccPointer.reset( new ClientCursor( queryOptions, cursor, ns,
                                               jsobj.getOwned() ) );
             cursorid = ccPointer->cursorid();
-            DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
+            DEV { MONGO_TLOG(2) << "query has more, cursorid: " << cursorid << endl; }
             if ( cursor->supportYields() ) {
                 ClientCursor::YieldData data;
                 ccPointer->prepareToYield( data );
@@ -815,7 +815,10 @@ namespace mongo {
             }
             
             if ( !ccPointer->ok() && ccPointer->c()->tailable() ) {
-                DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
+                DEV {
+                    MONGO_TLOG(0) << "query has no more but tailable, cursorid: " << cursorid <<
+                        endl;
+                }
             }
             
             if( queryOptions & QueryOption_Exhaust ) {
@@ -941,8 +944,7 @@ namespace mongo {
         
         uassert( 16332 , "can't have an empty ns" , ns[0] );
 
-        if( logLevel >= 2 )
-            log() << "runQuery called " << ns << " " << jsobj << endl;
+        LOG(2) << "runQuery called " << ns << " " << jsobj << endl;
 
         curop.debug().ns = ns;
         curop.debug().ntoreturn = pq.getNumToReturn();

@@ -850,7 +850,7 @@ namespace mongo {
         }
 
         if ( up == 1 ) {
-            LOG( LL_WARNING ) << "only 1 config server reachable, continuing" << endl;
+            warning() << "only 1 config server reachable, continuing" << endl;
             return true;
         }
 
@@ -870,7 +870,7 @@ namespace mongo {
 
             stringstream ss;
             ss << "config servers " << _config[firstGood] << " and " << _config[i] << " differ";
-            LOG( LL_WARNING ) << ss.str() << endl;
+            warning() << ss.str() << endl;
             if ( tries <= 1 ) {
                 ss << "\n" << c1 << "\t" << c2 << "\n" << d1 << "\t" << d2;
                 errmsg = ss.str();
@@ -890,7 +890,7 @@ namespace mongo {
         if ( checkConsistency ) {
             string errmsg;
             if ( ! checkConfigServersConsistent( errmsg ) ) {
-                LOG( LL_ERROR ) << "could not verify that config servers are in sync" << causedBy(errmsg) << warnings;
+                error() << "could not verify that config servers are in sync" << causedBy(errmsg) << warnings;
                 return false;
             }
         }

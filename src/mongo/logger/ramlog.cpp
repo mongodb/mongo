@@ -15,11 +15,13 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "log.h"
-#include "ramlog.h"
-#include "mongoutils/html.h"
-#include "mongoutils/str.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/logger/ramlog.h"
+
+#include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/util/mongoutils/html.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -47,15 +49,17 @@ namespace mongo {
         
     }
 
-    void RamLog::write(LogLevel ll, const std::string& str) {
+    void RamLog::write(const std::string& str) {
+        boost::unique_lock<boost::mutex> lk(_mutex);
         _lastWrite = time(0);
         _totalLinesWritten++;
 
         char *p = lines[(h+n)%N];
         
         unsigned sz = str.size();
+        if (0 == sz) return;
         if( sz < C ) {
-            if ( str.c_str()[sz-1] == '\n' ) {
+            if (str.c_str()[sz-1] == '\n' ) {
                 memcpy(p, str.c_str(), sz-1);
                 p[sz-1] = 0;
             }
@@ -70,12 +74,23 @@ namespace mongo {
         else h = (h+1) % N;
     }
 
-    void RamLog::get( vector<const char*>& v) const {
+    time_t RamLog::lastWrite() {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        return _lastWrite;
+    }
+
+    long long RamLog::getTotalLinesWritten() {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        return _totalLinesWritten;
+    }
+
+    void RamLog::get( std::vector<const char*>& v) {
+        boost::unique_lock<boost::mutex> lk(_mutex);
         for( unsigned x=0, i=h; x++ < n; i=(i+1)%N )
             v.push_back(lines[i]);
     }
 
-    int RamLog::repeats(const vector<const char *>& v, int i) {
+    int RamLog::repeats(const std::vector<const char *>& v, int i) {
         for( int j = i-1; j >= 0 && j+8 > i; j-- ) {
             if( strcmp(v[i]+20,v[j]+20) == 0 ) {
                 for( int x = 1; ; x++ ) {
@@ -90,7 +105,7 @@ namespace mongo {
     }
 
 
-    string RamLog::clean(const vector<const char *>& v, int i, string line ) {
+    string RamLog::clean(const std::vector<const char *>& v, int i, string line ) {
         if( line.empty() ) line = v[i];
         if( i > 0 && strncmp(v[i], v[i-1], 11) == 0 )
             return string("           ") + line.substr(11);
@@ -98,8 +113,8 @@ namespace mongo {
     }
 
     string RamLog::color(const std::string& line) {
-        string s = str::after(line, "replSet ");
-        if( str::startsWith(s, "warning") || startsWith(s, "error") )
+        std::string s = str::after(line, "replSet ");
+        if( str::startsWith(s, "warning") || str::startsWith(s, "error") )
             return html::red(line);
         if( str::startsWith(s, "info") ) {
             if( str::endsWith(s, " up\n") )
@@ -122,13 +137,13 @@ namespace mongo {
         while( *sp && *sp != ' ' ) sp++;
 
         string url(h, sp-h);
-        stringstream ss;
+        std::stringstream ss;
         ss << string(s, h-s) << "<a href=\"" << url << "\">" << url << "</a>" << sp;
         return ss.str();
     }
 
-    void RamLog::toHTML(stringstream& s) {
-        vector<const char*> v;
+    void RamLog::toHTML(std::stringstream& s) {
+        std::vector<const char*> v;
         get( v );
 
         s << "<pre>\n";
@@ -139,13 +154,13 @@ namespace mongo {
                 s << color( linkify( html::escape( clean(v, i) ).c_str() ) ) << '\n';
             }
             else {
-                stringstream x;
+                std::stringstream x;
                 x << string(v[i], 0, 24);
                 int nr = (i-r);
                 int last = i+nr-1;
                 for( ; r < i ; r++ ) x << '.';
                 if( 1 ) {
-                    stringstream r;
+                    std::stringstream r;
                     if( nr == 1 ) r << "repeat last line";
                     else r << "repeats last " << nr << " lines; ends " << string(v[last]+4,0,15);
                     s << html::a("", r.str(), html::escape( clean(v, i,x.str() ) ) );
@@ -156,6 +171,17 @@ namespace mongo {
             }
         }
         s << "</pre>\n";
+    }
+
+    RamLogAppender::RamLogAppender(RamLog* ramlog) : _ramlog(ramlog) {}
+    RamLogAppender::~RamLogAppender() {}
+
+    Status RamLogAppender::append(const logger::MessageEventEphemeral& event) {
+        std::ostringstream ss;
+        logger::MessageEventDetailsEncoder encoder;
+        encoder.encode(event, ss);
+        _ramlog->write(ss.str());
+        return Status::OK();
     }
 
     // ---------------
@@ -172,8 +198,8 @@ namespace mongo {
             return 0;
         return i->second;
     }
-    
-    void RamLog::getNames( vector<string>& names ) {
+
+    void RamLog::getNames( std::vector<string>& names ) {
         if ( ! _named )
             return;
 
@@ -186,6 +212,4 @@ namespace mongo {
 
     mongo::mutex* RamLog::_namedLock;
     RamLog::RM*  RamLog::_named = 0;
-
-    Tee* const warnings = new RamLog("warnings"); // Things put here go in serverStatus
 }

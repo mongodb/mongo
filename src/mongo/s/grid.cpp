@@ -549,13 +549,10 @@ namespace mongo {
             return true;
         }
 
-        if ( logLevel ) {
-            stringstream ss;
-            ss << " now: " << now
-               << " startTime: " << startTime 
-               << " stopTime: " << stopTime;
-            log() << "_inBalancingWindow: " << ss.str() << endl;
-        }
+        LOG(1).stream() << "_inBalancingWindow: "
+                        << " now: " << now
+                        << " startTime: " << startTime
+                        << " stopTime: " << stopTime;
 
         // allow balancing if during the activeWindow
         // note that a window may be open during the night

@@ -318,7 +318,7 @@ namespace mongo {
     void mongoAbort(const char *msg) { 
         if( reportEventToSystem ) 
             reportEventToSystem(msg);
-        rawOut(msg);
+        severe() << msg;
         ::abort();
     }
 
@@ -406,7 +406,7 @@ namespace mongo {
         debug.op = op;
 
         long long logThreshold = cmdLine.slowMS;
-        bool shouldLog = logLevel >= 1;
+        bool shouldLog = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
 
         if ( op == dbQuery ) {
             if ( handlePossibleShardedMessage( m , &dbresponse ) )
@@ -466,12 +466,12 @@ namespace mongo {
                 }
             }
             catch ( UserException& ue ) {
-                tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                MONGO_TLOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
                         << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
             }
             catch ( AssertionException& e ) {
-                tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                MONGO_TLOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
                         << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
                 shouldLog = true;
@@ -484,7 +484,7 @@ namespace mongo {
         logThreshold += currentOp.getExpectedLatencyMs();
 
         if ( shouldLog || debug.executionTime > logThreshold ) {
-            mongo::tlog() << debug.report( currentOp ) << endl;
+            MONGO_TLOG(0) << debug.report( currentOp ) << endl;
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
@@ -514,13 +514,13 @@ namespace mongo {
         uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
         if ( n > 2000 ) {
-            LOG( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
+            ( n < 30000 ? warning() : error() ) << "receivedKillCursors, n=" << n << endl;
             verify( n < 30000 );
         }
 
         int found = ClientCursor::eraseIfAuthorized(n, (long long *) x);
 
-        if ( logLevel > 0 || found != n ) {
+        if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
         }
 
