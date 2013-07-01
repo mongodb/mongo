@@ -44,6 +44,11 @@ namespace mongo {
         clearServer();
         client().insert("config.test", BSON( "hello" << "world" ));
         client().dropCollection("config.test");
+
+        // Create an index over the chunks, to allow correct diffing
+        client().ensureIndex( ChunkType::ConfigNS, // br
+                              BSON( ChunkType::ns() << 1 << // br
+                                      ChunkType::DEPRECATED_lastmod() << 1 ) );
     }
 
     void ConfigServerFixture::clearServer() {
