@@ -3,6 +3,7 @@
 var stddb = db;
 var db = db.getSisterDB("profile3");
 
+db.system.users.remove({});
 t = db.profile3;
 t.drop();
 
