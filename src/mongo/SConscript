@@ -343,6 +343,7 @@ env.StaticLibrary("coredb", [
                            'expressions',
                            'expressions_geo',
                            'expressions_where',
+                           'working_set',
                            '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",
