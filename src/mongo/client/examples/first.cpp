@@ -67,7 +67,7 @@ int main( int argc, const char **argv ) {
 
     {
         mongo::BSONObjBuilder query;
-        auto_ptr<mongo::DBClientCursor> cursor = conn.query( "test.people" , query.obj() );
+        std::auto_ptr<mongo::DBClientCursor> cursor = conn.query( "test.people" , query.obj() );
         if (!cursor.get()) {
             cout << "query failure" << endl;
             return EXIT_FAILURE;
@@ -95,4 +95,5 @@ int main( int argc, const char **argv ) {
         cout << res.isEmpty() << "\t" << res.jsonString() << endl;
     }
 
+    return EXIT_SUCCESS;
 }

@@ -21,6 +21,10 @@
 #include "mongo/client/dbclient.h"
 #include "util/net/httpclient.h"
 
+#ifndef verify
+#  define verify(x) MONGO_verify(x)
+#endif
+
 using namespace mongo;
 
 void play( string url ) {
@@ -28,10 +32,10 @@ void play( string url ) {
 
     HttpClient c;
     HttpClient::Result r;
-    MONGO_verify( c.get( url , &r ) == 200 );
+    verify( c.get( url , &r ) == 200 );
 
     HttpClient::Headers h = r.getHeaders();
-    MONGO_verify( h["Content-Type"].find( "text/html" ) == 0 );
+    verify( h["Content-Type"].find( "text/html" ) == 0 );
 
     cout << "\tHeaders" << endl;
     for ( HttpClient::Headers::iterator i = h.begin() ; i != h.end(); ++i ) {
@@ -49,8 +53,10 @@ int main( int argc, const char **argv, char **envp) {
 
     int port = 27017;
     if ( argc != 1 ) {
-        if ( argc != 3 )
-            throw -12;
+        if ( argc != 3 ) {
+            cout << "need to pass port as second param" << endl;
+            return EXIT_FAILURE;
+        }
         port = atoi( argv[ 2 ] );
     }
     port += 1000;
@@ -60,5 +66,6 @@ int main( int argc, const char **argv, char **envp) {
 #ifdef MONGO_SSL
     play( "https://www.10gen.com/" );
 #endif
-    
+
+    return EXIT_SUCCESS;
 }

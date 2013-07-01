@@ -20,6 +20,10 @@
 
 #include "mongo/client/dbclient.h"
 
+#ifndef verify
+#  define verify(x) MONGO_verify(x)
+#endif
+
 using namespace std;
 using namespace mongo;
 
@@ -27,8 +31,10 @@ int main( int argc, const char **argv ) {
 
     const char *port = "27017";
     if ( argc != 1 ) {
-        if ( argc != 3 )
-            throw -12;
+        if ( argc != 3 ) {
+            cout << "need to pass port as second param" << endl;
+            return EXIT_FAILURE;
+        }
         port = argv[ 2 ];
     }
 
@@ -36,7 +42,7 @@ int main( int argc, const char **argv ) {
     string errmsg;
     if ( ! conn.connect( string( "127.0.0.1:" ) + port , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
-        throw -11;
+        return EXIT_FAILURE;
     }
 
     const char * ns = "test.where";
@@ -46,7 +52,11 @@ int main( int argc, const char **argv ) {
     conn.insert( ns , BSON( "name" << "eliot" << "num" << 17 ) );
     conn.insert( ns , BSON( "name" << "sara" << "num" << 24 ) );
 
-    auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObj() );
+    std::auto_ptr<DBClientCursor> cursor = conn.query( ns , BSONObj() );
+    if (!cursor.get()) {
+        cout << "query failure" << endl;
+        return EXIT_FAILURE;
+    }
 
     while ( cursor->more() ) {
         BSONObj obj = cursor->next();
@@ -58,6 +68,10 @@ int main( int argc, const char **argv ) {
     Query q = Query("{}").where("this.name == name" , BSON( "name" << "sara" ));
 
     cursor = conn.query( ns , q );
+    if (!cursor.get()) {
+        cout << "query failure" << endl;
+        return EXIT_FAILURE;
+    }
 
     int num = 0;
     while ( cursor->more() ) {
@@ -65,5 +79,7 @@ int main( int argc, const char **argv ) {
         cout << "\t" << obj.jsonString() << endl;
         num++;
     }
-    MONGO_verify( num == 1 );
+    verify( num == 1 );
+
+    return EXIT_SUCCESS;
 }
