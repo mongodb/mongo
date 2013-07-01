@@ -381,6 +381,16 @@ namespace DocumentTests {
                 // binary equality
                 ASSERT_EQUALS(obj.objsize(), obj2.objsize());
                 ASSERT_EQUALS(memcmp(obj.objdata(), obj2.objdata(), obj.objsize()), 0);
+
+                // ensure sorter serialization round-trips correctly
+                BufBuilder bb;
+                doc.serializeForSorter(bb);
+                BufReader reader(bb.buf(), bb.len());
+                const Document doc3 = Document::deserializeForSorter(
+                                                    reader, Document::SorterDeserializeSettings());
+                BSONObj obj3 = toBson(doc3);
+                ASSERT_EQUALS(obj.objsize(), obj3.objsize());
+                ASSERT_EQUALS(memcmp(obj.objdata(), obj3.objdata(), obj.objsize()), 0);
             }
 
             template <typename T>

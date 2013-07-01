@@ -365,4 +365,16 @@ namespace mongo {
 
         return out.str();
     }
+
+    // TODO make these functions better
+    void Document::serializeForSorter(BufBuilder& buf) const {
+        BSONObjBuilder bb(buf);
+        toBson(&bb);
+        bb.doneFast();
+    }
+
+    Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+        BSONObj bson = BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings());
+        return Document(bson);
+    }
 }

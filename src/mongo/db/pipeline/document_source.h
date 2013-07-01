@@ -19,17 +19,19 @@
 #include "mongo/pch.h"
 
 #include <boost/unordered_map.hpp>
-#include "util/intrusive_counter.h"
-#include "db/clientcursor.h"
-#include "db/jsobj.h"
-#include "db/matcher.h"
-#include "db/pipeline/document.h"
-#include "db/pipeline/expression.h"
+
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "db/pipeline/value.h"
-#include "util/string_writer.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/value.h"
 #include "mongo/db/projection.h"
+#include "mongo/db/sorter/sorter.h"
 #include "mongo/s/shard.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_writer.h"
 
 namespace mongo {
     class Accumulator;
@@ -938,48 +940,36 @@ namespace mongo {
         void populate();
         bool populated;
 
-        // These are called by populate()
-        void populateAll();  // no limit
-        void populateOne();  // limit == 1
-        void populateTopK(); // limit > 1
-
         /* these two parallel each other */
         typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;
         SortPaths vSortKey;
         vector<char> vAscending; // used like vector<bool> but without specialization
 
-        struct KeyAndDoc {
-            explicit KeyAndDoc(const Document& d, const SortPaths& sp); // extracts sort key
-            Value key; // array of keys if vSortKey.size() > 1
-            Document doc;
-        };
-        friend void swap(KeyAndDoc& l, KeyAndDoc& r);
+        /// Extracts the fields in vSortKey from the Document;
+        Value extractKey(const Document& d) const;
 
-        /// Compare two KeyAndDocs according to the specified sort key.
-        int compare(const KeyAndDoc& lhs, const KeyAndDoc& rhs) const;
+        /// Compare two Values according to the specified sort key.
+        int compare(const Value& lhs, const Value& rhs) const;
 
-        /*
-          This is a utility class just for the STL sort that is done
-          inside.
-         */
+        typedef Sorter<Value, Document> MySorter;
+
+        // For MySorter
         class Comparator {
         public:
             explicit Comparator(const DocumentSourceSort& source): _source(source) {}
-            bool operator()(const KeyAndDoc& lhs, const KeyAndDoc& rhs) const {
-                return (_source.compare(lhs, rhs) < 0);
+            int operator()(const MySorter::Data& lhs, const MySorter::Data& rhs) const {
+                return _source.compare(lhs.first, rhs.first);
             }
         private:
             const DocumentSourceSort& _source;
         };
 
-        deque<KeyAndDoc> documents;
-
         intrusive_ptr<DocumentSourceLimit> limitSrc;
+
+        bool _done;
+        Document _current;
+        scoped_ptr<MySorter::Iterator> _output;
     };
-    inline void swap(DocumentSourceSort::KeyAndDoc& l, DocumentSourceSort::KeyAndDoc& r) {
-        l.key.swap(r.key);
-        l.doc.swap(r.doc);
-    }
 
     class DocumentSourceLimit :
         public SplittableDocumentSource {

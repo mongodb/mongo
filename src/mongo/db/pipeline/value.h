@@ -234,6 +234,13 @@ namespace mongo {
         /// Call this after memcpying to update ref counts if needed
         void memcpyed() const { _storage.memcpyed(); }
 
+        /// members for Sorter
+        struct SorterDeserializeSettings {}; // unused
+        void serializeForSorter(BufBuilder& buf) const;
+        static Value deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
+        int memUsageForSorter() const { return getApproximateSize(); }
+        Value getOwned() const { return *this; }
+
     private:
         /** This is a "honeypot" to prevent unexpected implicit conversions to the accepted argument
          *  types. bool is especially bad since without this it will accept any pointer.

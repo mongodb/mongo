@@ -39,7 +39,7 @@ namespace mongo {
         if (!populated)
             populate();
 
-        return documents.empty();
+        return _done;
     }
 
     bool DocumentSourceSort::advance() {
@@ -48,15 +48,21 @@ namespace mongo {
         if (!populated)
             populate();
 
-        if (!documents.empty())
-            documents.pop_front(); // this way we release memory as we go
+        verify(_output);
 
-        return !documents.empty();
+        if (_output->more()) {
+            _current = _output->next().second;
+        }
+        else {
+            _done = true;
+        }
+
+        return !_done;
     }
 
     Document DocumentSourceSort::getCurrent() {
-        verify(!documents.empty());
-        return documents.front().doc;
+        verify(populated && !_done);
+        return _current;
     }
 
     void DocumentSourceSort::addToBsonArray(BSONArrayBuilder *pBuilder, bool explain) const {
@@ -89,13 +95,16 @@ namespace mongo {
     }
 
     void DocumentSourceSort::dispose() {
-        documents.clear();
+        _current = Document();
+        _output.reset();
+        _done = true;
         pSource->dispose();
     }
 
     DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx)
         : SplittableDocumentSource(pExpCtx)
         , populated(false)
+        , _done(false)
     {}
 
     long long DocumentSourceSort::getLimit() const {
@@ -195,101 +204,48 @@ namespace mongo {
         /* make sure we've got a sort key */
         verify(vSortKey.size());
 
-        if (!limitSrc)
-            populateAll();
-        else if (limitSrc->getLimit() == 1)
-            populateOne();
-        else
-            populateTopK();
+        if (pSource->eof()) {
+            _done = true;
+            return;
+        }
+
+        SortOptions opts;
+        if (limitSrc)
+            opts.limit = limitSrc->getLimit();
+
+        // TODO make these tunable
+        opts.maxMemoryUsageBytes = 100*1024*1024;
+        opts.extSortAllowed = false;
+
+        scoped_ptr<MySorter> sorter (MySorter::make(opts, Comparator(*this)));
+
+        do { // pSource->eof() checked above
+            const Document doc = pSource->getCurrent();
+            sorter->add(extractKey(doc), doc);
+        } while (pSource->advance());
+
+        _output.reset(sorter->done());
+        verify(_output->more()); // we put something in so we should get something out
+        _current = _output->next().second;
 
         populated = true;
     }
 
-    void DocumentSourceSort::populateAll() {
-        /* track and warn about how much physical memory has been used */
-        DocMemMonitor dmm(this);
-
-        /* pull everything from the underlying source */
-        for (bool hasNext = !pSource->eof(); hasNext; hasNext = pSource->advance()) {
-            documents.push_back(KeyAndDoc(pSource->getCurrent(), vSortKey));
-            dmm.addToTotal(documents.back().doc.getApproximateSize());
-        }
-
-        /* sort the list */
-        Comparator comparator(*this);
-        sort(documents.begin(), documents.end(), comparator);
-    }
-
-    void DocumentSourceSort::populateOne() {
-        if (pSource->eof())
-            return;
-
-        KeyAndDoc best (pSource->getCurrent(), vSortKey);
-        while (pSource->advance()) {
-            KeyAndDoc next (pSource->getCurrent(), vSortKey);
-            if (compare(next, best) < 0) {
-                // we have a new best
-                swap(best, next);
-            }
-        }
-
-        documents.push_back(best);
-    }
-
-    void DocumentSourceSort::populateTopK() {
-        bool hasNext = !pSource->eof();
-
-        size_t limit = limitSrc->getLimit();
-
-        // Pull first K documents unconditionally
-        vector<KeyAndDoc> heap;
-        heap.reserve(limit);
-        for (; hasNext && heap.size() < limit; hasNext = pSource->advance()) {
-            heap.push_back(KeyAndDoc(pSource->getCurrent(), vSortKey));
-        }
-
-        // We now maintain a MaxHeap of K items. This means that the least-best
-        // document is at the top of the heap (heap.front()). If a new
-        // document is better than the top of the heap, we pop the top and add
-        // the new document to the heap.
-
-        Comparator comp (*this);
-
-        // after this, heap.front() is least-best document
-        std::make_heap(heap.begin(), heap.end(), comp);
-
-        for (; hasNext; hasNext = pSource->advance()) {
-            KeyAndDoc next (pSource->getCurrent(), vSortKey);
-            if (compare(next, heap.front()) < 0) {
-                // remove least-best from heap
-                std::pop_heap(heap.begin(), heap.end(), comp);
-
-                // add next to heap
-                swap(heap.back(), next);
-                std::push_heap(heap.begin(), heap.end(), comp);
-            }
-        }
-
-        std::sort_heap(heap.begin(), heap.end(), comp);
-        documents.insert(documents.begin(), heap.begin(), heap.end());
-    }
-
-    DocumentSourceSort::KeyAndDoc::KeyAndDoc(const Document& d, const SortPaths& sp) :doc(d) {
-        if (sp.size() == 1) {
-            key = sp[0]->evaluate(d);
-            return;
+    Value DocumentSourceSort::extractKey(const Document& d) const {
+        if (vSortKey.size() == 1) {
+            return vSortKey[0]->evaluate(d);
         }
 
         const Variables vars(d);
         vector<Value> keys;
-        keys.reserve(sp.size());
-        for (size_t i=0; i < sp.size(); i++) {
-            keys.push_back(sp[i]->evaluate(vars));
+        keys.reserve(vSortKey.size());
+        for (size_t i=0; i < vSortKey.size(); i++) {
+            keys.push_back(vSortKey[i]->evaluate(vars));
         }
-        key = Value::consume(keys);
+        return Value::consume(keys);
     }
 
-    int DocumentSourceSort::compare(const KeyAndDoc & lhs, const KeyAndDoc & rhs) const {
+    int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
 
         /*
           populate() already checked that there is a non-empty sort key,
@@ -301,14 +257,14 @@ namespace mongo {
         const size_t n = vSortKey.size();
         if (n == 1) { // simple fast case
             if (vAscending[0])
-                return  Value::compare(lhs.key, rhs.key);
+                return  Value::compare(lhs, rhs);
             else
-                return -Value::compare(lhs.key, rhs.key);
+                return -Value::compare(lhs, rhs);
         }
 
         // compound sort
         for (size_t i = 0; i < n; i++) {
-            int cmp = Value::compare(lhs.key[i], rhs.key[i]);
+            int cmp = Value::compare(lhs[i], rhs[i]);
             if (cmp) {
                 /* if necessary, adjust the return value by the key ordering */
                 if (!vAscending[i])
@@ -325,3 +281,6 @@ namespace mongo {
         return 0;
     }
 }
+
+#include "db/sorter/sorter.cpp"
+// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

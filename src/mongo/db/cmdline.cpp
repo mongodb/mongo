@@ -42,6 +42,12 @@ namespace po = boost::program_options;
 
 namespace mongo {
 
+#ifdef _WIN32
+    string dbpath = "\\data\\db\\";
+#else
+    string dbpath = "/data/db/";
+#endif
+
     static bool _isPasswordArgument(char const* argumentName);
     static bool _isPasswordSwitch(char const* switchName);
 

@@ -142,6 +142,13 @@ namespace mongo {
          */
         Document clone() const { return Document(storage().clone().get()); }
 
+        /// members for Sorter
+        struct SorterDeserializeSettings {}; // unused
+        void serializeForSorter(BufBuilder& buf) const;
+        static Document deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
+        int memUsageForSorter() const { return getApproximateSize(); }
+        Document getOwned() const { return *this; }
+
         // TEMP for compatibility with legacy intrusive_ptr<Document>
               Document& operator*()       { return *this; }
         const Document& operator*() const { return *this; }

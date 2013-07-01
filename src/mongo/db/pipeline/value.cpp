@@ -916,4 +916,15 @@ namespace mongo {
         // Not in default case to trigger better warning if a case is missing
         verify(false);
     }
+
+    // TODO make these functions better
+    void Value::serializeForSorter(BufBuilder& buf) const {
+        BSONObjBuilder bb(buf);
+        addToBsonObj(&bb, "");
+        bb.doneFast();
+    }
+    Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+        BSONObj bson = BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings());
+        return Value(bson.firstElement());
+    }
 }
