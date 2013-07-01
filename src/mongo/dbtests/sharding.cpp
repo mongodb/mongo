@@ -98,6 +98,11 @@ namespace ShardingTests {
             _shard = Shard( "shard0000", "$hostFooBar:27017" );
             // Need to run this to ensure the shard is in the global lookup table
             _shard.setAddress( _shard.getAddress() );
+
+            // Create an index so that diffing works correctly, otherwise no cursors from S&O
+            client().ensureIndex( "config.chunks", // br
+                                  BSON( "ns" << 1 << // br
+                                          "lastmod" << 1 ) );
         }
 
         virtual ~ChunkManagerTest() {
