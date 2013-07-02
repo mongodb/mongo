@@ -244,7 +244,8 @@ namespace mongo {
         try {
             if (!NamespaceString(d.getns()).isCommand()) {
                 // Auth checking for Commands happens later.
-                Status status = cc().getAuthorizationSession()->checkAuthForQuery(d.getns());
+                Status status = cc().getAuthorizationSession()->checkAuthForQuery(d.getns(),
+                                                                                  q.query);
                 uassert(16550, status.reason(), status.isOK());
             }
             dbresponse.exhaustNS = runQuery(m, q, op, *resp);
@@ -572,7 +573,10 @@ namespace mongo {
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
 
-        Status status = cc().getAuthorizationSession()->checkAuthForUpdate(ns, upsert);
+        Status status = cc().getAuthorizationSession()->checkAuthForUpdate(ns,
+                                                                           query,
+                                                                           toupdate,
+                                                                           upsert);
         uassert(16538, status.reason(), status.isOK());
 
         op.debug().query = query;
@@ -607,9 +611,6 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
 
-        Status status = cc().getAuthorizationSession()->checkAuthForDelete(ns);
-        uassert(16542, status.reason(), status.isOK());
-
         op.debug().ns = ns;
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
@@ -617,6 +618,9 @@ namespace mongo {
         verify( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
         
+        Status status = cc().getAuthorizationSession()->checkAuthForDelete(ns, pattern);
+        uassert(16542, status.reason(), status.isOK());
+
         op.debug().query = pattern;
         op.setQuery(pattern);
 
@@ -673,7 +677,7 @@ namespace mongo {
                 const NamespaceString nsString( ns );
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(ns);
+                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(ns, cursorid);
                 uassert(16543, status.reason(), status.isOK());
 
                 if (str::startsWith(ns, "local.oplog.")){
@@ -832,14 +836,6 @@ namespace mongo {
         const char *ns = d.getns();
         op.debug().ns = ns;
 
-        bool isIndexWrite = nsToCollectionSubstring(ns) == "system.indexes";
-
-        // Auth checking for index writes happens further down in this function.
-        if (!isIndexWrite) {
-            Status status = cc().getAuthorizationSession()->checkAuthForInsert(ns);
-            uassert(16544, status.reason(), status.isOK());
-        }
-
         if( !d.moreJSObjs() ) {
             // strange.  should we complain?
             return;
@@ -849,14 +845,11 @@ namespace mongo {
         while (d.moreJSObjs()){
             BSONObj obj = d.nextJsObj();
             multi.push_back(obj);
-            if (isIndexWrite) {
-                string indexNS = obj.getStringField("ns");
-                uassert(16548,
-                        mongoutils::str::stream() << "not authorized to create index on "
-                                << indexNS,
-                        cc().getAuthorizationSession()->checkAuthorization(
-                                indexNS, ActionType::ensureIndex));
-            }
+
+            // Check auth for insert (also handles checking if this is an index build and checks
+            // for the proper privileges in that case).
+            Status status = cc().getAuthorizationSession()->checkAuthForInsert(ns, obj);
+            uassert(16544, status.reason(), status.isOK());
         }
 
         PageFaultRetryableSection s;

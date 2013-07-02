@@ -55,7 +55,7 @@ namespace mongo {
 
             AuthorizationSession* authSession =
                     ClientBasic::getCurrent()->getAuthorizationSession();
-            Status status = authSession->checkAuthForQuery(q.ns);
+            Status status = authSession->checkAuthForQuery(q.ns, q.query);
             uassert(16549, status.reason(), status.isOK());
 
             LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
@@ -170,11 +170,6 @@ namespace mongo {
 
             const char *ns = r.getns();
 
-            AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
-            Status status = authSession->checkAuthForGetMore(ns);
-            uassert(16539, status.reason(), status.isOK());
-
             // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
             // for now has same semantics as legacy request
             ChunkManagerPtr info = r.getChunkManager();
@@ -188,6 +183,11 @@ namespace mongo {
                 LOG(3) << "single getmore: " << ns << endl;
 
                 long long id = r.d().getInt64( 4 );
+
+                AuthorizationSession* authSession =
+                        ClientBasic::getCurrent()->getAuthorizationSession();
+                Status status = authSession->checkAuthForGetMore(ns, id);
+                uassert(16539, status.reason(), status.isOK());
 
                 string host = cursorCache.getRef( id );
 
@@ -220,6 +220,11 @@ namespace mongo {
             else {
                 int ntoreturn = r.d().pullInt();
                 long long id = r.d().pullInt64();
+
+                AuthorizationSession* authSession =
+                        ClientBasic::getCurrent()->getAuthorizationSession();
+                Status status = authSession->checkAuthForGetMore(ns, id);
+                uassert(16939, status.reason(), status.isOK());
 
                 ShardedClientCursorPtr cursor = cursorCache.get( id );
                 if ( ! cursor ) {
@@ -505,12 +510,6 @@ namespace mongo {
 
             const string& ns = r.getns();
 
-            AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
-            Status status = authSession->checkAuthForInsert(ns);
-            uassert(16540, status.reason(), status.isOK());
-
-
             int flags = 0;
 
             if (d.reservedField() & Reserved_InsertOption_ContinueOnError) flags |=
@@ -557,6 +556,14 @@ namespace mongo {
 
                 // We should always have a shard if we have any inserts
                 verify(group.inserts.size() == 0 || group.shard.get());
+
+                for (vector<BSONObj>::iterator it = group.inserts.begin();
+                        it != group.inserts.end(); ++it) {
+                    AuthorizationSession* authSession =
+                            ClientBasic::getCurrent()->getAuthorizationSession();
+                    Status status = authSession->checkAuthForInsert(ns, *it);
+                    uassert(16540, status.reason(), status.isOK());
+                }
 
                 if (group.inserts.size() > 0 && group.hasException()) {
                     warning() << "problem preparing batch insert detected, first inserting "
@@ -1000,14 +1007,15 @@ namespace mongo {
             const BSONObj query = d.nextJsObj();
 
             bool upsert = flags & UpdateOption_Upsert;
-            AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
-            Status status = authSession->checkAuthForUpdate(ns, upsert);
-            uassert(16537, status.reason(), status.isOK());
 
             uassert( 10201 ,  "invalid update" , d.moreJSObjs() );
 
             const BSONObj toUpdate = d.nextJsObj();
+
+            AuthorizationSession* authzSession =
+                    ClientBasic::getCurrent()->getAuthorizationSession();
+            Status status = authzSession->checkAuthForUpdate(ns, query, toUpdate, upsert);
+            uassert(16537, status.reason(), status.isOK());
 
             if( d.reservedField() & Reserved_FromWriteback ){
                 flags |= WriteOption_FromWriteback;
@@ -1161,14 +1169,14 @@ namespace mongo {
             const string& ns = r.getns();
             int flags = d.pullInt();
 
-            AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
-            Status status = authSession->checkAuthForDelete(ns);
-            uassert(16541, status.reason(), status.isOK());
-
             uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
 
             const BSONObj query = d.nextJsObj();
+
+            AuthorizationSession* authSession =
+                    ClientBasic::getCurrent()->getAuthorizationSession();
+            Status status = authSession->checkAuthForDelete(ns, query);
+            uassert(16541, status.reason(), status.isOK());
 
             if( d.reservedField() & Reserved_FromWriteback ){
                 flags |= WriteOption_FromWriteback;
@@ -1230,6 +1238,12 @@ namespace mongo {
                 if (op == dbInsert) {
                     // Insert is the only write op allowed on system.indexes, so it's the only one
                     // we check auth for.
+
+                    // TODO(spencer): this auth check shouldn't be necessary.  We could just call
+                    // checkAuthForInsert with the insert object and it would handle checking for
+                    // index builds, but because of the way this file is structured we don't know
+                    // what the insert object looks like until after we've already special cased
+                    // index building.
                     AuthorizationSession* authSession =
                             ClientBasic::getCurrent()->getAuthorizationSession();
                     uassert(16547,

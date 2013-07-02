@@ -97,25 +97,29 @@ namespace mongo {
                                                       const UserName& user,
                                                       const BSONObj& privilegeDocument);
 
-        // Checks if this connection has the privileges necessary to perform a query on the given
-        // namespace.
-        Status checkAuthForQuery(const std::string& ns);
+        // Checks if this connection has the privileges necessary to perform the given query on the
+        // given namespace.
+        Status checkAuthForQuery(const std::string& ns, const BSONObj& query);
 
-        // Checks if this connection has the privileges necessary to perform an update on the given
-        // namespace.
-        Status checkAuthForUpdate(const std::string& ns, bool upsert);
+        // Checks if this connection has the privileges necessary to perform a getMore on the given
+        // cursor in the given namespace.
+        Status checkAuthForGetMore(const std::string& ns, long long cursorID);
 
-        // Checks if this connection has the privileges necessary to perform an insert to the given
-        // namespace.
-        Status checkAuthForInsert(const std::string& ns);
+        // Checks if this connection has the privileges necessary to perform the given update on the
+        // given namespace.
+        Status checkAuthForUpdate(const std::string& ns,
+                                  const BSONObj& query,
+                                  const BSONObj& update,
+                                  bool upsert);
+
+        // Checks if this connection has the privileges necessary to insert the given document
+        // to the given namespace.  Correctly interprets inserts to system.indexes and performs
+        // the proper auth checks for index building.
+        Status checkAuthForInsert(const std::string& ns, const BSONObj& document);
 
         // Checks if this connection has the privileges necessary to perform a delete on the given
         // namespace.
-        Status checkAuthForDelete(const std::string& ns);
-
-        // Checks if this connection has the privileges necessary to perform a getMore on the given
-        // namespace.
-        Status checkAuthForGetMore(const std::string& ns);
+        Status checkAuthForDelete(const std::string& ns, const BSONObj& query);
 
         // Checks if this connection is authorized for the given Privilege.
         Status checkAuthForPrivilege(const Privilege& privilege);
@@ -134,7 +138,8 @@ namespace mongo {
         Status _probeForPrivilege(const Privilege& privilege);
 
         // Returns a new privilege that has replaced the actions needed to handle special casing
-        // certain namespaces like system.users and system.profile.
+        // certain namespaces like system.users and system.profile.  Note that the special handling
+        // of system.indexes takes place in checkAuthForInsert, not here.
         Privilege _modifyPrivilegeForSpecialCases(const Privilege& privilege);
 
 
