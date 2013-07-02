@@ -1353,6 +1353,27 @@ namespace DocumentTests {
             }
         };
         
+
+        class SerializationOfMissingForSorter {
+            // Can't be tested in AllTypesDoc since missing values are omitted when adding to BSON.
+        public:
+            void run() {
+                const Value missing;
+                const Value arrayOfMissing = Value(vector<Value>(10));
+
+                BufBuilder bb;
+                missing.serializeForSorter(bb);
+                arrayOfMissing.serializeForSorter(bb);
+
+                BufReader reader(bb.buf(), bb.len());
+                ASSERT_EQUALS(
+                        missing,
+                        Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
+                ASSERT_EQUALS(
+                        arrayOfMissing,
+                        Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
+            }
+        };
     } // namespace Value
 
     class All : public Suite {
@@ -1449,6 +1470,7 @@ namespace DocumentTests {
             add<Value::AddToBsonArray>();
             add<Value::Compare>();
             add<Value::SubFields>();
+            add<Value::SerializationOfMissingForSorter>();
         }
     } myall;
     

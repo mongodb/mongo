@@ -366,15 +366,24 @@ namespace mongo {
         return out.str();
     }
 
-    // TODO make these functions better
     void Document::serializeForSorter(BufBuilder& buf) const {
-        BSONObjBuilder bb(buf);
-        toBson(&bb);
-        bb.doneFast();
+        const int numElems = size();
+        buf.appendNum(numElems);
+
+        for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+            buf.appendStr(it->nameSD(), /*NUL byte*/ true);
+            it->val.serializeForSorter(buf);
+        }
     }
 
     Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-        BSONObj bson = BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings());
-        return Document(bson);
+        const int numElems = buf.read<int>();
+        MutableDocument doc(numElems);
+        for (int i = 0; i < numElems; i++) {
+            StringData name = buf.readCStr();
+            doc.addField(name, Value::deserializeForSorter(buf,
+                                                           Value::SorterDeserializeSettings()));
+        }
+        return doc.freeze();
     }
 }

@@ -97,16 +97,17 @@ namespace mongo {
             return p;
         }
 
+        /// reads a NUL terminated string
+        StringData readCStr() {
+            const char* start = static_cast<const char*>(pos());
+            size_t len = strnlen(start, remaining()-1);
+            if (start[len] != '\0') throw eof(); // no NUL byte in remaining bytes
+            skip(len + 1/*NUL byte*/);
+            return StringData(start, len);
+        }
+
         void readStr(string& s) {
-            StringBuilder b;
-            while( 1 ) {
-                char ch;
-                read(ch);
-                if( ch == 0 )
-                    break;
-                b << ch;
-            }
-            s = b.str();
+            s = readCStr().toString();
         }
 
         const void* pos() { return _pos; }

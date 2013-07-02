@@ -917,14 +917,145 @@ namespace mongo {
         verify(false);
     }
 
-    // TODO make these functions better
     void Value::serializeForSorter(BufBuilder& buf) const {
-        BSONObjBuilder bb(buf);
-        addToBsonObj(&bb, "");
-        bb.doneFast();
+        buf.appendChar(getType());
+        switch(getType()) {
+        // type-only types
+        case EOO:
+        case MinKey:
+        case MaxKey:
+        case jstNULL:
+        case Undefined:
+            break;
+
+        // simple types
+        case jstOID:       buf.appendStruct(_storage.oid); break;
+        case NumberInt:    buf.appendNum(_storage.intValue); break;
+        case NumberLong:   buf.appendNum(_storage.longValue); break;
+        case NumberDouble: buf.appendNum(_storage.doubleValue); break;
+        case Bool:         buf.appendChar(_storage.boolValue); break;
+        case Date:         buf.appendNum(_storage.dateValue); break;
+        case Timestamp:    buf.appendStruct(getTimestamp()); break;
+
+        // types that are like strings
+        case String:
+        case Symbol:
+        case Code: {
+            StringData str = getStringData();
+            buf.appendNum(int(str.size()));
+            buf.appendStr(str, /*NUL byte*/ false);
+            break;
+        }
+
+        case BinData: {
+            StringData str = getStringData();
+            buf.appendChar(_storage.binDataType());
+            buf.appendNum(int(str.size()));
+            buf.appendStr(str, /*NUL byte*/ false);
+            break;
+        }
+
+        case RegEx:
+            buf.appendStr(getRegex(), /*NUL byte*/ true);
+            buf.appendStr(getRegexFlags(), /*NUL byte*/ true);
+            break;
+
+        case Object:
+            getDocument().serializeForSorter(buf);
+            break;
+
+        case DBRef:
+            buf.appendStruct(_storage.getDBRef()->oid);
+            buf.appendStr(_storage.getDBRef()->ns, /*NUL byte*/ true);
+            break;
+
+        case CodeWScope: {
+            intrusive_ptr<const RCCodeWScope> cws = _storage.getCodeWScope();
+            buf.appendNum(int(cws->code.size()));
+            buf.appendStr(cws->code, /*NUL byte*/ false);
+            cws->scope.serializeForSorter(buf);
+            break;
+         }
+
+        case Array: {
+            const vector<Value>& array = getArray();
+            const int numElems = array.size();
+            buf.appendNum(numElems);
+            for (int i = 0; i < numElems; i++)
+                array[i].serializeForSorter(buf);
+            break;
+        }
+        }
     }
-    Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-        BSONObj bson = BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings());
-        return Value(bson.firstElement());
+
+    Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings& settings) {
+        const BSONType type = BSONType(buf.read<signed char>()); // need sign extension for MinKey
+        switch(type) {
+        // type-only types
+        case EOO:
+        case MinKey:
+        case MaxKey:
+        case jstNULL:
+        case Undefined:
+            return Value(ValueStorage(type));
+
+        // simple types
+        case jstOID:       return Value(buf.read<OID>());
+        case NumberInt:    return Value(buf.read<int>());
+        case NumberLong:   return Value(buf.read<long long>());
+        case NumberDouble: return Value(buf.read<double>());
+        case Bool:         return Value(bool(buf.read<char>()));
+        case Date:         return Value(Date_t(buf.read<long long>()));
+        case Timestamp:    return Value(buf.read<OpTime>());
+
+        // types that are like strings
+        case String:
+        case Symbol:
+        case Code: {
+            int size = buf.read<int>();
+            const char* str = static_cast<const char*>(buf.skip(size));
+            return Value(ValueStorage(type, StringData(str, size)));
+        }
+
+        case BinData: {
+            BinDataType bdt = BinDataType(buf.read<char>());
+            int size = buf.read<int>();
+            const void* data = buf.skip(size);
+            return Value(BSONBinData(data, size, bdt));
+        }
+
+        case RegEx: {
+            StringData regex = buf.readCStr();
+            StringData flags = buf.readCStr();
+            return Value(BSONRegEx(regex, flags));
+        }
+
+        case Object:
+            return Value(Document::deserializeForSorter(buf,
+                                                        Document::SorterDeserializeSettings()));
+
+        case DBRef: {
+            OID oid = buf.read<OID>();
+            StringData ns = buf.readCStr();
+            return Value(BSONDBRef(ns, oid));
+        }
+
+        case CodeWScope: {
+            int size = buf.read<int>();
+            const char* str = static_cast<const char*>(buf.skip(size));
+            BSONObj bson = BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings());
+            return Value(BSONCodeWScope(StringData(str, size), bson));
+         }
+
+        case Array: {
+            const int numElems = buf.read<int>();
+            vector<Value> array;
+            array.reserve(numElems);
+            for (int i = 0; i < numElems; i++)
+                array.push_back(deserializeForSorter(buf, settings));
+            return Value::consume(array);
+        }
+        }
+        verify(false);
     }
 }
