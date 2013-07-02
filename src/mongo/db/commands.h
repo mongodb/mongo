@@ -19,6 +19,7 @@
 
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/jsobj.h"
@@ -111,12 +112,12 @@ namespace mongo {
         virtual void help( stringstream& help ) const;
 
         /**
-         * Appends to "*out" the privileges required to run this command on database "dbname" with
-         * the invocation described by "cmdObj".
+         * Checks if the given client is authorized to run this command on database "dbname"
+         * with the invocation described by "cmdObj".
          */
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) = 0;
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj);
 
         /* Return true if a replica set secondary should go into "recovering"
            (unreadable) state while running this command.
@@ -136,6 +137,19 @@ namespace mongo {
         virtual ~Command() {}
 
     protected:
+
+        /**
+         * Appends to "*out" the privileges required to run this command on database "dbname" with
+         * the invocation described by "cmdObj".  New commands shouldn't implement this, they should
+         * implement checkAuthForCommand instead.
+         */
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // The default implementation of addRequiredPrivileges should never be hit.
+            fassertFailed(16940);
+        }
+
         BSONObj getQuery( const BSONObj& cmdObj ) {
             if ( cmdObj["query"].type() == Object )
                 return cmdObj["query"].embeddedObject();

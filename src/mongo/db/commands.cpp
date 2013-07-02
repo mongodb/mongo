@@ -27,6 +27,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
@@ -198,6 +199,14 @@ namespace mongo {
         if (!ok && !have_errmsg) {
             result.append("errmsg", errmsg);
         }
+    }
+
+    Status Command::checkAuthForCommand(ClientBasic* client,
+                                        const std::string& dbname,
+                                        const BSONObj& cmdObj) {
+        std::vector<Privilege> privileges;
+        this->addRequiredPrivileges(dbname, cmdObj, &privileges);
+        return client->getAuthorizationSession()->checkAuthForPrivileges(privileges);
     }
 
     void Command::logIfSlow( const Timer& timer, const string& msg ) {

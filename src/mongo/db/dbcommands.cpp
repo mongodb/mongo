@@ -2126,11 +2126,11 @@ namespace mongo {
         }
 
         if (AuthorizationManager::isAuthEnabled()) {
-            std::vector<Privilege> privileges;
-            c->addRequiredPrivileges(dbname, cmdObj, &privileges);
-            Status status = client.getAuthorizationSession()->checkAuthForPrivileges(privileges);
+            Status status = c->checkAuthForCommand(&client, dbname, cmdObj);
             if (!status.isOK()) {
                 log() << "command denied: " << cmdObj.toString() << endl;
+                result.append("note", str::stream() << "not authorized for command: " <<
+                              c->name << " on database " << dbname);
                 appendCommandStatus(result, false, status.reason());
                 return;
             }
