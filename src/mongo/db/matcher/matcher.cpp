@@ -122,8 +122,9 @@ namespace mongo {
                 }
             }
 
-            // This is bad.
-            verify(0);
+            // This should not happen.
+            massert(16920, "trying to match on unknown field: " + path.fieldRef().dottedField(),
+                    0);
 
             return new SingleElementElementIterator(BSONElement());
         }

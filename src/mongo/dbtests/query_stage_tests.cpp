@@ -181,14 +181,8 @@ namespace QueryStageTests {
             params.endKeyInclusive = true;
             params.direction = 1;
 
-            bool threw = false;
-            try {
-                countResults(params, new Matcher(BSON("baz" << 25)));
-            } catch(...) {
-                threw = true;
-            }
-
-            ASSERT_TRUE(threw);
+            ASSERT_THROWS(countResults(params, new Matcher(BSON("baz" << 25))),
+                          MsgAssertionException);
         }
     };
 
