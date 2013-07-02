@@ -1116,24 +1116,27 @@ def doConfigure(myenv):
             Exit(1)
 
     # Check to see if we are trying to use an outdated libstdc++ in C++11 mode. This is
-    # primarly to help people using clang in C++11 mode on OS X but forgetting to use --libc++.
+    # primarly to help people using clang in C++11 mode on OS X but forgetting to use
+    # --libc++. We would, ideally, check the __GLIBCXX__ version, but for various reasons this
+    # is not workable. Instead, we switch on the fact that std::is_nothrow_constructible wasn't
+    # introduced until libstdc++ 4.6.0. Earlier versions of libstdc++ than 4.6 are unlikely to
+    # work well anyway.
     if has_option('c++11') and not has_option('libc++'):
 
         def CheckModernLibStdCxx(context):
 
-            # See http://gcc.gnu.org/onlinedocs/libstdc++/manual/abi.html for the origin of
-            # these values. Our choice of 4.7.0 is somewhat arbitrary.
-            minSupportedLibStdCxx = ("4.7.0", 20120322)
-
             test_body = """
             #include <vector>
-            #if defined(__GLIBCXX__) and (__GLIBCXX__ < %d)
-            #error
+            #include <cstdlib>
+            #if defined(__GLIBCXX__)
+            #include <type_traits>
+            int main() {
+                return std::is_nothrow_constructible<int>::value ? EXIT_SUCCESS : EXIT_FAILURE;
+            }
             #endif
-            """ % minSupportedLibStdCxx[1]
+            """
 
-            messageText = 'Checking for libstdc++ %s or newer (for C++11 support)... '
-            context.Message(messageText % minSupportedLibStdCxx[0])
+            context.Message('Checking for libstdc++ 4.6.0 or better (for C++11 support)... ')
             ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
             context.Result(ret)
             return ret
