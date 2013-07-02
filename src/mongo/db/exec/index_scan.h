@@ -27,7 +27,7 @@ namespace mongo {
     class IndexAccessMethod;
     class IndexCursor;
     class IndexDescriptor;
-    class IndexScanParams;
+    struct IndexScanParams;
     class WorkingSet;
 
     /**

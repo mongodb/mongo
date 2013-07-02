@@ -60,7 +60,7 @@ namespace mongo {
                     // TODO: Occasionally yield.  For now, we run until we get another result.
                 }
                 else {
-                    // IS_EOF, ERROR, NEED_YIELD.  We just stop here.
+                    // IS_EOF, FAILURE, NEED_YIELD.  We just stop here.
                     return false;
                 }
             }

@@ -70,7 +70,7 @@ namespace mongo {
      *     case PlanStage::NEED_TIME:
      *         // Need more time.
      *         break;
-     *     case PlanStage::ERROR:
+     *     case PlanStage::FAILURE:
      *         // Throw exception or return error
      *         break;
      *     case PlanStage::NEED_FETCH:
@@ -101,7 +101,7 @@ namespace mongo {
             // work(...) needs more time to product a result.  Call work(...) again.
             NEED_TIME,
             // Something has gone unrecoverably wrong.  Stop running this query.
-            ERROR,
+            FAILURE,
             // Something isn't in memory.  Fetch it.  TODO: actually support this (forthcoming).
             NEED_YIELD,
         };

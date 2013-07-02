@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    class WorkingSetMember;
+    struct WorkingSetMember;
 
     typedef long WorkingSetID;
 
