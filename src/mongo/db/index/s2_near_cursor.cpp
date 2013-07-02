@@ -67,13 +67,16 @@ namespace mongo {
             ++_nearFieldIndex;
         }
 
+        _minDistance = max(0.0, _nearQuery.minDistance);
+        
         // _outerRadius can't be greater than (pi * r) or we wrap around the opposite
         // side of the world.
         _maxDistance = min(M_PI * _params.radius, _nearQuery.maxDistance);
+        uassert(16892, "$minDistance too large", _minDistance < _maxDistance);
 
         // Start with a conservative _radiusIncrement.
         _radiusIncrement = 5 * S2::kAvgEdge.GetValue(_params.finestIndexedLevel) * _params.radius;
-        _innerRadius = _outerRadius = 0;
+        _innerRadius = _outerRadius = _minDistance;
         // We might want to adjust the sizes of our coverings if our search
         // isn't local to the start point.
         // Set up _outerRadius with proper checks (maybe maxDistance is really small?)
