@@ -27,7 +27,7 @@
 #include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/auth/user_name_hash.h" // TODO(spencer): Including this will slow compilation
+#include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_map.h"
 

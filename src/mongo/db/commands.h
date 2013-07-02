@@ -19,13 +19,9 @@
 
 #include <vector>
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -184,32 +180,6 @@ namespace mongo {
 
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;
-    };
-
-    class CmdShutdown : public Command {
-    public:
-        virtual bool requiresAuth() { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::shutdown);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
-        }
-        virtual LockType locktype() const { return NONE; }
-        virtual void help( stringstream& help ) const;
-        CmdShutdown() : Command("shutdown") {}
-        bool run(const string& dbname, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
-    private:
-        bool shutdownHelper();
     };
 
     bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);

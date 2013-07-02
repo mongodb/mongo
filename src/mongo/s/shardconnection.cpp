@@ -20,6 +20,7 @@
 
 #include <set>
 
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"

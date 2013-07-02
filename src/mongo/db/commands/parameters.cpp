@@ -17,9 +17,11 @@
 */
 
 #include "mongo/pch.h"
+
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/cmdline.h"
-#include "mongo/client/dbclient_rs.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {

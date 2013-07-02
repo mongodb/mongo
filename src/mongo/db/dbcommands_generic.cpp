@@ -28,6 +28,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/shutdown.h"
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
