@@ -634,6 +634,17 @@ env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
                           "mocklib"],
                 NO_CRUTCH=True)
 
+env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
+                LIBDEPS=[ "mongoscore",
+                          "coreshard",
+                          "mongocommon",
+                          "coreserver",
+                          "coredb",
+                          "dbcmdline",
+                          "mongodandmongos",
+                          "mocklib"],
+                NO_CRUTCH=True)
+
 
 # Should only need stuff from util, unittest and platform
 env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],

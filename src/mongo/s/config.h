@@ -219,6 +219,13 @@ namespace mongo {
         bool init( vector<string> configHosts );
 
         bool init( const std::string& s );
+ 
+        /**
+         * Check hosts are unique. Returns true if all configHosts 
+         * hostname:port entries are unique. Otherwise return false
+         * and fill errmsg with message containing the offending server.
+         */
+        bool checkHostsAreUnique( const vector<string>& configHosts, string* errmsg );
 
         bool allUp();
         bool allUp( string& errmsg );
