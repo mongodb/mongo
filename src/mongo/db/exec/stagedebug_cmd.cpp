@@ -18,6 +18,8 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/exec/and_hash.h"
+#include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/simple_plan_runner.h"
 #include "mongo/db/index/catalog_hack.h"
@@ -44,10 +46,14 @@ namespace mongo {
      *                          stop: stopObj, endInclusive: true/false, direction: -1/1,
      *                          limit: int}}}
      *
+     * Internal Nodes:
+     *
+     * node -> {andHash: {filter: {filter}, args: { nodes: [node, node]}}}
+     * node -> {andSorted: {filter: {filter}, args: { nodes: [node, node]}}}
+     *
      * Forthcoming Nodes:
      *
      * node -> {cscan: {filter: {filter}, args: {name: "collectionname" }}}
-     * node -> {and: {filter: {filter}, args: { nodes: [node, node]}}}
      * node -> {or: {filter: {filter}, args: { dedup:bool, nodes:[node, node]}}}
      * node -> {fetch: {filter: {filter}, args: {node: node}}}
      * node -> {sort: {filter: {filter}, args: {node: node, pattern: objWithSortCriterion}}}
@@ -146,6 +152,57 @@ namespace mongo {
                 params.forceBtreeAccessMethod = false;
 
                 return new IndexScan(params, workingSet, matcher.release());
+            }
+            else if ("andHash" == nodeName) {
+                uassert(16921, "Nodes argument must be provided to AND",
+                        nodeArgs["nodes"].isABSONObj());
+
+                auto_ptr<AndHashStage> andStage(new AndHashStage(workingSet, matcher.release()));
+
+                int nodesAdded = 0;
+                BSONObjIterator it(nodeArgs["nodes"].Obj());
+                while (it.more()) {
+                    BSONElement e = it.next();
+                    uassert(16922, "node of AND isn't an obj?: " + e.toString(),
+                            e.isABSONObj());
+
+                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet);
+                    uassert(16923, "Can't parse sub-node of AND: " + e.Obj().toString(),
+                            NULL != subNode);
+                    // takes ownership
+                    andStage->addChild(subNode);
+                    ++nodesAdded;
+                }
+
+                uassert(16927, "AND requires more than one child", nodesAdded >= 2);
+
+                return andStage.release();
+            }
+            else if ("andSorted" == nodeName) {
+                uassert(16924, "Nodes argument must be provided to AND",
+                        nodeArgs["nodes"].isABSONObj());
+
+                auto_ptr<AndSortedStage> andStage(new AndSortedStage(workingSet,
+                                                                     matcher.release()));
+
+                int nodesAdded = 0;
+                BSONObjIterator it(nodeArgs["nodes"].Obj());
+                while (it.more()) {
+                    BSONElement e = it.next();
+                    uassert(16925, "node of AND isn't an obj?: " + e.toString(),
+                            e.isABSONObj());
+
+                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet);
+                    uassert(16926, "Can't parse sub-node of AND: " + e.Obj().toString(),
+                            NULL != subNode);
+                    // takes ownership
+                    andStage->addChild(subNode);
+                    ++nodesAdded;
+                }
+
+                uassert(16928, "AND requires more than one child", nodesAdded >= 2);
+
+                return andStage.release();
             }
             else {
                 return NULL;

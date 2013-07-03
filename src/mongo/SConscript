@@ -460,6 +460,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/prefetch.cpp",
                     "db/repl/write_concern.cpp",
                     "db/btreecursor.cpp",
+                    "db/exec/and_hash.cpp",
+                    "db/exec/and_sorted.cpp",
                     "db/exec/index_scan.cpp",
                     "db/exec/stagedebug_cmd.cpp",
                     "db/exec/working_set_common.cpp",
@@ -661,10 +663,11 @@ serverOnlyFiles += [ "s/d_logic.cpp",
 
 env.StaticLibrary("defaultversion", "s/default_version.cpp")
 
-env.StaticLibrary("working_set", [ "db/exec/working_set.cpp", ],
-                  LIBDEPS = [ "bson",])
+# Query execution
+env.StaticLibrary("working_set", [ "db/exec/working_set.cpp", ], LIBDEPS = [ "bson",])
 env.CppUnitTest("working_set_test", [ "db/exec/working_set_test.cpp" ], LIBDEPS = ["working_set"])
 
+# Geo
 env.StaticLibrary("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], LIBDEPS = [ "bson" ])
 env.StaticLibrary("geoparser", [ "db/geo/geoparser.cpp", ],
                   LIBDEPS = [ "bson",

@@ -54,6 +54,21 @@ namespace mongo {
          */
         void free(const WorkingSetID& i);
 
+        /**
+         * The DiskLoc in WSM 'i' was invalidated while being processed.  Any predicates over the
+         * WSM could not be fully evaluated, so the WSM may or may not satisfy them.  As such, if we
+         * wish to output the WSM, we must do some clean-up work later.  Adds the WSM with id 'i' to
+         * the list of flagged WSIDs.
+         *
+         * The WSM must be in the state OWNED_OBJ.
+         */
+        void flagForReview(const WorkingSetID& i);
+
+        /**
+         * Return a vector of all WSIDs passed to flagForReview.
+         */
+        const vector<WorkingSetID>& getFlagged() const;
+
     private:
         typedef unordered_map<WorkingSetID, WorkingSetMember*> DataMap;
 
@@ -62,6 +77,9 @@ namespace mongo {
         // The WorkingSetID returned by the next call to allocate().  Should refer to the next valid
         // ID.  IDs allocated contiguously.  Should never point at an in-use ID.  
         WorkingSetID _nextId;
+
+        // All WSIDs invalidated during evaluation of a predicate (AND).
+        vector<WorkingSetID> _flagged;
     };
 
     /**

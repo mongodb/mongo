@@ -119,17 +119,24 @@ namespace mongo {
         return PlanStage::NEED_TIME;
     }
 
-    bool IndexScan::isEOF() { return _indexCursor->isEOF() || _hitEnd; }
+    bool IndexScan::isEOF() {
+        if (NULL == _indexCursor.get()) {
+            // Have to call work() at least once.
+            return false;
+        }
+
+        return _indexCursor->isEOF() || _hitEnd;
+    }
 
     void IndexScan::prepareToYield() {
-        if (isEOF()) { return; }
+        if (isEOF() || (NULL == _indexCursor.get())) { return; }
         _savedKey = _indexCursor->getKey().getOwned();
         _savedLoc = _indexCursor->getValue();
         _indexCursor->savePosition();
     }
 
     void IndexScan::recoverFromYield() {
-        if (isEOF()) { return; }
+        if (isEOF() || (NULL == _indexCursor.get())) { return; }
 
         _indexCursor->restorePosition();
 

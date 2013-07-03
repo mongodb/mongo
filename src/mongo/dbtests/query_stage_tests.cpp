@@ -16,8 +16,8 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/simple_plan_runner.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/simple_plan_runner.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
@@ -25,7 +25,7 @@
 #include "mongo/dbtests/dbtests.h"
 
 /**
- * This file tests the query stages in db/exec/.
+ * This file tests db/exec/index_scan.cpp
  */
 
 namespace QueryStageTests {

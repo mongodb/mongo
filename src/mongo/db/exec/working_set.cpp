@@ -49,6 +49,16 @@ namespace mongo {
         _data.erase(it);
     }
 
+    void WorkingSet::flagForReview(const WorkingSetID& i) {
+        WorkingSetMember* member = get(i);
+        verify(WorkingSetMember::OWNED_OBJ == member->state);
+        _flagged.push_back(i);
+    }
+
+    const vector<WorkingSetID>& WorkingSet::getFlagged() const {
+        return _flagged;
+    }
+
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }
 
     bool WorkingSetMember::hasLoc() const {
