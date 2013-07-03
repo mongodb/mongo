@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {
@@ -36,17 +38,29 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         CmdAuthenticate() : Command("authenticate") {}
-        bool run(const string& dbname , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
- 
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl);
+
     private:
-        bool authenticateCR(const string& dbname, 
-                            BSONObj& cmdObj, 
-                            string& errmsg, 
-                            BSONObjBuilder& result);
-        bool authenticateX509(const string& dbname, 
-                              BSONObj& cmdObj, 
-                              string& errmsg, 
-                              BSONObjBuilder& result);
+        /**
+         * Completes the authentication of "user" using parameters from "cmdObj".
+         *
+         * Returns Status::OK() on success.  All other statuses indicate failed authentication.  The
+         * entire status returned here may always be used for logging.  However, if the code is
+         * AuthenticationFailed, the "reason" field of the return status may contain information
+         * that should not be revealed to the connected client.
+         *
+         * Other than AuthenticationFailed, common returns are BadValue, indicating unsupported
+         * mechanism, and ProtocolError, indicating an error in the use of the authentication
+         * protocol.
+         */
+        Status _authenticate(const UserName& user, const BSONObj& cmdObj);
+        Status _authenticateCR(const UserName& user, const BSONObj& cmdObj);
+        Status _authenticateX509(const UserName& user, const BSONObj& cmdObj);
     };
 
     extern CmdAuthenticate cmdAuthenticate;

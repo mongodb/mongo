@@ -95,104 +95,105 @@ namespace mongo {
         boost::scoped_ptr<SecureRandom> _random;
     } cmdGetNonce;
 
-    bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        log() << " authenticate db: " << dbname << " " << cmdObj << endl;
+    bool CmdAuthenticate::run(const string& dbname,
+                              BSONObj& cmdObj,
+                              int,
+                              string& errmsg,
+                              BSONObjBuilder& result,
+                              bool fromRepl) {
 
+        log() << " authenticate db: " << dbname << " " << cmdObj << endl;
+        UserName user(cmdObj.getStringField("user"), dbname);
+        Status status = _authenticate(user, cmdObj);
+        if (!status.isOK()) {
+            if (status.code() == ErrorCodes::AuthenticationFailed) {
+                // Statuses with code AuthenticationFailed may contain messages we do not wish to
+                // reveal to the user, so we return a status with the message "auth failed".
+                appendCommandStatus(result,
+                                    Status(ErrorCodes::AuthenticationFailed, "auth failed"));
+            }
+            else {
+                appendCommandStatus(result, status);
+            }
+            return false;
+        }
+        result.append("dbname", user.getDB());
+        result.append("user", user.getUser());
+        return true;
+    }
+
+    Status CmdAuthenticate::_authenticate(const UserName& user, const BSONObj& cmdObj) {
         std::string mechanism = cmdObj.getStringField("mechanism");
         if (mechanism.empty() || mechanism == "MONGODB-CR") {
-            return authenticateCR(dbname, cmdObj, errmsg, result);
+            return _authenticateCR(user, cmdObj);
         }
 #ifdef MONGO_SSL
         if (mechanism == "MONGODB-X509") {
-            return authenticateX509(dbname, cmdObj, errmsg, result);
+            return _authenticateX509(dbname, cmdObj);
         }
 #endif
-        errmsg = "Unsupported mechanism: " + mechanism;
-        result.append(saslCommandCodeFieldName, ErrorCodes::BadValue);
-        return false;
+        return Status(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
     }
 
-    bool CmdAuthenticate::authenticateCR(const string& dbname, 
-                                         BSONObj& cmdObj, 
-                                         string& errmsg, 
-                                         BSONObjBuilder& result) {
-        
-        string user = cmdObj.getStringField("user");
+    Status CmdAuthenticate::_authenticateCR(const UserName& user, const BSONObj& cmdObj) {
 
         if (user == internalSecurity.user && cmdLine.clusterAuthMode == "x509") {
-            errmsg = "Mechanism x509 is required for internal cluster authentication";
-            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-            return false;
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "Mechanism x509 is required for internal cluster authentication");
         }
 
         if (!_areNonceAuthenticateCommandsEnabled) {
             // SERVER-8461, MONGODB-CR must be enabled for authenticating the internal user, so that
             // cluster members may communicate with each other.
-            if (dbname != StringData("local", StringData::LiteralTag()) ||
-                user != internalSecurity.user) {
-                errmsg = _nonceAuthenticateCommandsDisabledMessage;
-                result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-                return false;
+            if (user != internalSecurity.user) {
+                return Status(ErrorCodes::BadValue, _nonceAuthenticateCommandsDisabledMessage);
             }
         }
 
         string key = cmdObj.getStringField("key");
         string received_nonce = cmdObj.getStringField("nonce");
 
-        if( user.empty() || key.empty() || received_nonce.empty() ) {
-            log() << "field missing/wrong type in received authenticate command "
-                  << dbname
-                  << endl;
-            errmsg = "auth fails";
+        if( user.getUser().empty() || key.empty() || received_nonce.empty() ) {
             sleepmillis(10);
-            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-            return false;
+            return Status(ErrorCodes::ProtocolError,
+                          "field missing/wrong type in received authenticate command");
         }
 
         stringstream digestBuilder;
 
         {
-            bool reject = false;
             ClientBasic *client = ClientBasic::getCurrent();
-            AuthenticationSession *session = client->getAuthenticationSession();
+            boost::scoped_ptr<AuthenticationSession> session;
+            client->swapAuthenticationSession(session);
             if (!session || session->getType() != AuthenticationSession::SESSION_TYPE_MONGO) {
-                reject = true;
-                LOG(1) << "auth: No pending nonce" << endl;
+                sleepmillis(30);
+                return Status(ErrorCodes::ProtocolError, "No pending nonce");
             }
             else {
-                nonce64 nonce = static_cast<MongoAuthenticationSession*>(session)->getNonce();
+                nonce64 nonce = static_cast<MongoAuthenticationSession*>(session.get())->getNonce();
                 digestBuilder << hex << nonce;
-                reject = digestBuilder.str() != received_nonce;
-                if ( reject ) {
-                    LOG(1) << "auth: Authentication failed for " << dbname << '$' << user << endl;
+                if (digestBuilder.str() != received_nonce) {
+                    sleepmillis(30);
+                    return Status(ErrorCodes::AuthenticationFailed, "Received wrong nonce.");
                 }
-            }
-            client->resetAuthenticationSession(NULL);
-
-            if ( reject ) {
-                log() << "auth: bad nonce received or getnonce not called. could be a driver bug or a security attack. db:" << dbname << endl;
-                errmsg = "auth fails";
-                sleepmillis(30);
-                result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-                return false;
             }
         }
 
         BSONObj userObj;
         string pwd;
         Status status = getGlobalAuthorizationManager()->getPrivilegeDocument(
-                dbname, UserName(user, dbname), &userObj);
+                user.getDB().toString(), user, &userObj);
         if (!status.isOK()) {
-            log() << status.reason() << std::endl;
-            errmsg = "auth fails";
-            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-            return false;
+            // Failure to find the privilege document indicates no-such-user, a fact that we do not
+            // wish to reveal to the client.  So, we return AuthenticationFailed rather than passing
+            // through the returned status.
+            return Status(ErrorCodes::AuthenticationFailed, status.toString());
         }
         pwd = userObj["pwd"].String();
 
         md5digest d;
         {
-            digestBuilder << user << pwd;
+            digestBuilder << user.getUser() << pwd;
             string done = digestBuilder.str();
 
             md5_state_t st;
@@ -204,43 +205,32 @@ namespace mongo {
         string computed = digestToString( d );
 
         if ( key != computed ) {
-            log() << "auth: key mismatch " << user << ", ns:" << dbname << endl;
-            errmsg = "auth fails";
-            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-            return false;
+            return Status(ErrorCodes::AuthenticationFailed, "key mismatch");
         }
 
         AuthorizationSession* authorizationSession =
             ClientBasic::getCurrent()->getAuthorizationSession();
-        Principal* principal = new Principal(UserName(user, dbname));
+        Principal* principal = new Principal(user);
         principal->setImplicitPrivilegeAcquisition(true);
         authorizationSession->addAuthorizedPrincipal(principal);
 
-        result.append( "dbname" , dbname );
-        result.append( "user" , user );
-        return true;
+        return Status::OK();
     }
 
 #ifdef MONGO_SSL
-    bool CmdAuthenticate::authenticateX509(const string& dbname,
-                                           BSONObj& cmdObj, 
-                                           string& errmsg, 
-                                           BSONObjBuilder& result) {
-        if(dbname != "$external") {
-            errmsg = "X.509 authentication must always use the $external database.";
-            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-            return false;
+    Status CmdAuthenticate::_authenticateX509(const UserName& user, const BSONObj& cmdObj) {
+        if(user.getDB() != "$external") {
+            return Status(ErrorCodes::ProtocolError,
+                          "X.509 authentication must always use the $external database.");
         }
 
-        std::string user = cmdObj.getStringField("user");
         ClientBasic *client = ClientBasic::getCurrent();
         AuthorizationSession* authorizationSession = client->getAuthorizationSession();
         StringData subjectName = client->port()->getX509SubjectName();
-        
-        if (user != subjectName) {
-            errmsg = "There is no x.509 client certificate matching the user.";
-            result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-            return false;
+
+        if (user.getUser() != subjectName) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "There is no x.509 client certificate matching the user.");
         }
         else {
             StringData srvSubjectName = getSSLManager()->getServerSubjectName();
@@ -254,17 +244,15 @@ namespace mongo {
                     result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
                     return false;
                 }
-                authorizationSession->grantInternalAuthorization(UserName(user, "$external"));
+                authorizationSession->grantInternalAuthorization(user);
             }
             // Handle normal client authentication, only applies to client-server connections
             else {
-                Principal* principal = new Principal(UserName(user, "$external"));
+                Principal* principal = new Principal(user);
                 principal->setImplicitPrivilegeAcquisition(true);
                 authorizationSession->addAuthorizedPrincipal(principal);
             }
-            result.append( "dbname" , dbname );
-            result.append( "user" , user );
-            return true;
+            return Status::OK();
         }
     }
 #endif

@@ -129,14 +129,14 @@ namespace mongo {
 
         LOG(1) << "security key: " << str << endl;
 
-        // createPWDigest should really not be a member func
-        DBClientConnection conn;
-        internalSecurity.pwd = conn.createPasswordDigest(internalSecurity.user, str);
+        internalSecurity.pwd = DBClientWithCommands::createPasswordDigest(
+                internalSecurity.user.getUser().toString(), str);
 
         if (cmdLine.clusterAuthMode == "keyfile" || cmdLine.clusterAuthMode == "sendKeyfile") {
             setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                                      saslCommandUserSourceFieldName << "local" <<
-                                      saslCommandUserFieldName << internalSecurity.user <<
+                                      saslCommandUserSourceFieldName <<
+                                      internalSecurity.user.getDB() <<
+                                      saslCommandUserFieldName << internalSecurity.user.getUser() <<
                                       saslCommandPasswordFieldName << internalSecurity.pwd <<
                                       saslCommandDigestPasswordFieldName << false));
         }

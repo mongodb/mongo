@@ -65,9 +65,7 @@ namespace {
         if (!principal->isImplicitPrivilegeAcquisitionEnabled())
             return;
 
-        const std::string dbname = principal->getName().getDB().toString();
-        if (dbname == StringData("local", StringData::LiteralTag()) &&
-            principal->getName().getUser() == internalSecurity.user) {
+        if (principal->getName() == internalSecurity.user) {
 
             // Grant full access to internal user
             ActionSet allActions;
@@ -77,6 +75,7 @@ namespace {
             return;
         }
 
+        const std::string dbname = principal->getName().getDB().toString();
         _acquirePrivilegesForPrincipalFromDatabase(ADMIN_DBNAME, principal->getName());
         principal->markDatabaseAsProbed(ADMIN_DBNAME);
         _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());
