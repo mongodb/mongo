@@ -28,7 +28,6 @@
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_set.h"
-#include "mongo/db/auth/security_key.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespacestring.h"

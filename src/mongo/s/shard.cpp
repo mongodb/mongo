@@ -28,7 +28,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/security_key.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/client_info.h"
@@ -407,7 +406,11 @@ namespace mongo {
             string err;
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
 
-            bool result = authenticateInternalUser(conn);
+            bool result = conn->auth( "local",
+                                      internalSecurity.user,
+                                      internalSecurity.pwd,
+                                      err,
+                                      false );
 
             uassert( 15847, str::stream() << "can't authenticate to server "
                                           << conn->getServerAddress() << causedBy( err ), 
