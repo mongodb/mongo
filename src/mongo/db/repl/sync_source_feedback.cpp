@@ -18,8 +18,8 @@
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
@@ -47,29 +47,24 @@ namespace mongo {
             return false;
         }
 
-        string u;
-        string p;
         if (internalSecurity.pwd.length() > 0) {
-            u = internalSecurity.user;
-            p = internalSecurity.pwd;
+            return authenticateInternalUser(_connection.get());  
         }
-        else {
-            BSONObj user;
-            {
-                Client::ReadContext ctxt("local.");
-                if(!Helpers::findOne("local.system.users", userReplQuery, user) ||
-                        // try the first user in local
-                        !Helpers::getSingleton("local.system.users", user)) {
-                    log() << "replauthenticate: no user in local.system.users to use"
-                          << "for authentication" << endl;
-                    return false;
-                }
+        BSONObj user;
+        {
+            Client::ReadContext ctxt("local.");
+            if(!Helpers::findOne("local.system.users", userReplQuery, user) ||
+                    // try the first user in local
+                    !Helpers::getSingleton("local.system.users", user)) {
+                log() << "replauthenticate: no user in local.system.users to use"
+                        << "for authentication" << endl;
+                return false;
             }
-            u = user.getStringField("user");
-            p = user.getStringField("pwd");
-            massert(16889, "bad user object? [1]", !u.empty());
-            massert(16887, "bad user object? [2]", !p.empty());
         }
+        std::string u = user.getStringField("user");
+        std::string p = user.getStringField("pwd");
+        massert(16889, "bad user object? [1]", !u.empty());
+        massert(16887, "bad user object? [2]", !p.empty());
 
         string err;
         if( !_connection->auth("local", u.c_str(), p.c_str(), err, false) ) {

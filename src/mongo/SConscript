@@ -858,7 +858,7 @@ if shellEnv is not None:
     mongo_shell = shellEnv.Program(
         "mongo",
         coreShellFiles,
-        LIBDEPS=[ "db/auth/authcore","clientandshell", "mongocommon", "scripting", 
+        LIBDEPS=[ "clientandshell", "mongocommon", "scripting", 
                  "$BUILD_DIR/third_party/shim_pcrecpp"] + env['MODULE_LIBDEPS_MONGOSHELL'] )
 
     shellEnv.Install( '#/', mongo_shell )

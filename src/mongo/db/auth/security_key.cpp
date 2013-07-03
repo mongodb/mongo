@@ -20,7 +20,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -28,6 +27,19 @@
 
 
 namespace mongo {
+
+    bool authenticateInternalUser(DBClientWithCommands* conn){
+        string err;
+        if( !conn->auth("local", 
+                        internalSecurity.user,
+                        internalSecurity.pwd, 
+                        err, 
+                        false) ) {
+            log() << "can't authenticate as internal user, error: " << err << endl;
+            return false;
+        }
+        return true;
+    }
 
     bool setUpSecurityKey(const string& filename) {
         struct stat stats;
