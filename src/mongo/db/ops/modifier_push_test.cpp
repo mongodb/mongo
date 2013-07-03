@@ -29,6 +29,7 @@
 #include "mongo/db/json.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace {
 
@@ -311,6 +312,46 @@ namespace {
     }
 
     //
+    // If in $pushAll semantics, do we check the array and that nothing else is there?
+    //
+
+    TEST(Init, PushAllSimple) {
+        BSONObj modObj = fromjson("{$pushAll: {x: [0]}}");
+        ModifierPush mod(ModifierPush::PUSH_ALL);
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+    }
+
+    TEST(Init, PushAllMultiple) {
+        BSONObj modObj = fromjson("{$pushAll: {x: [1,2,3]}}");
+        ModifierPush mod(ModifierPush::PUSH_ALL);
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+    }
+
+    TEST(Init, PushAllObject) {
+        BSONObj modObj = fromjson("{$pushAll: {x: [{a:1},{a:2}]}}");
+        ModifierPush mod(ModifierPush::PUSH_ALL);
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+    }
+
+    TEST(Init, PushAllMixed) {
+        BSONObj modObj = fromjson("{$pushAll: {x: [1,{a:2}]}}");
+        ModifierPush mod(ModifierPush::PUSH_ALL);
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+    }
+
+    TEST(Init, PushAllWrongType) {
+        BSONObj modObj = fromjson("{$pushAll: {x: 1}}");
+        ModifierPush mod(ModifierPush::PUSH_ALL);
+        ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+    }
+
+    TEST(Init, PushAllNotArray) {
+        BSONObj modObj = fromjson("{$pushAll: {x: {a:1}}}");
+        ModifierPush mod(ModifierPush::PUSH_ALL);
+        ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+    }
+
+    //
     // Are all clauses present? Is anything extroneous? Is anything duplicated?
     //
 
@@ -374,14 +415,17 @@ namespace {
     // Simple mod
     //
 
-    /** Helper to build and manipulate a $set mod. */
+    /** Helper to build and manipulate a $push or a $pushAll mod. */
     class Mod {
     public:
         Mod() : _mod() {}
 
-        explicit Mod(BSONObj modObj) {
+        explicit Mod(BSONObj modObj)
+            : _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$pushAll") ?
+                   ModifierPush::PUSH_ALL : ModifierPush::PUSH_NORMAL) {
             _modObj = modObj;
-            ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement()));
+            const StringData& modName = modObj.firstElement().fieldName();
+            ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement()));
         }
 
         Status prepare(Element root,
@@ -543,6 +587,70 @@ namespace {
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [{b:0},{b:1}]}}")));
+    }
+
+    //
+    // $pushAll Variation
+    //
+
+    TEST(PushAll, PrepareApplyEmpty) {
+        Document doc(fromjson("{a: []}"));
+        Mod pushMod(fromjson("{$pushAll: {a: [1]}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.inPlace);
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
+
+        Document logDoc;
+        ASSERT_OK(pushMod.log(logDoc.root()));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
+    }
+
+    TEST(PushAll, PrepareApplyInexistent) {
+        Document doc(fromjson("{}"));
+        Mod pushMod(fromjson("{$pushAll: {a: [1]}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.inPlace);
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
+
+        Document logDoc;
+        ASSERT_OK(pushMod.log(logDoc.root()));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
+    }
+
+    TEST(PushAll, PrepareApplyNormal) {
+        Document doc(fromjson("{a: [0]}"));
+        Mod pushMod(fromjson("{$pushAll: {a: [1,2]}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.inPlace);
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [0,1,2]}")));
+
+        Document logDoc;
+        ASSERT_OK(pushMod.log(logDoc.root()));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [0,1,2]}}")));
     }
 
     //

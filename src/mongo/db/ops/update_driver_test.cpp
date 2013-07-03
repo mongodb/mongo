@@ -50,4 +50,11 @@ namespace {
         ASSERT_OK(driver.parse(fromjson("{$set:[{a:1}]}")));
     }
 
+    TEST(Parse, PushAll) {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}")));
+        ASSERT_EQUALS(driver.numMods(), 1U);
+    }
+
 } // unnamed namespace

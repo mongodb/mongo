@@ -122,10 +122,9 @@ namespace modifiertable {
         case MOD_PULL_ALL:
             return new ModifierPullAll;
         case MOD_PUSH:
-            return new ModifierPush;
+            return new ModifierPush(ModifierPush::PUSH_NORMAL);
         case MOD_PUSH_ALL:
-            verify(false);
-            return NULL; // TODO (syntactic sugar)
+            return new ModifierPush(ModifierPush::PUSH_ALL);
         case MOD_SET:
             return new ModifierSet;
         case MOD_SET_ON_INSERT:

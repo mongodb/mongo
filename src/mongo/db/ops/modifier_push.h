@@ -33,7 +33,8 @@ namespace mongo {
 
     public:
 
-        ModifierPush();
+        enum ModifierPushMode { PUSH_NORMAL, PUSH_ALL };
+        explicit ModifierPush(ModifierPushMode mode= PUSH_NORMAL);
 
         //
         // Modifier interface implementation
@@ -99,6 +100,9 @@ namespace mongo {
         int64_t _slice;
         bool _sortPresent;
         PatternElementCmp _sort;
+
+        // Whether this mod is supposed to be parsed as a $pushAll.
+        const ModifierPushMode _pushMode;
 
         // Simple (old style) push value when the $each variation of the command is not
         // used. The _eachMode flag would be off if we're this mode.
