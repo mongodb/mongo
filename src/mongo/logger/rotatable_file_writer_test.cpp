@@ -50,7 +50,7 @@ namespace {
             ASSERT_EQUALS(input, "Level 1 message.");
             ASSERT_TRUE(std::getline(ifs, input));
             ASSERT_EQUALS(input, "Level 2 message.");
-            ASSERT_FALSE(std::getline(ifs, input));
+            ASSERT_TRUE(std::getline(ifs, input).fail());
             ASSERT_TRUE(ifs.eof());
         }
 
@@ -63,7 +63,7 @@ namespace {
             ASSERT_EQUALS(input, "Level 3 message.");
             ASSERT_TRUE(std::getline(ifs, input));
             ASSERT_EQUALS(input, "Level 4 message.");
-            ASSERT_FALSE(std::getline(ifs, input));
+            ASSERT_TRUE(std::getline(ifs, input).fail());
             ASSERT_TRUE(ifs.eof());
         }
 
@@ -84,11 +84,11 @@ namespace {
             ASSERT_EQUALS(input, "Level 3 message.");
             ASSERT_TRUE(std::getline(ifs, input));
             ASSERT_EQUALS(input, "Level 4 message.");
-            ASSERT_TRUE(std::getline(ifs, input));
+            ASSERT_FALSE(std::getline(ifs, input).fail());
             ASSERT_EQUALS(input, "Level 5 message.");
             ASSERT_TRUE(std::getline(ifs, input));
             ASSERT_EQUALS(input, "Level 6 message.");
-            ASSERT_FALSE(std::getline(ifs, input));
+            ASSERT_TRUE(std::getline(ifs, input).fail());
             ASSERT_TRUE(ifs.eof());
         }
 
@@ -107,9 +107,9 @@ namespace {
             std::string input;
             ASSERT_TRUE(std::getline(ifs, input));
             ASSERT_EQUALS(input, "Level 7 message.");
-            ASSERT_TRUE(std::getline(ifs, input));
+            ASSERT_FALSE(std::getline(ifs, input).fail());
             ASSERT_EQUALS(input, "Level 8 message.");
-            ASSERT_FALSE(std::getline(ifs, input));
+            ASSERT_TRUE(std::getline(ifs, input).fail());
             ASSERT_TRUE(ifs.eof());
         }
     }
