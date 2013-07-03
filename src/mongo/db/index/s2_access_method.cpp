@@ -95,6 +95,9 @@ namespace mongo {
 
             BSONObjSet keysForThisField;
             if (IndexNames::GEO_2DSPHERE == e.valuestr()) {
+                // We can't ever return documents that don't have geometry so don't bother indexing
+                // them.
+                if (fieldElements.empty()) { return; }
                 getGeoKeys(fieldElements, &keysForThisField);
             } else {
                 getLiteralKeys(fieldElements, &keysForThisField);
