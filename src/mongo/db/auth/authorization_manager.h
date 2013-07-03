@@ -34,16 +34,6 @@
 namespace mongo {
 
     /**
-     * Internal secret key info.
-     */
-    struct AuthInfo {
-        AuthInfo();
-        std::string user;
-        std::string pwd;
-    };
-    extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
-
-    /**
      * Contains server/cluster-wide information about Authorization.
      */
     class AuthorizationManager {

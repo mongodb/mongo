@@ -18,7 +18,26 @@
 
 #include <string>
 
+#include "mongo/client/dbclientinterface.h"
+
 namespace mongo {
+
+    /**
+     * Internal secret key info.
+     */
+    struct AuthInfo {
+        AuthInfo();
+        std::string user;
+        std::string pwd;
+    };
+    extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
+
+    /**
+     * This method authenticates to another cluster member using appropriate
+     * authentication data
+     * @return true if the authentication was succesful
+     */
+    extern bool authenticateInternalUser(DBClientWithCommands* conn);
 
     /**
      * This method checks the validity of filename as a security key, hashes its

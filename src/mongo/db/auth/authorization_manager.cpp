@@ -37,11 +37,6 @@
 
 namespace mongo {
 
-    AuthInfo::AuthInfo() {
-        user = "__system";
-    }
-    AuthInfo internalSecurity;
-
     const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
     const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";

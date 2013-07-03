@@ -21,9 +21,9 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
@@ -58,30 +58,25 @@ namespace mongo {
             return false;
         }
 
-        string u;
-        string p;
         if (internalSecurity.pwd.length() > 0) {
-            u = internalSecurity.user;
-            p = internalSecurity.pwd;
+            return authenticateInternalUser(conn); 
         }
-        else {
-            BSONObj user;
-            {
-                Client::ReadContext ctxt("local.");
-                if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
-                        // try the first user in local
-                        !Helpers::getSingleton("local.system.users", user) ) {
-                    log() << "replauthenticate: no user in local.system.users to use for authentication" << endl;
-                    return false;
-                }
+        BSONObj user;
+        {
+            Client::ReadContext ctxt("local.");
+            if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
+                    // try the first user in local
+                    !Helpers::getSingleton("local.system.users", user) ) {
+                log() << "replauthenticate: no user in local.system.users to use for authentication" << endl;
+                return false;
             }
-            u = user.getStringField("user");
-            p = user.getStringField("pwd");
-            massert( 10392 , "bad user object? [1]", !u.empty());
-            massert( 10393 , "bad user object? [2]", !p.empty());
         }
+        std::string u = user.getStringField("user");
+        std::string p = user.getStringField("pwd");
+        massert( 10392 , "bad user object? [1]", !u.empty());
+        massert( 10393 , "bad user object? [2]", !p.empty());
 
-        string err;
+        std::string err;
         if( !conn->auth("local", u.c_str(), p.c_str(), err, false) ) {
             log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
             return false;

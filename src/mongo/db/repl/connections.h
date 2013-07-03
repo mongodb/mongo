@@ -21,6 +21,7 @@
 #include <map>
 
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/repl/rs.h" // extern Tee* rslog
 
 namespace mongo {
@@ -128,11 +129,7 @@ namespace mongo {
           // be rebooting. if their file has to change, they'll be rebooted so the
           // connection created above will go dead, reconnect, and reauth.
           if (AuthorizationManager::isAuthEnabled()) {
-              if (!connInfo->cc->auth("local",
-                                      internalSecurity.user,
-                                      internalSecurity.pwd,
-                                      err,
-                                      false)) {
+              if (!authenticateInternalUser(connInfo->cc.get())) {
                   log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
                   return false;
               }
