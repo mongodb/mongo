@@ -126,7 +126,7 @@ namespace mongo {
                 
                 LOG(3) << "TTLMonitor thread awake" << endl;
 
-                if ( ttlMonitorEnabled ) {
+                if ( !ttlMonitorEnabled ) {
                    LOG(1) << "TTLMonitor is disabled" << endl;
                    continue;
                 }
