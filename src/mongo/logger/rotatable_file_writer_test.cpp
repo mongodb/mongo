@@ -24,7 +24,25 @@ namespace {
     using namespace mongo;
     using namespace mongo::logger;
 
-    TEST(RotatableFileWriter, RotationTest) {
+    const std::string logFileName("LogTest_RotatableFileAppender.txt");
+    const std::string logFileNameRotated("LogTest_RotatableFileAppender_Rotated.txt");
+
+    // TODO(schwerin): Create a safe, uniform mechanism by which unit tests may read and write
+    // temporary files.
+    class RotatableFileWriterTest : public mongo::unittest::Test {
+    public:
+        RotatableFileWriterTest() {
+            unlink(logFileName.c_str());
+            unlink(logFileNameRotated.c_str());
+        }
+
+        virtual ~RotatableFileWriterTest() {
+            unlink(logFileName.c_str());
+            unlink(logFileNameRotated.c_str());
+        }
+    };
+
+    TEST_F(RotatableFileWriterTest, RotationTest) {
         using namespace logger;
 
         const std::string logFileName("LogTest_RotatableFileAppender.txt");
