@@ -21,42 +21,48 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    void AccumulatorAddToSet::processInternal(const Value& input) {
-        if (!pCtx->getDoingMerge()) {
+    void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
+        if (!merging) {
             if (!input.missing()) {
-                set.insert(input);
+                bool inserted = set.insert(input).second;
+                if (inserted) {
+                    _memUsageBytes += input.getApproximateSize();
+                }
             }
-        } else {
-            /*
-              If we're in the router, we need to take apart the arrays we
-              receive and put their elements into the array we are collecting.
-              If we didn't, then we'd get an array of arrays, with one array
-              from each shard that responds.
-             */
+        }
+        else {
+            // If we're merging, we need to take apart the arrays we
+            // receive and put their elements into the array we are collecting.
+            // If we didn't, then we'd get an array of arrays, with one array
+            // from each merge source.
             verify(input.getType() == Array);
             
             const vector<Value>& array = input.getArray();
-            set.insert(array.begin(), array.end());
+            for (size_t i=0; i < array.size(); i++) {
+                bool inserted = set.insert(array[i]).second;
+                if (inserted) {
+                    _memUsageBytes += array[i].getApproximateSize();
+                }
+            }
         }
     }
 
-    Value AccumulatorAddToSet::getValue() const {
+    Value AccumulatorAddToSet::getValue(bool toBeMerged) const {
         vector<Value> valVec(set.begin(), set.end());
         return Value::consume(valVec);
     }
 
-    AccumulatorAddToSet::AccumulatorAddToSet(
-        const intrusive_ptr<ExpressionContext> &pTheCtx):
-        Accumulator(),
-        set(),
-        pCtx(pTheCtx) {
+    AccumulatorAddToSet::AccumulatorAddToSet() {
+        _memUsageBytes = sizeof(*this);
     }
 
-    intrusive_ptr<Accumulator> AccumulatorAddToSet::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
-        intrusive_ptr<AccumulatorAddToSet> pAccumulator(
-            new AccumulatorAddToSet(pCtx));
-        return pAccumulator;
+    void AccumulatorAddToSet::reset() {
+        SetType().swap(set);
+        _memUsageBytes = sizeof(*this);
+    }
+
+    intrusive_ptr<Accumulator> AccumulatorAddToSet::create() {
+        return new AccumulatorAddToSet();
     }
 
     const char *AccumulatorAddToSet::getOpName() const {

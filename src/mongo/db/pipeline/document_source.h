@@ -648,8 +648,7 @@ namespace mongo {
                 group field
          */
         void addAccumulator(const std::string& fieldName,
-                            intrusive_ptr<Accumulator> (*pAccumulatorFactory)(
-                            const intrusive_ptr<ExpressionContext> &),
+                            intrusive_ptr<Accumulator> (*pAccumulatorFactory)(),
                             const intrusive_ptr<Expression> &pExpression);
 
         /**
@@ -691,9 +690,10 @@ namespace mongo {
 
         intrusive_ptr<Expression> pIdExpression;
 
-        typedef boost::unordered_map<Value,
-            vector<intrusive_ptr<Accumulator> >, Value::Hash> GroupsType;
-        GroupsType groups;
+        typedef vector<intrusive_ptr<Accumulator> > Accumulators;
+        typedef pair<Value, Accumulators> GroupPair;
+        typedef boost::unordered_map<Value, Accumulators, Value::Hash> GroupsMap;
+        GroupsMap groups;
 
         /*
           The field names for the result documents and the accumulator
@@ -708,14 +708,13 @@ namespace mongo {
           These three vectors parallel each other.
         */
         vector<string> vFieldName;
-        vector<intrusive_ptr<Accumulator> (*)(
-            const intrusive_ptr<ExpressionContext> &)> vpAccumulatorFactory;
+        vector<intrusive_ptr<Accumulator> (*)()> vpAccumulatorFactory;
         vector<intrusive_ptr<Expression> > vpExpression;
 
 
-        Document makeDocument(const GroupsType::iterator &rIter);
+        Document makeDocument(const GroupPair& group, bool mergeableOutput);
 
-        GroupsType::iterator groupsIterator;
+        GroupsMap::iterator groupsIterator;
     };
 
 

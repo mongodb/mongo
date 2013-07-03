@@ -25,10 +25,6 @@
 namespace mongo {
     using namespace mongoutils;
 
-    Value Accumulator::serialize() const {
-        return Value(DOC(getOpName() << _expr->serialize()));
-    }
-
     void agg_framework_reservedErrors() {
         uassert(16030, "reserved error", false);
         uassert(16031, "reserved error", false);

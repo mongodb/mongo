@@ -21,7 +21,7 @@
 
 namespace mongo {
 
-    void AccumulatorSum::processInternal(const Value& input) {
+    void AccumulatorSum::processInternal(const Value& input, bool merging) {
         // do nothing with non numeric types
         if (!input.numeric())
             return;
@@ -46,13 +46,11 @@ namespace mongo {
         count++;
     }
 
-    intrusive_ptr<Accumulator> AccumulatorSum::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
-        intrusive_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
-        return pSummer;
+    intrusive_ptr<Accumulator> AccumulatorSum::create() {
+        return new AccumulatorSum();
     }
 
-    Value AccumulatorSum::getValue() const {
+    Value AccumulatorSum::getValue(bool toBeMerged) const {
         if (totalType == NumberLong) {
             return Value(longTotal);
         }
@@ -67,12 +65,21 @@ namespace mongo {
         }
     }
 
-    AccumulatorSum::AccumulatorSum():
-        Accumulator(),
-        totalType(NumberInt),
-        longTotal(0),
-        doubleTotal(0),
-        count(0) {
+    AccumulatorSum::AccumulatorSum()
+        : totalType(NumberInt)
+        , longTotal(0)
+        , doubleTotal(0)
+        , count(0)
+    {
+        // This is a fixed size Accumulator so we never need to update this
+        _memUsageBytes = sizeof(*this);
+    }
+
+    void AccumulatorSum::reset() {
+        totalType = NumberInt;
+        longTotal = 0;
+        doubleTotal = 0;
+        count = 0;
     }
 
     const char *AccumulatorSum::getOpName() const {

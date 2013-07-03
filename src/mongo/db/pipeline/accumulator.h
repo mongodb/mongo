@@ -19,86 +19,71 @@
 #include "mongo/pch.h"
 
 #include <boost/unordered_set.hpp>
-#include "db/pipeline/value.h"
-#include "db/pipeline/expression.h"
-#include "bson/bsontypes.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
-    class ExpressionContext;
-
     class Accumulator : public RefCountable {
     public:
-        /// Serialize Accumulator and its input generating Expression.
-        Value serialize() const;
-
-        // TODO rename to process()
-        /// Process input and update internal state.
-        void evaluate(const Document& input)  { processInternal(_expr->evaluate(input)); }
-        void evaluate(const Variables& input) { processInternal(_expr->evaluate(input)); }
-
-        /// Add needed fields to the passed in set
-        void addDependencies(set<string>& deps) const { _expr->addDependencies(deps); }
-
-        // TODO move into constructor
-        /// Sets the expression used to generate input to the accumulator.
-        void addOperand(const intrusive_ptr<Expression>& expr) {
-            verify(!_expr); // only takes one operand
-            _expr = expr;
+        /** Process input and update internal state.
+         *  merging should be true when processing outputs from getValue(true).
+         */
+        void process(const Value& input, bool merging) {
+            processInternal(input, merging);
         }
 
-        /// Marks the end of the evaluate() phase and return accumulated result.
-        virtual Value getValue() const = 0;
+        /** Marks the end of the evaluate() phase and return accumulated result.
+         *  toBeMerged should be true when the outputs will be merged by process().
+         */
+        virtual Value getValue(bool toBeMerged) const = 0;
 
         /// The name of the op as used in a serialization of the pipeline.
         virtual const char* getOpName() const = 0;
 
+        int memUsageForSorter() const {
+            dassert(_memUsageBytes != 0); // This would mean subclass didn't set it
+            return _memUsageBytes;
+        }
+
+        /// Reset this accumulator to a fresh state ready to receive input.
+        virtual void reset() = 0;
+
     protected:
-        Accumulator() {}
+        Accumulator() : _memUsageBytes(0) {}
 
         /// Update subclass's internal state based on input
-        virtual void processInternal(const Value& input) = 0;
+        virtual void processInternal(const Value& input, bool merging) = 0;
 
-    private:
-        intrusive_ptr<Expression> _expr;
+        /// subclasses are expected to update this as necessary
+        int _memUsageBytes;
     };
 
 
     class AccumulatorAddToSet : public Accumulator {
     public:
-        virtual void processInternal(const Value& input);
-        virtual Value getValue() const;
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
         virtual const char* getOpName() const;
+        virtual void reset();
 
-        /*
-          Create an appending accumulator.
-
-          @param pCtx the expression context
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> create();
 
     private:
-        AccumulatorAddToSet(const intrusive_ptr<ExpressionContext> &pTheCtx);
+        AccumulatorAddToSet();
         typedef boost::unordered_set<Value, Value::Hash> SetType;
         SetType set;
-        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
     class AccumulatorFirst : public Accumulator {
     public:
-        virtual void processInternal(const Value& input);
-        virtual Value getValue() const;
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
         virtual const char* getOpName() const;
+        virtual void reset();
 
-        /*
-          Create the accumulator.
-
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorFirst();
@@ -110,17 +95,12 @@ namespace mongo {
 
     class AccumulatorLast : public Accumulator {
     public:
-        virtual void processInternal(const Value& input);
-        virtual Value getValue() const;
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
         virtual const char* getOpName() const;
+        virtual void reset();
 
-        /*
-          Create the accumulator.
-
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorLast();
@@ -130,18 +110,12 @@ namespace mongo {
 
     class AccumulatorSum : public Accumulator {
     public:
-        virtual void processInternal(const Value& input);
-        virtual Value getValue() const;
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
         virtual const char* getOpName() const;
+        virtual void reset();
 
-        /*
-          Create a summing accumulator.
-
-          @param pCtx the expression context
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> create();
 
     protected: /* reused by AccumulatorAvg */
         AccumulatorSum();
@@ -156,19 +130,13 @@ namespace mongo {
 
     class AccumulatorMinMax : public Accumulator {
     public:
-        virtual void processInternal(const Value& input);
-        virtual Value getValue() const;
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
         virtual const char* getOpName() const;
+        virtual void reset();
 
-        /*
-          Create either the max or min accumulator.
-
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> createMin(
-            const intrusive_ptr<ExpressionContext> &pCtx);
-        static intrusive_ptr<Accumulator> createMax(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> createMin();
+        static intrusive_ptr<Accumulator> createMax();
 
     private:
         AccumulatorMinMax(int theSense);
@@ -180,50 +148,31 @@ namespace mongo {
 
     class AccumulatorPush : public Accumulator {
     public:
-        virtual void processInternal(const Value& input);
-        virtual Value getValue() const;
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
         virtual const char* getOpName() const;
+        virtual void reset();
 
-        /*
-          Create an appending accumulator.
-
-          @param pCtx the expression context
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> create();
 
     private:
-        AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
+        AccumulatorPush();
 
         vector<Value> vpValue;
-        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
     class AccumulatorAvg : public AccumulatorSum {
         typedef AccumulatorSum Super;
     public:
-        virtual void processInternal(const Value& input);
-        virtual Value getValue() const;
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
         virtual const char* getOpName() const;
+        virtual void reset();
 
-        /*
-          Create an averaging accumulator.
-
-          @param pCtx the expression context
-          @returns the created accumulator
-         */
-        static intrusive_ptr<Accumulator> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+        static intrusive_ptr<Accumulator> create();
 
     private:
-        static const char subTotalName[];
-        static const char countName[];
-
-        AccumulatorAvg(const intrusive_ptr<ExpressionContext> &pCtx);
-
-        intrusive_ptr<ExpressionContext> pCtx;
+        AccumulatorAvg();
     };
-
 }

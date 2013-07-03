@@ -63,11 +63,11 @@ namespace mongo {
         if (!populated)
             populate();
 
-        return makeDocument(groupsIterator);
+        return makeDocument(*groupsIterator, pExpCtx->getInShard());
     }
 
     void DocumentSourceGroup::dispose() {
-        GroupsType().swap(groups);
+        GroupsMap().swap(groups);
         groupsIterator = groups.end();
 
         pSource->dispose();
@@ -82,9 +82,9 @@ namespace mongo {
         /* add the remaining fields */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pExpCtx));
-            pA->addOperand(vpExpression[i]);
-            insides[vFieldName[i]] = pA->serialize();
+            intrusive_ptr<Accumulator> accum = vpAccumulatorFactory[i]();
+            insides[vFieldName[i]] = Value(
+                    DOC(accum->getOpName() << vpExpression[i]->serialize()));
         }
 
         *pBuilder << groupName << insides.freeze();
@@ -97,9 +97,7 @@ namespace mongo {
         // add the rest
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pExpCtx));
-            pA->addOperand(vpExpression[i]);
-            pA->addDependencies(deps);
+            vpExpression[i]->addDependencies(deps);
         }
 
         return EXHAUSTIVE;
@@ -124,10 +122,9 @@ namespace mongo {
     }
 
     void DocumentSourceGroup::addAccumulator(
-        const std::string& fieldName,
-        intrusive_ptr<Accumulator> (*pAccumulatorFactory)(
-            const intrusive_ptr<ExpressionContext> &),
-        const intrusive_ptr<Expression> &pExpression) {
+            const std::string& fieldName,
+            intrusive_ptr<Accumulator> (*pAccumulatorFactory)(),
+            const intrusive_ptr<Expression> &pExpression) {
         vFieldName.push_back(fieldName);
         vpAccumulatorFactory.push_back(pAccumulatorFactory);
         vpExpression.push_back(pExpression);
@@ -135,14 +132,13 @@ namespace mongo {
 
 
     struct GroupOpDesc {
-        const char *pName;
-        intrusive_ptr<Accumulator> (*pFactory)(
-            const intrusive_ptr<ExpressionContext> &);
+        const char* name;
+        intrusive_ptr<Accumulator> (*factory)();
     };
 
     static int GroupOpDescCmp(const void *pL, const void *pR) {
-        return strcmp(((const GroupOpDesc *)pL)->pName,
-                      ((const GroupOpDesc *)pR)->pName);
+        return strcmp(((const GroupOpDesc *)pL)->name,
+                      ((const GroupOpDesc *)pR)->name);
     }
 
     /*
@@ -238,15 +234,13 @@ namespace mongo {
 
                     /* look for the specified operator */
                     GroupOpDesc key;
-                    key.pName = subElement.fieldName();
+                    key.name = subElement.fieldName();
                     const GroupOpDesc *pOp =
                         (const GroupOpDesc *)bsearch(
                               &key, GroupOpTable, NGroupOp, sizeof(GroupOpDesc),
                                       GroupOpDescCmp);
 
-                    uassert(15952, str::stream() <<
-                            "unknown group operator '" <<
-                            key.pName << "'",
+                    uassert(15952, str::stream() << "unknown group operator '" << key.name << "'",
                             pOp);
 
                     intrusive_ptr<Expression> pGroupExpr;
@@ -259,16 +253,14 @@ namespace mongo {
                             &subElement, &oCtx);
                     }
                     else if (elementType == Array) {
-                        uassert(15953, str::stream() <<
-                                "aggregating group operators are unary (" <<
-                                key.pName << ")", false);
+                        uasserted(15953, str::stream()
+                                << "aggregating group operators are unary (" << key.name << ")");
                     }
                     else { /* assume its an atomic single operand */
                         pGroupExpr = Expression::parseOperand(&subElement);
                     }
 
-                    pGroup->addAccumulator(
-                        pFieldName, pOp->pFactory, pGroupExpr);
+                    pGroup->addAccumulator(pFieldName, pOp->factory, pGroupExpr);
                 }
 
                 uassert(15954, str::stream() <<
@@ -286,6 +278,8 @@ namespace mongo {
     void DocumentSourceGroup::populate() {
         const size_t numAccumulators = vpAccumulatorFactory.size();
         dassert(numAccumulators == vpExpression.size());
+
+        const bool mergeInputs = pExpCtx->getDoingMerge();
 
         for (bool hasNext = !pSource->eof(); hasNext; hasNext = pSource->advance()) {
             const Document input = pSource->getCurrent();
@@ -311,16 +305,15 @@ namespace mongo {
                 /* add the accumulators */
                 group.reserve(numAccumulators);
                 for (size_t i = 0; i < numAccumulators; i++) {
-                    intrusive_ptr<Accumulator> accum = (*vpAccumulatorFactory[i])(pExpCtx);
-                    accum->addOperand(vpExpression[i]);
-                    group.push_back(accum);
+                    group.push_back(vpAccumulatorFactory[i]());
                 }
             }
 
             /* tickle all the accumulators for the group we found */
             dassert(numAccumulators == group.size());
-            for (size_t i = 0; i < numAccumulators; i++)
-                group[i]->evaluate(vars);
+            for (size_t i = 0; i < numAccumulators; i++) {
+                group[i]->process(vpExpression[i]->evaluate(vars), mergeInputs);
+            }
         }
 
         /* start the group iterator */
@@ -328,24 +321,24 @@ namespace mongo {
         populated = true;
     }
 
-    Document DocumentSourceGroup::makeDocument(
-        const GroupsType::iterator &rIter) {
-        vector<intrusive_ptr<Accumulator> > *pGroup = &rIter->second;
+    Document DocumentSourceGroup::makeDocument(const GroupPair& group,
+                                               bool mergeableOutput) {
+        const Accumulators& accums = group.second;
         const size_t n = vFieldName.size();
         MutableDocument out (1 + n);
 
         /* add the _id field */
-        out.addField("_id", rIter->first);
+        out.addField("_id", group.first);
 
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i) {
-            Value pValue((*pGroup)[i]->getValue());
-            if (pValue.missing()) {
+            Value val = accums[i]->getValue(mergeableOutput);
+            if (val.missing()) {
                 // we return null in this case so return objects are predictable
                 out.addField(vFieldName[i], Value(BSONNULL));
             }
             else {
-                out.addField(vFieldName[i], pValue);
+                out.addField(vFieldName[i], val);
             }
         }
 

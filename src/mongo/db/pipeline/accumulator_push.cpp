@@ -21,42 +21,44 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    void AccumulatorPush::processInternal(const Value& input) {
-        if (!pCtx->getDoingMerge()) {
+    void AccumulatorPush::processInternal(const Value& input, bool merging) {
+        if (!merging) {
             if (!input.missing()) {
                 vpValue.push_back(input);
+                _memUsageBytes += input.getApproximateSize();
             }
         }
         else {
-            /*
-              If we're in the router, we need to take apart the arrays we
-              receive and put their elements into the array we are collecting.
-              If we didn't, then we'd get an array of arrays, with one array
-              from each shard that responds.
-             */
+            // If we're merging, we need to take apart the arrays we
+            // receive and put their elements into the array we are collecting.
+            // If we didn't, then we'd get an array of arrays, with one array
+            // from each merge source.
             verify(input.getType() == Array);
             
             const vector<Value>& vec = input.getArray();
             vpValue.insert(vpValue.end(), vec.begin(), vec.end());
+
+            for (size_t i=0; i < vec.size(); i++) {
+                _memUsageBytes += vec[i].getApproximateSize();
+            }
         }
     }
 
-    Value AccumulatorPush::getValue() const {
+    Value AccumulatorPush::getValue(bool toBeMerged) const {
         return Value(vpValue);
     }
 
-    AccumulatorPush::AccumulatorPush(
-        const intrusive_ptr<ExpressionContext> &pTheCtx):
-        Accumulator(),
-        vpValue(),
-        pCtx(pTheCtx) {
+    AccumulatorPush::AccumulatorPush() {
+        _memUsageBytes = sizeof(*this);
     }
 
-    intrusive_ptr<Accumulator> AccumulatorPush::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
-        intrusive_ptr<AccumulatorPush> pAccumulator(
-            new AccumulatorPush(pCtx));
-        return pAccumulator;
+    void AccumulatorPush::reset() {
+        vector<Value>().swap(vpValue);
+        _memUsageBytes = sizeof(*this);
+    }
+
+    intrusive_ptr<Accumulator> AccumulatorPush::create() {
+        return new AccumulatorPush();
     }
 
     const char *AccumulatorPush::getOpName() const {
