@@ -376,7 +376,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 		memcpy(p, wtcursor->value.data, wtcursor->value.size);
 		p += wtcursor->value.size;
 	}
-	cursor->len = p - cursor->v;
+	cursor->len = (size_t)(p - cursor->v);
 
 	/* Update the underlying KVS record. */
 	r->val = cursor->v;
@@ -394,15 +394,11 @@ cache_value_unmarshall(WT_CURSOR *wtcursor)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
-	WT_SESSION *session;
 	uint32_t entries, i;
 	uint8_t *p;
 	int ret = 0;
 
-	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
 
 	/* If we don't have enough record slots, allocate some more. */
 	memcpy(&entries, cursor->v, sizeof(uint32_t));
@@ -897,9 +893,9 @@ cache_clean:
 	 */
 	if (cache_ret == 0 && ret == 0) {
 		a.data = cursor->v;		/* a is the primary */
-		a.size = cursor->len;
+		a.size = (uint32_t)cursor->len;
 		b.data = cursor->t3.v;		/* b is the cache */
-		b.size = cursor->t3.len;
+		b.size = (uint32_t)cursor->t3.len;
 		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
 			return (ret);
 		if (f == kvs_next) {
