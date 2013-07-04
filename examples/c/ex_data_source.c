@@ -154,6 +154,9 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	WT_SESSION *session = NULL;
 	int ret;
 
+	/* Unused parameters */
+	(void)wtcursor;
+
 	{
 	int is_snapshot_isolation;
 	/*! [WT_EXTENSION transaction snapshot isolation] */

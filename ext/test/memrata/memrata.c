@@ -290,7 +290,6 @@ txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
 	struct kvs_record txn;
 	CURSOR *cursor;
 	KVS_SOURCE *ks;
-	int ret = 0;
 	uint8_t val_buf[32];
 
 	cursor = (CURSOR *)wtcursor;
@@ -315,7 +314,7 @@ txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
  *	Append the current WiredTiger cursor's value to a cache record.
  */
 static int
-cache_value_append(WT_CURSOR *wtcursor, int remove)
+cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
@@ -324,7 +323,6 @@ cache_value_append(WT_CURSOR *wtcursor, int remove)
 	uint64_t txnid;
 	size_t len;
 	uint32_t slots;
-	int ret = 0;
 	uint8_t *p;
 
 	session = wtcursor->session;
@@ -339,7 +337,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove)
 	 * then append the WiredTiger cursor's information.
 	 */
 	len = cursor->len + sizeof(uint32_t);		/* slots */
-	if (!remove)
+	if (!remove_op)
 		len += wtcursor->value.size;		/* data */
 	len += sizeof(uint64_t) + 1;			/* txn ID, remove */
 	if (len > cursor->mem_len) {
@@ -369,7 +367,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove)
 	p = cursor->v + cursor->len;
 	memcpy(p, &txnid, sizeof(uint64_t));
 	p += sizeof(uint64_t);
-	if (remove)
+	if (remove_op)
 		*p++ = REMOVE_TOMBSTONE;
 	else {
 		*p++ = '\0';
@@ -401,7 +399,6 @@ cache_value_unmarshall(WT_CURSOR *wtcursor)
 	uint32_t entries, i;
 	uint8_t *p;
 	int ret = 0;
-	void *store;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
@@ -448,7 +445,6 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	u_int i;
-	int ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
@@ -494,7 +490,6 @@ cache_value_update_check(WT_CURSOR *wtcursor)
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	u_int i;
-	int ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
@@ -826,7 +821,7 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 	 */
 	if (cursor->t1.mem_len < r->key_len) {
 		if ((p = realloc(cursor->t1.v, r->key_len)) == NULL)
-			return (__os_errno());
+			return (os_errno());
 		cursor->t1.v = p;
 		cursor->t1.mem_len = r->key_len;
 	}
@@ -858,7 +853,7 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 		 */
 		if (cursor->t2.mem_len < r->key_len) {
 			if ((p = realloc(cursor->t2.v, r->key_len)) == NULL)
-				return (__os_errno());
+				return (os_errno());
 			cursor->t2.v = p;
 			cursor->t2.mem_len = r->key_len;
 		}
@@ -867,7 +862,7 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 
 		if (cursor->t3.mem_len < cp->len) {
 			if ((p = realloc(cursor->t3.v, cp->len)) == NULL)
-				return (__os_errno());
+				return (os_errno());
 			cursor->t3.v = p;
 			cursor->t3.mem_len = cp->len;
 		}
@@ -1183,7 +1178,7 @@ err:	ETRET(unlock(wtext, session, &ws->lock));
  *	Update or remove an entry.
  */
 static int
-update(WT_CURSOR *wtcursor, int remove)
+update(WT_CURSOR *wtcursor, int remove_op)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
@@ -1252,7 +1247,7 @@ update(WT_CURSOR *wtcursor, int remove)
 	 * Create a new cache value based on the current cache record plus the
 	 * WiredTiger cursor's value.
 	 */
-	if ((ret = cache_value_append(wtcursor, remove)) != 0)
+	if ((ret = cache_value_append(wtcursor, remove_op)) != 0)
 		goto err;
 
 	/* Push the record into the cache. */
@@ -1787,7 +1782,7 @@ err:		if (locked)
 	}
 
 	if (ks != NULL)
-		ETERT(kvs_source_close(wtext, session, ks));
+		ETRET(kvs_source_close(wtext, session, ks));
 
 	if (device_list != NULL) {
 		for (p = device_list; *p != NULL; ++p)
@@ -1807,7 +1802,6 @@ ws_source_name(
     const char *uri, const char *suffix, const char **pp, char **bufp)
 {
 	size_t len;
-	const char *p;
 	char *buf;
 
 	*bufp = NULL;
@@ -1835,7 +1829,6 @@ ws_source_drop_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
 	const char *p;
 	char *buf;
@@ -1865,7 +1858,6 @@ ws_source_rename_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
-	kvs_t kvs;
 	int ret = 0;
 	const char *p, *pnew;
 	char *buf, *bufnew;
@@ -2429,7 +2421,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	if (ret != 0)
 		ret = WT_PANIC;
 
-err:	ETRET(unlock(wtext, session, &ds->global_lock));
+	ETRET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
 }
 
@@ -2525,7 +2517,7 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 		ESET(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
 
-err:	ETRET(unlock(wtext, session, &ws->lock));
+	ETRET(unlock(wtext, session, &ws->lock));
 	return (ret);
 }
 
