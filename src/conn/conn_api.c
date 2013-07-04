@@ -10,6 +10,62 @@
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
+ * collate --
+ *	Call the collation function (external API version).
+ */
+static int
+collate(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, WT_ITEM *first, WT_ITEM *second, int *cmpp)
+{
+	if (wt_api->collator == NULL) {
+		*cmpp = __wt_btree_lex_compare(first, second);
+		return (0);
+	}
+	return (wt_api->collator->compare(
+	    wt_api->collator, wt_session, first, second, cmpp));
+}
+
+/*
+ * collator_config --
+ *	Given a single configuration string, configure the collator (external
+ * API version).
+ */
+static int
+collator_config(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_NAMED_COLLATOR *ncoll;
+	WT_SESSION_IMPL *session;
+	const char **cfg;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	/* The default is a standard lexicographic comparison. */
+	if ((cfg = (const char **)cfg_arg) == NULL)
+		return (0);
+	if ((ret = __wt_config_gets(session, cfg, "collator", &cval)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
+
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncoll, &conn->collqh, q) {
+			if (WT_STRING_MATCH(
+			    ncoll->name, cval.str, cval.len)) {
+				wt_api->collator = ncoll->collator;
+				return (0);
+			}
+		}
+		WT_RET_MSG(session, EINVAL,
+		    "unknown collator '%.*s'", (int)cval.len, cval.str);
+	}
+	return (0);
+}
+
+/*
  * __conn_get_extension_api --
  *	WT_CONNECTION.get_extension_api method.
  */
@@ -26,6 +82,8 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.strerror = wiredtiger_strerror;
 	conn->extension_api.scr_alloc = __wt_ext_scr_alloc;
 	conn->extension_api.scr_free = __wt_ext_scr_free;
+	conn->extension_api.collator_config = collator_config;
+	conn->extension_api.collate = collate;
 	conn->extension_api.config_get = __wt_ext_config_get;
 	conn->extension_api.config_strget = __wt_ext_config_strget;
 	conn->extension_api.config_scan_begin = __wt_ext_config_scan_begin;

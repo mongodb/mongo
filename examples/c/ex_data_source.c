@@ -150,7 +150,53 @@ static int my_cursor_search(WT_CURSOR *wtcursor)
 static int my_cursor_search_near(WT_CURSOR *wtcursor, int *exactp)
 	{ (void)wtcursor; (void)exactp; return (0); }
 static int my_cursor_insert(WT_CURSOR *wtcursor)
-	{ (void)wtcursor; return (0); }
+{
+	WT_SESSION *session = NULL;
+	int ret;
+
+	{
+	/*! [WT_EXTENSION transaction ID] */
+	uint64_t transaction_id;
+
+	ret = wt_api->transaction_id(wt_api, session, &transaction_id);
+	/*! [WT_EXTENSION transaction ID] */
+	}
+
+	{
+	uint64_t transaction_id = 1;
+	int is_visible;
+	/*! [WT_EXTENSION transaction visible] */
+	is_visible =
+	    wt_api->transaction_visible(wt_api, session, transaction_id);
+	/*! [WT_EXTENSION transaction visible] */
+	(void)is_visible;
+	}
+
+	{
+	const char *key1 = NULL, *key2 = NULL;
+	size_t key1_len = 0, key2_len = 0;
+	/*! [WT_EXTENSION collate] */
+	WT_ITEM first, second;
+	int cmp;
+
+	first.data = key1;
+	first.size = key1_len;
+	second.data = key2;
+	second.size = key2_len;
+
+	ret = wt_api->collate(wt_api, session, &first, &second, &cmp);
+	if (cmp == 0)
+		printf("key1 collates identically to key2\n");
+	else if (cmp < 0)
+		printf("key1 collates less than key2\n");
+	else
+		printf("key1 collates greater than key2\n");
+	/*! [WT_EXTENSION collate] */
+	}
+
+	return (0);
+}
+
 static int my_cursor_update(WT_CURSOR *wtcursor)
 	{ (void)wtcursor; return (0); }
 static int my_cursor_remove(WT_CURSOR *wtcursor)
@@ -322,6 +368,19 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 		printf("%.*s\n", (int)k.len, k.str);
 	ret = wt_api->config_scan_end(wt_api, scan);
 	/*! [WT_EXTENSION config scan] */
+	}
+
+	{
+	/*! [WT_EXTENSION collator config] */
+	/*
+	 * Configure the appropriate collator.
+	 */
+	if ((ret = wt_api->collator_config(wt_api, session, config)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
+		    "collator configuration: %s", wiredtiger_strerror(ret));
+		return (ret);
+	}
+	/*! [WT_EXTENSION collator config] */
 	}
 
 	/*! [WT_DATA_SOURCE error message] */
@@ -564,24 +623,6 @@ main(void)
 	/*! [WT_EXTENSION_API default_session] */
 	(void)wt_api->msg_printf(wt_api, NULL, "configuration complete");
 	/*! [WT_EXTENSION_API default_session] */
-
-	{
-	/*! [WT_EXTENSION transaction ID] */
-	uint64_t transaction_id;
-
-	ret = wt_api->transaction_id(wt_api, session, &transaction_id);
-	/*! [WT_EXTENSION transaction ID] */
-	}
-
-	{
-	uint64_t transaction_id = 1;
-	int is_visible;
-	/*! [WT_EXTENSION transaction visible] */
-	is_visible =
-	    wt_api->transaction_visible(wt_api, session, transaction_id);
-	/*! [WT_EXTENSION transaction visible] */
-	(void)is_visible;
-	}
 
 	(void)conn->close(conn, NULL);
 

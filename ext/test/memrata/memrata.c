@@ -84,14 +84,15 @@ typedef struct __wt_source {
 	int	 config_bitfield;		/* config "value_format=#t" */
 
 	/*
-	 * Each WiredTiger object has a "permanent" namespace in the KVS store,
-	 * plus a "cache" namespace, which has the not-yet-resolved updates for
-	 * the object.
+	 * Each WiredTiger object has a "primary" namespace in a KVS store plus
+	 * a "cache" namespace, which has not-yet-resolved updates.  There's a
+	 * dirty flag so we can ignore the cache until it's used.
 	 */
 	kvs_t kvs;				/* Underlying KVS object */
 	kvs_t kvscache;				/* Underlying KVS cache */
-	struct __kvs_source *ks;		/* Underlying KVS source */
+	int   kvscache_inuse;
 
+	struct __kvs_source *ks;		/* Underlying KVS source */
 	struct __wt_source *next;		/* List of WiredTiger objects */
 } WT_SOURCE;
 
@@ -111,22 +112,6 @@ typedef struct __kvs_source {
 	struct __kvs_source *next;		/* List of KVS sources */
 } KVS_SOURCE;
 
-typedef struct __cursor {
-	WT_CURSOR wtcursor;			/* Must come first */
-
-	WT_EXTENSION_API *wtext;		/* Extension functions */
-
-	WT_SOURCE *ws;				/* WiredTiger source */
-
-	struct kvs_record record;		/* Record */
-	uint8_t  key[KVS_MAX_KEY_LEN];		/* key, value */
-	uint8_t *val;
-	size_t   val_len;
-
-	int	 config_append;			/* config "append" */
-	int	 config_overwrite;		/* config "overwrite" */
-} CURSOR;
-
 typedef struct __data_source {
 	WT_DATA_SOURCE wtds;			/* Must come first */
 
@@ -136,6 +121,53 @@ typedef struct __data_source {
 
 	KVS_SOURCE *kvs_head;			/* List of KVS sources */
 } DATA_SOURCE;
+
+/*
+ * Values in the cache store are marshalled/unmarshalled to/from the store,
+ * using a simple encoding:
+ *	{N records: 4B}
+ *	{record#1 TxnID: 8B}
+ *	{record#1 remove tombstone: 1B}
+ *	{record#1 data length: 4B}
+ *	{record#1 data}
+ *	...
+ *
+ * Each KVS cursor potentially has a single set of these values.
+ */
+typedef struct __cache_record {
+	uint8_t	*v;				/* Value */
+	uint32_t len;				/* Value length */
+	uint64_t txnid;				/* Transaction ID */
+#define	REMOVE_TOMBSTONE	'R'
+	int	 remove;			/* 1/0 remove flag */
+} CACHE_RECORD;
+
+typedef struct __cursor {
+	WT_CURSOR wtcursor;			/* Must come first */
+
+	WT_EXTENSION_API *wtext;		/* Extension functions */
+
+	WT_SOURCE *ws;				/* WiredTiger source */
+
+	struct kvs_record record;		/* Record */
+	uint8_t  key[KVS_MAX_KEY_LEN];		/* key, value */
+	uint8_t *v;
+	size_t   len;
+	size_t	 mem_len;
+
+	struct {
+		uint8_t *v;			/* Temporary buffers */
+		size_t   len;
+		size_t   mem_len;
+	} t1, t2, t3;
+
+	int	 config_append;			/* config "append" */
+	int	 config_overwrite;		/* config "overwrite" */
+
+	CACHE_RECORD	*cache;			/* unmarshalled cache records */
+	uint32_t	 cache_entries;		/* cache records */
+	uint32_t	 cache_slots;		/* cache total record slots */
+} CURSOR;
 
 /*
  * os_errno --
@@ -209,6 +241,168 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 }
 
 /*
+ * cache_value_append --
+ *	Append the current WiredTiger cursor's value to a cache record.
+ */
+static int
+cache_value_append(WT_CURSOR *wtcursor, int remove)
+{
+	struct kvs_record *r;
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	uint64_t txnid;
+	size_t len;
+	uint32_t slots;
+	int ret = 0;
+	uint8_t *p;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
+	r = &cursor->record;
+
+	/*
+	 * The format of a cache update is the value, 8B of transaction ID
+	 * and 1B of remove tombstone.  Grow the value buffer as necessary,
+	 * then append the WiredTiger cursor's information.
+	 */
+	len = cursor->len + sizeof(uint32_t);		/* slots */
+	if (!remove)
+		len += wtcursor->value.size;		/* data */
+	len += sizeof(uint64_t) + 1;			/* txn ID, remove */
+	if (len > cursor->mem_len) {
+		if ((p = realloc(cursor->v, len + 64)) == NULL)
+			return (os_errno());
+		cursor->v = p;
+		cursor->mem_len = len + 64;
+	}
+
+	/* Get the transaction ID. */
+	if ((ret = wtext->transaction_id(wtext, session, &txnid)) != 0)
+		return (ret);
+
+	/* Update the number of records in this value. */
+	if (cursor->len == 0) {
+		slots = 1;
+		cursor->len = sizeof(uint32_t);
+	} else {
+		memcpy(&slots, cursor->v, sizeof(uint32_t));
+		++slots;
+	}
+	memcpy(cursor->v, &slots, sizeof(uint32_t));
+
+	/*
+	 * Copy the WiredTiger cursor's data into place: txn ID, remove
+	 * tombstone, data length, data.
+	 */
+	p = cursor->v + cursor->len;
+	memcpy(p, &txnid, sizeof(uint64_t));
+	p += sizeof(uint64_t);
+	if (remove)
+		*p++ = REMOVE_TOMBSTONE;
+	else {
+		*p++ = '\0';
+		memcpy(p, &wtcursor->value.size, sizeof(uint32_t));
+		p += sizeof(uint32_t);
+		memcpy(p, wtcursor->value.data, wtcursor->value.size);
+		p += wtcursor->value.size;
+	}
+	cursor->len = p - cursor->v;
+
+	/* Update the underlying KVS record. */
+	r->val = cursor->v;
+	r->val_len = cursor->len;
+
+	return (0);
+}
+
+/*
+ * cache_value_unmarshall --
+ *	Unmarshall a cache value into a set of records.
+ */
+static int
+cache_value_unmarshall(WT_CURSOR *wtcursor)
+{
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	uint32_t entries, i;
+	uint8_t *p;
+	int ret = 0;
+	void *store;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
+	/* If we don't have enough record slots, allocate some more. */
+	memcpy(&entries, cursor->v, sizeof(uint32_t));
+	if (entries > cursor->cache_slots) {
+		if ((p = realloc(cursor->cache,
+		    (entries + 20) * sizeof(cursor->cache[0]))) == NULL)
+			return (os_errno());
+
+		cursor->cache = (CACHE_RECORD *)p;
+		cursor->cache_slots = entries + 20;
+	}
+
+	/* Walk the value, splitting it up into records. */
+	p = cursor->v + sizeof(uint32_t);
+	for (i = 0, cp = cursor->cache; i < entries; ++i, ++cp) {
+		memcpy(&cp->txnid, p, sizeof(uint64_t));
+		p += sizeof(uint64_t);
+		cp->remove = *p++ == REMOVE_TOMBSTONE ? 1 : 0;
+		if (!cp->remove) {
+			memcpy(&cp->len, p, sizeof(uint32_t));
+			p += sizeof(uint32_t);
+			cp->v = p;
+			p += cp->len;
+		}
+	}
+	cursor->cache_entries = entries;
+
+	return (ret);
+}
+
+/*
+ * cache_value_visible --
+ *	Return if a record in the cache is visible to this transaction.
+ */
+static int
+cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
+{
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	u_int i;
+	int ret = 0;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
+	/*
+	 * We need to return the "best" reference, the largest txn ID visible
+	 * to us; the cache entries are in reverse order, walk them that way
+	 * to ensure we get the best match.
+	 */
+	cp = cursor->cache + cursor->cache_entries;
+	for (i = 0; i < cursor->cache_entries; ++i) {
+		--cp;
+		if (wtext->transaction_visible(wtext, session, cp->txnid)) {
+			if (cpp != NULL)
+				*cpp = cp;
+			return (1);
+		}
+	}
+	return (0);
+}
+
+/*
  * copyin_key --
  *	Copy a WT_CURSOR key to a struct kvs_record key.
  */
@@ -270,6 +464,7 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 		r->key = cursor->key;
 		r->key_len = size;
 	} else {
+		/* I'm not sure this test is necessary, but it's cheap. */
 		if (wtcursor->key.size > KVS_MAX_KEY_LEN)
 			ERET(wtext, session, ERANGE,
 			    "key size of %" PRIuMAX " is too large",
@@ -317,33 +512,11 @@ copyout_key(WT_CURSOR *wtcursor)
 }
 
 /*
- * copyin_val --
- *	Copy a WT_CURSOR value to a struct kvs_record value .
- */
-static inline int
-copyin_val(WT_CURSOR *wtcursor)
-{
-	struct kvs_record *r;
-	CURSOR *cursor;
-
-	cursor = (CURSOR *)wtcursor;
-	r = &cursor->record;
-
-	/*
-	 * XXX
-	 * The underlying KVS library data fields aren't const.
-	 */
-	r->val = (uint8_t *)wtcursor->value.data;
-	r->val_len = (unsigned long)wtcursor->value.size;
-	return (0);
-}
-
-/*
  * copyout_val --
- *	Copy a struct kvs_record value to a WT_CURSOR value.
+ *	Copy a kvs store's struct kvs_record value to a WT_CURSOR value.
  */
 static inline int
-copyout_val(WT_CURSOR *wtcursor)
+copyout_val(WT_CURSOR *wtcursor, CACHE_RECORD *cp)
 {
 	struct kvs_record *r;
 	CURSOR *cursor;
@@ -351,46 +524,13 @@ copyout_val(WT_CURSOR *wtcursor)
 	cursor = (CURSOR *)wtcursor;
 	r = &cursor->record;
 
-	wtcursor->value.data = r->val;
-	wtcursor->value.size = (uint32_t)r->val_len;
-	return (0);
-}
-
-/*
- * copy_key --
- *	Copy the key for methods where the underlying KVS call returns a key.
- */
-static inline int
-copy_key(WT_CURSOR *wtcursor)
-{
-	struct kvs_record *r;
-	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
-	WT_SESSION *session;
-
-	session = wtcursor->session;
-	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
-
-	r = &cursor->record;
-
-	/*
-	 * If the underlying KVS function is going to return a key, we have to
-	 * be sure the key buffer is large enough into which to copy any key,
-	 * that is, the key can't reference the WT_CURSOR key.  If the previous
-	 * call was set up so the key referenced the WT_CURSOR key, copy it to
-	 * the CURSOR key buffer.
-	 */
-	if (r->key == cursor->key)
-		return (0);
-
-	if (r->key_len > sizeof(cursor->key))
-		ERET(wtext, session, ERANGE,
-		    "key too large, maximum is %" PRIuMAX,
-		    (uintmax_t)sizeof(cursor->key));
-
-	memcpy(cursor->key, r->key, r->key_len);
-	r->key = cursor->key;
+	if (cp == NULL) {
+		wtcursor->value.data = r->val;
+		wtcursor->value.size = (uint32_t)r->val_len;
+	} else {
+		wtcursor->value.data = cp->v;
+		wtcursor->value.size = cp->len;
+	}
 	return (0);
 }
 
@@ -436,13 +576,12 @@ kvs_dump(
  *	Call a KVS key retrieval function, handling overflow.
  */
 static inline int
-kvs_call(WT_CURSOR *wtcursor, const char *fname,
+kvs_call(WT_CURSOR *wtcursor, const char *fname, kvs_t kvs,
     int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
 {
 	CURSOR *cursor;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	kvs_t kvs;
 	int ret = 0;
 	char *p;
 
@@ -450,12 +589,11 @@ kvs_call(WT_CURSOR *wtcursor, const char *fname,
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
 
-	kvs = cursor->ws->kvs;
-	cursor->record.val = cursor->val;
+	cursor->record.val = cursor->v;
 
 restart:
 	if ((ret = f(kvs, &cursor->record,
-	    0UL, (unsigned long)cursor->val_len)) != 0) {
+	    0UL, (unsigned long)cursor->mem_len)) != 0) {
 		if (ret == KVS_E_KEY_NOT_FOUND)
 			return (WT_NOTFOUND);
 		ERET(wtext,
@@ -476,18 +614,20 @@ restart:
 	 * key/value disappears.
 	 */
 	for (;;) {
-		if (cursor->val_len >= cursor->record.val_len)
+		if (cursor->mem_len >= cursor->record.val_len) {
+			cursor->len = cursor->record.val_len;
 			return (0);
+		}
 
 		/* Grow the value buffer. */
-		if ((p = realloc(
-		    cursor->val, cursor->record.val_len + 32)) == NULL)
+		if ((p =
+		    realloc(cursor->v, cursor->record.val_len + 32)) == NULL)
 			return (os_errno());
-		cursor->val = cursor->record.val = p;
-		cursor->val_len = cursor->record.val_len + 32;
+		cursor->v = cursor->record.val = p;
+		cursor->mem_len = cursor->record.val_len + 32;
 
 		if ((ret = kvs_get(kvs, &cursor->record,
-		    0UL, (unsigned long)cursor->val_len)) != 0) {
+		    0UL, (unsigned long)cursor->mem_len)) != 0) {
 			if (ret == KVS_E_KEY_NOT_FOUND)
 				goto restart;
 			ERET(wtext, session,
@@ -498,23 +638,187 @@ restart:
 }
 
 /*
+ * nextprev --
+ *	Cursor next/prev.
+ */
+static int
+nextprev(WT_CURSOR *wtcursor, const char *fname,
+    int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
+{
+	struct kvs_record *r;
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_ITEM a, b;
+	WT_SESSION *session;
+	WT_SOURCE *ws;
+	int cache_ret, cmp, ret = 0;
+	void *p;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	ws = cursor->ws;
+	wtext = cursor->wtext;
+
+	r = &cursor->record;
+
+	/*
+	 * If the underlying KVS function is going to return a key, we have to
+	 * be sure the key buffer is large enough into which to copy any key,
+	 * that is, the key can't reference the WT_CURSOR key.  If the previous
+	 * call was set up so the key referenced the WT_CURSOR key, copy it to
+	 * the CURSOR key buffer.
+	 */
+	if (r->key != cursor->key) {
+		if (r->key_len > sizeof(cursor->key))
+			ERET(wtext, session, ERANGE,
+			    "key too large, maximum is %" PRIuMAX,
+			    (uintmax_t)sizeof(cursor->key));
+
+		memcpy(cursor->key, r->key, r->key_len);
+		r->key = cursor->key;
+	}
+
+	/*
+	 * If the cache isn't yet in use, it's a simpler problem, just check
+	 * the store.  We don't care if we race, we're not guaranteeing any
+	 * special behavior with respect to phantoms.
+	 */
+	if (ws->kvscache_inuse == 0) {
+		cache_ret = WT_NOTFOUND;
+		goto cache_clean;
+	}
+
+	/*
+	 * The next/prev key/value pair might be in the cache, which means we
+	 * are making two calls and returning the best choice.  As each call
+	 * overwrites both key and value, we have to have a copy of the key
+	 * for the second call plus the returned key and value from the first
+	 * call.   That's why each cursor has 3 temporary buffers.
+	 *
+	 * First, copy the key.
+	 */
+	if (cursor->t1.mem_len < r->key_len) {
+		if ((p = realloc(cursor->t1.v, r->key_len)) == NULL)
+			return (__os_errno());
+		cursor->t1.v = p;
+		cursor->t1.mem_len = r->key_len;
+	}
+	memcpy(cursor->t1.v, r->key, r->key_len);
+	cursor->t1.len = r->key_len;
+
+	/*
+	 * Move through the cache until we either find a record with a visible
+	 * entry, or we reach the end/beginning.
+	 */
+	for (;;) {
+		if ((ret = kvs_call(wtcursor, fname, ws->kvscache, f)) != 0)
+			break;
+		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+			return (ret);
+
+		/*
+		 * If there's no visible entry, or the visible entry is a
+		 * deleted item, skip it.
+		 */
+		if (!cache_value_visible(wtcursor, &cp))
+			continue;
+		if (cp->remove)
+			continue;
+
+		/*
+		 * Copy the cache key/value pair, we will need them if we are
+		 * to return the cache's entry.
+		 */
+		if (cursor->t2.mem_len < r->key_len) {
+			if ((p = realloc(cursor->t2.v, r->key_len)) == NULL)
+				return (__os_errno());
+			cursor->t2.v = p;
+			cursor->t2.mem_len = r->key_len;
+		}
+		memcpy(cursor->t2.v, r->key, r->key_len);
+		cursor->t2.len = r->key_len;
+
+		if (cursor->t3.mem_len < cp->len) {
+			if ((p = realloc(cursor->t3.v, cp->len)) == NULL)
+				return (__os_errno());
+			cursor->t3.v = p;
+			cursor->t3.mem_len = cp->len;
+		}
+		memcpy(cursor->t3.v, cp->v, cp->len);
+		cursor->t3.len = cp->len;
+
+		break;
+	}
+	if (ret != 0 && ret != WT_NOTFOUND)
+		return (ret);
+	cache_ret = ret;
+
+	/* Copy the original key back into place. */
+	memcpy(r->key, cursor->t1.v, cursor->t1.len);
+	r->key_len = cursor->t1.len;
+
+cache_clean:
+	/* Get the next/prev entry from the store. */
+	if ((ret = kvs_call(wtcursor, fname, ws->kvs, f)) == 0) {
+		if ((ret = copyout_val(wtcursor, NULL)) != 0)
+			return (ret);
+	} else if (ret != WT_NOTFOUND)
+		return (ret);
+
+	/* If no entries in either the cache or the primary, we're done. */
+	if (cache_ret == WT_NOTFOUND && ret == WT_NOTFOUND)
+		return (WT_NOTFOUND);
+
+	/*
+	 * If both the cache and the primary had entries, decide which is a
+	 * better choice and pretend we didn't find the other one.
+	 */
+	if (cache_ret == 0 && ret == 0) {
+		a.data = cursor->v;		/* a is the primary */
+		a.size = cursor->len;
+		b.data = cursor->t3.v;		/* b is the cache */
+		b.size = cursor->t3.len;
+		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
+			return (ret);
+		if (f == kvs_next) {
+			if (cmp < 0)
+				cache_ret = WT_NOTFOUND;
+			else
+				ret = WT_NOTFOUND;
+		} else {
+			if (cmp < 0)
+				ret = WT_NOTFOUND;
+			else
+				cache_ret = WT_NOTFOUND;
+		}
+	}
+
+	/* If no entry in the primary, copy the cache's entry into place. */
+	if (cache_ret == 0 && ret == WT_NOTFOUND) {
+		memcpy(r->key, cursor->t2.v, cursor->t2.len);
+		r->key_len = cursor->t2.len;
+
+		memcpy(cursor->v, cursor->t3.v, cursor->t3.len);
+		cursor->len = cursor->t3.len;
+	}
+
+	/* Copy out the chosen key/value pair. */
+	if ((ret = copyout_key(wtcursor)) != 0)
+		return (ret);
+	if ((ret = copyout_val(wtcursor, NULL)) != 0)
+		return (ret);
+	return (0);
+}
+
+/*
  * kvs_cursor_next --
  *	WT_CURSOR::next method.
  */
 static int
 kvs_cursor_next(WT_CURSOR *wtcursor)
 {
-	int ret = 0;
-
-	if ((ret = copy_key(wtcursor)) != 0)
-		return (ret);
-	if ((ret = kvs_call(wtcursor, "kvs_next", kvs_next)) != 0)
-		return (ret);
-	if ((ret = copyout_key(wtcursor)) != 0)
-		return (ret);
-	if ((ret = copyout_val(wtcursor)) != 0)
-		return (ret);
-	return (0);
+	return (nextprev(wtcursor, "kvs_next", kvs_next));
 }
 
 /*
@@ -524,17 +828,7 @@ kvs_cursor_next(WT_CURSOR *wtcursor)
 static int
 kvs_cursor_prev(WT_CURSOR *wtcursor)
 {
-	int ret = 0;
-
-	if ((ret = copy_key(wtcursor)) != 0)
-		return (ret);
-	if ((ret = kvs_call(wtcursor, "kvs_prev", kvs_prev)) != 0)
-		return (ret);
-	if ((ret = copyout_key(wtcursor)) != 0)
-		return (ret);
-	if ((ret = copyout_val(wtcursor)) != 0)
-		return (ret);
-	return (0);
+	return (nextprev(wtcursor, "kvs_prev", kvs_prev));
 }
 
 /*
@@ -563,13 +857,38 @@ kvs_cursor_reset(WT_CURSOR *wtcursor)
 static int
 kvs_cursor_search(WT_CURSOR *wtcursor)
 {
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	WT_SOURCE *ws;
 	int ret = 0;
 
+	cursor = (CURSOR *)wtcursor;
+	ws = cursor->ws;
+
+	/* Copy in the WiredTiger cursor's key. */
 	if ((ret = copyin_key(wtcursor, 0)) != 0)
 		return (ret);
-	if ((ret = kvs_call(wtcursor, "kvs_get", kvs_get)) != 0)
+
+	/*
+	 * Check for an entry in the cache.  If we find one, unmarshall it
+	 * and check for a visible entry we can return.
+	 */
+	if ((ret = kvs_call(wtcursor, "kvs_get", ws->kvscache, kvs_get)) == 0) {
+		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+			return (ret);
+		if (cache_value_visible(wtcursor, &cp)) {
+			if ((ret = copyout_val(wtcursor, cp)) != 0)
+				return (ret);
+			return (cp->remove ? WT_NOTFOUND : 0);
+		}
+	}
+	if (ret != WT_NOTFOUND)
 		return (ret);
-	if ((ret = copyout_val(wtcursor)) != 0)
+
+	/* Check for an entry in the primary store. */
+	if ((ret = kvs_call(wtcursor, "kvs_get", ws->kvs, kvs_get)) != 0)
+		return (ret);
+	if ((ret = copyout_val(wtcursor, NULL)) != 0)
 		return (ret);
 	return (0);
 }
@@ -635,11 +954,67 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	wtext = cursor->wtext;
 	ws = cursor->ws;
 
+	/* Get the WiredTiger cursor's key. */
 	if ((ret = copyin_key(wtcursor, 1)) != 0)
 		return (ret);
-	if ((ret = copyin_val(wtcursor)) != 0)
+
+	/* Clear the value, assume we're adding the first cache entry. */
+	cursor->len = 0;
+
+	/* Updates are read-modify-writes, lock the underlying cache. */
+	if ((ret = writelock(wtext, session, &ws->lock)) != 0)
 		return (ret);
 
+	/* Read the record from the cache store. */
+	switch (ret = kvs_call(wtcursor, "kvs_get", ws->kvscache, kvs_get)) {
+	case 0:
+		if (cursor->config_overwrite)
+			break;
+
+		/*
+		 * If overwrite is false, crack the record and check for any
+		 * visible entries, that's an error.
+		 */
+		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+			goto err;
+		if (cache_value_visible(wtcursor, NULL)) {
+			ret = WT_DUPLICATE_KEY;
+			goto err;
+		}
+		/* FALLTHROUGH */
+	case WT_NOTFOUND:
+		if (cursor->config_overwrite)
+			break;
+
+		/*
+		 * If overwrite is false, check for an existing record in the
+		 * primary store, that's an error.
+		 */
+		if ((ret = kvs_call(
+		    wtcursor, "kvs_get", ws->kvs, kvs_get)) != WT_NOTFOUND) {
+			if (ret == 0)
+				ret = WT_DUPLICATE_KEY;
+			goto err;
+		}
+		break;
+	default:
+		goto err;
+	}
+
+	/*
+	 * Create a new cache value based on the current cache record plus the
+	 * WiredTiger cursor's value.
+	 */
+	if ((ret = cache_value_append(wtcursor, 0)) != 0)
+		goto err;
+
+	/* Push the record into the cache. */
+	if ((ret = kvs_set(ws->kvscache, &cursor->record)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_set: %s", kvs_strerror(ret));
+	ws->kvscache_inuse = 1;
+
+#if 0
 	/*
 	 * WT_CURSOR::insert with overwrite set (create the record if it does
 	 * not exist, update the record if it does exist), maps to kvs_set.
@@ -649,41 +1024,107 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	 */
 	if (cursor->config_overwrite) {
 		if ((ret = kvs_set(ws->kvs, &cursor->record)) != 0)
-			ERET(wtext, session, WT_ERROR,
+			ESET(wtext, session, WT_ERROR,
 			    "kvs_set: %s", kvs_strerror(ret));
 	} else
 		if ((ret = kvs_add(ws->kvs, &cursor->record)) != 0) {
 			if (ret == KVS_E_KEY_EXISTS)
-				return (WT_DUPLICATE_KEY);
-			ERET(wtext, session, WT_ERROR,
-			    "kvs_add: %s", kvs_strerror(ret));
+				ret = WT_DUPLICATE_KEY;
+			else
+				ESET(wtext, session, WT_ERROR,
+				    "kvs_add: %s", kvs_strerror(ret));
 		}
-	return (0);
+#endif
+
+	/* Discard the lock. */
+err:	ETRET(unlock(wtext, session, &ws->lock));
+
+	return (ret);
 }
 
 /*
- * kvs_cursor_update --
- *	WT_CURSOR::update method.
+ * update --
+ *	Update or remove an entry.
  */
 static int
-kvs_cursor_update(WT_CURSOR *wtcursor)
+update(WT_CURSOR *wtcursor, int remove)
 {
+	CACHE_RECORD *cp;
 	CURSOR *cursor;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	WT_SOURCE *ws;
-	int ret = 0;
+	int found, ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
 	ws = cursor->ws;
 
+	/* Get the WiredTiger cursor's key. */
 	if ((ret = copyin_key(wtcursor, 0)) != 0)
 		return (ret);
-	if ((ret = copyin_val(wtcursor)) != 0)
+
+	/* Clear the value, assume we're adding the first cache entry. */
+	cursor->len = 0;
+
+	/* Updates are read-modify-writes, lock the underlying cache. */
+	if ((ret = writelock(wtext, session, &ws->lock)) != 0)
 		return (ret);
 
+	/* Read the record from the cache store. */
+	switch (ret = kvs_call(wtcursor, "kvs_get", ws->kvscache, kvs_get)) {
+	case 0:
+		if (cursor->config_overwrite)
+			break;
+
+		/*
+		 * If overwrite is false, crack the record and check for no
+		 * visible entries, that's an error.
+		 */
+		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+			goto err;
+		if (cache_value_visible(wtcursor, &cp)) {
+			if (!cp->remove)
+				break;
+
+			ret = WT_NOTFOUND;
+			goto err;
+		}
+		/* FALLTHROUGH */
+	case WT_NOTFOUND:
+		if (cursor->config_overwrite)
+			break;
+
+		/*
+		 * If overwrite is false, check for no existing record in the
+		 * primary store, that's an error.
+		 */
+		if ((ret = kvs_call(
+		    wtcursor, "kvs_get", ws->kvs, kvs_get)) != WT_NOTFOUND) {
+			if (ret == 0)
+				ret = WT_NOTFOUND;
+			goto err;
+		}
+		break;
+	default:
+		goto err;
+	}
+
+	/*
+	 * Create a new cache value based on the current cache record plus the
+	 * WiredTiger cursor's value.
+	 */
+	if ((ret = cache_value_append(wtcursor, remove)) != 0)
+		goto err;
+
+	/* Push the record into the cache. */
+	if ((ret = kvs_set(ws->kvscache, &cursor->record)) != 0)
+		ESET(wtext, session, WT_ERROR,
+		    "kvs_set: %s", kvs_strerror(ret));
+	ws->kvscache_inuse = 1;
+
+#if 0
 	/*
 	 * WT_CURSOR::update without overwrite set (update the record if it
 	 * does exist, fail if it does not exist), maps to kvs_replace.  We
@@ -696,25 +1137,6 @@ kvs_cursor_update(WT_CURSOR *wtcursor)
 		    session, WT_ERROR, "kvs_replace: %s", kvs_strerror(ret));
 
 	return (0);
-}
-
-/*
- * kvs_cursor_remove --
- *	WT_CURSOR::remove method.
- */
-static int
-kvs_cursor_remove(WT_CURSOR *wtcursor)
-{
-	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
-	WT_SESSION *session;
-	WT_SOURCE *ws;
-	int ret = 0;
-
-	session = wtcursor->session;
-	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
-	ws = cursor->ws;
 
 	/*
 	 * WiredTiger's "remove" of a bitfield is really an update with a value
@@ -733,6 +1155,47 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 	if (ret == KVS_E_KEY_NOT_FOUND)
 		return (cursor->config_overwrite ? 0 : WT_NOTFOUND);
 	ERET(wtext, session, WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
+#endif
+
+	/* Discard the lock. */
+err:	ETRET(unlock(wtext, session, &ws->lock));
+
+	return (ret);
+}
+
+/*
+ * kvs_cursor_update --
+ *	WT_CURSOR::update method.
+ */
+static int
+kvs_cursor_update(WT_CURSOR *wtcursor)
+{
+	return (update(wtcursor, 0));
+}
+
+/*
+ * kvs_cursor_remove --
+ *	WT_CURSOR::remove method.
+ */
+static int
+kvs_cursor_remove(WT_CURSOR *wtcursor)
+{
+	return (update(wtcursor, 1));
+}
+
+/*
+ * cursor_destroy --
+ *	Free a cursor and it's memory.
+ */
+static void
+cursor_destroy(CURSOR *cursor)
+{
+	free(cursor->v);
+	free(cursor->t1.v);
+	free(cursor->t2.v);
+	free(cursor->t3.v);
+	free(cursor->cache);
+	free(cursor);
 }
 
 /*
@@ -753,14 +1216,12 @@ kvs_cursor_close(WT_CURSOR *wtcursor)
 	wtext = cursor->wtext;
 	ws = cursor->ws;
 
-	if ((ret = writelock(wtext, session, &ws->lock)) != 0)
-		goto err;
-	--ws->ref;
-	if ((ret = unlock(wtext, session, &ws->lock)) != 0)
-		goto err;
+	if ((ret = writelock(wtext, session, &ws->lock)) == 0) {
+		--ws->ref;
+		ret = unlock(wtext, session, &ws->lock);
+	}
+	cursor_destroy(cursor);
 
-err:	free(cursor->val);
-	free(cursor);
 	return (ret);
 }
 
@@ -1614,6 +2075,12 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	}
 	cursor->config_overwrite = v.val != 0;
 
+	if ((ret = wtext->collator_config(wtext, session, config)) != 0) {
+		ESET(wtext, session, ret,
+		    "collator configuration: %s", wtext->strerror(ret));
+		goto err;
+	}
+
 	/* Finish initializing the cursor. */
 	cursor->wtcursor.next = kvs_cursor_next;
 	cursor->wtcursor.prev = kvs_cursor_prev;
@@ -1621,17 +2088,16 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	cursor->wtcursor.search = kvs_cursor_search;
 	cursor->wtcursor.search_near = kvs_cursor_search_near;
 	cursor->wtcursor.insert = kvs_cursor_insert;
-	cursor->wtcursor.update =
-	    cursor->config_overwrite ? kvs_cursor_insert : kvs_cursor_update;
+	cursor->wtcursor.update = kvs_cursor_update;
 	cursor->wtcursor.remove = kvs_cursor_remove;
 	cursor->wtcursor.close = kvs_cursor_close;
 
 	cursor->wtext = wtext;
 
 	cursor->record.key = cursor->key;
-	if ((cursor->val = malloc(128)) == NULL)
+	if ((cursor->v = malloc(128)) == NULL)
 		goto err;
-	cursor->val_len = 128;
+	cursor->mem_len = 128;
 
 	/* Get a locked reference to the WiredTiger source. */
 	if ((ret = ws_source_open(wtds, session, uri, config, 0, &ws)) != 0)
@@ -1697,11 +2163,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if (0) {
 err:		if (ws != NULL && locked)
 			ETRET(unlock(wtext, session, &ws->lock));
-
-		if (cursor != NULL) {
-			free(cursor->val);
-			free(cursor);
-		}
+		if (cursor != NULL)
+			cursor_destroy(cursor);
 	}
 	free((void *)value);
 	return (ret);

@@ -52,6 +52,8 @@ struct __wt_extension_api {
 	 * Private fields.
 	 */
 	WT_CONNECTION *conn;		/* Enclosing connection */
+
+	WT_COLLATOR *collator;		/* Collation function */
 #endif
 	/*!
 	 * Insert an error message into the WiredTiger error stream.
@@ -114,6 +116,36 @@ struct __wt_extension_api {
 	 * @snippet ex_data_source.c WT_EXTENSION_API scr_free
 	 */
 	void (*scr_free)(WT_EXTENSION_API *, WT_SESSION *session, void *ref);
+
+	/*!
+	 * Configure the extension collator method.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param config the configuration information passed to an application
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION collator config
+	 */
+	int (*collator_config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    WT_CONFIG_ARG *config);
+
+	/*!
+	 * The extension collator method.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param first first item
+	 * @param second second item
+	 * @param[out] cmp set less than 0 if \c first collates less than
+	 * \c second, set equal to 0 if \c first collates equally to \c second,
+	 * set greater than 0 if \c first collates greater than \c second
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION collate
+	 */
+	int (*collate)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    WT_ITEM *first, WT_ITEM *second, int *cmp);
 
 	/*!
 	 * Return the value of a configuration string.
