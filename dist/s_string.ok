@@ -209,6 +209,7 @@ TRK
 TXN
 TXNID
 Timestamp
+TxnID
 UIDs
 UINT
 ULINE
@@ -217,6 +218,7 @@ URIs
 UTF
 UnixLib
 Unmap
+Unmarshall
 VARCHAR
 Vanishingly
 Vc
@@ -531,6 +533,7 @@ lzo
 madvise
 majorp
 malloc
+marshalled
 maxid
 maxintlitem
 maxintlpage
@@ -796,6 +799,8 @@ unix
 unjams
 unlinked
 unmap
+unmarshall
+unmarshalled
 unmerged
 unmodify
 unpackv
