@@ -287,7 +287,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_FORCE_EVICT | TXN_OLDEST | TXN_RUNNING);
+	F_CLR(txn,
+	    TXN_DATA_SOURCE |
+	    TXN_ERROR | TXN_FORCE_EVICT | TXN_OLDEST | TXN_RUNNING);
 
 	/* Update the global generation number. */
 	++txn_global->gen;
@@ -311,6 +313,13 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/*
+	 * If a data-source was involved in the transaction, let it know we're
+	 * committing.
+	 */
+	if (F_ISSET(txn, TXN_DATA_SOURCE))
+		WT_RET(__wt_curds_txn_commit(session));
+
+	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the
 	 * committed changes are visible to subsequent reads.  However, cursor
 	 * keys and values will point to the data that was just modified, so
@@ -331,8 +340,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_TXN *txn;
+	WT_DECL_RET;
 	WT_REF **rp;
+	WT_TXN *txn;
 	uint64_t **m;
 	u_int i;
 
@@ -341,6 +351,13 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
+
+	/*
+	 * If a data-source was involved in the transaction, let it know we're
+	 * rolling back.
+	 */
+	if (F_ISSET(txn, TXN_DATA_SOURCE))
+		WT_TRET(__wt_curds_txn_rollback(session));
 
 	/* Rollback updates. */
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
@@ -351,7 +368,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		__wt_tree_walk_delete_rollback(*rp);
 
 	__wt_txn_release(session);
-	return (0);
+	return (ret);
 }
 
 /*

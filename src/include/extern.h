@@ -598,6 +598,8 @@ extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_curds_txn_commit(WT_SESSION_IMPL *session);
+extern int __wt_curds_txn_rollback(WT_SESSION_IMPL *session);
 extern int __wt_curds_create(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
@@ -1286,9 +1288,10 @@ extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_ext_transaction_id(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session,
-    uint64_t *transaction_idp);
-extern int __wt_ext_transaction_visible(WT_EXTENSION_API *wt_api,
+extern uint64_t __wt_ext_transaction_id(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session);
+extern int __wt_ext_transaction_snapshot_isolation( WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session);
+extern int __wt_ext_transaction_visible( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     uint64_t transaction_id);

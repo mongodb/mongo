@@ -155,11 +155,21 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	int ret;
 
 	{
+	int is_snapshot_isolation;
+	/*! [WT_EXTENSION transaction snapshot isolation] */
+	is_snapshot_isolation =
+	    wt_api->transaction_snapshot_isolation(wt_api, session);
+	/*! [WT_EXTENSION transaction snapshot isolation] */
+	(void)is_snapshot_isolation;
+	}
+
+	{
 	/*! [WT_EXTENSION transaction ID] */
 	uint64_t transaction_id;
 
-	ret = wt_api->transaction_id(wt_api, session, &transaction_id);
+	transaction_id = wt_api->transaction_id(wt_api, session);
 	/*! [WT_EXTENSION transaction ID] */
+	(void)transaction_id;
 	}
 
 	{

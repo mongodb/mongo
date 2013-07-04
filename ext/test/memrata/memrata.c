@@ -105,6 +105,8 @@ typedef struct __kvs_source {
 	 * Each underlying KVS source has a txn namespace which has the list of
 	 * active transactions with their committed or aborted state.
 	 */
+#define	TXN_ABORTED	0x01
+#define	TXN_COMMITTED	0x02
 	kvs_t kvstxn;				/* Underlying KVS txn store */
 
 	struct __wt_source *ws_head;		/* List of WiredTiger sources */
@@ -241,6 +243,74 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 }
 
 /*
+ * txn_state_set --
+ *	Resolve a transaction.
+ */
+static int
+txn_state_set(WT_CURSOR *wtcursor, int commit)
+{
+	struct kvs_record txn;
+	CURSOR *cursor;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	uint64_t txnid;
+	uint8_t val_buf[32];
+	int ret = 0;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+	ks = cursor->ws->ks;
+
+	/* Get the transaction ID. */
+	txnid = wtext->transaction_id(wtext, session);
+
+	val_buf[0] = commit ? TXN_COMMITTED : TXN_ABORTED;
+
+	/* Update the store -- commits must be permanent, flush the device. */
+	txn.key = &txnid;
+	txn.key_len = sizeof(txnid);
+	txn.val = val_buf;
+	txn.val_len = 1;
+	if ((ret = kvs_set(ks->kvstxn, &txn)) != 0 ||
+	    (commit && (ret = kvs_commit(ks->kvs_device)) != 0))
+		ERET(wtext, session,
+		    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
+	return (0);
+}
+
+/*
+ * txn_state --
+ *	Return a transaction's state.
+ */
+static int
+txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
+{
+	struct kvs_record txn;
+	CURSOR *cursor;
+	KVS_SOURCE *ks;
+	int ret = 0;
+	uint8_t val_buf[32];
+
+	cursor = (CURSOR *)wtcursor;
+	ks = cursor->ws->ks;
+
+	txn.key = &txnid;
+	txn.key_len = sizeof(txnid);
+	txn.val = val_buf;
+	txn.val_len = sizeof(val_buf);
+
+	/*
+	 * We don't care if the transaction isn't resolved, we only care how it
+	 * might have been resolved.
+	 */
+	if (kvs_get(ks->kvstxn, &txn, 0UL, (unsigned long)sizeof(val_buf)) == 0)
+		return (val_buf[0]);
+	return (0);
+}
+
+/*
  * cache_value_append --
  *	Append the current WiredTiger cursor's value to a cache record.
  */
@@ -280,8 +350,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove)
 	}
 
 	/* Get the transaction ID. */
-	if ((ret = wtext->transaction_id(wtext, session, &txnid)) != 0)
-		return (ret);
+	txnid = wtext->transaction_id(wtext, session);
 
 	/* Update the number of records in this value. */
 	if (cursor->len == 0) {
@@ -393,11 +462,68 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
 	cp = cursor->cache + cursor->cache_entries;
 	for (i = 0; i < cursor->cache_entries; ++i) {
 		--cp;
-		if (wtext->transaction_visible(wtext, session, cp->txnid)) {
+
+		/*
+		 * XXX
+		 * WiredTiger resets updated entry transaction IDs to an aborted
+		 * state on rollback; to do that here would require tracking the
+		 * updated entries for a transaction or scanning the cache for
+		 * updates made for the transaction during rollback, expensive
+		 * stuff.  Instead, check if the transaction has been aborted
+		 * before calling the underlying WiredTiger visibility function.
+		 */
+		if (txn_state(wtcursor, cp->txnid) != TXN_ABORTED &&
+		    wtext->transaction_visible(wtext, session, cp->txnid)) {
 			if (cpp != NULL)
 				*cpp = cp;
 			return (1);
 		}
+	}
+	return (0);
+}
+
+/*
+ * cache_value_update_check --
+ *	Return if an update can proceed.
+ */
+static int
+cache_value_update_check(WT_CURSOR *wtcursor)
+{
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	u_int i;
+	int ret = 0;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
+	/* Only interesting for snapshot isolation. */
+	if (!wtext->transaction_snapshot_isolation(wtext, session))
+		return (0);
+
+	/*
+	 * If there's an entry that's not visible and hasn't been aborted,
+	 * return a deadlock.
+	 */
+	cp = cursor->cache + cursor->cache_entries;
+	for (i = 0; i < cursor->cache_entries; ++i) {
+		--cp;
+
+		/*
+		 * XXX
+		 * WiredTiger resets updated entry transaction IDs to an aborted
+		 * state on rollback; to do that here would require tracking the
+		 * updated entries for a transaction or scanning the cache for
+		 * updates made for the transaction during rollback, expensive
+		 * stuff.  Instead, check if the transaction has been aborted
+		 * before calling the underlying WiredTiger visibility function.
+		 */
+		if (txn_state(wtcursor, cp->txnid) != TXN_ABORTED &&
+		    !wtext->transaction_visible(wtext, session, cp->txnid))
+			return (WT_DEADLOCK);
 	}
 	return (0);
 }
@@ -943,6 +1069,7 @@ kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
 static int
 kvs_cursor_insert(WT_CURSOR *wtcursor)
 {
+	CACHE_RECORD *cp;
 	CURSOR *cursor;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
@@ -968,16 +1095,27 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	/* Read the record from the cache store. */
 	switch (ret = kvs_call(wtcursor, "kvs_get", ws->kvscache, kvs_get)) {
 	case 0:
+		/* Crack the record. */
+		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+			goto err;
+
+		/* Check if the update can proceed. */
+		if ((ret = cache_value_update_check(wtcursor)) != 0)
+			goto err;
+
 		if (cursor->config_overwrite)
 			break;
 
 		/*
-		 * If overwrite is false, crack the record and check for any
-		 * visible entries, that's an error.
+		 * If overwrite is false, a visible entry (that's not a removed
+		 * entry), is an error.  We're done checking if there is a
+		 * visible entry in the cache, otherwise repeat the check on the
+		 * primary store.
 		 */
-		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
-			goto err;
-		if (cache_value_visible(wtcursor, NULL)) {
+		if (cache_value_visible(wtcursor, &cp)) {
+			if (cp->remove)
+				break;
+
 			ret = WT_DUPLICATE_KEY;
 			goto err;
 		}
@@ -986,16 +1124,14 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 		if (cursor->config_overwrite)
 			break;
 
-		/*
-		 * If overwrite is false, check for an existing record in the
-		 * primary store, that's an error.
-		 */
+		/* If overwrite is false, an entry is an error. */
 		if ((ret = kvs_call(
 		    wtcursor, "kvs_get", ws->kvs, kvs_get)) != WT_NOTFOUND) {
 			if (ret == 0)
 				ret = WT_DUPLICATE_KEY;
 			goto err;
 		}
+		ret = 0;
 		break;
 	default:
 		goto err;
@@ -1054,7 +1190,7 @@ update(WT_CURSOR *wtcursor, int remove)
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	WT_SOURCE *ws;
-	int found, ret = 0;
+	int ret = 0;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
@@ -1075,15 +1211,22 @@ update(WT_CURSOR *wtcursor, int remove)
 	/* Read the record from the cache store. */
 	switch (ret = kvs_call(wtcursor, "kvs_get", ws->kvscache, kvs_get)) {
 	case 0:
+		/* Crack the record. */
+		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+			goto err;
+
+		/* Check if the update can proceed. */
+		if ((ret = cache_value_update_check(wtcursor)) != 0)
+			goto err;
+
 		if (cursor->config_overwrite)
 			break;
 
 		/*
-		 * If overwrite is false, crack the record and check for no
-		 * visible entries, that's an error.
+		 * If overwrite is false, no entry (or a removed entry), is an
+		 * error.   We're done checking if there is a visible entry in
+		 * the cache, otherwise repeat the check on the primary store.
 		 */
-		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
-			goto err;
 		if (cache_value_visible(wtcursor, &cp)) {
 			if (!cp->remove)
 				break;
@@ -1096,16 +1239,10 @@ update(WT_CURSOR *wtcursor, int remove)
 		if (cursor->config_overwrite)
 			break;
 
-		/*
-		 * If overwrite is false, check for no existing record in the
-		 * primary store, that's an error.
-		 */
+		/* If overwrite is false, no entry is an error. */
 		if ((ret = kvs_call(
-		    wtcursor, "kvs_get", ws->kvs, kvs_get)) != WT_NOTFOUND) {
-			if (ret == 0)
-				ret = WT_NOTFOUND;
+		    wtcursor, "kvs_get", ws->kvs, kvs_get)) != 0)
 			goto err;
-		}
 		break;
 	default:
 		goto err;
@@ -1181,6 +1318,26 @@ static int
 kvs_cursor_remove(WT_CURSOR *wtcursor)
 {
 	return (update(wtcursor, 1));
+}
+
+/*
+ * kvs_cursor_commit --
+ *	WT_CURSOR::commit method.
+ */
+static int
+kvs_cursor_commit(WT_CURSOR *wtcursor)
+{
+	return (txn_state_set(wtcursor, 1));
+}
+
+/*
+ * kvs_cursor_rollback --
+ *	WT_CURSOR::rollback method.
+ */
+static int
+kvs_cursor_rollback(WT_CURSOR *wtcursor)
+{
+	return (txn_state_set(wtcursor, 0));
 }
 
 /*
@@ -2082,15 +2239,23 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	}
 
 	/* Finish initializing the cursor. */
+	cursor->wtcursor.close = kvs_cursor_close;
+	cursor->wtcursor.insert = kvs_cursor_insert;
 	cursor->wtcursor.next = kvs_cursor_next;
 	cursor->wtcursor.prev = kvs_cursor_prev;
+	cursor->wtcursor.remove = kvs_cursor_remove;
 	cursor->wtcursor.reset = kvs_cursor_reset;
 	cursor->wtcursor.search = kvs_cursor_search;
 	cursor->wtcursor.search_near = kvs_cursor_search_near;
-	cursor->wtcursor.insert = kvs_cursor_insert;
 	cursor->wtcursor.update = kvs_cursor_update;
-	cursor->wtcursor.remove = kvs_cursor_remove;
-	cursor->wtcursor.close = kvs_cursor_close;
+
+	/*
+	 * XXX
+	 * The commit/rollback methods are private, which isn't right, but
+	 * they don't appear in anything other than data-source cursors.
+	 */
+	cursor->wtcursor.commit = kvs_cursor_commit;
+	cursor->wtcursor.rollback = kvs_cursor_rollback;
 
 	cursor->wtext = wtext;
 

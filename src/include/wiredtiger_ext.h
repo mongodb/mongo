@@ -328,13 +328,26 @@ struct __wt_extension_api {
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
-	 * @param [out] transaction_id the transaction ID
-	 * @errors
+	 * @returns the current transaction ID.
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION transaction ID
 	 */
-	int (*transaction_id)(WT_EXTENSION_API *wt_api,
-	    WT_SESSION *session, uint64_t *transaction_idp);
+	uint64_t (*transaction_id)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session);
+
+	/*!
+	 * Return if the current transaction is configured for snapshot
+	 * isolation.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @returns true (non-zero) if the current transaction is configured
+	 * for snapshot isolation.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction snapshot isolation
+	 */
+	int (*transaction_snapshot_isolation)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session);
 
 	/*!
 	 * Return if the current transaction can see the given transaction ID.

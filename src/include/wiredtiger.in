@@ -421,8 +421,13 @@ struct __wt_cursor {
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
-	/* Data source cursors have underlying application-owned cursors. */
+	/*
+	 * Data source cursors have underlying application-owned cursors,
+	 * with two additional methods, commit and rollback.
+	 */
 	WT_CURSOR *data_source;
+	int __F(commit)(WT_CURSOR *cursor);
+	int __F(rollback)(WT_CURSOR *cursor);
 
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_DUMP_HEX	0x0002
