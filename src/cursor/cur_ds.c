@@ -79,6 +79,9 @@ __curds_next(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
+	/* Check if we need an autocommit transaction. */
+	WT_ERR(__wt_txn_autocommit_check(session));
+
 	WT_ERR(cursor->data_source->next(cursor->data_source));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
@@ -98,6 +101,9 @@ __curds_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, prev, NULL);
+
+	/* Check if we need an autocommit transaction. */
+	WT_ERR(__wt_txn_autocommit_check(session));
 
 	WT_ERR(cursor->data_source->prev(cursor->data_source));
 	__curds_key_get(cursor);
@@ -137,6 +143,9 @@ __curds_search(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
+	/* Check if we need an autocommit transaction. */
+	WT_ERR(__wt_txn_autocommit_check(session));
+
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(cursor->data_source->search(cursor->data_source));
 	__curds_key_get(cursor);
@@ -158,6 +167,9 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
 
+	/* Check if we need an autocommit transaction. */
+	WT_ERR(__wt_txn_autocommit_check(session));
+
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(cursor->data_source->search_near(cursor->data_source, exact));
 	__curds_key_get(cursor);
@@ -178,6 +190,9 @@ __curds_insert(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
+
+	/* Check if we need an autocommit transaction. */
+	WT_ERR(__wt_txn_autocommit_check(session));
 
 	/* If not appending, we require a key. */
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
@@ -205,6 +220,9 @@ __curds_update(WT_CURSOR *cursor)
 
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 
+	/* Check if we need an autocommit transaction. */
+	WT_ERR(__wt_txn_autocommit_check(session));
+
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
 	WT_ERR(cursor->data_source->update(cursor->data_source));
@@ -224,6 +242,9 @@ __curds_remove(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
+
+	/* Check if we need an autocommit transaction. */
+	WT_ERR(__wt_txn_autocommit_check(session));
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(cursor->data_source->remove(cursor->data_source));
