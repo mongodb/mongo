@@ -939,13 +939,13 @@ namespace mutablebson {
         // The new element's left sibling is our left sibling.
         newRep.sibling.left = thisRep.sibling.left;
 
-        // The new element becomes our left sibling.
-        thisRep.sibling.left = e._repIdx;
-
         // If the new element has a left sibling after the adjustments above, then that left
         // sibling must be updated to have the new element as its right sibling.
         if (newRep.sibling.left != kInvalidRepIdx)
             impl.getElementRep(thisRep.sibling.left).sibling.right = e._repIdx;
+
+        // The new element becomes our left sibling.
+        thisRep.sibling.left = e._repIdx;
 
         // If we were our parent's left child, then we no longer are. Make the new right
         // sibling the right child.

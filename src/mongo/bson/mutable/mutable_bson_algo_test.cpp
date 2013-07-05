@@ -259,6 +259,41 @@ namespace {
         ASSERT_EQUALS(countChildren(threeChildren), 3u);
     }
 
+    TEST_F(CountTest, CountSiblingsNone) {
+        ConstElement current = findFirstChildNamed(doc().root(), "oneChild");
+        ASSERT_TRUE(current.ok());
+
+        current = current.leftChild();
+        ASSERT_TRUE(current.ok());
+
+        ASSERT_EQUALS(0U, countSiblingsLeft(current));
+        ASSERT_EQUALS(0U, countSiblingsRight(current));
+    }
+
+    TEST_F(CountTest, CountSiblingsMany) {
+        ConstElement current = findFirstChildNamed(doc().root(), "threeChildren");
+        ASSERT_TRUE(current.ok());
+
+        current = current.leftChild();
+        ASSERT_TRUE(current.ok());
+
+        ASSERT_EQUALS(0U, countSiblingsLeft(current));
+        ASSERT_EQUALS(2U, countSiblingsRight(current));
+
+        current = current.rightSibling();
+        ASSERT_TRUE(current.ok());
+        ASSERT_EQUALS(1U, countSiblingsLeft(current));
+        ASSERT_EQUALS(1U, countSiblingsRight(current));
+
+        current = current.rightSibling();
+        ASSERT_TRUE(current.ok());
+        ASSERT_EQUALS(2U, countSiblingsLeft(current));
+        ASSERT_EQUALS(0U, countSiblingsRight(current));
+
+        current = current.rightSibling();
+        ASSERT_FALSE(current.ok());
+    }
+
     TEST(DeduplicateTest, ManyDuplicates) {
         Document doc(mongo::fromjson("{ x : [ 1, 2, 2, 3, 3, 3, 4, 4, 4 ] }"));
         deduplicateChildren(doc.root().leftChild(), woEqual(false));
