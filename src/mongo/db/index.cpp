@@ -31,7 +31,6 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_update.h"
-#include "mongo/db/namespace-inl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/scopeguard.h"

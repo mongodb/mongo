@@ -26,7 +26,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_details.h"
-#include "mongo/db/namespace-inl.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {

@@ -22,7 +22,6 @@
 #include "mongo/client/constants.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace-inl.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {

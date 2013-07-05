@@ -14,14 +14,12 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/namespace_details.h"
 
 #include <algorithm>
 #include <list>
-
-#include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
@@ -76,29 +74,6 @@ namespace mongo {
         memset(_reserved, 0, sizeof(_reserved));
     }
 
-    bool NamespaceIndex::exists() const {
-        return !boost::filesystem::exists(path());
-    }
-
-    boost::filesystem::path NamespaceIndex::path() const {
-        boost::filesystem::path ret( dir_ );
-        if ( directoryperdb )
-            ret /= database_;
-        ret /= ( database_ + ".ns" );
-        return ret;
-    }
-
-    void NamespaceIndex::maybeMkdir() const {
-        if ( !directoryperdb )
-            return;
-        boost::filesystem::path dir( dir_ );
-        dir /= database_;
-        if ( !boost::filesystem::exists( dir ) )
-            MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
-    }
-
-    unsigned lenForNewNsFiles = 16 * 1024 * 1024;
-
 #if defined(_DEBUG)
     void NamespaceDetails::dump(const Namespace& k) {
         if( !cmdLine.dur )
@@ -124,72 +99,6 @@ namespace mongo {
     }
 #endif
 
-    NOINLINE_DECL void NamespaceIndex::_init() {
-        verify( !ht );
-
-        Lock::assertWriteLocked(database_);
-
-        /* if someone manually deleted the datafiles for a database,
-           we need to be sure to clear any cached info for the database in
-           local.*.
-        */
-        /*
-        if ( "local" != database_ ) {
-            DBInfo i(database_.c_str());
-            i.dbDropped();
-        }
-        */
-
-        unsigned long long len = 0;
-        boost::filesystem::path nsPath = path();
-        string pathString = nsPath.string();
-        void *p = 0;
-        if( boost::filesystem::exists(nsPath) ) {
-            if( f.open(pathString, true) ) {
-                len = f.length();
-                if ( len % (1024*1024) != 0 ) {
-                    log() << "bad .ns file: " << pathString << endl;
-                    uassert( 10079 ,  "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
-                }
-                p = f.getView();
-            }
-        }
-        else {
-            // use lenForNewNsFiles, we are making a new database
-            massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
-            maybeMkdir();
-            unsigned long long l = lenForNewNsFiles;
-            if( f.create(pathString, l, true) ) {
-                getDur().createdFile(pathString, l); // always a new file
-                len = l;
-                verify( len == lenForNewNsFiles );
-                p = f.getView();
-            }
-        }
-
-        if ( p == 0 ) {
-            /** TODO: this shouldn't terminate? */
-            log() << "error couldn't open file " << pathString << " terminating" << endl;
-            dbexit( EXIT_FS );
-        }
-
-
-        verify( len <= 0x7fffffff );
-        ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
-    }
-
-    static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
-        list<string> * l = (list<string>*)extra;
-        if ( ! k.hasDollarSign() )
-            l->push_back( (string)k );
-    }
-    void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
-        verify( onlyCollections ); // TODO: need to implement this
-        //                                  need boost::bind or something to make this less ugly
-
-        if ( ht )
-            ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
-    }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
@@ -477,55 +386,26 @@ namespace mongo {
         return cappedAlloc(ns,len);
     }
 
-    void NamespaceIndex::kill_ns(const char *ns) {
-        Lock::assertWriteLocked(ns);
-        if ( !ht )
-            return;
-        Namespace n(ns);
-        ht->kill(n);
-
-        for( int i = 0; i<=1; i++ ) {
-            try {
-                Namespace extra(n.extraName(i).c_str());
-                ht->kill(extra);
-            }
-            catch(DBException&) { 
-                dlog(3) << "caught exception in kill_ns" << endl;
-            }
-        }
-    }
-
-    void NamespaceIndex::add_ns(const char *ns, DiskLoc& loc, bool capped) {
-        NamespaceDetails details( loc, capped );
-        add_ns( ns, details );
-    }
-    void NamespaceIndex::add_ns( const char *ns, const NamespaceDetails &details ) {
-        Lock::assertWriteLocked(ns);
-        init();
-        Namespace n(ns);
-        uassert( 10081 , "too many namespaces/collections", ht->put(n, details));
-    }
-
-    /* extra space for indexes when more than 10 */
-    NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
-        Lock::assertWriteLocked(ns);
-        verify( i >= 0 && i <= 1 );
-        Namespace n(ns);
-        Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long
-
-        massert( 10350 ,  "allocExtra: base ns missing?", d );
-        massert( 10351 ,  "allocExtra: extra already exists", ht->get(extra) == 0 );
-
-        NamespaceDetails::Extra temp;
-        temp.init();
-        uassert( 10082 ,  "allocExtra: too many namespaces/collections", ht->put(extra, (NamespaceDetails&) temp));
-        NamespaceDetails::Extra *e = (NamespaceDetails::Extra *) ht->get(extra);
-        return e;
-    }
     NamespaceDetails::Extra* NamespaceDetails::allocExtra(const char *ns, int nindexessofar) {
+        Lock::assertWriteLocked(ns);
+
         NamespaceIndex *ni = nsindex(ns);
+
         int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
-        Extra *e = ni->newExtra(ns, i, this);
+        verify( i >= 0 && i <= 1 );
+
+        Namespace fullns(ns);
+        Namespace extrans(fullns.extraName(i)); // throws userexception if ns name too long
+
+        massert( 10350 ,  "allocExtra: base ns missing?", this );
+        massert( 10351 ,  "allocExtra: extra already exists", ni->details(extrans) == 0 );
+
+        Extra temp;
+        temp.init();
+
+        ni->add_ns( extrans, reinterpret_cast<NamespaceDetails*>( &temp ) );
+        Extra* e = reinterpret_cast<NamespaceDetails::Extra*>( ni->details( extrans ) );
+
         long ofs = e->ofsFrom(this);
         if( i == 0 ) {
             verify( _extraOffset == 0 );
@@ -1057,7 +937,7 @@ namespace mongo {
         NamespaceDetailsTransient::eraseCollection( from );
 
         NamespaceDetails *details = ni->details( from );
-        ni->add_ns( to, *details );
+        ni->add_ns( to, details );
         NamespaceDetails *todetails = ni->details( to );
         try {
             todetails->copyingFrom(to, details); // fixes extraOffset

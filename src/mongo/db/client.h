@@ -30,7 +30,6 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/lockstate.h"
-#include "mongo/db/namespace-inl.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/threadlocal.h"

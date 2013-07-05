@@ -60,3 +60,5 @@ namespace mongo {
 #pragma pack()
 
 } // namespace mongo
+
+#include "mongo/db/namespace-inl.h"

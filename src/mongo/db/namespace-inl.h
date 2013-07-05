@@ -1,4 +1,4 @@
-// @file namespace-inl.h
+// namespace-inl.h
 
 /**
 *    Copyright (C) 2009 10gen Inc.
@@ -17,8 +17,6 @@
 */
 
 #pragma once
-
-#include "mongo/db/namespace.h"
 
 namespace mongo {
 

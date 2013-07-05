@@ -1,4 +1,4 @@
-// @file namespace-inl.h
+// namespace_details-inl.h
 
 /**
 *    Copyright (C) 2009 10gen Inc.

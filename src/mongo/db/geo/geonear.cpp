@@ -32,7 +32,6 @@
 #include "mongo/db/index/s2_near_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
-#include "mongo/db/namespace-inl.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/platform/unordered_map.h"
 

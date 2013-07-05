@@ -24,7 +24,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/namespace-inl.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index.h"
 #include "mongo/db/commands.h"

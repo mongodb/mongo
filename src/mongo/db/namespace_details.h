@@ -27,8 +27,8 @@
 #include "mongo/db/namespace.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/querypattern.h"
+#include "mongo/db/storage/namespace_index.h"
 #include "mongo/platform/unordered_map.h"
-#include "mongo/util/hashtab.h"
 
 namespace mongo {
     class Database;
@@ -633,66 +633,6 @@ namespace mongo {
         }
         return make_inlock(ns);
     }
-
-    /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"
-       if you will: at least the core parts.  (Additional info in system.* collections.)
-    */
-    class NamespaceIndex {
-    public:
-        NamespaceIndex(const string &dir, const string &database) :
-            ht( 0 ), dir_( dir ), database_( database ) {}
-
-        /* returns true if new db will be created if we init lazily */
-        bool exists() const;
-
-        void init() {
-            if( !ht ) 
-                _init();
-        }
-
-        void add_ns(const char *ns, DiskLoc& loc, bool capped);
-        void add_ns( const char *ns, const NamespaceDetails &details );
-
-        NamespaceDetails* details(const StringData& ns) {
-            if ( !ht )
-                return 0;
-            Namespace n(ns);
-            NamespaceDetails *d = ht->get(n);
-            if ( d && d->isCapped() )
-                d->cappedCheckMigrate();
-            return d;
-        }
-
-        void kill_ns(const char *ns);
-
-        bool find(const char *ns, DiskLoc& loc) {
-            NamespaceDetails *l = details(ns);
-            if ( l ) {
-                loc = l->_firstExtent;
-                return true;
-            }
-            return false;
-        }
-
-        bool allocated() const { return ht != 0; }
-
-        void getNamespaces( list<string>& tofill , bool onlyCollections = true ) const;
-
-        NamespaceDetails::Extra* newExtra(const char *ns, int n, NamespaceDetails *d);
-
-        boost::filesystem::path path() const;
-
-        unsigned long long fileLength() const { return f.length(); }
-
-    private:
-        void _init();
-        void maybeMkdir() const;
-
-        MongoMMF f;
-        HashTable<Namespace,NamespaceDetails> *ht;
-        string dir_;
-        string database_;
-    };
 
     extern string dbpath; // --dbpath parm
     extern bool directoryperdb;

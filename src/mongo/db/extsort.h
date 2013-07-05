@@ -22,7 +22,6 @@
 
 #include "mongo/db/index.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace-inl.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/util/array.h"
 
