@@ -139,42 +139,74 @@ namespace {
         ASSERT_EQUALS(fieldRef.numReplaced(), 1U);
     }
 
-    TEST(Prefix, Normal) {
-        FieldRef prefix;
-        FieldRef other;
+    TEST( Prefix, Normal ) {
+        FieldRef prefix, base;
+        base.parse( "a.b.c" );
 
-        // Positive case
         prefix.parse( "a.b" );
-        other.parse( "a.b.c" );
-        ASSERT( prefix.isPrefixOf( other ) );
+        ASSERT_TRUE( prefix.isPrefixOf( base ) );
+
         prefix.parse( "a" );
-        ASSERT( prefix.isPrefixOf( other ) );
-        prefix.parse( "a.0" );
-        other.parse( "a.0.c" );
-        ASSERT( prefix.isPrefixOf( other ) );
-
-        // All these tests are for a prefix of "a.b" in other
-        // Negative cases
-        prefix.parse( "a.b" );
-        other.parse( "a.b" );
-        ASSERT( !prefix.isPrefixOf( other ) );
-        other.parse( "a" );
-        ASSERT( !prefix.isPrefixOf( other ) );
-        other.parse( "b" );
-        ASSERT( !prefix.isPrefixOf( other ) );
-        other.parse( "" );
-        ASSERT( !prefix.isPrefixOf( other ) );
-
-        // Change to no prefix, empty string, and other is "" also
-        prefix.parse( "" );
-        ASSERT( !prefix.isPrefixOf( other ) );
-
-        // Change other to "a", leave prefix at ""
-        other.parse( "a" );
-        ASSERT( !prefix.isPrefixOf( other ) );
+        ASSERT_TRUE( prefix.isPrefixOf( base ) );
     }
 
-    TEST(Equality, Simple1 ) {
+    TEST( Prefix, Dotted ) {
+        FieldRef prefix, base;
+        base.parse( "a.0.c" );
+        prefix.parse( "a.0" );
+        ASSERT_TRUE( prefix.isPrefixOf( base ) );
+    }
+
+    TEST( Prefix, NoPrefixes ) {
+        FieldRef prefix, base;
+        prefix.parse( "a.b" );
+        base.parse( "a.b" );
+        ASSERT_FALSE( prefix.isPrefixOf( base ) );
+
+        base.parse( "a" );
+        ASSERT_FALSE( prefix.isPrefixOf( base ) );
+
+        base.parse( "b" );
+        ASSERT_FALSE( prefix.isPrefixOf( base ) );
+    }
+
+    TEST( Prefix, EmptyBase ) {
+        FieldRef field, empty;
+        field.parse( "a" );
+        ASSERT_FALSE( field.isPrefixOf( empty ) );
+        ASSERT_FALSE( empty.isPrefixOf( field ) );
+        ASSERT_FALSE( empty.isPrefixOf( empty ) );
+    }
+
+    TEST( PrefixSize, Normal ) {
+        FieldRef fieldA, fieldB;
+        fieldA.parse( "a.b" );
+
+        fieldB.parse( "a" );
+        ASSERT_EQUALS( fieldA.commonPrefixSize( fieldB ), 1U );
+
+        fieldB.parse( "a.b" );
+        ASSERT_EQUALS( fieldA.commonPrefixSize( fieldB ), 2U );
+
+        fieldB.parse( "a.b.c" );
+        ASSERT_EQUALS( fieldA.commonPrefixSize( fieldB ), 2U );
+    }
+
+    TEST( PrefixSize, NoCommonatility ) {
+        FieldRef fieldA, fieldB;
+        fieldA.parse( "a" );
+        fieldB.parse( "b" );
+        ASSERT_EQUALS( fieldA.commonPrefixSize( fieldB ), 0U );
+    }
+
+    TEST( PrefixSize, Empty ) {
+        FieldRef fieldA, empty;
+        fieldA.parse( "a" );
+        ASSERT_EQUALS( fieldA.commonPrefixSize( empty ), 0U );
+        ASSERT_EQUALS( empty.commonPrefixSize( fieldA ), 0U );
+    }
+
+    TEST( Equality, Simple1 ) {
         FieldRef a;
         a.parse( "a.b" );
         ASSERT( a.equalsDottedField( "a.b" ) );
@@ -183,13 +215,58 @@ namespace {
         ASSERT( !a.equalsDottedField( "a.b.c" ) );
     }
 
-    TEST(Equality, Simple2 ) {
+    TEST( Equality, Simple2 ) {
         FieldRef a;
         a.parse( "a" );
         ASSERT( !a.equalsDottedField( "a.b" ) );
         ASSERT( a.equalsDottedField( "a" ) );
         ASSERT( !a.equalsDottedField( "b" ) );
         ASSERT( !a.equalsDottedField( "a.b.c" ) );
+    }
+
+    TEST( Comparison, BothEmpty ) {
+        FieldRef a;
+        ASSERT_TRUE( a == a );
+        ASSERT_FALSE( a != a );
+        ASSERT_FALSE( a < a );
+        ASSERT_TRUE( a <= a );
+        ASSERT_FALSE( a > a );
+        ASSERT_TRUE( a >= a );
+    }
+
+    TEST( Comparison, EqualInSize ) {
+        FieldRef a, b;
+        a.parse( "a.b.c" );
+        b.parse( "a.d.c" );
+        ASSERT_FALSE( a == b );
+        ASSERT_TRUE( a != b );
+        ASSERT_TRUE( a < b );
+        ASSERT_TRUE( a <= b );
+        ASSERT_FALSE( a > b );
+        ASSERT_FALSE( a >= b );
+    }
+
+    TEST( Comparison, NonEqual ) {
+        FieldRef a, b;
+        a.parse( "a.b.c" );
+        b.parse( "b.d" );
+        ASSERT_FALSE( a == b );
+        ASSERT_TRUE( a != b );
+        ASSERT_TRUE( a < b );
+        ASSERT_TRUE( a <= b );
+        ASSERT_FALSE( a > b );
+        ASSERT_FALSE( a >= b );
+    }
+
+    TEST( Comparison, MixedEmtpyAndNot ) {
+        FieldRef a, b;
+        a.parse( "a" );
+        ASSERT_FALSE( a == b );
+        ASSERT_TRUE( a != b );
+        ASSERT_FALSE( a < b );
+        ASSERT_FALSE( a <= b );
+        ASSERT_TRUE( a > b );
+        ASSERT_TRUE( a >= b );
     }
 
     TEST( DottedField, Simple1 ) {
@@ -205,4 +282,4 @@ namespace {
         ASSERT_EQUALS( "", a.dottedField(6) );
     }
 
-} // namespace mongo
+} // namespace

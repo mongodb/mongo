@@ -16,6 +16,8 @@
 
 #include "mongo/db/field_ref.h"
 
+#include <algorithm> // for min
+
 #include "mongo/util/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -94,11 +96,37 @@ namespace mongo {
         }
     }
 
-    void FieldRef::clear() {
-        _size = 0;
-        _variable.clear();
-        _fieldBase.reset();
-        _replacements.clear();
+    bool FieldRef::isPrefixOf( const FieldRef& other ) const {
+        // Can't be a prefix if the size is equal to or larger.
+        if ( _size >= other._size ) {
+            return false;
+        }
+
+        // Empty FieldRef is not a prefix of anything.
+        if ( _size == 0 ) {
+            return false;
+        }
+
+        size_t common = commonPrefixSize( other );
+        return common == _size && other._size > common;
+    }
+
+    size_t FieldRef::commonPrefixSize( const FieldRef& other ) const {
+        if (_size == 0 || other._size == 0) {
+            return 0;
+        }
+
+        size_t maxPrefixSize = std::min( _size-1, other._size-1 );
+        size_t prefixSize = 0;
+
+        while ( prefixSize <= maxPrefixSize ) {
+            if ( getPart( prefixSize ) != other.getPart( prefixSize ) ) {
+                break;
+            }
+            prefixSize++;
+        }
+
+        return prefixSize;
     }
 
     std::string FieldRef::dottedField( size_t offset ) const {
@@ -117,26 +145,8 @@ namespace mongo {
         return res;
     }
 
-    bool FieldRef::isPrefixOf( const FieldRef& other ) const {
-        // Can't be a prefix if equal to or larger
-        if ( other._size <= _size )
-            return false;
-
-        for ( size_t i = 0; i < _size; i++ ) {
-            // Get parts
-            StringData part = getPart( i );
-            StringData otherPart = other.getPart( i );
-
-            // If the parts are diff, can't be a prefix
-            if ( part != otherPart )
-                return false;
-        }
-        return true;
-    }
-
     bool FieldRef::equalsDottedField( const StringData& other ) const {
         StringData rest = other;
-
 
         for ( size_t i = 0; i < _size; i++ ) {
 
@@ -161,6 +171,34 @@ namespace mongo {
         return false;
     }
 
+    int FieldRef::compare(const FieldRef& other) const {
+        const size_t toCompare = std::min(_size, other._size);
+        for (size_t i = 0; i < toCompare; i++) {
+            if (getPart(i) == other.getPart(i)) {
+                continue;
+            }
+            return getPart(i) < other.getPart(i) ? -1 : 1;
+        }
+
+        const size_t rest = _size - toCompare;
+        const size_t otherRest = other._size - toCompare;
+        if ((rest == 0) && (otherRest == 0)) {
+            return 0;
+        }
+        else if (rest < otherRest ) {
+            return -1;
+        }
+        else {
+            return 1;
+        }
+    }
+
+    void FieldRef::clear() {
+        _size = 0;
+        _variable.clear();
+        _fieldBase.reset();
+        _replacements.clear();
+    }
 
     size_t FieldRef::numReplaced() const {
         size_t res = 0;
@@ -170,6 +208,10 @@ namespace mongo {
             }
         }
         return res;
+    }
+
+    std::ostream& operator<<(std::ostream& stream, const FieldRef& field) {
+        return stream << field.dottedField();
     }
 
 } // namespace mongo

@@ -17,6 +17,7 @@
 #pragma once
 
 #include <boost/scoped_array.hpp>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -63,10 +64,32 @@ namespace mongo {
         StringData getPart(size_t i) const;
 
         /**
+         * Returns true when 'this' FieldRef is a prefix of 'other'. Equality is not considered
+         * a prefix.
+         */
+        bool isPrefixOf( const FieldRef& other ) const;
+
+        /**
+         * Returns the number of field parts in the prefix that 'this' and 'other' share.
+         */
+        size_t commonPrefixSize( const FieldRef& other ) const;
+
+        /**
          * Returns a copy of the full dotted field in its current state (i.e., some parts may
          * have been replaced since the parse() call).
          */
         std::string dottedField( size_t offset = 0 ) const;
+
+        /**
+         * Compares the full dotted path represented by this FieldRef to other
+         */
+        bool equalsDottedField( const StringData& other ) const;
+
+        /**
+         * Return 0 if 'this' is equal to 'other' lexicographically, -1 if is it less than or
+         * +1 if it is greater than.
+         */
+        int compare( const FieldRef& other ) const;
 
         /**
          * Resets the internal state. See note in parse() call.
@@ -88,33 +111,12 @@ namespace mongo {
          */
         size_t numReplaced() const;
 
-        /**
-         * Compares the full dotted path represented by this FieldRef to other
-         */
-        bool equalsDottedField( const StringData& other ) const;
-
-        /**
-         * Compares the full dotted path represented by this FieldRef to other,
-         * and that we are a prefix of them.
-         *
-         * Returns true when 'this' is a prefix of 'other'; equality is not considered a prefix.
-         */
-        bool isPrefixOf( const FieldRef& other ) const;
-
     private:
-        // Dotted fields are most often not longer than three parts. We use a mixed structure
+        // Dotted fields are most often not longer than four parts. We use a mixed structure
         // here that will not require any extra memory allocation when that is the case. And
         // handle larger dotted fields if it is. The idea is not to penalize the common case
         // with allocations.
         static const size_t kReserveAhead = 4;
-
-        size_t _size;                                // # of field parts stored
-        StringData _fixed[kReserveAhead];            // first kResevedAhead field components
-        std::vector<StringData> _variable;           // remaining field components
-
-        // Areas that _fixed and _variable point to.
-        boost::scoped_array<char> _fieldBase;        // concatenation of null-terminated parts
-        std::vector<std::string> _replacements;      // added with the setPart call
 
         /** Converts the field part index to the variable part equivalent */
         size_t getIndex(size_t i) const { return i-kReserveAhead; }
@@ -125,10 +127,46 @@ namespace mongo {
          */
         size_t appendPart(const StringData& part);
 
+        // number of field parts stored
+        size_t _size;
+
+        // first kResevedAhead field components
+        StringData _fixed[kReserveAhead];
+
+         // remaining field components
+        std::vector<StringData> _variable;
+
+        // concatenation of null-terminated parts pointed to by _fixed and _variable
+        boost::scoped_array<char> _fieldBase;
+
+        // back memory added with the setPart call pointed to by _fized and _variable
+        std::vector<std::string> _replacements;
     };
 
     inline bool operator==(const FieldRef& lhs, const FieldRef& rhs) {
-        return lhs.equalsDottedField(rhs.dottedField());
+        return lhs.compare(rhs) == 0;
     }
+
+    inline bool operator!=(const FieldRef& lhs, const FieldRef& rhs) {
+        return lhs.compare(rhs) != 0;
+    }
+
+    inline bool operator<(const FieldRef& lhs, const FieldRef& rhs) {
+        return lhs.compare(rhs) < 0;
+    }
+
+    inline bool operator<=(const FieldRef& lhs, const FieldRef& rhs) {
+        return lhs.compare(rhs) <= 0;
+    }
+
+    inline bool operator>(const FieldRef& lhs, const FieldRef& rhs) {
+        return lhs.compare(rhs) > 0;
+    }
+
+    inline bool operator>=(const FieldRef& lhs, const FieldRef& rhs) {
+        return lhs.compare(rhs) >= 0;
+    }
+
+    std::ostream& operator<<(std::ostream& stream, const FieldRef& value);
 
 } // namespace mongo

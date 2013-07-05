@@ -40,5 +40,6 @@ error_code("RemoteChangeDetected", 36)
 error_code("FileRenameFailed", 37)
 error_code("FileNotOpen", 38)
 error_code("FileStreamFailed", 39)
+error_code("ConflictingUpdateOperators", 40)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

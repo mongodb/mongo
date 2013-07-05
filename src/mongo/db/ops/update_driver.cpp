@@ -20,6 +20,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/ops/modifier_interface.h"
 #include "mongo/db/ops/modifier_object_replace.h"
 #include "mongo/db/ops/modifier_table.h"
@@ -145,7 +146,10 @@ namespace mongo {
         // TODO: assert that update() is called at most once in a !_multi case.
 
         mutablebson::Document doc(oldObj);
+        FieldRefSet targetFields;
 
+        // Ask each of the mods to type check whether they can operate over the current document
+        // and, if so, to change that document accordingly.
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             ModifierInterface::ExecInfo execInfo;
             Status status = (*it)->prepare(doc.root(), matchedField, &execInfo);
@@ -153,21 +157,33 @@ namespace mongo {
                 return status;
             }
 
-            // TODO: gather the fields that each mod is interested on and check for conflicts.
-            // for (int i = 0; i < ModifierInterface::ExecInfo::MAX_NUM_FIELDS; i++) {
-            //     if (execInfo.fieldRef[i] == 0) {
-            //         break;
-            //     }
-            // }
+            // Gather which fields this mod is interested on and whether these fields were
+            // "taken" by previous mods.  Note that not all mods are multi-field mods. When we
+            // see an empty field, we may stop looking for others.
+            for (int i = 0; i < ModifierInterface::ExecInfo::MAX_NUM_FIELDS; i++) {
+                if (execInfo.fieldRef[i] == 0) {
+                    break;
+                }
+
+                const FieldRef* other;
+                if (!targetFields.insert(execInfo.fieldRef[i], &other)) {
+                    return Status(ErrorCodes::ConflictingUpdateOperators,
+                                  mongoutils::str::stream()
+                                      << "Cannot update '" << other->dottedField()
+                                      << "' and '" << execInfo.fieldRef[i]->dottedField()
+                                      << "' at the same time");
+                }
+            }
 
             if (!execInfo.noOp) {
-                status = (*it)->apply();
+                Status status = (*it)->apply();
                 if (!status.isOK()) {
                     return status;
                 }
             }
         }
 
+        // If we require a replication oplog entry for this update, go ahead and generate one.
         if (_logOp && logOpRec) {
             mutablebson::Document logDoc;
             for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
