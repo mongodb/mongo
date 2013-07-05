@@ -1169,11 +1169,9 @@ kvs_cursor_search(WT_CURSOR *wtcursor)
 	if ((ret = kvs_call(wtcursor, "kvs_get", ws->kvscache, kvs_get)) == 0) {
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			return (ret);
-		if (cache_value_visible(wtcursor, &cp)) {
-			if ((ret = copyout_val(wtcursor, cp)) != 0)
-				return (ret);
-			return (cp->remove ? WT_NOTFOUND : 0);
-		}
+		if (cache_value_visible(wtcursor, &cp))
+			return (cp->remove ?
+			    WT_NOTFOUND : copyout_val(wtcursor, cp));
 	}
 	if (ret != WT_NOTFOUND)
 		return (ret);
@@ -1181,9 +1179,8 @@ kvs_cursor_search(WT_CURSOR *wtcursor)
 	/* Check for an entry in the primary store. */
 	if ((ret = kvs_call(wtcursor, "kvs_get", ws->kvs, kvs_get)) != 0)
 		return (ret);
-	if ((ret = copyout_val(wtcursor, NULL)) != 0)
-		return (ret);
-	return (0);
+
+	return (copyout_val(wtcursor, NULL));
 }
 
 /*
