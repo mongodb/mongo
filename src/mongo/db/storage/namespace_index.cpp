@@ -33,9 +33,9 @@ namespace mongo {
     }
 
     NamespaceDetails* NamespaceIndex::details(const Namespace& ns) {
-        if ( !ht )
+        if ( !_ht )
             return 0;
-        NamespaceDetails *d = ht->get(ns);
+        NamespaceDetails *d = _ht->get(ns);
         if ( d && d->isCapped() )
             d->cappedCheckMigrate();
         return d;
@@ -54,20 +54,20 @@ namespace mongo {
     void NamespaceIndex::add_ns( const Namespace& ns, const NamespaceDetails* details ) {
         Lock::assertWriteLocked(ns.toString());
         init();
-        uassert( 10081 , "too many namespaces/collections", ht->put(ns, *details));
+        uassert( 10081 , "too many namespaces/collections", _ht->put(ns, *details));
     }
 
     void NamespaceIndex::kill_ns(const char *ns) {
         Lock::assertWriteLocked(ns);
-        if ( !ht )
+        if ( !_ht )
             return;
         Namespace n(ns);
-        ht->kill(n);
+        _ht->kill(n);
 
         for( int i = 0; i<=1; i++ ) {
             try {
                 Namespace extra(n.extraName(i));
-                ht->kill(extra);
+                _ht->kill(extra);
             }
             catch(DBException&) {
                 dlog(3) << "caught exception in kill_ns" << endl;
@@ -80,10 +80,10 @@ namespace mongo {
     }
 
     boost::filesystem::path NamespaceIndex::path() const {
-        boost::filesystem::path ret( dir_ );
+        boost::filesystem::path ret( _dir );
         if ( directoryperdb )
-            ret /= database_;
-        ret /= ( database_ + ".ns" );
+            ret /= _database;
+        ret /= ( _database + ".ns" );
         return ret;
     }
 
@@ -97,31 +97,31 @@ namespace mongo {
         verify( onlyCollections ); // TODO: need to implement this
         //                                  need boost::bind or something to make this less ugly
 
-        if ( ht )
-            ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
+        if ( _ht )
+            _ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
     }
 
     void NamespaceIndex::maybeMkdir() const {
         if ( !directoryperdb )
             return;
-        boost::filesystem::path dir( dir_ );
-        dir /= database_;
+        boost::filesystem::path dir( _dir );
+        dir /= _database;
         if ( !boost::filesystem::exists( dir ) )
             MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
     }
 
     NOINLINE_DECL void NamespaceIndex::_init() {
-        verify( !ht );
+        verify( !_ht );
 
-        Lock::assertWriteLocked(database_);
+        Lock::assertWriteLocked(_database);
 
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in
            local.*.
         */
         /*
-        if ( "local" != database_ ) {
-            DBInfo i(database_.c_str());
+        if ( "local" != _database ) {
+            DBInfo i(_database.c_str());
             i.dbDropped();
         }
         */
@@ -130,14 +130,14 @@ namespace mongo {
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
         void *p = 0;
-        if( boost::filesystem::exists(nsPath) ) {
-            if( f.open(pathString, true) ) {
-                len = f.length();
+        if ( boost::filesystem::exists(nsPath) ) {
+            if( _f.open(pathString, true) ) {
+                len = _f.length();
                 if ( len % (1024*1024) != 0 ) {
                     log() << "bad .ns file: " << pathString << endl;
                     uassert( 10079 ,  "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
                 }
-                p = f.getView();
+                p = _f.getView();
             }
         }
         else {
@@ -145,11 +145,11 @@ namespace mongo {
             massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
             maybeMkdir();
             unsigned long long l = lenForNewNsFiles;
-            if( f.create(pathString, l, true) ) {
+            if ( _f.create(pathString, l, true) ) {
                 getDur().createdFile(pathString, l); // always a new file
                 len = l;
                 verify( len == lenForNewNsFiles );
-                p = f.getView();
+                p = _f.getView();
             }
         }
 
@@ -161,7 +161,7 @@ namespace mongo {
 
 
         verify( len <= 0x7fffffff );
-        ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
+        _ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
     }
 
 

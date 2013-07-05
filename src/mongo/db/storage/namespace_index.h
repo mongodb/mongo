@@ -35,13 +35,13 @@ namespace mongo {
     class NamespaceIndex {
     public:
         NamespaceIndex(const std::string &dir, const std::string &database) :
-            ht( 0 ), dir_( dir ), database_( database ) {}
+            _ht( 0 ), _dir( dir ), _database( database ) {}
 
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
 
         void init() {
-            if( !ht )
+            if( !_ht )
                 _init();
         }
 
@@ -54,22 +54,22 @@ namespace mongo {
 
         void kill_ns(const char *ns);
 
-        bool allocated() const { return ht != 0; }
+        bool allocated() const { return _ht != 0; }
 
         void getNamespaces( std::list<std::string>& tofill , bool onlyCollections = true ) const;
 
         boost::filesystem::path path() const;
 
-        unsigned long long fileLength() const { return f.length(); }
+        unsigned long long fileLength() const { return _f.length(); }
 
     private:
         void _init();
         void maybeMkdir() const;
 
-        MongoMMF f;
-        HashTable<Namespace,NamespaceDetails> *ht;
-        std::string dir_;
-        std::string database_;
+        MongoMMF _f;
+        HashTable<Namespace,NamespaceDetails> *_ht;
+        std::string _dir;
+        std::string _database;
     };
 
 }
