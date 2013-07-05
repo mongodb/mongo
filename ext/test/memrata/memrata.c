@@ -41,26 +41,30 @@
  * Macros to output an error message and set or return an error.
  * Requires local variables:
  *	int ret;
+ *
+ * ESET: update an error value, handling more/less important errors.
+ * ERET: output a message and return the error.
+ * EMSG: output a message and set the local error value.
  */
-#undef	ERET
-#define	ERET(wtext, session, v, ...) do {				\
-	(void)								\
-	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
-	return (v);							\
-} while (0)
-#undef	ETRET
-#define	ETRET(a) do {							\
+#undef	ESET
+#define	ESET(a) do {							\
 	int __ret;							\
 	if ((__ret = (a)) != 0 &&					\
 	    (__ret == WT_PANIC ||					\
 	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
 		ret = __ret;						\
 } while (0)
-#undef	ESET
-#define	ESET(wtext, session, v, ...) do {				\
+#undef	ERET
+#define	ERET(wtext, session, v, ...) do {				\
 	(void)								\
 	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
-	ETRET(v);							\
+	return (v);							\
+} while (0)
+#undef	EMSG
+#define	EMSG(wtext, session, v, ...) do {				\
+	(void)								\
+	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
+	ESET(v);							\
 } while (0)
 
 /*
@@ -1134,7 +1138,7 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 
 	/* Push the record into the cache. */
 	if ((ret = kvs_set(ws->kvscache, &cursor->record)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_set: %s", kvs_strerror(ret));
 	ws->kvscache_inuse = 1;
 
@@ -1148,20 +1152,20 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	 */
 	if (cursor->config_overwrite) {
 		if ((ret = kvs_set(ws->kvs, &cursor->record)) != 0)
-			ESET(wtext, session, WT_ERROR,
+			EMSG(wtext, session, WT_ERROR,
 			    "kvs_set: %s", kvs_strerror(ret));
 	} else
 		if ((ret = kvs_add(ws->kvs, &cursor->record)) != 0) {
 			if (ret == KVS_E_KEY_EXISTS)
 				ret = WT_DUPLICATE_KEY;
 			else
-				ESET(wtext, session, WT_ERROR,
+				EMSG(wtext, session, WT_ERROR,
 				    "kvs_add: %s", kvs_strerror(ret));
 		}
 #endif
 
 	/* Discard the lock. */
-err:	ETRET(unlock(wtext, session, &ws->lock));
+err:	ESET(unlock(wtext, session, &ws->lock));
 
 	return (ret);
 }
@@ -1245,7 +1249,7 @@ update(WT_CURSOR *wtcursor, int remove_op)
 
 	/* Push the record into the cache. */
 	if ((ret = kvs_set(ws->kvscache, &cursor->record)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_set: %s", kvs_strerror(ret));
 	ws->kvscache_inuse = 1;
 
@@ -1283,7 +1287,7 @@ update(WT_CURSOR *wtcursor, int remove_op)
 #endif
 
 	/* Discard the lock. */
-err:	ETRET(unlock(wtext, session, &ws->lock));
+err:	ESET(unlock(wtext, session, &ws->lock));
 
 	return (ret);
 }
@@ -1469,7 +1473,7 @@ kvs_config_devices(WT_EXTENSION_API *wtext,
 	/* Set up the scan of the device list. */
 	if ((ret = wtext->config_scan_begin(
 	    wtext, session, orig->str, orig->len, &scan)) != 0) {
-		ESET(wtext, session, ret,
+		EMSG(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_begin: %s",
 		    wtext->strerror(ret));
 		goto err;
@@ -1495,13 +1499,13 @@ kvs_config_devices(WT_EXTENSION_API *wtext,
 		memcpy(argv[cnt], k.str, k.len);
 	}
 	if (ret != WT_NOTFOUND) {
-		ESET(wtext, session, ret,
+		EMSG(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_next: %s",
 		    wtext->strerror(ret));
 		goto err;
 	}
 	if ((ret = wtext->config_scan_end(wtext, scan)) != 0) {
-		ESET(wtext, session, ret,
+		EMSG(wtext, session, ret,
 		    "WT_EXTENSION_API::config_scan_end: %s",
 		    wtext->strerror(ret));
 		goto err;
@@ -1639,12 +1643,12 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 	int ret = 0;
 
 	if (ks->kvstxn != NULL && (ret = kvs_close(ks->kvstxn)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_close: %s.txn: %s", ks->name, kvs_strerror(ret));
 	ks->kvstxn = NULL;
 
 	if (ks->kvs_device != NULL && (ret = kvs_close(ks->kvs_device)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_close: %s: %s", ks->name, kvs_strerror(ret));
 	ks->kvs_device = NULL;
 
@@ -1696,7 +1700,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	    session, config, &device_list, &kvs_config, &flags)) != 0)
 		goto err;
 	if (device_list == NULL || device_list[0] == NULL) {
-		ESET(wtext, session, EINVAL, "kvs_open: no devices specified");
+		EMSG(wtext, session, EINVAL, "kvs_open: no devices specified");
 		goto err;
 	}
 	device_list_sort(device_list);
@@ -1728,7 +1732,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	ks->kvs_device =
 	    kvs_open(device_list, &kvs_config, flags | KVS_O_CREATE);
 	if (ks->kvs_device == NULL) {
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
 		goto err;
 	}
@@ -1748,7 +1752,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	 */
 	if ((ks->kvstxn =
 	    kvs_open_namespace(ks->kvs_device, "txn", KVS_O_CREATE)) == NULL) {
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_open_namespace: %s.txn: %s",
 		    ks->name, kvs_strerror(os_errno()));
 		goto err;
@@ -1756,7 +1760,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 
 	/* Push the change. */
 	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
 		goto err;
 	}
@@ -1771,11 +1775,11 @@ done:	*refp = ks;
 
 	if (0) {
 err:		if (locked)
-			ETRET(unlock(wtext, session, &ds->global_lock));
+			ESET(unlock(wtext, session, &ds->global_lock));
 	}
 
 	if (ks != NULL)
-		ETRET(kvs_source_close(wtext, session, ks));
+		ESET(kvs_source_close(wtext, session, ks));
 
 	if (device_list != NULL) {
 		for (p = device_list; *p != NULL; ++p)
@@ -1834,7 +1838,7 @@ ws_source_drop_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = ws_source_name(uri, suffix, &p, &buf)) != 0)
 		return (ret);
 	if ((ret = kvs_delete_namespace(kvs_device, p)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_delete_namespace: %s: %s", p, kvs_strerror(ret));
 
 	free(buf);
@@ -1864,7 +1868,7 @@ ws_source_rename_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if (ret == 0)
 		ret = ws_source_name(newuri, suffix, &pnew, &bufnew);
 	if (ret == 0 && (ret = kvs_rename_namespace(kvs_device, p, pnew)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_rename_namespace: %s: %s", p, kvs_strerror(ret));
 
 	free(buf);
@@ -1882,21 +1886,21 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 	int ret = 0;
 
 	if (ws->ref != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "%s: open object with %u open cursors being closed",
 		    ws->uri, ws->ref);
 
 	if (ws->kvs != NULL && (ret = kvs_close(ws->kvs)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_close: %s: %s", ws->uri, kvs_strerror(ret));
 	ws->kvs = NULL;
 	if (ws->kvscache != NULL && (ret = kvs_close(ws->kvscache)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_close: %s.cache: %s", ws->uri, kvs_strerror(ret));
 	ws->kvscache = NULL;
 
 	if (ws->lockinit)
-		ETRET(lock_destroy(wtext, session, &ws->lock));
+		ESET(lock_destroy(wtext, session, &ws->lock));
 
 	free(ws->uri);
 	free(ws);
@@ -1929,7 +1933,7 @@ ws_source_open_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = ws_source_name(uri, suffix, &p, &buf)) != 0)
 		return (ret);
 	if ((kvs = kvs_open_namespace(kvs_device, p, KVS_O_CREATE)) == NULL)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_open_namespace: %s: %s", p, kvs_strerror(os_errno()));
 	*kvsp = kvs;
 
@@ -1974,13 +1978,13 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 			/* Check to see if the object is busy. */
 			if (ws->ref != 0 && (flags & WS_SOURCE_OPEN_BUSY)) {
 				ret = EBUSY;
-				ETRET(unlock(wtext, session, &ds->global_lock));
+				ESET(unlock(wtext, session, &ds->global_lock));
 				return (ret);
 			}
 			/* Swap the global lock for an object lock. */
 			if (!(flags & WS_SOURCE_OPEN_GLOBAL)) {
 				ret = writelock(wtext, session, &ws->lock);
-				ETRET(unlock(wtext, session, &ds->global_lock));
+				ESET(unlock(wtext, session, &ds->global_lock));
 				if (ret != 0)
 					return (ret);
 			}
@@ -2013,7 +2017,7 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	    wtds, session, uri, "cache", ks->kvs_device, &ws->kvscache)) != 0)
 		goto err;
 	if ((ret = kvs_commit(ws->kvs)) != 0) {
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
 		goto err;
 	}
@@ -2031,14 +2035,14 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	ws = NULL;
 
 err:	if (ws != NULL)
-		ETRET(ws_source_close(wtext, session, ws));
+		ESET(ws_source_close(wtext, session, ws));
 
 	/*
 	 * If there was an error or our caller doesn't need the global lock,
 	 * release the global lock.
 	 */
 	if (!(flags & WS_SOURCE_OPEN_GLOBAL) || ret != 0)
-		ETRET(unlock(wtext, session, &ds->global_lock));
+		ESET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
 }
 
@@ -2203,7 +2207,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 	if ((ret = wtext->config_get(		/* Parse configuration */
 	    wtext, session, config, "append", &v)) != 0) {
-		ESET(wtext, session, ret,
+		EMSG(wtext, session, ret,
 		    "append configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
@@ -2211,14 +2215,14 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 	if ((ret = wtext->config_get(
 	    wtext, session, config, "overwrite", &v)) != 0) {
-		ESET(wtext, session, ret,
+		EMSG(wtext, session, ret,
 		    "overwrite configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
 
 	if ((ret = wtext->collator_config(wtext, session, config)) != 0) {
-		ESET(wtext, session, ret,
+		EMSG(wtext, session, ret,
 		    "collator configuration: %s", wtext->strerror(ret));
 		goto err;
 	}
@@ -2265,7 +2269,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 		if ((ret = wtext->config_strget(
 		    wtext, session, value, "key_format", &v)) != 0) {
-			ESET(wtext, session, ret,
+			EMSG(wtext, session, ret,
 			    "key_format configuration: %s",
 			    wtext->strerror(ret));
 			goto err;
@@ -2274,7 +2278,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 		if ((ret = wtext->config_strget(
 		    wtext, session, value, "value_format", &v)) != 0) {
-			ESET(wtext, session, ret,
+			EMSG(wtext, session, ret,
 			    "value_format configuration: %s",
 			    wtext->strerror(ret));
 			goto err;
@@ -2312,7 +2316,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 
 	if (0) {
 err:		if (ws != NULL && locked)
-			ETRET(unlock(wtext, session, &ws->lock));
+			ESET(unlock(wtext, session, &ws->lock));
 		if (cursor != NULL)
 			cursor_destroy(cursor);
 	}
@@ -2390,22 +2394,22 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 		}
 
 	/* Close the source, discarding the handles and structure. */
-	ETRET(ws_source_close(wtext, session, ws));
+	ESET(ws_source_close(wtext, session, ws));
 	ws = NULL;
 
 	/* Drop the underlying namespaces. */
-	ETRET(ws_source_drop_namespace(
+	ESET(ws_source_drop_namespace(
 	    wtds, session, uri, NULL, ks->kvs_device));
-	ETRET(ws_source_drop_namespace(
+	ESET(ws_source_drop_namespace(
 	    wtds, session, uri, "cache", ks->kvs_device));
 
 	/* Push the change. */
 	if ((ret = kvs_commit(ks->kvs_device)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
 
 	/* Discard the metadata entry. */
-	ETRET(master_uri_drop(wtds, session, uri));
+	ESET(master_uri_drop(wtds, session, uri));
 
 	/*
 	 * If we have an error at this point, panic -- there's an inconsistency
@@ -2414,7 +2418,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	if (ret != 0)
 		ret = WT_PANIC;
 
-	ETRET(unlock(wtext, session, &ds->global_lock));
+	ESET(unlock(wtext, session, &ds->global_lock));
 	return (ret);
 }
 
@@ -2456,18 +2460,18 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	copy = NULL;
 
 	/* Rename the underlying namespaces. */
-	ETRET(ws_source_rename_namespace(
+	ESET(ws_source_rename_namespace(
 	    wtds, session, uri, newuri, NULL, ks->kvs_device));
-	ETRET(ws_source_rename_namespace(
+	ESET(ws_source_rename_namespace(
 	    wtds, session, uri, newuri, "cache", ks->kvs_device));
 
 	/* Push the change. */
 	if ((ret = kvs_commit(ws->kvs)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
 
 	/* Update the metadata record. */
-	ETRET(master_uri_rename(wtds, session, uri, newuri));
+	ESET(master_uri_rename(wtds, session, uri, newuri));
 
 	/*
 	 * If we have an error at this point, panic -- there's an inconsistency
@@ -2476,7 +2480,7 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if (ret != 0)
 		ret = WT_PANIC;
 
-err:	ETRET(unlock(wtext, session, &ds->global_lock));
+err:	ESET(unlock(wtext, session, &ds->global_lock));
 
 	return (ret);
 }
@@ -2504,13 +2508,13 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 
 	/* Truncate the underlying namespaces. */
 	if ((ret = kvs_truncate(ws->kvs)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
 	if ((ret = kvs_truncate(ws->kvscache)) != 0)
-		ESET(wtext, session, WT_ERROR,
+		EMSG(wtext, session, WT_ERROR,
 		    "kvs_truncate: %s: %s", ws->uri, kvs_strerror(ret));
 
-	ETRET(unlock(wtext, session, &ws->lock));
+	ESET(unlock(wtext, session, &ws->lock));
 	return (ret);
 }
 
@@ -2555,22 +2559,22 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	/* Start a flush on any open KVS sources. */
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
 		if ((tret = kvs_commit(ks->kvs_device)) != 0)
-			ESET(wtext, session, WT_ERROR,
+			EMSG(wtext, session, WT_ERROR,
 			    "kvs_commit: %s", kvs_strerror(tret));
 
 	/* Close and discard all objects. */
 	while ((ks = ds->kvs_head) != NULL) {
 		while ((ws = ks->ws_head) != NULL) {
 			ks->ws_head = ws->next;
-			ETRET(ws_source_close(wtext, session, ws));
+			ESET(ws_source_close(wtext, session, ws));
 		}
 
 		ds->kvs_head = ks->next;
-		ETRET(kvs_source_close(wtext, session, ks));
+		ESET(kvs_source_close(wtext, session, ks));
 	}
 
-	ETRET(unlock(wtext, session, &ds->global_lock));
-	ETRET(lock_destroy(wtext, NULL, &ds->global_lock));
+	ESET(unlock(wtext, session, &ds->global_lock));
+	ESET(lock_destroy(wtext, NULL, &ds->global_lock));
 
 	free(ds);
 
@@ -2629,7 +2633,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 	if ((ret = connection->add_data_source(	/* Add the data source */
 	    connection, "memrata:", (WT_DATA_SOURCE *)ds, NULL)) != 0) {
-		ESET(wtext, NULL, ret,
+		EMSG(wtext, NULL, ret,
 		    "WT_CONNECTION.add_data_source: %s", wtext->strerror(ret));
 		goto err;
 	}
