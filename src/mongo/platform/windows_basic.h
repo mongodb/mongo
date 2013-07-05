@@ -56,6 +56,11 @@
 # ifndef NOMINMAX
 #  define NOMINMAX
 # endif
+
+// Do not complain that about standard library functions that Windows believes should have
+// underscores in front of them, such as unlink().
+#define _CRT_NONSTDC_NO_DEPRECATE
+
 // tell windows.h not to include a bunch of headers we don't need:
 # define WIN32_LEAN_AND_MEAN
 
