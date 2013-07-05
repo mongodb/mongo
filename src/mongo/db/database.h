@@ -46,7 +46,6 @@ namespace mongo {
         const string& name() const { return _name; }
         const string& path() const { return _path; }
 
-        void openAllFiles();
         void clearTmpCollections();
 
         /**
@@ -133,6 +132,13 @@ namespace mongo {
         void checkDuplicateUncasedNames(bool inholderlockalready) const;
 
         bool exists(int n) const;
+        void openAllFiles();
+
+        /**
+         * throws exception if error encounted
+         * @return true if the file was opened
+         *         false if no errors, but file doesn't exist
+         */
         bool openExistingFile( int n );
 
         const string _name; // "alleyinsider"
