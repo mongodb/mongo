@@ -247,6 +247,109 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 	return (0);
 }
 
+#if 0
+/*
+ * kvs_dump --
+ *	Dump the records in a KVS store.
+ */
+static void
+kvs_dump(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, kvs_t kvs, const char *tag)
+{
+	struct kvs_record *r, _r;
+	uint64_t recno;
+	size_t len, size;
+	uint8_t *p, key[256], val[256];
+
+	printf("== %s\n", tag);
+
+	r = &_r;
+	memset(r, 0, sizeof(*r));
+	r->key = key;
+	r->key_len = 0;
+	r->val = val;
+	r->val_len = sizeof(val);
+	while (kvs_next(kvs, r, 0UL, (unsigned long)sizeof(val)) == 0) {
+		p = r->key;
+		len = r->key_len;
+		(void)wtext->struct_unpack(wtext, session, p, 10, "r", &recno);
+		(void)wtext->struct_size(wtext, session, &size, "r", recno);
+		printf("\t%" PRIu64 ": ", recno);
+		printf("%.*s/%.*s\n",
+		    (int)(len - size), p + size,
+		    (int)r->val_len, (char *)r->val);
+
+		r->val_len = sizeof(val);
+	}
+}
+#endif
+
+/*
+ * kvs_call --
+ *	Call a KVS key retrieval function, handling overflow.
+ */
+static inline int
+kvs_call(WT_CURSOR *wtcursor, const char *fname, kvs_t kvs,
+    int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
+{
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	int ret = 0;
+	char *p;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
+	cursor->record.val = cursor->v;
+
+restart:
+	if ((ret = f(kvs, &cursor->record,
+	    0UL, (unsigned long)cursor->mem_len)) != 0) {
+		if (ret == KVS_E_KEY_NOT_FOUND)
+			return (WT_NOTFOUND);
+		ERET(wtext,
+		    session, WT_ERROR, "%s: %s", fname, kvs_strerror(ret));
+	}
+
+	/*
+	 * If the returned length is larger than our passed-in length, we didn't
+	 * get the complete value.  Grow the buffer and use kvs_get to complete
+	 * the retrieval (kvs_get because the call succeeded and the key was
+	 * copied out, so calling kvs_next/kvs_prev again would skip key/value
+	 * pairs).
+	 *
+	 * We have to loop, another thread of control might change the length of
+	 * the value, requiring we grow our buffer multiple times.
+	 *
+	 * We have to potentially restart the entire call in case the underlying
+	 * key/value disappears.
+	 */
+	for (;;) {
+		if (cursor->mem_len >= cursor->record.val_len) {
+			cursor->len = cursor->record.val_len;
+			return (0);
+		}
+
+		/* Grow the value buffer. */
+		if ((p =
+		    realloc(cursor->v, cursor->record.val_len + 32)) == NULL)
+			return (os_errno());
+		cursor->v = cursor->record.val = p;
+		cursor->mem_len = cursor->record.val_len + 32;
+
+		if ((ret = kvs_get(kvs, &cursor->record,
+		    0UL, (unsigned long)cursor->mem_len)) != 0) {
+			if (ret == KVS_E_KEY_NOT_FOUND)
+				goto restart;
+			ERET(wtext, session,
+			    WT_ERROR, "kvs_get: %s", kvs_strerror(ret));
+		}
+	}
+	/* NOTREACHED */
+}
+
 /*
  * txn_state_set --
  *	Resolve a transaction.
@@ -268,18 +371,21 @@ txn_state_set(WT_CURSOR *wtcursor, int commit)
 	wtext = cursor->wtext;
 	ks = cursor->ws->ks;
 
-	/* Get the transaction ID. */
-	txnid = wtext->transaction_id(wtext, session);
-
-	val = commit ? TXN_COMMITTED : TXN_ABORTED;
-
 	/* Update the store -- commits must be permanent, flush the device. */
+	memset(&txn, 0, sizeof(txn));
+
+	txnid = wtext->transaction_id(wtext, session);
 	txn.key = &txnid;
 	txn.key_len = sizeof(txnid);
+
+	val = commit ? TXN_COMMITTED : TXN_ABORTED;
 	txn.val = &val;
 	txn.val_len = 1;
-	if ((ret = kvs_set(ks->kvstxn, &txn)) != 0 ||
-	    (commit && (ret = kvs_commit(ks->kvs_device)) != 0))
+
+	if ((ret = kvs_set(ks->kvstxn, &txn)) != 0)
+		ERET(wtext, session,
+		    WT_ERROR, "kvs_set: %s", kvs_strerror(ret));
+	if (commit && (ret = kvs_commit(ks->kvs_device)) != 0)
 		ERET(wtext, session,
 		    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
 	return (0);
@@ -521,6 +627,178 @@ cache_value_update_check(WT_CURSOR *wtcursor)
 }
 
 /*
+ * cache_process --
+ *	Migrate information from the cache to the primary store.
+ */
+static int
+cache_process(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
+{
+	CACHE_RECORD *cp;
+	WT_CURSOR *wtcursor;
+	CURSOR *cursor, _cursor;
+	WT_SOURCE *ws;
+	uint64_t oldest, txnid;
+	u_int i;
+	int ret = 0, wslocked;
+
+	wslocked = 0;
+
+	memset(&_cursor, 0, sizeof(_cursor));		/* Fake a cursor. */
+	cursor = &_cursor;
+	cursor->wtext = wtext;
+	cursor->record.key = cursor->key;
+	if ((cursor->v = malloc(128)) == NULL)
+		return (os_errno());
+	cursor->mem_len = 128;
+
+	wtcursor = (WT_CURSOR *)cursor;
+	wtcursor->session = session;
+
+	/*
+	 * Get the oldest transaction ID not yet visible to a running
+	 * transaction.
+	 */
+	oldest = wtext->transaction_oldest(wtext, session);
+
+	/*
+	 * For every source object cache, copy the final value of all entries
+	 * where all of the updates are globally visible, to the primary store.
+	 */
+	for (ws = ks->ws_head; ws != NULL; ws = ws->next)
+		for (cursor->record.key_len = 0;
+		    (ret = kvs_call(wtcursor,
+		    "kvs_next", ws->kvscache, kvs_next)) == 0;) {
+			if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+				goto err;
+
+			/*
+			 * Compare the update's transaction ID and the oldest
+			 * known.  If there's an update a running transaction
+			 * might want, the entry has to remain in the cache.
+			 */
+			for (i = 0, cp = cursor->cache;
+			    i < cursor->cache_entries; ++i, ++cp)
+				if (cp->txnid >= oldest)
+					break;
+			if (i != cursor->cache_entries)
+				continue;
+
+			/* Reflect the most recent update into the primary. */
+			cp = &cursor->cache[cursor->cache_entries - 1];
+			if (cp->remove) {
+				if ((ret =
+				    kvs_del(ws->kvs, &cursor->record)) == 0)
+					continue;
+
+				/*
+				 * Updates confined to the cache may not appear
+				 * in the primary at all.
+				 */
+				if (ret == KVS_E_KEY_NOT_FOUND) {
+					ret = 0;
+					continue;
+				}
+				EMSG(wtext, session, WT_ERROR,
+				    "kvs_del: %s", kvs_strerror(ret));
+				goto err;
+			} else {
+				cursor->record.val = cp->v;
+				cursor->record.val_len = cp->len;
+				if ((ret =
+				    kvs_set(ws->kvs, &cursor->record)) == 0)
+					continue;
+				EMSG(wtext, session, WT_ERROR,
+				    "kvs_set: %s", kvs_strerror(ret));
+				goto err;
+			}
+		}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		goto err;
+
+	/* Push the primary store to stable storage for correctness. */
+	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
+		EMSG(wtext, session, WT_ERROR,
+		    "kvs_commit: %s", kvs_strerror(ret));
+		goto err;
+	}
+
+	/*
+	 * For every source object cache, remove all entries where every update
+	 * is globally visible.
+	 */
+	for (ws = ks->ws_head; ws != NULL; ws = ws->next) {
+		/* We're updating the cache, which requires a lock. */
+		if ((ret = writelock(wtext, session, &ws->lock)) != 0)
+			goto err;
+		wslocked = 1;
+
+		for (cursor->record.key_len = 0;
+		    (ret = kvs_call(
+		    wtcursor, "kvs_next", ws->kvscache, kvs_next)) == 0;) {
+			if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+				goto err;
+
+			/*
+			 * Compare the update's transaction ID and the oldest
+			 * known.  If there's an update a running transaction
+			 * might want, the entry has to remain in the cache.
+			 */
+			for (i = 0, cp = cursor->cache;
+			    i < cursor->cache_entries; ++i, ++cp)
+				if (cp->txnid >= oldest)
+					break;
+			if (i != cursor->cache_entries)
+				continue;
+
+			/* Remove the entry from the cache. */
+			if ((ret =
+			    kvs_del(ws->kvscache, &cursor->record)) != 0) {
+				EMSG(wtext, session, WT_ERROR,
+				    "kvs_del: %s", kvs_strerror(ret));
+				goto err;
+			}
+		}
+
+		wslocked = 0;
+		if ((ret = unlock(wtext, session, &ws->lock)) != 0)
+			goto err;
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		goto err;
+
+	/*
+	 * Remove all entries from the transaction start that are before the
+	 * oldest transaction ID.
+	 */
+	for (cursor->record.key_len = 0;
+	    (ret = kvs_call(
+	    wtcursor, "kvs_next", ks->kvstxn, kvs_next)) == 0;) {
+		memcpy(&txnid, cursor->key, sizeof(txnid));
+		if (txnid >= oldest)
+			continue;
+
+		if ((ret = kvs_del(ks->kvstxn, &cursor->record)) != 0) {
+			EMSG(wtext, session, WT_ERROR,
+			    "kvs_del: %s", kvs_strerror(ret));
+			goto err;
+		}
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		goto err;
+
+err:	if (wslocked)
+		ESET(unlock(wtext, session, &ws->lock));
+	free(cursor->v);
+	return (ret);
+}
+
+/*
  * copyin_key --
  *	Copy a WT_CURSOR key to a struct kvs_record key.
  */
@@ -650,109 +928,6 @@ copyout_val(WT_CURSOR *wtcursor, CACHE_RECORD *cp)
 		wtcursor->value.size = cp->len;
 	}
 	return (0);
-}
-
-#if 0
-/*
- * kvs_dump --
- *	Dump the records in the KVS store.
- */
-static void
-kvs_dump(
-    WT_EXTENSION_API *wtext, WT_SESSION *session, kvs_t kvs, const char *tag)
-{
-	struct kvs_record *r, _r;
-	uint64_t recno;
-	size_t len, size;
-	uint8_t *p, key[256], val[256];
-
-	printf("== %s\n", tag);
-
-	r = &_r;
-	memset(r, 0, sizeof(*r));
-	r->key = key;
-	r->key_len = 0;
-	r->val = val;
-	r->val_len = sizeof(val);
-	while (kvs_next(kvs, r, 0UL, (unsigned long)sizeof(val)) == 0) {
-		p = r->key;
-		len = r->key_len;
-		(void)wtext->struct_unpack(wtext, session, p, 10, "r", &recno);
-		(void)wtext->struct_size(wtext, session, &size, "r", recno);
-		printf("\t%" PRIu64 ": ", recno);
-		printf("%.*s/%.*s\n",
-		    (int)(len - size), p + size,
-		    (int)r->val_len, (char *)r->val);
-
-		r->val_len = sizeof(val);
-	}
-}
-#endif
-
-/*
- * kvs_call --
- *	Call a KVS key retrieval function, handling overflow.
- */
-static inline int
-kvs_call(WT_CURSOR *wtcursor, const char *fname, kvs_t kvs,
-    int (*f)(kvs_t, struct kvs_record *, unsigned long, unsigned long))
-{
-	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
-	WT_SESSION *session;
-	int ret = 0;
-	char *p;
-
-	session = wtcursor->session;
-	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
-
-	cursor->record.val = cursor->v;
-
-restart:
-	if ((ret = f(kvs, &cursor->record,
-	    0UL, (unsigned long)cursor->mem_len)) != 0) {
-		if (ret == KVS_E_KEY_NOT_FOUND)
-			return (WT_NOTFOUND);
-		ERET(wtext,
-		    session, WT_ERROR, "%s: %s", fname, kvs_strerror(ret));
-	}
-
-	/*
-	 * If the returned length is larger than our passed-in length, we didn't
-	 * get the complete value.  Grow the buffer and use kvs_get to complete
-	 * the retrieval (kvs_get because the call succeeded and the key was
-	 * copied out, so calling kvs_next/kvs_prev again would skip key/value
-	 * pairs).
-	 *
-	 * We have to loop, another thread of control might change the length of
-	 * the value, requiring we grow our buffer multiple times.
-	 *
-	 * We have to potentially restart the entire call in case the underlying
-	 * key/value disappears.
-	 */
-	for (;;) {
-		if (cursor->mem_len >= cursor->record.val_len) {
-			cursor->len = cursor->record.val_len;
-			return (0);
-		}
-
-		/* Grow the value buffer. */
-		if ((p =
-		    realloc(cursor->v, cursor->record.val_len + 32)) == NULL)
-			return (os_errno());
-		cursor->v = cursor->record.val = p;
-		cursor->mem_len = cursor->record.val_len + 32;
-
-		if ((ret = kvs_get(kvs, &cursor->record,
-		    0UL, (unsigned long)cursor->mem_len)) != 0) {
-			if (ret == KVS_E_KEY_NOT_FOUND)
-				goto restart;
-			ERET(wtext, session,
-			    WT_ERROR, "kvs_get: %s", kvs_strerror(ret));
-		}
-	}
-	/* NOTREACHED */
 }
 
 /*
@@ -2555,6 +2730,16 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	wtext = ds->wtext;
 
 	ret = writelock(wtext, session, &ds->global_lock);
+
+	/*
+	 * Resolve the cache into the primary.
+	 *
+	 * XXX
+	 * Once we have durable transactions inside WiredTiger, this call goes
+	 * somewhere else (probably a thread that periodically cleans up).
+	 */
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		ESET(cache_process(wtext, session, ks));
 
 	/* Start a flush on any open KVS sources. */
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
