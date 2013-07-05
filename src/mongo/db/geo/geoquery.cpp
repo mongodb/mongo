@@ -28,6 +28,19 @@ namespace mongo {
         // The CRS for the legacy points dictates that distances are in radians.
         fromRadians = (FLAT == centroid.crs);
 
+        if (!obj["minDistance"].eoo()) {
+            if (obj["minDistance"].isNumber()) {
+                double distArg = obj["minDistance"].number();
+                if (fromRadians) {
+                    minDistance = distArg * radius;
+                } else {
+                    minDistance = distArg;
+                }
+            } else {
+                return false;
+            }
+        }
+
         if (!obj["maxDistance"].eoo()) {
             if (obj["maxDistance"].isNumber()) {
                 double distArg = obj["maxDistance"].number();

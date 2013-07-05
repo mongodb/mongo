@@ -112,6 +112,75 @@ assert.eq(
         + n_bw500_and_1000_count
 );
 
+
+//
+// Test geoNear command with GeoJSON point.
+// Distances are in meters.
+//
+
+var cmdResult = db.runCommand({
+    geoNear: t.getName(),
+    near: {type: 'Point', coordinates: [0, 0]},
+    minDistance: 1400 * km,
+    spherical: true  // spherical required for 2dsphere index
+});
+assert.eq(
+    n_docs - n_docs_within(1400),
+    cmdResult.results.length,
+    "Expected " + (n_docs - n_docs_within(1400))
+        + " points geoNear (0, 0) with $minDistance 1400 km, got "
+        + cmdResult.results.length
+);
+
+cmdResult = db.runCommand({
+    geoNear: t.getName(),
+    near: {type: 'Point', coordinates: [0, 0]},
+    minDistance: 500 * km,
+    maxDistance: 1000 * km,
+    spherical: true
+});
+assert.eq(
+    n_docs_within(1000) - n_docs_within(500),
+    cmdResult.results.length,
+    "Expected " + (n_docs_within(1000) - n_docs_within(500))
+        + " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got "
+        + cmdResult.results.length
+);
+
+//
+// Test geoNear command with legacy point.
+// Distances are in radians.
+//
+
+cmdResult = db.runCommand({
+    geoNear: t.getName(),
+    near: legacyPoint,
+    minDistance: metersToRadians(1400 * km),
+    spherical: true  // spherical required for 2dsphere index
+});
+assert.eq(
+    n_docs - n_docs_within(1400),
+    cmdResult.results.length,
+    "Expected " + (n_docs - n_docs_within(1400))
+        + " points geoNear (0, 0) with $minDistance 1400 km, got "
+        + cmdResult.results.length
+);
+
+cmdResult = db.runCommand({
+    geoNear: t.getName(),
+    near: legacyPoint,
+    minDistance: metersToRadians(500 * km),
+    maxDistance: metersToRadians(1000 * km),
+    spherical: true
+});
+assert.eq(
+    n_docs_within(1000) - n_docs_within(500),
+    cmdResult.results.length,
+    "Expected " + (n_docs_within(1000) - n_docs_within(500))
+        + " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got "
+        + cmdResult.results.length
+);
+
 //
 // Test $minDistance input validation for $near and $nearSphere queries.
 //
