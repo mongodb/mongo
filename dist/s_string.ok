@@ -68,12 +68,15 @@ EB
 EBUSY
 EINTR
 EINVAL
+EMSG
 EMail
 ENOENT
 ENOMEM
 ENOTSUP
 ENV
 EOF
+ERET
+ESET
 ETIME
 ETIMEDOUT
 EXTLIST
@@ -808,6 +811,7 @@ unreferenced
 unsized
 untyped
 upd
+update's
 upg
 uri
 uri's
