@@ -731,6 +731,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	size_t size;
 	const char *tablename, *columns;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
+
 	WT_CLEAR(fmt);
 	WT_CLEAR(plan);
 	ctable = NULL;
@@ -788,7 +790,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		cursor->reset = __curtable_reset;
 	}
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
 	/*

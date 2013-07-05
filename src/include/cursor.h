@@ -48,7 +48,7 @@
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
 	0,				/* int saved_err */		\
-	NULL, NULL, NULL,		/* WT_DATA_SOURCE cursor */	\
+	NULL, NULL,			/* source commit, rollback */	\
 	0				/* uint32_t flags */		\
 }
 
@@ -200,6 +200,12 @@ struct __wt_cursor_bulk {
 
 struct __wt_cursor_config {
 	WT_CURSOR iface;
+};
+
+struct __wt_cursor_data_source {
+	WT_CURSOR iface;
+
+	WT_CURSOR *source;			/* Application-owned cursor. */
 };
 
 struct __wt_cursor_dump {

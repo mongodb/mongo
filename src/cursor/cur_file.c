@@ -299,6 +299,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	size_t csize;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
+
 	cbt = NULL;
 
 	btree = S2BT(session);
@@ -330,7 +332,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	}
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	WT_CSTAT_INCR(session, cursor_create);

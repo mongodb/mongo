@@ -30,14 +30,16 @@ __curds_txn_init(WT_SESSION_IMPL *session)
 int
 __wt_curds_txn_commit(WT_SESSION_IMPL *session)
 {
-	WT_CURSOR *cursor;
+	WT_CURSOR *cursor, *source;
 	WT_DECL_RET;
 
 	TAILQ_FOREACH(cursor, &session->cursors, q)
-		if (cursor->data_source != NULL &&
-		    cursor->data_source->commit != NULL)
-			WT_TRET(
-			    cursor->data_source->commit(cursor->data_source));
+		if (F_ISSET(cursor, WT_CURSTD_DATA_SOURCE)) {
+			source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+			if (source->commit != NULL)
+				WT_TRET(source->commit(source));
+		}
+
 	return (ret);
 }
 
@@ -48,14 +50,16 @@ __wt_curds_txn_commit(WT_SESSION_IMPL *session)
 int
 __wt_curds_txn_rollback(WT_SESSION_IMPL *session)
 {
-	WT_CURSOR *cursor;
+	WT_CURSOR *cursor, *source;
 	WT_DECL_RET;
 
 	TAILQ_FOREACH(cursor, &session->cursors, q)
-		if (cursor->data_source != NULL &&
-		    cursor->data_source->rollback != NULL)
-			WT_TRET(
-			    cursor->data_source->rollback(cursor->data_source));
+		if (F_ISSET(cursor, WT_CURSTD_DATA_SOURCE)) {
+			source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+			if (source->rollback != NULL)
+				WT_TRET(source->rollback(source));
+		}
+
 	return (ret);
 }
 
@@ -66,9 +70,13 @@ __wt_curds_txn_rollback(WT_SESSION_IMPL *session)
 static inline void
 __curds_key_get(WT_CURSOR *cursor)
 {
-	cursor->recno = cursor->data_source->recno;
-	cursor->key.data = cursor->data_source->key.data;
-	cursor->key.size = cursor->data_source->key.size;
+	WT_CURSOR *source;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
+	cursor->recno = source->recno;
+	cursor->key.data = source->key.data;
+	cursor->key.size = source->key.size;
 	F_CLR(cursor, WT_CURSTD_KEY_APP);
 	F_SET(cursor, WT_CURSTD_KEY_RET);
 }
@@ -80,8 +88,12 @@ __curds_key_get(WT_CURSOR *cursor)
 static inline void
 __curds_value_get(WT_CURSOR *cursor)
 {
-	cursor->value.data = cursor->data_source->value.data;
-	cursor->value.size = cursor->data_source->value.size;
+	WT_CURSOR *source;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
+	cursor->value.data = source->value.data;
+	cursor->value.size = source->value.size;
 	F_CLR(cursor, WT_CURSTD_VALUE_APP);
 	F_SET(cursor, WT_CURSTD_VALUE_RET);
 }
@@ -93,12 +105,16 @@ __curds_value_get(WT_CURSOR *cursor)
 static inline int
 __curds_key_set(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
 	WT_CURSOR_NEEDKEY(cursor);
-	cursor->data_source->recno = cursor->recno;
-	cursor->data_source->key.data = cursor->key.data;
-	cursor->data_source->key.size = cursor->key.size;
+
+	source->recno = cursor->recno;
+	source->key.data = cursor->key.data;
+	source->key.size = cursor->key.size;
 
 err:	return (ret);
 }
@@ -110,11 +126,15 @@ err:	return (ret);
 static inline int
 __curds_value_set(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
 	WT_CURSOR_NEEDVALUE(cursor);
-	cursor->data_source->value.data = cursor->value.data;
-	cursor->data_source->value.size = cursor->value.size;
+
+	source->value.data = cursor->value.data;
+	source->value.size = cursor->value.size;
 
 err:	return (ret);
 }
@@ -126,12 +146,15 @@ err:	return (ret);
 static int
 __curds_next(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
-	WT_ERR(cursor->data_source->next(cursor->data_source));
+	WT_ERR(source->next(source));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
@@ -146,14 +169,17 @@ err:	API_END(session);
 static int
 __curds_prev(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 
 	WT_ERR(__curds_txn_init(session));
 
-	WT_ERR(cursor->data_source->prev(cursor->data_source));
+	WT_ERR(source->prev(source));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
@@ -168,12 +194,15 @@ err:	API_END(session);
 static int
 __curds_reset(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	WT_ERR(cursor->data_source->reset(cursor->data_source));
+	WT_ERR(source->reset(source));
 
 err:	API_END(session);
 	return (ret);
@@ -186,15 +215,18 @@ err:	API_END(session);
 static int
 __curds_search(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
 	WT_ERR(__curds_txn_init(session));
 
 	WT_ERR(__curds_key_set(cursor));
-	WT_ERR(cursor->data_source->search(cursor->data_source));
+	WT_ERR(source->search(source));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
@@ -209,15 +241,18 @@ err:	API_END(session);
 static int
 __curds_search_near(WT_CURSOR *cursor, int *exact)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
 
 	WT_ERR(__curds_txn_init(session));
 
 	WT_ERR(__curds_key_set(cursor));
-	WT_ERR(cursor->data_source->search_near(cursor->data_source, exact));
+	WT_ERR(source->search_near(source, exact));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
@@ -232,8 +267,11 @@ err:	API_END(session);
 static int
 __curds_insert(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
 
@@ -243,7 +281,7 @@ __curds_insert(WT_CURSOR *cursor)
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
 		WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
-	WT_ERR(cursor->data_source->insert(cursor->data_source));
+	WT_ERR(source->insert(source));
 
 	/* If appending, we allocated a key. */
 	if (F_ISSET(cursor, WT_CURSTD_APPEND))
@@ -260,8 +298,11 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 static int
 __curds_update(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 
@@ -269,7 +310,7 @@ __curds_update(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
-	ret = cursor->data_source->update(cursor->data_source);
+	ret = source->update(source);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -282,15 +323,18 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 static int
 __curds_remove(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
 
 	WT_ERR(__curds_txn_init(session));
 
 	WT_ERR(__curds_key_set(cursor));
-	ret = cursor->data_source->remove(cursor->data_source);
+	ret = source->remove(source);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -303,13 +347,16 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 static int
 __curds_close(WT_CURSOR *cursor)
 {
+	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	if (cursor->data_source != NULL)
-		ret = cursor->data_source->close(cursor->data_source);
+	if (source != NULL)
+		ret = source->close(source);
 
 	/*
 	 * The key/value formats are in allocated memory, which isn't standard
@@ -348,16 +395,21 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	    __curds_remove,		/* remove */
 	    __curds_close);		/* close */
 	WT_CONFIG_ITEM cval;
-	WT_CURSOR *cursor, *dsc;
+	WT_CURSOR *cursor, *source;
+	WT_CURSOR_DATA_SOURCE *data_source;
 	WT_DECL_RET;
 	const char *metaconf;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_DATA_SOURCE, iface) == 0);
+
+	data_source = NULL;
 	metaconf = NULL;
 
-	/* Open the WiredTiger cursor. */
-	WT_RET(__wt_calloc_def(session, 1, &cursor));
+	WT_RET(__wt_calloc_def(session, 1, &data_source));
+	cursor = &data_source->iface;
 	*cursor = iface;
-	cursor->session = (WT_SESSION *)session;
+	cursor->session = &session->iface;
+	F_SET(cursor, WT_CURSTD_DATA_SOURCE);
 
 	/*
 	 * XXX
@@ -373,25 +425,22 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	WT_ERR(dsrc->open_cursor(dsrc,
-	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &dsc));
-	dsc->session = (WT_SESSION *)session;
-	memset(&dsc->q, 0, sizeof(dsc->q));
-	dsc->recno = 0;
-	memset(dsc->raw_recno_buf, 0, sizeof(dsc->raw_recno_buf));
-	memset(&dsc->key, 0, sizeof(dsc->key));
-	memset(&dsc->value, 0, sizeof(dsc->value));
-	memset(&dsc->saved_err, 0, sizeof(dsc->saved_err));
-	dsc->data_source = NULL;
-	memset(&dsc->flags, 0, sizeof(dsc->flags));
-
-	/* Reference the underlying application cursor. */
-	cursor->data_source = dsc;
+	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &data_source->source));
+	source = data_source->source;
+	source->session = (WT_SESSION *)session;
+	memset(&source->q, 0, sizeof(source->q));
+	source->recno = 0;
+	memset(source->raw_recno_buf, 0, sizeof(source->raw_recno_buf));
+	memset(&source->key, 0, sizeof(source->key));
+	memset(&source->value, 0, sizeof(source->value));
+	source->saved_err = 0;
+	source->flags = 0;
 
 	if (0) {
 err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
 			WT_TRET(cursor->close(cursor));
 		else
-			__wt_free(session, cursor);
+			__wt_free(session, data_source);
 	}
 
 	__wt_free(session, metaconf);

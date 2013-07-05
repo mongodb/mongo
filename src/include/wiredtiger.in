@@ -422,24 +422,24 @@ struct __wt_cursor {
 	int saved_err;			/* Saved error in set_{key,value}. */
 
 	/*
-	 * Data source cursors have underlying application-owned cursors,
-	 * with two additional methods, commit and rollback.
+	 * XXX
+	 * Two additional methods for data sources, commit and rollback.
 	 */
-	WT_CURSOR *data_source;
 	int __F(commit)(WT_CURSOR *cursor);
 	int __F(rollback)(WT_CURSOR *cursor);
 
 #define	WT_CURSTD_APPEND	0x0001
-#define	WT_CURSTD_DUMP_HEX	0x0002
-#define	WT_CURSTD_DUMP_PRINT	0x0004
-#define	WT_CURSTD_KEY_APP	0x0008
-#define	WT_CURSTD_KEY_RET	0x0010
+#define	WT_CURSTD_DATA_SOURCE	0x0002
+#define	WT_CURSTD_DUMP_HEX	0x0004
+#define	WT_CURSTD_DUMP_PRINT	0x0008
+#define	WT_CURSTD_KEY_APP	0x0010
+#define	WT_CURSTD_KEY_RET	0x0020
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_APP | WT_CURSTD_KEY_RET)
-#define	WT_CURSTD_OPEN		0x0020
-#define	WT_CURSTD_OVERWRITE	0x0040
-#define	WT_CURSTD_RAW		0x0080
-#define	WT_CURSTD_VALUE_APP	0x0100
-#define	WT_CURSTD_VALUE_RET	0x0200
+#define	WT_CURSTD_OPEN		0x0040
+#define	WT_CURSTD_OVERWRITE	0x0080
+#define	WT_CURSTD_RAW		0x0100
+#define	WT_CURSTD_VALUE_APP	0x0200
+#define	WT_CURSTD_VALUE_RET	0x0400
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_APP | WT_CURSTD_VALUE_RET)
 	uint32_t flags;
 #endif
