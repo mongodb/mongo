@@ -2554,7 +2554,7 @@ namespace QueryOptimizerCursorTests {
         public:
             void run() {
                 // Create a sparse index, so we can easily remove entries from it with an update.
-                _cli.insert( Namespace( ns() ).getSisterNS( "system.indexes" ).c_str(),
+                _cli.insert( NamespaceString( ns() ).getSystemIndexesCollection(),
                             BSON( "ns" << ns() << "key" << BSON( "a" << 1 ) << "name" << "idx" <<
                                  "sparse" << true ) );
 

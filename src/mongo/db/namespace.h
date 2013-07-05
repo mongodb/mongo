@@ -48,11 +48,6 @@ namespace mongo {
         string extraName(int i) const;
         bool isExtra() const; /* ends with $extr... -- when true an extra block not a normal NamespaceDetails block */
 
-        /** ( foo.bar ).getSisterNS( "blah" ) == foo.blah
-            perhaps this should move to the NamespaceString helper?
-         */
-        string getSisterNS( const char * local ) const;
-
         enum MaxNsLenValue { MaxNsLen = 128 };
     private:
         char buf[MaxNsLen];

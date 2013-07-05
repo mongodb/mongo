@@ -63,6 +63,13 @@ namespace mongo {
         bool operator!=( const string& nsIn ) const { return nsIn != _ns; }
         bool operator!=( const NamespaceString& nsIn ) const { return nsIn._ns != _ns; }
 
+        /** ( foo.bar ).getSisterNS( "blah" ) == foo.blah
+         */
+        string getSisterNS( const StringData& local ) const;
+
+        // @return db() + ".system.indexes"
+        string getSystemIndexesCollection() const;
+
         /**
          * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
          * which do not contain BSON objects in their records. ("oplog.$main" is the exception)

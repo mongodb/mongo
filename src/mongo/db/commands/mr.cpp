@@ -356,8 +356,8 @@ namespace mongo {
                     }
 
                     BSONObj indexToInsert = b.obj();
-                    Namespace tempNamespace(_config.tempNamespace.c_str());
-                    insert(tempNamespace.getSisterNS("system.indexes").c_str(), indexToInsert);
+                    NamespaceString tempNamespace(_config.tempNamespace);
+                    insert(tempNamespace.getSystemIndexesCollection(), indexToInsert);
                 }
 
             }

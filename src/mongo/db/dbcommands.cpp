@@ -913,7 +913,7 @@ namespace mongo {
                 BSONObj o = *i;
                 LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
                 string systemIndexesNs =
-                        Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" );
+                    NamespaceString( toDeleteNs ).getSystemIndexesCollection();
                 theDataFileMgr.insertWithObjMod( systemIndexesNs.c_str(), o, false, true );
             }
 

@@ -432,7 +432,8 @@ namespace mongo {
         massert( 13424, "collection must be capped", isCapped() );
         massert( 13425, "background index build in progress", !_indexBuildsInProgress );
 
-        vector<BSONObj> indexes = Helpers::findAll( Namespace( ns ).getSisterNS( "system.indexes" ) , BSON( "ns" << ns ) );
+        vector<BSONObj> indexes = Helpers::findAll( NamespaceString(ns).getSystemIndexesCollection(),
+                                                    BSON( "ns" << ns ) );
         for ( unsigned i=0; i<indexes.size(); i++ ) {
             indexes[i] = indexes[i].copy();
         }
@@ -486,7 +487,8 @@ namespace mongo {
         }
 
         for ( unsigned i=0; i<indexes.size(); i++ ) {
-            theDataFileMgr.insertWithObjMod(Namespace( ns ).getSisterNS( "system.indexes" ).c_str(),
+            string idxns = NamespaceString(ns).getSystemIndexesCollection();
+            theDataFileMgr.insertWithObjMod(idxns.c_str(),
                                             indexes[i],
                                             false,
                                             true);

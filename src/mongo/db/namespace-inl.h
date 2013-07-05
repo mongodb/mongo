@@ -58,13 +58,4 @@ namespace mongo {
         return (x & 0x7fffffff) | 0x8000000; // must be > 0
     }
 
-    /* future : this doesn't need to be an inline. */
-    inline string Namespace::getSisterNS( const char * local ) const {
-        verify( local && local[0] != '.' );
-        string old(buf);
-        if ( old.find( "." ) != string::npos )
-            old = old.substr( 0 , old.find( "." ) );
-        return old + "." + local;
-    }
-
 }  // namespace mongo

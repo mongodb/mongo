@@ -120,4 +120,14 @@ namespace mongo {
         return false;
     }
 
+    /* future : this doesn't need to be an inline. */
+    inline string NamespaceString::getSisterNS( const StringData& local ) const {
+        verify( local.size() && local[0] != '.' );
+        return db().toString() + "." + local.toString();
+    }
+
+    inline string NamespaceString::getSystemIndexesCollection() const {
+        return db().toString() + ".system.indexes";
+    }
+
 }

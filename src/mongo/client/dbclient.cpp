@@ -1184,9 +1184,8 @@ namespace mongo {
         say( toSend );
     }
 
-    
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
-        return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
+        return query( NamespaceString( ns ).getSystemIndexesCollection() , BSON( "ns" << ns ) );
     }
 
     void DBClientWithCommands::dropIndex( const string& ns , BSONObj keys ) {
@@ -1227,7 +1226,7 @@ namespace mongo {
 
         for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
             BSONObj o = *i;
-            insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , o );
+            insert( NamespaceString( ns ).getSystemIndexesCollection() , o );
         }
 
     }
@@ -1297,7 +1296,7 @@ namespace mongo {
         if ( ttl > 0 )
             toSave.append( "expireAfterSeconds", ttl );
 
-        insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes"  ).c_str() , toSave.obj() );
+        insert( NamespaceString( ns ).getSystemIndexesCollection() , toSave.obj() );
         return 1;
     }
 
