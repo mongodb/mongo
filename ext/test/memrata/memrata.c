@@ -103,10 +103,11 @@ typedef struct __kvs_source {
 
 	/*
 	 * Each underlying KVS source has a txn namespace which has the list of
-	 * active transactions with their committed or aborted state.
+	 * active transactions with their committed or aborted state as a value.
 	 */
-#define	TXN_ABORTED	0x01
-#define	TXN_COMMITTED	0x02
+#define	TXN_ABORTED	1
+#define	TXN_COMMITTED	2
+#define	TXN_UNRESOLVED	3
 	kvs_t kvstxn;				/* Underlying KVS txn store */
 
 	struct __wt_source *ws_head;		/* List of WiredTiger sources */
@@ -255,7 +256,7 @@ txn_state_set(WT_CURSOR *wtcursor, int commit)
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	uint64_t txnid;
-	uint8_t val_buf[32];
+	uint8_t val;
 	int ret = 0;
 
 	session = wtcursor->session;
@@ -266,12 +267,12 @@ txn_state_set(WT_CURSOR *wtcursor, int commit)
 	/* Get the transaction ID. */
 	txnid = wtext->transaction_id(wtext, session);
 
-	val_buf[0] = commit ? TXN_COMMITTED : TXN_ABORTED;
+	val = commit ? TXN_COMMITTED : TXN_ABORTED;
 
 	/* Update the store -- commits must be permanent, flush the device. */
 	txn.key = &txnid;
 	txn.key_len = sizeof(txnid);
-	txn.val = val_buf;
+	txn.val = &val;
 	txn.val_len = 1;
 	if ((ret = kvs_set(ks->kvstxn, &txn)) != 0 ||
 	    (commit && (ret = kvs_commit(ks->kvs_device)) != 0))
@@ -290,7 +291,7 @@ txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
 	struct kvs_record txn;
 	CURSOR *cursor;
 	KVS_SOURCE *ks;
-	uint8_t val_buf[32];
+	uint8_t val_buf[16];
 
 	cursor = (CURSOR *)wtcursor;
 	ks = cursor->ws->ks;
@@ -300,13 +301,9 @@ txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
 	txn.val = val_buf;
 	txn.val_len = sizeof(val_buf);
 
-	/*
-	 * We don't care if the transaction isn't resolved, we only care how it
-	 * might have been resolved.
-	 */
 	if (kvs_get(ks->kvstxn, &txn, 0UL, (unsigned long)sizeof(val_buf)) == 0)
 		return (val_buf[0]);
-	return (0);
+	return (TXN_UNRESOLVED);
 }
 
 /*
