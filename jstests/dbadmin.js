@@ -29,10 +29,10 @@ if ( localTimeSkew >= 50 ) {
 assert.lt( localTimeSkew, 500, "isMaster.localTime" )
 
 before = db.runCommand( "serverStatus" )
-print(before.uptimeEstimate);
+printjson(before);
 sleep( 5000 )
 after = db.runCommand( "serverStatus" )
-print(after.uptimeEstimate);
+printjson(after);
 assert.lt( 2 , after.uptimeEstimate , "up1" )
 assert.gt( after.uptimeEstimate , before.uptimeEstimate , "up2" )
 
