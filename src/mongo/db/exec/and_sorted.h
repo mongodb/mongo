@@ -75,7 +75,7 @@ namespace mongo {
 
         // Nodes we're moving forward until they hit the element we're AND-ing.
         // Everything in here has not advanced to _targetLoc yet.
-        queue<PlanStage*> _workingTowardRep;
+        std::queue<PlanStage*> _workingTowardRep;
 
         // If any child hits EOF or if we have any errors, we're EOF.
         bool _isEOF;
