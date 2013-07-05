@@ -20,6 +20,19 @@ __wt_ext_transaction_id(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session)
 }
 
 /*
+ * __wt_ext_transaction_oldest --
+ *	Return the oldest transaction ID not yet visible to a running
+ * transaction.
+ */
+uint64_t
+__wt_ext_transaction_oldest(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session)
+{
+	(void)wt_api;					/* Unused parameters */
+
+	return (S2C((WT_SESSION_IMPL *)wt_session)->txn_global.oldest_id);
+}
+
+/*
  * __wt_ext_transaction_snapshot_isolation --
  *	Return if the current transaction is configured for snapshot isolation.
  */

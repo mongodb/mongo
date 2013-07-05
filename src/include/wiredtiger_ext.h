@@ -336,6 +336,20 @@ struct __wt_extension_api {
 	    WT_SESSION *session);
 
 	/*!
+	 * Return the oldest transaction ID not yet visible to a running
+	 * transaction.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @returns the oldest transaction ID not yet visible to a running
+	 * transaction.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction oldest
+	 */
+	uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session);
+
+	/*!
 	 * Return if the current transaction is configured for snapshot
 	 * isolation.
 	 *
