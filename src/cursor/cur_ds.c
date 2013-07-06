@@ -8,19 +8,34 @@
 #include "wt_internal.h"
 
 /*
- * __curds_txn_init --
- *	Do any necessary initialization for a transaction's first operation.
+ * __curds_txn_enter --
+ *	Do transactional initialization when starting an operation.
  */
-static inline int
-__curds_txn_init(WT_SESSION_IMPL *session)
+static int
+__curds_txn_enter(WT_SESSION_IMPL *session, int update)
 {
-	/* Check if we need an autocommit transaction. */
-	WT_RET(__wt_txn_autocommit_check(session));
+	/* Check if we need to start an autocommit transaction. */
+	if (update)
+		WT_RET(__wt_txn_autocommit_check(session));
 
-	/* Note this transaction involves a data-source. */
+	if (session->ncursors++ == 0)			/* XXX */
+		__wt_txn_read_first(session);
+
+	/* This transaction involves a data-source. */
 	F_SET(&session->txn, TXN_DATA_SOURCE);
 
 	return (0);
+}
+
+/*
+ * __curds_txn_leave --
+ *	Do transactional cleanup when ending an operation.
+ */
+static void
+__curds_txn_leave(WT_SESSION_IMPL *session)
+{
+	if (--session->ncursors == 0)			/* XXX */
+		__wt_txn_read_last(session);
 }
 
 /*
@@ -175,11 +190,15 @@ __curds_next(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
+	WT_ERR(__curds_txn_enter(session, 0));
+
 	WT_ERR(source->next(source));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
-err:	API_END(session);
+err:	__curds_txn_leave(session);
+
+	API_END(session);
 	return (ret);
 }
 
@@ -198,13 +217,15 @@ __curds_prev(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 
-	WT_ERR(__curds_txn_init(session));
+	WT_ERR(__curds_txn_enter(session, 0));
 
 	WT_ERR(source->prev(source));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
-err:	API_END(session);
+err:	__curds_txn_leave(session);
+
+	API_END(session);
 	return (ret);
 }
 
@@ -244,14 +265,16 @@ __curds_search(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
-	WT_ERR(__curds_txn_init(session));
+	WT_ERR(__curds_txn_enter(session, 0));
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(source->search(source));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
-err:	API_END(session);
+err:	__curds_txn_leave(session);
+
+	API_END(session);
 	return (ret);
 }
 
@@ -270,14 +293,16 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
 
-	WT_ERR(__curds_txn_init(session));
+	WT_ERR(__curds_txn_enter(session, 0));
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(source->search_near(source, exact));
 	__curds_key_get(cursor);
 	__curds_value_get(cursor);
 
-err:	API_END(session);
+err:	__curds_txn_leave(session);
+
+	API_END(session);
 	return (ret);
 }
 
@@ -296,7 +321,7 @@ __curds_insert(WT_CURSOR *cursor)
 
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
 
-	WT_ERR(__curds_txn_init(session));
+	WT_ERR(__curds_txn_enter(session, 1));
 
 	/* If not appending, we require a key. */
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
@@ -308,7 +333,9 @@ __curds_insert(WT_CURSOR *cursor)
 	if (F_ISSET(cursor, WT_CURSTD_APPEND))
 		__curds_key_get(cursor);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	__curds_txn_leave(session);
+
+	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -327,13 +354,15 @@ __curds_update(WT_CURSOR *cursor)
 
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 
-	WT_ERR(__curds_txn_init(session));
+	WT_ERR(__curds_txn_enter(session, 1));
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
 	ret = source->update(source);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	__curds_txn_leave(session);
+
+	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -352,12 +381,14 @@ __curds_remove(WT_CURSOR *cursor)
 
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
 
-	WT_ERR(__curds_txn_init(session));
+	WT_ERR(__curds_txn_enter(session, 1));
 
 	WT_ERR(__curds_key_set(cursor));
 	ret = source->remove(source);
 
-err:	CURSOR_UPDATE_API_END(session, ret);
+err:	__curds_txn_leave(session);
+
+	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
