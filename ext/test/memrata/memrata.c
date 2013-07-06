@@ -1439,16 +1439,6 @@ update(WT_CURSOR *wtcursor, int remove_op)
 
 	return (0);
 
-	/*
-	 * WiredTiger's "remove" of a bitfield is really an update with a value
-	 * of a single byte of zero.
-	 */
-	if (ws->config_bitfield) {
-		wtcursor->value.size = 1;
-		wtcursor->value.data = "\0";
-		return (wtcursor->update(wtcursor));
-	}
-
 	if ((ret = copyin_key(wtcursor, 0)) != 0)
 		return (ret);
 	if ((ret = kvs_del(ws->kvs, &cursor->record)) == 0)
@@ -1481,6 +1471,21 @@ kvs_cursor_update(WT_CURSOR *wtcursor)
 static int
 kvs_cursor_remove(WT_CURSOR *wtcursor)
 {
+	CURSOR *cursor;
+	WT_SOURCE *ws;
+
+	cursor = (CURSOR *)wtcursor;
+	ws = cursor->ws;
+
+	/*
+	 * WiredTiger's "remove" of a bitfield is really an update with a value
+	 * of zero.
+	 */
+	if (ws->config_bitfield) {
+		wtcursor->value.size = 1;
+		wtcursor->value.data = "\0";
+		return (update(wtcursor, 0));
+	}
 	return (update(wtcursor, 1));
 }
 
