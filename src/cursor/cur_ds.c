@@ -465,7 +465,10 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 
 	/*
 	 * XXX
-	 * We'll need the object's key and value formats.
+	 * The underlying data-source may require the object's key and value
+	 * formats.  This isn't a particularly elegant way of getting that
+	 * information to the data-source, this feels like a layering problem
+	 * to me.
 	 */
 	WT_ERR(__wt_metadata_search(session, uri, &metaconf));
 	WT_ERR(__wt_config_getones(session, metaconf, "key_format", &cval));
