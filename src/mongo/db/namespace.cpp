@@ -16,18 +16,16 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-
-#include "mongo/db/namespace.h"
 
 #include <boost/static_assert.hpp>
 
+#include "mongo/db/namespace.h"
 #include "mongo/db/namespacestring.h"
 
 namespace mongo {
-namespace {
-BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
-BOOST_STATIC_ASSERT( Namespace::MaxNsLen == MaxDatabaseNameLen );
-}  // namespace
-}  // namespace mongo
+    namespace {
+        BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
+        BOOST_STATIC_ASSERT( Namespace::MaxNsLen == MaxDatabaseNameLen );
+    }
+}
 
