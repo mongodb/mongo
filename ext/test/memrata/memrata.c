@@ -921,8 +921,8 @@ copyout_val(WT_CURSOR *wtcursor, CACHE_RECORD *cp)
 	r = &cursor->record;
 
 	if (cp == NULL) {
-		wtcursor->value.data = r->val;
-		wtcursor->value.size = (uint32_t)r->val_len;
+		wtcursor->value.data = cursor->v;
+		wtcursor->value.size = (uint32_t)cursor->len;
 	} else {
 		wtcursor->value.data = cp->v;
 		wtcursor->value.size = cp->len;
