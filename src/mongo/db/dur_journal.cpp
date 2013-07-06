@@ -28,7 +28,6 @@
 #include "mongo/db/dur_journalformat.h"
 #include "mongo/db/dur_journalimpl.h"
 #include "mongo/db/dur_stats.h"
-#include "mongo/db/namespace.h"
 #include "mongo/platform/random.h"
 #include "mongo/server.h"
 #include "mongo/util/alignedbuilder.h"

@@ -23,13 +23,10 @@
 
 #pragma once
 
-#include "../db/namespace.h"
-#include "../client/model.h"
 #include "mongo/client/dbclient_rs.h"
-
-#include "chunk.h"
-#include "shard.h"
-#include "shardkey.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/shardkey.h"
 
 namespace mongo {
 

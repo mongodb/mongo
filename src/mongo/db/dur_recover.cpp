@@ -36,7 +36,6 @@
 #include "mongo/db/durop.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/mongommf.h"
-#include "mongo/db/namespace.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
