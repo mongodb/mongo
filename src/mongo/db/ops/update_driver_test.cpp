@@ -29,6 +29,7 @@ namespace {
         UpdateDriver driver(opts);
         ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}")));
         ASSERT_EQUALS(driver.numMods(), 1U);
+        ASSERT_TRUE(driver.dollarModMode());
     }
 
     TEST(Parse, MultiMods) {
@@ -36,18 +37,46 @@ namespace {
         UpdateDriver driver(opts);
         ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}")));
         ASSERT_EQUALS(driver.numMods(), 2U);
+        ASSERT_TRUE(driver.dollarModMode());
     }
 
-    TEST(Parse, EmptyMods) {
+    TEST(Parse, MixingMods) {
         UpdateDriver::Options opts;
         UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{$set:{}}")));
+        ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}")));
+        ASSERT_EQUALS(driver.numMods(), 2U);
+        ASSERT_TRUE(driver.dollarModMode());
+    }
+
+    TEST(Parse, ObjectReplacment) {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}")));
+        ASSERT_FALSE(driver.dollarModMode());
+    }
+
+    TEST(Parse, EmptyMod) {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        ASSERT_NOT_OK(driver.parse(fromjson("{$set:{}}")));
+    }
+
+    TEST(Parse, WrongMod) {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        ASSERT_NOT_OK(driver.parse(fromjson("{$xyz:{a:1}}")));
     }
 
     TEST(Parse, WrongType) {
         UpdateDriver::Options opts;
         UpdateDriver driver(opts);
-        ASSERT_OK(driver.parse(fromjson("{$set:[{a:1}]}")));
+        ASSERT_NOT_OK(driver.parse(fromjson("{$set:[{a:1}]}")));
+    }
+
+    TEST(Parse, ModsWithLaterObjReplacement)  {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        ASSERT_NOT_OK(driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}")));
     }
 
     TEST(Parse, PushAll) {

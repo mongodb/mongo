@@ -65,6 +65,8 @@ namespace mongo {
 
         size_t numMods() const;
 
+        bool dollarModMode() const;
+
         bool multi() const;
         void setMulti(bool multi);
 
@@ -87,6 +89,9 @@ namespace mongo {
 
         // Should this driver generate an oplog record when it applies the update?
         bool _logOp;
+
+        // Is there a list of $mod's on '_mods' or is it just full object replacement?
+        bool _dollarModMode;
 
         // Collection of update mod instances. Owned here.
         vector<ModifierInterface*> _mods;

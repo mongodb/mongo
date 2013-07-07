@@ -33,6 +33,7 @@
 #include "mongo/db/record.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/platform/unordered_set.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -486,14 +487,25 @@ namespace mongo {
 
         // TODO
         // + Separate UpdateParser from UpdateRunner (the latter should be "stage-y")
-        // + fast path for update for query by _id
-        // + $atomic support (or better, support proper yielding if not)
-        // + define the dedup story (and do it here, if that's the decidion)
-        // + support in-place updates (and determination if indices are involved in an update)
-        // + update OpDebug counters properly
-        // + specific paths set on insert
-        // + support for relaxing viable path constraint in replication
-        // + set UpdateResponse properly
+        //   + All the yield and deduplicate logic would move to the query stage
+        //     portion of it
+        //
+        // + Replication related
+        //   + fast path for update for query by _id
+        //   + support for relaxing viable path constraint in replication
+        //
+        // + In Place
+        //   + collect damage vector and apply it insetad of calling disk
+        //   + support for determining if updates affects an index (pre-req for in place)
+        //
+        // + Missing ops
+        //   + specific paths set on insert
+        //
+        // + Yiedling related
+        //   + $atomic support (or better, support proper yielding if not)
+        //   + page fault support
+
+        debug.updateobj = updateobj;
 
         UpdateDriver::Options opts;
         opts.multi = multi;
@@ -509,18 +521,39 @@ namespace mongo {
         NamespaceDetails* d = nsdetails(ns); // can be null if an upsert...
         NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get(ns);
 
+        // The 'cursor' the optimizer gave us may contain query plans that generate duplicate
+        // diskloc's. We set up here the mechanims that will prevent us from processing those
+        // twice if we see them. We also set up a 'ClientCursor' so that we can support
+        // yielding.
+        const bool dedupHere = cursor->autoDedup();
+        shared_ptr<Cursor> cPtr = cursor;
+        auto_ptr<ClientCursor> clientCursor( new ClientCursor( QueryOption_NoCursorTimeout,
+                                                               cPtr,
+                                                               ns ) );
+
+        //
+        // Upsert Logic
+        //
+
         // We may or may not have documents for this update. If we don't, then try to upsert,
         // if allowed.
         if ( !cursor->ok() && upsert ) {
 
-            // If this is not a full object replace, we need to generate a document by
-            // examining the query. Otherwise, we can use the replacement object itself.
+            // If this is a $mod base update, we need to generate a document by examining the
+            // query and the mods. Otherwise, we can use the object replacement sent by the user
+            // update command that was parsed by the driver before.
             BSONObj oldObj;
             if ( *updateobj.firstElementFieldName() == '$' ) {
                 if ( !driver.createFromQuery( patternOrig, &oldObj ) ) {
                     uasserted( 16835, "cannot create object to update" );
                 }
+                debug.fastmodinsert = true;
+
                 // TODO this is the hook for activating a $setOnInsert
+
+            }
+            else {
+                debug.upsert = true;
             }
 
             // Since this is an upsert, we will be oplogging it as an insert. We don't
@@ -539,30 +572,91 @@ namespace mongo {
                 logOp( "i", ns, newObj, 0, 0, fromMigrate, &newObj );
             }
 
-            return UpdateResult( false, false, 0, BSONObj() );
+            return UpdateResult( false /* updated a non existing document */,
+                                 driver.dollarModMode() /* $mod or obj replacement? */,
+                                 1 /* count of updated documents */,
+                                 newObj /* object that was upserted */ );
         }
 
-        // We have documents for this update. Let's fetch each of them and pipe them through
-        // the update expression.
+        //
+        // We have one or more documents for this update.
+        //
+
+        // Let's fetch each of them and pipe them through the update expression, making sure to
+        // keep track of the necessary stats. Recall that we'll be pulling documents out of
+        // cursors and some of them do not deduplicate the entries they generate. We have
+        // deduping logic in here, too -- for now.
+        unordered_set<DiskLoc, DiskLoc::Hasher> seenLocs;
+        int numUpdated = 0;
+        debug.nscanned = 0;
         while ( cursor->ok() ) {
 
-            // Get Obj and match details
+            // Let's fetch the next candidate object for this update.
             Record* r = cursor->_current();
             DiskLoc loc = cursor->currLoc();
             const BSONObj oldObj = loc.obj();
 
+            // We count how many documents we scanned even though we may skip those that are
+            // deemed duplicated. The final 'numUpdated' and 'nscanned' numbers may differ for
+            // that reason.
+            debug.nscanned++;
 
-            // Skip documents that don't match. Also, we don't want to update the very object
-            // atop of which the cursor is, becuase that document may move. So we advance the
-            // cursor before operating on the record.
+            // Skips this document if it:
+            // a) doesn't match the query portion of the update
+            // b) was deemed duplicate by the underlying cursor machinery
+            //
+            // Now, if we are going to update the document,
+            // c) we don't want to do so while the cursor is at it, as that may invalidate
+            // the cursor. So, we advance to next document, before issuing the update.
             MatchDetails matchDetails;
             matchDetails.requestElemMatchKey();
             if ( !cursor->currentMatches( &matchDetails ) ) {
+                // a)
                 cursor->advance();
                 continue;
             }
-            else if (multi) {
+            else if ( cursor->getsetdup( loc ) && dedupHere ) {
+                // b)
                 cursor->advance();
+                continue;
+            }
+            else if (driver.dollarModMode() && multi) {
+                // c)
+                cursor->advance();
+                if ( dedupHere ) {
+                    if ( seenLocs.count( loc ) ) {
+                        continue;
+                    }
+                }
+
+                // There are certain kind of cursors that hold multiple pointers to data
+                // underneath. $or cursors is one example. In a $or cursor, it may be the case
+                // that when we did the last advance(), we finished consuming documents from
+                // one of $or child and started consuming the next one. In that case, it is
+                // possible that the last document of the previous child is the same as the
+                // first document of the next (see SERVER-5198 and jstests/orp.js).
+                //
+                // So we advance the cursor here until we see a new diskloc.
+                //
+                // Note that we won't be yielding, and we may not do so for a while if we find
+                // a particularly duplicated sequence of loc's. That is highly unlikely,
+                // though.  (See SERVER-5725, if curious, but "stage" based $or will make that
+                // ticket moot).
+                while( cursor->ok() && loc == cursor->currLoc() ) {
+                    cursor->advance();
+                }
+            }
+
+            // For some (unfortunate) historical reasons, not all cursors would be valid after
+            // a write simply because we advanced them to a document not affected by the write.
+            // To protect in those cases, not only we engaged in the advance() logic above, but
+            // we also tell the cursor we're about to write a document that we've just seen.
+            // prepareToTouchEarlierIterate() requires calling later
+            // recoverFromTouchingEarlierIterate(), so we make a note here to do so.
+            bool touchPreviousDoc = multi && cursor->ok();
+            if ( touchPreviousDoc  ) {
+                clientCursor->setDoingDeletes( true );
+                cursor->prepareToTouchEarlierIterate();
             }
 
             BSONObj newObj;
@@ -573,14 +667,24 @@ namespace mongo {
             }
 
             // Write Obj
-            theDataFileMgr.updateRecord(ns,
-                                        d,
-                                        nsdt,
-                                        r,
-                                        loc,
-                                        newObj.objdata(),
-                                        newObj.objsize(),
-                                        debug);
+            DiskLoc newLoc = theDataFileMgr.updateRecord(ns,
+                                                         d,
+                                                         nsdt,
+                                                         r,
+                                                         loc,
+                                                         newObj.objdata(),
+                                                         newObj.objsize(),
+                                                         debug);
+
+            // If we've moved this object to a new location, make sure we don't apply
+            // that update again if our traversal picks the objecta again.
+            //
+            // TODO: we also want to note the diskloc if the updates are affecting indices.
+            // Changes are that we're traversing one of them and they may be multi key and
+            // therefore duplicate disklocs.
+            if ( newLoc != loc /* TODO || modsIsIndexed ?? */ ) {
+                seenLocs.insert( newLoc );
+            }
 
             // Log Obj
             if ( logop ) {
@@ -590,14 +694,27 @@ namespace mongo {
                 }
             }
 
-            getDur().commitIfNeeded();
+            // One more document updated.
+            numUpdated++;
 
             if (!multi) {
                 break;
             }
+
+            // If we used the cursor mechanism that prepares an earlier seen document for a
+            // write we need to tell such mechanisms that the write is over.
+            if ( touchPreviousDoc ) {
+                cursor->recoverFromTouchingEarlierIterate();
+            }
+
+            getDur().commitIfNeeded();
+
         }
 
-        return UpdateResult( false, false, 0, BSONObj() );
+        return UpdateResult( true /* updated existing object(s) */,
+                             driver.dollarModMode() /* $mod or obj replacement */,
+                             numUpdated /* # of docments update */,
+                             BSONObj() );
     }
 
     UpdateResult updateObjects( const char* ns,

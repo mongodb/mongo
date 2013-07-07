@@ -62,6 +62,9 @@ namespace mongo {
 
             _mods.push_back(mod.release());
 
+            // Register the fact that this driver will only do full object replacements.
+            _dollarModMode = false;
+
             return Status::OK();
         }
 
@@ -71,9 +74,20 @@ namespace mongo {
         while (outerIter.more()) {
             BSONElement outerModElem = outerIter.next();
 
+            // Check whether this is a valid mod type.
             modifiertable::ModifierType modType = modifiertable::getType(outerModElem.fieldName());
             if (modType == modifiertable::MOD_UNKNOWN) {
-                return Status(ErrorCodes::FailedToParse, "wrong modifier type");
+                return Status(ErrorCodes::FailedToParse, "unknown modifier type");
+            }
+
+            // Check whether there is indeed a list of mods under this modifier.
+            if (outerModElem.type() != Object) {
+                return Status(ErrorCodes::FailedToParse, "List of mods must be an object");
+            }
+
+            // Check whether there are indeed mods under this modifier.
+            if (outerModElem.embeddedObject().isEmpty()) {
+                return Status(ErrorCodes::FailedToParse, "Empty expression after update $mod");
             }
 
             BSONObjIterator innerIter(outerModElem.embeddedObject());
@@ -84,7 +98,8 @@ namespace mongo {
                 dassert(mod.get());
 
                 if (innerModElem.eoo()) {
-                    return Status(ErrorCodes::FailedToParse, "empty mod");
+                    return Status(ErrorCodes::FailedToParse,
+                                  "empty entry in $mod expression list");
                 }
 
                 Status status = mod->init(innerModElem);
@@ -95,6 +110,10 @@ namespace mongo {
                 _mods.push_back(mod.release());
             }
         }
+
+        // Register the fact that there will be only $mod's in this driver -- no object
+        // replacement.
+        _dollarModMode = true;
 
         return Status::OK();
     }
@@ -201,6 +220,10 @@ namespace mongo {
 
     size_t UpdateDriver::numMods() const {
         return _mods.size();
+    }
+
+    bool UpdateDriver::dollarModMode() const {
+        return _dollarModMode;
     }
 
     bool UpdateDriver::multi() const {
