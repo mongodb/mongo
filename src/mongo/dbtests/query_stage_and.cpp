@@ -19,6 +19,8 @@
  * so we cannot test it outside of a dbtest.
  */
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
@@ -51,7 +53,7 @@ namespace QueryStageAnd {
         }
 
         void getLocs(set<DiskLoc>* out) {
-            for (shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok(); c->advance()) {
+            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok(); c->advance()) {
                 out->insert(c->currLoc());
             }
         }
