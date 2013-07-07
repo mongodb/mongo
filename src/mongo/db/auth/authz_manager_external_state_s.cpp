@@ -102,4 +102,17 @@ namespace mongo {
         return Status::OK();
     }
 
+    void AuthzManagerExternalStateMongos::getAllDatabaseNames(
+            std::vector<std::string>* dbnames) const {
+        // TODO(spencer): NOT YET IMPLEMENTED
+        fassertFailed(16964);
+    }
+
+    std::vector<BSONObj> AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
+            const std::string& dbname) const {
+        // TODO(spencer): NOT YET IMPLEMENTED
+        fassertFailed(16965);
+    }
+
+
 } // namespace mongo

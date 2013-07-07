@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -49,12 +50,17 @@ namespace mongo {
 
         void clearPrivilegeDocuments();
 
+        virtual void getAllDatabaseNames(std::vector<std::string>* dbnames) const;
+
+        virtual std::vector<BSONObj> getAllV1PrivilegeDocsForDB(const std::string& dbname) const;
+
         virtual bool _findUser(const std::string& usersNamespace,
                                const BSONObj& query,
                                BSONObj* result) const;
 
+
     private:
-        unordered_map<std::string, BSONObj> _userDocuments; // dbname to user document
+        unordered_map<std::string, std::vector<BSONObj> > _userDocuments; // dbname to user docs
     };
 
 } // namespace mongo

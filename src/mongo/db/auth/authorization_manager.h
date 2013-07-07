@@ -143,6 +143,19 @@ namespace mongo {
          */
         void releaseUser(User* user);
 
+        /**
+         * Initializes the user cache with User objects for every v0 and v1 user document in the
+         * system, by reading the system.users collection of every database.  If this function
+         * returns a non-ok Status, the _userCache should be considered corrupt and must be
+         * discarded.  This function should be called once at startup (only if the system hasn't yet
+         * been upgraded to V2 user data format) and never again after that.
+         * TODO(spencer): This function will temporarily be called every time user data is changed
+         * as part of the transition period to the new User data structures.  This should be changed
+         * once we have all the code necessary to upgrade to the V2 user data format, as at that
+         * point we'll only be able to user V1 user data as read-only.
+         */
+        Status initilizeAllV1UserData();
+
     private:
 
         // Parses the old-style (pre 2.4) privilege document and returns a PrivilegeSet of all the
@@ -170,6 +183,12 @@ namespace mongo {
          */
         Status _initializeUserFromPrivilegeDocument(User* user,
                                                     const BSONObj& privDoc) const;
+
+        /**
+         * Invalidates all User objects in the cache and removes them from the cache.
+         * Should only be called when already holding _lock.
+         */
+        void _invalidateUserCache_inlock();
 
 
         static bool _doesSupportOldStylePrivileges;

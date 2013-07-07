@@ -33,6 +33,7 @@
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -694,7 +695,10 @@ namespace {
         boost::lock_guard<boost::mutex> lk(_lock);
         user->decrementRefCount();
         if (user->getRefCount() == 0) {
-            _userCache.erase(user->getName());
+            // If it's been invalidated then it's not in the _userCache anymore.
+            if (user->isValid()) {
+                _userCache.erase(user->getName());
+            }
             delete user;
         }
     }
@@ -804,6 +808,74 @@ namespace {
             return status;
         }
         _initializeUserPrivilegesFromRoles(user);
+        return Status::OK();
+    }
+
+    void AuthorizationManager::_invalidateUserCache_inlock() {
+        for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
+                it != _userCache.end(); ++it) {
+            it->second->invalidate();
+        }
+        _userCache.clear();
+    }
+
+    Status AuthorizationManager::initilizeAllV1UserData() {
+        boost::lock_guard<boost::mutex> lk(_lock);
+        _invalidateUserCache_inlock();
+
+        try {
+            std::vector<std::string> dbNames;
+            _externalState->getAllDatabaseNames(&dbNames);
+
+            for (std::vector<std::string>::iterator dbIt = dbNames.begin();
+                    dbIt != dbNames.end(); ++dbIt) {
+                std::string dbname = *dbIt;
+                std::vector<BSONObj> privDocs = _externalState->getAllV1PrivilegeDocsForDB(dbname);
+
+                for (std::vector<BSONObj>::iterator docIt = privDocs.begin();
+                        docIt != privDocs.end(); ++docIt) {
+                    const BSONObj& privDoc = *docIt;
+
+                    std::string source;
+                    if (privDoc.hasField("userSource")) {
+                        source = privDoc["userSource"].String();
+                    } else {
+                        source = dbname;
+                    }
+                    UserName userName(privDoc["user"].String(), source);
+
+                    User* user = mapFindWithDefault(_userCache, userName, static_cast<User*>(NULL));
+                    if (!user) {
+                        user = new User(userName);
+                        // Make sure the user always has a refCount of at least 1 so it's
+                        // effectively "pinned" and will never be removed from the _userCache
+                        // unless the whole cache is invalidated.
+                        user->incrementRefCount();
+                        _userCache.insert(make_pair(userName, user));
+                    }
+
+                    if (source == dbname || source == "$external") {
+                        Status status = _initializeUserCredentialsFromPrivilegeDocument(user,
+                                                                                        privDoc);
+                        if (!status.isOK()) {
+                            return status;
+                        }
+                    }
+                    Status status = _initializeUserRolesFromPrivilegeDocument(user,
+                                                                              privDoc,
+                                                                              dbname);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                    _initializeUserPrivilegesFromRoles(user);
+                }
+            }
+        } catch (const DBException& e) {
+            return e.toStatus();
+        } catch (const std::exception& e) {
+            return Status(ErrorCodes::InternalError, e.what());
+        }
+
         return Status::OK();
     }
 } // namespace mongo

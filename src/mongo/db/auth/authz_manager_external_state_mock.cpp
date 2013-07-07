@@ -38,13 +38,33 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMock::insertPrivilegeDocument(const std::string& dbname,
                                                                   const BSONObj& userObj) {
-        _userDocuments.insert(make_pair(dbname, userObj));
+        _userDocuments[dbname].push_back(userObj);
         return Status::OK();
     }
 
     void AuthzManagerExternalStateMock::clearPrivilegeDocuments() {
         _userDocuments.clear();
     }
+
+    void AuthzManagerExternalStateMock::getAllDatabaseNames(
+            std::vector<std::string>* dbnames) const {
+        unordered_map<std::string, std::vector<BSONObj> >::const_iterator it;
+        for (it = _userDocuments.begin(); it != _userDocuments.end(); ++it) {
+            dbnames->push_back(it->first);
+        }
+    }
+
+    std::vector<BSONObj> AuthzManagerExternalStateMock::getAllV1PrivilegeDocsForDB(
+            const std::string& dbname) const {
+        std::vector<BSONObj> out;
+
+        const std::vector<BSONObj>& dbDocs = _userDocuments.find(dbname)->second;
+        for (std::vector<BSONObj>::const_iterator it = dbDocs.begin(); it != dbDocs.end(); ++it) {
+            out.push_back(*it);
+        }
+        return out;
+    }
+
 
     bool AuthzManagerExternalStateMock::_findUser(const std::string& usersNamespace,
                            const BSONObj& query,
@@ -55,11 +75,15 @@ namespace mongo {
         }
         MatchExpression* matcher = parseResult.getValue();
 
-        for (unordered_map<std::string, BSONObj>::const_iterator it = _userDocuments.begin();
-                it != _userDocuments.end(); ++it) {
-            if (nsToDatabase(usersNamespace) == it->first && matcher->matchesBSON(it->second)) {
-                *result = it->second;
-                return true;
+        unordered_map<std::string, std::vector<BSONObj> >::const_iterator mapIt;
+        for (mapIt = _userDocuments.begin(); mapIt != _userDocuments.end(); ++mapIt) {
+            for (std::vector<BSONObj>::const_iterator vecIt = mapIt->second.begin();
+                    vecIt != mapIt->second.end(); ++vecIt) {
+                if (nsToDatabase(usersNamespace) == mapIt->first &&
+                        matcher->matchesBSON(*vecIt)) {
+                    *result = *vecIt;
+                    return true;
+                }
             }
         }
         return false;

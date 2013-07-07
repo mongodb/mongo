@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -56,6 +57,17 @@ namespace mongo {
         // Updates the given user object with the given update modifier.
         virtual Status updatePrivilegeDocument(const UserName& user,
                                                const BSONObj& updateObj) const = 0;
+
+        /**
+         * Puts into the *dbnames vector the name of every database in the cluster.
+         */
+        virtual void getAllDatabaseNames(std::vector<std::string>* dbnames) const = 0;
+
+        /**
+         * Returns a vector of every privilege document from the given database's
+         * system.users collection.
+         */
+        virtual std::vector<BSONObj> getAllV1PrivilegeDocsForDB(const std::string& dbname) const = 0;
 
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
