@@ -20,6 +20,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/const_element.h"
+#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
@@ -186,7 +187,6 @@ namespace mutablebson {
      * comments.
      */
 
-
     /** Document is the entry point into the mutable BSON system. It has a fairly simple
      *  API. It acts as an owner for the Element resources of the document, provides a
      *  pre-constructed designated root Object Element, and acts as a factory for new Elements,
@@ -233,8 +233,16 @@ namespace mutablebson {
         /** Construct a new empty document. */
         Document();
 
-        /** Construct new document for the given BSONObj. The data in 'value' is NOT copied. */
-        explicit Document(const BSONObj& value);
+        enum InPlaceMode {
+            kInPlaceDisabled = 0,
+            kInPlaceEnabled  = 1,
+        };
+
+        /** Construct new document for the given BSONObj. The data in 'value' is NOT copied. By
+         *  default, queueing of in-place modifications against the underlying document is
+         *  permitted. To disable this behavior, explicitly pass kInPlaceDisabled.
+         */
+        explicit Document(const BSONObj& value, InPlaceMode inPlaceMode = kInPlaceEnabled);
 
         ~Document();
 
@@ -260,7 +268,8 @@ namespace mutablebson {
         inline void writeTo(BSONObjBuilder* builder) const;
 
         /** Serialize the Elements reachable from the root Element of this Document and return
-         *  the result as a BSONObj. */
+         *  the result as a BSONObj.
+         */
         inline BSONObj getObject() const;
 
 
@@ -397,6 +406,65 @@ namespace mutablebson {
         ConstElement end() const;
 
         inline std::string toString() const;
+
+        //
+        // In-place API.
+        //
+
+        /** Ensure that at least 'expectedEvents' damage events can be recorded for in-place
+         *  mutations without reallocation. This call is ignored if damage events are disabled.
+         */
+        void reserveDamageEvents(size_t expectedEvents);
+
+        /** Request a vector of damage events describing in-place updates to this Document. If
+         *  the modifications to this Document were not all able to be achieved in-place, then
+         *  a non-OK Status is returned, and the provided damage vector will be made empty and
+         *  *source set equal to NULL. Otherwise, the provided damage vector is populated, and
+         *  the 'source' argument is set to point to a region from which bytes can be read. The
+         *  'source' offsets in the damage vector are to be interpreted as offsets within this
+         *  region. If the 'size' parameter is non-null and 'source' is set to a non-NULL
+         *  value, then size will be filled in with the size of the 'source' region to
+         *  facilitate making an owned copy of the source data, in the event that that is
+         *  needed.
+         *
+         *  The lifetime of the source region should be considered to extend only from the
+         *  return from this call to before the next API call on this Document or any of its
+         *  member Elements. That is almost certainly overly conservative: some read only calls
+         *  are undoubtedly fine. But it is very easy to invalidate 'source' by calling any
+         *  mutating operation, so proceed with due caution.
+         *
+         *  It is expected, though, that in normal modes of operation obtainin the damage
+         *  vector is one of the last operations performed on a Document before its
+         *  destruction, so this is not so great a restriction.
+         *
+         *  The destination offsets in the damage events are implicitly offsets into the
+         *  BSONObj used to construct this Document.
+         */
+        bool getInPlaceUpdates(DamageVector* damages,
+                               const char** source,
+                               size_t* size = NULL);
+
+        /** Drop the queue of in-place update damage events, and do not queue new operations
+         *  that would otherwise have been in-place. Use this if you know that in-place updates
+         *  will not continue to be possible and do not want to pay the overhead of
+         *  speculatively queueing them. After calling this method, getInPlaceUpdates will
+         *  return a non-OK Status. It is not possible to re-enable in-place updates once
+         *  disabled.
+         */
+        void disableInPlaceUpdates();
+
+        /** Returns the current in-place mode for the document. Note that for some documents,
+         *  like those created without any backing BSONObj, this will always return kForbidden,
+         *  since in-place updates make no sense for such an object. In other cases, an object
+         *  which started in kInPlacePermitted mode may transition to kInPlaceForbidden if a
+         *  topology mutating operation is applied.
+         */
+        InPlaceMode getCurrentInPlaceMode() const;
+
+        /** A convenience routine, this returns true if the current in-place mode is
+         *  kInPlaceEnabled, and false otherwise.
+         */
+        inline bool isInPlaceModeEnabled() const;
 
     private:
         friend class Element;

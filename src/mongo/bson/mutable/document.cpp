@@ -17,6 +17,7 @@
 
 #include "mongo/bson/mutable/document.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/static_assert.hpp>
 #include <cstdlib>
 #include <cstring>
@@ -24,6 +25,8 @@
 #include <vector>
 
 #include "mongo/bson/inline_decls.h"
+
+#include "mongo/bson/mutable/damage_vector.h"
 
 namespace mongo {
 namespace mutablebson {
@@ -560,12 +563,13 @@ namespace mutablebson {
         MONGO_DISALLOW_COPYING(Impl);
 
     public:
-        Impl()
+        Impl(Document::InPlaceMode inPlaceMode)
             : _elements()
             , _objects()
             , _fieldNames()
             , _leafBuf()
-            , _leafBuilder(_leafBuf) {
+            , _leafBuilder(_leafBuf)
+            , _damages() {
             // We always have a BSONObj for the leaves, so reserve one.
             _objects.reserve(1);
             // We need an object at _objects[0] so that we can access leaf elements we
@@ -574,6 +578,12 @@ namespace mutablebson {
             // 0.
             dassert(_objects.size() == kLeafObjIdx);
             _objects.push_back(_leafBuilder.asTempObj());
+
+            // TODO: Could use boost optional to reduce pointer chasing.
+            if (inPlaceMode == Document::kInPlaceEnabled) {
+                _damages.reset(new DamageVector);
+            }
+
         }
 
         // Obtain the ElementRep for the given rep id.
@@ -690,6 +700,11 @@ namespace mutablebson {
 
         // Returns true if rep's value can be provided as a BSONElement.
         bool hasValue(const ElementRep& rep) const {
+            // The root element may be marked serialized, but it doesn't have a BSONElement
+            // representation.
+            if (&rep == &_elements[kRootRepIdx])
+                return false;
+
             return rep.serialized;
         }
 
@@ -706,10 +721,9 @@ namespace mutablebson {
                 return rep->child.left;
 
             // It should be impossible to have an opaque left child and be non-serialized,
-            // unless you are the root.
-            dassert(rep->serialized || index == kRootRepIdx);
+            dassert(rep->serialized);
             BSONElement childElt = (
-                rep->serialized ?
+                hasValue(*rep) ?
                 getSerializedElement(*rep).embeddedObject() :
                 getObject(rep->objIdx)).firstElement();
 
@@ -869,6 +883,59 @@ namespace mutablebson {
             return (data >= start) && (data < end);
         }
 
+        void reserveDamageEvents(size_t expectedEvents) {
+            if (_damages)
+                _damages->reserve(expectedEvents);
+        }
+
+        bool getInPlaceUpdates(DamageVector* damages, const char** source, size_t* size) {
+
+            // If some operations were not in-place, set source to NULL and return false to
+            // inform upstream that we are not returning in-place result data.
+            if (!_damages) {
+                damages->clear();
+                *source = NULL;
+                return false;
+            }
+
+            // Set up the source and source size out parameters.
+            *source = _objects[0].objdata();
+            if (size)
+                *size = _objects[0].objsize();
+
+            // Swap our damage event queue with upstream, and reset ours to an empty vector. In
+            // princple, we can do another round of in-place updates.
+            damages->swap(*_damages);
+            _damages->clear();
+            return true;
+        }
+
+        void disableInPlaceUpdates() {
+            _damages.reset();
+        }
+
+        Document::InPlaceMode getCurrentInPlaceMode() const {
+            return (_damages ? Document::kInPlaceEnabled : kInPlaceDisabled);
+        }
+
+        bool isInPlaceModeEnabled() const {
+            return getCurrentInPlaceMode() == Document::kInPlaceEnabled;
+        }
+
+        void recordDamageEvent(DamageEvent::OffsetSizeType targetOffset,
+                               DamageEvent::OffsetSizeType sourceOffset,
+                               size_t size) {
+            _damages->push_back(DamageEvent());
+            _damages->back().targetOffset = targetOffset;
+            _damages->back().sourceOffset = sourceOffset;
+            _damages->back().size = size;
+            if (debug && paranoid) {
+                // Force damage events to new addresses to catch invalidation errors.
+                DamageVector new_damages(*_damages);
+                _damages->swap(new_damages);
+            }
+        }
+
     private:
 
         // Insert the given field name into the field name heap, and return an ID for this
@@ -898,10 +965,14 @@ namespace mutablebson {
         std::vector<ElementRep> _elements;
         std::vector<BSONObj> _objects;
         std::vector<char> _fieldNames;
+
         // We own a BufBuilder to avoid BSONObjBuilder's ref-count mechanism which would throw
         // off our offset calculations.
         BufBuilder _leafBuf;
         BSONObjBuilder _leafBuilder;
+
+        // Queue of damage events if in-place updates are possible.
+        boost::scoped_ptr<DamageVector> _damages;
     };
 
     Status Element::addSiblingLeft(Element e) {
@@ -929,6 +1000,8 @@ namespace mutablebson {
             return Status(
                 ErrorCodes::IllegalOperation,
                 "Attempt to add a sibling element under a non-object element");
+
+        impl.disableInPlaceUpdates();
 
         // The new element shares our parent.
         newRep.parent = thisRep.parent;
@@ -983,6 +1056,8 @@ namespace mutablebson {
                 ErrorCodes::IllegalOperation,
                 "Attempt to add a sibling element under a non-object element");
 
+        impl.disableInPlaceUpdates();
+
         // If our current right sibling is opaque it needs to be resolved. This will invalidate
         // our reps so we need to reacquire them.
         Element::RepIdx rightSiblingIdx = thisRep->sibling.right;
@@ -1034,6 +1109,7 @@ namespace mutablebson {
 
         if (thisRep.parent == kInvalidRepIdx)
             return Status(ErrorCodes::IllegalOperation, "trying to remove a parentless element");
+        impl.disableInPlaceUpdates();
 
         // If our right sibling is not the end of the object, then set its left sibling to be
         // our left sibling.
@@ -1072,7 +1148,14 @@ namespace mutablebson {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
+        if (_repIdx == kRootRepIdx)
+            return Status(ErrorCodes::IllegalOperation,
+                          "Invalid attempt to rename the root element of a document");
+
         dassert(impl.doesNotAlias(newName));
+
+        // TODO: Some rename operations may be possible to do in-place.
+        impl.disableInPlaceUpdates();
 
         // Operations below may invalidate thisRep, so we may need to reacquire it.
         ElementRep* thisRep = &impl.getElementRep(_repIdx);
@@ -1102,7 +1185,7 @@ namespace mutablebson {
             thisRep->objIdx = kInvalidObjIdx;
         }
 
-        if (thisRep->serialized) {
+        if (impl.hasValue(*thisRep)) {
             // For leaf elements we just create a new Element with the current value and
             // replace. Note that the 'setValue' call below will invalidate thisRep.
             Element replacement = _doc->makeElementWithNewFieldName(newName, *this);
@@ -1371,7 +1454,6 @@ namespace mutablebson {
         if (thisRep.parent == kInvalidRepIdx && _repIdx == kRootRepIdx) {
             // If this is the root element, then we need to handle it differently, since it
             // doesn't have a field name and should embed directly, rather than as an object.
-            dassert(!thisRep.serialized);
             writeChildren(builder);
         } else {
             writeElement(builder);
@@ -1387,12 +1469,88 @@ namespace mutablebson {
     }
 
     Status Element::setValueDouble(const double value) {
+        // TODO: Template-ize this so we don't need to write this logic everwhere. The only
+        // variation is the 'makeElementX' call and the argument types.
+
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementDouble(fieldNameCopy, value);
-        return setValue(&newValue);
+        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
+
+        // Create a dummy element. If we can do in-place updates, we will use this to sew into
+        // the element graph. Otherwise, we will use a different element, created below.
+        bool inPlace = false;
+        Element newValue = getDocument().end();
+
+        if (impl.isInPlaceModeEnabled()) {
+
+            // In place updates are currently enabled. We can do an in-place update to an
+            // element that is serialized and is not in the leaf heap.
+            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
+            const bool hasValue = impl.hasValue(*thisRep);
+
+            // TODO: In the future, we can replace values in the leaf heap if they are of the
+            // same size as the origin was. For now, we don't support that.
+            if (hasValue && !inLeafHeap) {
+
+                // Create a new double element in the leaf heap. There is no need to copy the
+                // fieldname, since the fieldname and leafheap are in different storage areas.
+                const StringData fieldName = impl.getFieldName(*thisRep);
+                newValue = getDocument().makeElementDouble(fieldName, value);
+
+                // Reacquire thisRep, since it may have been reallocated by makeElement.
+                thisRep = &impl.getElementRep(_repIdx);
+
+                // See if the new Element can be recorded as an in-place update.
+
+                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
+                dassert(impl.hasValue(newRep));
+
+                // Get the BSONElement representations of the existing and new value, so we can
+                // check if they are size compatible.
+                BSONElement thisElt = impl.getSerializedElement(*thisRep);
+                BSONElement newElt = impl.getSerializedElement(newRep);
+
+                if (thisElt.size() == newElt.size()) {
+
+                    inPlace = true;
+
+                    // The old and new elements are size compatible. Compute the base offsets
+                    // of each BSONElement in the object in which it resides. We use these to
+                    // calculate the source and target offsets in the damage entries we are
+                    // going to write.
+
+                    const DamageEvent::OffsetSizeType targetBaseOffset =
+                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
+
+                    const DamageEvent::OffsetSizeType sourceBaseOffset =
+                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
+
+                    // If this is a type change, record a damage event for the new type.
+                    if (thisElt.type() != newElt.type()) {
+                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
+                    }
+
+                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
+                    dassert(thisElt.valuesize() == newElt.valuesize());
+
+                    // Record a damage event for the new value data.
+                    impl.recordDamageEvent(
+                        targetBaseOffset + thisElt.fieldNameSize(),
+                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        thisElt.valuesize());
+                }
+            }
+        }
+
+        if (!newValue.ok()) {
+            // If we didn't build a new element yet, do so now.
+            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
+            // TODO: Can we hoist this above so we only call makeElement once in this function?
+            newValue = getDocument().makeElementDouble(fieldNameCopy, value);
+        }
+
+        // Attach the new element into the graph.
+        return setValue(&newValue, inPlace);
     }
 
     Status Element::setValueString(const StringData& value) {
@@ -1461,10 +1619,62 @@ namespace mutablebson {
     Status Element::setValueBool(const bool value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementBool(fieldNameCopy, value);
-        return setValue(&newValue);
+        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
+
+        // NOTE: See setValueDouble for detailed comments.
+
+        bool inPlace = false;
+        Element newValue = getDocument().end();
+
+        if (impl.isInPlaceModeEnabled()) {
+
+            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
+            const bool hasValue = impl.hasValue(*thisRep);
+
+            if (hasValue && !inLeafHeap) {
+
+                const StringData fieldName = impl.getFieldName(*thisRep);
+                newValue = getDocument().makeElementBool(fieldName, value);
+
+                thisRep = &impl.getElementRep(_repIdx);
+
+                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
+                dassert(impl.hasValue(newRep));
+
+                BSONElement thisElt = impl.getSerializedElement(*thisRep);
+                BSONElement newElt = impl.getSerializedElement(newRep);
+
+                if (thisElt.size() == newElt.size()) {
+
+                    inPlace = true;
+
+                    const DamageEvent::OffsetSizeType targetBaseOffset =
+                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
+
+                    const DamageEvent::OffsetSizeType sourceBaseOffset =
+                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
+
+                    if (thisElt.type() != newElt.type()) {
+                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
+                    }
+
+                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
+                    dassert(thisElt.valuesize() == newElt.valuesize());
+
+                    impl.recordDamageEvent(
+                        targetBaseOffset + thisElt.fieldNameSize(),
+                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        thisElt.valuesize());
+                }
+            }
+        }
+
+        if (!newValue.ok()) {
+            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
+            newValue = getDocument().makeElementBool(fieldNameCopy, value);
+        }
+
+        return setValue(&newValue, inPlace);
     }
 
     Status Element::setValueDate(const Date_t value) {
@@ -1541,10 +1751,62 @@ namespace mutablebson {
     Status Element::setValueInt(const int32_t value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementInt(fieldNameCopy, value);
-        return setValue(&newValue);
+        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
+
+        // NOTE: See setValueDouble for detailed comments.
+
+        bool inPlace = false;
+        Element newValue = getDocument().end();
+
+        if (impl.isInPlaceModeEnabled()) {
+
+            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
+            const bool hasValue = impl.hasValue(*thisRep);
+
+            if (hasValue && !inLeafHeap) {
+
+                const StringData fieldName = impl.getFieldName(*thisRep);
+                newValue = getDocument().makeElementInt(fieldName, value);
+
+                thisRep = &impl.getElementRep(_repIdx);
+
+                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
+                dassert(impl.hasValue(newRep));
+
+                BSONElement thisElt = impl.getSerializedElement(*thisRep);
+                BSONElement newElt = impl.getSerializedElement(newRep);
+
+                if (thisElt.size() == newElt.size()) {
+
+                    inPlace = true;
+
+                    const DamageEvent::OffsetSizeType targetBaseOffset =
+                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
+
+                    const DamageEvent::OffsetSizeType sourceBaseOffset =
+                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
+
+                    if (thisElt.type() != newElt.type()) {
+                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
+                    }
+
+                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
+                    dassert(thisElt.valuesize() == newElt.valuesize());
+
+                    impl.recordDamageEvent(
+                        targetBaseOffset + thisElt.fieldNameSize(),
+                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        thisElt.valuesize());
+                }
+            }
+        }
+
+        if (!newValue.ok()) {
+            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
+            newValue = getDocument().makeElementInt(fieldNameCopy, value);
+        }
+
+        return setValue(&newValue, inPlace);
     }
 
     Status Element::setValueTimestamp(const OpTime value) {
@@ -1559,10 +1821,62 @@ namespace mutablebson {
     Status Element::setValueLong(const int64_t value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementLong(fieldNameCopy, value);
-        return setValue(&newValue);
+        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
+
+        // NOTE: See setValueDouble for detailed comments.
+
+        bool inPlace = false;
+        Element newValue = getDocument().end();
+
+        if (impl.isInPlaceModeEnabled()) {
+
+            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
+            const bool hasValue = impl.hasValue(*thisRep);
+
+            if (hasValue && !inLeafHeap) {
+
+                const StringData fieldName = impl.getFieldName(*thisRep);
+                newValue = getDocument().makeElementLong(fieldName, value);
+
+                thisRep = &impl.getElementRep(_repIdx);
+
+                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
+                dassert(impl.hasValue(newRep));
+
+                BSONElement thisElt = impl.getSerializedElement(*thisRep);
+                BSONElement newElt = impl.getSerializedElement(newRep);
+
+                if (thisElt.size() == newElt.size()) {
+
+                    inPlace = true;
+
+                    const DamageEvent::OffsetSizeType targetBaseOffset =
+                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
+
+                    const DamageEvent::OffsetSizeType sourceBaseOffset =
+                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
+
+                    if (thisElt.type() != newElt.type()) {
+                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
+                    }
+
+                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
+                    dassert(thisElt.valuesize() == newElt.valuesize());
+
+                    impl.recordDamageEvent(
+                        targetBaseOffset + thisElt.fieldNameSize(),
+                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        thisElt.valuesize());
+                }
+            }
+        }
+
+        if (!newValue.ok()) {
+            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
+            newValue = getDocument().makeElementLong(fieldNameCopy, value);
+        }
+
+        return setValue(&newValue, inPlace);
     }
 
     Status Element::setValueMinKey() {
@@ -1583,36 +1897,73 @@ namespace mutablebson {
         return setValue(&newValue);
     }
 
-    Status Element::setValueElement(Element* value) {
-        verify(ok());
-        verify(value->ok());
-        verify(_doc == value->_doc);
-        Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& valueRep = impl.getElementRep(value->_repIdx);
-        if (!canAttach(value->_repIdx, valueRep))
-            return getAttachmentError(valueRep);
-        return setValue(value);
-    }
-
     Status Element::setValueBSONElement(const BSONElement& value) {
         verify(ok());
-        Document::Impl& impl = getDocument().getImpl();
-        dassert(impl.doesNotAlias(value));
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementWithNewFieldName(
-            fieldNameCopy,
-            value);
-        return setValue(&newValue);
+        dassert(getDocument().getImpl().doesNotAlias(value));
+
+        switch(value.type()) {
+        case EOO:
+            return Status(ErrorCodes::IllegalOperation, "Can't set Element value to EOO");
+        case NumberDouble:
+            return setValueDouble(value._numberDouble());
+        case String:
+            return setValueString(StringData(value.valuestr(), value.valuestrsize() - 1));
+        case Object:
+            return setValueObject(value.Obj());
+        case Array:
+            return setValueArray(value.Obj());
+        case BinData: {
+            int len = 0;
+            const char* binData = value.binData(len);
+            return setValueBinary(len, value.binDataType(), binData);
+        }
+        case Undefined:
+            return setValueUndefined();
+        case jstOID:
+            return setValueOID(value.__oid());
+        case Bool:
+            return setValueBool(value.boolean());
+        case Date:
+            return setValueDate(value.date());
+        case jstNULL:
+            return setValueNull();
+        case RegEx:
+            return setValueRegex(value.regex(), value.regexFlags());
+        case DBRef:
+            return setValueDBRef(value.dbrefNS(), value.dbrefOID());
+        case Code:
+            return setValueCode(StringData(value.valuestr(), value.valuestrsize() - 1));
+        case Symbol:
+            return setValueSymbol(StringData(value.valuestr(), value.valuestrsize() - 1));
+        case CodeWScope:
+            return setValueCodeWithScope(value.codeWScopeCode(), value.codeWScopeObject());
+        case NumberInt:
+            return setValueInt(value._numberInt());
+        case Timestamp:
+            return setValueTimestamp(value._opTime());
+        case NumberLong:
+            return setValueLong(value._numberLong());
+        case MinKey:
+            return setValueMinKey();
+        case MaxKey:
+            return setValueMaxKey();
+        default:
+            verify(false);
+        }
     }
 
     Status Element::setValueSafeNum(const SafeNum value) {
         verify(ok());
-        Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementSafeNum(fieldNameCopy, value);
-        return setValue(&newValue);
+        switch (value.type()) {
+        case mongo::NumberInt:
+            return setValueInt(value._value.int32Val);
+        case mongo::NumberLong:
+            return setValueLong(value._value.int64Val);
+        case mongo::NumberDouble:
+            return setValueDouble(value._value.doubleVal);
+        default:
+            verify(false);
+        }
     }
 
     bool Element::ok() const {
@@ -1654,6 +2005,8 @@ namespace mutablebson {
                 ErrorCodes::IllegalOperation,
                 "Attempt to add a child element to a non-object element");
 
+        impl.disableInPlaceUpdates();
+
         // TODO: In both of the following cases, we call two public API methods each. We can
         // probably do better by writing this explicitly here and drying it with the public
         // addSiblingLeft and addSiblingRight implementations.
@@ -1684,7 +2037,7 @@ namespace mutablebson {
         return Status::OK();
     }
 
-    Status Element::setValue(Element* value) {
+    Status Element::setValue(Element* value, bool inPlace) {
         // No need to verify(ok()) since we are only called from methods that have done so.
         dassert(ok());
 
@@ -1692,6 +2045,9 @@ namespace mutablebson {
             return Status(ErrorCodes::IllegalOperation, "Cannot call setValue on the root object");
 
         Document::Impl& impl = getDocument().getImpl();
+
+        if (!inPlace)
+            impl.disableInPlaceUpdates();
 
         // Establish our right sibling in case it is opaque. Otherwise, we would lose the
         // ability to do so after the modifications below. It is important that this occur
@@ -1760,7 +2116,7 @@ namespace mutablebson {
         const Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
 
-        if (thisRep.serialized) {
+        if (impl.hasValue(thisRep)) {
             BSONElement element = impl.getSerializedElement(thisRep);
             if (fieldName)
                 builder->appendAs(element, *fieldName);
@@ -1810,18 +2166,35 @@ namespace mutablebson {
     }
 
     Document::Document()
-        : _impl(new Impl)
+        : _impl(new Impl(Document::kInPlaceDisabled))
         , _root(makeElementObject(StringData(kRootFieldName, StringData::LiteralTag()))) {
         dassert(_root._repIdx == kRootRepIdx);
     }
 
-    Document::Document(const BSONObj& value)
-        : _impl(new Impl)
+    Document::Document(const BSONObj& value, InPlaceMode inPlaceMode)
+        : _impl(new Impl(inPlaceMode))
         , _root(makeElementObject(StringData(kRootFieldName, StringData::LiteralTag()), value)) {
         dassert(_root._repIdx == kRootRepIdx);
     }
 
     Document::~Document() {}
+
+    void Document::reserveDamageEvents(size_t expectedEvents) {
+        return getImpl().reserveDamageEvents(expectedEvents);
+    }
+
+    bool Document::getInPlaceUpdates(DamageVector* damages,
+                                     const char** source, size_t* size) {
+        return getImpl().getInPlaceUpdates(damages, source, size);
+    }
+
+    void Document::disableInPlaceUpdates() {
+        return getImpl().disableInPlaceUpdates();
+    }
+
+    Document::InPlaceMode Document::getCurrentInPlaceMode() const {
+        return getImpl().getCurrentInPlaceMode();
+    }
 
     Element Document::makeElementDouble(const StringData& fieldName, const double value) {
         Impl& impl = getImpl();
@@ -1866,6 +2239,11 @@ namespace mutablebson {
             // copied like all other BSONObjs.
             newElt.objIdx = impl.insertObject(value);
             impl.insertFieldName(newElt, fieldName);
+            // Strictly, the following is a lie: the root isn't serialized, because it doesn't
+            // have a contiguous fieldname. However, it is a useful fiction to pretend that it
+            // is, so we can easily check if we have a 'pristine' document state by checking if
+            // the root is marked as serialized.
+            newElt.serialized = true;
             newEltIdx = impl.insertElement(newElt);
         } else {
             // Copy the provided values into the leaf builder.

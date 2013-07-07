@@ -21,11 +21,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/timer.h"
-
-#include "mongo/client/dbclientinterface.h"
 
 namespace {
 
@@ -518,10 +516,7 @@ namespace {
         ASSERT_EQUALS(size_t(1), mmb::countChildren(e1));
         ASSERT_EQUALS(20, e1[0].getValueInt());
 
-        mmb::Element e8 = doc.makeElementInt("", 100);
-        ASSERT_EQUALS(100, e8.getValueInt());
-        ASSERT_EQUALS(e1[0].setValueElement(&e8), mongo::Status::OK());
-        ASSERT_EQUALS(100, e8.getValueInt());
+        ASSERT_EQUALS(e1[0].setValueInt(100), mongo::Status::OK());
         ASSERT_EQUALS(100, e1[0].getValueInt());
         ASSERT_EQUALS(100, e1.leftChild().getValueInt());
         ASSERT_EQUALS(size_t(1), mmb::countChildren(e1));
@@ -803,12 +798,12 @@ namespace {
 
         static const char inJson[] =
             "{"
-            "  'whale': { 'alive': true, 'dv': -9.8, 'height': 50, attrs : [ 'big' ] },"
-            "  'petunias': { 'alive': true, 'dv': -9.8, 'height': 50 } "
+            "  'whale': { 'alive': true, 'dv': -9.8, 'height': 50.0, attrs : [ 'big' ] },"
+            "  'petunias': { 'alive': true, 'dv': -9.8, 'height': 50.0 } "
             "}";
         mongo::BSONObj obj = mongo::fromjson(inJson);
 
-        // Create a new document representing bacBSONObj with the above contents.
+        // Create a new document representing BSONObj with the above contents.
         mmb::Document doc(obj);
 
         // The whale hits the planet and dies.
@@ -818,26 +813,26 @@ namespace {
         mmb::Element whale_deltav = mmb::findFirstChildNamed(whale, "dv");
         ASSERT_TRUE(whale_deltav.ok());
         // Set the dv field to zero.
-        whale_deltav.setValueDouble(0.0);
+        ASSERT_OK(whale_deltav.setValueDouble(0.0));
         // Find the 'height' field in the whale.
         mmb::Element whale_height = mmb::findFirstChildNamed(whale, "height");
         ASSERT_TRUE(whale_height.ok());
         // Set the height field to zero.
-        whale_deltav.setValueDouble(0);
+        ASSERT_OK(whale_height.setValueDouble(0));
         // Find the 'alive' field, and set it to false.
         mmb::Element whale_alive = mmb::findFirstChildNamed(whale, "alive");
         ASSERT_TRUE(whale_alive.ok());
-        whale_alive.setValueBool(false);
+        ASSERT_OK(whale_alive.setValueBool(false));
 
         // The petunias survive, update its fields much like we did above.
         mmb::Element petunias = mmb::findFirstChildNamed(doc.root(), "petunias");
         ASSERT_TRUE(petunias.ok());
         mmb::Element petunias_deltav = mmb::findFirstChildNamed(petunias, "dv");
         ASSERT_TRUE(petunias_deltav.ok());
-        petunias_deltav.setValueDouble(0.0);
+        ASSERT_OK(petunias_deltav.setValueDouble(0.0));
         mmb::Element petunias_height = mmb::findFirstChildNamed(petunias, "height");
         ASSERT_TRUE(petunias_height.ok());
-        petunias_deltav.setValueDouble(0);
+        ASSERT_OK(petunias_height.setValueDouble(0));
 
         // Replace the whale by its wreckage, saving only its attributes:
         // Construct a new mongo::Object element for the ex-whale.
@@ -846,17 +841,113 @@ namespace {
         // Find the attributes of the old 'whale' element.
         mmb::Element whale_attrs = mmb::findFirstChildNamed(whale, "attrs");
         // Remove the attributes from the whale (they remain valid, but detached).
-        whale_attrs.remove();
+        ASSERT_OK(whale_attrs.remove());
         // Insert the attributes into the ex-whale.
-        ex_whale.pushBack(whale_attrs);
+        ASSERT_OK(ex_whale.pushBack(whale_attrs));
         // Remove the whale object.
-        whale.remove();
+        ASSERT_OK(whale.remove());
 
         static const char outJson[] =
             "{"
-            "    'petunias': { 'alive': true, 'dv': 0.0, 'height': 50 },"
+            "    'petunias': { 'alive': true, 'dv': 0.0, 'height': 0 },"
             "    'ex-whale': { 'attrs': [ 'big' ] } })"
             "}";
+
+        mongo::BSONObjBuilder builder;
+        doc.writeTo(&builder);
+        ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    }
+
+    namespace {
+        void apply(mongo::BSONObj* obj, const mmb::DamageVector& damages, const char* source) {
+            const mmb::DamageVector::const_iterator end = damages.end();
+            mmb::DamageVector::const_iterator where = damages.begin();
+            char* const target = const_cast<char *>(obj->objdata());
+            for ( ; where != end; ++where ) {
+                std::memcpy(
+                    target + where->targetOffset,
+                    source + where->sourceOffset,
+                    where->size);
+            }
+        }
+    } // namespace
+
+    TEST(Documentation, Example2InPlaceWithDamageVector) {
+
+        static const char inJson[] =
+            "{"
+            "  'whale': { 'alive': true, 'dv': -9.8, 'height': 50.0, attrs : [ 'big' ] },"
+            "  'petunias': { 'alive': true, 'dv': -9.8, 'height': 50.0 } "
+            "}";
+
+        // Make the object, and make a copy for reference.
+        mongo::BSONObj obj = mongo::fromjson(inJson);
+        const mongo::BSONObj copyOfObj = obj.getOwned();
+        ASSERT_EQUALS(obj, copyOfObj);
+
+        // Create a new document representing BSONObj with the above contents.
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_EQUALS(obj, doc);
+        ASSERT_EQUALS(copyOfObj, doc);
+
+        // Enable in-place mutation for this document
+        ASSERT_EQUALS(mmb::Document::kInPlaceEnabled, doc.getCurrentInPlaceMode());
+
+        // The whale hits the planet and dies.
+        mmb::Element whale = mmb::findFirstChildNamed(doc.root(), "whale");
+        ASSERT_TRUE(whale.ok());
+        // Find the 'dv' field in the whale.
+        mmb::Element whale_deltav = mmb::findFirstChildNamed(whale, "dv");
+        ASSERT_TRUE(whale_deltav.ok());
+        // Set the dv field to zero.
+        ASSERT_OK(whale_deltav.setValueDouble(0.0));
+        // Find the 'height' field in the whale.
+        mmb::Element whale_height = mmb::findFirstChildNamed(whale, "height");
+        ASSERT_TRUE(whale_height.ok());
+        // Set the height field to zero.
+        ASSERT_OK(whale_height.setValueDouble(0));
+        // Find the 'alive' field, and set it to false.
+        mmb::Element whale_alive = mmb::findFirstChildNamed(whale, "alive");
+        ASSERT_TRUE(whale_alive.ok());
+        ASSERT_OK(whale_alive.setValueBool(false));
+
+        // The petunias survive, update its fields much like we did above.
+        mmb::Element petunias = mmb::findFirstChildNamed(doc.root(), "petunias");
+        ASSERT_TRUE(petunias.ok());
+        mmb::Element petunias_deltav = mmb::findFirstChildNamed(petunias, "dv");
+        ASSERT_TRUE(petunias_deltav.ok());
+        ASSERT_OK(petunias_deltav.setValueDouble(0.0));
+        mmb::Element petunias_height = mmb::findFirstChildNamed(petunias, "height");
+        ASSERT_TRUE(petunias_height.ok());
+        ASSERT_OK(petunias_height.setValueDouble(0));
+
+        // Demonstrate that while the document has changed, the underlying BSONObj has not yet
+        // changed.
+        ASSERT_FALSE(obj == doc);
+        ASSERT_EQUALS(copyOfObj, obj);
+
+        // Ensure that in-place updates are still enabled.
+        ASSERT_EQUALS(mmb::Document::kInPlaceEnabled, doc.getCurrentInPlaceMode());
+
+        // Extract the damage events
+        mmb::DamageVector damages;
+        const char* source = NULL;
+        size_t size = 0;
+        ASSERT_EQUALS(true, doc.getInPlaceUpdates(&damages, &source, &size));
+        ASSERT_NOT_EQUALS(0U, damages.size());
+        ASSERT_NOT_EQUALS(static_cast<const char*>(NULL), source);
+        ASSERT_NOT_EQUALS(0U, size);
+
+        apply(&obj, damages, source);
+
+        static const char outJson[] =
+            "{"
+            "  'whale': { 'alive': false, 'dv': 0, 'height': 0, attrs : [ 'big' ] },"
+            "  'petunias': { 'alive': true, 'dv': 0, 'height': 0 } "
+            "}";
+        mongo::BSONObj outObj = mongo::fromjson(outJson);
+
+        ASSERT_EQUALS(outObj, doc);
 
         mongo::BSONObjBuilder builder;
         doc.writeTo(&builder);
@@ -2285,5 +2376,328 @@ namespace {
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
 
-} // namespace
+    TEST(Document, ManipulateComplexObjInLeafHeap) {
+        // Test that an object with complex substructure that lives in the leaf builder can be
+        // manipulated in the same way as an object with complex substructure that lives
+        // freely.
+        mmb::Document doc;
+        static const char inJson[] = "{ a: 1, b: 2, d : ['w', 'x', 'y', 'z'] }";
+        mmb::Element embedded = doc.makeElementObject("embedded", mongo::fromjson(inJson));
+        ASSERT_OK(doc.root().pushBack(embedded));
+        mmb::Element free = doc.makeElementObject("free");
+        ASSERT_OK(doc.root().pushBack(free));
 
+        mmb::Element e_a = embedded.leftChild();
+        ASSERT_TRUE(e_a.ok());
+        ASSERT_EQUALS("a", e_a.getFieldName());
+        mmb::Element e_b = e_a.rightSibling();
+        ASSERT_TRUE(e_b.ok());
+        ASSERT_EQUALS("b", e_b.getFieldName());
+
+        mmb::Element new_c = doc.makeElementDouble("c", 2.0);
+        ASSERT_TRUE(new_c.ok());
+        ASSERT_OK(e_b.addSiblingRight(new_c));
+
+        mmb::Element e_d = new_c.rightSibling();
+        ASSERT_TRUE(e_d.ok());
+        ASSERT_EQUALS("d", e_d.getFieldName());
+
+        mmb::Element e_d_0 = e_d.leftChild();
+        ASSERT_TRUE(e_d_0.ok());
+
+        mmb::Element e_d_1 = e_d_0.rightSibling();
+        ASSERT_TRUE(e_d_1.ok());
+
+        mmb::Element e_d_2 = e_d_1.rightSibling();
+        ASSERT_TRUE(e_d_2.ok());
+
+        ASSERT_OK(e_d_1.remove());
+
+        static const char outJson[] =
+            "{ embedded: { a: 1, b: 2, c: 2.0, d : ['w', 'y', 'z'] }, free: {} }";
+        ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    }
+
+    TEST(DocumentInPlace, EphemeralDocumentsDoNotUseInPlaceMode) {
+        mmb::Document doc;
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsHonored1) {
+        mongo::BSONObj obj;
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        doc.disableInPlaceUpdates();
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsHonored2) {
+        mongo::BSONObj obj;
+        mmb::Document doc(obj, mmb::Document::kInPlaceDisabled);
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        doc.disableInPlaceUpdates();
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeWorksWithNoMutations) {
+        mongo::BSONObj obj;
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        const char* source = NULL;
+        mmb::DamageVector damages;
+        ASSERT_TRUE(damages.empty());
+        doc.getInPlaceUpdates(&damages, &source);
+        ASSERT_TRUE(damages.empty());
+        ASSERT_NOT_EQUALS(static_cast<const char*>(NULL), source);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByAddSiblingLeft) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        mmb::Element newElt = doc.makeElementInt("bar", 42);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().leftChild().addSiblingLeft(newElt));
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByAddSiblingRight) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        mmb::Element newElt = doc.makeElementInt("bar", 42);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().leftChild().addSiblingRight(newElt));
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByRemove) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().leftChild().remove());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    // NOTE: Someday, we may do in-place renames, but renaming 'foo' to 'foobar' will never
+    // work because the sizes don't match. Validate that this disables in-place updates.
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByRename) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().leftChild().rename("foobar"));
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByPushFront) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        mmb::Element newElt = doc.makeElementInt("bar", 42);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().pushFront(newElt));
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByPushBack) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        mmb::Element newElt = doc.makeElementInt("bar", 42);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().pushBack(newElt));
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByPopFront) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().popFront());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByPopBack) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_OK(doc.root().popBack());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    // This isn't a great test since we aren't testing all possible combinations of compatible
+    // and incompatible sets, but since all setValueX calls decay to the internal setValue, we
+    // can be pretty sure that this will at least check the logic somewhat.
+    TEST(DocumentInPlace, InPlaceModeIsDisabledByIncompatibleSetValue) {
+        mongo::BSONObj obj(mongo::fromjson("{ foo : false }"));
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        mmb::Element foo = doc.root().leftChild();
+        ASSERT_TRUE(foo.ok());
+        ASSERT_OK(foo.setValueString("foo"));
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, DisablingInPlaceDoesNotDiscardUpdates) {
+        mongo::BSONObj obj(mongo::fromjson("{ foo : false, bar : true }"));
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+
+        mmb::Element foo = doc.root().leftChild();
+        ASSERT_TRUE(foo.ok());
+        ASSERT_OK(foo.setValueBool(true));
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+
+        mmb::Element bar = doc.root().rightChild();
+        ASSERT_TRUE(bar.ok());
+        ASSERT_OK(bar.setValueBool(false));
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+
+        ASSERT_OK(doc.root().appendString("baz", "baz"));
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+
+        static const char outJson[] =
+            "{ foo : true, bar : false, baz : 'baz' }";
+        ASSERT_EQUALS(mongo::fromjson(outJson), doc.getObject());
+    }
+
+    TEST(DocumentInPlace, BooleanLifecycle) {
+        mongo::BSONObj obj(mongo::fromjson("{ x : false }"));
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+
+        mmb::Element x = doc.root().leftChild();
+
+        mmb::DamageVector damages;
+        const char* source = NULL;
+
+        x.setValueBool(false);
+        ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        apply(&obj, damages, source);
+        ASSERT_TRUE(x.hasValue());
+        ASSERT_TRUE(x.isType(mongo::Bool));
+        ASSERT_EQUALS(false, x.getValueBool());
+
+        // TODO: Re-enable when in-place updates to leaf elements is supported
+        // x.setValueBool(true);
+        // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        // apply(&obj, damages, source);
+        // ASSERT_TRUE(x.hasValue());
+        // ASSERT_TRUE(x.isType(mongo::Bool));
+        // ASSERT_EQUALS(true, x.getValueBool());
+    }
+
+    TEST(DocumentInPlace, NumberIntLifecycle) {
+        const int value1 = 42;
+        const int value2 = 3;
+        mongo::BSONObj obj(BSON("x" << value1));
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+
+        mmb::Element x = doc.root().leftChild();
+
+        mmb::DamageVector damages;
+        const char* source = NULL;
+
+        x.setValueInt(value2);
+        ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        apply(&obj, damages, source);
+        ASSERT_TRUE(x.hasValue());
+        ASSERT_TRUE(x.isType(mongo::NumberInt));
+        ASSERT_EQUALS(value2, x.getValueInt());
+
+        // TODO: Re-enable when in-place updates to leaf elements is supported
+        // x.setValueInt(value1);
+        // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        // apply(&obj, damages, source);
+        // ASSERT_TRUE(x.hasValue());
+        // ASSERT_TRUE(x.isType(mongo::NumberInt));
+        // ASSERT_EQUALS(value1, x.getValueInt());
+    }
+
+    TEST(DocumentInPlace, NumberLongLifecycle) {
+        const long long value1 = 42;
+        const long long value2 = 3;
+
+        mongo::BSONObj obj(BSON("x" << value1));
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+
+        mmb::Element x = doc.root().leftChild();
+
+        mmb::DamageVector damages;
+        const char* source = NULL;
+
+        x.setValueLong(value2);
+        ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        apply(&obj, damages, source);
+        ASSERT_TRUE(x.hasValue());
+        ASSERT_TRUE(x.isType(mongo::NumberLong));
+        ASSERT_EQUALS(value2, x.getValueLong());
+
+        // TODO: Re-enable when in-place updates to leaf elements is supported
+        // x.setValueLong(value1);
+        // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        // apply(&obj, damages, source);
+        // ASSERT_TRUE(x.hasValue());
+        // ASSERT_TRUE(x.isType(mongo::NumberLong));
+        // ASSERT_EQUALS(value1, x.getValueLong());
+    }
+
+    TEST(DocumentInPlace, NumberDoubleLifecycle) {
+        const double value1 = 32.0;
+        const double value2 = 2.0;
+
+        mongo::BSONObj obj(BSON("x" << value1));
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+
+        mmb::Element x = doc.root().leftChild();
+
+        mmb::DamageVector damages;
+        const char* source = NULL;
+
+        x.setValueDouble(value2);
+        ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        apply(&obj, damages, source);
+        ASSERT_TRUE(x.hasValue());
+        ASSERT_TRUE(x.isType(mongo::NumberDouble));
+        ASSERT_EQUALS(value2, x.getValueDouble());
+
+        // TODO: Re-enable when in-place updates to leaf elements is supported
+        // x.setValueDouble(value1);
+        // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        // apply(&obj, damages, source);
+        // ASSERT_TRUE(x.hasValue());
+        // ASSERT_TRUE(x.isType(mongo::NumberDouble));
+        // ASSERT_EQUALS(value1, x.getValueDouble());
+    }
+
+    // Doubles and longs are the same size, 8 bytes, so we should be able to do in-place
+    // updates between them.
+    TEST(DocumentInPlace, DoubleToLongAndBack) {
+        const double value1 = 32.0;
+        const long long value2 = 42;
+
+        mongo::BSONObj obj(BSON("x" << value1));
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+
+        mmb::Element x = doc.root().leftChild();
+
+        mmb::DamageVector damages;
+        const char* source = NULL;
+
+        x.setValueLong(value2);
+        ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        apply(&obj, damages, source);
+        ASSERT_TRUE(x.hasValue());
+        ASSERT_TRUE(x.isType(mongo::NumberLong));
+        ASSERT_EQUALS(value2, x.getValueLong());
+
+        // TODO: Re-enable when in-place updates to leaf elements is supported
+        // x.setValueDouble(value1);
+        // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
+        // apply(&obj, damages, source);
+        // ASSERT_TRUE(x.hasValue());
+        // ASSERT_TRUE(x.isType(mongo::NumberDouble));
+        // ASSERT_EQUALS(value1, x.getValueDouble());
+    }
+
+} // namespace

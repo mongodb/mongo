@@ -53,8 +53,7 @@ namespace mutablebson {
      *    act much like STL iterators that walk over the Document tree. One important
      *    difference is that Elements are never invalidated, even when 'remove' is called. If
      *    you have two Elements that alias the same element in the Document tree, modifications
-     *    through one Element will be visible via the other (modulo one exception noted below
-     *    for Element::setValueElement).
+     *    through one Element will be visible via the other.
      *
      *  - Value access: These methods provide access to the value in the Document tree that the
      *    current Element represents. All leaf (a.k.a. 'primitive', or non-Object and
@@ -409,21 +408,6 @@ namespace mutablebson {
         // Value mutation API from variant types.
         //
 
-        /** Set the name, type, and value of this Element to those of the provided Element. The
-         *  Element 'value' must be in a "detached" state, meaning that it is newly constructed
-         *  and not attached to any other Element in the Document.
-         *
-         *  WARNING: This is the one violation of the 'no Element invalidation rule'. The
-         *  Element passed in as 'value' will be modified to point to this Element because the
-         *  source Element referred to by 'value' *is invalidated*. Any Element objects that
-         *  alias 'value' are therefore also invalidated. This shouldn't be a problem since you
-         *  should pass the return value of Document::makeElement[Type] immediately to this
-         *  call, meaning you should never construct an Element that aliases value. Accessing
-         *  the invalidated Element after this call will result in undefined behavior. You have
-         *  been warned.
-         */
-        Status setValueElement(Element* value);
-
         /** Set the value of this element to equal the value of the provided BSONElement
          *  'value'. The name of this Element is not modified.
          *
@@ -566,7 +550,7 @@ namespace mutablebson {
 
         StringData getValueStringOrSymbol() const;
 
-        Status setValue(Element* newValue);
+        Status setValue(Element* newValue, bool inPlace = false);
 
         template<typename Builder>
         inline void writeElement(Builder* builder, const StringData* fieldName = NULL) const;

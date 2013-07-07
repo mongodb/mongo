@@ -51,5 +51,9 @@ namespace mutablebson {
         return getObject().toString();
     }
 
+    inline bool Document::isInPlaceModeEnabled() const {
+        return getCurrentInPlaceMode() == kInPlaceEnabled;
+    }
+
 } // namespace mutablebson
 } // namespace mongo
