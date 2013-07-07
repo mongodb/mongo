@@ -47,9 +47,12 @@ namespace {
     public:
         Mod() : _mod() {}
 
-        explicit Mod(BSONObj modObj) {
+        explicit Mod(BSONObj modObj)
+            : _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$setOnInsert") ?
+                   ModifierSet::SET_ON_INSERT : ModifierSet::SET_NORMAL) {
             _modObj = modObj;
-            ASSERT_OK(_mod.init(_modObj["$set"].embeddedObject().firstElement()));
+            const StringData& modName = modObj.firstElement().fieldName();
+            ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement()));
         }
 
         Status prepare(Element root,
@@ -103,6 +106,19 @@ namespace {
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
+    }
+
+    TEST(SimpleMod, PrepareSetOnInsert) {
+        Document doc(fromjson("{a: 1}"));
+        Mod setMod(fromjson("{$setOnInsert: {a: 2}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_TRUE(execInfo.inPlace);
+        ASSERT_FALSE(execInfo.noOp);
+        ASSERT_EQUALS(execInfo.context, ModifierInterface::ExecInfo::INSERT_CONTEXT);
     }
 
     TEST(SimpleMod, PrepareApplyEmptyDocument) {

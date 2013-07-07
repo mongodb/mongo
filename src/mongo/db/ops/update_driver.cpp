@@ -21,7 +21,6 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/ops/modifier_interface.h"
 #include "mongo/db/ops/modifier_object_replace.h"
 #include "mongo/db/ops/modifier_table.h"
 #include "mongo/util/embedded_builder.h"
@@ -194,7 +193,16 @@ namespace mongo {
                 }
             }
 
-            if (!execInfo.noOp) {
+            // If a mod wants to be applied only if this is an upsert (or only if this is a
+            // strict update), we should respect that. If a mod doesn't care, it would state
+            // it is fine with ANY update context.
+            bool validContext = false;
+            if (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
+                execInfo.context == _context) {
+                validContext = true;
+            }
+
+            if (!execInfo.noOp && validContext) {
                 Status status = (*it)->apply();
                 if (!status.isOK()) {
                     return status;
@@ -248,6 +256,14 @@ namespace mongo {
 
     void UpdateDriver::setLogOp(bool logOp) {
         _logOp = logOp;
+    }
+
+    ModifierInterface::ExecInfo::UpdateContext UpdateDriver::context() const {
+        return _context;
+    }
+
+    void UpdateDriver::setContext(ModifierInterface::ExecInfo::UpdateContext context) {
+        _context = context;
     }
 
     void UpdateDriver::clear() {

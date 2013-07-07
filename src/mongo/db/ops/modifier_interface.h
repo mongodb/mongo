@@ -126,7 +126,22 @@ namespace mongo {
     struct ModifierInterface::ExecInfo {
         static const int MAX_NUM_FIELDS = 2;
 
-        ExecInfo() : inPlace(false), noOp(false) {
+        /**
+         * An update mod may specify that it wishes to the applied only if the context
+         * of the update turns out a certain way.
+         */
+        enum UpdateContext {
+            // This mod wants to be applied only if the update turns out to be an insert.
+            INSERT_CONTEXT,
+
+            // This mod wants to be applied only if the update is not an insert.
+            UPDATE_CONTEXT,
+
+            // This mod doesn't care if the update will be an update or an upsert.
+            ANY_CONTEXT
+        };
+
+        ExecInfo() : inPlace(false), noOp(false), context(ANY_CONTEXT) {
             for (int i = 0; i < MAX_NUM_FIELDS; i++) {
                 fieldRef[i] = NULL;
             }
@@ -136,6 +151,7 @@ namespace mongo {
         FieldRef* fieldRef[MAX_NUM_FIELDS]; // not owned here
         bool inPlace;
         bool noOp;
+        UpdateContext context;
     };
 
 } // namespace mongo

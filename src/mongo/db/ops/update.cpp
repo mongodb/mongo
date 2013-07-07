@@ -498,8 +498,9 @@ namespace mongo {
         //   + collect damage vector and apply it insetad of calling disk
         //   + support for determining if updates affects an index (pre-req for in place)
         //
-        // + Missing ops
-        //   + specific paths set on insert
+        // + Field Management
+        //   + Force all upsert to contain _id
+        //   + Prevent changes to immutable fields (_id, and those mentioned by sharding)
         //
         // + Yiedling related
         //   + $atomic support (or better, support proper yielding if not)
@@ -548,17 +549,17 @@ namespace mongo {
                     uasserted( 16835, "cannot create object to update" );
                 }
                 debug.fastmodinsert = true;
-
-                // TODO this is the hook for activating a $setOnInsert
-
             }
             else {
                 debug.upsert = true;
             }
 
             // Since this is an upsert, we will be oplogging it as an insert. We don't
-            // need the driver's help to build the oplog record, then.
-            driver.setLogOp(false);
+            // need the driver's help to build the oplog record, then. We also set the
+            // context of the update driver to an "upsert". Some mods may only work in that
+            // context (e.g. $setOnInsert).
+            driver.setLogOp( false );
+            driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
 
             BSONObj newObj;
             status = driver.update( oldObj, StringData(), &newObj, NULL /* no oplog record */);
@@ -581,6 +582,10 @@ namespace mongo {
         //
         // We have one or more documents for this update.
         //
+
+        // We record that this will not be an upsert, in case a mod doesn't want to be applied
+        // when in strict update mode.
+        driver.setContext( ModifierInterface::ExecInfo::UPDATE_CONTEXT );
 
         // Let's fetch each of them and pipe them through the update expression, making sure to
         // keep track of the necessary stats. Recall that we'll be pulling documents out of

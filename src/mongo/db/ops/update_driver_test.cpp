@@ -84,6 +84,15 @@ namespace {
         UpdateDriver driver(opts);
         ASSERT_OK(driver.parse(fromjson("{$pushAll:{a:[1,2,3]}}")));
         ASSERT_EQUALS(driver.numMods(), 1U);
+        ASSERT_TRUE(driver.dollarModMode());
+    }
+
+    TEST(Parse, SetOnInsert) {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}")));
+        ASSERT_EQUALS(driver.numMods(), 1U);
+        ASSERT_TRUE(driver.dollarModMode());
     }
 
 } // unnamed namespace

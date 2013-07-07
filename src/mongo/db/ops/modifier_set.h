@@ -32,7 +32,8 @@ namespace mongo {
 
     public:
 
-        ModifierSet();
+        enum ModifierSetMode { SET_NORMAL, SET_ON_INSERT };
+        explicit ModifierSet(ModifierSetMode mode = SET_NORMAL);
 
         //
         // Modifier interface implementation
@@ -78,6 +79,9 @@ namespace mongo {
 
         // 0 or index for $-positional in _fieldRef.
         size_t _posDollar;
+
+        // If on 'on insert' mode, We'd like to apply this mod only if we're in a upsert.
+        const ModifierSetMode _setMode;
 
         // Element of the $set expression.
         BSONElement _val;

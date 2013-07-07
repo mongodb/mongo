@@ -21,10 +21,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/modifier_interface.h"
 
 namespace mongo {
-
-    class ModifierInterface;
 
     class UpdateDriver {
     public:
@@ -76,6 +75,9 @@ namespace mongo {
         bool logOp() const;
         void setLogOp(bool logOp);
 
+        ModifierInterface::ExecInfo::UpdateContext context() const;
+        void setContext(ModifierInterface::ExecInfo::UpdateContext context);
+
     private:
 
         /** Resets the state of the class associated with mods (not the error state) */
@@ -92,6 +94,9 @@ namespace mongo {
 
         // Is there a list of $mod's on '_mods' or is it just full object replacement?
         bool _dollarModMode;
+
+        // Is this update going to be an upsert?
+        ModifierInterface::ExecInfo::UpdateContext _context;
 
         // Collection of update mod instances. Owned here.
         vector<ModifierInterface*> _mods;
