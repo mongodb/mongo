@@ -100,7 +100,7 @@ var dbrefConstructors = {
             "DBRef()",
             "DBRef(true, ObjectId())",
             "DBRef(\"namespace\")",
-            "DBRef(\"namespace\", ObjectId(), true)"
+            "DBRef(\"namespace\", ObjectId(), true)",
         ]
 }
 
@@ -115,7 +115,7 @@ var dbpointerConstructors = {
             "DBPointer(\"namespace\", 0)",
             "DBPointer(\"namespace\", \"test\")",
             "DBPointer(\"namespace\")",
-            "DBPointer(\"namespace\", ObjectId(), true)"
+            "DBPointer(\"namespace\", ObjectId(), true)",
         ]
 }
 
@@ -125,13 +125,13 @@ var objectidConstructors = {
         'ObjectId()',
         'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFF")',
         'new ObjectId()',
-        'new ObjectId("FFFFFFFFFFFFFFFFFFFFFFFF")'
+        'new ObjectId("FFFFFFFFFFFFFFFFFFFFFFFF")',
         ],
     "invalid" : [
         'ObjectId(5)',
         'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")',
         'new ObjectId(5)',
-        'new ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")'
+        'new ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")',
         ]
 }
 
@@ -160,20 +160,151 @@ var timestampConstructors = {
         'Timestamp(0,true)',
         'new Timestamp(true,true)',
         'new Timestamp(true,0)',
-        'new Timestamp(0,true)'
+        'new Timestamp(0,true)',
         ]
 }
 
 var bindataConstructors = {
     "valid" : [
         'BinData(0,"test")',
-        //'BinData()', SERVER-8961
         'new BinData(0,"test")',
-        //'new BinData()' SERVER-8961
         ],
     "invalid" : [
         'BinData(0,"test", "test")',
-        'new BinData(0,"test", "test")'
+        'new BinData(0,"test", "test")',
+        'BinData()',
+        'new BinData()',
+        'BinData(-1, "")',
+        'new BinData(-1, "")',
+        'BinData(256, "")',
+        'new BinData(256, "")',
+        'BinData("string","aaaa")',
+        'new BinData("string","aaaa")',
+        // SERVER-10152
+        //'BinData(0, true)',
+        //'new BinData(0, true)',
+        //'BinData(0, null)',
+        //'new BinData(0, null)',
+        //'BinData(0, undefined)',
+        //'new BinData(0, undefined)',
+        //'BinData(0, {})',
+        //'new BinData(0, {})',
+        //'BinData(0, [])',
+        //'new BinData(0, [])',
+        //'BinData(0, function () {})',
+        //'new BinData(0, function () {})',
+        ]
+}
+
+var uuidConstructors = {
+    "valid" : [
+        'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'new UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        ],
+    "invalid" : [
+        'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+        'new UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+        'UUID()',
+        'new UUID()',
+        'UUID("aa")',
+        'new UUID("aa")',
+        'UUID("invalidhex")',
+        'new UUID("invalidhex")',
+        // SERVER-9686
+        //'UUID("invalidhexbutstilltherequiredlen")',
+        //'new UUID("invalidhexbutstilltherequiredlen")',
+        'UUID(true)',
+        'new UUID(true)',
+        'UUID(null)',
+        'new UUID(null)',
+        'UUID(undefined)',
+        'new UUID(undefined)',
+        'UUID({})',
+        'new UUID({})',
+        'UUID([])',
+        'new UUID([])',
+        'UUID(function () {})',
+        'new UUID(function () {})',
+        ]
+}
+
+var md5Constructors = {
+    "valid" : [
+        'MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'new MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        ],
+    "invalid" : [
+        'MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+        'new MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+        'MD5()',
+        'new MD5()',
+        'MD5("aa")',
+        'new MD5("aa")',
+        'MD5("invalidhex")',
+        'new MD5("invalidhex")',
+        // SERVER-9686
+        //'MD5("invalidhexbutstilltherequiredlen")',
+        //'new MD5("invalidhexbutstilltherequiredlen")',
+        'MD5(true)',
+        'new MD5(true)',
+        'MD5(null)',
+        'new MD5(null)',
+        'MD5(undefined)',
+        'new MD5(undefined)',
+        'MD5({})',
+        'new MD5({})',
+        'MD5([])',
+        'new MD5([])',
+        'MD5(function () {})',
+        'new MD5(function () {})',
+        ]
+}
+
+var hexdataConstructors = {
+    "valid" : [
+        'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'new HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        // Numbers as the payload are converted to strings, so HexData(0, 100) == HexData(0, "100")
+        'HexData(0, 100)',
+        'new HexData(0, 100)',
+        'HexData(0, "")',
+        'new HexData(0, "")',
+        'HexData(0, "aaa")',
+        'new HexData(0, "aaa")',
+        'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'new HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'HexData(0, "000000000000000000000005")', // SERVER-9605
+        'new HexData(0, "000000000000000000000005")',
+        ],
+    "invalid" : [
+        'HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+        'new HexData(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
+        'HexData()',
+        'new HexData()',
+        'HexData(0)',
+        'new HexData(0)',
+        'HexData(-1, "")',
+        'new HexData(-1, "")',
+        'HexData(256, "")',
+        'new HexData(256, "")',
+        'HexData("string","aaaa")',
+        'new HexData("string","aaaa")',
+        // SERVER-10152
+        //'HexData(0, true)',
+        //'new HexData(0, true)',
+        //'HexData(0, null)',
+        //'new HexData(0, null)',
+        //'HexData(0, undefined)',
+        //'new HexData(0, undefined)',
+        //'HexData(0, {})',
+        //'new HexData(0, {})',
+        //'HexData(0, [])',
+        //'new HexData(0, [])',
+        //'HexData(0, function () {})',
+        //'new HexData(0, function () {})',
+        // SERVER-9686
+        //'HexData(0, "invalidhex")',
+        //'new HexData(0, "invalidhex")',
         ]
 }
 
@@ -189,7 +320,7 @@ var dateConstructors = {
         'new Date(0,0)',
         'new Date(0,0,0)',
         'new Date(0,0,0,0)',
-        'new Date("foo")'
+        'new Date("foo")',
         ],
     "invalid" : [
         ]
@@ -200,6 +331,9 @@ clientEvalConstructorTest(dbpointerConstructors);
 clientEvalConstructorTest(objectidConstructors);
 clientEvalConstructorTest(timestampConstructors);
 clientEvalConstructorTest(bindataConstructors);
+clientEvalConstructorTest(uuidConstructors);
+clientEvalConstructorTest(md5Constructors);
+clientEvalConstructorTest(hexdataConstructors);
 clientEvalConstructorTest(dateConstructors);
 
 dbEvalConstructorTest(dbrefConstructors);
@@ -207,6 +341,9 @@ dbEvalConstructorTest(dbpointerConstructors);
 dbEvalConstructorTest(objectidConstructors);
 dbEvalConstructorTest(timestampConstructors);
 dbEvalConstructorTest(bindataConstructors);
+dbEvalConstructorTest(uuidConstructors);
+dbEvalConstructorTest(md5Constructors);
+dbEvalConstructorTest(hexdataConstructors);
 dbEvalConstructorTest(dateConstructors);
 
 // SERVER-8963
@@ -216,6 +353,9 @@ if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
     mapReduceConstructorTest(objectidConstructors);
     mapReduceConstructorTest(timestampConstructors);
     mapReduceConstructorTest(bindataConstructors);
+    mapReduceConstructorTest(uuidConstructors);
+    mapReduceConstructorTest(md5Constructors);
+    mapReduceConstructorTest(hexdataConstructors);
 }
 mapReduceConstructorTest(dateConstructors);
 
@@ -226,5 +366,8 @@ if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
     whereConstructorTest(objectidConstructors);
     whereConstructorTest(timestampConstructors);
     whereConstructorTest(bindataConstructors);
+    whereConstructorTest(uuidConstructors);
+    whereConstructorTest(md5Constructors);
+    whereConstructorTest(hexdataConstructors);
 }
 whereConstructorTest(dateConstructors);

@@ -733,24 +733,21 @@ namespace mongo {
         v8::Local<v8::Object> it = args.This();
         verify(scope->BinDataFT()->HasInstance(it));
 
-        if (args.Length() == 2) {
-            // 2 args: type, base64 string
-            v8::Handle<v8::Value> type = args[0];
-            if (!type->IsNumber() || type->Int32Value() < 0 || type->Int32Value() > 255) {
-                return v8AssertionException(
-                        "BinData subtype must be a Number between 0 and 255 inclusive)");
-            }
-            v8::String::Utf8Value utf(args[1]);
-            // uassert if invalid base64 string
-            string tmpBase64 = base64::decode(*utf);
-            // length property stores the decoded length
-            it->ForceSet(scope->v8StringData("len"), v8::Number::New(tmpBase64.length()));
-            it->ForceSet(scope->v8StringData("type"), type);
-            it->SetInternalField(0, args[1]);
+        argumentCheck(args.Length() == 2, "BinData takes 2 arguments -- BinData(subtype,data)");
+
+        // 2 args: type, base64 string
+        v8::Handle<v8::Value> type = args[0];
+        if (!type->IsNumber() || type->Int32Value() < 0 || type->Int32Value() > 255) {
+            return v8AssertionException(
+                    "BinData subtype must be a Number between 0 and 255 inclusive)");
         }
-        else if (args.Length() != 0) {
-            return v8AssertionException("BinData takes 2 arguments -- BinData(subtype,data)");
-        }
+        v8::String::Utf8Value utf(args[1]);
+        // uassert if invalid base64 string
+        string tmpBase64 = base64::decode(*utf);
+        // length property stores the decoded length
+        it->ForceSet(scope->v8StringData("len"), v8::Number::New(tmpBase64.length()));
+        it->ForceSet(scope->v8StringData("type"), type);
+        it->SetInternalField(0, args[1]);
 
         return it;
     }
@@ -790,9 +787,9 @@ namespace mongo {
         return v8::String::New(ss.str().c_str());
     }
 
-    static v8::Handle<v8::Value> hexToBinData(V8Scope* scope, v8::Local<v8::Object> it, int type,
-                                              string hexstr) {
-        verify(scope->BinDataFT()->HasInstance(it));
+    static v8::Handle<v8::Value> hexToBinData(V8Scope* scope, int type, string hexstr) {
+        // SERVER-9686: This function does not correctly check to make sure hexstr is actually made
+        // up of valid hex digits, and fails in the hex utility functions
 
         int len = hexstr.length() / 2;
         scoped_array<char> data(new char[len]);
@@ -802,38 +799,35 @@ namespace mongo {
         }
 
         string encoded = base64::encode(data.get(), len);
-        it->ForceSet(v8::String::New("len"), v8::Number::New(len));
-        it->ForceSet(v8::String::New("type"), v8::Number::New(type));
-        it->SetInternalField(0, v8::String::New(encoded.c_str(), encoded.length()));
-        return it;
+        v8::Handle<v8::Value> argv[2];
+        argv[0] = v8::Number::New(type);
+        argv[1] = v8::String::New(encoded.c_str());
+        return scope->BinDataFT()->GetFunction()->NewInstance(2, argv);
     }
 
     v8::Handle<v8::Value> uuidInit(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 1, "UUID needs 1 argument")
         v8::String::Utf8Value utf(args[0]);
         argumentCheck(utf.length() == 32, "UUID string must have 32 characters")
-
-        v8::Handle<v8::Function> f = scope->BinDataFT()->GetFunction();
-        v8::Local<v8::Object> it = f->NewInstance();
-        return hexToBinData(scope, it, bdtUUID, *utf);
+        return hexToBinData(scope, bdtUUID, *utf);
     }
 
     v8::Handle<v8::Value> md5Init(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 1, "MD5 needs 1 argument")
         v8::String::Utf8Value utf(args[0]);
         argumentCheck(utf.length() == 32, "MD5 string must have 32 characters")
-
-        v8::Handle<v8::Function> f = scope->BinDataFT()->GetFunction();
-        v8::Local<v8::Object> it = f->NewInstance();
-        return hexToBinData(scope, it, MD5Type, *utf);
+        return hexToBinData(scope, MD5Type, *utf);
     }
 
     v8::Handle<v8::Value> hexDataInit(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 2, "HexData needs 2 arguments")
+        v8::Handle<v8::Value> type = args[0];
+        if (!type->IsNumber() || type->Int32Value() < 0 || type->Int32Value() > 255) {
+            return v8AssertionException(
+                    "HexData subtype must be a Number between 0 and 255 inclusive");
+        }
         v8::String::Utf8Value utf(args[1]);
-        v8::Handle<v8::Function> f = scope->BinDataFT()->GetFunction();
-        v8::Local<v8::Object> it = f->NewInstance();
-        return hexToBinData(scope, it, args[0]->IntegerValue(), *utf);
+        return hexToBinData(scope, type->Int32Value(), *utf);
     }
 
     v8::Handle<v8::Value> numberLongInit(V8Scope* scope, const v8::Arguments& args) {
