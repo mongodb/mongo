@@ -1,0 +1,110 @@
+/**
+ *    Copyright (C) 2013 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "mongo/db/commands/write_commands/write_commands.h"
+
+#include "mongo/db/client.h"
+#include "mongo/db/commands/write_commands/batch_executor.h"
+#include "mongo/db/json.h"
+#include "mongo/db/stats/counters.h"
+
+namespace mongo {
+
+    // Write commands are currently "unregistered".  Uncomment the following lines if you want to
+    // experiment:
+
+    // TODO Register commands.
+    // CmdInsert cmdInsert;
+    // CmdUpdate cmdUpdate;
+    // CmdDelete cmdDelete;
+
+    WriteCmd::WriteCmd(const StringData& name, WriteBatch::WriteType writeType, ActionType action)
+        : Command(name)
+        , _action(action)
+        , _writeType(writeType) {}
+
+    // Write commands are fanned out in oplog as single writes.
+    bool WriteCmd::logTheOp() { return false; }
+
+    // Slaves can't perform writes.
+    bool WriteCmd::slaveOk() const { return false; }
+
+    // Write commands acquire write lock, but not for entire length of execution.
+    Command::LockType WriteCmd::locktype() const { return NONE; }
+
+    void WriteCmd::addRequiredPrivileges(const std::string& dbname,
+                                         const BSONObj& cmdObj,
+                                         std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(_action);
+        out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+    }
+
+    // Write commands are counted towards their corresponding opcounters, not command opcounters.
+    bool WriteCmd::shouldAffectCommandCounter() const { return false; }
+
+    bool WriteCmd::run(const string& dbName,
+                       BSONObj& cmdObj,
+                       int options,
+                       string& errMsg,
+                       BSONObjBuilder& result,
+                       bool fromRepl) {
+        verify(!fromRepl); // Can't be run on secondaries (logTheOp() == false, slaveOk() == false).
+
+        if (cmdObj.firstElementType() != mongo::String) {
+            errMsg = "expected string type for collection name";
+            return false;
+        }
+        string ns = parseNs(dbName, cmdObj);
+        if (!NamespaceString(ns).isValid()) {
+            errMsg = mongoutils::str::stream() << "invalid namespace: \"" << ns << "\"";
+            return false;
+        }
+
+        {
+            // Commands with locktype == NONE need to acquire a Context in order to set
+            // CurOp::_ns.  Setting a CurOp's namespace is necessary for higher-level
+            // functionality (e.g. profiling) to operate on the correct database (note that
+            // WriteBatchExecutor doesn't do this for us, since its job is to create child CurOp
+            // objects and operate on them).
+            //
+            // Acquire ReadContext momentarily, for satisfying this purpose.
+            Client::ReadContext ctx(dbName + ".$cmd");
+        }
+
+        WriteBatch writeBatch(ns, _writeType);
+
+        if (!writeBatch.parse(cmdObj, &errMsg)) {
+            return false;
+        }
+
+        WriteBatchExecutor writeBatchExecutor(&cc(), &globalOpCounters, lastError.get());
+        return writeBatchExecutor.executeBatch(writeBatch, &errMsg, &result);
+    }
+
+    CmdInsert::CmdInsert() : WriteCmd("insert", WriteBatch::WRITE_INSERT, ActionType::insert) {}
+
+    void CmdInsert::help(stringstream& help) const { help << "insert documents"; }
+
+    CmdUpdate::CmdUpdate() : WriteCmd("update", WriteBatch::WRITE_UPDATE, ActionType::update) {}
+
+    void CmdUpdate::help(stringstream& help) const { help << "update documents"; }
+
+    CmdDelete::CmdDelete() : WriteCmd("delete", WriteBatch::WRITE_DELETE, ActionType::remove) {}
+
+    void CmdDelete::help(stringstream& help) const { help << "delete documents"; }
+
+} // namespace mongo

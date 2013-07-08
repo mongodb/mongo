@@ -137,4 +137,6 @@ namespace mongo {
 
     void exitCleanly( ExitCode code );
 
+    void checkAndInsert(const char *ns, BSONObj& js);
+
 } // namespace mongo

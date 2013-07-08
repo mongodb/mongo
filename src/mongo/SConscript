@@ -527,6 +527,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     # most commands are only for mongod
                     "db/commands/apply_ops.cpp",
                     "db/commands/fsync.cpp",
+                    "db/commands/write_commands/write_commands.cpp",
+                    "db/commands/write_commands/batch_executor.cpp",
                     "db/commands/distinct.cpp",
                     "db/commands/find_and_modify.cpp",
                     "db/commands/group.cpp",
@@ -702,6 +704,13 @@ env.CppUnitTest('range_deleter_stat_test',
                 [ 'db/range_deleter_stat_test.cpp' ],
                 LIBDEPS = [ 'range_deleter', 'db/common' ]);
 
+env.StaticLibrary("writebatch",
+                  ["db/commands/write_commands/batch.cpp"],
+                  LIBDEPS=["db/common"])
+
+env.CppUnitTest("batch_test",
+                ["db/commands/write_commands/batch_test.cpp"],
+                LIBDEPS=["writebatch"])
 
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
@@ -717,6 +726,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            'range_deleter',
                            's/metadata',
                            "working_set",
+                           "writebatch",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 
