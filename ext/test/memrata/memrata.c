@@ -115,30 +115,35 @@ typedef struct __kvs_source {
 
 	kvs_t kvs_device;			/* Underlying KVS store */
 
-	/*
-	 * Each underlying KVS source has a txn namespace which has the list of
-	 * active transactions with their committed or aborted state as a value.
-	 */
-#define	TXN_ABORTED	1
-#define	TXN_COMMITTED	2
-#define	TXN_UNRESOLVED	3
-	kvs_t kvstxn;				/* Underlying KVS txn store */
+	struct __wt_source *ws_head;		/* List of WiredTiger sources */
 
 	/*
-	 * Each KVS store has a cleaner thread that migrates updates from the
-	 * cache into the primary, based on the number of bytes or the number
-	 * of operations.  We read these fields without a lock, but serialize
-	 * writes to minimize races.
+	 * Each KVS store has a cleaner thread that migrates updates made to the
+	 * WiredTiger sources from the cache namespace to the primary namespace,
+	 * based on the number of bytes or the number of operations.  We read
+	 * these fields without a lock, but serialize writes to minimize races.
 	 *
-	 * There's a cleaner thread per KVS store because that gives us a valid
-	 * WT_SESSION handle for the cleaner without a lot of magic.
+	 * There's a cleaner thread per KVS store because those operations can
+	 * overlap and that gives us a valid WT_SESSION handle for the cleaner
+	 * without a lot of magic.
 	 */
 	WT_EXTENSION_API *wtext;		/* Extension functions */
 	WT_SESSION	 *session;		/* Enclosing session */
 	pthread_t cleaner_id;			/* Cleaner thread ID */
 	int	  cleaner_stop;			/* Cleaner thread quit flag */
 
-	struct __wt_source *ws_head;		/* List of WiredTiger sources */
+	/*
+	 * Each WiredTiger connection has a transaction namespace which lists
+	 * resolved transactions with their committed or aborted state as a
+	 * value.  We create that namesapce in the first KVS store created,
+	 * and then simply reference it from other, subsequently created KVS
+	 * stores.
+	 */
+#define	TXN_ABORTED	1
+#define	TXN_COMMITTED	2
+#define	TXN_UNRESOLVED	3
+	kvs_t	kvstxn;				/* Underlying KVS txn store */
+	int	kvstxn_first;			/* First KVS store */
 
 	struct __kvs_source *next;		/* List of KVS sources */
 } KVS_SOURCE;
@@ -860,7 +865,6 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 		 * the maximum known record number, update the maximum number
 		 * as necessary.
 		 *
-		 * XXX
 		 * Assume we can compare 8B values without locking them, and
 		 * test again after acquiring the lock.
 		 *
@@ -1867,14 +1871,14 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 		ks->cleaner_id = 0;
 	}
 
-	/* Close the underlying name spaces. */
+	/* Close the underlying WiredTiger sources. */
 	while ((ws = ks->ws_head) != NULL) {
 		ks->ws_head = ws->next;
 		ESET(ws_source_close(wtext, session, ws));
 	}
 
-	/* Close the transaction name space. */
-	if (ks->kvstxn != NULL) {
+	/* Close the transaction name space in the first KVS source opened. */
+	if (ks->kvstxn_first && ks->kvstxn != NULL) {
 		if ((tret = kvs_close(ks->kvstxn)) != 0)
 			EMSG(wtext, session, WT_ERROR,
 			    "kvs_close: %s.txn: %s",
@@ -2026,27 +2030,28 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	}
 
 	/*
-	 * Open the global txn namespace.
+	 * The global txn namespace is per connection, that is, it might span
+	 * multiple KVS sources.  Open it when opening the first KVS source;
+	 * for the second and subsequent KVS sources, reference it.
 	 *
 	 * XXX
-	 * This is not quite correct: if there are multiple KVS devices, we'd
-	 * only want to open one of the transaction namespaces, and subsequent
-	 * KVS device opens would reference the same transaction name space.
-	 *
-	 * XXX
-	 * This is where we'll handle recovery of the global txn namespace, we
-	 * have to review any list of committed transactions in the txn store
-	 * and update the primary as necessary.
+	 * This is where we'll handle recovery.
 	 */
-	if ((ks->kvstxn =
-	    kvs_open_namespace(ks->kvs_device, "txn", KVS_O_CREATE)) == NULL) {
-		EMSG(wtext, session, WT_ERROR,
-		    "kvs_open_namespace: %s.txn: %s",
-		    ks->name, kvs_strerror(os_errno()));
-		goto err;
+	if (ds->kvs_head == NULL) {
+		if ((ks->kvstxn = kvs_open_namespace(
+		    ks->kvs_device, "txn", KVS_O_CREATE)) == NULL) {
+			EMSG(wtext, session, WT_ERROR,
+			    "kvs_open_namespace: %s.txn: %s",
+			    ks->name, kvs_strerror(os_errno()));
+			goto err;
+		}
+		ks->kvstxn_first = 1;
+	} else {
+		ks->kvstxn = ds->kvs_head->kvstxn;
+		ks->kvstxn_first = 0;
 	}
 
-	/* Push the change. */
+	/* Push any changes. */
 	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
 		EMSG(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
