@@ -24,21 +24,23 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-
+#include "mongo/client/sasl_client_authenticate.h"
 
 namespace mongo {
 
+    bool setInternalUserAuthParams(BSONObj authParams) {
+        internalSecurity.authParams = authParams.copy(); 
+        return true;
+    }
+ 
     bool authenticateInternalUser(DBClientWithCommands* conn){
-        string err;
-        if( !conn->auth("local", 
-                        internalSecurity.user,
-                        internalSecurity.pwd, 
-                        err, 
-                        false) ) {
-            log() << "can't authenticate as internal user, error: " << err << endl;
+        try {
+            conn->auth(internalSecurity.authParams); 
+            return true;
+        } catch(const UserException& ex) {
+            log() << "can't authenticate as internal user, error: " << ex.what() << endl;
             return false;
         }
-        return true;
     }
 
     bool setUpSecurityKey(const string& filename) {
@@ -112,6 +114,12 @@ namespace mongo {
         // createPWDigest should really not be a member func
         DBClientConnection conn;
         internalSecurity.pwd = conn.createPasswordDigest(internalSecurity.user, str);
+
+        setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
+                       saslCommandUserSourceFieldName << "local" <<
+                       saslCommandUserFieldName << internalSecurity.user <<
+                       saslCommandPasswordFieldName << internalSecurity.pwd <<
+                       saslCommandDigestPasswordFieldName << false));
 
         return true;
     }

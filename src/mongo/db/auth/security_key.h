@@ -21,6 +21,12 @@
 #include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
+    /**
+     * This method initializes the internalSecurity object with authentication
+     * credentials to be used by authenticateInternalUser
+     *
+     */
+    extern bool setInternalUserAuthParams(BSONObj authParams);
 
     /**
      * This method authenticates to another cluster member using appropriate

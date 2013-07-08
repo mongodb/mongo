@@ -40,6 +40,7 @@ namespace mongo {
         AuthInfo();
         std::string user;
         std::string pwd;
+        BSONObj authParams;
     };
     extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
 
