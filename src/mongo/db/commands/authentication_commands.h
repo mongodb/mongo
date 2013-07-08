@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/status.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
@@ -47,7 +49,7 @@ namespace mongo {
 
     private:
         /**
-         * Completes the authentication of "user" using parameters from "cmdObj".
+         * Completes the authentication of "user" using "mechanism" and parameters from "cmdObj".
          *
          * Returns Status::OK() on success.  All other statuses indicate failed authentication.  The
          * entire status returned here may always be used for logging.  However, if the code is
@@ -58,7 +60,9 @@ namespace mongo {
          * mechanism, and ProtocolError, indicating an error in the use of the authentication
          * protocol.
          */
-        Status _authenticate(const UserName& user, const BSONObj& cmdObj);
+        Status _authenticate(const std::string& mechanism,
+                             const UserName& user,
+                             const BSONObj& cmdObj);
         Status _authenticateCR(const UserName& user, const BSONObj& cmdObj);
         Status _authenticateX509(const UserName& user, const BSONObj& cmdObj);
     };

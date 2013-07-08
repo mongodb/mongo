@@ -22,6 +22,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -104,7 +105,15 @@ namespace mongo {
 
         log() << " authenticate db: " << dbname << " " << cmdObj << endl;
         UserName user(cmdObj.getStringField("user"), dbname);
-        Status status = _authenticate(user, cmdObj);
+        std::string mechanism = cmdObj.getStringField("mechanism");
+        if (mechanism.empty()) {
+            mechanism = "MONGODB-CR";
+        }
+        Status status = _authenticate(mechanism, user, cmdObj);
+        audit::logAuthentication(ClientBasic::getCurrent(),
+                                 mechanism,
+                                 user,
+                                 status.code());
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::AuthenticationFailed) {
                 // Statuses with code AuthenticationFailed may contain messages we do not wish to
@@ -122,9 +131,11 @@ namespace mongo {
         return true;
     }
 
-    Status CmdAuthenticate::_authenticate(const UserName& user, const BSONObj& cmdObj) {
-        std::string mechanism = cmdObj.getStringField("mechanism");
-        if (mechanism.empty() || mechanism == "MONGODB-CR") {
+    Status CmdAuthenticate::_authenticate(const std::string& mechanism,
+                                          const UserName& user,
+                                          const BSONObj& cmdObj) {
+
+        if (mechanism == "MONGODB-CR") {
             return _authenticateCR(user, cmdObj);
         }
 #ifdef MONGO_SSL
