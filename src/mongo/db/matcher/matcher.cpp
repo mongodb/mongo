@@ -19,7 +19,6 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/init.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"

@@ -1,0 +1,51 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary(
+    target = "working_set",
+    source = [
+        "working_set.cpp",
+    ],
+    LIBDEPS = [
+        "$BUILD_DIR/mongo/bson",
+    ],
+)
+
+env.CppUnitTest(
+    target = "working_set_test",
+    source = [
+        "working_set_test.cpp"
+    ],
+    LIBDEPS = [
+        "working_set",
+    ],
+)
+
+env.StaticLibrary(
+    target = "mock_stage",
+    source = [
+        "mock_stage.cpp",
+    ],
+    LIBDEPS = [
+        "working_set",
+    ],
+)
+
+env.StaticLibrary(
+    target = 'exec',
+    source = [
+        "and_hash.cpp",
+        "and_sorted.cpp",
+        "fetch.cpp",
+        "index_scan.cpp",
+        "limit.cpp",
+        "or.cpp",
+        "skip.cpp",
+        "stagedebug_cmd.cpp",
+        "working_set_common.cpp",
+    ],
+    LIBDEPS = [
+        "$BUILD_DIR/mongo/bson"
+    ],
+)

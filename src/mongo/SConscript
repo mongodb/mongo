@@ -17,6 +17,7 @@ Import("darwin windows solaris linux nix")
 
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
+                'db/exec/SConscript',
                 'db/fts/SConscript',
                 'db/ops/SConscript',
                 'db/SConscript',
@@ -348,7 +349,7 @@ env.StaticLibrary("coredb", [
                            'expressions',
                            'expressions_geo',
                            'expressions_where',
-                           'working_set',
+                           'db/exec/working_set',
                            '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",
@@ -463,11 +464,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/prefetch.cpp",
                     "db/repl/write_concern.cpp",
                     "db/btreecursor.cpp",
-                    "db/exec/and_hash.cpp",
-                    "db/exec/and_sorted.cpp",
-                    "db/exec/index_scan.cpp",
-                    "db/exec/stagedebug_cmd.cpp",
-                    "db/exec/working_set_common.cpp",
                     "db/index_legacy.cpp",
                     "db/index_selection.cpp",
                     "db/index/2d_access_method.cpp",
@@ -669,10 +665,6 @@ serverOnlyFiles += [ "s/d_logic.cpp",
 
 env.StaticLibrary("defaultversion", "s/default_version.cpp")
 
-# Query execution
-env.StaticLibrary("working_set", [ "db/exec/working_set.cpp", ], LIBDEPS = [ "bson",])
-env.CppUnitTest("working_set_test", [ "db/exec/working_set_test.cpp" ], LIBDEPS = ["working_set"])
-
 # Geo
 env.StaticLibrary("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], LIBDEPS = [ "bson" ])
 env.StaticLibrary("geoparser", [ "db/geo/geoparser.cpp", ],
@@ -730,6 +722,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            's/metadata',
                            "working_set",
                            "writebatch",
+                           "db/exec/exec",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 
@@ -827,6 +820,7 @@ test = testEnv.Install(
                        "gridfs",
                        "s/upgrade",
                        "mocklib",
+                       "db/exec/mock_stage",
                        "$BUILD_DIR/mongo/db/auth/authmocks"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):

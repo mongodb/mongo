@@ -259,6 +259,9 @@ namespace mongo {
         const char * data() const { _accessing(); return _data; }
         char * data() { _accessing(); return _data; }
 
+        const char * dataNoThrowing() const { return _data; }
+        char * dataNoThrowing() { return _data; }
+
         int netLength() const { _accessing(); return _netLength(); }
 
         /* use this when a record is deleted. basically a union with next/prev fields */

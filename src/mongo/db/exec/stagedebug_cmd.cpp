@@ -20,7 +20,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
+#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/limit.h"
+#include "mongo/db/exec/or.h"
+#include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/simple_plan_runner.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
@@ -49,16 +53,16 @@ namespace mongo {
      *
      * node -> {andHash: {filter: {filter}, args: { nodes: [node, node]}}}
      * node -> {andSorted: {filter: {filter}, args: { nodes: [node, node]}}}
+     * node -> {or: {filter: {filter}, args: { dedup:bool, nodes:[node, node]}}}
+     * node -> {fetch: {filter: {filter}, args: {node: node}}}
+     * node -> {limit: {args: {node: node, num: posint}}}
+     * node -> {skip: {args: {node: node, num: posint}}}
      *
      * Forthcoming Nodes:
      *
      * node -> {cscan: {filter: {filter}, args: {name: "collectionname" }}}
-     * node -> {or: {filter: {filter}, args: { dedup:bool, nodes:[node, node]}}}
-     * node -> {fetch: {filter: {filter}, args: {node: node}}}
      * node -> {sort: {filter: {filter}, args: {node: node, pattern: objWithSortCriterion}}}
      * node -> {dedup: {filter: {filter}, args: {node: node, field: field}}}
-     * node -> {limit: {filter: filter}, args: {node: node, num: posint}}
-     * node -> {skip: {filter: filter}, args: {node: node, num: posint}}
      * node -> {unwind: {filter: filter}, args: {node: node, field: field}}
      */
     class StageDebugCmd : public Command {
@@ -202,6 +206,52 @@ namespace mongo {
                 uassert(16928, "AND requires more than one child", nodesAdded >= 2);
 
                 return andStage.release();
+            }
+            else if ("or" == nodeName) {
+                uassert(16934, "Nodes argument must be provided to AND",
+                        nodeArgs["nodes"].isABSONObj());
+                uassert(16935, "Dedup argument must be provided to OR",
+                        !nodeArgs["dedup"].eoo());
+                BSONObjIterator it(nodeArgs["nodes"].Obj());
+                auto_ptr<OrStage> orStage(new OrStage(workingSet, nodeArgs["dedup"].Bool(),
+                                                      matcher.release()));
+                while (it.more()) {
+                    BSONElement e = it.next();
+                    if (!e.isABSONObj()) { return NULL; }
+                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet);
+                    uassert(16936, "Can't parse sub-node of OR: " + e.Obj().toString(),
+                            NULL != subNode);
+                    // takes ownership
+                    orStage->addChild(subNode);
+                }
+
+                return orStage.release();
+            }
+            else if ("fetch" == nodeName) {
+                uassert(16929, "Node argument must be provided to fetch",
+                        nodeArgs["node"].isABSONObj());
+                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet);
+                return new FetchStage(workingSet, subNode, matcher.release());
+            }
+            else if ("limit" == nodeName) {
+                uassert(16937, "Limit stage doesn't have a filter (put it on the child)",
+                        NULL == matcher.get());
+                uassert(16930, "Node argument must be provided to limit",
+                        nodeArgs["node"].isABSONObj());
+                uassert(16931, "Num argument must be provided to limit",
+                        nodeArgs["num"].isNumber());
+                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet);
+                return new LimitStage(nodeArgs["num"].numberInt(), workingSet, subNode);
+            }
+            else if ("skip" == nodeName) {
+                uassert(16938, "Skip stage doesn't have a filter (put it on the child)",
+                        NULL == matcher.get());
+                uassert(16932, "Node argument must be provided to skip",
+                        nodeArgs["node"].isABSONObj());
+                uassert(16933, "Num argument must be provided to skip",
+                        nodeArgs["num"].isNumber());
+                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet);
+                return new SkipStage(nodeArgs["num"].numberInt(), workingSet, subNode);
             }
             else {
                 return NULL;

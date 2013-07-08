@@ -94,16 +94,33 @@ namespace mongo {
          * All possible return values of work(...)
          */
         enum StageState {
-            // work(...) has returned a new result in its out parameter.
+            // work(...) has returned a new result in its out parameter.  The caller must free it
+            // from the working set when done with it.
             ADVANCED,
-            // work(...) won't do anything more.  isEOF() will also be true.
+
+            // work(...) won't do anything more.  isEOF() will also be true.  There is nothing
+            // output in the out parameter.
             IS_EOF,
-            // work(...) needs more time to product a result.  Call work(...) again.
+
+            // work(...) needs more time to product a result.  Call work(...) again.  There is
+            // nothing output in the out parameter.
             NEED_TIME,
-            // Something has gone unrecoverably wrong.  Stop running this query.
+
+            // Something has gone unrecoverably wrong.  Stop running this query.  There is nothing
+            // output in the out parameter.
             FAILURE,
-            // Something isn't in memory.  Fetch it.  TODO: actually support this (forthcoming).
-            NEED_YIELD,
+
+            // Something isn't in memory.  Fetch it.
+            //
+            // Full fetch semantics:
+            // The fetch-requesting stage populates the out parameter of work(...) with a WSID that
+            // refers to a WSM with a valid loc.  Each stage that receives a NEED_FETCH from a child
+            // must propagate the NEED_FETCH up and perform no work.  The plan runner is responsible
+            // for paging in the data upon receipt of a NEED_FETCH. The plan runner does NOT free
+            // the WSID of the requested fetch.  The stage that requested the fetch holds the WSID
+            // of the loc it wants fetched.  On the next call to work() that stage can assume a
+            // fetch was performed on the WSM that the held WSID refers to.
+            NEED_FETCH,
         };
 
         /**
