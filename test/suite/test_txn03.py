@@ -48,8 +48,7 @@ class test_txn03(wttest.WiredTigerTestCase):
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open(dir, 'create,' +
-                ('error_prefix="%s: ",' % self.shortid()) +
-                'transactional,')
+                ('error_prefix="%s: ",' % self.shortid()))
         self.pr(`conn`)
         return conn
 
