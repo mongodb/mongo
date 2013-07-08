@@ -22,6 +22,11 @@ StaticLibrary('ta', ['a.c'])
 
 And the build system will figure out that it needs to link libta.a and libtb.a
 when building 'try'.
+
+A StaticLibrary S may also declare programs or libraries, [L1, ...] to be dependent
+upon S by setting LIBDEPS_DEPENDENTS=[L1, ...], using the same syntax as is used
+for LIBDEPS, except that the libraries and programs will not have LIBPREFIX/LIBSUFFIX
+automatically added when missing.
 """
 
 # Copyright (c) 2010, Corensic Inc., All Rights Reserved.
@@ -97,7 +102,7 @@ def __compute_libdeps(node):
     node.attributes.libdeps_exploring = True
     try:
         try:
-            for child in env.Flatten(env.get(libdeps_env_var, [])):
+            for child in env.Flatten(getattr(node.attributes, 'libdeps_direct', [])):
                 if not child:
                     continue
                 deps.add(child)
@@ -183,6 +188,11 @@ def get_syslibdeps(source, target, env, for_signature):
             result.append(d)
     return result
 
+def __append_direct_libdeps(node, prereq_nodes):
+    if getattr(node.attributes, 'libdeps_direct', None) is None:
+        node.attributes.libdeps_direct = []
+    node.attributes.libdeps_direct.extend(prereq_nodes)
+
 def libdeps_emitter(target, source, env):
     """SCons emitter that takes values from the LIBDEPS environment variable and
     converts them to File node objects, binding correct path information into
@@ -196,13 +206,16 @@ def libdeps_emitter(target, source, env):
     relative paths to LIBDEPS elements.
 
     This emitter also adds LIBSUFFIX and LIBPREFIX appropriately.
+
+    NOTE: For purposes of LIBDEPS_DEPENDENTS propagation, only the first member
+    of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
     """
 
     libdep_files = []
     lib_suffix = env.subst('$LIBSUFFIX', target=target, source=source)
     lib_prefix = env.subst('$LIBPREFIX', target=target, source=source)
-    for dep in env.Flatten([env.get(libdeps_env_var, [])]):
-        full_path = env.subst(str(dep), target=target, source=source)
+    for prereq in env.Flatten([env.get(libdeps_env_var, [])]):
+        full_path = env.subst(str(prereq), target=target, source=source)
         dir_name = os.path.dirname(full_path)
         file_name = os.path.basename(full_path)
         if not file_name.startswith(lib_prefix):
@@ -211,7 +224,11 @@ def libdeps_emitter(target, source, env):
             file_name += '${LIBSUFFIX}'
         libdep_files.append(env.File(os.path.join(dir_name, file_name)))
 
-    env[libdeps_env_var] = libdep_files
+    for t in target:
+        __append_direct_libdeps(t, libdep_files)
+
+    for dependent in env.Flatten([env.get('LIBDEPS_DEPENDENTS', [])]):
+        __append_direct_libdeps(env.File(dependent), [target[0]])
 
     return target, source
 
