@@ -439,9 +439,7 @@ extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_INSERT **insp,
     size_t *ins_sizep);
 extern int __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args);
-extern int __wt_update_check(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    WT_UPDATE *next);
+extern int __wt_update_check(WT_SESSION_IMPL *session, WT_UPDATE *next);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,

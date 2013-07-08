@@ -461,10 +461,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			 * page (because it was never deleted, but by definition
 			 * no earlier transaction might need it).
 			 *
-			 * Re-create the WT_REF state of a deleted node, give
-			 * the page a modify structure and set the transaction
-			 * ID for the first update to the page (WT_TXN_NONE
-			 * because the transaction is committed and visible.)
+			 * Re-create the WT_REF state of a deleted node and give
+			 * the page a modify structure.
 			 *
 			 * If the tree is already dirty and so will be written,
 			 * mark the page dirty.  (We'd like to free the deleted
@@ -477,7 +475,6 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 				ref->txnid = WT_TXN_NONE;
 
 				WT_ERR(__wt_page_modify_init(session, page));
-				page->modify->first_id = WT_TXN_NONE;
 				if (btree->modified)
 					__wt_page_modify_set(session, page);
 			}
