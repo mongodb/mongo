@@ -192,13 +192,7 @@ namespace mongo {
                 string host = cursorCache.getRef( id );
 
                 if( host.size() == 0 ){
-
-                    //
-                    // Match legacy behavior here by throwing an exception when we can't find
-                    // the cursor, but make the exception more informative
-                    //
-
-                    LOG(6) << "could not find cursor in cache for id " << id
+                    LOG(3) << "could not find cursor in cache for id " << id
                            << " over collection " << ns << endl;
                     replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                     return;
@@ -227,11 +221,9 @@ namespace mongo {
                 int ntoreturn = r.d().pullInt();
                 long long id = r.d().pullInt64();
 
-                LOG(6) << "want cursor : " << id << endl;
-
                 ShardedClientCursorPtr cursor = cursorCache.get( id );
                 if ( ! cursor ) {
-                    LOG(6) << "\t invalid cursor :(" << endl;
+                    LOG(3) << "Invalid cursor:" << id << endl;
                     replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                     return;
                 }
