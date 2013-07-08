@@ -55,7 +55,7 @@ namespace mongo {
         bool hasOption( int x ) const { return ( x & _options ) != 0; }
         bool hasReadPref() const { return _hasReadPref; }
         
-        bool isExplain() const { return _explain; }
+        char isExplain() const { return _explain; }
         bool isSnapshot() const { return _snapshot; }
         bool returnKey() const { return _returnKey; }
         bool showDiskLoc() const { return _showDiskLoc; }
@@ -100,7 +100,7 @@ namespace mongo {
         const int _options;
         shared_ptr<Projection> _fields;
         bool _wantMore;
-        bool _explain;
+        char _explain;
         bool _snapshot;
         bool _returnKey;
         bool _showDiskLoc;

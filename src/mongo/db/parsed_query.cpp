@@ -108,7 +108,7 @@ namespace mongo {
 
     void ParsedQuery::_reset() {
         _wantMore = true;
-        _explain = false;
+        _explain = 0;
         _snapshot = false;
         _returnKey = false;
         _showDiskLoc = false;
@@ -161,7 +161,7 @@ namespace mongo {
             if( *name == '$' ) {
                 name++;
                 if ( strcmp( "explain" , name ) == 0 )
-                    _explain = e.trueValue();
+                    _explain = e.isNumber() ? (char)e.numberInt() : e.trueValue();
                 else if ( strcmp( "snapshot" , name ) == 0 )
                     _snapshot = e.trueValue();
                 else if ( strcmp( "min" , name ) == 0 )
