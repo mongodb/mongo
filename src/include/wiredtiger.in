@@ -1421,8 +1421,6 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
  * checkpoints., a boolean flag; default \c true.}
- * @config{transactional, support transactional semantics., a boolean flag;
- * default \c true.}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
  * process is running with special privileges.  See @ref home for more
