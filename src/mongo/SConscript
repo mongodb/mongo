@@ -111,6 +111,9 @@ env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
 env.CppUnitTest('namespacestring_test', ['db/namespace_string_test.cpp'],
                 LIBDEPS=['bson'])
 
+env.CppUnitTest('namespace_test', ['db/storage/namespace_test.cpp'],
+                LIBDEPS=['foundation'])
+
 env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
                 LIBDEPS=['bson','index_set'])
 
