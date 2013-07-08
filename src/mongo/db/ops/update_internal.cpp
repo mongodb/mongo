@@ -1255,7 +1255,7 @@ namespace mongo {
                          fieldName[0] != '$' || op == Mod::UNSET );
                 uassert( 10148,
                          "Mod on _id not allowed",
-                         strcmp( fieldName, "_id" ) != 0 );
+                         strcmp( fieldName, "_id" ) != 0 && op != Mod::SET_ON_INSERT);
                 uassert( 10149,
                          "Invalid mod field name, may not end in a period",
                          fieldName[ strlen( fieldName ) - 1 ] != '.' );
