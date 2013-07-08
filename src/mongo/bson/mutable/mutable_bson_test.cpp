@@ -373,8 +373,8 @@ namespace {
         mmb::Element foo = doc.root().rightChild();
         ASSERT_TRUE(foo.ok());
         ASSERT_OK(foo.remove());
-        ASSERT_OK(doc.root().appendString("bar", "bar"));
-        mmb::Element bar = doc.root().rightChild();
+        ASSERT_FALSE(foo.parent().ok());
+        mmb::Element bar = doc.makeElementString("bar", "bar");
         ASSERT_TRUE(bar.ok());
         ASSERT_NOT_OK(foo.addSiblingLeft(bar));
     }
@@ -385,8 +385,8 @@ namespace {
         mmb::Element foo = doc.root().rightChild();
         ASSERT_TRUE(foo.ok());
         ASSERT_OK(foo.remove());
-        ASSERT_OK(doc.root().appendString("bar", "bar"));
-        mmb::Element bar = doc.root().rightChild();
+        ASSERT_FALSE(foo.parent().ok());
+        mmb::Element bar = doc.makeElementString("bar", "bar");
         ASSERT_TRUE(bar.ok());
         ASSERT_NOT_OK(foo.addSiblingRight(bar));
     }
@@ -580,7 +580,7 @@ namespace {
         docChild = docChild.rightSibling();
         ASSERT_TRUE(docChild.ok());
         ASSERT_TRUE(iter.more());
-        ASSERT_EQUALS(iter.next().toString(), docChild.toString());
+        ASSERT_EQUALS(iter.next().toString(), mmb::ConstElement(docChild).toString());
 
         // 'c'
         docChild = docChild.rightSibling();
@@ -2698,6 +2698,58 @@ namespace {
         // ASSERT_TRUE(x.hasValue());
         // ASSERT_TRUE(x.isType(mongo::NumberDouble));
         // ASSERT_EQUALS(value1, x.getValueDouble());
+    }
+
+    TEST(DocumentComparison, SimpleComparison) {
+        const mongo::BSONObj obj =
+            mongo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
+
+        const mmb::Document doc1(obj.getOwned());
+        ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj));
+        const mmb::Document doc2(obj.getOwned());
+        ASSERT_EQUALS(0, doc1.compareWith(doc2));
+        ASSERT_EQUALS(0, doc2.compareWith(doc1));
+    }
+
+    TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
+        const mongo::BSONObj obj =
+            mongo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
+
+        // Perform an operation on 'b' that doesn't change the serialized value, but
+        // deserializes the node.
+        mmb::Document doc1(obj.getOwned());
+        const mmb::Document doc1Copy(obj.getOwned());
+        mmb::Element b = doc1.root()["b"];
+        ASSERT_TRUE(b.ok());
+        mmb::Element b0 = b[0];
+        ASSERT_TRUE(b0.ok());
+        ASSERT_OK(b0.remove());
+        ASSERT_OK(b.pushBack(b0));
+        // Ensure that it compares correctly against the source object.
+        ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj));
+        // Ensure that it compares correctly against a pristine document.
+        ASSERT_EQUALS(0, doc1.compareWith(doc1Copy));
+        ASSERT_EQUALS(0, doc1Copy.compareWith(doc1));
+
+        // Perform an operation on 'c' that doesn't change the serialized value, but
+        // deserializeds the node.
+        mmb::Document doc2(obj.getOwned());
+        const mmb::Document doc2Copy(obj.getOwned());
+        mmb::Element c = doc2.root()["c"];
+        ASSERT_TRUE(c.ok());
+        mmb::Element c1 = c.leftChild();
+        ASSERT_TRUE(c1.ok());
+        ASSERT_OK(c1.remove());
+        ASSERT_OK(c.pushBack(c1));
+        // Ensure that it compares correctly against the source object
+        ASSERT_EQUALS(0, doc2.compareWithBSONObj(obj));
+        // Ensure that it compares correctly against a pristine document.
+        ASSERT_EQUALS(0, doc2.compareWith(doc2Copy));
+        ASSERT_EQUALS(0, doc2Copy.compareWith(doc2));
+
+        // Ensure that the two deserialized documents compare with each other correctly.
+        ASSERT_EQUALS(0, doc1.compareWith(doc2));
+        ASSERT_EQUALS(0, doc2.compareWith(doc1));
     }
 
 } // namespace

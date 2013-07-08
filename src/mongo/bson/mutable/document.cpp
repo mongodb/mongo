@@ -1344,16 +1344,16 @@ namespace mutablebson {
                 return fnamesComp;
         }
 
+        const bool considerChildFieldNames =
+            (impl.getType(thisRep) != mongo::Array) &&
+            (oimpl.getType(otherRep) != mongo::Array);
+
         // We are dealing with either two objects, or two arrays. We need to consider the child
         // elements individually. We walk two iterators forward over the children and compare
         // them. Length mismatches are handled by checking early for reaching the end of the
         // children.
         ConstElement thisIter = leftChild();
         ConstElement otherIter = other.leftChild();
-
-        const bool considerChildFieldNames =
-            (impl.getType(thisRep) != mongo::Array) &&
-            (impl.getType(otherRep) != mongo::Array);
 
         while (true) {
             if (!thisIter.ok())
