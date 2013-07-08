@@ -39,7 +39,9 @@ namespace mongo {
         if (!populated)
             populate();
 
-        return (groupsIterator == groups.end());
+        return _spilled
+                ? _done
+                : (groupsIterator == groups.end());
     }
 
     bool DocumentSourceGroup::advance() {
@@ -48,12 +50,59 @@ namespace mongo {
         if (!populated)
             populate();
 
-        verify(groupsIterator != groups.end());
+        if (_spilled) {
+            if (_doneAfterNextAdvance) {
+                verify(!_done);
+                _done = true;
+                return !_done;
+            }
 
-        ++groupsIterator;
-        if (groupsIterator == groups.end()) {
-            dispose();
-            return false;
+            const size_t numAccumulators = vpAccumulatorFactory.size();
+            for (size_t i=0; i < numAccumulators; i++) {
+                _currentAccumulators[i]->reset(); // prep accumulators for a new group
+            }
+
+            _currentId = _firstPartOfNextGroup.first;
+            while (_currentId == _firstPartOfNextGroup.first) {
+                // Inside of this loop, _firstPartOfNextGroup is the current data being processed.
+                // At loop exit, it is the first value to be processed in the next group.
+
+                switch (numAccumulators) { // mirrors switch in spill()
+                case 0: // no Accumulators so no Values
+                    break;
+
+                case 1: // single accumulators serialize as a single Value
+                    _currentAccumulators[0]->process(_firstPartOfNextGroup.second,
+                                                     /*merging=*/true);
+                    break;
+
+                default: { // multiple accumulators serialize as an array
+                    const vector<Value>& accumulatorStates =
+                        _firstPartOfNextGroup.second.getArray();
+                    for (size_t i=0; i < numAccumulators; i++) {
+                        _currentAccumulators[i]->process(accumulatorStates[i],
+                                                         /*merging=*/true);
+                    }
+                    break;
+                }
+                }
+
+                if (!_sorterIterator->more()) {
+                    _doneAfterNextAdvance = true;
+                    break;
+                }
+
+                _firstPartOfNextGroup = _sorterIterator->next();
+            }
+
+        } else {
+            verify(groupsIterator != groups.end());
+
+            ++groupsIterator;
+            if (groupsIterator == groups.end()) {
+                dispose();
+                return false;
+            }
         }
 
         return true;
@@ -63,13 +112,28 @@ namespace mongo {
         if (!populated)
             populate();
 
-        return makeDocument(*groupsIterator, pExpCtx->getInShard());
+        dassert(!eof());
+
+        if (_spilled) {
+            return makeDocument(_currentId, _currentAccumulators, pExpCtx->getInShard());
+        } else {
+            return makeDocument(groupsIterator->first,
+                                groupsIterator->second,
+                                pExpCtx->getInShard());
+        }
     }
 
     void DocumentSourceGroup::dispose() {
+        // free our resources
         GroupsMap().swap(groups);
+        _sorterIterator.reset();
+
+        // make us look done
+        _doneAfterNextAdvance = true;
+        _done = true;
         groupsIterator = groups.end();
 
+        // free our source's resources
         pSource->dispose();
     }
 
@@ -110,16 +174,18 @@ namespace mongo {
         return pSource;
     }
 
-    DocumentSourceGroup::DocumentSourceGroup(
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        SplittableDocumentSource(pExpCtx),
-        populated(false),
-        pIdExpression(),
-        groups(),
-        vFieldName(),
-        vpAccumulatorFactory(),
-        vpExpression() {
-    }
+    DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx)
+        : SplittableDocumentSource(pExpCtx)
+        , populated(false)
+        , _spilled(false)
+
+        // TODO: support opting-in to external sort
+        , _extSortAllowed(false)
+
+        , _maxMemoryUsageBytes(100*1024*1024)
+        , _doneAfterNextAdvance(false)
+        , _done(false)
+    {}
 
     void DocumentSourceGroup::addAccumulator(
             const std::string& fieldName,
@@ -275,13 +341,35 @@ namespace mongo {
         return pGroup;
     }
 
+    namespace {
+        class SorterComparator {
+        public:
+            typedef pair<Value, Value> Data;
+            int operator() (const Data& lhs, const Data& rhs) const {
+                return Value::compare(lhs.first, rhs.first);
+            }
+        };
+    }
+
     void DocumentSourceGroup::populate() {
         const size_t numAccumulators = vpAccumulatorFactory.size();
         dassert(numAccumulators == vpExpression.size());
 
         const bool mergeInputs = pExpCtx->getDoingMerge();
 
+        // pushed to on spill()
+        vector<shared_ptr<Sorter<Value, Value>::Iterator> > sortedFiles;
+        int memoryUsageBytes = 0;
+
+        // This loop consumes all input from pSource and buckets it based on pIdExpression.
         for (bool hasNext = !pSource->eof(); hasNext; hasNext = pSource->advance()) {
+            if (memoryUsageBytes > _maxMemoryUsageBytes) {
+                uassert(16945, "Exceeded memory limit for $group, but didn't allow external sort",
+                        _extSortAllowed);
+                sortedFiles.push_back(spill());
+                memoryUsageBytes = 0;
+            }
+
             const Document input = pSource->getCurrent();
             const Variables vars (input);
 
@@ -296,16 +384,22 @@ namespace mongo {
               Look for the _id value in the map; if it's not there, add a
               new entry with a blank accumulator.
             */
+            const size_t oldSize = groups.size();
             vector<intrusive_ptr<Accumulator> >& group = groups[id];
+            const bool inserted = groups.size() != oldSize;
 
-            if (numAccumulators == 0)
-                continue; // we are basically building a set
+            if (inserted) {
+                memoryUsageBytes += id.getApproximateSize();
 
-            if (group.empty()) {
-                /* add the accumulators */
+                // Add the accumulators
                 group.reserve(numAccumulators);
                 for (size_t i = 0; i < numAccumulators; i++) {
                     group.push_back(vpAccumulatorFactory[i]());
+                }
+            } else {
+                for (size_t i = 0; i < numAccumulators; i++) {
+                    // subtract old mem usage. New usage added back after processing.
+                    memoryUsageBytes -= group[i]->memUsageForSorter();
                 }
             }
 
@@ -313,22 +407,109 @@ namespace mongo {
             dassert(numAccumulators == group.size());
             for (size_t i = 0; i < numAccumulators; i++) {
                 group[i]->process(vpExpression[i]->evaluate(vars), mergeInputs);
+                memoryUsageBytes += group[i]->memUsageForSorter();
+            }
+
+            DEV {
+                // In debug mode, spill every time we have a duplicate id to stress merge logic.
+                if (!inserted // is a dup
+                        && !pExpCtx->getInRouter() // can't spill to disk in router
+                        && !_extSortAllowed // don't change behavior when testing external sort
+                        && sortedFiles.size() < 20 // don't open too many FDs
+                        ) {
+                    sortedFiles.push_back(spill());
+                }
             }
         }
 
-        /* start the group iterator */
-        groupsIterator = groups.begin();
-        populated = true;
+        // These blocks do any final steps necessary to prepare to output results.
+        if (!sortedFiles.empty()) {
+            _spilled = true;
+            if (!groups.empty()) {
+                sortedFiles.push_back(spill());
+            }
+
+            // We won't be using groups again so free its memory.
+            GroupsMap().swap(groups);
+
+            _sorterIterator.reset(
+                    Sorter<Value,Value>::Iterator::merge(
+                        sortedFiles, SortOptions(), SorterComparator()));
+
+            // prepare current to accumulate data
+            _currentAccumulators.reserve(numAccumulators);
+            for (size_t i = 0; i < numAccumulators; i++) {
+                _currentAccumulators.push_back(vpAccumulatorFactory[i]());
+            }
+
+            // must be before call to advance so we don't recurse
+            populated = true;
+
+            verify(_sorterIterator->more()); // we put data in, we should get something out.
+            _firstPartOfNextGroup = _sorterIterator->next();
+            verify(advance()); // moves first result into _currentId and _currentAccumulators
+        } else {
+            // start the group iterator
+            groupsIterator = groups.begin();
+            populated = true;
+        }
     }
 
-    Document DocumentSourceGroup::makeDocument(const GroupPair& group,
+    class DocumentSourceGroup::SpillSTLComparator {
+    public:
+        bool operator() (const GroupsMap::value_type* lhs, const GroupsMap::value_type* rhs) const {
+            return Value::compare(lhs->first, rhs->first) < 0;
+        }
+    };
+
+    shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
+        vector<const GroupsMap::value_type*> ptrs; // using pointers to speed sorting
+        ptrs.reserve(groups.size());
+        for (GroupsMap::const_iterator it=groups.begin(), end=groups.end(); it != end; ++it) {
+            ptrs.push_back(&*it);
+        }
+
+        stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator());
+
+        SortedFileWriter<Value, Value> writer;
+        switch (vpAccumulatorFactory.size()) { // same as ptrs[i]->second.size() for all i.
+        case 0: // no values, essentially a distinct
+            for (size_t i=0; i < ptrs.size(); i++) {
+                writer.addAlreadySorted(ptrs[i]->first, Value());
+            }
+            break;
+
+        case 1: // just one value, use optimized serialization as single Value
+            for (size_t i=0; i < ptrs.size(); i++) {
+                writer.addAlreadySorted(ptrs[i]->first,
+                                        ptrs[i]->second[0]->getValue(/*toBeMerged=*/true));
+            }
+            break;
+
+        default: // multiple values, serialize as array-typed Value
+            for (size_t i=0; i < ptrs.size(); i++) {
+                vector<Value> accums;
+                for (size_t j=0; j < ptrs[i]->second.size(); j++) {
+                    accums.push_back(ptrs[i]->second[j]->getValue(/*toBeMerged=*/true));
+                }
+                writer.addAlreadySorted(ptrs[i]->first, Value::consume(accums));
+            }
+            break;
+        }
+
+        groups.clear();
+
+        return shared_ptr<Sorter<Value, Value>::Iterator>(writer.done());
+    }
+
+    Document DocumentSourceGroup::makeDocument(const Value& id,
+                                               const Accumulators& accums,
                                                bool mergeableOutput) {
-        const Accumulators& accums = group.second;
         const size_t n = vFieldName.size();
         MutableDocument out (1 + n);
 
         /* add the _id field */
-        out.addField("_id", group.first);
+        out.addField("_id", id);
 
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i) {
@@ -375,3 +556,6 @@ namespace mongo {
         return pMerger;
     }
 }
+
+#include "db/sorter/sorter.cpp"
+// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

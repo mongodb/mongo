@@ -1470,6 +1470,11 @@ var g5 = db.runCommand(
     {$sort: {'_id': 1}}
 ]});
 
+// $addToSet doesn't guarantee order so we shouldn't test for it.
+g5.result.forEach(function(obj) {
+    obj.authors.sort();
+});
+
 var g5result = [
     {
         "_id" : {
@@ -1484,8 +1489,8 @@ var g5result = [
             "tags" : "fun"
         },
         "authors" : [
+            "bob",
             "dave",
-            "bob"
         ]
     },
     {
@@ -1501,8 +1506,8 @@ var g5result = [
             "tags" : "nasty"
         },
         "authors" : [
+            "dave",
             "jane",
-            "dave"
         ]
     }
 ];

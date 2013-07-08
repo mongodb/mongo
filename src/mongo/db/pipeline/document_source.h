@@ -679,6 +679,12 @@ namespace mongo {
     private:
         DocumentSourceGroup(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
+        /// Spill groups map to disk and returns an iterator to the file.
+        shared_ptr<Sorter<Value, Value>::Iterator> spill();
+
+        // Only used by spill. Would be function-local if that were legal in C++03.
+        class SpillSTLComparator;
+
         /*
           Before returning anything, this source must fetch everything from
           the underlying source and group it.  populate() is used to do that
@@ -691,7 +697,6 @@ namespace mongo {
         intrusive_ptr<Expression> pIdExpression;
 
         typedef vector<intrusive_ptr<Accumulator> > Accumulators;
-        typedef pair<Value, Accumulators> GroupPair;
         typedef boost::unordered_map<Value, Accumulators, Value::Hash> GroupsMap;
         GroupsMap groups;
 
@@ -712,9 +717,22 @@ namespace mongo {
         vector<intrusive_ptr<Expression> > vpExpression;
 
 
-        Document makeDocument(const GroupPair& group, bool mergeableOutput);
+        Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
 
+        bool _spilled;
+        const bool _extSortAllowed;
+        const int _maxMemoryUsageBytes;
+
+        // only used when !_spilled
         GroupsMap::iterator groupsIterator;
+
+        // only used when _spilled
+        scoped_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
+        pair<Value, Value> _firstPartOfNextGroup;
+        Value _currentId;
+        Accumulators _currentAccumulators;
+        bool _doneAfterNextAdvance;
+        bool _done;
     };
 
 
