@@ -647,6 +647,7 @@ namespace mongo {
     }
 
     QueryResult* emptyMoreResult(long long);
+    QueryResult* emptyMoreResultWithCursor(long long);
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
@@ -759,7 +760,12 @@ namespace mongo {
                 return ok;
             }
 
-            msgdata = emptyMoreResult(cursorid);
+            if (ex->getCode() == 12051 ) { // Cursor was already locked.
+            	msgdata = emptyMoreResultWithCursor(cursorid);
+            }
+            else {
+                msgdata = emptyMoreResult(cursorid);
+            }
         }
 
         Message *resp = new Message();

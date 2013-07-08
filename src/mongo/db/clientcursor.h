@@ -73,7 +73,7 @@ namespace mongo {
                 recursive_scoped_lock lock( ccmutex );
                 ClientCursor *cursor = ClientCursor::find_inlock( cursorid, true );
                 if ( cursor ) {
-                    uassert( 12051, "clientcursor already in use? driver problem?",
+                    uassert( 12051, "clientcursor already in use.",
                             cursor->_pinValue < 100 );
                     cursor->_pinValue += 100;
                     _cursorid = cursorid;

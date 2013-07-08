@@ -72,12 +72,12 @@ namespace mongo {
 
     //int dump = 0;
 
-    /* empty result for error conditions */
-    QueryResult* emptyMoreResult(long long cursorid) {
+    /* empty result for error conditions but keeps the cursor alive. */
+    QueryResult* emptyMoreResultWithCursor(long long cursorid) {
         BufBuilder b(32768);
         b.skip(sizeof(QueryResult));
         QueryResult *qr = (QueryResult *) b.buf();
-        qr->cursorId = 0; // 0 indicates no more data to retrieve.
+        qr->cursorId = cursorid;
         qr->startingFrom = 0;
         qr->len = b.len();
         qr->setOperation(opReply);
@@ -85,6 +85,11 @@ namespace mongo {
         qr->nReturned = 0;
         b.decouple();
         return qr;
+    }
+
+    /* empty result for error conditions */
+    QueryResult* emptyMoreResult(long long cursorid) {
+        return emptyMoreResultWithCursor(0); // 0 indicates no more data to retrieve.
     }
 
     QueryResult* processGetMore(const char* ns,
