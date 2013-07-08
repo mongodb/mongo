@@ -1,5 +1,6 @@
 
 s = new ShardingTest( "sort1" , 2 , 0 , 2 )
+sh.stopBalancer();
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.data" , key : { 'sub.num' : 1 } } );
@@ -20,7 +21,10 @@ db.getLastError();
 s.adminCommand( { split : "test.data" , middle : { 'sub.num' : 33 } } )
 s.adminCommand( { split : "test.data" , middle : { 'sub.num' : 66 } } )
 
-s.adminCommand( { movechunk : "test.data" , find : { 'sub.num' : 50 } , to : s.getOther( s.getServer( "test" ) ).name } );
+s.adminCommand({ movechunk : "test.data", 
+                 find : { 'sub.num' : 50 }, 
+                 to : s.getOther( s.getServer( "test" ) ).name,
+                 waitForDelete : true });
 
 assert.lte( 3 , s.config.chunks.find().itcount() , "A1" );
 
