@@ -55,13 +55,13 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
  *	Join a consolidated logging slot.
  */
 int
-__wt_log_slot_join(WT_SESSION_IMPL *session, uint32_t mysize,
+__wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
     uint32_t flags, WT_MYSLOT *myslotp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int32_t cur_state, new_state, old_state;
+	int64_t cur_state, new_state, old_state;
 	uint32_t i;
 
 	conn = S2C(session);
@@ -84,7 +84,7 @@ join_slot:
 	 * Add in our size to the state and then atomically swap that
 	 * into place if it is still the same value.
 	 */
-	new_state = old_state + (int32_t)mysize;
+	new_state = old_state + (int64_t)mysize;
 	if (new_state < old_state) {
 		/* Our size doesn't fit here. */
 		WT_CSTAT_INCR(session, log_slot_toobig);
@@ -126,7 +126,7 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *newslot;
-	int32_t old_state;
+	int64_t old_state;
 	uint32_t pool_i;
 
 	conn = S2C(session);
@@ -150,7 +150,7 @@ retry:
 	newslot->slot_index = slot->slot_index;
 	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
 	old_state = WT_ATOMIC_STORE(slot->slot_state, WT_LOG_SLOT_PENDING);
-	slot->slot_group_size = (uint32_t)(old_state - WT_LOG_SLOT_READY);
+	slot->slot_group_size = (uint64_t)(old_state - WT_LOG_SLOT_READY);
 	/*
 	 * Note that this statistic may be much bigger than in reality,
 	 * especially when compared with the total bytes written in
@@ -170,7 +170,8 @@ retry:
 int
 __wt_log_slot_notify(WT_LOGSLOT *slot)
 {
-	slot->slot_state = (int32_t)(WT_LOG_SLOT_DONE - slot->slot_group_size);
+	slot->slot_state =
+	    (int64_t)WT_LOG_SLOT_DONE - (int64_t)slot->slot_group_size;
 	return (0);
 }
 
@@ -191,16 +192,16 @@ __wt_log_slot_wait(WT_LOGSLOT *slot)
  *	Each thread in a consolidated group releases its portion to
  *	signal it has completed writing its piece of the log.
  */
-int32_t
-__wt_log_slot_release(WT_LOGSLOT *slot, uint32_t size)
+int64_t
+__wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size)
 {
-	int32_t newsize;
+	int64_t newsize;
 
 	/*
 	 * Add my size into the state.  When it reaches WT_LOG_SLOT_DONE
 	 * all participatory threads have completed copying their piece.
 	 */
-	newsize = WT_ATOMIC_ADD(slot->slot_state, (int32_t)size);
+	newsize = WT_ATOMIC_ADD(slot->slot_state, (int64_t)size);
 	return (newsize);
 }
 

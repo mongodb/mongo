@@ -115,7 +115,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		log->first_lsn.file = firstlog;
 		log->first_lsn.offset = 0;
 		WT_VERBOSE_ERR(session, log,
-		    "log_open: open to end of existing log %d,%d",
+		    "log_open: open to end of existing log %d,%" PRIu64,
 		    log->alloc_lsn.file, log->alloc_lsn.offset);
 	}
 err:
@@ -174,7 +174,7 @@ err:
 }
 
 static int
-__log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t recsize)
+__log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 {
 	WT_CONNECTION_IMPL *conn;
 
@@ -189,7 +189,7 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t recsize)
  *	from __wt_log_newfile when we change log files.
  */
 static int
-__log_acquire(WT_SESSION_IMPL *session, uint32_t recsize, WT_LOGSLOT *slot)
+__log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -350,7 +350,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
-	uint32_t cksum, rdup_len, reclen;
+	uint64_t rdup_len, reclen;
+	uint32_t cksum;
 
 	WT_UNUSED(flags);
 	/*
@@ -380,7 +381,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * that we rarely will have to read more.  Most log records
 	 * will be fairly small.
 	 */
-	reclen = *(uint32_t *)record->mem;
+	reclen = *(uint64_t *)record->mem;
 	if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
 		ret = WT_NOTFOUND;
 		goto err;
@@ -422,8 +423,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, rd_lsn, start_lsn;
-	off_t log_size;
-	uint32_t cksum, rdup_len, reclen;
+	uint64_t log_size, rdup_len, reclen;
+	uint32_t cksum;
 	int done;
 
 	conn = S2C(session);
@@ -456,7 +457,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	end_lsn = log->alloc_lsn;
 	log_fh = NULL;
 	WT_RET(__log_openfile(session, 0, &log_fh, start_lsn.file));
-	WT_ERR(__wt_filesize(session, log_fh, &log_size));
+	WT_ERR(__wt_filesize(session, log_fh, (off_t *)&log_size));
 	if (LF_ISSET(WT_LOGSCAN_ONE))
 		done = 1;
 	else
@@ -485,7 +486,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 				break;
 			WT_ERR(__log_openfile(
 			    session, 0, &log_fh, rd_lsn.file));
-			WT_ERR(__wt_filesize(session, log_fh, &log_size));
+			WT_ERR(__wt_filesize(
+			    session, log_fh, (off_t *)&log_size));
 			continue;
 		}
 		/*
@@ -500,7 +502,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * that we rarely will have to read more.  Most log records
 		 * will be fairly small.
 		 */
-		reclen = *(uint32_t *)buf.mem;
+		reclen = *(uint64_t *)buf.mem;
 		if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
 			ret = WT_NOTFOUND;
 			goto err;
@@ -556,7 +558,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOGSLOT tmp;
 	WT_LSN tmp_lsn;
 	WT_MYSLOT myslot;
-	uint32_t rdup_len;
+	uint64_t rdup_len;
 	int locked;
 
 	conn = S2C(session);

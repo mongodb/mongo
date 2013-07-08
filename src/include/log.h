@@ -13,10 +13,11 @@
 /*
  * The slot algorithm uses negative values, so we lose a bit.
  */
-#define	WT_MAX_LOG_OFFSET	INT32_MAX
+#define	WT_MAX_LOG_OFFSET	INT64_MAX
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
-	uint32_t	offset;		/* Log file offset */
+	uint32_t	unused;
+	uint64_t	offset;		/* Log file offset */
 };
 
 typedef enum {
@@ -67,13 +68,13 @@ typedef struct {
 		struct {
 #undef	slot_state
 #define	slot_state		u.slot.state
-			int32_t	 state;		/* Slot state */
+			int64_t	 state;		/* Slot state */
+#undef	slot_group_size
+#define	slot_group_size		u.slot.group_size
+			uint64_t group_size;	/* Group size */
 #undef	slot_error
 #define	slot_error		u.slot.error
 			int32_t	 error;		/* Error value */
-#undef	slot_group_size
-#define	slot_group_size		u.slot.group_size
-			uint32_t group_size;	/* Group size */
 #undef	slot_index
 #define	slot_index		u.slot.index
 #define	SLOT_INVALID_INDEX	0xffffffff
@@ -146,9 +147,9 @@ typedef struct {
 } WT_LOG;
 
 typedef struct {
-	uint32_t	len;		/* 00-03: Record length including hdr */
-	uint32_t	checksum;	/* 04-07: Checksum of the record */
-	uint32_t	unused[2];	/* 08-15: Padding */
+	uint64_t	len;		/* 00-07: Record length including hdr */
+	uint32_t	checksum;	/* 08-11: Checksum of the record */
+	uint32_t	unused;		/* 12-15: Padding */
 	uint8_t		record[0];	/* Beginning of actual data */
 } WT_LOG_RECORD;
 
@@ -163,6 +164,5 @@ struct __wt_log_desc {
 	uint16_t	majorv;		/* 04-05: Major version */
 #define	WT_LOG_MINOR_VERSION	0
 	uint16_t	minorv;		/* 06-07: Minor version */
-	uint32_t	log_size;	/* 08-11: Log file size */
-	uint32_t	unused;		/* 12-15: Padding */
+	uint64_t	log_size;	/* 08-15: Log file size */
 };

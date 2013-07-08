@@ -84,8 +84,8 @@ __log_archive_server(void *arg)
 
 		lsn = log->ckpt_lsn;
 		lsn.offset = 0;
-		WT_VERBOSE_ERR(session, log, "log_archive: ckpt LSN %d,%d",
-		    lsn.file, lsn.offset);
+		WT_VERBOSE_ERR(session, log,
+		    "log_archive: ckpt LSN %d,%" PRIu64, lsn.file, lsn.offset);
 		/*
 		 * Main archive code.  Get the list of all log files and
 		 * remove any earlier than the checkpoint LSN.

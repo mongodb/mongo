@@ -699,13 +699,13 @@ extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     va_list ap);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
-    uint32_t mysize,
+    uint64_t mysize,
     uint32_t flags,
     WT_MYSLOT *myslotp);
 extern int __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
 extern int __wt_log_slot_notify(WT_LOGSLOT *slot);
 extern int __wt_log_slot_wait(WT_LOGSLOT *slot);
-extern int32_t __wt_log_slot_release(WT_LOGSLOT *slot, uint32_t size);
+extern int64_t __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size);
 extern int __wt_log_slot_free(WT_LOGSLOT *slot);
 extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
     u_int start_chunk,
@@ -1254,7 +1254,7 @@ extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern uint32_t __wt_log2_int(uint32_t n);
 extern int __wt_ispo2(uint32_t v);
-extern uint32_t __wt_rduppo2(uint32_t n, uint32_t po2);
+extern uint64_t __wt_rduppo2(uint64_t n, uint32_t po2);
 extern uint32_t __wt_random(void);
 extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
