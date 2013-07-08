@@ -1024,6 +1024,23 @@ namespace mongo {
 
                 conn.done();
 
+                if ( res["ns"].str() != ns ||
+                        res["from"].str() != fromShard.getConnString() ||
+                        !res["min"].isABSONObj() ||
+                        res["min"].Obj().woCompare(min) != 0 ||
+                        !res["max"].isABSONObj() ||
+                        res["max"].Obj().woCompare(max) != 0 ) {
+                    // This can happen when the destination aborted the migration and
+                    // received another recvChunk before this thread sees the transition
+                    // to the abort state. This is currently possible only if multiple migrations
+                    // are happening at once. This is an unfortunate consequence of the shards not
+                    // being able to keep track of multiple incoming and outgoing migrations.
+                    errmsg = str::stream() << "Destination shard aborted migration, "
+                            "now running a new one: " << res;
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
                 LOG(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
                 if ( ! ok || res["state"].String() == "fail" ) {
