@@ -17,7 +17,7 @@
 #include "mongo/db/commands/write_commands/batch.h"
 
 #include "mongo/db/field_parser.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
