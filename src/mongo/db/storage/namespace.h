@@ -26,6 +26,11 @@
 namespace mongo {
 
 #pragma pack(1)
+    /**
+     * This is used for storing a namespace on disk in a fixed witdh form
+     * it should only be used for that, not for passing internally
+     * for that, please use NamespaceString
+     */
     class Namespace {
     public:
         Namespace(const StringData& ns) { *this = ns; }
@@ -56,4 +61,4 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "mongo/db/namespace-inl.h"
+#include "mongo/db/storage/namespace-inl.h"

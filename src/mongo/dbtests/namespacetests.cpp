@@ -18,15 +18,15 @@
  */
 
 // Where IndexDetails defined.
-#include "pch.h"
-#include "../db/namespace.h"
+#include "mongo/pch.h"
 
-#include "../db/db.h"
-#include "../db/json.h"
-#include "mongo/db/index_legacy.h"
-#include "mongo/db/index_selection.h"
+#include "mongo/db/db.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/hash_access_method.h"
+#include "mongo/db/index_legacy.h"
+#include "mongo/db/index_selection.h"
+#include "mongo/db/json.h"
+#include "mongo/db/storage/namespace.h"
 #include "mongo/db/queryutil.h"
 
 #include "dbtests.h"

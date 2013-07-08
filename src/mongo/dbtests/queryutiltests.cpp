@@ -1208,24 +1208,23 @@ namespace QueryUtilTests {
 
     namespace FieldRangeSetTests {
 
-        class ToString {
+        class Basics {
         public:
             void run() {
-                BSONObj obj = BSON( "a" << 1 );
-                FieldRangeSet fieldRangeSet( "", obj, true, true );
-                fieldRangeSet.toString(); // Just test that we don't crash.
-            }
-        };
-        
-        class Namespace {
-        public:
-            void run() {
-                boost::shared_ptr<FieldRangeSet> frs;
                 {
-                    string ns = str::stream() << "foo";
-                    frs.reset( new FieldRangeSet( ns.c_str(), BSONObj(), true, true ) );
+                    BSONObj obj = BSON( "a" << 1 );
+                    FieldRangeSet fieldRangeSet( "", obj, true, true );
+                    fieldRangeSet.toString(); // Just test that we don't crash.
                 }
-                ASSERT_EQUALS( string( "foo" ), frs->ns() );
+
+                {
+                    boost::shared_ptr<FieldRangeSet> frs;
+                    {
+                        string ns = str::stream() << "foo";
+                        frs.reset( new FieldRangeSet( ns.c_str(), BSONObj(), true, true ) );
+                    }
+                    ASSERT_EQUALS( string( "foo" ), frs->ns() );
+                }
             }
         };
 
@@ -3000,8 +2999,7 @@ namespace QueryUtilTests {
             add<FieldRangeTests::ExactMatchRepresentation::Intersection>();
             add<FieldRangeTests::ExactMatchRepresentation::Union>();
             add<FieldRangeTests::ExactMatchRepresentation::Difference>();
-            add<FieldRangeSetTests::ToString>();
-            add<FieldRangeSetTests::Namespace>();
+            add<FieldRangeSetTests::Basics>();
             add<FieldRangeSetTests::Intersect>();
             add<FieldRangeSetTests::MultiKeyIntersect>();
             add<FieldRangeSetTests::EmptyMultiKeyIntersect>();

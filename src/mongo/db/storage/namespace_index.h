@@ -22,7 +22,7 @@
 #include <string>
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/namespace.h"
+#include "mongo/db/storage/namespace.h"
 #include "mongo/util/hashtab.h"
 
 namespace mongo {

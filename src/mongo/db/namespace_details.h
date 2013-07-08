@@ -24,9 +24,9 @@
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongommf.h"
-#include "mongo/db/namespace.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/querypattern.h"
+#include "mongo/db/storage/namespace.h"
 #include "mongo/db/storage/namespace_index.h"
 #include "mongo/platform/unordered_map.h"
 

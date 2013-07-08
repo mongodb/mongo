@@ -23,7 +23,7 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/client.h"
-#include "mongo/db/namespace.h"
+#include "mongo/db/storage/namespace.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"

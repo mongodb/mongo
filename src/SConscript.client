@@ -50,7 +50,7 @@ clientSourceBasic = [
     'mongo/db/jsobj.cpp',
     'mongo/db/json.cpp',
     'mongo/db/lasterror.cpp',
-    'mongo/db/namespace.cpp',
+    'mongo/db/storage/namespace.cpp',
     'mongo/db/dbmessage.cpp',
     'mongo/pch.cpp',
     'mongo/platform/backtrace.cpp',

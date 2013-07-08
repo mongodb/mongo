@@ -185,7 +185,7 @@ env.StaticLibrary('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/lasterror.cpp",
-                "db/namespace.cpp",
+                "db/storage/namespace.cpp",
                 "shell/mongo.cpp",
                 "util/background.cpp",
                 "util/intrusive_counter.cpp",
