@@ -766,7 +766,7 @@ mongod = env.Install(
                                 "mongodwebserver",
                                 "ntservice",
                                 "serveronly",
-                                ] + env['MODULE_LIBDEPS_MONGOD'] ) )
+                                ] ) )
 Default( mongod )
 
 # tools
@@ -798,7 +798,7 @@ env.Install( '#/', [
 mongos = env.Program(
     "mongos", [ "s/server.cpp"] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
-             "mongodandmongos", "s/upgrade"] + env['MODULE_LIBDEPS_MONGOS'])
+             "mongodandmongos", "s/upgrade"])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
@@ -881,8 +881,8 @@ if shellEnv is not None:
     mongo_shell = shellEnv.Program(
         "mongo",
         coreShellFiles,
-        LIBDEPS=[ "clientandshell", "mongocommon", "scripting", 
-                 "$BUILD_DIR/third_party/shim_pcrecpp"] + env['MODULE_LIBDEPS_MONGOSHELL'] )
+        LIBDEPS=[ "clientandshell", "mongocommon", "scripting",
+                 "$BUILD_DIR/third_party/shim_pcrecpp"])
 
     shellEnv.Install( '#/', mongo_shell )
 
