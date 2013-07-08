@@ -28,12 +28,22 @@ namespace mongo {
     class BSONObj;
     class ClientBasic;
     class NamespaceString;
+    class StringData;
+    class UserName;
 
 namespace mutablebson {
     class Document;
 }  // namespace mutablebson
 
 namespace audit {
+
+    /**
+     * Logs the result of an authentication attempt.
+     */
+    void logAuthentication(ClientBasic* client,
+                           const StringData& mechanism,
+                           const UserName& user,
+                           ErrorCodes::Error result);
 
     //
     // Authorization (authz) logging functions.

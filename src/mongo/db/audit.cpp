@@ -25,6 +25,11 @@
 namespace mongo {
 namespace audit {
 
+    void logAuthentication(ClientBasic* client,
+                           const StringData& mechanism,
+                           const UserName& user,
+                           ErrorCodes::Error result) MONGO_AUDIT_STUB
+
     void logCommandAuthzCheck(ClientBasic* client,
                               const NamespaceString& ns,
                               const mutablebson::Document& cmdObj,
