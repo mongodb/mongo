@@ -996,10 +996,7 @@ namespace mutablebson {
                 "Attempt to add a sibling to an element without a parent");
 
         ElementRep& parentRep = impl.getElementRep(thisRep.parent);
-        if (impl.isLeaf(parentRep))
-            return Status(
-                ErrorCodes::IllegalOperation,
-                "Attempt to add a sibling element under a non-object element");
+        dassert(!impl.isLeaf(parentRep));
 
         impl.disableInPlaceUpdates();
 
@@ -1051,10 +1048,7 @@ namespace mutablebson {
                 "Attempt to add a sibling to an element without a parent");
 
         ElementRep* parentRep = &impl.getElementRep(thisRep->parent);
-        if (impl.isLeaf(*parentRep))
-            return Status(
-                ErrorCodes::IllegalOperation,
-                "Attempt to add a sibling element under a non-object element");
+        dassert(!impl.isLeaf(*parentRep));
 
         impl.disableInPlaceUpdates();
 
