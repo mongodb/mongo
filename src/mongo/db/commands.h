@@ -102,6 +102,12 @@ namespace mongo {
         */
         virtual bool logTheOp() { return false; }
 
+        /**
+         * Override and return fales if the command opcounters should not be incremented on
+         * behalf of this command.
+         */
+        virtual bool shouldAffectCommandCounter() const { return true; }
+
         virtual void help( stringstream& help ) const;
 
         /**

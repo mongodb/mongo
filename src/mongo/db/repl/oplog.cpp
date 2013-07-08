@@ -556,10 +556,10 @@ namespace mongo {
                 verify( opType[1] == 'b' ); // "db" advertisement
         }
         else if ( *opType == 'c' ) {
-            opCounters->gotCommand();
             BufBuilder bb;
             BSONObjBuilder ob;
             _runCommands(ns, o, bb, ob, true, 0);
+            // _runCommands takes care of adjusting opcounters for command counting.
         }
         else if ( *opType == 'n' ) {
             // no op

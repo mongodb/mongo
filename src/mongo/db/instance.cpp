@@ -359,7 +359,31 @@ namespace mongo {
             opwrite(m);
         }
 
-        globalOpCounters.gotOp( op , isCommand );
+        // Increment op counters.
+        switch (op) {
+        case dbQuery:
+            if (!isCommand) {
+                globalOpCounters.gotQuery();
+            }
+            else {
+                // Command counting is deferred, since it is not known yet whether the command
+                // needs counting.
+            }
+            break;
+        case dbGetMore:
+            globalOpCounters.gotGetMore();
+            break;
+        case dbInsert:
+            // Insert counting is deferred, since it is not known yet whether the insert contains
+            // multiple documents (each of which needs to be counted).
+            break;
+        case dbUpdate:
+            globalOpCounters.gotUpdate();
+            break;
+        case dbDelete:
+            globalOpCounters.gotDelete();
+            break;
+        }
 
         Client& c = cc();
         c.getAuthorizationSession()->startRequest();

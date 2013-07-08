@@ -2091,6 +2091,7 @@ namespace mongo {
      * this handles
      - auth
      - maintenance mode
+     - opcounters
      - locking
      - context
      then calls run()
@@ -2169,6 +2170,13 @@ namespace mongo {
 
         if (c->maintenanceMode() && theReplSet) {
             mmSetter.reset(new MaintenanceModeSetter());
+        }
+
+        if (c->shouldAffectCommandCounter()) {
+            // If !fromRepl, globalOpCounters need to be incremented.  Otherwise, replOpCounters
+            // need to be incremented.
+            OpCounters* opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
+            opCounters->gotCommand();
         }
 
         std::string errmsg;
