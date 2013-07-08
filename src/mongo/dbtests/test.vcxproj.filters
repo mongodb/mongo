@@ -973,9 +973,6 @@
     <ClInclude Include="..\util\string_map_internal.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\string_writer.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\stringutils.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -1058,9 +1055,6 @@
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\pipeline\builder.h">
-      <Filter>db\pipeline\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\pipeline\doc_mem_monitor.h">
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\pipeline\document.h">
@@ -3466,9 +3460,6 @@
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\db\pipeline\builder.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\pipeline\doc_mem_monitor.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\db\pipeline\document.cpp">

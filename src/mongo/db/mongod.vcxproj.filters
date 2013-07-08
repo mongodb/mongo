@@ -187,9 +187,6 @@
     <ClCompile Include="pipeline\accumulator_sum.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\doc_mem_monitor.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\document.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
@@ -2284,9 +2281,6 @@
     <ClInclude Include="pipeline\accumulator.h">
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pipeline\doc_mem_monitor.h">
-      <Filter>db\pipeline\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="pipeline\document.h">
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
@@ -3657,9 +3651,6 @@
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\string_map_internal.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\string_writer.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\stringutils.h">

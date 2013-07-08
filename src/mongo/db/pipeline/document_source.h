@@ -31,7 +31,6 @@
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/s/shard.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/string_writer.h"
 
 namespace mongo {
     class Accumulator;
@@ -43,14 +42,9 @@ namespace mongo {
     class ExpressionObject;
     class DocumentSourceLimit;
 
-    class DocumentSource :
-        public IntrusiveCounterUnsigned,
-        public StringWriter {
+    class DocumentSource : public IntrusiveCounterUnsigned {
     public:
         virtual ~DocumentSource();
-
-        // virtuals from StringWriter
-        virtual void writeString(stringstream &ss) const;
 
         /**
            Set the step for a user-specified pipeline step.

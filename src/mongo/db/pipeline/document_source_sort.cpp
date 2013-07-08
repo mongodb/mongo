@@ -19,7 +19,6 @@
 #include "db/pipeline/document_source.h"
 
 #include "db/jsobj.h"
-#include "db/pipeline/doc_mem_monitor.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"

@@ -2377,9 +2377,6 @@
     <ClInclude Include="..\util\string_map_internal.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\string_writer.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\timer-inl.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>

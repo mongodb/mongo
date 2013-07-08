@@ -1890,7 +1890,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\stack_introspect.h" />
     <ClInclude Include="..\util\string_map.h" />
     <ClInclude Include="..\util\string_map_internal.h" />
-    <ClInclude Include="..\util\string_writer.h" />
     <ClInclude Include="..\util\timer-inl.h" />
     <ClInclude Include="..\util\unordered_fast_key_table.h" />
     <ClInclude Include="..\util\unordered_fast_key_table_internal.h" />

@@ -3498,7 +3498,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="pipeline\document_source_skip.cpp" />
     <ClCompile Include="pipeline\document_source_sort.cpp" />
     <ClCompile Include="pipeline\document_source_unwind.cpp" />
-    <ClCompile Include="pipeline\doc_mem_monitor.cpp" />
     <ClCompile Include="pipeline\expression.cpp" />
     <ClCompile Include="pipeline\expression_context.cpp" />
     <ClCompile Include="pipeline\field_path.cpp" />
@@ -4093,7 +4092,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\stringutils.h" />
     <ClInclude Include="..\util\string_map.h" />
     <ClInclude Include="..\util\string_map_internal.h" />
-    <ClInclude Include="..\util\string_writer.h" />
     <ClInclude Include="..\util\timer-inl.h" />
     <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
@@ -4525,7 +4523,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="pipeline\builder.h" />
     <ClInclude Include="pipeline\document.h" />
     <ClInclude Include="pipeline\document_source.h" />
-    <ClInclude Include="pipeline\doc_mem_monitor.h" />
     <ClInclude Include="pipeline\expression.h" />
     <ClInclude Include="pipeline\expression_context.h" />
     <ClInclude Include="pipeline\field_path.h" />
