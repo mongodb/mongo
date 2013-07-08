@@ -1660,7 +1660,7 @@ namespace {
         mongo::BSONObjBuilder builder;
         const char name[] = "thing";
         const mongo::BinDataType value1 = mongo::newUUID;
-        const char value2[] = {
+        const unsigned char value2[] = {
             0x00, 0x9D, 0x15, 0xA3,
             0x3B, 0xCC, 0x46, 0x60,
             0x90, 0x45, 0xEF, 0x54,
