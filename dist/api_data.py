@@ -524,7 +524,7 @@ methods = {
 		::wiredtiger_extension_init'''),
 	Config('prefix', '', r'''
 		a prefix for all names registered by this extension (e.g., to
-		make namespaces distinct or during upgrades'''),
+		make namespaces distinct or during upgrades)'''),
 	Config('terminate', 'wiredtiger_extension_terminate', r'''
 		a optional function in the extension that is called before the
 		extension is unloaded during WT_CONNECTION::close.  The signature of
