@@ -19,6 +19,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
+#include "mongo/db/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
@@ -36,7 +37,10 @@ namespace mongo {
         DBDirectClient client;
         {
             Client::GodScope gs;
-            Client::WriteContext ctx(userNS);
+            // TODO(spencer): Once we're no longer fully rebuilding the user cache on every change
+            // to user data we should remove the global lock and uncomment the WriteContext below
+            Lock::GlobalWrite w;
+            // Client::WriteContext ctx(userNS);
             client.insert(userNS, userObj);
         }
 
@@ -60,7 +64,10 @@ namespace mongo {
         DBDirectClient client;
         {
             Client::GodScope gs;
-            Client::WriteContext ctx(userNS);
+            // TODO(spencer): Once we're no longer fully rebuilding the user cache on every change
+            // to user data we should remove the global lock and uncomment the WriteContext below
+            Lock::GlobalWrite w;
+            // Client::WriteContext ctx(userNS);
             client.update(userNS,
                           QUERY("user" << user.getUser() << "userSource" << BSONNULL),
                           updateObj);
