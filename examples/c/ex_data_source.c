@@ -179,7 +179,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	/*! [WT_EXTENSION transaction oldest] */
 	uint64_t transaction_oldest;
 
-	transaction_oldest = wt_api->transaction_oldest(wt_api, session);
+	transaction_oldest = wt_api->transaction_oldest(wt_api);
 	/*! [WT_EXTENSION transaction oldest] */
 	(void)transaction_oldest;
 	}

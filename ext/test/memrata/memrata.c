@@ -67,6 +67,13 @@
 	ESET(v);							\
 } while (0)
 
+/* Macro to make sure we don't re-use a structure after it's dead. */
+#undef	OVERWRITE_AND_FREE
+#define	OVERWRITE_AND_FREE(p) do {					\
+	memset(p, 0xab, sizeof(*(p)));                         		\
+	free(p);							\
+} while (0)
+
 /*
  * Version each file, out of sheer raging paranoia.
  */
@@ -96,6 +103,9 @@ typedef struct __wt_source {
 	kvs_t kvscache;				/* Underlying KVS cache */
 	int   kvscache_inuse;
 
+	uint64_t cleaner_bytes;			/* Bytes since clean */
+	uint64_t cleaner_ops;			/* Operations since clean */
+
 	struct __kvs_source *ks;		/* Underlying KVS source */
 	struct __wt_source *next;		/* List of WiredTiger objects */
 } WT_SOURCE;
@@ -113,6 +123,20 @@ typedef struct __kvs_source {
 #define	TXN_COMMITTED	2
 #define	TXN_UNRESOLVED	3
 	kvs_t kvstxn;				/* Underlying KVS txn store */
+
+	/*
+	 * Each KVS store has a cleaner thread that migrates updates from the
+	 * cache into the primary, based on the number of bytes or the number
+	 * of operations.  We read these fields without a lock, but serialize
+	 * writes to minimize races.
+	 *
+	 * There's a cleaner thread per KVS store because that gives us a valid
+	 * WT_SESSION handle for the cleaner without a lot of magic.
+	 */
+	WT_EXTENSION_API *wtext;		/* Extension functions */
+	WT_SESSION	 *session;		/* Enclosing session */
+	pthread_t cleaner_id;			/* Cleaner thread ID */
+	int	  cleaner_stop;			/* Cleaner thread quit flag */
 
 	struct __wt_source *ws_head;		/* List of WiredTiger sources */
 
@@ -631,7 +655,8 @@ cache_value_update_check(WT_CURSOR *wtcursor)
  *	Migrate information from the cache to the primary store.
  */
 static int
-cache_process(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
+cache_process(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks, int final)
 {
 	CACHE_RECORD *cp;
 	WT_CURSOR *wtcursor;
@@ -658,7 +683,7 @@ cache_process(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 	 * Get the oldest transaction ID not yet visible to a running
 	 * transaction.
 	 */
-	oldest = wtext->transaction_oldest(wtext, session);
+	oldest = wtext->transaction_oldest(wtext);
 
 	/*
 	 * For every source object cache, copy the final value of all entries
@@ -749,8 +774,13 @@ cache_process(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 			    i < cursor->cache_entries; ++i, ++cp)
 				if (cp->txnid >= oldest)
 					break;
-			if (i != cursor->cache_entries)
+			if (i != cursor->cache_entries) {
+				if (final)
+					EMSG(wtext, session, WT_ERROR,
+					    "cleaner: closing with unresolved "
+					    "transactions in the cache");
 				continue;
+			}
 
 			/* Remove the entry from the cache. */
 			if ((ret =
@@ -760,6 +790,9 @@ cache_process(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 				goto err;
 			}
 		}
+
+		/* Update the state while still holding the lock. */
+		ws->cleaner_bytes = ws->cleaner_ops = 0;
 
 		wslocked = 0;
 		if ((ret = unlock(wtext, session, &ws->lock)) != 0)
@@ -1068,19 +1101,19 @@ cache_clean:
 	 * better choice and pretend we didn't find the other one.
 	 */
 	if (cache_ret == 0 && ret == 0) {
-		a.data = cursor->v;		/* a is the primary */
-		a.size = (uint32_t)cursor->len;
-		b.data = cursor->t3.v;		/* b is the cache */
-		b.size = (uint32_t)cursor->t3.len;
+		a.data = cursor->key;		/* a is the primary */
+		a.size = cursor->record.key_len;
+		b.data = cursor->t2.v;		/* b is the cache */
+		b.size = (uint32_t)cursor->t2.len;
 		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
 			return (ret);
 		if (f == kvs_next) {
-			if (cmp < 0)
-				cache_ret = WT_NOTFOUND;
-			else
+			if (cmp >= 0)
 				ret = WT_NOTFOUND;
+			else
+				cache_ret = WT_NOTFOUND;
 		} else {
-			if (cmp < 0)
+			if (cmp <= 0)
 				ret = WT_NOTFOUND;
 			else
 				cache_ret = WT_NOTFOUND;
@@ -1312,7 +1345,11 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	if ((ret = kvs_set(ws->kvscache, &cursor->record)) != 0)
 		EMSG(wtext, session, WT_ERROR,
 		    "kvs_set: %s", kvs_strerror(ret));
+
+	/* Update the state while still holding the lock. */
 	ws->kvscache_inuse = 1;
+	ws->cleaner_bytes += wtcursor->value.size;
+	++ws->cleaner_ops;
 
 #if 0
 	/*
@@ -1521,7 +1558,7 @@ cursor_destroy(CURSOR *cursor)
 	free(cursor->t2.v);
 	free(cursor->t3.v);
 	free(cursor->cache);
-	free(cursor);
+	OVERWRITE_AND_FREE(cursor);
 }
 
 /*
@@ -1810,6 +1847,9 @@ device_string(char **device_list, char **devicesp)
 	return (0);
 }
 
+/* XXX */
+static int ws_source_close(WT_EXTENSION_API *, WT_SESSION *, WT_SOURCE *);
+
 /*
  * kvs_source_close --
  *	Kill a KVS_SOURCE structure.
@@ -1817,22 +1857,93 @@ device_string(char **device_list, char **devicesp)
 static int
 kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 {
-	int ret = 0;
+	WT_SOURCE *ws;
+	int ret = 0, tret;
 
-	if (ks->kvstxn != NULL && (ret = kvs_close(ks->kvstxn)) != 0)
-		EMSG(wtext, session, WT_ERROR,
-		    "kvs_close: %s.txn: %s", ks->name, kvs_strerror(ret));
-	ks->kvstxn = NULL;
+	/* Resolve the cache into the primary one last time and quit. */
+	if (ks->cleaner_id != 0) {
+		ks->cleaner_stop = 1;
+		if ((tret = pthread_join(ks->cleaner_id, NULL)) != 0)
+			EMSG(wtext, session, tret,
+			    "pthread_join: %s", kvs_strerror(tret));
+		ks->cleaner_id = 0;
+	}
 
-	if (ks->kvs_device != NULL && (ret = kvs_close(ks->kvs_device)) != 0)
-		EMSG(wtext, session, WT_ERROR,
-		    "kvs_close: %s: %s", ks->name, kvs_strerror(ret));
-	ks->kvs_device = NULL;
+	/* Close the underlying name spaces. */
+	while ((ws = ks->ws_head) != NULL) {
+		ks->ws_head = ws->next;
+		ESET(ws_source_close(wtext, session, ws));
+	}
+
+	/* Close the transaction name space. */
+	if (ks->kvstxn != NULL) {
+		if ((tret = kvs_close(ks->kvstxn)) != 0)
+			EMSG(wtext, session, WT_ERROR,
+			    "kvs_close: %s.txn: %s",
+			    ks->name, kvs_strerror(tret));
+		ks->kvstxn = NULL;
+	}
+
+	/* Flush and close the source. */
+	if (ks->kvs_device != NULL) {
+		if ((tret = kvs_commit(ks->kvs_device)) != 0)
+			EMSG(wtext, session, WT_ERROR,
+			    "kvs_commit: %s: %s", ks->name, kvs_strerror(tret));
+		if ((tret = kvs_close(ks->kvs_device)) != 0)
+			EMSG(wtext, session, WT_ERROR,
+			    "kvs_close: %s: %s", ks->name, kvs_strerror(ret));
+		ks->kvs_device = NULL;
+	}
 
 	free(ks->name);
-	free(ks);
+	OVERWRITE_AND_FREE(ks);
 
 	return (ret);
+}
+
+/*
+ * kvs_cleaner --
+ *	Thread to migrate data from the cache to the primary.
+ */
+static void *
+kvs_cleaner(void *arg)
+{
+	struct timeval t;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	WT_SOURCE *ws;
+
+	ks = (KVS_SOURCE *)arg;
+	wtext = ks->wtext;
+	session = ks->session;
+	for (;;) {
+		/*
+		 * Check the underlying caches for either a number of operations
+		 * or a number of bytes.  It's more expensive to return values
+		 * from the cache (because we have to marshall/unmarshall them),
+		 * but there's no information yet on how to tune the values.
+		 */
+#undef	MEGABYTE
+#define	MEGABYTE	1048576
+		for (ws = ks->ws_head; ws != NULL; ws = ws->next)
+			if (ws->cleaner_ops > 1000 ||
+			    ws->cleaner_bytes > 10 * MEGABYTE)
+				break;
+
+		if (ws != NULL || ks->cleaner_stop)
+			(void)cache_process(
+			    wtext, session, ks, ks->cleaner_stop);
+
+		if (ks->cleaner_stop)
+			break;
+
+		/* Check once a second. */
+		t.tv_sec = 1;
+		t.tv_usec = 0;
+		(void)select(0, NULL, NULL, NULL, &t);
+	}
+	return (NULL);
 }
 
 /*
@@ -1903,6 +2014,8 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 		goto err;
 	}
 	ks->name = devices;
+	ks->wtext = wtext;
+	ks->session = session;
 	devices = NULL;
 
 	/* Open the underlying KVS store (creating it if necessary). */
@@ -1939,6 +2052,15 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
 		EMSG(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
+		goto err;
+	}
+
+	/* Start a cleaner thread. */
+	if ((ret =
+	    pthread_create(&ks->cleaner_id, NULL, kvs_cleaner, ks)) != 0) {
+		EMSG(wtext, NULL, ret,
+		    "pthread_create: %s: cleaner thread: %s",
+		    ks->name, wtext->strerror(ret));
 		goto err;
 	}
 
@@ -2080,7 +2202,7 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 		ESET(lock_destroy(wtext, session, &ws->lock));
 
 	free(ws->uri);
-	free(ws);
+	OVERWRITE_AND_FREE(ws);
 
 	return (ret);
 }
@@ -2725,45 +2847,25 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
-	WT_SOURCE *ws;
-	int tret, ret = 0;
+	int ret = 0;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
+	/* Lock the system down. */
 	ret = writelock(wtext, session, &ds->global_lock);
 
-	/*
-	 * Resolve the cache into the primary.
-	 *
-	 * XXX
-	 * Once we have durable transactions inside WiredTiger, this call goes
-	 * somewhere else (probably a thread that periodically cleans up).
-	 */
-	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		ESET(cache_process(wtext, session, ks));
-
-	/* Start a flush on any open KVS sources. */
-	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		if ((tret = kvs_commit(ks->kvs_device)) != 0)
-			EMSG(wtext, session, WT_ERROR,
-			    "kvs_commit: %s", kvs_strerror(tret));
-
-	/* Close and discard all objects. */
+	/* Close the KVS sources. */
 	while ((ks = ds->kvs_head) != NULL) {
-		while ((ws = ks->ws_head) != NULL) {
-			ks->ws_head = ws->next;
-			ESET(ws_source_close(wtext, session, ws));
-		}
-
 		ds->kvs_head = ks->next;
 		ESET(kvs_source_close(wtext, session, ks));
 	}
 
+	/* Unlock and destroy the system. */
 	ESET(unlock(wtext, session, &ds->global_lock));
 	ESET(lock_destroy(wtext, NULL, &ds->global_lock));
 
-	free(ds);
+	OVERWRITE_AND_FREE(ds);
 
 	return (ret);
 }
@@ -2777,7 +2879,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	/*
 	 * List of the WT_DATA_SOURCE methods -- it's static so it breaks at
-	 * compile-time should the structure changes underneath us.
+	 * compile-time should the structure change underneath us.
 	 */
 	static WT_DATA_SOURCE wtds = {
 		kvs_session_create,		/* session.create */
@@ -2822,15 +2924,17 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	    connection, "memrata:", (WT_DATA_SOURCE *)ds, NULL)) != 0) {
 		EMSG(wtext, NULL, ret,
 		    "WT_CONNECTION.add_data_source: %s", wtext->strerror(ret));
-		goto err;
+err:		OVERWRITE_AND_FREE(ds);
+		return (ret);
 	}
 
-	/* Add KVS-specific configuration options. */
-	ret = kvs_config_add(connection, wtext);
-
-err:	if (ret != 0)
-		free(ds);
-	return (ret);
+	/*
+	 * Add KVS-specific configuration options.
+	 *
+	 * Once we've successfully added the data source, error returns should
+	 * eventually remove it, don't free the structure here,
+	 */
+	return (kvs_config_add(connection, wtext));
 }
 
 /*

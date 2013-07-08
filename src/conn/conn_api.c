@@ -127,26 +127,29 @@ __conn_load_extension(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
-	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
-
 	/*
 	 * This assumes the underlying shared libraries are reference counted,
 	 * that is, that re-opening a shared library simply increments a ref
 	 * count, and closing it simply decrements the ref count, and the last
 	 * close discards the reference entirely -- in other words, we do not
 	 * check to see if we've already opened this shared library.
-	 *
-	 * Fill in the extension structure and call the load function.
 	 */
 	WT_ERR(__wt_dlopen(session, path, &dlh));
-	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
-	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
-	/* Remember the unload function for when we close. */
+	/*
+	 * Find the load function, remember the unload function for when we
+	 * close.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
+	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
+
 	WT_ERR(__wt_config_gets(session, cfg, "terminate", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &terminate_name));
 	WT_ERR(__wt_dlsym(session, dlh, terminate_name, 0, &dlh->terminate));
+
+	/* Call the load function last, it simplifies error handling. */
+	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);

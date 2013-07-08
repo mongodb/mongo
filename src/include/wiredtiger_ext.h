@@ -346,8 +346,7 @@ struct __wt_extension_api {
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION transaction oldest
 	 */
-	uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api,
-	    WT_SESSION *session);
+	uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api);
 
 	/*!
 	 * Return if the current transaction is configured for snapshot
