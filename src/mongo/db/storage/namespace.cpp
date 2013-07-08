@@ -19,6 +19,8 @@
 
 #include <boost/static_assert.hpp>
 
+#include "mongo/pch.h"
+
 #include "mongo/db/storage/namespace.h"
 #include "mongo/db/namespace_string.h"
 

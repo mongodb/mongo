@@ -21,6 +21,8 @@
 #include <cstring>
 #include <string>
 
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 
 #pragma pack(1)
@@ -47,13 +49,13 @@ namespace mongo {
 
         size_t size() const { return strlen( buf ); }
 
-        string toString() const { return buf; }
-        operator string() const { return buf; }
+        std::string toString() const { return buf; }
+        operator std::string() const { return buf; }
 
         /* NamespaceDetails::Extra was added after fact to allow chaining of data blocks to support more than 10 indexes
            (more than 10 IndexDetails).  It's a bit hacky because of this late addition with backward
            file support. */
-        string extraName(int i) const;
+        std::string extraName(int i) const;
         bool isExtra() const; /* ends with $extr... -- when true an extra block not a normal NamespaceDetails block */
 
         enum MaxNsLenValue { MaxNsLen = 128 };
