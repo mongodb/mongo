@@ -536,6 +536,7 @@ lzo
 madvise
 majorp
 malloc
+marshall
 marshalled
 maxid
 maxintlitem
