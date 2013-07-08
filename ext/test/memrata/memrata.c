@@ -947,11 +947,9 @@ copyout_key(WT_CURSOR *wtcursor)
 static inline int
 copyout_val(WT_CURSOR *wtcursor, CACHE_RECORD *cp)
 {
-	struct kvs_record *r;
 	CURSOR *cursor;
 
 	cursor = (CURSOR *)wtcursor;
-	r = &cursor->record;
 
 	if (cp == NULL) {
 		wtcursor->value.data = cursor->v;
