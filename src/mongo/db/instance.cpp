@@ -746,24 +746,16 @@ namespace mongo {
         };
 
         if (ex) {
-            exhaust = false;
-
             BSONObjBuilder err;
             ex->getInfo().append( err );
             BSONObj errObj = err.done();
 
-            log() << errObj << endl;
-
             curop.debug().exceptionInfo = ex->getInfo();
 
-            if (ex->getCode() == 13436) {
-                replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
-                curop.debug().responseLength = dbresponse.response->header()->dataLen();
-                curop.debug().nreturned = 1;
-                return ok;
-            }
-
-            msgdata = emptyMoreResult(cursorid);
+            replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
+            curop.debug().responseLength = dbresponse.response->header()->dataLen();
+            curop.debug().nreturned = 1;
+            return ok;
         }
 
         Message *resp = new Message();

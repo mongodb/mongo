@@ -127,7 +127,7 @@ DBQuery.prototype.next = function(){
         throw "error hasNext: " + o;
     
     var ret = this._cursor.next();
-    if ( ret.$err && this._numReturned == 0 && ! this.hasNext() )
+    if ( ret.$err )
         throw "error: " + tojson( ret );
 
     this._numReturned++;

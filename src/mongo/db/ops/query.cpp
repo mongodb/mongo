@@ -37,6 +37,7 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/server.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -44,6 +45,8 @@ namespace mongo {
        a little bit more than this, it is a threshold rather than a limit.
     */
     const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+
+    MONGO_FP_DECLARE(getMoreError);
 
     bool runCommands(const char *ns, BSONObj& jsobj, CurOp& curop, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
         try {
@@ -122,6 +125,10 @@ namespace mongo {
             uassert(14833, "auth error", str::equals(ns, cc->ns().c_str()));
 
             *isCursorAuthorized = true;
+
+            // This must be done after auth check to ensure proper cleanup.
+            uassert(16951, "failing getmore due to set failpoint",
+                    !MONGO_FAIL_POINT(getMoreError));
 
             if ( pass == 0 )
                 cc->updateSlaveLocation( curop );
