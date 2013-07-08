@@ -173,7 +173,7 @@ namespace QueryStageAnd {
 
                 ASSERT_TRUE(member->getFieldDotted("foo", &elt));
                 ASSERT_LESS_THAN_OR_EQUALS(elt.numberInt(), 20);
-                ASSERT_TRUE(15 != elt.numberInt());
+                ASSERT_NOT_EQUALS(15, elt.numberInt());
                 ASSERT_TRUE(member->getFieldDotted("bar", &elt));
                 ASSERT_GREATER_THAN_OR_EQUALS(elt.numberInt(), 10);
             }
