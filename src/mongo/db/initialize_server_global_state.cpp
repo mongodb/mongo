@@ -174,6 +174,14 @@ namespace mongo {
             StringBuilder sb;
             sb << cmdLine.binaryName << "." << cmdLine.port;
             Logstream::useSyslog( sb.str().c_str() );
+
+            // SERVER-9239
+            fclose(stdout);
+            FILE* f = freopen("/dev/null", "w", stdout);
+            if ( f == NULL ) {
+                cout << "Cant reassign stdout while forking server process: " << strerror(errno) << endl;
+                return false;
+            }
         }
 #endif
         if (!cmdLine.logpath.empty()) {
