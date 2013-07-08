@@ -18,7 +18,7 @@
 
 #include "mongo/pch.h"
 #include "mongo/base/init.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"

@@ -23,7 +23,7 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/matcher.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"  // for StaleConfigException
 #include "mongo/util/concurrency/mvar.h"

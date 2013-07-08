@@ -29,7 +29,7 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/bgsync.h"

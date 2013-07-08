@@ -177,4 +177,4 @@ namespace mongo {
 }
 
 
-#include "mongo/db/namespacestring-inl.h"
+#include "mongo/db/namespace_string-inl.h"

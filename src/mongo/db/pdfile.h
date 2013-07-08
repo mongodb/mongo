@@ -31,7 +31,7 @@
 #include "mongo/db/memconcept.h"
 #include "mongo/db/mongommf.h"
 #include "mongo/db/namespace_details-inl.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pdfile_version.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/log.h"

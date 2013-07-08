@@ -24,7 +24,7 @@
 #include "mongo/base/init.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/scripting/engine_v8.h"
 #include "mongo/scripting/v8_utils.h"

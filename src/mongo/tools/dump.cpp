@@ -25,7 +25,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/text.h"
 

@@ -26,7 +26,7 @@
 #include "mongo/db/d_globals.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/lockstat.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/server.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mapsf.h"

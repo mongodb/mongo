@@ -28,7 +28,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/stringutils.h"

@@ -19,7 +19,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 

@@ -22,7 +22,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 

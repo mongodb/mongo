@@ -17,7 +17,7 @@
 #include "mongo/s/config_upgrade_helpers.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/cluster_client_internal.h"
 #include "mongo/util/timer.h"
 

@@ -20,7 +20,7 @@
 #include <boost/static_assert.hpp>
 
 #include "mongo/db/storage/namespace.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
     namespace {

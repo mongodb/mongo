@@ -27,7 +27,7 @@
 #include <sstream>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {

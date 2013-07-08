@@ -19,7 +19,7 @@
 #pragma once
 
 #include "mongo/db/database.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo { 
 

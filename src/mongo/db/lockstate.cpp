@@ -22,7 +22,7 @@
 #include "mongo/db/lockstate.h"
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/namespacestring.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/client.h"
 #include "mongo/util/mongoutils/str.h"
 
