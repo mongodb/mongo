@@ -37,8 +37,7 @@
 #define	TXN_API_CALL(s, h, n, cur, bt, config, cfg) do {		\
 	int __autotxn = 0;						\
 	API_CALL(s, h, n, bt, cur, config, cfg);			\
-	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
-	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_RUNNING);			\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
@@ -46,8 +45,7 @@
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
 	int __autotxn = 0;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
-	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
-	    !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);		\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 

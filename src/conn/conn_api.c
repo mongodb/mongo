@@ -1005,10 +1005,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_SYNC);
 
-	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_TRANSACTIONAL);
-
 	WT_ERR(__conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));

@@ -22,8 +22,7 @@ __cache_read_row_deleted(
 	btree = S2BT(session);
 
 	/*
-	 * Give the page a modify structure and set the transaction ID for the
-	 * first update to the page.
+	 * Give the page a modify structure.
 	 *
 	 * If the tree is already dirty and so will be written, mark the page
 	 * dirty.  (We'd like to free the deleted pages, but if the handle is
@@ -31,7 +30,6 @@ __cache_read_row_deleted(
 	 * able to do so.)
 	 */
 	WT_RET(__wt_page_modify_init(session, page));
-	page->modify->first_id = ref->txnid;
 	if (btree->modified)
 		__wt_page_modify_set(session, page);
 

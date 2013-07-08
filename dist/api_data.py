@@ -628,9 +628,6 @@ methods = {
 		flush files to stable storage when closing or writing
 		checkpoints''',
 		type='boolean'),
-	Config('transactional', 'true', r'''
-		support transactional semantics''',
-		type='boolean'),
 	Config('use_environment_priv', 'false', r'''
 		use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
 		variables regardless of whether or not the process is running
