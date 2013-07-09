@@ -679,6 +679,7 @@ int _main( int argc, char* argv[], char **envp ) {
     std::string sslPEMKeyFile;
     std::string sslPEMKeyPassword;
     std::string sslCAFile;
+    std::string sslCRLFile;
 
     bool runShell = false;
     bool nodb = false;
@@ -717,6 +718,9 @@ int _main( int argc, char* argv[], char **envp ) {
     ( "sslPEMKeyFile", po::value<std::string>(&sslPEMKeyFile), "PEM certificate/key file for SSL" )
     ( "sslPEMKeyPassword", po::value<std::string>(&sslPEMKeyFile), 
       "password for key in PEM file for SSL" )
+    ( "sslCRLFile", po::value<std::string>(&sslCRLFile),
+      "Certificate Revocation List file for SSL")
+    ( "sslFIPSMode", "activate FIPS 140-2 mode at startup")
 #endif
     ;
 
@@ -798,6 +802,12 @@ int _main( int argc, char* argv[], char **envp ) {
     }
     if (params.count("sslCAFile")) {
         mongo::cmdLine.sslCAFile = params["sslCAFile"].as<std::string>();
+    }
+    if (params.count("sslCRLFile")) {
+        mongo::cmdLine.sslCRLFile = params["sslCRLFile"].as<std::string>();
+    }
+    if (params.count( "sslFIPSMode")) {
+        mongo::cmdLine.sslFIPSMode = true;
     }
 #endif
     if ( params.count( "nokillop" ) ) {
