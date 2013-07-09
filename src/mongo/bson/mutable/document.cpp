@@ -1529,8 +1529,8 @@ namespace mutablebson {
 
                     // Record a damage event for the new value data.
                     impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize(),
-                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        targetBaseOffset + thisElt.fieldNameSize() + 1,
+                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
                         thisElt.valuesize());
                 }
             }
@@ -1656,8 +1656,8 @@ namespace mutablebson {
                     dassert(thisElt.valuesize() == newElt.valuesize());
 
                     impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize(),
-                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        targetBaseOffset + thisElt.fieldNameSize() + 1,
+                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
                         thisElt.valuesize());
                 }
             }
@@ -1788,8 +1788,8 @@ namespace mutablebson {
                     dassert(thisElt.valuesize() == newElt.valuesize());
 
                     impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize(),
-                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        targetBaseOffset + thisElt.fieldNameSize() + 1,
+                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
                         thisElt.valuesize());
                 }
             }
@@ -1858,8 +1858,8 @@ namespace mutablebson {
                     dassert(thisElt.valuesize() == newElt.valuesize());
 
                     impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize(),
-                        sourceBaseOffset + thisElt.fieldNameSize(),
+                        targetBaseOffset + thisElt.fieldNameSize() + 1,
+                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
                         thisElt.valuesize());
                 }
             }
