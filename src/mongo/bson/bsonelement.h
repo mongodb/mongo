@@ -60,7 +60,7 @@ namespace mongo {
     */
     class BSONElement {
     public:
-        /** These functions, which start with a capital letter, throw a UserException if the
+        /** These functions, which start with a capital letter, throw a MsgAssertionException if the
             element is not of the required type. Example:
 
             std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
@@ -74,8 +74,8 @@ namespace mongo {
         bool Bool()                 const { return chk(mongo::Bool).boolean(); }
         std::vector<BSONElement> Array() const; // see implementation for detailed comments
         mongo::OID OID()            const { return chk(jstOID).__oid(); }
-        void Null()                 const { chk(isNull()); } // throw UserException if not null
-        void OK()                   const { chk(ok()); }     // throw UserException if element DNE
+        void Null()                 const { chk(isNull()); } // throw MsgAssertionException if not null
+        void OK()                   const { chk(ok()); }     // throw MsgAssertionException if element DNE
 
         /** @return the embedded object associated with this field.
             Note the returned object is a reference to within the parent bson object. If that 
