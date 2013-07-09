@@ -140,7 +140,7 @@ wts_create(void)
 		die(ret, "connection.open_session");
 
 	/*
-	 * Ensure that we can service at least one operation per-thread 
+	 * Ensure that we can service at least one operation per-thread
 	 * concurrently without filling the cache with pinned pages. We
 	 * choose a multiplier of three because the max configurations control
 	 * on disk size and in memory pages are often significantly larger
