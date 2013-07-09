@@ -1607,6 +1607,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::NumberDouble);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueDouble());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1624,7 +1625,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1646,6 +1647,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::String);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueString());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1663,7 +1665,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1685,6 +1687,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::Object);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueObject());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1702,7 +1705,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1725,6 +1728,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::Array);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueArray());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1742,7 +1746,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1787,7 +1791,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1808,6 +1812,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::Undefined);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_TRUE(mmb::ConstElement(a).isValueUndefined());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1825,7 +1830,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1847,6 +1852,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::jstOID);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueOID());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1864,7 +1870,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1886,6 +1892,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::Bool);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueBool());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1903,7 +1910,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1925,6 +1932,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::Date);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueDate());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1942,7 +1950,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -1963,6 +1971,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::jstNULL);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_TRUE(mmb::ConstElement(a).isValueNull());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -1980,7 +1989,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2020,7 +2029,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2060,7 +2069,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2099,7 +2108,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2121,6 +2130,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::Symbol);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueSymbol());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -2138,7 +2148,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2178,7 +2188,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2200,6 +2210,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::NumberInt);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueInt());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -2217,7 +2228,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2239,6 +2250,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::Timestamp);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_TRUE(value1 == mmb::ConstElement(a).getValueTimestamp());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -2256,7 +2268,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2278,6 +2290,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::NumberLong);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueLong());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -2295,7 +2308,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2316,6 +2329,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::MinKey);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_TRUE(mmb::ConstElement(a).isValueMinKey());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -2333,7 +2347,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
@@ -2354,6 +2368,7 @@ namespace {
         ASSERT_TRUE(a.ok());
         ASSERT_EQUALS(a.getType(), mongo::MaxKey);
         ASSERT_TRUE(a.hasValue());
+        ASSERT_TRUE(mmb::ConstElement(a).isValueMaxKey());
 
         // Construct via call passing BSON element
         ASSERT_OK(doc.root().appendElement(thing));
@@ -2371,7 +2386,7 @@ namespace {
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
-        ASSERT_TRUE(identical(thing, a.getValue()));
+        ASSERT_TRUE(identical(thing, mmb::ConstElement(a).getValue()));
         ASSERT_TRUE(identical(a.getValue(), b.getValue()));
         ASSERT_TRUE(identical(b.getValue(), c.getValue()));
     }
