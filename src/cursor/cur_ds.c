@@ -21,9 +21,6 @@ __curds_txn_enter(WT_SESSION_IMPL *session, int update)
 	if (session->ncursors++ == 0)			/* XXX */
 		__wt_txn_read_first(session);
 
-	/* This transaction involves a data-source. */
-	F_SET(&session->txn, TXN_DATA_SOURCE);
-
 	return (0);
 }
 
@@ -36,67 +33,6 @@ __curds_txn_leave(WT_SESSION_IMPL *session)
 {
 	if (--session->ncursors == 0)			/* XXX */
 		__wt_txn_read_last(session);
-}
-
-/*
- * __wt_curds_txn_commit --
- *	Call the data-source on commit.
- */
-int
-__wt_curds_txn_commit(WT_SESSION_IMPL *session)
-{
-	WT_CURSOR *cursor, *source;
-	WT_DECL_RET;
-	int (*f)(WT_CURSOR *);
-
-	/*
-	 * It's normal to have multiple cursors open in the session, possibly on
-	 * different data sources.  We'd rather not call the data source once
-	 * for every open cursor on every commit/rollback: keep a simple cache
-	 * of the last commit/rollback API we called, so in the common case of
-	 * cursors open on the same underlying data source, we only call once.
-	 */
-	f = NULL;
-	TAILQ_FOREACH(cursor, &session->cursors, q)
-		if (F_ISSET(cursor, WT_CURSTD_DATA_SOURCE)) {
-			source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
-			if (source->commit != NULL && source->commit != f) {
-				f = source->commit;
-				WT_TRET(source->commit(source));
-			}
-		}
-
-	return (ret);
-}
-
-/*
- * __wt_curds_txn_rollback --
- *	Call the data-source on rollback.
- */
-int
-__wt_curds_txn_rollback(WT_SESSION_IMPL *session)
-{
-	WT_CURSOR *cursor, *source;
-	WT_DECL_RET;
-	int (*f)(WT_CURSOR *);
-
-	/*
-	 * It's normal to have multiple cursors open in the session, possibly on
-	 * different data sources.  We'd rather not call the data source once
-	 * for every open cursor on every commit/rollback: keep a simple cache
-	 * of the last commit/rollback API we called, so in the common case of
-	 * cursors open on the same underlying data source, we only call once.
-	 */
-	f = NULL;
-	TAILQ_FOREACH(cursor, &session->cursors, q)
-		if (F_ISSET(cursor, WT_CURSTD_DATA_SOURCE)) {
-			source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
-			if (source->rollback != NULL && source->rollback != f) {
-				f = source->rollback;
-				WT_TRET(source->rollback(source));
-			}
-		}
-	return (ret);
 }
 
 /*

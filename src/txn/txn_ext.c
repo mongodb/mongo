@@ -31,6 +31,39 @@ __wt_ext_transaction_oldest(WT_EXTENSION_API *wt_api)
 }
 
 /*
+ * __wt_ext_transaction_resolve --
+ *	Request notification of transaction resolution.
+ */
+int
+__wt_ext_transaction_resolve(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
+    int (*notify)(WT_SESSION *, void *, uint64_t, int), void *cookie)
+{
+	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
+
+	(void)wt_api;					/* Unused parameters */
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	txn = &session->txn;
+
+	/*
+	 * For now, a single slot for notifications: I'm not bothering with
+	 * more than one because more than one data-source in a transaction
+	 * doesn't work anyway.
+	 */
+	if (txn->notify == notify && txn->notify_cookie == cookie)
+		return (0);
+	if (txn->notify != NULL)
+		return (ENOMEM);
+
+	txn->notify = notify;
+	txn->notify_cookie = cookie;
+
+	return (0);
+}
+
+/*
  * __wt_ext_transaction_snapshot_isolation --
  *	Return if the current transaction is configured for snapshot isolation.
  */

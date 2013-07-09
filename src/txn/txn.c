@@ -269,6 +269,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 	txn->mod_count = txn->modref_count = 0;
+	txn->notify = NULL;
+	txn->notify_cookie = NULL;
+
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
 
@@ -287,9 +290,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn,
-	    TXN_DATA_SOURCE |
-	    TXN_ERROR | TXN_FORCE_EVICT | TXN_OLDEST | TXN_RUNNING);
+	F_CLR(txn, TXN_ERROR | TXN_FORCE_EVICT | TXN_OLDEST | TXN_RUNNING);
 
 	/* Update the global generation number. */
 	++txn_global->gen;
@@ -312,12 +313,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
-	/*
-	 * If a data-source was involved in the transaction, let it know we're
-	 * committing.
-	 */
-	if (F_ISSET(txn, TXN_DATA_SOURCE))
-		WT_RET(__wt_curds_txn_commit(session));
+	/* Commit notification. */
+	if (txn->notify != NULL)
+		WT_RET(txn->notify(
+		    (WT_SESSION *)session, txn->notify_cookie, txn->id, 1));
 
 	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the
@@ -352,12 +351,10 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
-	/*
-	 * If a data-source was involved in the transaction, let it know we're
-	 * rolling back.
-	 */
-	if (F_ISSET(txn, TXN_DATA_SOURCE))
-		WT_TRET(__wt_curds_txn_rollback(session));
+	/* Rollback notification. */
+	if (txn->notify != NULL)
+		WT_TRET(txn->notify(
+		    (WT_SESSION *)session, txn->notify_cookie, txn->id, 0));
 
 	/* Rollback updates. */
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)

@@ -384,26 +384,16 @@ restart:
  *	Resolve a transaction.
  */
 static int
-txn_state_set(WT_CURSOR *wtcursor, int commit)
+txn_state_set(WT_EXTENSION_API *wtext,
+    WT_SESSION *session, KVS_SOURCE *ks, uint64_t txnid, int commit)
 {
 	struct kvs_record txn;
-	CURSOR *cursor;
-	KVS_SOURCE *ks;
-	WT_EXTENSION_API *wtext;
-	WT_SESSION *session;
-	uint64_t txnid;
 	uint8_t val;
 	int ret = 0;
 
-	session = wtcursor->session;
-	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
-	ks = cursor->ws->ks;
-
-	/* Update the store -- commits must be permanent, flush the device. */
+	/* Update the store -- commits must be durable, flush the device. */
 	memset(&txn, 0, sizeof(txn));
 
-	txnid = wtext->transaction_id(wtext, session);
 	txn.key = &txnid;
 	txn.key_len = sizeof(txnid);
 
@@ -414,10 +404,25 @@ txn_state_set(WT_CURSOR *wtcursor, int commit)
 	if ((ret = kvs_set(ks->kvstxn, &txn)) != 0)
 		ERET(wtext, session,
 		    WT_ERROR, "kvs_set: %s", kvs_strerror(ret));
+
 	if (commit && (ret = kvs_commit(ks->kvs_device)) != 0)
 		ERET(wtext, session,
 		    WT_ERROR, "kvs_commit: %s", kvs_strerror(ret));
 	return (0);
+}
+
+/*
+ * txn_notify --
+ *	Resolve a transaction.
+ */
+static int
+txn_notify(WT_SESSION *session, void *cookie, uint64_t txnid, int committed)
+{
+	KVS_SOURCE *ks;
+
+	ks = cookie;
+
+	return (txn_state_set(ks->wtext, session, ks, txnid, committed));
 }
 
 /*
@@ -1270,6 +1275,7 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
+	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	WT_SOURCE *ws;
@@ -1279,6 +1285,7 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
 	ws = cursor->ws;
+	ks = ws->ks;
 
 	/* Get the WiredTiger cursor's key. */
 	if ((ret = copyin_key(wtcursor, 1)) != 0)
@@ -1378,6 +1385,11 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	/* Discard the lock. */
 err:	ESET(unlock(wtext, session, &ws->lock));
 
+	/* If successful, request notification at transaction resolution. */
+	if (ret == 0)
+		ESET(
+		    wtext->transaction_resolve(wtext, session, txn_notify, ks));
+
 	return (ret);
 }
 
@@ -1390,6 +1402,7 @@ update(WT_CURSOR *wtcursor, int remove_op)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
+	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	WT_SOURCE *ws;
@@ -1399,6 +1412,7 @@ update(WT_CURSOR *wtcursor, int remove_op)
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
 	ws = cursor->ws;
+	ks = ws->ks;
 
 	/* Get the WiredTiger cursor's key. */
 	if ((ret = copyin_key(wtcursor, 0)) != 0)
@@ -1490,6 +1504,11 @@ update(WT_CURSOR *wtcursor, int remove_op)
 	/* Discard the lock. */
 err:	ESET(unlock(wtext, session, &ws->lock));
 
+	/* If successful, request notification at transaction resolution. */
+	if (ret == 0)
+		ESET(
+		    wtext->transaction_resolve(wtext, session, txn_notify, ks));
+
 	return (ret);
 }
 
@@ -1526,26 +1545,6 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 		return (update(wtcursor, 0));
 	}
 	return (update(wtcursor, 1));
-}
-
-/*
- * kvs_cursor_commit --
- *	WT_CURSOR::commit method.
- */
-static int
-kvs_cursor_commit(WT_CURSOR *wtcursor)
-{
-	return (txn_state_set(wtcursor, 1));
-}
-
-/*
- * kvs_cursor_rollback --
- *	WT_CURSOR::rollback method.
- */
-static int
-kvs_cursor_rollback(WT_CURSOR *wtcursor)
-{
-	return (txn_state_set(wtcursor, 0));
 }
 
 /*
@@ -2539,14 +2538,6 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	cursor->wtcursor.search = kvs_cursor_search;
 	cursor->wtcursor.search_near = kvs_cursor_search_near;
 	cursor->wtcursor.update = kvs_cursor_update;
-
-	/*
-	 * XXX
-	 * The commit/rollback methods are private, which isn't right, but
-	 * they don't appear in anything other than data-source cursors.
-	 */
-	cursor->wtcursor.commit = kvs_cursor_commit;
-	cursor->wtcursor.rollback = kvs_cursor_rollback;
 
 	cursor->wtext = wtext;
 

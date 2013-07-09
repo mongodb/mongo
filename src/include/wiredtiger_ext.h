@@ -349,6 +349,30 @@ struct __wt_extension_api {
 	uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api);
 
 	/*!
+	 * Request notification of transaction resolution by specifying a
+	 * function to be called when the session's current transaction is
+	 * either committed or rolled back.  If the transaction is being
+	 * committed, but the notification function returns an error, the
+	 * transaction will be rolled back.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @param notify a function called when the session's current
+	 * transaction is committed or rolled back; the resolution function is
+	 * passed the session handle, a memory reference, the transaction ID,
+	 * and an integer value which is non-zero if the transaction is being
+	 * committed
+	 * @param cookie a cookie passed to the resolution function
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction resolve
+	 */
+	int (*transaction_resolve)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, int (*notify)(
+	    WT_SESSION *session, void *cookie, uint64_t txnid, int committed),
+	    void *cookie);
+
+	/*!
 	 * Return if the current transaction is configured for snapshot
 	 * isolation.
 	 *

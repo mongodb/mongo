@@ -139,6 +139,19 @@ data_source_error(int v)
 	return (v == 0 ? "one" : "two");
 }
 
+static int
+data_source_notify(
+    WT_SESSION *session, void *cookie, uint64_t txnid, int committed)
+{
+	/* Unused parameters */
+	(void)session;
+	(void)cookie;
+	(void)txnid;
+	(void)committed;
+
+	return (0);
+}
+
 static int my_cursor_next(WT_CURSOR *wtcursor)
 	{ (void)wtcursor; return (0); }
 static int my_cursor_prev(WT_CURSOR *wtcursor)
@@ -182,6 +195,14 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	transaction_oldest = wt_api->transaction_oldest(wt_api);
 	/*! [WT_EXTENSION transaction oldest] */
 	(void)transaction_oldest;
+	}
+
+	{
+	void *cookie = NULL;
+	/*! [WT_EXTENSION transaction resolve] */
+	ret = wt_api->transaction_resolve(
+	    wt_api, session, data_source_notify, cookie);
+	/*! [WT_EXTENSION transaction resolve] */
 	}
 
 	{
