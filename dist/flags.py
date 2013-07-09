@@ -75,7 +75,6 @@ flags = {
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',
 		'CONN_SYNC',
-		'CONN_TRANSACTIONAL',
 	],
 	'session' : [
 		'SESSION_INTERNAL',

@@ -18,7 +18,10 @@ FreeBSD
 GCC
 Gawlick
 GitHub
+Google
+Google's
 IEC
+JavaScript
 LDFLAGS
 LIBS
 LSB
@@ -238,6 +241,7 @@ os
 ovfl
 pcoll
 pdf
+petabyte
 pget
 php
 png
@@ -316,6 +320,7 @@ umask
 unallocated
 unencoded
 unescaped
+uninstall
 untyped
 uri
 useconds

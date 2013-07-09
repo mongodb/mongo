@@ -81,8 +81,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
 		/* Make sure the update can proceed. */
-		WT_ERR(
-		    __wt_update_check(session, page, old_upd = cbt->ins->upd));
+		WT_ERR(__wt_update_check(session, old_upd = cbt->ins->upd));
 
 		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
@@ -99,7 +98,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_update_check(session, page, NULL));
+		WT_ERR(__wt_update_check(session, NULL));
 
 		/* There may be no insert list, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;

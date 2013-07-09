@@ -66,7 +66,7 @@ class test_config03(test_base03.test_base03):
 
     config_vars = [ 'cache_size', 'create', 'error_prefix', 'eviction_target',
                     'eviction_trigger', 'hazard_max', 'multiprocess',
-                    'session_max', 'transactional', 'verbose' ]
+                    'session_max', 'verbose' ]
 
     all_scenarios = wtscenario.multiply_scenarios('_',
         cache_size_scenarios, create_scenarios, error_prefix_scenarios,

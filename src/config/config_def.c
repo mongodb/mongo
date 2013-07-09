@@ -252,7 +252,6 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "statistics_log", "category", NULL,
 	     confchk_statistics_log_subconfigs},
 	{ "sync", "boolean", NULL, NULL},
-	{ "transactional", "boolean", NULL, NULL},
 	{ "use_environment_priv", "boolean", NULL, NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
@@ -409,7 +408,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "multiprocess=0,session_max=50,shared_cache=(chunk=10MB,enable=0,"
 	  "name=pool,reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
 	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\","
-	  "wait=0),sync=,transactional=,use_environment_priv=0,verbose=",
+	  "wait=0),sync=,use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }

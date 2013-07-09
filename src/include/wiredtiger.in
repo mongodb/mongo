@@ -1220,7 +1220,7 @@ struct __wt_connection {
 	 * function must match ::wiredtiger_extension_init., a string; default
 	 * \c wiredtiger_extension_init.}
 	 * @config{prefix, a prefix for all names registered by this extension
-	 * (e.g.\, to make namespaces distinct or during upgrades., a string;
+	 * (e.g.\, to make namespaces distinct or during upgrades)., a string;
 	 * default empty.}
 	 * @config{terminate, a optional function in the extension that is
 	 * called before the extension is unloaded during WT_CONNECTION::close.
@@ -1444,8 +1444,6 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
  * checkpoints., a boolean flag; default \c true.}
- * @config{transactional, support transactional semantics., a boolean flag;
- * default \c true.}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
  * process is running with special privileges.  See @ref home for more

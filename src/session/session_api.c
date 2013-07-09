@@ -155,17 +155,12 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__session_reset_cursors(session));
 
 	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
-	if (cval.len != 0) {
-		if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-			WT_ERR_MSG(session, EINVAL,
-			    "Database not configured for transactions");
-
+	if (cval.len != 0)
 		session->isolation = session->txn.isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
 		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
-	}
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -651,9 +646,6 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, begin_transaction, config, cfg);
 	WT_CSTAT_INCR(session, txn_begin);
 
-	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-		WT_ERR_MSG(session, EINVAL,
-		    "Database not configured for transactions");
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
