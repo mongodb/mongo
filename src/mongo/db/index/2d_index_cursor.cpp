@@ -1778,6 +1778,9 @@ namespace mongo {
         const Point n(cmdObj["near"]);
         result.append("near", params.geoHashConverter->hash(cmdObj["near"]).toString());
 
+        uassert(16903, "'minDistance' param not supported for 2d index, requires 2dsphere index",
+                cmdObj["minDistance"].eoo());
+
         double maxDistance = numeric_limits<double>::max();
         if (cmdObj["maxDistance"].isNumber())
             maxDistance = cmdObj["maxDistance"].number();
@@ -1882,6 +1885,10 @@ namespace mongo {
                         uassert(16792, string("invalid $near search type: ") + e.fieldName(), false);
                         type = twod_internal::GEO_PLANE; // prevents uninitialized warning
                     }
+
+                    uassert(16904,
+                        "'$minDistance' param not supported for 2d index, requires 2dsphere index",
+                        n["$minDistance"].eoo());
 
                     double maxDistance = numeric_limits<double>::max();
                     if (e.isABSONObj() && e.embeddedObject().nFields() > 2) {
