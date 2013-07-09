@@ -46,6 +46,7 @@ namespace mongo {
     v8::Handle<v8::Value> mongoUpdate(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> mongoAuth(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> mongoLogout(V8Scope* scope, const v8::Arguments& args);
+    v8::Handle<v8::Value> mongoCursorFromId(V8Scope* scope, const v8::Arguments& args);
 
     // Cursor object
     v8::Handle<v8::Value> internalCursorCons(V8Scope* scope, const v8::Arguments& args);

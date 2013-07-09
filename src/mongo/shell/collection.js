@@ -886,6 +886,31 @@ DBCollection.prototype.distinct = function( keyString , query ){
 }
 
 
+DBCollection.prototype.aggregateCursor = function(pipeline, extraOpts) {
+    // This function should replace aggregate() in SERVER-10165.
+
+    var cmd = {pipeline: pipeline};
+
+    if (!(pipeline instanceof Array)) {
+        // support varargs form
+        cmd.pipeline = [];
+        for (var i=0; i<arguments.length; i++) {
+            cmd.pipeline.push(arguments[i]);
+        }
+    }
+    else {
+        Object.extend(cmd, extraOpts);
+    }
+
+    if (cmd.cursor === undefined) {
+        cmd.cursor = {};
+    }
+
+    var cursorRes = this.runCommand("aggregate", cmd);
+    assert.commandWorked(cursorRes, "aggregate with cursor failed");
+    return new DBCommandCursor(this._mongo, cursorRes);
+}
+
 DBCollection.prototype.aggregate = function( ops ) {
     
     var arr = ops;
@@ -902,6 +927,19 @@ DBCollection.prototype.aggregate = function( ops ) {
         printStackTrace();
         throw "aggregate failed: " + tojson(res);
     }
+
+    if (TestData) {
+        // If we are running in a test, make sure cursor output is the same.
+        // This block should go away with work on SERVER-10165.
+
+        if (this._db.isMaster().msg !== "isdbgrid") {
+            // agg cursors not supported sharded yet
+
+            var cursor = this.aggregateCursor(arr, {cursor: {batchSize: 0}});
+            assert.eq(cursor.toArray(), res.result);
+        }
+    }
+
     return res;
 }
 

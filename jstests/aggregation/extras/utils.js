@@ -241,12 +241,35 @@ function assertErrorCode(coll, pipe, code, errmsg) {
         pipe = [pipe];
     }
 
+    // Test non-cursor
     var res = coll.runCommand("aggregate", {pipeline: pipe});
-
     if (res.ok || res.code != code)
         printjson({pipeline: pipe, result: res});
 
     /* assert failure with proper error code */
     assert(!res.ok, errmsg || "failed in assertErrorCode");
     assert.eq(res.code, code);
+
+    // Test with cursors
+    if (coll.getDB().isMaster().msg !== "isdbgrid") {
+        // agg cursors not supported sharded yet
+
+        var cmd = {pipeline: pipe};
+        // cmd.cursor = {};
+        cmd.cursor = {batchSize: 0};
+
+        var cursorRes = coll.runCommand("aggregate", cmd);
+        if (cursorRes.ok) {
+            var followupBatchSize = 0; // default
+            var cursor = new DBCommandCursor(coll.getMongo(), cursorRes, followupBatchSize);
+
+            var error = assert.throws(function(){cursor.itcount()}, [], "expected error: " + code);
+            if (!error.search(code)) {
+                assert(false, "expected error: " + code + " got: " + error);
+            }
+        }
+        else {
+            assert.eq(cursorRes.code, code);
+        }
+    }
 }

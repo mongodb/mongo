@@ -98,6 +98,6 @@ namespace mongo {
         const BSONObj &query,
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSourceFilterBase(pExpCtx),
-        matcher(query) {
+        matcher(query.getOwned()) {
     }
 }

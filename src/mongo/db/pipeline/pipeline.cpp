@@ -104,6 +104,11 @@ namespace mongo {
                 continue;
             }
 
+            // ignore cursor options since they are handled externally.
+            if (str::equals(pFieldName, "cursor")) {
+                continue;
+            }
+
             /* look for the aggregation command */
             if (!strcmp(pFieldName, commandName)) {
                 pPipeline->collectionName = cmdElement.String();
@@ -392,7 +397,7 @@ namespace mongo {
         }
     }
 
-    bool Pipeline::run(BSONObjBuilder &result, string &errmsg) {
+    void Pipeline::stitch() {
         massert(16600, "should not have an empty pipeline",
                 !sources.empty());
 
@@ -406,7 +411,9 @@ namespace mongo {
             pTemp->setSource(prevSource);
             prevSource = pTemp.get();
         }
+    }
 
+    void Pipeline::run(BSONObjBuilder& result) {
         /*
           Iterate through the resulting documents, and add them to the result.
           We do this even if we're doing an explain, in order to capture
@@ -425,7 +432,7 @@ namespace mongo {
             // cant use subArrayStart() due to error handling
             BSONArrayBuilder resultArray;
             DocumentSource* finalSource = sources.back().get();
-            for(bool hasDoc = !finalSource->eof(); hasDoc; hasDoc = finalSource->advance()) {
+            for (bool hasDoc = !finalSource->eof(); hasDoc; hasDoc = finalSource->advance()) {
                 Document pDocument(finalSource->getCurrent());
 
                 /* add the document to the result set */
@@ -442,8 +449,6 @@ namespace mongo {
             resultArray.done();
             result.appendArray("result", resultArray.arr());
         }
-
-    return true;
     }
 
     void Pipeline::writeExplainOps(BSONArrayBuilder *pArrayBuilder) const {

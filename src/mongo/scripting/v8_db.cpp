@@ -100,6 +100,7 @@ namespace mongo {
         scope->injectV8Method("update", mongoUpdate, proto);
         scope->injectV8Method("auth", mongoAuth, proto);
         scope->injectV8Method("logout", mongoLogout, proto);
+        scope->injectV8Method("cursorFromId", mongoCursorFromId, proto);
 
         fassert(16468, _mongoPrototypeManipulatorsFrozen);
         for (size_t i = 0; i < _mongoPrototypeManipulators.size(); ++i)
@@ -201,6 +202,27 @@ namespace mongo {
         if (!cursor.get()) {
             return v8AssertionException("error doing query: failed");
         }
+
+        v8::Handle<v8::Function> cons = scope->InternalCursorFT()->GetFunction();
+        v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
+        c->SetInternalField(0, v8::External::New(cursor.get()));
+        scope->dbClientCursorTracker.track(c, cursor.release());
+        return c;
+    }
+
+    v8::Handle<v8::Value> mongoCursorFromId(V8Scope* scope, const v8::Arguments& args) {
+        argumentCheck(args.Length() == 2 || args.Length() == 3, "cursorFromId needs 2 or 3 args")
+        argumentCheck(scope->NumberLongFT()->HasInstance(args[1]), "2nd arg must be a NumberLong")
+        argumentCheck(args[2]->IsUndefined() || args[2]->IsNumber(), "3rd arg must be a js Number")
+
+        DBClientBase* conn = getConnection(scope, args);
+        const string ns = toSTLString(args[0]);
+        long long cursorId = numberLongVal(scope, args[1]->ToObject());
+
+        auto_ptr<mongo::DBClientCursor> cursor(new DBClientCursor(conn, ns, cursorId, 0, 0));
+
+        if (!args[2]->IsUndefined())
+            cursor->setBatchSize(args[2]->Int32Value());
 
         v8::Handle<v8::Function> cons = scope->InternalCursorFT()->GetFunction();
         v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());

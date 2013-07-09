@@ -129,6 +129,9 @@ namespace mongo {
             return (resultFlags & flag) != 0;
         }
 
+        /// Change batchSize after construction. Can change after requesting first batch.
+        void setBatchSize(int newBatchSize) { batchSize = newBatchSize; }
+
         DBClientCursor( DBClientBase* client, const string &_ns, BSONObj _query, int _nToReturn,
                         int _nToSkip, const BSONObj *_fieldsToReturn, int queryOptions , int bs ) :
             _client(client),

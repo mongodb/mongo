@@ -115,7 +115,7 @@ namespace mongo {
                 ClientCursor *cc = i.current();
 
                 bool shouldDelete = false;
-                if ( cc->_db == db ) {
+                if (cc->c()->shouldDestroyOnNSDeletion() && cc->_db == db) {
                     if (isDB) {
                         // already checked that db matched above
                         dassert( str::startsWith(cc->_ns.c_str(), ns) );
@@ -126,7 +126,7 @@ namespace mongo {
                             shouldDelete = true;
                     }
                 }
-                
+
                 if ( shouldDelete ) {
                     i.deleteAndAdvance();
                 }

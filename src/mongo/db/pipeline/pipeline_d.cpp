@@ -197,6 +197,10 @@ namespace mongo {
         ClientCursor::Holder cursor(
                 new ClientCursor(QueryOption_NoCursorTimeout, pCursor, fullName));
         CursorId cursorId = cursor->cursorid();
+        massert(16917, str::stream()
+                            << "cursor " << cursor->c()->toString()
+                            << "does its own locking so it can't be used with aggregation",
+                cursor->c()->requiresLock());
 
         // Prepare the cursor for data to change under it when we unlock
         if (cursor->c()->supportYields()) {

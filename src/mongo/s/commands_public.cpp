@@ -1800,6 +1800,9 @@ namespace mongo {
                                   BSONObjBuilder &result, bool fromRepl) {
             //const string shardedOutputCollection = getTmpName( collection );
 
+            uassert(16961, "Aggregation in a sharded system doesn't yet support cursors",
+                    !cmdObj.hasField("cursor"));
+
             intrusive_ptr<ExpressionContext> pExpCtx(
                 ExpressionContext::create(&InterruptStatusMongos::status));
             pExpCtx->setInRouter(true);
@@ -1855,7 +1858,8 @@ namespace mongo {
             pPipeline->addInitialSource(DocumentSourceCommandShards::create(shardResults, pExpCtx));
 
             // Combine the shards' output and finish the pipeline
-            pPipeline->run(result, errmsg);
+            pPipeline->stitch();
+            pPipeline->run(result);
 
             if (errmsg.length() > 0)
                 return false;

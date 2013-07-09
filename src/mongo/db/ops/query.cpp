@@ -107,7 +107,7 @@ namespace mongo {
         int start = 0;
         int n = 0;
 
-        Client::ReadContext ctx(ns);
+        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
         // call this readlocked so state can't change
         replVerifyReadsOk();
 
@@ -140,6 +140,14 @@ namespace mongo {
 
             start = cc->pos();
             Cursor *c = cc->c();
+
+            if (!c->requiresLock()) {
+                // make sure it won't be destroyed under us
+                fassert(16952, !c->shouldDestroyOnNSDeletion());
+                fassert(16953, !c->supportYields());
+                ctx.reset(); // unlocks
+            }
+
             c->recoverFromYield();
             DiskLoc last;
 

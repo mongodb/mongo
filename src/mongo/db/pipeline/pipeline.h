@@ -94,14 +94,17 @@ namespace mongo {
         */
         void toBson(BSONObjBuilder *pBuilder) const;
 
+        /** Stitch together the source pointers (by calling setSource) for each source in sources.
+         *  Must be called after optimize and addInitialSource but before trying to get results.
+         */
+        void stitch();
+
         /**
           Run the Pipeline on the given source.
 
           @param result builder to write the result to
-          @param errmsg place to put error messages, if any
-          @returns true on success, false if an error occurs
         */
-        bool run(BSONObjBuilder &result, string &errmsg);
+        void run(BSONObjBuilder& result);
 
         /**
           Debugging:  should the processing pipeline be split within
@@ -125,6 +128,9 @@ namespace mongo {
 
         /// The initial source is special since it varies between mongos and mongod.
         void addInitialSource(intrusive_ptr<DocumentSource> source);
+
+        /// The source that represents the output. Returns a non-owning pointer.
+        DocumentSource* output() { return sources.back().get(); }
 
         /**
           The aggregation command name.
