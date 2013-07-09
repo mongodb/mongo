@@ -54,7 +54,7 @@ namespace mongo {
         }
         void reconnect() {
             connInfo->cc.reset(new DBClientConnection(true, 0, connInfo->getTimeout()));
-            connInfo->cc->_logLevel = 2;
+            connInfo->cc->_logLevel = logger::LogSeverity::Debug(2);
             connInfo->connected = false;
             connect();
         }
@@ -89,7 +89,7 @@ namespace mongo {
                                           /*replicaSet*/ 0,
                                           /*timeout*/ ReplSetConfig::DEFAULT_HB_TIMEOUT)),
                 connected(false) {
-                cc->_logLevel = 2;
+                cc->_logLevel = logger::LogSeverity::Debug(2);
             }
 
             void tagPort() {

@@ -128,7 +128,7 @@ namespace mongo {
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( double timeout, int ll ) 
+    MessagingPort::MessagingPort( double timeout, logger::LogSeverity ll ) 
         : psock( new Socket( timeout, ll ) ) {
         ports.insert(this);
         piggyBackData = 0;

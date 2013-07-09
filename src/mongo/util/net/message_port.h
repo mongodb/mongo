@@ -66,7 +66,8 @@ namespace mongo {
         // in some cases the timeout will actually be 2x this value - eg we do a partial send,
         // then the timeout fires, then we try to send again, then the timeout fires again with
         // no data sent, then we detect that the other side is down
-        MessagingPort(double so_timeout = 0, int logLevel = 0 );
+        MessagingPort(double so_timeout = 0,
+                      logger::LogSeverity logLevel = logger::LogSeverity::Log() );
 
         MessagingPort(boost::shared_ptr<Socket> socket);
 

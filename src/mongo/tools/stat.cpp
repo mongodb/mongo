@@ -287,7 +287,7 @@ namespace mongo {
         static void serverThread( shared_ptr<ServerState> state , int sleepTime) {
             try {
                 DBClientConnection conn( true );
-                conn._logLevel = 1;
+                conn._logLevel = logger::LogSeverity::Debug(1);
                 string errmsg;
                 if ( ! conn.connect( state->host , errmsg ) )
                     state->error = errmsg;

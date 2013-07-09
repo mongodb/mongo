@@ -25,6 +25,7 @@
 #include <boost/function.hpp>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
@@ -580,9 +581,9 @@ namespace mongo {
         set<string> _seenIndexes;
     public:
         /** controls how chatty the client is about network errors & such.  See log.h */
-        int _logLevel;
+        logger::LogSeverity _logLevel;
 
-        DBClientWithCommands() : _logLevel(0),
+        DBClientWithCommands() : _logLevel(logger::LogSeverity::Log()),
                 _cachedAvailableOptions( (enum QueryOptions)0 ),
                 _haveCachedAvailableOptions(false) { }
 

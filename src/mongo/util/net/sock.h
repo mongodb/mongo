@@ -88,7 +88,7 @@ namespace mongo {
             memset(&sa, 0, sizeof(sa));
             sa.ss_family = AF_UNSPEC;
         }
-        SockAddr(int sourcePort); /* listener side */
+        explicit SockAddr(int sourcePort); /* listener side */
         SockAddr(const char *ip, int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
 
         template <typename T> T& as() { return *(T*)(&sa); }
