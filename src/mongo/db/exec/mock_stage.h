@@ -66,8 +66,8 @@ namespace mongo {
         WorkingSet* _ws;
 
         // The data we return.
-        queue<PlanStage::StageState> _results;
-        queue<WorkingSetMember> _members;
+        std::queue<PlanStage::StageState> _results;
+        std::queue<WorkingSetMember> _members;
     };
 
 }  // namespace mongo
