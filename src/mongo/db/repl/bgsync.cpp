@@ -298,7 +298,7 @@ namespace replset {
         // this oplog reader does not do a handshake because we don't want the server it's syncing
         // from to track how far it has synced
         OplogReader r(false /* doHandshake */);
-
+        OpTime lastOpTimeFetched;
         // find a target to sync from the last op time written
         getOplogReader(r);
 
@@ -312,9 +312,10 @@ namespace replset {
                 // if there is no one to sync from
                 return;
             }
-
-            r.tailingQueryGTE(rsoplog, _lastOpTimeFetched);
+            lastOpTimeFetched = _lastOpTimeFetched;
         }
+
+        r.tailingQueryGTE(rsoplog, lastOpTimeFetched);
 
         // if target cut connections between connecting and querying (for
         // example, because it stepped down) we might not have a cursor
