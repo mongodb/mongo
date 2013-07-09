@@ -2,6 +2,10 @@
 #
 # Build Makefile.am
 
+# We use read, make sure spaces separate input fields
+unset IFS
+export IFS
+
 # Process Make.base, insert subdirs that exist from Make.subdirs
 # (in release trees, some of the subdirs might be excluded).
 (sed -n '1,/BEGIN SUBDIRS/p' Make.base
