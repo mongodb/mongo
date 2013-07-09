@@ -1476,12 +1476,14 @@ namespace mongo {
             try {
                 _lastSlaveOkConn->auth(params);
             }
-            catch (const DBException&) {
-                /* Swallow exception. _lastSlaveOkConn is now in failed state.
-                 * The next time we create a new secondary connection it will
-                 * be authenticated with the credentials from _auths.
-                 */
-                verify(_lastSlaveOkConn->isFailed());
+            catch (const DBException& ex) {
+                LOG(1) << "Failed to authenticate secondary, clearing cached connection: "
+                       << causedBy(ex) << endl;
+                // We need to clear the cached connection because it will not match the set
+                // of cached username/pwd. Anything can be wrong here: user was removed in between
+                // authenticating to primary and secondary, user not yet replicated to secondary,
+                // secondary connection failed, etc.
+                invalidateLastSlaveOkCache();
             }
         }
 
