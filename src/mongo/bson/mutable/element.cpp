@@ -158,10 +158,12 @@ namespace mutablebson {
             BSONObj obj = builder.obj();
             return obj.firstElement().toString();
         } else if (isType(mongo::Array)) {
-            BSONArrayBuilder builder;
-            writeArrayTo(&builder);
-            BSONArray arr = builder.arr();
-            return arr.firstElement().toString();
+            BSONObjBuilder builder;
+            BSONArrayBuilder arrayBuilder(builder.subarrayStart(getFieldName()));
+            writeArrayTo(&arrayBuilder);
+            arrayBuilder.done();
+            BSONObj obj = builder.obj();
+            return obj.firstElement().toString();
         } else {
             return "corrupted element";
         }

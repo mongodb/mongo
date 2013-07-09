@@ -1407,11 +1407,22 @@ namespace {
     TEST(Document, toStringEphemeralObject) {
         mmb::Document doc;
         mmb::Element e = doc.makeElementObject("foo");
-        doc.root().pushBack(e);
-        e.appendDouble("d", 1.0);
-        e.appendString("s", "str");
+        ASSERT_OK(doc.root().pushBack(e));
+        ASSERT_OK(e.appendDouble("d", 1.0));
+        ASSERT_OK(e.appendString("s", "str"));
         ASSERT_EQUALS(
             mongo::fromjson("{ foo: { d : 1.0, s : 'str' } }").firstElement().toString(),
+            e.toString());
+    }
+
+    TEST(Document, toStringEphemeralArray) {
+        mmb::Document doc;
+        mmb::Element e = doc.makeElementArray("foo");
+        ASSERT_OK(doc.root().pushBack(e));
+        ASSERT_OK(e.appendDouble(mongo::StringData(), 1.0));
+        ASSERT_OK(e.appendString(mongo::StringData(), "str"));
+        ASSERT_EQUALS(
+            mongo::fromjson("{ foo: [ 1.0, 'str' ] }").firstElement().toString(),
             e.toString());
     }
 

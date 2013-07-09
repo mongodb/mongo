@@ -1459,7 +1459,7 @@ namespace mutablebson {
         const Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
         verify(impl.getType(thisRep) == mongo::Array);
-        return writeElement(builder);
+        return writeChildren(builder);
     }
 
     Status Element::setValueDouble(const double value) {
