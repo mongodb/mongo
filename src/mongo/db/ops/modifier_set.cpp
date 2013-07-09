@@ -142,15 +142,13 @@ namespace mongo {
             return status;
         }
 
+        if (_setMode == SET_ON_INSERT) {
+            execInfo->context = ModifierInterface::ExecInfo::INSERT_CONTEXT;
+        }
+
         // We register interest in the field name. The driver needs this info to sort out if
         // there is any conflict among mods.
         execInfo->fieldRef[0] = &_fieldRef;
-
-        // We may allow this $set to be in place if the value being set and the existing one
-        // have the same size.
-        if (_val.isNumber() && (_val.type() == _preparedState->elemFound.getType())) {
-            execInfo->inPlace = _preparedState->inPlace = true;
-        }
 
         //
         // in-place and no-op logic
@@ -161,6 +159,14 @@ namespace mongo {
         if (!_preparedState->elemFound.ok() ||
             _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts()-1)) {
             return Status::OK();
+        }
+
+        // We may allow this $set to be in place if the value being set and the existing one
+        // have the same size.
+        if (_val.isNumber() &&
+            (_preparedState->elemFound != root.getDocument().end()) &&
+            (_val.type() == _preparedState->elemFound.getType())) {
+            execInfo->inPlace = _preparedState->inPlace = true;
         }
 
         // If the value being $set is the same as the one already in the doc, than this is a
