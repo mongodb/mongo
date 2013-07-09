@@ -7,7 +7,6 @@
 (sed -n '1,/BEGIN SUBDIRS/p' Make.base
 
 echo "SUBDIRS = ."
-IFS=$(printf ' \t\n')
 sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | (while read dir cond ; do
 	test -d ../$dir || continue
 	if test -n "$cond" ; then

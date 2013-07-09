@@ -3,9 +3,12 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-# Insulate against locale-specific sort order
+# Insulate against locale-specific sort order and IFS from the user's env
 LC_ALL=C
 export LC_ALL
+IFS=' ''	''
+'
+export IFS
 
 build() {
 	# Build the standard typedefs.
@@ -15,7 +18,6 @@ build() {
 	    -e 'q' \
 	    -e '}' < $f
 
-	IFS=$(printf ' \t\n')
 	l=`ls ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
 	egrep -h '^[ 	]*(enum|struct|union)[	 ]*__.*[	 ]*{$' $l | \
