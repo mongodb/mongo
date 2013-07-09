@@ -12,7 +12,11 @@ $(PYSRC)/wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(PYSRC)/wir
 _wiredtiger.so: $(top_builddir)/libwiredtiger.la $(PYSRC)/wiredtiger_wrap.c
 	$(PYTHON) $(PYSRC)/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG)
 
-TESTS = run-ex_access
+install-exec-local:
+	$(PYTHON) $(PYSRC)/setup.py install_lib -b . --skip-build
 
 clean-local:
-	rm -rf WT_TEST
+	$(PYTHON) $(PYSRC)/setup.py clean
+	rm -rf _wiredtiger.so WT_TEST
+
+TESTS = run-ex_access
