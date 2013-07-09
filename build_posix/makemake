@@ -2,15 +2,12 @@
 #
 # Build Makefile.am
 
-# We use read, make sure spaces separate input fields
-unset IFS
-export IFS
-
 # Process Make.base, insert subdirs that exist from Make.subdirs
 # (in release trees, some of the subdirs might be excluded).
 (sed -n '1,/BEGIN SUBDIRS/p' Make.base
 
 echo "SUBDIRS = ."
+IFS=$(printf ' \t\n')
 sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | (while read dir cond ; do
 	test -d ../$dir || continue
 	if test -n "$cond" ; then

@@ -6,10 +6,6 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 # Allow this script to be run from anywhere
 cd "`dirname \"$0\"`"
 
-# We use read, make sure spaces separate input fields
-unset IFS
-export IFS
-
 # There's a cleanup function so we can easily clean out the directory.
 clean()
 {
@@ -36,6 +32,7 @@ echo "# This file is built automatically from build_posix/configure.ac.in."
 
 sed -n '1,/BEGIN check existence/p' configure.ac.in
 
+IFS=$(printf ' \t\n')
 sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | while read dir cond ; do
 	test -d ../$dir || continue
 	echo 'AC_CONFIG_FILES(['$dir/Makefile'])'
