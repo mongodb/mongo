@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -263,6 +264,10 @@ namespace mongo {
         if (!status.isOK()) {
             log() << status << std::endl;
         }
+        audit::logCommandAuthzCheck(client,
+                                    NamespaceString(c->parseNs(dbname, cmdObj)),
+                                    cmdObj,
+                                    status.code());
         return status;
     }
 }

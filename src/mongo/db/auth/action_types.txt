@@ -1,10 +1,11 @@
-# -*- python-mode -*-
+# -*- mode: python -*-
 
 # List describing the ActionTypes that should be created.
 # Please note that the order of the elements is not guaranteed to be the same across versions.
 # This means that the integer value assigned to each ActionType and used internally in ActionSet
 # also may change between versions.
 ["addShard",
+"authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
 "captrunc",
 "clean",
 "clone",

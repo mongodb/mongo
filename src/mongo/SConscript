@@ -288,6 +288,7 @@ env.StaticLibrary('mongocommon', commonFiles,
 
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",
+        "db/audit.cpp",
         "db/commands.cpp",
         "db/commands/authentication_commands.cpp",
         "db/commands/connection_status.cpp",
