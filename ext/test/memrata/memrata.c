@@ -134,7 +134,7 @@ typedef struct __kvs_source {
 	/*
 	 * Each WiredTiger connection has a transaction namespace which lists
 	 * resolved transactions with their committed or aborted state as a
-	 * value.  We create that namesapce in the first KVS store created,
+	 * value.  We create that namespace in the first KVS store created,
 	 * and then simply reference it from other, subsequently created KVS
 	 * stores.
 	 */
