@@ -720,7 +720,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "index_set",
                            'range_deleter',
                            's/metadata',
-                           "working_set",
+                           "db/exec/working_set",
                            "writebatch",
                            "db/exec/exec",
                            '$BUILD_DIR/third_party/shim_snappy'])

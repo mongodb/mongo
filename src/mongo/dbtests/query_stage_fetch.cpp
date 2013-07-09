@@ -18,6 +18,8 @@
  * This file tests db/exec/fetch.cpp.  Fetch goes to disk so we cannot test outside of a dbtest.
  */
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/cursor.h"
 #include "mongo/db/exec/fetch.h"
@@ -43,7 +45,7 @@ namespace QueryStageFetch {
         }
 
         void getLocs(set<DiskLoc>* out) {
-            for (shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok(); c->advance()) {
+            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok(); c->advance()) {
                 out->insert(c->currLoc());
             }
         }
