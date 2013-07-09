@@ -1,6 +1,6 @@
 
 s = new ShardingTest( "sort1" , 2 , 0 , 2 )
-sh.stopBalancer();
+s.stopBalancer();
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.data" , key : { 'sub.num' : 1 } } );
