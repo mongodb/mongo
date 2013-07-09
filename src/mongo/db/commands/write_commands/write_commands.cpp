@@ -16,20 +16,31 @@
 
 #include "mongo/db/commands/write_commands/write_commands.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/write_commands/batch_executor.h"
 #include "mongo/db/json.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
-    // Write commands are currently "unregistered".  Uncomment the following lines if you want to
-    // experiment:
+    namespace {
 
-    // TODO Register commands.
-    // CmdInsert cmdInsert;
-    // CmdUpdate cmdUpdate;
-    // CmdDelete cmdDelete;
+        // Write commands are only registered if the following ServerParameter is set.
+        MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableExperimentalWriteCommands, bool, false);
+
+        MONGO_INITIALIZER(RegisterWriteCommands)(InitializerContext* context) {
+            if (enableExperimentalWriteCommands) {
+                // Leaked intentionally: a Command registers itself when constructed.
+                new CmdInsert();
+                new CmdUpdate();
+                new CmdDelete();
+            }
+            return Status::OK();
+        }
+
+    } // namespace
 
     WriteCmd::WriteCmd(const StringData& name, WriteBatch::WriteType writeType, ActionType action)
         : Command(name)
