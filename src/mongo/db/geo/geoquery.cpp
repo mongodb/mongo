@@ -31,6 +31,7 @@ namespace mongo {
         if (!obj["minDistance"].eoo()) {
             if (obj["minDistance"].isNumber()) {
                 double distArg = obj["minDistance"].number();
+                uassert(16901, "minDistance must be non-negative", distArg >= 0.0);
                 if (fromRadians) {
                     minDistance = distArg * radius;
                 } else {
@@ -44,6 +45,7 @@ namespace mongo {
         if (!obj["maxDistance"].eoo()) {
             if (obj["maxDistance"].isNumber()) {
                 double distArg = obj["maxDistance"].number();
+                uassert(16902, "maxDistance must be non-negative", distArg >= 0.0);
                 if (fromRadians) {
                     maxDistance = distArg * radius;
                 } else {
