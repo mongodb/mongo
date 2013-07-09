@@ -235,6 +235,7 @@ namespace {
         internalActions.addAction(ActionType::replSetGetRBID);
         internalActions.addAction(ActionType::replSetHeartbeat);
         internalActions.addAction(ActionType::writebacklisten);
+        internalActions.addAction(ActionType::userAdminV1);
         internalActions.addAction(ActionType::_migrateClone);
         internalActions.addAction(ActionType::_recvChunkAbort);
         internalActions.addAction(ActionType::_recvChunkCommit);

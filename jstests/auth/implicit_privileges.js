@@ -51,26 +51,28 @@ assertInsertSucceeds(admin.system.users,
                                "userAdminAnyDatabase"]
                      });
 
-var andyUserDocumentTestDb = {
+var andyAddUserCommandTestDb = {
+    createUser: 1,
     user: "andy",
-    pwd: hex_md5("andy:mongo:a"),
+    pwd: "a",
     roles: [ "readWrite" ]
 };
 
-var andyUserDocumentTest2Db = {
+var andyAddUserCommandTest2Db = {
+    createUser: 1,
     user: "andy",
     userSource: "test",
     roles: [ "read" ]
 };
 
 assertInsertFails(test.foo, {});
-assertInsertFails(test.system.users, andyUserDocumentTestDb);
+assert.commandFailed(test.runCommand(andyAddUserCommandTestDb));
 assert.throws(function() { test.foo.findOne(); });
 assert.throws(function() { test2.foo.findOne(); } );
 
 assert(admin.auth('root', 'a'));
-assertInsertSucceeds(test.system.users, andyUserDocumentTestDb);
-assertInsertSucceeds(test2.system.users, andyUserDocumentTest2Db);
+assert.commandWorked(test.runCommand(andyAddUserCommandTestDb));
+assert.commandWorked(test2.runCommand(andyAddUserCommandTest2Db));
 assertInsertSucceeds(test.foo, {_id: 0});
 assertInsertSucceeds(test2.foo, {_id: 0});
 
@@ -83,7 +85,7 @@ assert.eq(test.foo.findOne({_id: 1})._id, 1);
 assert.eq(test2.foo.findOne({_id: 0})._id, 0);
 assert(test.logout());
 assertInsertFails(test.foo, {});
-assertInsertFails(test.system.users, andyUserDocumentTestDb);
+assert.commandFailed(test.runCommand(andyAddUserCommandTestDb));
 assert.throws(function() { test.foo.findOne(); });
 assert.throws(function() { test2.foo.findOne(); } );
 

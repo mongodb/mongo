@@ -258,11 +258,18 @@ namespace {
         NamespaceString ns( privilege.getResource() );
 
         if (ns.coll() == "system.users") {
+            if (newActions.contains(ActionType::insert) ||
+                    newActions.contains(ActionType::update)) {
+                // End users can't insert or update system.users directly, only the system can.
+                // TODO(spencer): check for remove also once there's a command to remove users.
+                newActions.addAction(ActionType::userAdminV1);
+            } else {
+                newActions.addAction(ActionType::userAdmin);
+            }
             newActions.removeAction(ActionType::find);
             newActions.removeAction(ActionType::insert);
             newActions.removeAction(ActionType::update);
             newActions.removeAction(ActionType::remove);
-            newActions.addAction(ActionType::userAdmin);
         } else if (ns.coll() == "system.profile") {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::profileRead);

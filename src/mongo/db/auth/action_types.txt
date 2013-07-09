@@ -89,6 +89,7 @@
 "unsetSharding",
 "update",
 "userAdmin",
+"userAdminV1",
 "validate",
 "writebacklisten",
 "writeBacksQueued",

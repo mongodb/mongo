@@ -419,7 +419,10 @@ var TESTS = [
         testOps(conn.getDB('test'), UADMIN_PERM);
     }
 },
-{
+
+// Changing role test disabled per SERVER-10151. Once we have commands for changing user's roles,
+// this should be changed to use those and re-enabled
+/*{
     name: 'Test change role',
     test: function(conn) {
         var testDB = conn.getDB('test');
@@ -449,7 +452,8 @@ var TESTS = [
 
         testDB2.system.users.update({ user: 'rw' }, origSpec);
     }
-},
+},*/
+
 {
     name: 'Test override user',
     test: function(conn) {
