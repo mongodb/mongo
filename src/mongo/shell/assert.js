@@ -197,7 +197,7 @@ assert.time = function(f, msg, timeout /*ms*/) {
 assert.throws = function(func, params, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
     if (params && typeof(params) == "string")
-        throw "2nd argument to assert.throws has to be an array"
+        throw ("2nd argument to assert.throws has to be an array, not " + params);
     try {
         func.apply(null, params);
     }
