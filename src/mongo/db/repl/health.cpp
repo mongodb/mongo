@@ -19,6 +19,7 @@
 #include "mongo/db/repl/health.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
@@ -127,8 +128,6 @@ namespace mongo {
         if( s.s == MemberState::RS_ROLLBACK ) return a("", "rolling back operations to get in sync", "ROLLBACK");
         return "";
     }
-
-    extern time_t started;
 
     // oplogdiags in web ui
     static void say(stringstream&ss, const bo& op) {
@@ -309,7 +308,7 @@ namespace mongo {
             s << tr() << td(_self->fullName() + " (me)") <<
               td(_self->id()) <<
               td("1") <<  //up
-              td(ago(started)) <<
+              td(ago(cmdLine.started)) <<
               td("") << // last heartbeat
               td(ToString(_self->config().votes)) <<
               td(ToString(_self->config().priority)) <<

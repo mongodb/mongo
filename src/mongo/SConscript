@@ -300,7 +300,6 @@ env.StaticLibrary("coredb", [
         "db/commands/user_management_commands.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
-        "db/dbwebserver.cpp",
         "db/index_names.cpp",
         "db/index/btree_key_generator.cpp",
         "db/keypattern.cpp",
@@ -488,7 +487,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/cap.cpp",
                     "db/matcher_covered.cpp",
                     "db/dbeval.cpp",
-                    "db/restapi.cpp",
                     "db/dbhelpers.cpp",
                     "db/instance.cpp",
                     "db/client.cpp",
@@ -731,10 +729,20 @@ mongodAndMongosFiles = [
     "db/initialize_server_global_state.cpp",
     "db/server_extra_log_context.cpp",
     "util/net/message_server_port.cpp",
+    "db/dbwebserver.cpp",
     ]
 env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)
 
-mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp" ]
+env.StaticLibrary("mongodwebserver",
+                  [
+                   "db/clientlistplugin.cpp",
+                   "db/repl/replset_web_handler.cpp",
+                   "db/restapi.cpp",
+                   "db/stats/snapshots_webplugins.cpp",
+                   ],
+                  LIBDEPS=["coredb", "mongodandmongos"])
+
+mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", ]
 
 # ----- TARGETS ------
 
@@ -752,6 +760,7 @@ mongod = env.Install(
                        LIBDEPS=["coredb",
                                 "coreserver",
                                 "mongodandmongos",
+                                "mongodwebserver",
                                 "ntservice",
                                 "serveronly",
                                 ] + env['MODULE_LIBDEPS_MONGOD'] ) )

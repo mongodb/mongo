@@ -32,6 +32,7 @@
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
+#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
@@ -49,8 +50,6 @@ namespace mongo {
 
     using namespace mongoutils::html;
     using namespace bson;
-
-    time_t started = time(0);
 
     struct Timing {
         Timing() {
@@ -75,7 +74,7 @@ namespace mongo {
             ss << mongodVersion() << '\n';
             ss << "git hash: " << gitVersion() << '\n';
             ss << "sys info: " << sysInfo() << '\n';
-            ss << "uptime: " << time(0)-started << " seconds\n";
+            ss << "uptime: " << time(0)-cmdLine.started << " seconds\n";
             ss << "</pre>";
         }
 
