@@ -82,8 +82,8 @@ namespace mongo {
             out << "   idx miss \t- percent of btree page misses (sampled)\n";
             out << "   qr|qw    \t- queue lengths for clients waiting (read|write)\n";
             out << "   ar|aw    \t- active clients (read|write)\n";
-            out << "   netIn    \t- network traffic in - bits\n";
-            out << "   netOut   \t- network traffic out - bits\n";
+            out << "   netIn    \t- network traffic in - bytes\n";
+            out << "   netOut   \t- network traffic out - bytes\n";
             out << "   conn     \t- number of open connections\n";
             out << "   set      \t- replica set name\n";
             out << "   repl     \t- replication type \n";
