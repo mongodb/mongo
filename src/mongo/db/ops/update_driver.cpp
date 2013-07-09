@@ -38,8 +38,10 @@ namespace mongo {
         clear();
     }
 
-    Status UpdateDriver::parse(const BSONObj& updateExpr) {
+    Status UpdateDriver::parse(const IndexPathSet& indexedFields, const BSONObj& updateExpr) {
         clear();
+
+        _indexedFields = indexedFields;
 
         // Check if the update expression is a full object replacement.
         if (*updateExpr.firstElementFieldName() != '$') {
@@ -157,20 +159,19 @@ namespace mongo {
         return true;
     }
 
-    Status UpdateDriver::update(const BSONObj& oldObj,
-                                const StringData& matchedField,
-                                BSONObj* newObj,
+    Status UpdateDriver::update(const StringData& matchedField,
+                                mutablebson::Document* doc,
                                 BSONObj* logOpRec) {
         // TODO: assert that update() is called at most once in a !_multi case.
 
-        mutablebson::Document doc(oldObj);
         FieldRefSet targetFields;
+        _affectIndices = false;
 
         // Ask each of the mods to type check whether they can operate over the current document
         // and, if so, to change that document accordingly.
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             ModifierInterface::ExecInfo execInfo;
-            Status status = (*it)->prepare(doc.root(), matchedField, &execInfo);
+            Status status = (*it)->prepare(doc->root(), matchedField, &execInfo);
             if (!status.isOK()) {
                 return status;
             }
@@ -190,6 +191,13 @@ namespace mongo {
                                       << "Cannot update '" << other->dottedField()
                                       << "' and '" << execInfo.fieldRef[i]->dottedField()
                                       << "' at the same time");
+                }
+
+                // TODO: make mightBeIndexed and fieldRef like each other.
+                if (!_affectIndices &&
+                    _indexedFields.mightBeIndexed(execInfo.fieldRef[i]->dottedField())) {
+                    _affectIndices = true;
+                    doc->disableInPlaceUpdates();
                 }
             }
 
@@ -222,7 +230,6 @@ namespace mongo {
             *logOpRec = logDoc.getObject();
         }
 
-        *newObj = doc.getObject();
         return Status::OK();
     }
 
@@ -232,6 +239,10 @@ namespace mongo {
 
     bool UpdateDriver::dollarModMode() const {
         return _dollarModMode;
+    }
+
+    bool UpdateDriver::modsAffectIndices() const {
+        return _affectIndices;
     }
 
     bool UpdateDriver::multi() const {
@@ -270,6 +281,8 @@ namespace mongo {
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             delete *it;
         }
+        _indexedFields.clear();
+        _dollarModMode = false;
     }
 
 } // namespace mongo

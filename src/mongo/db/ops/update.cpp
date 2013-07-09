@@ -20,8 +20,13 @@
 
 #include "mongo/db/ops/update.h"
 
+#include <cstring>  // for memcpy
+
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/index_set.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_internal.h"
@@ -494,10 +499,6 @@ namespace mongo {
         //   + fast path for update for query by _id
         //   + support for relaxing viable path constraint in replication
         //
-        // + In Place
-        //   + collect damage vector and apply it insetad of calling disk
-        //   + support for determining if updates affects an index (pre-req for in place)
-        //
         // + Field Management
         //   + Force all upsert to contain _id
         //   + Prevent changes to immutable fields (_id, and those mentioned by sharding)
@@ -508,19 +509,20 @@ namespace mongo {
 
         debug.updateobj = updateobj;
 
+        NamespaceDetails* d = nsdetails( ns );
+        NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get( ns );
+
         UpdateDriver::Options opts;
         opts.multi = multi;
         opts.upsert = upsert;
         opts.logOp = logop;
-        UpdateDriver driver(opts);
-        Status status = driver.parse( updateobj );
+        UpdateDriver driver( opts );
+        Status status = driver.parse( nsdt->indexKeys(), updateobj );
         if ( !status.isOK() ) {
             uasserted( 16840, status.reason() );
         }
 
         shared_ptr<Cursor> cursor = getOptimizedCursor( ns, patternOrig, BSONObj(), planPolicy );
-        NamespaceDetails* d = nsdetails(ns); // can be null if an upsert...
-        NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get(ns);
 
         // The 'cursor' the optimizer gave us may contain query plans that generate duplicate
         // diskloc's. We set up here the mechanims that will prevent us from processing those
@@ -561,11 +563,12 @@ namespace mongo {
             driver.setLogOp( false );
             driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
 
-            BSONObj newObj;
-            status = driver.update( oldObj, StringData(), &newObj, NULL /* no oplog record */);
+            mutablebson::Document doc( oldObj, mutablebson::Document::kInPlaceDisabled );
+            status = driver.update( StringData(), &doc, NULL /* no oplog record */);
             if ( !status.isOK() ) {
                 uasserted( 16836, status.reason() );
             }
+            BSONObj newObj = doc.getObject();
 
             theDataFileMgr.insertWithObjMod( ns, newObj, false, su );
 
@@ -664,34 +667,71 @@ namespace mongo {
                 cursor->prepareToTouchEarlierIterate();
             }
 
-            BSONObj newObj;
+            // Ask the driver to apply the mods. It may be that the driver can apply those "in
+            // place", that is, some values of the old document just get adjusted without any
+            // change to the binary layout on the bson layer. It may be that a whole new
+            // document is needed to accomodate the new bson layout of the resulting document.
+            mutablebson::Document doc( oldObj, mutablebson::Document::kInPlaceEnabled );
             BSONObj logObj;
             StringData matchedField = matchDetails.hasElemMatchKey() ?
                                                     matchDetails.elemMatchKey():
                                                     StringData();
-            status = driver.update( oldObj, matchedField, &newObj, &logObj );
+            status = driver.update( matchedField, &doc, &logObj );
             if ( !status.isOK() ) {
                 uasserted( 16837, status.reason() );
             }
 
-            // Write Obj
-            DiskLoc newLoc = theDataFileMgr.updateRecord(ns,
-                                                         d,
-                                                         nsdt,
-                                                         r,
-                                                         loc,
-                                                         newObj.objdata(),
-                                                         newObj.objsize(),
-                                                         debug);
-
-            // If we've moved this object to a new location, make sure we don't apply
-            // that update again if our traversal picks the objecta again.
+            // If the driver applied the mods in place, we can ask the mutable for what
+            // changed. We call those changes "damages". :) We use the damages to inform the
+            // journal what was changed, and then apply them to the original document
+            // ourselves. If, however, the driver applied the mods out of place, we ask it to
+            // generate a new, modified document for us. In that case, the file manager will
+            // take care of the journaling details for us.
             //
-            // TODO: we also want to note the diskloc if the updates are affecting indices.
-            // Changes are that we're traversing one of them and they may be multi key and
-            // therefore duplicate disklocs.
-            if ( newLoc != loc /* TODO || modsIsIndexed ?? */ ) {
-                seenLocs.insert( newLoc );
+            // This code flow is admittedly odd. But, right now, journaling is baked in the file
+            // manager. And if we aren't using the file manager, we have to do jounaling
+            // ourselves.
+            BSONObj newObj;
+            const char* source = NULL;
+            mutablebson::DamageVector damages;
+            bool inPlace = doc.getInPlaceUpdates(&damages, &source);
+            if ( inPlace && !driver.modsAffectIndices() ) {
+
+                // All updates were in place. Apply them via durability and writing pointer.
+                mutablebson::DamageVector::const_iterator where = damages.begin();
+                const mutablebson::DamageVector::const_iterator end = damages.end();
+                for( ; where != end; ++where ) {
+                    const char* sourcePtr = source + where->sourceOffset;
+                    void* targetPtr = getDur().writingPtr(
+                        const_cast<char*>(oldObj.objdata()) + where->targetOffset,
+                        where->size);
+                    std::memcpy(targetPtr, sourcePtr, where->size);
+                }
+                newObj = oldObj;
+                debug.fastmod = true;
+            }
+            else {
+
+                // The updates were not in place. Apply them through the file manager.
+                newObj = doc.getObject();
+                DiskLoc newLoc = theDataFileMgr.updateRecord(ns,
+                                                             d,
+                                                             nsdt,
+                                                             r,
+                                                             loc,
+                                                             newObj.objdata(),
+                                                             newObj.objsize(),
+                                                             debug);
+
+                // If we've moved this object to a new location, make sure we don't apply
+                // that update again if our traversal picks the objecta again.
+                //
+                // We also take note that the diskloc if the updates are affecting indices.
+                // Chances are that we're traversing one of them and they may be multi key and
+                // therefore duplicate disklocs.
+                if ( newLoc != loc || driver.modsAffectIndices()  ) {
+                    seenLocs.insert( newLoc );
+                }
             }
 
             // Log Obj
@@ -810,19 +850,19 @@ namespace mongo {
             UpdateDriver::Options opts;
             opts.multi = false;
             opts.upsert = false;
-            UpdateDriver driver(opts);
-            Status status = driver.parse( operators );
+            UpdateDriver driver( opts );
+            Status status = driver.parse( IndexPathSet(), operators );
             if ( !status.isOK() ) {
                 uasserted( 16838, status.reason() );
             }
 
-            BSONObj newObj;
-            status = driver.update( from, StringData(), &newObj, NULL /* not oplogging */ );
+            mutablebson::Document doc( from, mutablebson::Document::kInPlaceDisabled );
+            status = driver.update( StringData(), &doc, NULL /* not oplogging */ );
             if ( !status.isOK() ) {
                 uasserted( 16839, status.reason() );
             }
 
-            return newObj;
+            return doc.getObject();
         }
         else {
             ModSet mods( operators );

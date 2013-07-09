@@ -172,6 +172,7 @@ env.StaticLibrary(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/index_set',
         'update',
     ],
 )
