@@ -12,6 +12,12 @@ WT_CURSOR::close methods.
 When bulk-loading row-store objects, keys must be loaded in sorted
 order.
 
+When using the \c sort utility on a Linux or other POSIX-like system to
+pre-sort keys, the locale specified by the environment affects the sort
+order and may not match the default sort order used by WiredTiger.  Set
+\c LC_ALL=C in the process' environment to configure the traditional sort
+order that uses native byte values.
+
 When bulk-loading fixed-length column store objects, the \c bulk
 configuration string value \c bitmap allows chunks of a memory resident
 bitmap to be loaded directly into an object by passing a WT_ITEM to
