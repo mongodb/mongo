@@ -301,8 +301,13 @@ namespace mongo {
          */
         void State::dropTempCollections() {
             _db.dropCollection(_config.tempNamespace);
-            if (_useIncremental)
+            // Always forget about temporary namespaces, so we don't cache lots of them
+            ShardConnection::forgetNS( _config.tempNamespace );
+            if (_useIncremental) {
                 _db.dropCollection(_config.incLong);
+                ShardConnection::forgetNS( _config.incLong );
+            }
+
         }
 
         /**
@@ -1477,6 +1482,9 @@ namespace mongo {
                     if (++index >= chunks.size())
                         break;
                 }
+
+                // Forget temporary input collection, if output is sharded collection
+                ShardConnection::forgetNS( inputNS );
 
                 result.append( "chunkSizes" , chunkSizes.arr() );
 
