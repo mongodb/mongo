@@ -2559,8 +2559,9 @@ namespace mutablebson {
             // builder. We still do need to dassert that the field name doesn't alias us
             // somehow.
             Impl& impl = getImpl();
-            if (fieldName)
+            if (fieldName) {
                 dassert(impl.doesNotAlias(*fieldName));
+            }
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
             element.writeElement(&builder, fieldName);
