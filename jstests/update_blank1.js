@@ -7,4 +7,4 @@ t.insert( orig );
 t.update( {} , { $set : { "c" :  5 } } );
 print( db.getLastError() );
 orig["c"] = 5;
-assert.eq( orig , t.findOne() , "after $set" ); // SERVER-2651
+assert.docEq( orig , t.findOne() , "after $set" ); // SERVER-2651
