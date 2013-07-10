@@ -1476,7 +1476,8 @@ namespace mongo {
             replSetMajorityCount = theReplSet ? theReplSet->config().getMajority() : 0;
 
             log() << "starting receiving-end of migration of chunk " << min << " -> " << max <<
-                    " for collection " << ns << " from " << from << endl;
+                    " for collection " << ns << " from " << from
+                  << " at epoch " << epoch.toString() << endl;
 
             string errmsg;
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , errmsg );
@@ -1968,7 +1969,9 @@ namespace mongo {
             BSONObj max = cmdObj["max"].Obj().getOwned();
 
             // Refresh our collection manager from the config server, we need a collection manager
-            // to start registering pending chunks
+            // to start registering pending chunks.
+            // We force the remote refresh here to make the behavior consistent and predictable,
+            // generally we'd refresh anyway, and to be paranoid.
             ChunkVersion currentVersion;
             shardingState.trySetVersion( ns, currentVersion, true );
 

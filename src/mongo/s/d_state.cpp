@@ -165,7 +165,9 @@ namespace mongo {
         CollectionMetadataPtr p = it->second;
 
         // empty shards should have version 0
-        version = ( p->getNumChunks() > 1 ) ? version : ChunkVersion( 0 , OID() );
+        version =
+                ( p->getNumChunks() > 1 ) ?
+                        version : ChunkVersion( 0, 0, p->getCollVersion().epoch() );
 
         ChunkType chunk;
         chunk.setMin( min );
@@ -210,7 +212,7 @@ namespace mongo {
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         if ( it == _collMetadata.end() ) {
 
-            *errMsg = str::stream() << "could not note chunk " << " [" << min << "," << max << ")"
+            *errMsg = str::stream() << "could not note chunk " << "[" << min << "," << max << ")"
                                     << " as pending because the local metadata for " << ns
                                     << " has changed";
 
@@ -223,7 +225,7 @@ namespace mongo {
         // The idea for checking this here is that in the future we shouldn't have this problem
         if ( metadata->getCollVersion().epoch() != epoch ) {
 
-            *errMsg = str::stream() << "could not note chunk " << " [" << min << "," << max << ")"
+            *errMsg = str::stream() << "could not note chunk " << "[" << min << "," << max << ")"
                                     << " as pending because the epoch for " << ns
                                     << " has changed from "
                                     << epoch << " to " << metadata->getCollVersion().epoch();
@@ -253,7 +255,7 @@ namespace mongo {
         if ( it == _collMetadata.end() ) {
 
             *errMsg = str::stream() << "no need to forget pending chunk "
-                                    << " [" << min << "," << max << ")"
+                                    << "[" << min << "," << max << ")"
                                     << " because the local metadata for " << ns << " has changed";
 
             return false;
@@ -266,7 +268,7 @@ namespace mongo {
         if ( metadata->getCollVersion().epoch() != epoch ) {
 
             *errMsg = str::stream() << "no need to forget pending chunk "
-                                    << " [" << min << "," << max << ")"
+                                    << "[" << min << "," << max << ")"
                                     << " because the epoch for " << ns << " has changed from "
                                     << epoch << " to " << metadata->getCollVersion().epoch();
 
@@ -382,15 +384,6 @@ namespace mongo {
         uassert( 16853, str::stream() << "bad config server connection string" << _configServer
                 << causedBy( errMsg ),
                 configLoc.type() != ConnectionString::INVALID );
-
-        // If our epochs aren't compatible, it's not useful to use the old metadata for chunk diffs
-        if( currMetadata && ! currMetadata->getCollVersion().hasCompatibleEpoch( version ) ){
-
-            warning() << "detected incompatible version epoch in new version " << version
-                      << ", old version was " << currMetadata->getCollVersion() << endl;
-
-            currMetadata.reset();
-        }
 
         MetadataLoader mdLoader( configLoc );
         CollectionMetadata* newMetadataRaw = new CollectionMetadata();

@@ -190,14 +190,16 @@ namespace mongo {
                                        CollectionMetadata* metadata ) const
     {
         map<string, ChunkVersion> versionMap;
+
+        // Preserve the epoch
+        versionMap[shard] = metadata->_shardVersion;
         OID epoch = metadata->getCollVersion().epoch();
 
         // Check to see if we should use the old version or not.
         if ( oldMetadata ) {
 
-            ChunkVersion oldVersion = oldMetadata->getShardVersion();
-
-            if ( oldVersion.isSet() && oldVersion.hasCompatibleEpoch( epoch ) ) {
+            // If our epochs are compatible, it's useful to use the old metadata for diffs
+            if ( oldMetadata->getCollVersion().hasCompatibleEpoch( epoch ) ) {
 
                 // Our epoch for coll version and shard version should be the same.
                 verify( oldMetadata->getCollVersion().hasCompatibleEpoch( epoch ) );
@@ -209,15 +211,17 @@ namespace mongo {
                 // not as frequently reloaded as in mongos.
                 metadata->_chunksMap = oldMetadata->_chunksMap;
 
-                LOG(2) << "loading new chunks for collection " << ns
-                              << " using old metadata w/ version " << oldMetadata->getShardVersion()
-                              << " and " << metadata->_chunksMap.size() << " chunks" << endl;
+                LOG( 2 ) << "loading new chunks for collection " << ns
+                         << " using old metadata w/ version " << oldMetadata->getShardVersion()
+                         << " and " << metadata->_chunksMap.size() << " chunks" << endl;
+            }
+            else {
+                warning() << "reloading collection metadata for " << ns << " with new epoch "
+                          << epoch.toString() << ", the current epoch is "
+                          << oldMetadata->getCollVersion().epoch().toString() << endl;
             }
         }
-        else {
-            // Preserve the epoch
-            versionMap[shard] = metadata->_shardVersion;
-        }
+
 
         // Exposes the new metadata's range map and version to the "differ," who
         // would ultimately be responsible of filling them up.

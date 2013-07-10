@@ -19,6 +19,8 @@
 
 namespace {
 
+    using mongo::MINKEY;
+    using mongo::MAXKEY;
     using mongo::rangeOverlaps;
     using mongo::rangeMapOverlaps;
     using mongo::RangeMap;
@@ -133,6 +135,16 @@ namespace {
         ASSERT( rangeMapContains( rangeMap, BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
         ASSERT( !rangeMapContains( rangeMap, BSON( "x" << 99 ), BSON( "x" << 200 ) ) );
         ASSERT( !rangeMapContains( rangeMap, BSON( "x" << 100 ), BSON( "x" << 201 ) ) );
+    }
+
+    TEST(RangeMap, RangeMapContainsMinMax) {
+
+        RangeMap rangeMap;
+        rangeMap.insert( make_pair( BSON( "x" << MINKEY ), BSON( "x" << MAXKEY ) ) );
+
+        ASSERT( rangeMapContains( rangeMap, BSON( "x" << MINKEY ), BSON( "x" << MAXKEY ) ) );
+        ASSERT( !rangeMapContains( rangeMap, BSON( "x" << 1 ), BSON( "x" << MAXKEY ) ) );
+        ASSERT( !rangeMapContains( rangeMap, BSON( "x" << MINKEY ), BSON( "x" << 1 ) ) );
     }
 
 }
