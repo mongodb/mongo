@@ -488,6 +488,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
 
     _isUpgradeSwitchSet = params.count("upgrade");
 
+    // dbpath currently must be linked in to mongos, but the directory should never be written to.
+    dbpath = "";
+
 #if defined(_WIN32)
     vector<string> disallowedOptions;
     disallowedOptions.push_back( "upgrade" );

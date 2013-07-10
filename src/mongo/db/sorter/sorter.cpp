@@ -39,6 +39,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/cmdline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/log.h"
@@ -624,6 +625,10 @@ namespace mongo {
     SortedFileWriter<Key, Value>::SortedFileWriter(const Settings& settings)
         : _settings(settings)
     {
+        // This should be checked by consumers, but if we get here don't allow writes.
+        massert(16946, "Attempting to use external sort from mongos. This is not allowed.",
+                !cmdLine.isMongos());
+
         {
             StringBuilder sb;
             // TODO use tmpPath rather than dbpath/_tmp
@@ -695,6 +700,11 @@ namespace mongo {
     Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
                                                  const Comparator& comp,
                                                  const Settings& settings) {
+
+        // This should be checked by consumers, but if it isn't try to fail early.
+        massert(16947, "Attempting to use external sort from mongos. This is not allowed.",
+                !(cmdLine.isMongos() && opts.extSortAllowed));
+
         switch (opts.limit) {
             case 0:  return new sorter::NoLimitSorter<Key, Value, Comparator>(opts, comp, settings);
             case 1:  return new sorter::LimitOneSorter<Key, Value, Comparator>(opts, comp);
