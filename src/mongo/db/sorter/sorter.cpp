@@ -416,7 +416,7 @@ namespace mongo {
 
                 SortedFileWriter<Key, Value> writer(_settings);
                 for ( ; !_data.empty(); _data.pop_front()) {
-                    writer.addAlreadySorted(_data.front().first, _data.back().second);
+                    writer.addAlreadySorted(_data.front().first, _data.front().second);
                 }
 
                 _iters.push_back(boost::shared_ptr<Iterator>(writer.done()));
