@@ -123,13 +123,38 @@ namespace mongo {
                                          BSONObj& cmdObj,
                                          BSONObjBuilder& result,
                                          bool fromRepl ) {
+        verify(c);
+
         std::string dbname = nsToDatabase(ns);
 
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
-        if (!status.isOK()) {
-            appendCommandStatus(result, status);
+        // Access control checks
+        if (AuthorizationManager::isAuthEnabled()) {
+            Status status = c->checkAuthForCommand(&client, dbname, cmdObj);
+            if (!status.isOK()) {
+                log() << "command denied: " << cmdObj.toString() << endl;
+                result.append("note", str::stream() << "not authorized for command: " <<
+                              c->name << " on database " << dbname);
+                appendCommandStatus(result, false, status.reason());
+                return;
+            }
+        }
+        if (c->adminOnly() &&
+                c->localHostOnlyIfNoAuth(cmdObj) &&
+                !AuthorizationManager::isAuthEnabled() &&
+                !client.getIsLocalHostConnection()) {
+            log() << "command denied: " << cmdObj.toString() << endl;
+            appendCommandStatus(result,
+                               false,
+                               "unauthorized: this command must run from localhost when running db "
+                               "without auth");
             return;
         }
+        if (c->adminOnly() && !startsWith(ns, "admin.")) {
+            log() << "command denied: " << cmdObj.toString() << endl;
+            appendCommandStatus(result, false, "access denied - use admin db");
+            return;
+        }
+        // End of access control checks
 
         if (cmdObj.getBoolField("help")) {
             stringstream help;

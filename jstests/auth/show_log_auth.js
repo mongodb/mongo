@@ -21,12 +21,8 @@ finally {
     print = oldprint;
 }
 
-function assertStartsWith(s, prefix) {
-    assert.eq(s.substr(0, prefix.length), prefix);
-}
-
-assertStartsWith(printed[0], 'Error while trying to show logs');
-assertStartsWith(printed[1], 'Error while trying to show ' + baseName + ' log');
+assert(printed[0]=='Error while trying to show logs: unauthorized');
+assert(printed[1]=='Error while trying to show ' + baseName + ' log: unauthorized');
 
 db.auth( "admin" , "pass" );
 db.shutdownServer();

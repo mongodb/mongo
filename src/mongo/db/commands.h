@@ -197,29 +197,9 @@ namespace mongo {
 
         // Helper for setting errmsg and ok field in command result object.
         static void appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg);
-        static void appendCommandStatus(BSONObjBuilder& result, const Status& status);
 
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;
-
-    private:
-        /**
-         * Checks to see if the client is authorized to run the given command with the given
-         * parameters on the given named database.
-         *
-         * fromRepl is true if this command is running as part of oplog application, which for
-         * historic reasons has slightly different authorization semantics.  TODO(schwerin): Check
-         * to see if this oddity can now be eliminated.
-         *
-         * Returns Status::OK() if the command is authorized.  Most likely returns
-         * ErrorCodes::Unauthorized otherwise, but any return other than Status::OK implies not
-         * authorized.
-         */
-        static Status _checkAuthorization(Command* c,
-                                          ClientBasic* client,
-                                          const std::string& dbname,
-                                          const BSONObj& cmdObj,
-                                          bool fromRepl);
     };
 
     bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);

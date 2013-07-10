@@ -80,7 +80,7 @@ logout(adminUser);
 
 var result = s.getDB("admin").runCommand({addShard : shardName});
 printjson(result);
-assert.eq(result.code, 13);
+assert.eq(result.errmsg, "unauthorized");
 
 login(adminUser);
 

@@ -26,11 +26,9 @@ db.getSisterDB( "admin" ).addUser( "super", "super" );
 assert.throws( function() { t.findOne() }, [], "read without login" );
 
 print("make sure we can't run certain commands w/out auth");
-var codeUnauthorized = 13;
-var rslt = db.runCommand({eval : "function() { return 1; }"});
-assert.eq(rslt.code, codeUnauthorized, tojson(rslt));
-var rslt = db.runCommand({getLog : "global"});
-assert.eq(rslt.code, codeUnauthorized, tojson(rslt));
+var errmsg = "unauthorized";
+assert.eq(db.runCommand({eval : "function() { return 1; }"}).errmsg, errmsg);
+assert.eq(db.adminCommand({getLog : "global"}).errmsg, errmsg);
 
 assert(!db.auth("eliot", "eliot2"), "auth succeeded with wrong password");
 assert(db.auth("eliot", "eliot"), "auth failed");
