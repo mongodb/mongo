@@ -28,6 +28,7 @@ namespace mongo {
         doingMerge(false),
         inShard(false),
         inRouter(false),
+        extSortAllowed(false),
         intCheckCounter(1),
         pStatus(pS) {
     }

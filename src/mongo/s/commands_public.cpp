@@ -1810,6 +1810,10 @@ namespace mongo {
             if (!pPipeline.get())
                 return false; // there was some parsing error
 
+            // This restriction will be loosened when we move the merge phase to a shard.
+            uassert(16948, "Aggregation in a sharded system doesn't yet support disk usage",
+                    !pExpCtx->getExtSortAllowed());
+
             string fullns(dbName + "." + pPipeline->getCollectionName());
 
             /*

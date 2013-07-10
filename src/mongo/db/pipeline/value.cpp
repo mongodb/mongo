@@ -819,8 +819,8 @@ namespace mongo {
         case BinData:
         case String:
             return sizeof(Value) + (_storage.shortStr
-                                        ? sizeof(RCString) + _storage.getString().size()
-                                        : 0);
+                                        ? 0 // string stored inline, so no extra mem usage
+                                        : sizeof(RCString) + _storage.getString().size());
 
         case Object:
             return sizeof(Value) + getDocument()->getApproximateSize();

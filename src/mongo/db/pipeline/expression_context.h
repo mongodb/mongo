@@ -32,10 +32,12 @@ namespace mongo {
         void setDoingMerge(bool b);
         void setInShard(bool b);
         void setInRouter(bool b);
+        void setExtSortAllowed(bool b) { extSortAllowed = b; }
 
         bool getDoingMerge() const;
         bool getInShard() const;
         bool getInRouter() const;
+        bool getExtSortAllowed() const { return extSortAllowed; }
 
         /**
            Used by a pipeline to check for interrupts so that killOp() works.
@@ -54,6 +56,7 @@ namespace mongo {
         bool doingMerge;
         bool inShard;
         bool inRouter;
+        bool extSortAllowed;
         unsigned intCheckCounter; // interrupt check counter
         InterruptStatus *const pStatus;
     };

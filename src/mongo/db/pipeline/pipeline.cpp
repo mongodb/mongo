@@ -134,6 +134,15 @@ namespace mongo {
                 continue;
             }
 
+            if (str::equals(pFieldName, "allowDiskUsage")) {
+                uassert(16949,
+                        str::stream() << "allowDiskUsage must be a bool, not a "
+                                      << typeName(cmdElement.type()),
+                        cmdElement.type() == Bool);
+                pCtx->setExtSortAllowed(cmdElement.Bool());
+                continue;
+            }
+
             /* we didn't recognize a field in the command */
             ostringstream sb;
             sb <<
@@ -367,6 +376,10 @@ namespace mongo {
 
         if (explain) {
             pBuilder->append(explainName, explain);
+        }
+
+        if (pCtx->getExtSortAllowed()) {
+            pBuilder->append("allowDiskUsage", true);
         }
 
         bool btemp;

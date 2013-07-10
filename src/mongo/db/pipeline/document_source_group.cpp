@@ -178,10 +178,7 @@ namespace mongo {
         : SplittableDocumentSource(pExpCtx)
         , populated(false)
         , _spilled(false)
-
-        // TODO: support opting-in to external sort
-        , _extSortAllowed(false)
-
+        , _extSortAllowed(pExpCtx->getExtSortAllowed() && !pExpCtx->getInRouter())
         , _maxMemoryUsageBytes(100*1024*1024)
         , _doneAfterNextAdvance(false)
         , _done(false)
