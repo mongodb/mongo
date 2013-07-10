@@ -136,7 +136,6 @@ namespace mongo {
 #endif
     }
 
-
     // --- SockAddr
 
     SockAddr::SockAddr(int sourcePort) {
@@ -390,10 +389,28 @@ namespace mongo {
     }
 
     // ------------ Socket -----------------
-    
+
+    static int socketGetLastError() {
+#ifdef _WIN32
+        return WSAGetLastError();
+#else
+        return errno;
+#endif
+    }
+
+    static SockAddr getLocalAddrForBoundSocketFd(int fd) {
+        SockAddr result;
+        int rc = getsockname(fd, result.raw(), &result.addressSize);
+        massert(0, getAddrInfoStrError(socketGetLastError()), 0 == rc);
+        return result;
+    }
+
     Socket::Socket(int fd , const SockAddr& remote) : 
         _fd(fd), _remote(remote), _timeout(0), _lastValidityCheckAtSecs(time(0)), _logLevel(logger::LogSeverity::Log()) {
         _init();
+        if (fd >= 0) {
+            _local = getLocalAddrForBoundSocketFd(_fd);
+        }
     }
 
     Socket::Socket( double timeout, logger::LogSeverity ll ) : _logLevel(ll) {
@@ -508,6 +525,8 @@ namespace mongo {
         const int one = 1;
         setsockopt( _fd , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
 #endif
+
+        _local = getLocalAddrForBoundSocketFd(_fd);
 
         _fdCreationMicroSec = curTimeMicros64();
         return true;

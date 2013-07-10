@@ -216,6 +216,8 @@ namespace mongo {
         std::string remoteString() const { return _remote.toString(); }
         unsigned remotePort() const { return _remote.getPort(); }
 
+        SockAddr localAddr() const { return _local; }
+
         void clearCounters() { _bytesIn = 0; _bytesOut = 0; }
         long long getBytesIn() const { return _bytesIn; }
         long long getBytesOut() const { return _bytesOut; }
@@ -263,6 +265,7 @@ namespace mongo {
 
         int _fd;
         uint64_t _fdCreationMicroSec;
+        SockAddr _local;
         SockAddr _remote;
         double _timeout;
 
