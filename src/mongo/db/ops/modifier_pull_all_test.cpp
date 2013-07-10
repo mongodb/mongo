@@ -131,7 +131,7 @@ namespace {
 
     TEST(EmptyResult, RemoveEverythingOutOfOrder) {
         Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : {  {r:1, b:2}, 1, 'a' } }"));
+        Mod mod(fromjson("{ $pullAll : {a : [ {r:1, b:2}, 1, 'a' ] }}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
