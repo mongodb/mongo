@@ -928,16 +928,14 @@ namespace mongo {
                 // load the shard's metadata, if we don't have it
                 shardingState.gotShardName( myOldShard );
 
-                // Using the maxVersion we just found will enforce a check - if we use zero version,
-                // it's possible this shard will be *at* zero version from a previous migrate and
-                // no refresh will be done
-                // TODO: Make this less fragile
+                // Always refresh against config server here
                 startingVersion = maxVersion;
-                shardingState.trySetVersion( ns , startingVersion /* will return updated */ );
+                shardingState.trySetVersion( ns , startingVersion, true );
 
                 if (startingVersion.majorVersion() == 0) {
-                   // It makes no sense to migrate if our version is zero and we have no chunks, so return
-                   warning() << "moveChunk cannot start migration with zero version" << endl;
+                   // It makes no sense to migrate if our version is zero and we have no chunks
+                   errmsg = "moveChunk cannot migrate with zero version";
+                   warning() << errmsg << endl;
                    return false;
                 }
 
@@ -1362,6 +1360,7 @@ namespace mongo {
             timing.done(5);
 
             // 6.
+            // NOTE: It is important that the distributed collection lock be held for this step.
             RangeDeleter* deleter = getDeleter();
             if (waitForDelete) {
                 log() << "doing delete inline for cleanup of chunk data" << migrateLog;
@@ -1455,6 +1454,16 @@ namespace mongo {
                 errmsg = "UNKNOWN ERROR";
                 error() << "migrate failed with unknown exception" << migrateLog;
             }
+
+            {
+                // Unprotect the range if needed/possible
+                Lock::DBWrite lk( ns );
+                string errMsg;
+                if ( !shardingState.forgetPending( ns, min, max, epoch, &errMsg ) ) {
+                    warning() << errMsg << endl;
+                }
+            }
+
             setActive( false );
         }
 
@@ -1531,6 +1540,16 @@ namespace mongo {
                     warning() << errmsg << endl;
                     state = FAIL;
                     return;
+                }
+
+                {
+                    // Protect the range by noting that we're now starting a migration to it
+                    Lock::DBWrite lk( ns );
+                    if ( !shardingState.notePending( ns, min, max, epoch, &errmsg ) ) {
+                        warning() << errmsg << endl;
+                        state = FAIL;
+                        return;
+                    }
                 }
 
                 if ( num )
@@ -1883,6 +1902,7 @@ namespace mongo {
         BSONObj min;
         BSONObj max;
         BSONObj shardKeyPattern;
+        OID epoch;
 
         long long numCloned;
         long long clonedBytes;
@@ -1912,7 +1932,7 @@ namespace mongo {
     public:
         RecvChunkStartCommand() : ChunkCommandHelper( "_recvChunkStart" ) {}
 
-        virtual LockType locktype() const { return WRITE; }  // this is so don't have to do locking internally
+        virtual LockType locktype() const { return NONE; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -1922,11 +1942,16 @@ namespace mongo {
         }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
+            // Active state of TO-side migrations (MigrateStatus) is serialized by distributed
+            // collection lock.
             if ( migrateStatus.getActive() ) {
                 errmsg = "migrate already in progress";
                 return false;
             }
 
+            // Pending deletes (for migrations) are serialized by the distributed collection lock,
+            // we are sure we registered a delete for a range *before* we can migrate-in a
+            // subrange.
             int numDeletes = getDeleter()->getStats()->getCurrentDeletes();
             if (numDeletes > 0) {
                 errmsg = str::stream() << "can't accept new chunks because "
@@ -1938,12 +1963,20 @@ namespace mongo {
             if ( ! configServer.ok() )
                 ShardingState::initialize(cmdObj["configServer"].String());
 
-            migrateStatus.prepare();
+            string ns = cmdObj.firstElement().String();
+            BSONObj min = cmdObj["min"].Obj().getOwned();
+            BSONObj max = cmdObj["max"].Obj().getOwned();
 
-            migrateStatus.ns = cmdObj.firstElement().String();
+            // Refresh our collection manager from the config server, we need a collection manager
+            // to start registering pending chunks
+            ChunkVersion currentVersion;
+            shardingState.trySetVersion( ns, currentVersion, true );
+
+            migrateStatus.ns = ns;
             migrateStatus.from = cmdObj["from"].String();
-            migrateStatus.min = cmdObj["min"].Obj().getOwned();
-            migrateStatus.max = cmdObj["max"].Obj().getOwned();
+            migrateStatus.min = min;
+            migrateStatus.max = max;
+            migrateStatus.epoch = currentVersion.epoch();
             migrateStatus.secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
             if (cmdObj.hasField("shardKeyPattern")) {
                 migrateStatus.shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
@@ -1967,6 +2000,9 @@ namespace mongo {
                 warning() << "secondaryThrottle asked for, but not replication" << endl;
                 migrateStatus.secondaryThrottle = false;
             }
+
+            // Set the TO-side migration to active
+            migrateStatus.prepare();
 
             boost::thread m( migrateThread );
 

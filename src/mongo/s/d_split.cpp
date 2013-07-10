@@ -656,8 +656,17 @@ namespace mongo {
                 // since this could be the first call that enable sharding we also make sure to load
                 // the shard's metadata
                 shardingState.gotShardName( shard );
+
+                // Always refresh against config server here
                 ChunkVersion shardVersion;
-                shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
+                shardingState.trySetVersion( ns , shardVersion, true );
+
+                if (shardVersion.majorVersion() == 0) {
+                   // It makes no sense to split if our version is zero and we have no chunks
+                   errmsg = "splitChunk cannot split with zero version";
+                   warning() << errmsg << endl;
+                   return false;
+                }
 
                 log() << "splitChunk accepted at version " << shardVersion << endl;
 

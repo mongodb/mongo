@@ -203,6 +203,7 @@ namespace mongo {
     bool ShardingState::notePending( const string& ns,
                                      const BSONObj& min,
                                      const BSONObj& max,
+                                     const OID& epoch,
                                      string* errMsg ) {
         scoped_lock lk( _mutex );
 
@@ -216,11 +217,25 @@ namespace mongo {
             return false;
         }
 
+        CollectionMetadataPtr metadata = it->second;
+
+        // This can currently happen because drops aren't synchronized with in-migrations
+        // The idea for checking this here is that in the future we shouldn't have this problem
+        if ( metadata->getCollVersion().epoch() != epoch ) {
+
+            *errMsg = str::stream() << "could not note chunk " << " [" << min << "," << max << ")"
+                                    << " as pending because the epoch for " << ns
+                                    << " has changed from "
+                                    << epoch << " to " << metadata->getCollVersion().epoch();
+
+            return false;
+        }
+
         ChunkType chunk;
         chunk.setMin( min );
         chunk.setMax( max );
 
-        CollectionMetadataPtr cloned( it->second->clonePlusPending( chunk, errMsg ) );
+        CollectionMetadataPtr cloned( metadata->clonePlusPending( chunk, errMsg ) );
         if ( !cloned ) return false;
 
         _collMetadata[ns] = cloned;
@@ -252,7 +267,8 @@ namespace mongo {
 
             *errMsg = str::stream() << "no need to forget pending chunk "
                                     << " [" << min << "," << max << ")"
-                                    << " because the local metadata for " << ns << " has changed";
+                                    << " because the epoch for " << ns << " has changed from "
+                                    << epoch << " to " << metadata->getCollVersion().epoch();
 
             return false;
         }
@@ -297,7 +313,9 @@ namespace mongo {
         _collMetadata.erase( ns );
     }
 
-    bool ShardingState::trySetVersion( const string& ns , ChunkVersion& version /* IN-OUT */ ) {
+    bool ShardingState::trySetVersion( const string& ns,
+                                       ChunkVersion& version /* IN-OUT */,
+                                       bool forceRefresh ) {
 
         // Currently this function is called after a getVersion(), which is the first "check", but
         // because refreshing the config data from a remote server takes a long time, many
@@ -338,8 +356,10 @@ namespace mongo {
             }
             else{
                 currMetadata = it->second;
-                if( ( storedVersion = it->second->getShardVersion() ).isEquivalentTo( version ) )
+                storedVersion = it->second->getShardVersion();
+                if( !forceRefresh && it->second->getShardVersion().isEquivalentTo( version ) ) {
                     return true;
+                }
             }
         }
         
@@ -818,7 +838,7 @@ namespace mongo {
                 dbtemprelease unlock;
 
                 ChunkVersion currVersion = version;
-                if ( ! shardingState.trySetVersion( ns , currVersion ) ) {
+                if ( ! shardingState.trySetVersion( ns , currVersion, false ) ) {
                     errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
                     result.append( "ns" , ns );
 

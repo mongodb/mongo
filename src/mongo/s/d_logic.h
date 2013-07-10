@@ -87,9 +87,10 @@ namespace mongo {
          * @param ns collection to be accessed
          * @param version (IN) the client believe this collection is on and (OUT) the version the
          *  metadata is actually in
+         * @param forceRefresh force contacting the config server to check version
          * @return true if the access can be allowed at the provided version
          */
-        bool trySetVersion( const string& ns , ChunkVersion& version );
+        bool trySetVersion( const string& ns , ChunkVersion& version, bool forceRefresh );
 
         void appendInfo( BSONObjBuilder& b );
 
@@ -141,6 +142,7 @@ namespace mongo {
         bool notePending( const string& ns,
                           const BSONObj& min,
                           const BSONObj& max,
+                          const OID& epoch,
                           string* errMsg );
 
         /**
