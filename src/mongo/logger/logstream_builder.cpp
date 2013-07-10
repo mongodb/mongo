@@ -17,7 +17,9 @@
 
 #include "mongo/logger/logstream_builder.h"
 
+#include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/status.h"
 #include "mongo/logger/tee.h"
 #include "mongo/util/assert_util.h"  // TODO: remove apple dep for this in threadlocal.h
 #include "mongo/util/concurrency/threadlocal.h"
@@ -30,6 +32,16 @@ namespace {
     /// vector, it should only ever contain 0 or 1 item.  It is a vector rather than just a
     /// thread_specific_ptr<> because of the high cost of thread_specific_ptr<>::reset().
     typedef OwnedPointerVector<std::ostringstream> OwnedOstreamVector;
+
+    /// This flag indicates whether the system providing a per-thread cache of ostringstreams
+    /// for use by LogstreamBuilder instances is initialized and ready for use.  Until this
+    /// flag is true, LogstreamBuilder instances must not use the cache.
+    bool isThreadOstreamCacheInitialized = false;
+
+    MONGO_INITIALIZER(LogstreamBuilder)(InitializerContext*) {
+        isThreadOstreamCacheInitialized = true;
+        return Status::OK();
+    }
 
 }  // namespace
 
@@ -80,9 +92,11 @@ namespace logger {
             if (_tee)
                 _tee->write(_baseMessage);
             _os->str("");
-            std::vector<std::ostringstream*>& cache = threadOstreamCache.getMake()->mutableVector();
-            if (!cache.empty()) {
-                cache.push_back(_os);
+            if (isThreadOstreamCacheInitialized && threadOstreamCache.getMake()->vector().empty()) {
+                threadOstreamCache.get()->mutableVector().push_back(_os);
+            }
+            else {
+                delete _os;
             }
         }
     }
@@ -95,13 +109,15 @@ namespace logger {
 
     void LogstreamBuilder::makeStream() {
         if (!_os) {
-            std::vector<std::ostringstream*>& oses = threadOstreamCache.getMake()->mutableVector();
-            if (oses.empty()) {
-                _os = new std::ostringstream;
-            }
-            else {
+            if (isThreadOstreamCacheInitialized &&
+                !threadOstreamCache.getMake()->vector().empty()) {
+
+                std::vector<std::ostringstream*>& oses = threadOstreamCache.get()->mutableVector();
                 _os = oses.back();
                 oses.pop_back();
+            }
+            else {
+                _os = new std::ostringstream;
             }
         }
     }
