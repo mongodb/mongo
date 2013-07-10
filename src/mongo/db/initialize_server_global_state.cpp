@@ -206,13 +206,40 @@ namespace mongo {
 
         if (!cmdLine.logpath.empty()) {
             fassert(16448, !cmdLine.logWithSyslog);
-            string absoluteLogpath = boost::filesystem::absolute(
+            std::string absoluteLogpath = boost::filesystem::absolute(
                     cmdLine.logpath, cmdLine.cwd).string();
+
+            const bool exists = boost::filesystem::exists(absoluteLogpath);
+
+            if (exists) {
+                if (boost::filesystem::is_directory(absoluteLogpath)) {
+                    return Status(ErrorCodes::FileNotOpen, mongoutils::str::stream() <<
+                                  "logpath \"" << absoluteLogpath <<
+                                  "\" should name a file, not a directory.");
+                }
+
+                if (!cmdLine.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
+                    std::string renameTarget = absoluteLogpath + "." + terseCurrentTime(false);
+                    if (0 == rename(absoluteLogpath.c_str(), renameTarget.c_str())) {
+                        log() << "log file \"" << absoluteLogpath
+                              << "\" exists; moved to \"" << renameTarget << "\".";
+                    }
+                    else {
+                        return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                      "Could not rename preexisting log file \"" <<
+                                      absoluteLogpath << "\" to \"" << renameTarget <<
+                                      "\"; run with --logappend or manually remove file: " <<
+                                      errnoWithDescription());
+                    }
+                }
+            }
+
             StatusWithRotatableFileWriter writer =
                 logger::globalRotatableFileManager()->openFile(absoluteLogpath, cmdLine.logAppend);
             if (!writer.isOK()) {
                 return writer.getStatus();
             }
+
             LogManager* manager = logger::globalLogManager();
             manager->getGlobalDomain()->clearAppenders();
             manager->getGlobalDomain()->attachAppender(
@@ -223,6 +250,18 @@ namespace mongo {
                     MessageLogDomain::AppenderAutoPtr(
                             new RotatableFileAppender<MessageEventEphemeral>(
                                     new MessageEventDetailsEncoder, writer.getValue())));
+
+            if (cmdLine.logAppend && exists) {
+                log() << std::endl;
+                log() << std::endl;
+                log() << "***** SERVER RESTARTED *****";
+                log() << std::endl;
+                log() << std::endl;
+                Status status =
+                    logger::RotatableFileWriter::Use(writer.getValue()).status();
+                if (!status.isOK())
+                    return status;
+            }
         }
 
         return Status::OK();
