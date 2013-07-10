@@ -30,8 +30,10 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	WT_RET(__wt_filename(session, dir, &path));
 
 	*countp = 0;
-	entries = NULL;
+	dirp = NULL;
 	dirallocsz = 0;
+	*dirlist = NULL;
+	entries = NULL;
 	if (flags == 0)
 		LF_SET(WT_DIRLIST_INCLUDE);
 	WT_VERBOSE_RET(session, fileops, "wt_dirlist of %s %s prefix %s",
@@ -40,8 +42,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	if (ret != 0)
-		WT_RET_MSG(session, ret, "%s: opendir", path);
-	*dirlist = NULL;
+		WT_ERR_MSG(session, ret, "%s: opendir", path);
 	for (dirsz = 0, count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
 		 * Skip . and ..
@@ -74,13 +75,14 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 		*dirlist = entries;
 	*countp = count;
 err:
-	(void)closedir(dirp);
+	if (dirp != NULL)
+		(void)closedir(dirp);
 	__wt_free(session, path);
 
 	if (ret == 0)
 		return (0);
 
-	if (dirlist != NULL) {
+	if (dirlist != NULL && *dirlist != NULL) {
 		for (count = dirsz; count > 0; count--)
 			__wt_free(session, entries[count]);
 		__wt_free(session, entries);
