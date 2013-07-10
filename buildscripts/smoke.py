@@ -201,6 +201,9 @@ class mongod(object):
         argv += ['--setParameter', 'enableTestCommands=1', '--httpinterface']
         if self.kwargs.get('small_oplog'):
             argv += ["--master", "--oplogSize", "511"]
+        params = self.kwargs.get('set_parameters', None)
+        if params:
+            for p in params.split(','): argv += ['--setParameter', p]
         if self.kwargs.get('small_oplog_rs'):
             argv += ["--replSet", "foo", "--oplogSize", "511"]
         if self.slave:
@@ -213,7 +216,7 @@ class mongod(object):
             argv += ['--auth']
             authMechanism = self.kwargs.get('authMechanism', 'MONGODB-CR')
             if authMechanism != 'MONGODB-CR':
-                argv.append('--setParameter=authenticationMechanisms=' + authMechanism)
+                argv += ['--setParameter', 'authenticationMechanisms=' + authMechanism]
             self.auth = True
         if self.kwargs.get('use_ssl'):
             argv += ['--sslOnNormalPorts',
@@ -536,6 +539,7 @@ def run_tests(tests):
         master = mongod(small_oplog_rs=small_oplog_rs,
                         small_oplog=small_oplog,
                         no_journal=no_journal,
+                        set_parameters=set_parameters,
                         no_preallocj=no_preallocj,
                         auth=auth,
                         authMechanism=authMechanism,
@@ -550,6 +554,7 @@ def run_tests(tests):
                            small_oplog_rs=small_oplog_rs,
                            small_oplog=small_oplog,
                            no_journal=no_journal,
+                           set_parameters=set_parameters,
                            no_preallocj=no_preallocj,
                            auth=auth,
                            authMechanism=authMechanism,
@@ -594,6 +599,7 @@ def run_tests(tests):
                             master = mongod(small_oplog_rs=small_oplog_rs,
                                             small_oplog=small_oplog,
                                             no_journal=no_journal,
+                                            set_parameters=set_parameters,
                                             no_preallocj=no_preallocj,
                                             auth=auth,
                                             authMechanism=authMechanism,
@@ -747,7 +753,7 @@ def add_exe(e):
 
 def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs
-    global no_journal, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
+    global no_journal, set_parameters, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
     global use_ssl
     global file_of_commands_mode
     start_mongod = options.start_mongod
@@ -772,6 +778,7 @@ def set_globals(options, tests):
     if hasattr(options, "small_oplog_rs"):
         small_oplog_rs = options.small_oplog_rs
     no_journal = options.no_journal
+    set_parameters = options.set_parameters
     no_preallocj = options.no_preallocj
     if options.mode == 'suite' and tests == ['client']:
         # The client suite doesn't work with authentication
@@ -874,7 +881,7 @@ def add_to_failfile(tests, options):
 
 
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, set_parameters, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -933,7 +940,8 @@ def main():
     parser.add_option('--use-ssl', dest='use_ssl', default=False,
                       action='store_true',
                       help='Run mongo shell and mongod instances with SSL encryption')
-
+    parser.add_option('--set-parameters', dest='set_parameters', default="",
+                      help='Adds --setParameter for each passed in items in the csv list - ex. "param1=1,param2=foo" ')
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
                       action="store", help='Set the "builder name" for buildlogger')
