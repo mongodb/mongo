@@ -235,8 +235,6 @@ namespace mongo {
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
-
-        CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         if ( it == _collMetadata.end() ) {
 
             *errMsg = str::stream() << "no need to forget pending chunk "
