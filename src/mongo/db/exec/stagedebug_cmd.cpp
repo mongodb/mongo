@@ -20,6 +20,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
+#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/limit.h"
@@ -48,6 +49,7 @@ namespace mongo {
      *                   args: {name: "collectionname", indexKeyPattern: kpObj, start: startObj,
      *                          stop: stopObj, endInclusive: true/false, direction: -1/1,
      *                          limit: int}}}
+     * node -> {cscan: {filter: {filter}, args: {name: "collectionname", direction: -1/1}}}
      *
      * Internal Nodes:
      *
@@ -60,7 +62,6 @@ namespace mongo {
      *
      * Forthcoming Nodes:
      *
-     * node -> {cscan: {filter: {filter}, args: {name: "collectionname" }}}
      * node -> {sort: {filter: {filter}, args: {node: node, pattern: objWithSortCriterion}}}
      * node -> {dedup: {filter: {filter}, args: {node: node, field: field}}}
      * node -> {unwind: {filter: filter}, args: {node: node, field: field}}
@@ -252,6 +253,26 @@ namespace mongo {
                         nodeArgs["num"].isNumber());
                 PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet);
                 return new SkipStage(nodeArgs["num"].numberInt(), workingSet, subNode);
+            }
+            else if ("cscan" == nodeName) {
+                CollectionScanParams params;
+
+                // What collection?
+                params.ns = dbname + "." + nodeArgs["name"].String();
+                uassert(16962, "Can't find collection " + nodeArgs["name"].String(),
+                        NULL != nsdetails(params.ns));
+
+                // What direction?
+                uassert(16963, "Direction argument must be specified and be a number",
+                        nodeArgs["direction"].isNumber());
+                if (1 == nodeArgs["direction"].numberInt()) {
+                    params.direction = CollectionScanParams::FORWARD;
+                }
+                else {
+                    params.direction = CollectionScanParams::BACKWARD;
+                }
+
+                return new CollectionScan(params, workingSet, matcher.release());
             }
             else {
                 return NULL;

@@ -37,6 +37,8 @@ env.StaticLibrary(
     source = [
         "and_hash.cpp",
         "and_sorted.cpp",
+        "collection_scan.cpp",
+        "collection_iterator.cpp",
         "fetch.cpp",
         "index_scan.cpp",
         "limit.cpp",

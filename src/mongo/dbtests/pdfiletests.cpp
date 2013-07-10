@@ -27,6 +27,7 @@
 
 namespace PdfileTests {
 
+    // XXX: These tests have been ported to query_stage_collscan.cpp and are deprecated here.
     namespace ScanCapped {
 
         class Base {
