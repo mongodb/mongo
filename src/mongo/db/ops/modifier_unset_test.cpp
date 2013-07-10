@@ -36,7 +36,6 @@ namespace {
     using mongo::ModifierUnset;
     using mongo::Status;
     using mongo::StringData;
-    using mongo::mutablebson::checkDoc;
     using mongo::mutablebson::Document;
     using mongo::mutablebson::Element;
 
@@ -101,7 +100,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{b: 2}")));
+        ASSERT_EQUALS(fromjson("{b: 2}"), doc);
     }
 
     TEST(SimpleMod, PrepareApplyInPlace) {
@@ -116,7 +115,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{x: 0}")));
+        ASSERT_EQUALS(fromjson("{x: 0}"), doc);
     }
 
     TEST(SimpleMod, PrepareApplyGeneratesEmptyDocument) {
@@ -131,7 +130,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{}")));
+        ASSERT_EQUALS(fromjson("{}"), doc);
     }
 
     TEST(SimpleMod, PrepareApplyUnsetSubtree) {
@@ -146,7 +145,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{c: 2}")));
+        ASSERT_EQUALS(fromjson("{c: 2}"), doc);
     }
 
     TEST(SimpleMod, LogNormal) {
@@ -163,7 +162,7 @@ namespace {
 
         Document logDoc;
         ASSERT_OK(modUnset.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, modUnset.modObj()));
+        ASSERT_EQUALS(modUnset.modObj(), logDoc);
     }
 
     //
@@ -194,7 +193,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a:{}, c:2}"))));
+        ASSERT_EQUALS(fromjson("{a:{}, c:2}"), doc);
     }
 
     TEST(DottedMod, PrepareApplyInPlace) {
@@ -209,7 +208,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{x: 0, a:{}}"))));
+        ASSERT_EQUALS(fromjson("{x: 0, a:{}}"), doc);
     }
 
     TEST(DottedMod, PrepareApplyUnsetNestedSubobject) {
@@ -224,7 +223,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson(("{a: {}}"))));
+        ASSERT_EQUALS(fromjson("{a: {}}"), doc);
     }
 
     //
@@ -255,7 +254,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a:[null,1,2]}")));
+        ASSERT_EQUALS(fromjson("{a:[null,1,2]}"), doc);
     }
 
     TEST(IndexedMod, PrepareApplyInPlace) {
@@ -270,7 +269,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{b:1, a:[null]}")));
+        ASSERT_EQUALS(fromjson("{b:1, a:[null]}"), doc);
     }
 
     TEST(IndexedMod, PrepareApplyInPlaceNuance) {
@@ -286,7 +285,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a:[null], b:1}")));
+        ASSERT_EQUALS(fromjson("{a:[null], b:1}"), doc);
     }
 
     TEST(IndexedMod, PrepareApplyInnerObject) {
@@ -301,7 +300,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a:[{}]}")));
+        ASSERT_EQUALS(fromjson("{a:[{}]}"), doc);
     }
 
     TEST(IndexedMod, PrepareApplyObject) {
@@ -316,7 +315,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a:[null]}")));
+        ASSERT_EQUALS(fromjson("{a:[null]}"), doc);
     }
 
     TEST(IndexedMod, LogNormal) {
@@ -328,7 +327,7 @@ namespace {
 
         Document logDoc;
         ASSERT_OK(modUnset.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, modUnset.modObj()));
+        ASSERT_EQUALS(modUnset.modObj(), logDoc);
     }
 
     //
@@ -367,7 +366,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [{}, {c:1}]}")));
+        ASSERT_EQUALS(fromjson("{a: [{}, {c:1}]}"), doc);
     }
 
     TEST(PositionalMod, PrepareApplyObject) {
@@ -382,7 +381,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [null, {c:1}]}")));
+        ASSERT_EQUALS(fromjson("{a: [null, {c:1}]}"), doc);
     }
 
     TEST(PositionalMod, PrepareApplyInPlace) {
@@ -397,7 +396,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(modUnset.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{b:1, a:[{}]}")));
+        ASSERT_EQUALS(fromjson("{b:1, a:[{}]}"), doc);
     }
 
     TEST(PositionalMod, LogNormal) {
@@ -413,7 +412,7 @@ namespace {
 
         Document logDoc;
         ASSERT_OK(modUnset.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$unset: {'a.0.b': 1}}")));
+        ASSERT_EQUALS(fromjson("{$unset: {'a.0.b': 1}}"), logDoc);
     }
 
 

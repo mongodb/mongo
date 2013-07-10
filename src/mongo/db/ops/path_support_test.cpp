@@ -44,7 +44,6 @@ namespace {
     using mongo::pathsupport::createPathAt;
     using mongo::Status;
     using mongo::StringData;
-    using mongo::mutablebson::checkDoc;
     using mongo::mutablebson::countChildren;
     using mongo::mutablebson::getNthChild;
     using mongo::mutablebson::Document;
@@ -89,7 +88,7 @@ namespace {
         Element newElem = doc().makeElementInt("a", 1);
         ASSERT_TRUE(newElem.ok());
         ASSERT_OK(createPathAt(field(), 0, root(), newElem));
-        ASSERT_TRUE(checkDoc(doc(), fromjson("{a: 1}")));
+        ASSERT_EQUALS(fromjson("{a: 1}"), doc());
     }
 
     class SimpleDoc : public mongo::unittest::Test {
@@ -263,8 +262,7 @@ namespace {
         ASSERT_EQUALS(countChildren(elemFound), 1u); // 'c' is a child of 'b'
 
         ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
-        BSONObj obj = fromjson("{a: {b: {c: 1, d: 1}}}");
-        ASSERT_TRUE(checkDoc(doc(), obj));
+        ASSERT_EQUALS(fromjson("{a: {b: {c: 1, d: 1}}}"), doc());
     }
 
     TEST_F(NestedDoc, NotStartingFromRoot) {
@@ -359,8 +357,7 @@ namespace {
         ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of b.0
 
         ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
-        BSONObj obj = fromjson("{a: [], b: [{c:1, d:1}]}");
-        ASSERT_TRUE(checkDoc(doc(), obj));
+        ASSERT_EQUALS(fromjson("{a: [], b: [{c:1, d:1}]}"), doc());
     }
 
     TEST_F(ArrayDoc, NewObjectInsideArray) {
@@ -379,8 +376,7 @@ namespace {
         ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of 'b'
 
         ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
-        BSONObj obj = fromjson("{a: [], b: [{c:1},{c:2}]}");
-        ASSERT_TRUE(checkDoc(doc(), obj));
+        ASSERT_EQUALS(fromjson("{a: [], b: [{c:1},{c:2}]}"), doc());
     }
 
     TEST_F(ArrayDoc, NewNestedObjectInsideArray) {
@@ -399,8 +395,7 @@ namespace {
         ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of 'b'
 
         ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
-        BSONObj obj = fromjson("{a: [], b: [{c:1},{c:{d:2}}]}");
-        ASSERT_TRUE(checkDoc(doc(), obj));
+        ASSERT_EQUALS(fromjson("{a: [], b: [{c:1},{c:{d:2}}]}"), doc());
     }
 
     TEST_F(ArrayDoc, ArrayPaddingNecessary) {
@@ -419,8 +414,7 @@ namespace {
         ASSERT_EQUALS(countChildren(elemFound), 1u); // '{c:1}' is a child of 'b'
 
         ASSERT_OK(createPathAt(field(), idxFound+1, elemFound, newElem));
-        BSONObj obj = fromjson("{a: [], b: [{c:1},null,null,null,null,1]}");
-        ASSERT_TRUE(checkDoc(doc(), obj));
+        ASSERT_EQUALS(fromjson("{a: [], b: [{c:1},null,null,null,null,1]}"), doc());
     }
 
     TEST_F(ArrayDoc, ExcessivePaddingRequested) {

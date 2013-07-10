@@ -36,7 +36,6 @@ namespace {
     using mongo::Status;
     using mongo::StringData;
     using mongo::fromjson;
-    using mongo::mutablebson::checkDoc;
     using mongo::mutablebson::ConstElement;
     using mongo::mutablebson::Document;
     using mongo::mutablebson::Element;
@@ -101,7 +100,7 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : ['a', {r:1, b:2}] }")));
+        ASSERT_EQUALS(fromjson("{ a : ['a', {r:1, b:2}] }"), doc);
     }
 
     TEST(PrepareApply, MissingElement) {
@@ -114,7 +113,7 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [1, 'a', {r:1, b:2}] }")));
+        ASSERT_EQUALS(fromjson("{ a : [1, 'a', {r:1, b:2}] }"), doc);
     }
 
     TEST(PrepareApply, TwoElements) {
@@ -127,12 +126,12 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [{r:1, b:2}] }")));
+        ASSERT_EQUALS(fromjson("{ a : [{r:1, b:2}] }"), doc);
     }
 
-    TEST(PrepareApply, EverythingAndThenSome) {
+    TEST(EmptyResult, RemoveEverythingOutOfOrder) {
         Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : [2,3,1,'r', {r:1, b:2}, 'a' ] } }"));
+        Mod mod(fromjson("{ $pullAll : {  {r:1, b:2}, 1, 'a' } }"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
@@ -140,27 +139,62 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [] }")));
-    }
-
-    TEST(PrepareApplyLog, EverythingAndThenSome) {
-        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
-        Mod mod(fromjson("{ $pullAll : { a : [2,3,1,'r', {r:1, b:2}, 'a' ] } }"));
-
-        ModifierInterface::ExecInfo execInfo;
-        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
-
-        ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [] }")));
+        ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : [] } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
     }
 
-    TEST(PrepareApplyLog, MissingPath) {
+    TEST(EmptyResult, RemoveEverythingInOrder) {
+        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+        Mod mod(fromjson("{ $pullAll : { a : [1, 'a', {r:1, b:2} ] } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+        ASSERT_FALSE(execInfo.inPlace);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+    }
+
+    TEST(EmptyResult, RemoveEverythingAndThenSome) {
+        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+        Mod mod(fromjson("{ $pullAll : { a : [2,3,1,'r', {r:1, b:2}, 'a' ] } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+        ASSERT_FALSE(execInfo.inPlace);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
+    }
+
+    TEST(PrepareLog, MissingPullValue) {
+        Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
+        Mod mod(fromjson("{ $pullAll : { a : [2] } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_TRUE(execInfo.noOp);
+        ASSERT_TRUE(execInfo.inPlace);
+
+        Document logDoc;
+        ASSERT_OK(mod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : [1, 'a', {r:1, b:2}] } }"), logDoc);
+    }
+
+    TEST(PrepareLog, MissingPath) {
         Document doc(fromjson("{ a : [1, 'a', {r:1, b:2}] }"));
         Mod mod(fromjson("{ $pullAll : { b : [1] } }"));
 
@@ -169,12 +203,9 @@ namespace {
         ASSERT_TRUE(execInfo.noOp);
         ASSERT_TRUE(execInfo.inPlace);
 
-        ASSERT_OK(mod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : [1, 'a', {r:1, b:2}] }")));
-
         Document logDoc;
         ASSERT_OK(mod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $unset : { b : true } }")));
+        ASSERT_EQUALS(fromjson("{ $unset : { b : true } }"), logDoc);
     }
 
 } // namespace

@@ -508,28 +508,12 @@ namespace mongo {
             return Status(ErrorCodes::InternalError, "cannot create log entry for $push mod");
         }
 
-        // Then we create the {<fieldname>:[]} Element, that is, an empty array.
-        mutablebson::Element logElement = doc.makeElementArray(_fieldRef.dottedField());
+        // value for the logElement ("field.path.name": <value>)
+        mutablebson::Element logElement = logRoot.getDocument().makeElementWithNewFieldName(
+                                                            _fieldRef.dottedField(),
+                                                            _preparedState->elemFound);
         if (!logElement.ok()) {
             return Status(ErrorCodes::InternalError, "cannot create details for $push mod");
-        }
-
-        // Fill up the empty array.
-        mutablebson::Element curr = _preparedState->elemFound.leftChild();
-        while (curr.ok()) {
-
-            // We need to copy each array entry from the resulting document to the log
-            // document.
-            mutablebson::Element currCopy = doc.makeElementWithNewFieldName(StringData(),
-                                                                            curr.getValue());
-            if (!currCopy.ok()) {
-                return Status(ErrorCodes::InternalError, "could create copy element");
-            }
-            Status status = logElement.pushBack(currCopy);
-            if (!status.isOK()) {
-                return Status(ErrorCodes::BadValue, "could not append entry for $push log");
-            }
-            curr = curr.rightSibling();
         }
 
         // Now, we attach the {<fieldname>: [<filled array>]} Element under the {$set: ...}

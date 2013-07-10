@@ -161,30 +161,15 @@ namespace mongo {
             return Status(ErrorCodes::InternalError, "cannot create log entry");
         }
 
-        // value for the logElement
+        // value for the logElement ("field.path.name": <value>)
         mutablebson::Element logElement = pathExists ?
-                                            doc.makeElementArray(_fieldRef.dottedField()) :
+                                            logRoot.getDocument().makeElementWithNewFieldName(
+                                                    _fieldRef.dottedField(),
+                                                    _preparedState->pathFoundElement
+                                                    ):
                                             doc.makeElementBool(_fieldRef.dottedField(), true);
         if (!logElement.ok()) {
             return Status(ErrorCodes::InternalError, "cannot create details");
-        }
-
-        if (pathExists) {
-            // Append all the array elements to the new array (in the log doc)
-            mutablebson::Element elem = _preparedState->pathFoundElement.leftChild();
-            while (elem.ok()) {
-                mutablebson::Element newElem = doc.makeElement(elem.getValue());
-                if (!newElem.ok()) {
-                    return Status(ErrorCodes::InternalError, "error making element copy");
-                }
-
-                Status status = logElement.pushBack(newElem);
-                if (!status.isOK()) {
-                    return status;
-                }
-
-                elem = elem.rightSibling();
-            }
         }
 
         // Now, we attach the {<fieldname>: <value>} Element under the {$op: ...} one.

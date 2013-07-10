@@ -36,7 +36,6 @@ namespace {
     using mongo::Status;
     using mongo::StringData;
     using mongo::fromjson;
-    using mongo::mutablebson::checkDoc;
     using mongo::mutablebson::ConstElement;
     using mongo::mutablebson::Document;
     using mongo::mutablebson::Element;
@@ -151,11 +150,25 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 1 }")));
+        ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
 
         Document logDoc;
         ASSERT_OK(incMod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 1 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
+    }
+
+    TEST(SimpleMod, LogWithoutApplyEmptyDocument) {
+        Document doc(fromjson("{}"));
+        Mod incMod(fromjson("{ $inc: { a : 1 }}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(incMod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.inPlace);
+        ASSERT_FALSE(execInfo.noOp);
+
+        Document logDoc;
+        ASSERT_OK(incMod.log(logDoc.root()));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
     }
 
     TEST(SimpleMod, ApplyAndLogSimpleDocument) {
@@ -168,11 +181,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 3 }")));
+        ASSERT_EQUALS(fromjson("{ a : 3 }"), doc);
 
         Document logDoc;
         ASSERT_OK(incMod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 3 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 3 } }"), logDoc);
     }
 
     TEST(DottedMod, ApplyAndLogSimpleDocument) {
@@ -185,11 +198,11 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : { b : 3 } }")));
+        ASSERT_EQUALS(fromjson("{ a : { b : 3 } }"), doc);
 
         Document logDoc;
         ASSERT_OK(incMod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { 'a.b' : 3 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { 'a.b' : 3 } }"), logDoc);
     }
 
     TEST(InPlace, IntToInt) {
@@ -260,12 +273,12 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 1 }")));
+        ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
 
         Document logDoc;
         ASSERT_OK(incMod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 1 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
         ASSERT_EQUALS(mongo::NumberLong, logDoc.root()["$set"]["a"].getType());
     }
 
@@ -283,12 +296,12 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 1.0 }")));
+        ASSERT_EQUALS(fromjson("{ a : 1.0 }"), doc);
         ASSERT_EQUALS(mongo::NumberDouble, doc.root()["a"].getType());
 
         Document logDoc;
         ASSERT_OK(incMod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 1.0 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1.0 } }"), logDoc);
         ASSERT_EQUALS(mongo::NumberDouble, logDoc.root()["$set"]["a"].getType());
     }
 
@@ -306,12 +319,12 @@ namespace {
         ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 1.0 }")));
+        ASSERT_EQUALS(fromjson("{ a : 1.0 }"), doc);
         ASSERT_EQUALS(mongo::NumberDouble, doc.root()["a"].getType());
 
         Document logDoc;
         ASSERT_OK(incMod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 1.0 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1.0 } }"), logDoc);
         ASSERT_EQUALS(mongo::NumberDouble, logDoc.root()["$set"]["a"].getType());
     }
 
@@ -328,12 +341,12 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{ a : 2.0 }")));
+        ASSERT_EQUALS(fromjson("{ a : 2.0 }"), doc);
         ASSERT_EQUALS(mongo::NumberDouble, doc.root()["a"].getType());
 
         Document logDoc;
         ASSERT_OK(incMod.log(logDoc.root()));
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{ $set : { a : 2.0 } }")));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 2.0 } }"), logDoc);
         ASSERT_EQUALS(mongo::NumberDouble, logDoc.root()["$set"]["a"].getType());
     }
 
@@ -355,7 +368,7 @@ namespace {
         const long long target_value = static_cast<long long>(initial_value) + 1;
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, BSON("a" << target_value)));
+        ASSERT_EQUALS(BSON("a" << target_value), doc);
     }
 
     TEST(Spilling, UnderflowIntToLong) {
@@ -373,7 +386,7 @@ namespace {
         const long long target_value = static_cast<long long>(initial_value) - 1;
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc, BSON("a" << target_value)));
+        ASSERT_EQUALS(BSON("a" << target_value), doc);
     }
 
     TEST(Lifecycle, IncModCanBeReused) {
@@ -388,14 +401,14 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc1, fromjson("{ a : 2 }")));
+        ASSERT_EQUALS(fromjson("{ a : 2 }"), doc1);
 
         ASSERT_OK(incMod.prepare(doc2.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(incMod.apply());
-        ASSERT_TRUE(checkDoc(doc2, fromjson("{ a : 2 }")));
+        ASSERT_EQUALS(fromjson("{ a : 2 }"), doc2);
     }
 
 } // namespace

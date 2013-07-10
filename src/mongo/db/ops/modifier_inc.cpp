@@ -234,6 +234,8 @@ namespace mongo {
 
     Status ModifierInc::log(mutablebson::Element logRoot) const {
 
+        dassert(_preparedState->newValue.isValid());
+
         // We'd like to create an entry such as {$set: {<fieldname>: <value>}} under 'logRoot'.
         // We start by creating the {$set: ...} Element.
         mutablebson::Document& doc = logRoot.getDocument();

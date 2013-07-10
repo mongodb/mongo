@@ -42,7 +42,6 @@ namespace {
     using mongo::NumberInt;
     using mongo::Status;
     using mongo::StringData;
-    using mongo::mutablebson::checkDoc;
     using mongo::mutablebson::ConstElement;
     using mongo::mutablebson::countChildren;
     using mongo::mutablebson::Document;
@@ -469,12 +468,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [1]}")));
+        ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
 
     TEST(SimpleMod, PrepareApplyInexistent) {
@@ -489,12 +488,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [1]}")));
+        ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
 
     TEST(SimpleMod, PrepareApplyNormal) {
@@ -509,12 +508,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [0,1]}")));
+        ASSERT_EQUALS(fromjson("{a: [0,1]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [0,1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [0,1]}}"), logDoc);
     }
 
     //
@@ -541,12 +540,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [{b:1}]}")));
+        ASSERT_EQUALS(fromjson("{a: [{b:1}]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [{b:1}]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [{b:1}]}}"), logDoc);
     }
 
     TEST(SimpleObjMod, PrepareApplyInexistent) {
@@ -561,12 +560,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [{b:1}]}")));
+        ASSERT_EQUALS(fromjson("{a: [{b:1}]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [{b:1}]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [{b:1}]}}"), logDoc);
     }
 
     TEST(SimpleObjMod, PrepareApplyNormal) {
@@ -581,12 +580,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [{b:0},{b:1}]}")));
+        ASSERT_EQUALS(fromjson("{a: [{b:0},{b:1}]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [{b:0},{b:1}]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [{b:0},{b:1}]}}"), logDoc);
     }
 
     //
@@ -677,12 +676,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [1]}")));
+        ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
 
      TEST(SimpleEachMod, PrepareApplyInexistent) {
@@ -697,12 +696,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [1]}")));
+        ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
 
      TEST(SimpleEachMod, PrepareApplyInexistentMultiple) {
@@ -717,12 +716,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [1, 2]}")));
+        ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1, 2]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [1, 2]}}"), logDoc);
     }
 
     TEST(SimpleEachMod, PrepareApplyNormal) {
@@ -737,12 +736,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [0,1]}")));
+        ASSERT_EQUALS(fromjson("{a: [0,1]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [0,1]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [0,1]}}"), logDoc);
     }
 
     TEST(SimpleEachMod, PrepareApplyNormalMultiple) {
@@ -757,12 +756,12 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
-        ASSERT_TRUE(checkDoc(doc, fromjson("{a: [0,1,2]}")));
+        ASSERT_EQUALS(fromjson("{a: [0,1,2]}"), doc);
 
         Document logDoc;
         ASSERT_OK(pushMod.log(logDoc.root()));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-        ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [0,1,2]}}")));
+        ASSERT_EQUALS(fromjson("{$set: {a: [0,1,2]}}"), logDoc);
     }
 
     /**
@@ -889,7 +888,7 @@ namespace {
                        eachArray,  /* a: [1] */
                        slice,
                        &combinedVec);
-            ASSERT_TRUE(checkDoc(doc, getObjectUsing(combinedVec)));
+            ASSERT_EQUALS(getObjectUsing(combinedVec), doc);
         }
     }
 
@@ -920,7 +919,7 @@ namespace {
                        eachArray, /* a: [1] */
                        slice,
                        &combinedVec);
-            ASSERT_TRUE(checkDoc(doc, getObjectUsing(combinedVec)));
+            ASSERT_EQUALS(getObjectUsing(combinedVec), doc);
         }
     }
 
@@ -963,12 +962,12 @@ namespace {
                                           slice,
                                           sortOrder,
                                           &combinedVec);
-                        ASSERT_TRUE(checkDoc(doc, getObjectUsing(combinedVec)));
+                        ASSERT_EQUALS(getObjectUsing(combinedVec), doc);
 
                         Document logDoc;
                         ASSERT_OK(mod().log(logDoc.root()));
                         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-                        ASSERT_TRUE(checkDoc(logDoc, BSON("$set" << getObjectUsing(combinedVec))));
+                        ASSERT_EQUALS(BSON("$set" << getObjectUsing(combinedVec)), logDoc);
 
                     }
                 }
@@ -1016,12 +1015,12 @@ namespace {
                                           slice,
                                           sortOrder,
                                           &combinedVec);
-                        ASSERT_TRUE(checkDoc(doc, getObjectUsing(combinedVec)));
+                        ASSERT_EQUALS(getObjectUsing(combinedVec), doc);
 
                         Document logDoc;
                         ASSERT_OK(mod().log(logDoc.root()));
                         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-                        ASSERT_TRUE(checkDoc(logDoc, BSON("$set" << getObjectUsing(combinedVec))));
+                        ASSERT_EQUALS(BSON("$set" << getObjectUsing(combinedVec)), logDoc);
 
                     }
                 }

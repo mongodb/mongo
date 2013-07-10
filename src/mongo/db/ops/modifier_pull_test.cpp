@@ -33,7 +33,6 @@ namespace {
     using mongo::Status;
     using mongo::StringData;
     using mongo::fromjson;
-    using mongo::mutablebson::checkDoc;
     using mongo::mutablebson::Document;
     using mongo::mutablebson::Element;
 
