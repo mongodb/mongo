@@ -15,9 +15,6 @@ function loadData() {
 loadData();
 
 function test(pipeline, outOfMemoryCode) {
-    // don't return bigStr so result size is under limit
-    pipeline.push({$project: {_id:1, random:1}});
-
     // ensure by default we error out if exceeding memory limit
     var res = t.runCommand('aggregate', {pipeline: pipeline});
     assert.commandFailed(res);
@@ -34,22 +31,23 @@ function test(pipeline, outOfMemoryCode) {
     assert.eq(res.code, 16949);
 
     // ensure we work when allowingDiskUsage === true
-    var res = t.runCommand('aggregate', {pipeline: pipeline, allowDiskUsage: true});
-    assert.commandWorked(res);
+    var res = t.aggregateCursor(pipeline, {allowDiskUsage: true});
+    assert.eq(res.itcount(), t.count()); // all tests output one doc per input doc
 }
 
 var groupCode = 16945;
 var sortCode = 16819;
 
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], groupCode);
-test([{$sort: {bigStr: 1}}], sortCode); // can't use index
+
+// sorting with _id would use index which doesn't require extsort
+test([{$sort: {random: 1}}], sortCode);
+test([{$sort: {bigStr: 1}}], sortCode); // big key and value
 
 // test combining two extSorts in both same and different orders
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id:1}}], groupCode);
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id:-1}}], groupCode);
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {random:1}}], groupCode);
-
-// sorting with _id would use index which doesn't require extsort
 test([{$sort: {random:1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], sortCode);
 
 // don't leave large collection laying around
