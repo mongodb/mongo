@@ -135,14 +135,18 @@ __wt_log_close(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
-	/*
-	 * If we don't have a log open, there's nothing to do.
-	 */
-	if (log->log_fh == NULL)
-		return (0);
-	WT_VERBOSE_RET(session, log, "closing log %s", log->log_fh->name);
-	WT_RET(__wt_close(session, log->log_fh));
-	log->log_fh = NULL;
+
+	if (log->log_close_fh != NULL && log->log_close_fh != log->log_fh) {
+		WT_VERBOSE_RET(session, log,
+		    "closing old log %s", log->log_close_fh->name);
+		WT_RET(__wt_close(session, log->log_close_fh));
+	}
+	if (log->log_fh != NULL) {
+		WT_VERBOSE_RET(session, log,
+		    "closing log %s", log->log_fh->name);
+		WT_RET(__wt_close(session, log->log_fh));
+		log->log_fh = NULL;
+	}
 	return (0);
 }
 

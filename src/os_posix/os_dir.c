@@ -39,6 +39,8 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	    prefix == NULL ? "all" : prefix);
 
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
+	if (ret != 0)
+		WT_RET_MSG(session, ret, "%s: opendir", path);
 	*dirlist = NULL;
 	for (dirsz = 0, count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
