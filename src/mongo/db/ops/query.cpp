@@ -971,8 +971,13 @@ namespace mongo {
         uassert( 16256, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
         // Run a command.
-        
-        if ( pq.couldBeCommand() ) {
+
+        if ( nsString.isCommand() ) {
+            int nToReturn = pq.getNumToReturn();
+            uassert( 16979, str::stream() << "bad numberToReturn (" << nToReturn
+                                          << ") for $cmd type ns - can only be 1 or -1",
+                     nToReturn == 1 || nToReturn == -1 );
+
             curop.markCommand();
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
