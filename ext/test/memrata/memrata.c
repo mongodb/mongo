@@ -641,7 +641,7 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
 	wtext = cursor->wtext;
 
 	/*
-	 * We return (the most recent cache entry update); the cache entries are
+	 * We want the most recent cache entry update; the cache entries are
 	 * in update order, walk from the end to the beginning.
 	 */
 	cp = cursor->cache + cursor->cache_entries;
