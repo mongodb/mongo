@@ -570,53 +570,29 @@ cache_value_unmarshall(WT_CURSOR *wtcursor)
 }
 
 /*
- * cache_value_visible --
- *	Return if a record in the cache is visible to this transaction.
+ * cache_value_aborted --
+ *	Return if a transaction has been aborted.
  */
-static int
-cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
+static inline int
+cache_value_aborted(WT_CURSOR *wtcursor, CACHE_RECORD *cp)
 {
-	CACHE_RECORD *cp;
-	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
-	WT_SESSION *session;
-	u_int i;
-
-	session = wtcursor->session;
-	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
-
 	/*
-	 * We need to return the "best" reference, the largest txn ID visible
-	 * to us; the cache entries are in reverse order, walk them that way
-	 * to ensure we get the best match.
+	 * This function exists as a place to hang this comment.
+	 *
+	 * WiredTiger resets updated entry transaction IDs to an aborted state
+	 * on rollback; to do that here would require tracking updated entries
+	 * for a transaction or scanning the cache for updates made on behalf
+	 * of the transaction during rollback, expensive stuff.  Instead, check
+	 * if the transaction has been aborted before calling the underlying
+	 * WiredTiger visibility function.
 	 */
-	cp = cursor->cache + cursor->cache_entries;
-	for (i = 0; i < cursor->cache_entries; ++i) {
-		--cp;
-
-		/*
-		 * XXX
-		 * WiredTiger resets updated entry transaction IDs to an aborted
-		 * state on rollback; to do that here would require tracking the
-		 * updated entries for a transaction or scanning the cache for
-		 * updates made for the transaction during rollback, expensive
-		 * stuff.  Instead, check if the transaction has been aborted
-		 * before calling the underlying WiredTiger visibility function.
-		 */
-		if (txn_state(wtcursor, cp->txnid) != TXN_ABORTED &&
-		    wtext->transaction_visible(wtext, session, cp->txnid)) {
-			if (cpp != NULL)
-				*cpp = cp;
-			return (1);
-		}
-	}
-	return (0);
+	return (txn_state(wtcursor, cp->txnid) == TXN_ABORTED ? 1 : 0);
 }
 
 /*
  * cache_value_update_check --
- *	Return if an update can proceed.
+ *	Return if an update can proceed based on the previous updates made to
+ * the cache entry.
  */
 static int
 cache_value_update_check(WT_CURSOR *wtcursor)
@@ -639,24 +615,144 @@ cache_value_update_check(WT_CURSOR *wtcursor)
 	 * If there's an entry that's not visible and hasn't been aborted,
 	 * return a deadlock.
 	 */
+	for (i = 0, cp = cursor->cache; i < cursor->cache_entries; ++i, ++cp)
+		if (!cache_value_aborted(wtcursor, cp) &&
+		    !wtext->transaction_visible(wtext, session, cp->txnid))
+			return (WT_DEADLOCK);
+	return (0);
+}
+
+/*
+ * cache_value_visible --
+ *	Return the most recent cache entry update visible to the running
+ * transaction.
+ */
+static int
+cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
+{
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	u_int i;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
+	/*
+	 * We return the most recent cache entry update; the cache entries are
+	 * in update order, walk from the end to the beginning.
+	 */
 	cp = cursor->cache + cursor->cache_entries;
 	for (i = 0; i < cursor->cache_entries; ++i) {
 		--cp;
-
-		/*
-		 * XXX
-		 * WiredTiger resets updated entry transaction IDs to an aborted
-		 * state on rollback; to do that here would require tracking the
-		 * updated entries for a transaction or scanning the cache for
-		 * updates made for the transaction during rollback, expensive
-		 * stuff.  Instead, check if the transaction has been aborted
-		 * before calling the underlying WiredTiger visibility function.
-		 */
-		if (txn_state(wtcursor, cp->txnid) != TXN_ABORTED &&
-		    !wtext->transaction_visible(wtext, session, cp->txnid))
-			return (WT_DEADLOCK);
+		if (!cache_value_aborted(wtcursor, cp) &&
+		    wtext->transaction_visible(wtext, session, cp->txnid)) {
+			if (cpp != NULL)
+				*cpp = cp;
+			return (1);
+		}
 	}
 	return (0);
+}
+
+/*
+ * cache_value_visible_all --
+ *	Return if a cache entry has no updates that aren't globally visible.
+ */
+static int
+cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
+{
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	WT_EXTENSION_API *wtext;
+	WT_SESSION *session;
+	u_int i;
+
+	session = wtcursor->session;
+	cursor = (CURSOR *)wtcursor;
+	wtext = cursor->wtext;
+
+	/*
+	 * Compare the update's transaction ID and the oldest transaction ID
+	 * not yet visible to a running transaction.  If there's an update a
+	 * running transaction might want, the entry must remain in the cache.
+	 * (We could tighten this requirement: if the only update required is
+	 * also the update we'd migrate to the primary, it would still be OK
+	 * to migrate it.)
+	 */
+	for (i = 0, cp = cursor->cache; i < cursor->cache_entries; ++i, ++cp)
+		if (cp->txnid >= oldest)
+			break;
+	if (i == cursor->cache_entries)
+		return (1);
+
+	/*
+	 * If this is the final pass when shutting down the KVS store, there
+	 * should not be any entries that aren't globally visible.
+	 */
+	if (final)
+		ERET(wtext, session, 0,
+		    "cleaner: closing with unresolved upates in the cache");
+	return (0);
+}
+
+/*
+ * cache_value_newest --
+ *	Find the most recent committed update in a cache entry.
+ */
+static void
+cache_value_newest(WT_CURSOR *wtcursor, uint64_t oldest, CACHE_RECORD **cpp)
+{
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	u_int i;
+
+	*cpp = NULL;
+
+	cursor = (CURSOR *)wtcursor;
+
+	/*
+	 * Find the most recent update in the cache record, we're going to try
+	 * and migrate it into the primary.   (We don't have to check if the
+	 * entry was committed, we've already confirmed that all entries for
+	 * this cache key are globally visible, which means they must be either
+	 * committed or aborted.)
+	 *
+	 * The cache entries are in update order, walk from the end to the
+	 * beginning.
+	 */
+	cp = cursor->cache + cursor->cache_entries;
+	for (i = 0; i < cursor->cache_entries; ++i) {
+		--cp;
+		if (!cache_value_aborted(wtcursor, cp)) {
+			*cpp = cp;
+			return;
+		}
+	}
+}
+
+/*
+ * cache_value_txnmin --
+ *	Return the oldest transaction ID involved in a cache update.
+ */
+static void
+cache_value_txnmin(WT_CURSOR *wtcursor, uint64_t *txnminp)
+{
+	CACHE_RECORD *cp;
+	CURSOR *cursor;
+	uint64_t txnmin;
+	u_int i;
+
+	cursor = (CURSOR *)wtcursor;
+
+	/* Return the oldest transaction ID for in the cache entry. */
+	txnmin = UINT64_MAX;
+	for (i = 0, cp = cursor->cache; i < cursor->cache_entries; ++i, ++cp)
+		if (txnmin > cp->txnid)
+			txnmin = cp->txnid;
+	*txnminp = txnmin;
 }
 
 /*
@@ -670,11 +766,12 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 	WT_CURSOR *wtcursor;
 	CURSOR *cursor, _cursor;
 	WT_SOURCE *ws;
-	uint64_t oldest, txnid;
+	uint64_t oldest, txnid, txnmin;
 	u_int i;
 	int ret = 0, wslocked;
 
 	wslocked = 0;
+	txnmin = UINT64_MAX;
 
 	memset(&_cursor, 0, sizeof(_cursor));		/* Fake a cursor. */
 	cursor = &_cursor;
@@ -700,30 +797,29 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 	oldest = wtext->transaction_oldest(wtext);
 
 	/*
-	 * For every source object cache, copy the final value of all entries
-	 * where all of the updates are globally visible, to the primary store.
+	 * For every source object cache:
+	 *    For every cache key where all updates are globally visible:
+	 *	  Migrate the most recent update value to the primary store.
 	 */
-	for (ws = ks->ws_head; ws != NULL; ws = ws->next)
+	for (ws = ks->ws_head; ws != NULL; ws = ws->next) {
+		cursor->ws = ws;
+
 		for (cursor->record.key_len = 0;
 		    (ret = kvs_call(wtcursor,
 		    "kvs_next", ws->kvscache, kvs_next)) == 0;) {
-			if ((ret = cache_value_unmarshall(wtcursor)) != 0)
-				goto err;
 
 			/*
-			 * Compare the update's transaction ID and the oldest
-			 * known.  If there's an update a running transaction
-			 * might want, the entry has to remain in the cache.
+			 * Unmarshall the value, and if all of the updates are
+			 * globally visible, update the primary.
 			 */
-			for (i = 0, cp = cursor->cache;
-			    i < cursor->cache_entries; ++i, ++cp)
-				if (cp->txnid >= oldest)
-					break;
-			if (i != cursor->cache_entries)
+			if ((ret = cache_value_unmarshall(wtcursor)) != 0)
+				goto err;
+			if (!cache_value_visible_all(wtcursor, oldest, 0))
+				continue;
+			cache_value_newest(wtcursor, oldest, &cp);
+			if (cp == NULL)
 				continue;
 
-			/* Reflect the most recent update into the primary. */
-			cp = &cursor->cache[cursor->cache_entries - 1];
 			if (cp->remove) {
 				if ((ret =
 				    kvs_del(ws->kvs, &cursor->record)) == 0)
@@ -731,7 +827,8 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 
 				/*
 				 * Updates confined to the cache may not appear
-				 * in the primary at all.
+				 * in the primary at all, that is, an insert and
+				 * remove pair may be confined to the cache.
 				 */
 				if (ret == KVS_E_KEY_NOT_FOUND) {
 					ret = 0;
@@ -751,6 +848,7 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 				goto err;
 			}
 		}
+	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	if (ret != 0)
@@ -764,10 +862,13 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 	}
 
 	/*
-	 * For every source object cache, remove all entries where every update
-	 * is globally visible.
+	 * For every source object cache:
+	 *    For every cache key where all updates are globally visible:
+	 *	  Remove the cache key.
 	 */
 	for (ws = ks->ws_head; ws != NULL; ws = ws->next) {
+		cursor->ws = ws;
+
 		/* We're updating the cache, which requires a lock. */
 		if ((ret = writelock(wtext, NULL, &ws->lock)) != 0)
 			goto err;
@@ -776,33 +877,33 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 		for (cursor->record.key_len = 0;
 		    (ret = kvs_call(
 		    wtcursor, "kvs_next", ws->kvscache, kvs_next)) == 0;) {
+			/*
+			 * Unmarshall the value, and if all of the updates are
+			 * globally visible, remove the cache entry.
+			 */
 			if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 				goto err;
-
-			/*
-			 * Compare the update's transaction ID and the oldest
-			 * known.  If there's an update a running transaction
-			 * might want, the entry has to remain in the cache.
-			 */
-			for (i = 0, cp = cursor->cache;
-			    i < cursor->cache_entries; ++i, ++cp)
-				if (cp->txnid >= oldest)
-					break;
-			if (i != cursor->cache_entries) {
-				if (final)
+			if (cache_value_visible_all(wtcursor, oldest, final)) {
+				if ((ret = kvs_del(
+				    ws->kvscache, &cursor->record)) != 0) {
 					EMSG(wtext, NULL, WT_ERROR,
-					    "cleaner: closing with unresolved "
-					    "transactions in the cache");
+					    "kvs_del: %s", kvs_strerror(ret));
+					goto err;
+				}
 				continue;
 			}
 
-			/* Remove the entry from the cache. */
-			if ((ret =
-			    kvs_del(ws->kvscache, &cursor->record)) != 0) {
-				EMSG(wtext, NULL, WT_ERROR,
-				    "kvs_del: %s", kvs_strerror(ret));
-				goto err;
-			}
+			/*
+			 * If the entry will remain in the cache, figure out the
+			 * oldest transaction for which it contains an update
+			 * (which might be different from the oldest transaction
+			 * in the system).  We need the oldest transaction that
+			 * appears anywhere in the cache, that value limits the
+			 * records we can discard from the transaction store.
+			 */
+			cache_value_txnmin(wtcursor, &txnid);
+			if (txnid < txnmin)
+				txnmin = txnid;
 		}
 
 		/* Update the state while still holding the lock. */
@@ -818,17 +919,15 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 		goto err;
 
 	/*
-	 * Remove all entries from the transaction start that are before the
-	 * oldest transaction ID.
+	 * Remove all entries from the transaction store that are before the
+	 * oldest transaction ID that appears anywhere in any cache.
 	 */
 	for (cursor->record.key_len = 0;
 	    (ret = kvs_call(
 	    wtcursor, "kvs_next", ks->kvstxn, kvs_next)) == 0;) {
 		memcpy(&txnid, cursor->key, sizeof(txnid));
-		if (txnid >= oldest)
-			continue;
-
-		if ((ret = kvs_del(ks->kvstxn, &cursor->record)) != 0) {
+		if (txnid < txnmin &&
+		    (ret = kvs_del(ks->kvstxn, &cursor->record)) != 0) {
 			EMSG(wtext, NULL, WT_ERROR,
 			    "kvs_del: %s", kvs_strerror(ret));
 			goto err;
