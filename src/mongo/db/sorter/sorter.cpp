@@ -614,13 +614,19 @@ namespace mongo {
             std::vector<Data> _data; // the "current" data. Organized as max-heap if size == limit.
             std::vector<boost::shared_ptr<Iterator> > _iters; // data that has already been spilled
         };
+
+        inline unsigned nextFileNumber() {
+            // This is unified across all Sorter types and instances.
+            static AtomicUInt fileCounter;
+            return fileCounter++;
+        }
     } // namespace sorter
 
     //
     // SortedFileWriter
     //
 
-    static AtomicUInt fileCounter;
+
     template <typename Key, typename Value>
     SortedFileWriter<Key, Value>::SortedFileWriter(const Settings& settings)
         : _settings(settings)
@@ -632,7 +638,7 @@ namespace mongo {
         {
             StringBuilder sb;
             // TODO use tmpPath rather than dbpath/_tmp
-            sb << dbpath << "/_tmp" << "/extsort." << fileCounter++;
+            sb << dbpath << "/_tmp" << "/extsort." << sorter::nextFileNumber();
             _fileName = sb.str();
         }
 
