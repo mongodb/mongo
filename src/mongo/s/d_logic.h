@@ -129,6 +129,38 @@ namespace mongo {
         void undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version );
 
         /**
+         * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
+         * into it.  This data can then be protected against cleanup of orphaned data.
+         *
+         * Overlapping pending ranges will be removed, so it is only safe to use this when you know
+         * your metadata view is definitive, such as at the start of a migration.
+         *
+         * @return false with errMsg if the range is owned by this shard
+         */
+        bool notePending( const string& ns,
+                          const BSONObj& min,
+                          const BSONObj& max,
+                          string* errMsg );
+
+        /**
+         * Stops tracking a chunk range between 'min' and 'max' that previously was having data
+         * migrated into it.  This data is no longer protected against cleanup of orphaned data.
+         *
+         * To avoid removing pending ranges of other operations, ensure that this is only used when
+         * a migration is still active.
+         * TODO: Because migrations may currently be active when a collection drops, an epoch is
+         * necessary to ensure the pending metadata change is still applicable.
+         *
+         * @return false with errMsg if the range is owned by the shard or the epoch of the metadata
+         * has changed
+         */
+        bool forgetPending( const string& ns,
+                            const BSONObj& min,
+                            const BSONObj& max,
+                            const OID& epoch,
+                            string* errMsg );
+
+        /**
          * Creates and installs a new chunk metadata for a given collection by splitting one of its
          * chunks in two or more. The version for the first split chunk should be provided. The
          * subsequent chunks' version would be the latter with the minor portion incremented.

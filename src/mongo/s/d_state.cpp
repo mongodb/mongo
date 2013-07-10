@@ -200,6 +200,76 @@ namespace mongo {
         _collMetadata[ns] = cloned;
     }
 
+    bool ShardingState::notePending( const string& ns,
+                                     const BSONObj& min,
+                                     const BSONObj& max,
+                                     string* errMsg ) {
+        scoped_lock lk( _mutex );
+
+        CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
+        if ( it == _collMetadata.end() ) {
+
+            *errMsg = str::stream() << "could not note chunk " << " [" << min << "," << max << ")"
+                                    << " as pending because the local metadata for " << ns
+                                    << " has changed";
+
+            return false;
+        }
+
+        ChunkType chunk;
+        chunk.setMin( min );
+        chunk.setMax( max );
+
+        CollectionMetadataPtr cloned( it->second->clonePlusPending( chunk, errMsg ) );
+        if ( !cloned ) return false;
+
+        _collMetadata[ns] = cloned;
+        return true;
+    }
+
+    bool ShardingState::forgetPending( const string& ns,
+                                       const BSONObj& min,
+                                       const BSONObj& max,
+                                       const OID& epoch,
+                                       string* errMsg ) {
+        scoped_lock lk( _mutex );
+
+        CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
+
+        CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
+        if ( it == _collMetadata.end() ) {
+
+            *errMsg = str::stream() << "no need to forget pending chunk "
+                                    << " [" << min << "," << max << ")"
+                                    << " because the local metadata for " << ns << " has changed";
+
+            return false;
+        }
+
+        CollectionMetadataPtr metadata = it->second;
+
+        // This can currently happen because drops aren't synchronized with in-migrations
+        // The idea for checking this here is that in the future we shouldn't have this problem
+        if ( metadata->getCollVersion().epoch() != epoch ) {
+
+            *errMsg = str::stream() << "no need to forget pending chunk "
+                                    << " [" << min << "," << max << ")"
+                                    << " because the local metadata for " << ns << " has changed";
+
+            return false;
+        }
+
+        ChunkType chunk;
+        chunk.setMin( min );
+        chunk.setMax( max );
+
+        CollectionMetadataPtr cloned( metadata->cloneMinusPending( chunk, errMsg ) );
+        if ( !cloned ) return false;
+
+        _collMetadata[ns] = cloned;
+        return true;
+    }
+
     void ShardingState::splitChunk( const string& ns,
                                     const BSONObj& min,
                                     const BSONObj& max,

@@ -357,7 +357,7 @@ namespace mongo {
                 // this is so that we don't have to handle this cursor in the delete code
                 c.reset(0);
 
-                if (fromMigrate && onlyRemoveOrphanedDocs) {
+                if ( onlyRemoveOrphanedDocs ) {
 
                     // Do a final check in the write lock to make absolutely sure that our
                     // collection hasn't been modified in a way that invalidates our migration
@@ -368,14 +368,14 @@ namespace mongo {
                     verify(shardingState.enabled());
 
                     // In write lock, so will be the most up-to-date version
-                    // TODO: This is not quite correct, we may be transferring docs in the same
-                    // range.  Right now we're protected since we can't transfer docs in while we
-                    // delete.
                     CollectionMetadataPtr metadataNow = shardingState.getCollectionMetadata( ns );
-                    bool docIsOrphan = true;
+
+                    bool docIsOrphan;
                     if ( metadataNow ) {
                         KeyPattern kp( metadataNow->getKeyPattern() );
-                        docIsOrphan = !metadataNow->keyBelongsToMe( kp.extractSingleKey( obj ) );
+                        BSONObj key = kp.extractSingleKey( obj );
+                        docIsOrphan = !metadataNow->keyBelongsToMe( key )
+                            && !metadataNow->keyIsPending( key );
                     }
                     else {
                         docIsOrphan = false;
