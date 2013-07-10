@@ -16,6 +16,8 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/util/elapsed_tracker.h"
 
 #include "mongo/util/net/listen.h"
