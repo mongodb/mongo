@@ -23,10 +23,16 @@ namespace mongo {
 
     struct ModifierObjectReplace::PreparedState {
 
-        PreparedState(mutablebson::Document* targetDoc) : doc(*targetDoc) {}
+        PreparedState(mutablebson::Document* targetDoc)
+            : doc(*targetDoc)
+            , noOp(false) {
+        }
 
         // Document that is going to be changed
         mutablebson::Document& doc;
+
+        // This is a no op
+        bool noOp;
 
     };
 
@@ -65,12 +71,19 @@ namespace mongo {
     Status ModifierObjectReplace::prepare(mutablebson::Element root,
                                           const StringData& matchedField,
                                           ExecInfo* execInfo) {
+        BSONObj objOld = root.getDocument().getObject();
 
+        // objectSize checked by binaryEqual (optimization)
+        if (objOld.binaryEqual(_val)) {
+            _preparedState->noOp = true;
+            execInfo->noOp = true;
+        }
         _preparedState.reset(new PreparedState(&root.getDocument()));
         return Status::OK();
     }
 
     Status ModifierObjectReplace::apply() const {
+        dassert(!_preparedState->noOp);
 
         // Remove the contents of the provided doc.
         mutablebson::Document& doc = _preparedState->doc;
