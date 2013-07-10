@@ -17,7 +17,6 @@
 #include "mongo/s/collection_metadata.h"
 
 #include "mongo/bson/util/builder.h" // for StringBuilder
-#include "mongo/s/range_arithmetic.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -28,9 +27,9 @@ namespace mongo {
 
     CollectionMetadata::~CollectionMetadata() { }
 
-    CollectionMetadata* CollectionMetadata::cloneMinus(const ChunkType& chunk,
-                                                     const ChunkVersion& newShardVersion,
-                                                     string* errMsg) const {
+    CollectionMetadata* CollectionMetadata::cloneMinusChunk( const ChunkType& chunk,
+                                                             const ChunkVersion& newShardVersion,
+                                                             string* errMsg ) const {
         // The error message string is optional.
         string dummy;
         if (errMsg == NULL) {
@@ -38,45 +37,68 @@ namespace mongo {
         }
 
         // Check that we have the exact chunk that will be subtracted.
-        if (!chunkExists(chunk, errMsg)) {
-            // Message was filled in by chunkExists().
+        if ( !rangeMapContains( _chunksMap, chunk.getMin(), chunk.getMax() ) ) {
+
+            *errMsg = stream() << "cannot remove chunk "
+                               << rangeToString( chunk.getMin(), chunk.getMax() )
+                               << ", this shard does not contain the chunk";
+
+            if ( rangeMapOverlaps( _chunksMap, chunk.getMin(), chunk.getMax() ) ) {
+
+                RangeVector overlap;
+                getRangeMapOverlap( _chunksMap, chunk.getMin(), chunk.getMax(), &overlap );
+
+                *errMsg += stream() << " and it overlaps " << overlapToString( overlap );
+            }
+
+            warning() << *errMsg << endl;
             return NULL;
         }
 
         // If left with no chunks, check that the version is zero.
         if (_chunksMap.size() == 1) {
             if (newShardVersion.isSet()) {
-                *errMsg = stream() << "setting version to " << newShardVersion.toString()
-                                   << " on removing last chunk";
+
+                *errMsg = stream() << "cannot set shard version to non-zero value "
+                                   << newShardVersion.toString() << " when removing last chunk "
+                                   << rangeToString( chunk.getMin(), chunk.getMax() );
+
+                warning() << *errMsg << endl;
                 return NULL;
             }
         }
         // Can't move version backwards when subtracting chunks.  This is what guarantees that
         // no read or write would be taken once we subtract data from the current shard.
         else if (newShardVersion <= _shardVersion) {
-            *errMsg = stream() << "version " << newShardVersion.toString()
-                               << " not greater than " << _shardVersion.toString();
+
+            *errMsg = stream() << "cannot remove chunk "
+                               << rangeToString( chunk.getMin(), chunk.getMax() )
+                               << " because the new shard version " << newShardVersion.toString()
+                               << " is not greater than the current shard version "
+                               << _shardVersion.toString();
+
+            warning() << *errMsg << endl;
             return NULL;
         }
 
-        auto_ptr<CollectionMetadata> manager(new CollectionMetadata);
-        manager->_keyPattern = this->_keyPattern;
-        manager->_keyPattern.getOwned();
-        manager->_chunksMap = this->_chunksMap;
-        manager->_chunksMap.erase(chunk.getMin());
-        manager->_shardVersion = newShardVersion;
-        manager->_collVersion = newShardVersion > _collVersion ?
-                                   newShardVersion : this->_collVersion;
-        manager->fillRanges();
+        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        metadata->_keyPattern = this->_keyPattern;
+        metadata->_keyPattern.getOwned();
+        metadata->_pendingMap = this->_pendingMap;
+        metadata->_chunksMap = this->_chunksMap;
+        metadata->_chunksMap.erase( chunk.getMin() );
+        metadata->_shardVersion = newShardVersion;
+        metadata->_collVersion =
+                newShardVersion > _collVersion ? newShardVersion : this->_collVersion;
+        metadata->fillRanges();
 
-        dassert(manager->isValid());
-
-        return manager.release();
+        dassert(metadata->isValid());
+        return metadata.release();
     }
 
-    CollectionMetadata* CollectionMetadata::clonePlus(const ChunkType& chunk,
-                                                    const ChunkVersion& newShardVersion,
-                                                    string* errMsg) const {
+    CollectionMetadata* CollectionMetadata::clonePlusChunk( const ChunkType& chunk,
+                                                            const ChunkVersion& newShardVersion,
+                                                            string* errMsg ) const {
         // The error message string is optional.
         string dummy;
         if (errMsg == NULL) {
@@ -86,45 +108,147 @@ namespace mongo {
         // It is acceptable to move version backwards (e.g., undoing a migration that went bad
         // during commit) but only cloning away the last chunk may reset the version to 0.
         if (!newShardVersion.isSet()) {
-            *errMsg =  "version can't be set to zero";
+
+            *errMsg = stream() << "cannot add chunk "
+                               << rangeToString( chunk.getMin(), chunk.getMax() )
+                               << " with zero shard version";
+
+            warning() << *errMsg << endl;
             return NULL;
         }
 
         // Check that there isn't any chunk on the interval to be added.
-       if (!_chunksMap.empty()) {
-           RangeMap::const_iterator it = _chunksMap.lower_bound(chunk.getMax());
-            if (it != _chunksMap.begin()) {
-                --it;
+        if ( rangeMapOverlaps( _chunksMap, chunk.getMin(), chunk.getMax() ) ) {
+
+            RangeVector overlap;
+            getRangeMapOverlap( _chunksMap, chunk.getMin(), chunk.getMax(), &overlap );
+
+            *errMsg = stream() << "cannot add chunk "
+                               << rangeToString( chunk.getMin(), chunk.getMax() )
+                               << " because the chunk overlaps " << overlapToString( overlap );
+
+            warning() << *errMsg << endl;
+            return NULL;
+        }
+
+        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        metadata->_keyPattern = this->_keyPattern;
+        metadata->_keyPattern.getOwned();
+        metadata->_pendingMap = this->_pendingMap;
+        metadata->_chunksMap = this->_chunksMap;
+        metadata->_chunksMap.insert( make_pair( chunk.getMin().getOwned(),
+                                                chunk.getMax().getOwned() ) );
+        metadata->_shardVersion = newShardVersion;
+        metadata->_collVersion =
+                newShardVersion > _collVersion ? newShardVersion : this->_collVersion;
+        metadata->fillRanges();
+
+        dassert(metadata->isValid());
+        return metadata.release();
+    }
+
+    CollectionMetadata* CollectionMetadata::cloneMinusPending( const ChunkType& pending,
+                                                               string* errMsg ) const {
+        // The error message string is optional.
+        string dummy;
+        if ( errMsg == NULL ) {
+            errMsg = &dummy;
+        }
+
+        // Check that we have the exact chunk that will be subtracted.
+        if ( !rangeMapContains( _pendingMap, pending.getMin(), pending.getMax() ) ) {
+
+            *errMsg = stream() << "cannot remove pending chunk "
+                               << rangeToString( pending.getMin(), pending.getMax() )
+                               << ", this shard does not contain the chunk";
+
+            if ( rangeMapOverlaps( _pendingMap, pending.getMin(), pending.getMax() ) ) {
+
+                RangeVector overlap;
+                getRangeMapOverlap( _pendingMap, pending.getMin(), pending.getMax(), &overlap );
+
+                *errMsg += stream() << " and it overlaps " << overlapToString( overlap );
             }
-            if (rangeOverlaps(chunk.getMin(), chunk.getMax(), it->first, it->second)) {
-                *errMsg = stream() << "ranges overlap, "
-                                   << "requested: " << chunk.getMin()
-                                   <<" -> " << chunk.getMax() << " "
-                                   << "existing: " << it->first.toString()
-                                   << " -> " + it->second.toString();
-                return NULL;
+
+            warning() << *errMsg << endl;
+            return NULL;
+        }
+
+        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        metadata->_keyPattern = this->_keyPattern;
+        metadata->_keyPattern.getOwned();
+        metadata->_pendingMap = this->_pendingMap;
+        metadata->_pendingMap.erase( pending.getMin() );
+        metadata->_chunksMap = this->_chunksMap;
+        metadata->_rangesMap = this->_rangesMap;
+        metadata->_shardVersion = _shardVersion;
+        metadata->_collVersion = _collVersion;
+
+        dassert(metadata->isValid());
+        return metadata.release();
+    }
+
+    CollectionMetadata* CollectionMetadata::clonePlusPending( const ChunkType& pending,
+                                                              string* errMsg ) const {
+        // The error message string is optional.
+        string dummy;
+        if ( errMsg == NULL ) {
+            errMsg = &dummy;
+        }
+
+        if ( rangeMapOverlaps( _chunksMap, pending.getMin(), pending.getMax() ) ) {
+
+            RangeVector overlap;
+            getRangeMapOverlap( _chunksMap, pending.getMin(), pending.getMax(), &overlap );
+
+            *errMsg = stream() << "cannot add pending chunk "
+                               << rangeToString( pending.getMin(), pending.getMax() )
+                               << " because the chunk overlaps " << overlapToString( overlap );
+
+            warning() << *errMsg << endl;
+            return NULL;
+        }
+
+        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        metadata->_keyPattern = this->_keyPattern;
+        metadata->_keyPattern.getOwned();
+        metadata->_pendingMap = this->_pendingMap;
+        metadata->_chunksMap = this->_chunksMap;
+        metadata->_rangesMap = this->_rangesMap;
+        metadata->_shardVersion = _shardVersion;
+        metadata->_collVersion = _collVersion;
+
+        // If there are any pending chunks on the interval to be added this is ok, since pending
+        // chunks aren't officially tracked yet and something may have changed on servers we do not
+        // see yet.
+        // We remove any chunks we overlap, the remote request starting a chunk migration must have
+        // been authoritative.
+
+        if ( rangeMapOverlaps( _pendingMap, pending.getMin(), pending.getMax() ) ) {
+
+            RangeVector pendingOverlap;
+            getRangeMapOverlap( _pendingMap, pending.getMin(), pending.getMax(), &pendingOverlap );
+
+            warning() << "new pending chunk " << rangeToString( pending.getMin(), pending.getMax() )
+                      << " overlaps existing pending chunks " << overlapToString( pendingOverlap )
+                      << ", a migration may not have completed" << endl;
+
+            for ( RangeVector::iterator it = pendingOverlap.begin(); it != pendingOverlap.end();
+                    ++it ) {
+                metadata->_pendingMap.erase( it->first );
             }
         }
 
-        auto_ptr<CollectionMetadata> manager(new CollectionMetadata);
-        manager->_keyPattern = this->_keyPattern;
-        manager->_keyPattern.getOwned();
-        manager->_chunksMap = this->_chunksMap;
-        manager->_chunksMap.insert(make_pair(chunk.getMin().getOwned(), chunk.getMax().getOwned()));
-        manager->_shardVersion = newShardVersion;
-        manager->_collVersion = newShardVersion > _collVersion ?
-                                   newShardVersion : this->_collVersion;
-        manager->fillRanges();
+        metadata->_pendingMap.insert( make_pair( pending.getMin(), pending.getMax() ) );
 
-        dassert(manager->isValid());
-
-        return manager.release();
+        dassert(metadata->isValid());
+        return metadata.release();
     }
 
-    CollectionMetadata* CollectionMetadata::cloneSplit(const ChunkType& chunk,
-                                                     const vector<BSONObj>& splitKeys,
-                                                     const ChunkVersion& newShardVersion,
-                                                     string* errMsg) const {
+    CollectionMetadata* CollectionMetadata::cloneSplit( const ChunkType& chunk,
+                                                        const vector<BSONObj>& splitKeys,
+                                                        const ChunkVersion& newShardVersion,
+                                                        string* errMsg ) const {
         // The error message string is optional.
         string dummy;
         if (errMsg == NULL) {
@@ -140,50 +264,74 @@ namespace mongo {
         // TODO drop the uniqueness constraint and tighten the check below so that only the
         // minor portion of version changes
         if (newShardVersion <= _shardVersion) {
-            *errMsg = stream()<< "version " << newShardVersion.toString()
-                              << " not greater than " << _shardVersion.toString();
+
+            *errMsg = stream() << "cannot split chunk "
+                               << rangeToString( chunk.getMin(), chunk.getMax() )
+                               << ", new shard version "
+                               << newShardVersion.toString()
+                               << " is not greater than current version "
+                               << _shardVersion.toString();
+
+            warning() << *errMsg << endl;
             return NULL;
         }
 
-        // Check that we have the exact chunk that will be split and that the split point is
-        // valid.
-        if (!chunkExists(chunk, errMsg)) {
+        // Check that we have the exact chunk that will be subtracted.
+        if ( !rangeMapContains( _chunksMap, chunk.getMin(), chunk.getMax() ) ) {
+
+            *errMsg = stream() << "cannot split chunk "
+                               << rangeToString( chunk.getMin(), chunk.getMax() )
+                               << ", this shard does not contain the chunk";
+
+            if ( rangeMapOverlaps( _chunksMap, chunk.getMin(), chunk.getMax() ) ) {
+
+                RangeVector overlap;
+                getRangeMapOverlap( _chunksMap, chunk.getMin(), chunk.getMax(), &overlap );
+
+                *errMsg += stream() << " and it overlaps " << overlapToString( overlap );
+            }
+
+            warning() << *errMsg << endl;
             return NULL;
         }
 
-        for (vector<BSONObj>::const_iterator it = splitKeys.begin();
-             it != splitKeys.end();
-             ++it) {
+        // Check that the split key is valid
+        for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it )
+        {
             if (!rangeContains(chunk.getMin(), chunk.getMax(), *it)) {
-                *errMsg = stream() << "can split " << chunk.getMin()
-                                   << " -> " << chunk.getMax() << " on " << *it;
+
+                *errMsg = stream() << "cannot split chunk "
+                                   << rangeToString( chunk.getMin(), chunk.getMax() ) << " at key "
+                                   << *it;
+
+                warning() << *errMsg << endl;
                 return NULL;
             }
         }
 
-        auto_ptr<CollectionMetadata> manager(new CollectionMetadata);
-        manager->_keyPattern = this->_keyPattern;
-        manager->_keyPattern.getOwned();
-        manager->_chunksMap = this->_chunksMap;
-        manager->_shardVersion = newShardVersion; // will increment 2nd, 3rd,... chunks below
+        auto_ptr<CollectionMetadata> metadata(new CollectionMetadata);
+        metadata->_keyPattern = this->_keyPattern;
+        metadata->_keyPattern.getOwned();
+        metadata->_pendingMap = this->_pendingMap;
+        metadata->_chunksMap = this->_chunksMap;
+        metadata->_shardVersion = newShardVersion; // will increment 2nd, 3rd,... chunks below
 
         BSONObj startKey = chunk.getMin();
-        for (vector<BSONObj>::const_iterator it = splitKeys.begin();
-             it != splitKeys.end();
-             ++it) {
+        for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end();
+                ++it ) {
             BSONObj split = *it;
-            manager->_chunksMap[chunk.getMin()] = split.getOwned();
-            manager->_chunksMap.insert(make_pair(split.getOwned(), chunk.getMax().getOwned()));
-            manager->_shardVersion.incMinor();
+            metadata->_chunksMap[chunk.getMin()] = split.getOwned();
+            metadata->_chunksMap.insert( make_pair( split.getOwned(), chunk.getMax().getOwned() ) );
+            metadata->_shardVersion.incMinor();
             startKey = split;
         }
 
-        manager->_collVersion = manager->_shardVersion > _collVersion ?
-                        manager->_shardVersion : this->_collVersion;
-        manager->fillRanges();
+        metadata->_collVersion =
+                metadata->_shardVersion > _collVersion ? metadata->_shardVersion : _collVersion;
+        metadata->fillRanges();
 
-        dassert(manager->isValid());
-        return manager.release();
+        dassert(metadata->isValid());
+        return metadata.release();
     }
 
     bool CollectionMetadata::keyBelongsToMe( const BSONObj& key ) const {
@@ -202,8 +350,9 @@ namespace mongo {
 
         bool good = rangeContains( it->first, it->second, key );
 
+#ifdef _DEBUG
         // Logs if in debugging mode and the point doesn't belong here.
-        if ( dcompare(!good) ) {
+        if ( !good ) {
             log() << "bad: " << key << " " << it->first << " " << key.woCompare( it->first ) << " "
                   << key.woCompare( it->second ) << endl;
 
@@ -211,8 +360,26 @@ namespace mongo {
                 log() << "\t" << i->first << "\t" << i->second << "\t" << endl;
             }
         }
+#endif
 
         return good;
+    }
+
+    bool CollectionMetadata::keyIsPending( const BSONObj& key ) const {
+        // If we aren't sharded, then the key is never pending (though it belongs-to-me)
+        if ( _keyPattern.isEmpty() ) {
+            return false;
+        }
+
+        if ( _pendingMap.size() <= 0 ) {
+            return false;
+        }
+
+        RangeMap::const_iterator it = _pendingMap.upper_bound( key );
+        if ( it != _pendingMap.begin() ) it--;
+
+        bool isPending = rangeContains( it->first, it->second, key );
+        return isPending;
     }
 
     bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey,
@@ -265,29 +432,6 @@ namespace mongo {
         return true;
     }
 
-    bool CollectionMetadata::chunkExists(const ChunkType& chunk,
-                                        string* errMsg) const {
-        RangeMap::const_iterator it = _chunksMap.find(chunk.getMin());
-        if (it == _chunksMap.end()) {
-            *errMsg =  stream() << "couldn't find chunk " << chunk.getMin()
-                                << "->" << chunk.getMax();
-            return false;
-        }
-
-        if (it->second.woCompare(chunk.getMax()) != 0) {
-            *errMsg = stream() << "ranges differ, "
-                               << "requested: "  << chunk.getMin()
-                               << " -> " << chunk.getMax() << " "
-                               << "existing: "
-                               << ((it == _chunksMap.end()) ?
-                                   "<empty>" :
-                                   it->first.toString() + " -> " + it->second.toString());
-            return false;
-        }
-
-        return true;
-    }
-
     void CollectionMetadata::fillRanges() {
         if (_chunksMap.empty())
             return;
@@ -320,6 +464,22 @@ namespace mongo {
         dassert(!min.isEmpty());
 
         _rangesMap.insert(make_pair(min, max));
+    }
+
+    string CollectionMetadata::rangeToString( const BSONObj& inclusiveLower,
+                                              const BSONObj& exclusiveUpper ) const {
+        stringstream ss;
+        ss << "[" << inclusiveLower.toString() << ", " << exclusiveUpper.toString() << ")";
+        return ss.str();
+    }
+
+    string CollectionMetadata::overlapToString( RangeVector overlap ) const {
+        stringstream ss;
+        for ( RangeVector::const_iterator it = overlap.begin(); it != overlap.end(); ++it ) {
+            if ( it != overlap.begin() ) ss << ", ";
+            ss << rangeToString( it->first, it->second );
+        }
+        return ss.str();
     }
 
 } // namespace mongo

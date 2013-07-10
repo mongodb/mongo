@@ -172,7 +172,7 @@ namespace mongo {
         chunk.setMax( max );
         string errMsg;
 
-        CollectionMetadataPtr cloned( p->cloneMinus( chunk, version, &errMsg ) );
+        CollectionMetadataPtr cloned( p->cloneMinusChunk( chunk, version, &errMsg ) );
         // uassert to match old behavior, TODO: report errors w/o throwing
         uassert( 16855, errMsg, NULL != cloned.get() );
 
@@ -193,7 +193,7 @@ namespace mongo {
         chunk.setMax( max );
         string errMsg;
 
-        CollectionMetadataPtr cloned( it->second->clonePlus( chunk, version, &errMsg ) );
+        CollectionMetadataPtr cloned( it->second->clonePlusChunk( chunk, version, &errMsg ) );
         // uassert to match old behavior, TODO: report errors w/o throwing
         uassert( 16856, errMsg, NULL != cloned.get() );
 
@@ -312,8 +312,9 @@ namespace mongo {
                                                          currMetadata.get(),
                                                          newMetadataRaw );
 
-        if ( status.code() == ErrorCodes::RemoteChangeDetected ) {
-            version = ChunkVersion( 0, OID() );
+        if ( status.code() == ErrorCodes::RemoteChangeDetected
+                || status.code() == ErrorCodes::NamespaceNotFound ) {
+            version = ChunkVersion( 0, 0, OID() );
             warning() << "did not load new metadata for " << causedBy( status.reason() ) << endl;
             // we loaded something unexpected, the collection may be dropped or dropping
             return false;

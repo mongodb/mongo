@@ -18,7 +18,12 @@
 #include "mongo/unittest/unittest.h"
 
 namespace {
+
     using mongo::rangeOverlaps;
+    using mongo::rangeMapOverlaps;
+    using mongo::RangeMap;
+    using mongo::RangeVector;
+    using std::make_pair;
 
     TEST(BSONRange, SmallerLowerRangeNonSubset) {
         ASSERT_TRUE(rangeOverlaps(BSON("x" << 100), BSON("x" << 200),
@@ -55,4 +60,79 @@ namespace {
         ASSERT_TRUE(rangeOverlaps(BSON("x" << 100), BSON("x" << 200),
                                   BSON("x" << 100), BSON("x" << 200)));
     }
+
+    TEST(RangeMap, RangeMapOverlap) {
+
+        RangeMap rangeMap;
+        rangeMap.insert( make_pair( BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+        rangeMap.insert( make_pair( BSON( "x" << 200 ), BSON( "x" << 300 ) ) );
+        rangeMap.insert( make_pair( BSON( "x" << 300 ), BSON( "x" << 400 ) ) );
+
+        RangeVector overlap;
+        getRangeMapOverlap( rangeMap, BSON( "x" << 50 ), BSON( "x" << 350 ), &overlap );
+
+        ASSERT( !overlap.empty() );
+        ASSERT_EQUALS( overlap.size(), 3u );
+    }
+
+    TEST(RangeMap, RangeMapOverlapPartial) {
+
+        RangeMap rangeMap;
+        rangeMap.insert( make_pair( BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+        rangeMap.insert( make_pair( BSON( "x" << 200 ), BSON( "x" << 300 ) ) );
+
+        RangeVector overlap;
+        getRangeMapOverlap( rangeMap, BSON( "x" << 150 ), BSON( "x" << 250 ), &overlap );
+
+        ASSERT( !overlap.empty() );
+        ASSERT_EQUALS( overlap.size(), 2u );
+    }
+
+    TEST(RangeMap, RangeMapOverlapInner) {
+
+        RangeMap rangeMap;
+        rangeMap.insert( make_pair( BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+
+        RangeVector overlap;
+        getRangeMapOverlap( rangeMap, BSON( "x" << 125 ), BSON( "x" << 150 ), &overlap );
+
+        ASSERT( !overlap.empty() );
+        ASSERT_EQUALS( overlap.size(), 1u );
+    }
+
+    TEST(RangeMap, RangeMapNoOverlap) {
+
+        RangeMap rangeMap;
+        rangeMap.insert( make_pair( BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+        rangeMap.insert( make_pair( BSON( "x" << 300 ), BSON( "x" << 400 ) ) );
+
+        RangeVector overlap;
+        getRangeMapOverlap( rangeMap, BSON( "x" << 200 ), BSON( "x" << 300 ), &overlap );
+
+        ASSERT( overlap.empty() );
+    }
+
+    TEST(RangeMap, RangeMapOverlaps) {
+
+        RangeMap rangeMap;
+        rangeMap.insert( make_pair( BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+
+        ASSERT( rangeMapOverlaps( rangeMap, BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+        ASSERT( rangeMapOverlaps( rangeMap, BSON( "x" << 99 ), BSON( "x" << 200 ) ) );
+        ASSERT( rangeMapOverlaps( rangeMap, BSON( "x" << 100 ), BSON( "x" << 201 ) ) );
+        ASSERT( rangeMapOverlaps( rangeMap, BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+        ASSERT( !rangeMapOverlaps( rangeMap, BSON( "x" << 99 ), BSON( "x" << 100 ) ) );
+        ASSERT( !rangeMapOverlaps( rangeMap, BSON( "x" << 200 ), BSON( "x" << 201 ) ) );
+    }
+
+    TEST(RangeMap, RangeMapContains) {
+
+        RangeMap rangeMap;
+        rangeMap.insert( make_pair( BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+
+        ASSERT( rangeMapContains( rangeMap, BSON( "x" << 100 ), BSON( "x" << 200 ) ) );
+        ASSERT( !rangeMapContains( rangeMap, BSON( "x" << 99 ), BSON( "x" << 200 ) ) );
+        ASSERT( !rangeMapContains( rangeMap, BSON( "x" << 100 ), BSON( "x" << 201 ) ) );
+    }
+
 }

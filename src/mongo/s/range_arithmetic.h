@@ -17,6 +17,8 @@
 #pragma once
 
 #include <string>
+#include <map>
+#include <vector>
 
 #include "mongo/db/jsobj.h"
 
@@ -87,5 +89,44 @@ namespace mongo {
                        const BSONObj& rangeMax1,
                        const BSONObj& rangeMin2,
                        const BSONObj& rangeMax2 );
+
+    /**
+     * A RangeMap is a mapping of a BSON range from lower->upper (lower maps to upper), using
+     * standard BSON woCompare.  Upper bound is exclusive.
+     *
+     * NOTE: For overlap testing to work correctly, there may be no overlaps present in the map
+     * itself.
+     */
+    typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+
+    /**
+     * A RangeVector is a list of [lower,upper) ranges.
+     */
+    typedef vector<pair<BSONObj,BSONObj> > RangeVector;
+
+    /**
+     * Returns the overlap of a range [inclusiveLower, exclusiveUpper) with the provided range map
+     * as a vector of ranges from the map.
+     */
+    void getRangeMapOverlap( const RangeMap& ranges,
+                             const BSONObj& inclusiveLower,
+                             const BSONObj& exclusiveUpper,
+                             RangeVector* vector );
+
+    /**
+     * Returns true if the provided range map has ranges which overlap the provided range
+     * [inclusiveLower, exclusiveUpper).
+     */
+    bool rangeMapOverlaps( const RangeMap& ranges,
+                           const BSONObj& inclusiveLower,
+                           const BSONObj& exclusiveUpper );
+
+    /**
+     * Returns true if the provided range map exactly contains the provided range
+     * [inclusiveLower, exclusiveUpper).
+     */
+    bool rangeMapContains( const RangeMap& ranges,
+                           const BSONObj& inclusiveLower,
+                           const BSONObj& exclusiveUpper );
 
 }

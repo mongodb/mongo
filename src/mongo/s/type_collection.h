@@ -179,7 +179,7 @@ namespace mongo {
                 return primary.getDefault();
             }
         }
-        void setKeyPattern(BSONObj& keyPattern) {
+        void setKeyPattern(const BSONObj& keyPattern) {
             _keyPattern = keyPattern.getOwned();
             _isKeyPatternSet = true;
         }

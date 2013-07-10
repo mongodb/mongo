@@ -19,6 +19,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/range_arithmetic.h"
 #include "mongo/s/type_chunk.h"
 
 namespace mongo {
@@ -30,7 +31,7 @@ namespace mongo {
     typedef shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
 
     /**
-     * The collection manager has metadata information about a collection, in particular the
+     * The collection metadata has metadata information about a collection, in particular the
      * sharding information. It's main goal in life is to be capable of answering if a certain
      * document belongs to it or not. (In some scenarios such as chunk migration, a given
      * document is in a shard but cannot be accessed.)
@@ -52,35 +53,57 @@ namespace mongo {
         //
 
         /**
-         * Returns a new manager's instance based on 'this's state by removing 'chunk'.
+         * Returns a new metadata's instance based on 'this's state by removing 'chunk'.
          * When cloning away the last chunk, 'newShardVersion' must be zero. In any case,
-         * the caller owns the new manager when the cloning is successful.
+         * the caller owns the new metadata when the cloning is successful.
          *
-         * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
          */
-        CollectionMetadata* cloneMinus( const ChunkType& chunk,
-                                        const ChunkVersion& newShardVersion,
-                                        string* errMsg ) const;
+        CollectionMetadata* cloneMinusChunk( const ChunkType& chunk,
+                                             const ChunkVersion& newShardVersion,
+                                             string* errMsg ) const;
 
         /**
-         * Returns a new manager's instance based on 'this's state by adding 'chunk'. The new
-         * manager can never be zero, though (see cloneMinus). The caller owns the new manager.
+         * Returns a new metadata's instance based on 'this's state by adding 'chunk'. The new
+         * metadata can never be zero, though (see cloneMinus). The caller owns the new metadata.
          *
-         * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
          */
-        CollectionMetadata* clonePlus( const ChunkType& chunk,
-                                       const ChunkVersion& newShardVersion,
-                                       string* errMsg ) const;
+        CollectionMetadata* clonePlusChunk( const ChunkType& chunk,
+                                            const ChunkVersion& newShardVersion,
+                                            string* errMsg ) const;
 
         /**
-         * Returns a new manager's instance by splitting an existing 'chunk' at the points
+         * Returns a new metadata's instance based on 'this's state by removing a 'pending' chunk.
+         *
+         * The shard and collection version of the new metadata are unaffected.  The caller owns the
+         * new metadata.
+         *
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
+         * provided.
+         */
+        CollectionMetadata* cloneMinusPending( const ChunkType& pending, string* errMsg ) const;
+
+        /**
+         * Returns a new metadata's instance based on 'this's state by adding a 'pending' chunk.
+         *
+         * The shard and collection version of the new metadata are unaffected.  The caller owns the
+         * new metadata.
+         *
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
+         * provided.
+         */
+        CollectionMetadata* clonePlusPending( const ChunkType& pending, string* errMsg ) const;
+
+        /**
+         * Returns a new metadata's instance by splitting an existing 'chunk' at the points
          * describe by 'splitKeys'. The first resulting chunk will have 'newShardVersion' and
          * subsequent one would have that with the minor version incremented at each chunk. The
-         * caller owns the manager.
+         * caller owns the metadata.
          *
-         * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
          */
         CollectionMetadata* cloneSplit( const ChunkType& chunk,
@@ -93,11 +116,17 @@ namespace mongo {
         //
 
         /**
-         * Returns true the document key 'key' belongs to this chunkset. Recall that documents of
+         * Returns true if the document key 'key' belongs to this chunkset. Recall that documents of
          * an in-flight chunk migration may be present and should not be considered part of the
          * collection / chunkset yet. Key must be the full shard key.
          */
         bool keyBelongsToMe( const BSONObj& key ) const;
+
+        /**
+         * Returns true if the document key 'key' is or has been migrated to this shard, and may
+         * belong to us after a subsequent config reload.  Key must be the full shard key.
+         */
+        bool keyIsPending( const BSONObj& key ) const;
 
         /**
          * Given the chunk's min key (or empty doc) in 'lookupKey', gets the boundaries of the
@@ -105,7 +134,7 @@ namespace mongo {
          * boundaries.  If the next chunk happens to be the last one, returns true otherwise
          * false.
          *
-         * @param lookupKey passing a doc that does not belong to this manager is undefined.
+         * @param lookupKey passing a doc that does not belong to this metadata is undefined.
          *     An empty doc is special and the chunk with the lowest range will be set on
          *     foundChunk.
          */
@@ -131,11 +160,15 @@ namespace mongo {
             return _chunksMap.size();
         }
 
+        std::size_t getNumPending() const {
+            return _pendingMap.size();
+        }
+
         string toString() const;
 
         /**
          * Use the MetadataLoader to fill the empty metadata from the config server, or use
-         * clone*() methods to use existing managers to build new ones.
+         * clone*() methods to use existing metadatas to build new ones.
          *
          * Unless you are the MetadataLoader or a test you should probably not be using this
          * directly.
@@ -155,14 +188,21 @@ namespace mongo {
         // sharded state below, for when the collection gets sharded
         //
 
-        // highest ChunkVersion for which this manager's information is accurate
+        // highest ChunkVersion for which this metadata's information is accurate
         ChunkVersion _shardVersion;
 
         // key pattern for chunks under this range
         BSONObj _keyPattern;
 
-        // a map from a min key into the chunk's (or range's) max boundary
-        typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+        //
+        // RangeMaps represent chunks by mapping the min key to the chunk's max key, allowing
+        // efficient lookup and intersection.
+        //
+
+        // Map of ranges of chunks that are migrating but have not been confirmed added yet
+        RangeMap _pendingMap;
+
+        // Map of chunks tracked by this shard
         RangeMap _chunksMap;
 
         // A second map from a min key into a range or contiguous chunks. The map is redundant
@@ -171,19 +211,25 @@ namespace mongo {
         RangeMap _rangesMap;
 
         /**
-         * Returns true if this manager was loaded with all necessary information.
+         * Returns true if this metadata was loaded with all necessary information.
          */
         bool isValid() const;
-
-        /**
-         * Returns true if 'chunk' exist in this * collections's chunkset.
-         */
-        bool chunkExists( const ChunkType& chunk, string* errMsg ) const;
 
         /**
          * Try to find chunks that are adjacent and record these intervals in the _rangesMap
          */
         void fillRanges();
+
+        /**
+         * String representation of [inclusiveLower, exclusiveUpper)
+         */
+        std::string rangeToString( const BSONObj& inclusiveLower,
+                                   const BSONObj& exclusiveUpper ) const;
+
+        /**
+         * String representation of overlapping ranges as a list "[range1),[range2),..."
+         */
+        std::string overlapToString( RangeVector overlap ) const;
 
     };
 

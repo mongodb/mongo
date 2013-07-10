@@ -47,7 +47,7 @@ namespace mongo {
          * that we make no restrictions about which connection string that is, including
          * CUSTOM, which we rely on in testing.
          */
-        explicit MetadataLoader( ConnectionString configLoc );
+        explicit MetadataLoader( const ConnectionString& configLoc );
 
         ~MetadataLoader();
 
@@ -63,13 +63,14 @@ namespace mongo {
          * Abnormal:
          * @return FailedToParse if there was an error parsing the remote config data
          * Normal:
+         * @return NamespaceNotFound if the collection no longer exists
          * @return HostUnreachable if there was an error contacting the config servers
          * @return RemoteChangeDetected if the data loaded was modified by another operation
          */
         Status makeCollectionMetadata( const string& ns,
                                        const string& shard,
                                        const CollectionMetadata* oldMetadata,
-                                       CollectionMetadata* metadata );
+                                       CollectionMetadata* metadata ) const;
 
     private:
         ConnectionString _configLoc;
@@ -79,6 +80,7 @@ namespace mongo {
          * information, not including chunks.
          *
          * If information about the collection can be accessed or is invalid, returns:
+         * @return NamespaceNotFound if the collection no longer exists
          * @return FailedToParse if there was an error parsing the remote config data
          * @return HostUnreachable if there was an error contacting the config servers
          * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
@@ -86,7 +88,7 @@ namespace mongo {
          */
         Status initCollection( const string& ns,
                                const string& shard,
-                               CollectionMetadata* metadata );
+                               CollectionMetadata* metadata ) const;
 
         /**
          * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the
@@ -101,7 +103,7 @@ namespace mongo {
         Status initChunks( const string& ns,
                            const string& shard,
                            const CollectionMetadata* oldMetadata,
-                           CollectionMetadata* metadata );
+                           CollectionMetadata* metadata ) const;
     };
 
 } // namespace mongo
