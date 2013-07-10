@@ -40,7 +40,8 @@ namespace mongo {
 
             LOG(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << " options : " << q.queryOptions << endl;
 
-            verify(r.isCommand()); // Regular queries are handled in strategy_shard.cpp
+            // Regular queries are handled in strategy_shard.cpp
+            verify( NamespaceString( r.getns() ).isCommand() );
 
             if ( handleSpecialNamespaces( r , q ) )
                 return;

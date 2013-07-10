@@ -50,7 +50,8 @@ namespace mongo {
 
         virtual void queryOp( Request& r ) {
 
-            verify(!r.isCommand()); // Commands are handled in strategy_single.cpp
+            // Commands are handled in strategy_single.cpp
+            verify( !NamespaceString( r.getns() ).isCommand() );
 
             QueryMessage q( r.d() );
 

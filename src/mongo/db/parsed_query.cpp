@@ -48,11 +48,6 @@ namespace mongo {
         initFields( fields );
     }
 
-    bool ParsedQuery::couldBeCommand() const {
-        /* we assume you are using findOne() for running a cmd... */
-        return _ntoreturn == 1 && strstr( _ns , ".$cmd" );
-    }
-
     bool ParsedQuery::hasIndexSpecifier() const {
         return ! _hint.isEmpty() || ! _min.isEmpty() || ! _max.isEmpty();
     }
