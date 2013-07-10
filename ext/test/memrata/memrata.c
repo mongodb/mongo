@@ -641,7 +641,7 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
 	wtext = cursor->wtext;
 
 	/*
-	 * We return the most recent cache entry update; the cache entries are
+	 * We return (the most recent cache entry update); the cache entries are
 	 * in update order, walk from the end to the beginning.
 	 */
 	cp = cursor->cache + cursor->cache_entries;
@@ -694,7 +694,7 @@ cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
 	 */
 	if (final)
 		ERET(wtext, session, 0,
-		    "cleaner: closing with unresolved upates in the cache");
+		    "cleaner: closing with unresolved updates in the cache");
 	return (0);
 }
 
@@ -703,7 +703,7 @@ cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
  *	Find the most recent committed update in a cache entry.
  */
 static void
-cache_value_newest(WT_CURSOR *wtcursor, uint64_t oldest, CACHE_RECORD **cpp)
+cache_value_newest(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
@@ -767,7 +767,6 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 	CURSOR *cursor, _cursor;
 	WT_SOURCE *ws;
 	uint64_t oldest, txnid, txnmin;
-	u_int i;
 	int ret = 0, wslocked;
 
 	wslocked = 0;
@@ -816,7 +815,7 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 				goto err;
 			if (!cache_value_visible_all(wtcursor, oldest, 0))
 				continue;
-			cache_value_newest(wtcursor, oldest, &cp);
+			cache_value_newest(wtcursor, &cp);
 			if (cp == NULL)
 				continue;
 
