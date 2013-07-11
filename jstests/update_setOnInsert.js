@@ -16,12 +16,12 @@ function dotest( useIndex ) {
     }
 
     t.update( { _id: 5 }, { $inc : { x: 2 }, $setOnInsert : { a : 3 } }, true );
-    assert.eq( { _id : 5, a: 3, x : 2 }, t.findOne() );
+    assert.docEq( { _id : 5, a: 3, x : 2 }, t.findOne() );
 
     t.update( { _id: 5 }, { $set : { a : 4 } }, true );
 
     t.update( { _id: 5 }, { $inc : { x: 2 }, $setOnInsert : { a : 3 } }, true );
-    assert.eq( { _id : 5, a: 4, x : 4 }, t.findOne() );
+    assert.docEq( { _id : 5, a: 4, x : 4 }, t.findOne() );
 
     op = getLastOp();
     assert( op.fastmod );

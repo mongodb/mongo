@@ -176,6 +176,15 @@ namespace mongo {
                 return status;
             }
 
+            // If a mod wants to be applied only if this is an upsert (or only if this is a
+            // strict update), we should respect that. If a mod doesn't care, it would state
+            // it is fine with ANY update context.
+            bool validContext = false;
+            if (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
+                execInfo.context == _context) {
+                validContext = true;
+            }
+
             // Gather which fields this mod is interested on and whether these fields were
             // "taken" by previous mods.  Note that not all mods are multi-field mods. When we
             // see an empty field, we may stop looking for others.
@@ -193,21 +202,19 @@ namespace mongo {
                                       << "' at the same time");
                 }
 
+                // We start with the expectation that a mod will be in-place. But if the mod
+                // touched an indexed field and the mod will indeed be executed -- that is, it
+                // is not a no-op and it is in a valid context -- then we switch back to a
+                // non-in-place mode.
+                //
                 // TODO: make mightBeIndexed and fieldRef like each other.
                 if (!_affectIndices &&
+                    !execInfo.noOp &&
+                    validContext &&
                     _indexedFields.mightBeIndexed(execInfo.fieldRef[i]->dottedField())) {
                     _affectIndices = true;
                     doc->disableInPlaceUpdates();
                 }
-            }
-
-            // If a mod wants to be applied only if this is an upsert (or only if this is a
-            // strict update), we should respect that. If a mod doesn't care, it would state
-            // it is fine with ANY update context.
-            bool validContext = false;
-            if (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
-                execInfo.context == _context) {
-                validContext = true;
             }
 
             if (!execInfo.noOp && validContext) {
