@@ -329,15 +329,15 @@ namespace mongo {
     class LogPlugin : public WebStatusPlugin {
     public:
         LogPlugin() : WebStatusPlugin( "Log" , 100 ), _log(0) {
-        }
-
-        virtual void init() {
             _log = RamLog::get( "global" );
             if ( ! _log ) {
                 _log = new RamLog("global");
                 logger::globalLogDomain()->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
                                                                   new RamLogAppender(_log)));
             }
+        }
+
+        virtual void init() {
         }
 
         virtual void run( stringstream& ss ) {
@@ -349,7 +349,9 @@ namespace mongo {
     MONGO_INITIALIZER_GENERAL(WebStatusLogPlugin, ("ServerLogRedirection"), ("default"))(
             InitializerContext*) {
 
-        new LogPlugin;
+        if (cmdLine.isHttpInterfaceEnabled) {
+            new LogPlugin;
+        }
         return Status::OK();
     }
 

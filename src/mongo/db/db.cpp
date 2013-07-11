@@ -104,7 +104,6 @@ namespace mongo {
 
     CmdLine cmdLine;
     static bool scriptingEnabled = true;
-    static bool httpInterface = false;
     bool shouldRepairDatabases = 0;
     static bool forceRepair = 0;
     Timer startupSrandTimer;
@@ -288,7 +287,7 @@ namespace mongo {
 
         logStartup();
         startReplication();
-        if ( httpInterface )
+        if ( cmdLine.isHttpInterfaceEnabled )
             boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
 
 #if(TESTEXHAUST)
@@ -997,7 +996,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
                 log() << "can't have both --httpinterface and --nohttpinterface" << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
-            httpInterface = true;
+            cmdLine.isHttpInterfaceEnabled = true;
         }
         // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in the future 
         if (params.count("rest")) {
@@ -1009,7 +1008,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
                 log() << "** WARNING: --rest is specified without --httpinterface," << 
                     startupWarningsLog;
                 log() << "**          enabling http interface" << startupWarningsLog;
-                httpInterface = true;
+                cmdLine.isHttpInterfaceEnabled = true;
             }
             cmdLine.rest = true;
         }
@@ -1022,7 +1021,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
                 log() << "** WARNING --jsonp is specified without --httpinterface," << 
                     startupWarningsLog;
                 log() << "**         enabling http interface" << startupWarningsLog;
-                httpInterface = true;
+                cmdLine.isHttpInterfaceEnabled = true;
             }
             cmdLine.jsonp = true;
         }

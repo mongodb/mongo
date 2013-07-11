@@ -80,7 +80,6 @@ namespace mongo {
     string mongosCommand;
     bool dbexitCalled = false;
     static bool scriptingEnabled = true;
-    static bool httpInterface = false;
     static vector<string> configdbs;
 
     bool inShutdown() {
@@ -335,7 +334,7 @@ static bool runMongosServer( bool doUpgrade ) {
     CmdLine::launchOk();
 #endif
 
-    if ( httpInterface )
+    if ( cmdLine.isHttpInterfaceEnabled )
         boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
     MessageServer::Options opts;
@@ -463,7 +462,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             out() << "can't have both --httpinterface and --nohttpinterface" << endl;
             ::_exit(EXIT_FAILURE);
         }
-        httpInterface = true;
+        cmdLine.isHttpInterfaceEnabled = true;
     }
 
     if (params.count("noAutoSplit")) {

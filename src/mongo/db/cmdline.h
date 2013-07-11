@@ -128,6 +128,8 @@ namespace mongo {
         bool logWithSyslog;    // True if logging to syslog; must not be set if logpath is set.
         std::string clusterAuthMode; // Cluster authentication mode
 
+        bool isHttpInterfaceEnabled; // True if the dbwebserver should be enabled.
+
 #ifndef _WIN32
         ProcessId parentProc;      // --fork pid of initial process
         ProcessId leaderProc;      // --fork pid of leader process
@@ -196,7 +198,7 @@ namespace mongo {
         durOptions(0), objcheck(true), oplogSize(0), defaultProfile(0),
         slowMS(100), defaultLocalThresholdMillis(15), pretouch(0), moveParanoia( false ),
         syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN),
-        logAppend(false), logWithSyslog(false)
+        logAppend(false), logWithSyslog(false), isHttpInterfaceEnabled(false)
     {
         started = time(0);
 
