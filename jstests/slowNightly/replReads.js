@@ -1,4 +1,4 @@
-2// Test that doing slaveOk reads from secondaries hits all the secondaries evenly
+// Test that doing slaveOk reads from secondaries hits all the secondaries evenly
 
 function testReadLoadBalancing(numReplicas) {
 
@@ -47,10 +47,14 @@ function testReadLoadBalancing(numReplicas) {
     // Primary may change with reconfig
     primary.getDB('test').setProfilingLevel(2)
 
+    // Store references to the connection so they won't be garbage collected.
+    var connections = [];
+
     for (var i = 0; i < secondaries.length * 10; i++) {
         conn = new Mongo(s._mongos[0].host)
         conn.setSlaveOk()
         conn.getDB('test').foo.findOne()
+        connections.push(conn);
     }
 
     var profileCriteria = { op: 'query', ns: 'test.foo' };
@@ -101,6 +105,7 @@ function testReadLoadBalancing(numReplicas) {
         conn = new Mongo(s._mongos[0].host)
         conn.setSlaveOk()
         conn.getDB('test').foo.findOne()
+        connections.push(conn);
     }
 
     var counts = []
