@@ -2,6 +2,11 @@
 
 var numPerTypeToCreate = 100;
 
+// We need to create a new mongod to ensure no one else is talking to us in the background, and 
+// will screw up our stats.
+var mongo = MongoRunner.runMongod({});
+var db = mongo.getDB("test");
+
 var availableConnections = db.serverStatus().connections.available;
 if ( availableConnections < ( numPerTypeToCreate * 10 ) ) {
     numPerTypeToCreate = Math.floor( availableConnections / 10 );
@@ -81,3 +86,5 @@ waitForConnections(originalConnInfo.current + numPerTypeToCreate,
 
 persistent = null;
 gc();
+
+MongoRunner.stopMongod( mongo );
