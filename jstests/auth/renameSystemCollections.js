@@ -5,6 +5,8 @@ var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("testdb");
 var testDB2 = conn.getDB("testdb2");
 
+var CodeUnauthorized = 13;
+
 testDB.addUser({user:'spencer',
                 pwd:'password',
                 roles:['readWrite']});
@@ -24,13 +26,13 @@ userAdminConn.getDB('admin').addUser({user:'readWriteAdmin',
 testDB.auth('spencer', 'password');
 res = testDB.system.profile.renameCollection("profile");
 assert.eq(0, res.ok);
-assert.eq("unauthorized", res.errmsg);
+assert.eq(CodeUnauthorized, res.code);
 
 
 // Test that a readWrite user can't rename system.users to something they can read.
 var res = testDB.system.users.renameCollection("users");
 assert.eq(0, res.ok);
-assert.eq("unauthorized", res.errmsg);
+assert.eq(CodeUnauthorized, res.code);
 assert.eq(0, testDB.users.count());
 
 
@@ -40,7 +42,7 @@ testDB.users.insert({user:'backdoor',
                      roles:'userAdmin'});
 res = testDB.users.renameCollection("system.users", true);
 assert.eq(0, res.ok);
-assert.eq("unauthorized", res.errmsg);
+assert.eq(CodeUnauthorized, res.code);
 assert.eq(null, userAdminConn.getDB('testdb').system.users.findOne({user:'backdoor'}));
 
 
@@ -51,7 +53,7 @@ testDB2.users.insert({user:'backdoor',
                       roles:'userAdmin'});
 res = testDB2.users.renameCollection("system.users");
 assert.eq(0, res.ok);
-assert.eq("unauthorized", res.errmsg);
+assert.eq(CodeUnauthorized, res.code);
 assert.eq(0, userAdminConn.getDB('testdb2').system.users.count());
 
 
@@ -59,7 +61,7 @@ assert.eq(0, userAdminConn.getDB('testdb2').system.users.count());
 testDB2.users.drop();
 var res = adminDB.runCommand({renameCollection:'testdb.system.users', to:'testdb2.users'});
 assert.eq(0, res.ok);
-assert.eq("unauthorized", res.errmsg);
+assert.eq(CodeUnauthorized, res.code);
 assert.eq(0, testDB2.users.count());
 
 
@@ -67,7 +69,7 @@ assert.eq(0, testDB2.users.count());
 testDB.users.drop();
 var res = userAdminConn.getDB('testdb').system.users.renameCollection("users");
 assert.eq(0, res.ok);
-assert.eq("unauthorized", res.errmsg);
+assert.eq(CodeUnauthorized, res.code);
 assert.eq(0, testDB.users.count());
 
 

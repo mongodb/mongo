@@ -274,7 +274,9 @@ namespace mongo {
                 if( ok ) {
                     up(info, mem);
                 }
-                else if (!info["errmsg"].eoo() && info["errmsg"].str() == "unauthorized") {
+                else if (info["code"].numberInt() == ErrorCodes::Unauthorized ||
+                         info["errmsg"].str() == "unauthorized") {
+
                     authIssue(mem);
                 }
                 else {

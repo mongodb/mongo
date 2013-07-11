@@ -22,8 +22,7 @@
 
     // Asserts that on the given "conn", "dbName"."collectionName".count() fails as unauthorized.
     function assertCountUnauthorized(conn, dbName, collectionName) {
-        assert.eq(runCountCommand(conn, dbName, collectionName).errmsg,
-                  "unauthorized",
+        assert.eq(runCountCommand(conn, dbName, collectionName).code, 13,
                   "On " + dbName + "." + collectionName);
     }
 
