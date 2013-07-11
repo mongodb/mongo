@@ -266,9 +266,8 @@ err:	if (ndsrc != NULL) {
 }
 
 /*
- * __wt_conn_remove_compressor --
- *	remove compressor added by WT_CONNECTION->add_compressor,
- *	only used internally.
+ * __wt_conn_remove_data_source --
+ *	Remove data source added by WT_CONNECTION->add_data_source.
  */
 int
 __wt_conn_remove_data_source(
