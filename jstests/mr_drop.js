@@ -12,7 +12,7 @@ reduceSleep = Random.randInt( 4 );
 finalizeSleep = Random.randInt( 4 );
 
 // Insert some documents.
-for( i = 0; i < 1000; ++i ) {
+for( i = 0; i < 10000; ++i ) {
     t.save( { key:parseInt( i / 2 ),
               mapSleep:mapSleep,
               reduceSleep:reduceSleep,
@@ -20,8 +20,8 @@ for( i = 0; i < 1000; ++i ) {
 }
 db.getLastError();
 
-// Schedule a collection drop one second in the future.
-s = startParallelShell( "sleep( 1000 ); db.jstests_mr_drop.drop();" );
+// Schedule a collection drop two seconds in the future.
+s = startParallelShell( "sleep( 2000 ); db.jstests_mr_drop.drop();" );
 
 // Run the map/reduce job.  Check for command failure internally.  The job succeeds even if the
 // source collection is dropped in progress.
