@@ -886,6 +886,10 @@ extern int __wt_errno(void);
 extern int __wt_exist(WT_SESSION_IMPL *session,
     const char *filename,
     int *existp);
+extern int __wt_fallocate(WT_SESSION_IMPL *session,
+    WT_FH *fh,
+    off_t offset,
+    off_t len);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);

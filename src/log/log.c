@@ -56,15 +56,19 @@ __wt_log_extract_lognum(
 static int
 __log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(path);
 	WT_DECL_RET;
 
+	conn = S2C(session);
 	WT_RET(__wt_scr_alloc(session, 0, &path));
 	WT_ERR(__wt_log_filename(session, id, path));
 	WT_VERBOSE_ERR(session, log, "opening log %s",
 	    (const char *)path->data);
 	WT_ERR(__wt_open(
 	    session, path->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
+	if (ok_create)
+		WT_ERR(__wt_fallocate(session, *fh, 0, conn->log_file_max));
 err:	__wt_scr_free(&path);
 	return (ret);
 }
@@ -185,6 +189,45 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 	conn = S2C(session);
 	return (lsn->offset + recsize < conn->log_file_max);
 
+}
+
+/*
+ * __log_filesize --
+ *	Returns an estimate of the real end of log file.
+ */
+static int
+__log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, uint64_t *eof)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	uint64_t log_size, off, rec;
+
+	conn = S2C(session);
+	log = conn->log;
+	if (eof == NULL)
+		return (0);
+	*eof = 0;
+	WT_ERR(__wt_filesize(session, fh, (off_t *)&log_size));
+	/*
+	 * We know all log records are aligned at log->allocsize.  The first
+	 * item in a log record is always the length.  Look for any non-zero
+	 * at the allocsize boundary.  This may not be a true log record since
+	 * it could be the middle of a large record.  But we know no log record
+	 * starts after it.  Return an estimate of the log file size.
+	 */
+	for (off = (log_size - log->allocsize);
+	    off > 0; off -= log->allocsize) {
+		WT_ERR(__wt_read(session, fh, off, sizeof(uint64_t), &rec));
+		if (rec != 0)
+			break;
+	}
+	/*
+	 * Set EOF to the last zero-filled record we saw.
+	 */
+	*eof = off + log->allocsize;
+err:
+	return (ret);
 }
 
 /*
@@ -461,7 +504,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	end_lsn = log->alloc_lsn;
 	log_fh = NULL;
 	WT_RET(__log_openfile(session, 0, &log_fh, start_lsn.file));
-	WT_ERR(__wt_filesize(session, log_fh, (off_t *)&log_size));
+	WT_ERR(__log_filesize(session, log_fh, &log_size));
 	if (LF_ISSET(WT_LOGSCAN_ONE))
 		done = 1;
 	else
@@ -490,8 +533,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 				break;
 			WT_ERR(__log_openfile(
 			    session, 0, &log_fh, rd_lsn.file));
-			WT_ERR(__wt_filesize(
-			    session, log_fh, (off_t *)&log_size));
+			WT_ERR(__log_filesize(session, log_fh, &log_size));
 			continue;
 		}
 		/*

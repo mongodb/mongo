@@ -93,6 +93,7 @@ src/os_posix/os_dlopen.c
 src/os_posix/os_dir.c
 src/os_posix/os_errno.c
 src/os_posix/os_exist.c
+src/os_posix/os_fallocate.c
 src/os_posix/os_filesize.c
 src/os_posix/os_flock.c
 src/os_posix/os_fsync.c
