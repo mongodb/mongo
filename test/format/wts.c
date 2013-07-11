@@ -135,25 +135,31 @@ wts_create(void)
 
 	/*
 	 * Create the underlying store.
-	 *
-	 * Make sure at least 2 internal page per thread can fit in cache.
 	 */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
+	/*
+	 * Ensure that we can service at least one operation per-thread
+	 * concurrently without filling the cache with pinned pages. We
+	 * choose a multiplier of three because the max configurations control
+	 * on disk size and in memory pages are often significantly larger
+	 * than their disk counterparts.
+	 */
 	maxintlpage = 1U << g.c_intl_page_max;
-	while (maxintlpage > 512 &&
-	    2 * g.c_threads * maxintlpage > g.c_cache << 20)
-		maxintlpage >>= 1;
+	maxleafpage = 1U << g.c_leaf_page_max;
+	while (3 * g.c_threads * (maxintlpage + maxleafpage) >
+	    g.c_cache << 20) {
+		if (maxleafpage <= 512 && maxintlpage <= 512)
+			break;
+		if (maxintlpage > 512)
+			maxintlpage >>= 1;
+		if (maxleafpage > 512)
+			maxleafpage >>= 1;
+	}
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
 		maxintlitem = 40;
-
-	/* Make sure at least two leaf pages per thread can fit in cache. */
-	maxleafpage = 1U << g.c_leaf_page_max;
-	while (maxleafpage > 512 &&
-	    2 * g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
-		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafitem < 40)
 		maxleafitem = 40;
