@@ -1513,9 +1513,9 @@ namespace JsobjTests {
     public:
         void run() {
             Date_t before = jsTime();
-            sleepmillis(1);
-            time_t now = time(NULL);
-            sleepmillis(1);
+            sleepmillis(2);
+            time_t now = jsTime().toTimeT();
+            sleepmillis(2);
             Date_t after = jsTime();
 
             BSONObjBuilder b;
