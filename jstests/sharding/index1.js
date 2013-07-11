@@ -11,6 +11,7 @@ for ( var i = 0; i < 19; i++ ) {
 	for ( var j = 0; j < 300; j++ ) {
 		coll.insert( { num : j, x : 1 } )
 	}
+    assert.eq( null, coll.getDB().getLastError() );
 
 	if(i == 0) s.adminCommand( { enablesharding : "" + coll._db } );
 
