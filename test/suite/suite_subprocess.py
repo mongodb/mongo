@@ -142,14 +142,12 @@ class suite_subprocess:
                     print "*********************************************"
                     print "**** Run 'wt' via: run " + " ".join(procargs[3:]) + infilepart + ">" + wtoutname + " 2>" + wterrname
                     print "*********************************************"
-                    proc = subprocess.Popen(procargs)
+                    subprocess.call(procargs)
+                elif infilename:
+                    with open(infilename, "r") as wtin:
+                        subprocess.call(procargs, stdin=wtin, stdout=wtout, stderr=wterr)
                 else:
-                    if infilename != None:
-                        with open(infilename, "r") as wtin:
-                            proc = subprocess.Popen(procargs, stdin=wtin, stdout=wtout, stderr=wterr)
-                    else:
-                        proc = subprocess.Popen(procargs, stdout=wtout, stderr=wterr)
-                proc.wait()
+                    subprocess.call(procargs, stdout=wtout, stderr=wterr)
         if errfilename == None:
             self.check_empty_file(wterrname)
         if outfilename == None:

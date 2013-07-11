@@ -95,7 +95,8 @@ class CapturedFd(object):
         in the constructor.
         """
         filefd = os.open(self.filename, os.O_RDWR | os.O_CREAT | os.O_APPEND)
-        os.close(self.targetFd)
+        if filefd < 0:
+            raise Exception(self.testdir + ": cannot remove directory")
         os.dup2(filefd, self.targetFd)
         os.close(filefd)
 
@@ -103,8 +104,8 @@ class CapturedFd(object):
         """
         Stop capturing.  Restore the original fd from the duped copy.
         """
-        os.close(self.targetFd)
-        os.dup2(self.originalDupedFd, self.targetFd)
+        if self.originalDupedFd >= 0:
+            os.dup2(self.originalDupedFd, self.targetFd)
 
     def show(self, pfx=None):
         contents = self.readFileFrom(self.filename, 0, 1000)
@@ -264,23 +265,29 @@ class WiredTigerTestCase(unittest.TestCase):
         if os.path.exists(self.testdir):
             raise Exception(self.testdir + ": cannot remove directory")
         os.makedirs(self.testdir)
+        os.chdir(self.testdir)
+        self.fdSetUp()
+        # tearDown needs a conn field, set it here in case the open fails.
+        self.conn = None
         try:
-            os.chdir(self.testdir)
-            self.fdSetUp()
             self.conn = self.setUpConnectionOpen(".")
             self.session = self.setUpSessionOpen(self.conn)
         except:
-            os.chdir(self.origcwd)
+            self.tearDown()
             raise
 
     def tearDown(self):
         excinfo = sys.exc_info()
         passed = (excinfo == (None, None, None))
+        self.pr('finishing')
+
+        try:
+            self.close_conn()
+        except:
+            pass
 
         try:
             self.fdTearDown()
-            self.pr('finishing')
-            self.close_conn()
             # Only check for unexpected output if the test passed
             if passed:
                 self.captureout.check(self)
