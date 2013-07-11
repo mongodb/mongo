@@ -7,6 +7,8 @@ kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
 pre-start script
     mkdir -p /var/lib/mongodb/
     mkdir -p /var/log/mongodb/
+    touch /var/run/mongodb.pid
+    chown mongodb /var/run/mongodb.pid
 end script
 
 start on runlevel [2345]
@@ -15,5 +17,11 @@ stop on runlevel [06]
 script
   ENABLE_MONGODB="yes"
   if [ -f /etc/default/mongodb ]; then . /etc/default/mongodb; fi
-  if [ "x$ENABLE_MONGODB" = "xyes" ]; then exec start-stop-daemon --start --quiet --chuid mongodb --exec  /usr/bin/mongod -- --config /etc/mongodb.conf; fi
+  if [ "x$ENABLE_MONGODB" = "xyes" ]; then
+    exec start-stop-daemon --start --quiet \
+      --chuid mongodb \
+      --pidfile /var/run/mongodb.pid \
+      --make-pidfile \
+      --exec /usr/bin/mongod -- --config /etc/mongodb.conf
+  fi
 end script
