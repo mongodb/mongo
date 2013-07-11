@@ -64,15 +64,17 @@ assert.soon(function() {
 });
 
 print("now getmore shouldn't work");
-lastDoc = null;
-while (cursor.hasNext()) {
-    lastDoc = cursor.next();
-}
+var ex = assert.throws(
+	function(){
+		lastDoc = null;
+		while (cursor.hasNext()) {
+			lastDoc = cursor.next();
+		}
+	},
+	[] /*no params*/,
+	"getmore didn't fail")
 
-print("the shell is currently stupid and won't throw once it's returned any query results");
-printjson(lastDoc);
-assert("$err" in lastDoc);
-assert.eq(lastDoc.code, 13436);
+assert(ex.match("13436"), "wrong error code -- " + ex );
 
 result = conns[1].getDB("admin").runCommand({replSetMaintenance : 0});
 assert.eq(result.ok, 1, tojson(result));
