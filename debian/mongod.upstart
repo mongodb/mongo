@@ -13,12 +13,15 @@ limit nproc 32000 32000
 kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
 
 pre-start script
+  DAEMONUSER=${DAEMONUSER:-mongodb}
   if [ ! -d /var/lib/mongod ]; then
     mkdir -p /var/lib/mongodb && chown mongodb:mongodb /var/lib/mongodb
   fi
   if [ ! -d /var/log/mongod ]; then
     mkdir -p /var/log/mongodb && chown mongodb:mongodb /var/log/mongodb
   fi
+  touch /var/run/mongodb.pid
+  chown $DAEMONUSER /var/run/mongodb.pid
 end script
 
 start on runlevel [2345]
@@ -48,6 +51,8 @@ script
   then
     exec start-stop-daemon --start \
         --chuid $DAEMONUSER \
+        --pidfile /var/run/mongodb.pid \
+        --make-pidfile \
         --exec $NUMACTL $DAEMON $DAEMON_OPTS
   fi
 end script
