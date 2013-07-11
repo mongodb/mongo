@@ -6,12 +6,21 @@ m = db.getMongo();
 baseName = "jstests_dropdb";
 ddb = db.getSisterDB( baseName );
 
+print("initial dbs: " + tojson(m.getDBNames()));
+
+function check(shouldExist) {
+    var dbs = m.getDBNames();
+    assert.eq(Array.contains(dbs, baseName), shouldExist,
+              "DB " + baseName + " should " + (shouldExist ? "" : "not ") + "exist."
+              + " dbs: " + tojson(dbs));
+}
+
 ddb.c.save( {} );
 ddb.getLastError();
-assert.neq( -1, m.getDBNames().indexOf( baseName ) );
+check(true);
 
 ddb.dropDatabase();
-assert.eq( -1, m.getDBNames().indexOf( baseName ) );
+check(false);
 
 ddb.dropDatabase();
-assert.eq( -1, m.getDBNames().indexOf( baseName ) );
+check(false);
