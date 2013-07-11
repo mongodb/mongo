@@ -42,7 +42,6 @@ files.forEach(function(x) {
     // fsync, fsync2: isn't supported through mongos.
     // remove5: getpreverror, I think. don't run.
     // update4: getpreverror don't run.
-    // getmore_error: tests a mongod-specific failpoint
 
     // Around July 20, command passthrough went away, and these
     // commands weren't implemented:
@@ -117,7 +116,6 @@ files.forEach(function(x) {
         'reversecursor|' +
         'block_check_supported|' +
         'stages.*|' +
-        'getmore_error|' +
         'stats' + // tests db.stats().dataFileVersion, which doesn't appear in sharded db.stats()
         ')\.js$');
 
