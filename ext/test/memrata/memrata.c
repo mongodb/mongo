@@ -636,6 +636,8 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
 	WT_SESSION *session;
 	u_int i;
 
+	*cpp = NULL;
+
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
 	wtext = cursor->wtext;
@@ -649,8 +651,7 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
 		--cp;
 		if (!cache_value_aborted(wtcursor, cp) &&
 		    wtext->transaction_visible(wtext, session, cp->txnid)) {
-			if (cpp != NULL)
-				*cpp = cp;
+			*cpp = cp;
 			return (1);
 		}
 	}
