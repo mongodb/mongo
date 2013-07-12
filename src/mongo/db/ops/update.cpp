@@ -535,55 +535,8 @@ namespace mongo {
                                                                ns ) );
 
         //
-        // Upsert Logic
-        //
-
-        // We may or may not have documents for this update. If we don't, then try to upsert,
-        // if allowed.
-        if ( !cursor->ok() && upsert ) {
-
-            // If this is a $mod base update, we need to generate a document by examining the
-            // query and the mods. Otherwise, we can use the object replacement sent by the user
-            // update command that was parsed by the driver before.
-            BSONObj oldObj;
-            if ( *updateobj.firstElementFieldName() == '$' ) {
-                if ( !driver.createFromQuery( patternOrig, &oldObj ) ) {
-                    uasserted( 16835, "cannot create object to update" );
-                }
-                debug.fastmodinsert = true;
-            }
-            else {
-                debug.upsert = true;
-            }
-
-            // Since this is an upsert, we will be oplogging it as an insert. We don't
-            // need the driver's help to build the oplog record, then. We also set the
-            // context of the update driver to an "upsert". Some mods may only work in that
-            // context (e.g. $setOnInsert).
-            driver.setLogOp( false );
-            driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
-
-            mutablebson::Document doc( oldObj, mutablebson::Document::kInPlaceDisabled );
-            status = driver.update( StringData(), &doc, NULL /* no oplog record */);
-            if ( !status.isOK() ) {
-                uasserted( 16836, status.reason() );
-            }
-            BSONObj newObj = doc.getObject();
-
-            theDataFileMgr.insertWithObjMod( ns, newObj, false, su );
-
-            if ( logop ) {
-                logOp( "i", ns, newObj, 0, 0, fromMigrate, &newObj );
-            }
-
-            return UpdateResult( false /* updated a non existing document */,
-                                 driver.dollarModMode() /* $mod or obj replacement? */,
-                                 1 /* count of updated documents */,
-                                 newObj /* object that was upserted */ );
-        }
-
-        //
-        // We have one or more documents for this update.
+        // We'll start assuming we have one or more documents for this update. (Othwerwise,
+        // we'll fallback to upserting.)
         //
 
         // We record that this will not be an upsert, in case a mod doesn't want to be applied
@@ -759,10 +712,61 @@ namespace mongo {
 
         }
 
-        return UpdateResult( true /* updated existing object(s) */,
-                             driver.dollarModMode() /* $mod or obj replacement */,
-                             numUpdated /* # of docments update */,
-                             BSONObj() );
+        if (numUpdated > 0) {
+            return UpdateResult( true /* updated existing object(s) */,
+                                 driver.dollarModMode() /* $mod or obj replacement */,
+                                 numUpdated /* # of docments update */,
+                                 BSONObj() );
+        }
+        else if (numUpdated == 0 && !upsert) {
+            return UpdateResult( false /* no object updated */,
+                                 driver.dollarModMode() /* $mod or obj replacement */,
+                                 0 /* no updates */,
+                                 BSONObj() );
+        }
+
+        //
+        // We haven't succeeded updating any existing document but upserts are allowed.
+        //
+
+        // If this is a $mod base update, we need to generate a document by examining the
+        // query and the mods. Otherwise, we can use the object replacement sent by the user
+        // update command that was parsed by the driver before.
+        BSONObj oldObj;
+        if ( *updateobj.firstElementFieldName() == '$' ) {
+            if ( !driver.createFromQuery( patternOrig, &oldObj ) ) {
+                uasserted( 16835, "cannot create object to update" );
+            }
+            debug.fastmodinsert = true;
+        }
+        else {
+            debug.upsert = true;
+        }
+
+        // Since this is an upsert, we will be oplogging it as an insert. We don't
+        // need the driver's help to build the oplog record, then. We also set the
+        // context of the update driver to an "upsert". Some mods may only work in that
+        // context (e.g. $setOnInsert).
+        driver.setLogOp( false );
+        driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
+
+        mutablebson::Document doc( oldObj, mutablebson::Document::kInPlaceDisabled );
+        status = driver.update( StringData(), &doc, NULL /* no oplog record */);
+        if ( !status.isOK() ) {
+            uasserted( 16836, status.reason() );
+        }
+        BSONObj newObj = doc.getObject();
+
+        theDataFileMgr.insertWithObjMod( ns, newObj, false, su );
+
+        if ( logop ) {
+            logOp( "i", ns, newObj, 0, 0, fromMigrate, &newObj );
+        }
+
+        return UpdateResult( false /* updated a non existing document */,
+                             driver.dollarModMode() /* $mod or obj replacement? */,
+                             1 /* count of updated documents */,
+                             newObj /* object that was upserted */ );
     }
 
     UpdateResult updateObjects( const char* ns,
