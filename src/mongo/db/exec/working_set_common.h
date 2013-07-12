@@ -18,7 +18,7 @@
 
 namespace mongo {
 
-    class WorkingSetMember;
+    struct WorkingSetMember;
 
     class WorkingSetCommon {
     public:
