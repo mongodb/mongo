@@ -1227,9 +1227,49 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_test_utils.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
     <ClCompile Include="..\client\sasl_client_authenticate.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
+    <ClCompile Include="..\logger\console.cpp" />
+    <ClCompile Include="..\logger\logger.cpp" />
+    <ClCompile Include="..\logger\logstream_builder.cpp" />
+    <ClCompile Include="..\logger\log_manager.cpp" />
+    <ClCompile Include="..\logger\log_severity.cpp" />
+    <ClCompile Include="..\logger\log_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\logger\message_event_utf8_encoder.cpp" />
+    <ClCompile Include="..\logger\message_log_domain.cpp" />
+    <ClCompile Include="..\logger\ramlog.cpp" />
+    <ClCompile Include="..\logger\rotatable_file_manager.cpp" />
+    <ClCompile Include="..\logger\rotatable_file_writer.cpp" />
+    <ClCompile Include="..\logger\rotatable_file_writer_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\platform\atomic_word_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -1311,6 +1351,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\scripting\v8_profiler.cpp" />
     <ClCompile Include="..\scripting\v8_utils.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
+    <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
+    <ClCompile Include="..\util\concurrency\synchronization.cpp" />
+    <ClCompile Include="..\util\concurrency\task.cpp" />
+    <ClCompile Include="..\util\concurrency\thread_name.cpp" />
+    <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\fail_point_service.cpp" />
@@ -1423,7 +1468,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\net\message_port.cpp" />
     <ClCompile Include="..\util\net\sock.cpp" />
     <ClCompile Include="..\util\password.cpp" />
-    <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stacktrace.cpp" />
     <ClCompile Include="..\util\startup_test.cpp" />
@@ -1475,7 +1519,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="..\base\error_codes.err" />
     <None Include="..\base\generate_error_codes.py" />
     <None Include="..\base\SConscript" />
+    <None Include="..\logger\SConscript" />
     <None Include="..\platform\SConscript" />
+    <None Include="..\util\concurrency\README" />
+    <None Include="..\util\concurrency\SConscript" />
     <None Include="assert.js" />
     <None Include="collection.js" />
     <None Include="db.js" />
@@ -1818,14 +1865,46 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\mutable\algorithm.h" />
     <ClInclude Include="..\bson\mutable\const_element-inl.h" />
     <ClInclude Include="..\bson\mutable\const_element.h" />
+    <ClInclude Include="..\bson\mutable\damage_vector.h" />
     <ClInclude Include="..\bson\mutable\document-inl.h" />
     <ClInclude Include="..\bson\mutable\document.h" />
     <ClInclude Include="..\bson\mutable\element-inl.h" />
     <ClInclude Include="..\bson\mutable\element.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_test_utils.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\bson\util\bson_extract.h" />
     <ClInclude Include="..\client\dbclientinterface.h" />
     <ClInclude Include="..\client\sasl_client_authenticate.h" />
     <ClInclude Include="..\db\repl\is_master.h" />
+    <ClInclude Include="..\logger\appender.h" />
+    <ClInclude Include="..\logger\console.h" />
+    <ClInclude Include="..\logger\console_appender.h" />
+    <ClInclude Include="..\logger\encoder.h" />
+    <ClInclude Include="..\logger\labeled_level.h" />
+    <ClInclude Include="..\logger\logger.h" />
+    <ClInclude Include="..\logger\logstream_builder.h" />
+    <ClInclude Include="..\logger\log_domain-impl.h" />
+    <ClInclude Include="..\logger\log_domain.h" />
+    <ClInclude Include="..\logger\log_manager.h" />
+    <ClInclude Include="..\logger\log_severity-inl.h" />
+    <ClInclude Include="..\logger\log_severity.h" />
+    <ClInclude Include="..\logger\message_event.h" />
+    <ClInclude Include="..\logger\message_event_utf8_encoder.h" />
+    <ClInclude Include="..\logger\message_log_domain.h" />
+    <ClInclude Include="..\logger\ramlog.h" />
+    <ClInclude Include="..\logger\rotatable_file_appender.h" />
+    <ClInclude Include="..\logger\rotatable_file_manager.h" />
+    <ClInclude Include="..\logger\rotatable_file_writer.h" />
+    <ClInclude Include="..\logger\syslog_appender.h" />
+    <ClInclude Include="..\logger\tee.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_gcc.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -1873,6 +1952,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\v8_profiler.h" />
     <ClInclude Include="..\scripting\v8_utils.h" />
     <ClInclude Include="..\util\bson_util.h" />
+    <ClInclude Include="..\util\concurrency\mapsf.h" />
+    <ClInclude Include="..\util\concurrency\mvar.h" />
+    <ClInclude Include="..\util\concurrency\qlock.h" />
+    <ClInclude Include="..\util\concurrency\simplerwlock.h" />
+    <ClInclude Include="..\util\concurrency\synchronization.h" />
+    <ClInclude Include="..\util\concurrency\thread_name.h" />
+    <ClInclude Include="..\util\concurrency\ticketholder.h" />
     <ClInclude Include="..\util\elapsed_tracker.h" />
     <ClInclude Include="..\util\exit_code.h" />
     <ClInclude Include="..\util\fail_point.h" />
@@ -2008,7 +2094,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\net\message.h" />
     <ClInclude Include="..\util\net\message_port.h" />
     <ClInclude Include="..\util\net\sock.h" />
-    <ClInclude Include="..\util\optime.h" />
     <ClInclude Include="..\util\password.h" />
     <ClInclude Include="..\util\paths.h" />
     <ClInclude Include="..\util\processinfo.h" />

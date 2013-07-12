@@ -161,6 +161,9 @@
     <Filter Include="third_party\MurmurHash3">
       <UniqueIdentifier>{51e6660e-644c-44e4-b9f9-a44b6f25ccd8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="logger">
+      <UniqueIdentifier>{f78649b9-5f23-47ef-84ec-bfa2a80e77c7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\scripting\engine.cpp">
@@ -330,9 +333,6 @@
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\util\processinfo_win32.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\ramlog.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\util\util.cpp">
@@ -1076,6 +1076,60 @@
     <ClCompile Include="..\platform\backtrace.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\logger\console.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\log_manager.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\log_severity.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\log_test.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\logger.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\logstream_builder.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\message_event_utf8_encoder.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\message_log_domain.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\ramlog.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\rotatable_file_manager.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\rotatable_file_writer.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\rotatable_file_writer_test.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\rwlockimpl.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\synchronization.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\task.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\thread_name.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\thread_pool.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_test_utils.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\v8\src\apinatives.js">
@@ -1191,6 +1245,15 @@
     </None>
     <None Include="..\base\SConscript">
       <Filter>base</Filter>
+    </None>
+    <None Include="..\logger\SConscript">
+      <Filter>logger</Filter>
+    </None>
+    <None Include="..\util\concurrency\README">
+      <Filter>util\concurrency</Filter>
+    </None>
+    <None Include="..\util\concurrency\SConscript">
+      <Filter>util\concurrency</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -1517,9 +1580,6 @@
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\md5.hpp">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\optime.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\password.h">
@@ -2466,6 +2526,96 @@
     </ClInclude>
     <ClInclude Include="..\platform\backtrace.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\console.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\console_appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\encoder.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\labeled_level.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_domain.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_domain-impl.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_manager.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_severity.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_severity-inl.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\logger.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\logstream_builder.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\message_event.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\message_event_utf8_encoder.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\message_log_domain.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\ramlog.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\rotatable_file_appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\rotatable_file_manager.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\rotatable_file_writer.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\syslog_appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\tee.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mapsf.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mvar.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\qlock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\simplerwlock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\synchronization.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\thread_name.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\ticketholder.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\damage_vector.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_test_utils.h">
+      <Filter>bson\mutable</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

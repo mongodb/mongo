@@ -207,6 +207,15 @@
     <Filter Include="db\index">
       <UniqueIdentifier>{0eac96c1-0a62-4f8c-bc16-aaef2bee1cfa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="logger">
+      <UniqueIdentifier>{d8a59c28-e712-4fc4-8071-7ed69f5f2c2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\exec">
+      <UniqueIdentifier>{42c39d01-b79c-43af-9c01-4271c0ec3ccd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\commands\write_commands">
+      <UniqueIdentifier>{002d5879-227e-4f02-95cc-1166a615af5a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -517,9 +526,6 @@
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\util\processinfo_win32.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\ramlog.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\util\signal_handlers.cpp">
@@ -1809,12 +1815,135 @@
     <ClCompile Include="..\platform\backtrace.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="config_server_checker_service.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="config_server_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\console.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\log_manager.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\log_severity.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\log_test.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\logger.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\logstream_builder.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\message_event_utf8_encoder.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\message_log_domain.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\ramlog.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\rotatable_file_manager.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\rotatable_file_writer.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\logger\rotatable_file_writer_test.cpp">
+      <Filter>logger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\synchronization.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\thread_name.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\shutdown.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\and_hash.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\and_sorted.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\fetch.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\index_scan.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\limit.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\mock_stage.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\or.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\skip.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\stagedebug_cmd.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\working_set.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\working_set_common.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\working_set_test.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_test_utils.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authz_manager_external_state_mock.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_index_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\background.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\clientlistplugin.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\write_commands\batch.cpp">
+      <Filter>db\commands\write_commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\write_commands\batch_executor.cpp">
+      <Filter>db\commands\write_commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\write_commands\batch_test.cpp">
+      <Filter>db\commands\write_commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\write_commands\write_commands.cpp">
+      <Filter>db\commands\write_commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\field_parser_test.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\field_ref_set.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\field_ref_set_test.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\field_ref_test.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
-    <ClInclude Include="..\util\concurrency\remap_lock.h">
-      <Filter>util\concurrency</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\concurrency\rwlockimpl.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
@@ -3484,6 +3613,198 @@
     <ClInclude Include="..\platform\backtrace.h">
       <Filter>platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\auth\user_name_hash.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="config_server_checker_service.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\console.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\console_appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\encoder.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\labeled_level.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_domain.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_domain-impl.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_manager.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_severity.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\log_severity-inl.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\logger.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\logstream_builder.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\message_event.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\message_event_utf8_encoder.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\message_log_domain.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\ramlog.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\rotatable_file_appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\rotatable_file_manager.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\rotatable_file_writer.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\syslog_appender.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\logger\tee.h">
+      <Filter>logger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\list.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mapsf.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\msg.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mutex.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mvar.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\qlock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\race.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\rwlock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\shared_mutex_win.hpp">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\spin_lock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\synchronization.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\task.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\thread_name.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\thread_pool.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\threadlocal.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\ticketholder.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\value.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\mr.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\shutdown.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\and_common-inl.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\and_hash.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\and_sorted.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\fetch.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\index_scan.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\limit.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\mock_stage.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\or.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\plan_stage.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\simple_plan_runner.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\skip.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\working_set.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\working_set_common.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\damage_vector.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_test_utils.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authz_manager_external_state_mock.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_index_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\background.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\write_commands\batch.h">
+      <Filter>db\commands\write_commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\write_commands\batch_executor.h">
+      <Filter>db\commands\write_commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\write_commands\write_commands.h">
+      <Filter>db\commands\write_commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\field_ref_set.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\base\error_codes.err">
@@ -3662,6 +3983,21 @@
     </None>
     <None Include="..\base\SConscript">
       <Filter>base</Filter>
+    </None>
+    <None Include="..\logger\SConscript">
+      <Filter>logger</Filter>
+    </None>
+    <None Include="..\util\concurrency\README">
+      <Filter>util\concurrency</Filter>
+    </None>
+    <None Include="..\util\concurrency\SConscript">
+      <Filter>util\concurrency</Filter>
+    </None>
+    <None Include="..\db\exec\SConscript">
+      <Filter>db\exec</Filter>
+    </None>
+    <None Include="..\db\SConscript">
+      <Filter>db</Filter>
     </None>
   </ItemGroup>
 </Project>
