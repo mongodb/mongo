@@ -1269,6 +1269,7 @@ extern void __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats);
 extern void __wt_stat_clear_connection_stats(void *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
+extern void __wt_txn_refresh_force(WT_SESSION_IMPL *session);
 extern void __wt_txn_refresh(WT_SESSION_IMPL *session,
     uint64_t max_id,
     int get_snapshot);

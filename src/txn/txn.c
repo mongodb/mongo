@@ -56,6 +56,27 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_refresh_force --
+ *	Refresh the transaction state, called when the connection closes.
+ */
+void
+__wt_txn_refresh_force(WT_SESSION_IMPL *session)
+{
+	/*
+	 * !!!
+	 * If a data-source is calling the WT_EXTENSION_API.transaction_oldest
+	 * method (for the oldest transaction ID not yet visible to a running
+	 * transaction), and then comparing that oldest ID against committed
+	 * transactions to see if updates for a committed transaction are still
+	 * visible to running transactions, the oldest transaction ID may be
+	 * the same as the last committed transaction ID, if the transaction
+	 * state wasn't refreshed after the last transaction committed.  Push
+	 * past the last committed transaction.
+	 */
+	__wt_txn_refresh(session, WT_TXN_NONE, 0);
+}
+
+/*
  * __wt_txn_refresh --
  *	Allocate a transaction ID and/or a snapshot.
  */
