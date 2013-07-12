@@ -46,7 +46,7 @@ namespace mongo {
     using namespace mongoutils::html;
     using namespace bson;
 
-    static RamLog * _rsLog = new RamLog( "rs" );
+    static RamLog * _rsLog = RamLog::get("rs");
     Tee *rsLog = _rsLog;
     extern bool replSetBlind; // for testing
 

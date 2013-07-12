@@ -354,20 +354,18 @@ namespace mongo {
                 result.appendArray( "names" , arr.arr() );
             }
             else {
-                RamLog* rl = RamLog::get( p );
-                if ( ! rl ) {
+                RamLog* ramlog = RamLog::getIfExists(p);
+                if ( ! ramlog ) {
                     errmsg = str::stream() << "no RamLog named: " << p;
                     return false;
                 }
+                RamLog::LineIterator rl(ramlog);
 
-                result.appendNumber( "totalLinesWritten", rl->getTotalLinesWritten() );
-
-                vector<const char*> lines;
-                rl->get( lines );
+                result.appendNumber( "totalLinesWritten", rl.getTotalLinesWritten() );
 
                 BSONArrayBuilder arr( result.subarrayStart( "log" ) );
-                for ( unsigned i=0; i<lines.size(); i++ )
-                    arr.append( lines[i] );
+                while (rl.more())
+                    arr.append(rl.next());
                 arr.done();
             }
             return true;

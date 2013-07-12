@@ -137,7 +137,7 @@ namespace mongo {
     LogIndentLevel::~LogIndentLevel() {
     }
 
-    Tee* const warnings = new RamLog("warnings"); // Things put here go in serverStatus
-    Tee* const startupWarningsLog = new RamLog("startupWarnings");  // intentionally leaked
+    Tee* const warnings = RamLog::get("warnings"); // Things put here go in serverStatus
+    Tee* const startupWarningsLog = RamLog::get("startupWarnings");  // intentionally leaked
 
 }  // namespace mongo

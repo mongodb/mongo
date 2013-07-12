@@ -19,43 +19,39 @@
 
 #include "mongo/logger/ramlog.h"
 
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/util/mongoutils/html.h"
+#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace {
+    typedef std::map<string,RamLog*> RM;
+    mongo::mutex* _namedLock = NULL;
+    RM*  _named = NULL;
+
+}  // namespace
 
     using namespace mongoutils;
 
     RamLog::RamLog( const std::string& name ) : _name(name), _totalLinesWritten(0), _lastWrite(0) {
-        h = 0; n = 0;
+        h = 0;
+        n = 0;
         for( int i = 0; i < N; i++ )
             lines[i][C-1] = 0;
-
-        if ( name.size() ) {
-            
-            if ( ! _namedLock )
-                _namedLock = new mongo::mutex("RamLog::_namedLock");
-
-            scoped_lock lk( *_namedLock );
-            if ( ! _named )
-                _named = new RM();
-            (*_named)[name] = this;
-        }
-        
     }
 
-    RamLog::~RamLog() {
-        
-    }
+    RamLog::~RamLog() {}
 
     void RamLog::write(const std::string& str) {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         _lastWrite = time(0);
         _totalLinesWritten++;
 
         char *p = lines[(h+n)%N];
-        
+
         unsigned sz = str.size();
         if (0 == sz) return;
         if( sz < C ) {
@@ -74,20 +70,18 @@ namespace mongo {
         else h = (h+1) % N;
     }
 
-    time_t RamLog::lastWrite() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        return _lastWrite;
+    time_t RamLog::LineIterator::lastWrite() {
+        return _ramlog->_lastWrite;
     }
 
-    long long RamLog::getTotalLinesWritten() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        return _totalLinesWritten;
+    long long RamLog::LineIterator::getTotalLinesWritten() {
+        return _ramlog->_totalLinesWritten;
     }
 
-    void RamLog::get( std::vector<const char*>& v) {
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        for( unsigned x=0, i=h; x++ < n; i=(i+1)%N )
-            v.push_back(lines[i]);
+    const char* RamLog::getLine_inlock(unsigned lineNumber) const {
+        if (lineNumber >= n)
+            return "";
+        return lines[(lineNumber + h) % N]; // h = 0 unless n == N, hence modulo N.
     }
 
     int RamLog::repeats(const std::vector<const char *>& v, int i) {
@@ -143,8 +137,10 @@ namespace mongo {
     }
 
     void RamLog::toHTML(std::stringstream& s) {
+        LineIterator iter(this);
         std::vector<const char*> v;
-        get( v );
+        while (iter.more())
+            v.push_back(iter.next());
 
         s << "<pre>\n";
         for( int i = 0; i < (int)v.size(); i++ ) {
@@ -173,6 +169,12 @@ namespace mongo {
         s << "</pre>\n";
     }
 
+    RamLog::LineIterator::LineIterator(RamLog* ramlog) :
+        _ramlog(ramlog),
+        _lock(ramlog->_mutex),
+        _nextLineIndex(0) {
+    }
+
     RamLogAppender::RamLogAppender(RamLog* ramlog) : _ramlog(ramlog) {}
     RamLogAppender::~RamLogAppender() {}
 
@@ -188,15 +190,31 @@ namespace mongo {
     // static things
     // ---------------
 
-    RamLog* RamLog::get( const std::string& name ) {
-        if ( ! _named )
-            return 0;
+    RamLog* RamLog::get(const std::string& name) {
+        if (!_namedLock) {
+            // Guaranteed to happen before multi-threaded operation.
+            _namedLock = new mongo::mutex("RamLog::_namedLock");
+        }
 
         scoped_lock lk( *_namedLock );
-        RM::iterator i = _named->find( name );
-        if ( i == _named->end() )
-            return 0;
-        return i->second;
+        if (!_named) {
+            // Guaranteed to happen before multi-threaded operation.
+            _named = new RM();
+        }
+
+        RamLog* result = mapFindWithDefault(*_named, name, static_cast<RamLog*>(NULL));
+        if (!result) {
+            result = new RamLog(name);
+            (*_named)[name] = result;
+        }
+        return result;
+    }
+
+    RamLog* RamLog::getIfExists(const std::string& name) {
+        if (!_named)
+            return NULL;
+        scoped_lock lk(*_namedLock);
+        return mapFindWithDefault(*_named, name, static_cast<RamLog*>(NULL));
     }
 
     void RamLog::getNames( std::vector<string>& names ) {
@@ -210,6 +228,20 @@ namespace mongo {
         }
     }
 
-    mongo::mutex* RamLog::_namedLock;
-    RamLog::RM*  RamLog::_named = 0;
+    /**
+     * Ensures that RamLog::get() is called at least once during single-threaded operation,
+     * ensuring that _namedLock and _named are initialized safely.
+     */
+    MONGO_INITIALIZER(RamLogCatalog)(InitializerContext*) {
+        if (!_namedLock) {
+            if (_named) {
+                return Status(ErrorCodes::InternalError,
+                              "Inconsistent intiailization of RamLogCatalog.");
+            }
+            _namedLock = new mongo::mutex("RamLog::_namedLock");
+            _named = new RM();
+        }
+
+        return Status::OK();
+    }
 }

@@ -141,20 +141,16 @@ namespace mongo {
             // --- some hard coded global things hard to pull out
 
             {
-                RamLog* rl = RamLog::get( "warnings" );
-                massert(15880, "no ram log for warnings?" , rl);
-                
-                if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
-                    vector<const char*> lines;
-                    rl->get( lines );
-                    
-                    BSONArrayBuilder arr( result.subarrayStart( "warnings" ) );
-                    for ( unsigned i=std::max(0,(int)lines.size()-10); i<lines.size(); i++ )
-                        arr.append( lines[i] );
+                RamLog::LineIterator rl(RamLog::get("warnings"));
+                if (rl.lastWrite() >= time(0)-(10*60)){  // only show warnings from last 10 minutes
+                    BSONArrayBuilder arr(result.subarrayStart("warnings"));
+                    while (rl.more()) {
+                        arr.append(rl.next());
+                    }
                     arr.done();
                 }
             }
-            
+
             timeBuilder.appendNumber( "at end" , Listener::getElapsedTimeMillis() - start );
             if ( Listener::getElapsedTimeMillis() - start > 1000 ) {
                 BSONObj t = timeBuilder.obj();

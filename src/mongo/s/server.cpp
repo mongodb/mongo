@@ -228,9 +228,6 @@ namespace mongo {
 
     void init() {
         serverID.init();
-
-        logger::globalLogDomain()->attachAppender(
-                logger::MessageLogDomain::AppenderAutoPtr(new RamLogAppender(new RamLog("global"))));
     }
 
     void start( const MessageServer::Options& opts ) {
