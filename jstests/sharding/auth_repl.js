@@ -27,10 +27,12 @@ assert(doc != null);
 // Add admin user using direct connection to primary to simulate connection from remote host
 var adminDB = primary.getDB('admin');
 adminDB.addUser('user', 'user', false, nodeCount);
+adminDB.runCommand({ getLastError: 1, w: nodeCount }); // TODO: remove after fixing SERVER-9980
 adminDB.auth('user', 'user');
 
 var priTestDB = primary.getDB('test');
 priTestDB.addUser('a', 'a', false, nodeCount);
+priTestDB.runCommand({ getLastError: 1, w: nodeCount }); // TODO: remove after fixing SERVER-9980
 
 // Authenticate the replSet connection
 assert.eq(1, testDB.auth('a', 'a'));
