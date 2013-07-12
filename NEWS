@@ -1,3 +1,16 @@
+WiredTiger release 1.6.3, 2013-07-12
+------------------------------------
+
+This is a bugfix and performance tuning release. The main changes are:
+
+* Change the default cursor overwrite configuration so that it is consistent
+  across all data sources. This change may alter the behavior of existing
+  applications without triggering any compilation or runtime warnings. See
+  the upgrade documentation for details. [#512]
+
+* Require platform support for 64 bit atomic operations. [#553]
+
+
 WiredTiger release 1.6.2, 2013-06-18
 ------------------------------------
 
