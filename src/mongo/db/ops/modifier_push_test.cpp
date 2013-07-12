@@ -588,6 +588,38 @@ namespace {
         ASSERT_EQUALS(fromjson("{$set: {a: [{b:0},{b:1}]}}"), logDoc);
     }
 
+    TEST(SimpleObjMod, PrepareApplyDotted) {
+        Document doc(fromjson("{ _id : 1 , "
+                              "  question : 'a', "
+                              "  choices : { "
+                              "            first : { choice : 'b' }, "
+                              "            second : { choice : 'c' } }"
+                              "}"));
+        Mod pushMod(fromjson("{$push: {'choices.first.votes': 1}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "choices.first.votes");
+        ASSERT_FALSE(execInfo.inPlace);
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_EQUALS(fromjson(   "{ _id : 1 , "
+                                  "  question : 'a', "
+                                  "  choices : { "
+                                  "            first : { choice : 'b', votes: [1]}, "
+                                  "            second : { choice : 'c' } }"
+                                  "}"),
+                      doc);
+
+        Document logDoc;
+        ASSERT_OK(pushMod.log(logDoc.root()));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {'choices.first.votes':[1]}}"), logDoc);
+    }
+
+
     //
     // $pushAll Variation
     //

@@ -360,9 +360,11 @@ namespace mongo {
         }
         else if (status.isOK()) {
 
+            const bool destExists = (_preparedState->idxFound ==
+                                            static_cast<int32_t>(_fieldRef.numParts()-1));
             // If the path exists, we require the target field to be already an
             // array.
-            if (_preparedState->elemFound.getType() != Array) {
+            if (destExists && _preparedState->elemFound.getType() != Array) {
                 return Status(ErrorCodes::BadValue, "can only $push into arrays");
             }
 
