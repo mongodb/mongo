@@ -21,22 +21,6 @@ replTest.awaitSecondaryNodes();
 master.getDB("foo").bar.insert({x:1});
 replTest.awaitReplication();
 
-jsTestLog("Checking that currentOp for secondaries uses OpTime, not Date");
-assert.soon(
-    function() {
-        var count = 0;
-        var currentOp = master.getDB("admin").currentOp({ns: 'local.oplog.rs'});
-        printjson(currentOp);
-        currentOp.inprog.forEach(
-            function(op) {
-                assert.eq(op.query.ts.$gte.constructor, Timestamp);
-                count++;
-            }
-        );
-        return count >= 4;
-    }
-);
-
 jsTestLog("Bridging replica set");
 master = replTest.bridge();
 
