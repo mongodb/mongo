@@ -37,18 +37,21 @@ print("1")
 var result = admin.runCommand( { configureFailPoint: 'rsChaining1', mode: { times : 1 } } );
 assert.eq(1, result.ok, 'rsChaining1');
 cdb.foo.insert({a:1});
+sleep(1);
 assertGLEOK(cdb.getLastErrorObj());
 replTest.awaitReplication();
 print("2")
 admin.runCommand( { configureFailPoint: 'rsChaining2', mode: { times : 1 } } );
 assert.eq(1, result.ok, 'rsChaining2');
 cdb.foo.insert({a:1});
+sleep(1);
 assertGLEOK(cdb.getLastErrorObj());
 replTest.awaitReplication();
 print("3")
 admin.runCommand( { configureFailPoint: 'rsChaining3', mode: { times : 1 } } );
 assert.eq(1, result.ok, 'rsChaining3');
 cdb.foo.insert({a:1});
+sleep(1);
 assertGLEOK(cdb.getLastErrorObj());
 replTest.awaitReplication();
 replTest.stopSet();
