@@ -1,3 +1,5 @@
+if (0) { // Test disabled until SERVER-8579 is finished. Reminder ticket: SERVER-8342
+
 var currentOp;
 var N;
 var i;
@@ -130,3 +132,5 @@ if ( len != 0 ) {
 }
 print( "Shell ==== Test completed successfully, shutting down server" );
 testServer.stop();
+
+}
