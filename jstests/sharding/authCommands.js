@@ -58,6 +58,8 @@ for ( var i = 0; i < 100; i++ ) {
 }
 testDB.getLastError( 'majority' );
 
+assert.eq(1000, testDB.foo.count());
+
 // Wait for the balancer to start back up
 st.startBalancer()
 
