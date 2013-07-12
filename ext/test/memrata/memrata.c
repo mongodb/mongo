@@ -1315,8 +1315,7 @@ kvs_cursor_search(WT_CURSOR *wtcursor)
 		if (cache_value_visible(wtcursor, &cp))
 			return (cp->remove ?
 			    WT_NOTFOUND : copyout_val(wtcursor, cp));
-	}
-	if (ret != WT_NOTFOUND)
+	} else if (ret != WT_NOTFOUND)
 		return (ret);
 
 	/* Check for an entry in the primary store. */
