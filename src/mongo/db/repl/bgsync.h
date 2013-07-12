@@ -86,6 +86,7 @@ namespace replset {
         boost::mutex _lastOpMutex;
 
         const Member* _oplogMarkerTarget;
+        OplogReader _oplogMarker; // not locked, only used by notifier thread
         OpTime _consumedOpTime; // not locked, only used by notifier thread
 
         BackgroundSync();

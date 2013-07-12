@@ -925,11 +925,8 @@ namespace mongo {
     void ReplSetImpl::registerSlave(const BSONObj& rid, const int memberId) {
         // To prevent race conditions with clearing the cache at reconfig time,
         // we lock the replset mutex here.
-        {
-            lock lk(this);
-            ghost->associateSlave(rid, memberId);
-        }
-        syncSourceFeedback.associateMember(rid, memberId);
+        lock lk(this);
+        ghost->associateSlave(rid, memberId);
     }
 
     class ReplIndexPrefetch : public ServerParameter {

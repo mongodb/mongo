@@ -50,9 +50,6 @@ namespace mongo {
             return findOne(ns, Query().sort(reverseNaturalObj));
         }
 
-        /* SO_TIMEOUT (send/recv time out) for our DBClientConnections */
-        static const int tcp_timeout = 30;
-
         /* ok to call if already connected */
         bool connect(const std::string& hostname);
 
