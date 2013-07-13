@@ -485,8 +485,8 @@ __verify_row_leaf_key_order(
 	 * are all empty entries).
 	 */
 	if (vs->max_addr->size != 0) {
-		WT_RET(
-		    __wt_row_key_copy(session, page, page->u.row.d, vs->tmp1));
+		WT_RET(__wt_row_leaf_key_copy(
+		    session, page, page->u.row.d, vs->tmp1));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -510,7 +510,7 @@ __verify_row_leaf_key_order(
 	}
 
 	/* Update the largest key we've seen to the last key on this page. */
-	WT_RET(__wt_row_key_copy(session,
+	WT_RET(__wt_row_leaf_key_copy(session,
 	    page, page->u.row.d + (page->entries - 1), vs->max_key));
 	(void)__wt_page_addr_string(session, vs->max_addr, page);
 

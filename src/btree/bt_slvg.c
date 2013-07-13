@@ -534,9 +534,9 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * it's probably a great place to start.
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 1, &page));
-		WT_ERR(__wt_row_key_copy(session,
+		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->u.row.d[0], &trk->row_start));
-		WT_ERR(__wt_row_key_copy(session,
+		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->u.row.d[page->entries - 1], &trk->row_stop));
 
 		if (WT_VERBOSE_ISSET(session, salvage)) {

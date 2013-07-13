@@ -241,7 +241,8 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			kb->size = cbt->tmp.size;
 			cbt->rip_saved = rip;
 		} else
-slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
+slow:			WT_RET(__wt_row_leaf_key_copy(
+			    session, cbt->page, rip, kb));
 	}
 
 	/*

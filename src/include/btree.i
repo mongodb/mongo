@@ -466,7 +466,8 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 	 * If we're instantiating the key on the page, do that, and then look
 	 * it up again, else, we have a copy and we can return.
 	 */
-	WT_RET(__wt_row_key_copy(session, page, rip, instantiate ? NULL : key));
+	WT_RET(__wt_row_leaf_key_copy(
+	    session, page, rip, instantiate ? NULL : key));
 	if (instantiate)
 		goto retry;
 	return (0);

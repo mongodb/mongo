@@ -57,7 +57,8 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Instantiate the keys. */
 	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
-			WT_ERR(__wt_row_key_copy(session, page, rip, NULL));
+			WT_ERR(
+			    __wt_row_leaf_key_copy(session, page, rip, NULL));
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
@@ -100,12 +101,12 @@ __inmem_row_leaf_slots(
 }
 
 /*
- * __wt_row_key_copy --
- *	Copy an on-page key into a return buffer, or, if no return buffer
- * is specified, instantiate the key into the in-memory page.
+ * __wt_row_leaf_key_copy --
+ *	Copy a leaf-page on-page key into a return buffer, or, if no return
+ * buffer is specified, instantiate the key into the in-memory page.
  */
 int
-__wt_row_key_copy(
+__wt_row_leaf_key_copy(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb)
 {
 	enum { FORWARD, BACKWARD } direction;
@@ -172,7 +173,7 @@ __wt_row_key_copy(
 
 			__wt_cell_unpack(
 			    WT_PAGE_REF_OFFSET(page, ikey->cell_offset),
-			    page->type, unpack);
+			    WT_PAGE_ROW_LEAF, unpack);
 
 			/*
 			 * If we wanted a different key and this key is an
@@ -205,7 +206,7 @@ __wt_row_key_copy(
 		}
 
 		/* Unpack the key's cell. */
-		__wt_cell_unpack(key, page->type, unpack);
+		__wt_cell_unpack(key, WT_PAGE_ROW_LEAF, unpack);
 
 		/* 2: the test for an on-page reference to an overflow key. */
 		if (unpack->type == WT_CELL_KEY_OVFL) {
@@ -215,7 +216,7 @@ __wt_row_key_copy(
 			 */
 			if (slot_offset == 0) {
 				WT_ERR(__wt_cell_unpack_copy(
-				    session, page->type, unpack, retb));
+				    session, WT_PAGE_ROW_LEAF, unpack, retb));
 				break;
 			}
 
@@ -251,7 +252,7 @@ __wt_row_key_copy(
 			 * directions then.
 			 */
 			WT_ERR(__wt_cell_unpack_copy(
-			    session, page->type, unpack, retb));
+			    session, WT_PAGE_ROW_LEAF, unpack, retb));
 			if (slot_offset == 0)
 				break;
 
@@ -277,7 +278,7 @@ __wt_row_key_copy(
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 			WT_ERR(__wt_cell_unpack_ref(
-			    session, page->type, unpack, tmp));
+			    session, WT_PAGE_ROW_LEAF, unpack, tmp));
 			WT_ERR(__wt_buf_initsize(
 			    session, retb, tmp->size + unpack->prefix));
 			memcpy((uint8_t *)
@@ -372,7 +373,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * the length of the cell should be the byte immediately after the page
 	 * disk image.
 	 */
-	__wt_cell_unpack(cell, page->type, &unpack);
+	__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, &unpack);
 	cell = (WT_CELL *)((uint8_t *)cell + __wt_cell_total_len(&unpack));
 	if (__wt_off_page(page, cell))
 		return (NULL);
