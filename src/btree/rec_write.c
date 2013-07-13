@@ -3853,7 +3853,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			WT_DSTAT_INCR(session, rec_split_intl);
+			WT_DSTAT_INCR(session, rec_split_internal);
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
@@ -4188,7 +4188,7 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session,
 
 	/* Create an overflow object if the data won't fit. */
 	if (size > btree->maxintlitem) {
-		WT_DSTAT_INCR(session, rec_ovfl_key);
+		WT_DSTAT_INCR(session, rec_overflow_key_internal);
 
 		*is_ovflp = 1;
 		return (__rec_cell_build_ovfl(
@@ -4272,7 +4272,7 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 		 * object that was prefix compressed.
 		 */
 		if (pfx == 0) {
-			WT_DSTAT_INCR(session, rec_ovfl_key);
+			WT_DSTAT_INCR(session, rec_overflow_key_leaf);
 
 			*is_ovflp = 1;
 			return (__rec_cell_build_ovfl(
@@ -4353,7 +4353,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session,
 
 		/* Create an overflow object if the data won't fit. */
 		if (val->buf.size > btree->maxleafitem) {
-			WT_DSTAT_INCR(session, rec_ovfl_value);
+			WT_DSTAT_INCR(session, rec_overflow_value);
 
 			return (__rec_cell_build_ovfl(
 			    session, r, val, WT_CELL_VALUE_OVFL, rle));
