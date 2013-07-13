@@ -607,7 +607,7 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	uint32_t i;
 
 	WT_REF_FOREACH(page, ref, i) {
-		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->u.recno);
+		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->key.recno);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 
@@ -671,10 +671,12 @@ static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
 	WT_REF *ref;
-	uint32_t i;
+	uint8_t *p;
+	uint32_t i, len;
 
 	WT_REF_FOREACH(page, ref, i) {
-		__debug_ikey(ds, ref->u.key);
+		__wt_ref_key(page, ref, &p, &len);
+		__debug_item(ds, "K", p, len);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 

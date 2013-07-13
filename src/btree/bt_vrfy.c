@@ -361,7 +361,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			 * reviewed to this point.
 			 */
 			++entry;
-			if (ref->u.recno != vs->record_total + 1) {
+			if (ref->key.recno != vs->record_total + 1) {
 				__wt_cell_unpack(
 				    ref->addr, WT_PAGE_COL_INT, unpack);
 				WT_RET_MSG(session, WT_ERROR,
@@ -372,7 +372,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 				    entry,
 				    __wt_page_addr_string(
 				    session, vs->tmp1, page),
-				    ref->u.recno,
+				    ref->key.recno,
 				    vs->record_total + 1);
 			}
 
@@ -429,7 +429,6 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_REF *ref, uint32_t entry, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
-	WT_IKEY *ikey;
 	WT_ITEM item;
 	int cmp;
 
@@ -438,10 +437,8 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr->size != 0);
 
-	/* Set up the key structure. */
-	ikey = ref->u.key;
-	item.data = WT_IKEY_DATA(ikey);
-	item.size = ikey->size;
+	/* Get the current key. */
+	__wt_ref_key(page, ref, &item.data, &item.size);
 
 	/* Compare the key against the largest key we've seen so far. */
 	WT_RET(WT_BTREE_CMP(session, btree, &item, vs->max_key, cmp));

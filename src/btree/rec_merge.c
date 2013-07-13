@@ -177,7 +177,8 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 	if (parent->type == WT_PAGE_ROW_INT)
 		__merge_transfer_footprint(
 		    state->session, state->page, parent,
-		    (uint32_t)sizeof(WT_IKEY) + ((WT_IKEY *)ref->u.key)->size);
+		    (uint32_t)sizeof(WT_IKEY) +
+		    ((WT_IKEY *)ref->key.ikey)->size);
 
 	if (ref->state == WT_REF_LOCKED) {
 		child = ref->page;
@@ -283,15 +284,15 @@ __merge_promote_key(WT_SESSION_IMPL *session, WT_REF *ref)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		child_ref = &page->u.intl.t[0];
-		ref->u.recno = page->u.intl.recno = child_ref->u.recno;
+		ref->key.recno = page->u.intl.recno = child_ref->key.recno;
 		return (0);
 
 	case WT_PAGE_ROW_INT:
 		child_ref = &page->u.intl.t[0];
-		ikey = child_ref->u.key;
+		ikey = child_ref->key.ikey;
 		WT_ASSERT(session, ikey != NULL);
 		return (__wt_row_ikey_incr(session,
-		    page, 0, WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
+		    page, 0, WT_IKEY_DATA(ikey), ikey->size, &ref->key.ikey));
 
 	WT_ILLEGAL_VALUE(session);
 	}

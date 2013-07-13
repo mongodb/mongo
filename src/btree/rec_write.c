@@ -2234,7 +2234,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* For each entry in the page... */
 	WT_REF_FOREACH(page, ref, i) {
 		/* Update the starting record number in case we split. */
-		r->recno = ref->u.recno;
+		r->recno = ref->key.recno;
 
 		/*
 		 * The page may be emptied or internally created during a split.
@@ -2289,7 +2289,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			    addr->addr, addr->size,
 			    addr->leaf_no_overflow ?
 			    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
-			    ref->u.recno);
+			    ref->key.recno);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -2940,7 +2940,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * set the WT_IKEY reference, and unpack the cell if the key
 		 * references one.
 		 */
-		ikey = ref->u.key;
+		ikey = ref->key.ikey;
 		if (ikey->cell_offset == 0)
 			cell = NULL;
 		else {
@@ -3203,7 +3203,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Build the key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		ikey = ref->u.key;
+		ikey = ref->key.ikey;
 		WT_RET(__rec_cell_build_key(session, r, WT_IKEY_DATA(ikey),
 		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
 		r->cell_zero = 0;
@@ -4090,7 +4090,7 @@ __rec_split_row(
 	if (WT_PAGE_IS_ROOT(orig))
 		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
-		ikey = orig->ref->u.key;
+		ikey = orig->ref->key.ikey;
 		WT_ERR(__wt_buf_set(
 		    session, &r->bnd[0].key, WT_IKEY_DATA(ikey), ikey->size));
 	}
@@ -4106,7 +4106,7 @@ __rec_split_row(
 
 		ref->page = NULL;
 		WT_ERR(__wt_row_ikey(session, 0,
-		    bnd->key.data, bnd->key.size, &ref->u.key));
+		    bnd->key.data, bnd->key.size, &ref->key.ikey));
 		size += sizeof(WT_IKEY) + bnd->key.size;
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
@@ -4148,7 +4148,7 @@ __rec_split_col(
 		bnd->addr.addr = NULL;
 
 		ref->page = NULL;
-		ref->u.recno = bnd->recno;
+		ref->key.recno = bnd->recno;
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}

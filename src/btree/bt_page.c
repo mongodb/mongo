@@ -345,7 +345,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, WT_PAGE_COL_INT, unpack);
 		ref->addr = cell;
-		ref->u.recno = unpack->v;
+		ref->key.recno = unpack->v;
 		++ref;
 	}
 }
@@ -537,7 +537,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 		 */
 		WT_ERR(__wt_row_ikey(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
-		    current->data, current->size, &ref->u.key));
+		    current->data, current->size, &ref->key.ikey));
 		*sizep += sizeof(WT_IKEY) + current->size;
 
 		/*

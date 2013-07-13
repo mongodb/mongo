@@ -1105,7 +1105,7 @@ __slvg_col_build_internal(
 
 		ref->page = NULL;
 		ref->addr = addr;
-		ref->u.recno = trk->col_start;
+		ref->key.recno = trk->col_start;
 		ref->state = WT_REF_DISK;
 
 		/*
@@ -1194,7 +1194,7 @@ __slvg_col_build_leaf(
 		    session, trk->ss->tmp1, trk->addr.addr, trk->addr.size),
 		    cookie->missing);
 	}
-	ref->u.recno = page->u.col_var.recno;
+	ref->key.recno = page->u.col_var.recno;
 
 	/*
 	 * We can't discard the original blocks associated with this page now.
@@ -1596,7 +1596,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_ERR(__wt_row_key(session, page, rip, key, 0));
+		WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 		WT_ERR(WT_BTREE_CMP(session, btree, key, stop, cmp));
 		if (cmp > 0) {
 			found = 1;
@@ -1677,7 +1677,7 @@ __slvg_row_build_internal(
 
 		ref->page = NULL;
 		ref->addr = addr;
-		ref->u.key = NULL;
+		__wt_ref_key_clear(ref);
 		ref->state = WT_REF_DISK;
 
 		/*
@@ -1696,7 +1696,7 @@ __slvg_row_build_internal(
 		} else
 			WT_ERR(__wt_row_ikey_incr(session, page, 0,
 			    trk->row_start.data, trk->row_start.size,
-			    &ref->u.key));
+			    &ref->key.ikey));
 		++ref;
 	}
 
@@ -1756,7 +1756,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
-			WT_ERR(__wt_row_key(session, page, rip, key, 0));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 
 			/*
 			 * >= is correct: see the comment above.
@@ -1779,7 +1779,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
-			WT_ERR(__wt_row_key(session, page, rip, key, 0));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 
 			/*
 			 * < is correct: see the comment above.
@@ -1812,9 +1812,9 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * a copy from the page.
 	 */
 	rip = page->u.row.d + skip_start;
-	WT_ERR(__wt_row_key(session, page, rip, key, 0));
+	WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 	WT_ERR(__wt_row_ikey_incr(
-	    session, parent, 0, key->data, key->size, &ref->u.key));
+	    session, parent, 0, key->data, key->size, &ref->key.ikey));
 
 	/*
 	 * Discard backing overflow pages for any items being discarded that

@@ -353,11 +353,71 @@ __wt_off_page(WT_PAGE *page, const void *p)
 }
 
 /*
- * __wt_row_key --
- *	Set a buffer to reference a key as cheaply as possible.
+ * __wt_ref_key --
+ *	Return a reference to an internal page key as cheaply as possible.
+ */
+static inline void
+__wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
+{
+	uint32_t offset;
+
+	/*
+	 * An internal page key is in one of two places: if we instantiated the
+	 * key (for example, when reading the page), WT_REF.key.ikey references
+	 * a WT_IKEY structure, otherwise, WT_REF.key.page references an on-page
+	 * key.
+	 *
+	 * Now the magic: any allocated memory will have a low-order bit of 0.
+	 * We can fit the maximum page size in 31 bits, so we use a low-order
+	 * bit of 1 in the first field of WT_REF.key.page to indicate the other
+	 * 7 bits are a page offset, and it's not a WT_IKEY pointer.  If this
+	 * isn't a little-endian machine or a compiler does something magical,
+	 * this will break.  I think we're safe: C99 requires union elements
+	 * have the same initial address, the only thing the compiler could do
+	 * here is to re-order the WT_REF.key.page.{offset,len} fields, and
+	 * there's no reason to do that (and just in case, we verify it as part
+	 * of the build process).
+	 */
+	offset = ref->key.page.offset;
+	if (offset & 0x1) {
+		*(void **)keyp = WT_PAGE_REF_OFFSET(page, offset >> 1);
+		*sizep = ref->key.page.len;
+	} else {
+		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
+		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
+	}
+}
+
+/*
+ * __wt_ref_key_instantiated --
+ *	Return an instantiated key from a WT_REF.
+ */
+static inline WT_IKEY *
+__wt_ref_key_instantiated(WT_REF *ref)
+{
+	/*
+	 * See the comment in __wt_ref_key for an explanation of the magic.
+	 */
+	return (ref->key.page.offset & 0x1 ? NULL : ref->key.ikey);
+}
+
+/*
+ * __wt_ref_key_clear --
+ *	Clear a WT_REF key.
+ */
+static inline void
+__wt_ref_key_clear(WT_REF *ref)
+{
+	/* The key union has 3 fields, all of which are 8B. */
+	ref->key.recno = 0;
+}
+
+/*
+ * __wt_row_leaf_key --
+ *	Set a buffer to reference a leaf page key as cheaply as possible.
  */
 static inline int
-__wt_row_key(WT_SESSION_IMPL *session,
+__wt_row_leaf_key(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
 {
 	WT_BTREE *btree;

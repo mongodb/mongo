@@ -84,8 +84,8 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			cursor->key.data = WT_INSERT_KEY(cbt->ins);
 			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 		} else {
-			WT_RET(
-			    __wt_row_key(session, page, rip, &cursor->key, 0));
+			WT_RET(__wt_row_leaf_key(
+			    session, page, rip, &cursor->key, 0));
 			upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		}
 		if (upd != NULL) {
