@@ -3668,7 +3668,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\repl_reads_ok.cpp" />
     <ClCompile Include="repl\repl_start.cpp" />
     <ClCompile Include="repl\sync.cpp" />
-    <ClCompile Include="repl\sync_source_feedback.cpp" />
     <ClCompile Include="repl\write_concern.cpp">
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)repl_write_concern.obj</ObjectFileName>
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)repl_write_concern.obj</ObjectFileName>
@@ -4580,7 +4579,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="repl\rs_member.h" />
     <ClInclude Include="repl\rs_sync.h" />
     <ClInclude Include="repl\sync.h" />
-    <ClInclude Include="repl\sync_source_feedback.h" />
     <ClInclude Include="repl\write_concern.h" />
     <ClInclude Include="restapi.h" />
     <ClInclude Include="server_parameters.h" />

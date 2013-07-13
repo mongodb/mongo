@@ -2547,9 +2547,6 @@
     <ClInclude Include="..\db\auth\user_name_hash.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\repl\sync_source_feedback.h">
-      <Filter>db\repl</Filter>
-    </ClInclude>
     <ClInclude Include="..\logger\appender.h">
       <Filter>logger</Filter>
     </ClInclude>
@@ -5118,9 +5115,6 @@
     </ClCompile>
     <ClCompile Include="..\db\namespace_string_test.cpp">
       <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\repl\sync_source_feedback.cpp">
-      <Filter>db\repl</Filter>
     </ClCompile>
     <ClCompile Include="..\logger\console.cpp">
       <Filter>logger</Filter>

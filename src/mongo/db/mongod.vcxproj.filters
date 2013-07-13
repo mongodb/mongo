@@ -2303,9 +2303,6 @@
     <ClCompile Include="..\util\concurrency\thread_name.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
-    <ClCompile Include="repl\sync_source_feedback.cpp">
-      <Filter>db\repl</Filter>
-    </ClCompile>
     <ClCompile Include="storage\namespace.cpp">
       <Filter>db\storage</Filter>
     </ClCompile>
@@ -4748,9 +4745,6 @@
     </ClInclude>
     <ClInclude Include="..\util\concurrency\ticketholder.h">
       <Filter>util\concurrency</Filter>
-    </ClInclude>
-    <ClInclude Include="repl\sync_source_feedback.h">
-      <Filter>db\repl</Filter>
     </ClInclude>
     <ClInclude Include="storage\namespace.h">
       <Filter>db\storage</Filter>
