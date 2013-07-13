@@ -223,8 +223,10 @@ typedef struct {
 
 static void __rec_cell_build_addr(
 		WT_RECONCILE *, const void *, uint32_t, u_int, uint64_t);
-static int  __rec_cell_build_key(WT_SESSION_IMPL *,
-		WT_RECONCILE *, const void *, uint32_t, int, int *);
+static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
+		WT_RECONCILE *, const void *, uint32_t, int *);
+static int  __rec_cell_build_leaf_key(WT_SESSION_IMPL *,
+		WT_RECONCILE *, const void *, uint32_t, int *);
 static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *,
@@ -2021,8 +2023,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
 	val = &r->v;
-	WT_RET(__rec_cell_build_key(session, r,		/* Build key cell */
-	    cursor->key.data, cursor->key.size, 0, &ovfl_key));
+	WT_RET(__rec_cell_build_leaf_key(session, r,	/* Build key cell */
+	    cursor->key.data, cursor->key.size, &ovfl_key));
 	WT_RET(__rec_cell_build_val(session, r,		/* Build value cell */
 	    cursor->value.data, cursor->value.size, (uint64_t)0));
 
@@ -2044,8 +2046,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 			if (r->key_pfx_compress_conf) {
 				r->key_pfx_compress = 0;
 				if (!ovfl_key)
-					WT_RET(__rec_cell_build_key(
-					    session, r, NULL, 0, 0, &ovfl_key));
+					WT_RET(__rec_cell_build_leaf_key(
+					    session, r, NULL, 0, &ovfl_key));
 			}
 		}
 
@@ -3074,8 +3076,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			ovfl_key = 1;
 		} else {
 			__wt_ref_key(page, ref, &p, &size);
-			WT_RET(__rec_cell_build_key(session, r,
-			    p, r->cell_zero ? 1 : size, 1, &ovfl_key));
+			WT_RET(__rec_cell_build_int_key(session, r,
+			    p, r->cell_zero ? 1 : size, &ovfl_key));
 		}
 		r->cell_zero = 0;
 
@@ -3204,8 +3206,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
 		__wt_ref_key(page, ref, &p, &size);
-		WT_RET(__rec_cell_build_key(session, r,
-		    p, r->cell_zero ? 1 : size, 1, &ovfl_key));
+		WT_RET(__rec_cell_build_int_key(session, r,
+		    p, r->cell_zero ? 1 : size, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
@@ -3504,8 +3506,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ERR(__wt_row_leaf_key_copy(
 				    session, page, rip, tmpkey));
 
-			WT_ERR(__rec_cell_build_key(session, r,
-			    tmpkey->data, tmpkey->size, 0, &ovfl_key));
+			WT_ERR(__rec_cell_build_leaf_key(session, r,
+			    tmpkey->data, tmpkey->size, &ovfl_key));
 		}
 
 		/*
@@ -3539,8 +3541,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (r->key_pfx_compress_conf) {
 				r->key_pfx_compress = 0;
 				if (!ovfl_key)
-					WT_ERR(__rec_cell_build_key(
-					    session, r, NULL, 0, 0, &ovfl_key));
+					WT_ERR(__rec_cell_build_leaf_key(
+					    session, r, NULL, 0, &ovfl_key));
 			}
 		}
 
@@ -3595,8 +3597,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			WT_RET(__rec_cell_build_val(session, r,
 			    WT_UPDATE_DATA(upd), upd->size, (uint64_t)0));
 
-		WT_RET(__rec_cell_build_key(session, r,	/* Build key cell. */
-		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), 0, &ovfl_key));
+							/* Build key cell. */
+		WT_RET(__rec_cell_build_leaf_key(session, r,
+		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &ovfl_key));
 
 		/*
 		 * Boundary: split or write the page.
@@ -3617,8 +3620,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			if (r->key_pfx_compress_conf) {
 				r->key_pfx_compress = 0;
 				if (!ovfl_key)
-					WT_RET(__rec_cell_build_key(
-					    session, r, NULL, 0, 0, &ovfl_key));
+					WT_RET(__rec_cell_build_leaf_key(
+					    session, r, NULL, 0, &ovfl_key));
 			}
 		}
 
@@ -4163,13 +4166,49 @@ err:	if (page != NULL)
 }
 
 /*
- * __rec_cell_build_key --
+ * __rec_cell_build_int_key --
  *	Process a key and return a WT_CELL structure and byte string to be
- * stored on the page.
+ * stored on a row-store internal page.
  */
 static int
-__rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-    const void *data, uint32_t size, int is_internal, int *is_ovflp)
+__rec_cell_build_int_key(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, const void *data, uint32_t size, int *is_ovflp)
+{
+	WT_BTREE *btree;
+	WT_KV *key;
+
+	*is_ovflp = 0;
+
+	btree = S2BT(session);
+	key = &r->k;
+
+	/* Copy the bytes into the "current" and key buffers. */
+	WT_RET(__wt_buf_set(session, r->cur, data, size));
+	WT_RET(__wt_buf_set(session, &key->buf, data, size));
+
+	/* Create an overflow object if the data won't fit. */
+	if (size > btree->maxintlitem) {
+		WT_DSTAT_INCR(session, rec_ovfl_key);
+
+		*is_ovflp = 1;
+		return (__rec_cell_build_ovfl(
+		    session, r, key, WT_CELL_KEY_OVFL, (uint64_t)0));
+	}
+
+	key->cell_len = __wt_cell_pack_int_key(&key->cell, key->buf.size);
+	key->len = key->cell_len + key->buf.size;
+
+	return (0);
+}
+
+/*
+ * __rec_cell_build_leaf_key --
+ *	Process a key and return a WT_CELL structure and byte string to be
+ * stored on a row-store leaf page.
+ */
+static int
+__rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, const void *data, uint32_t size, int *is_ovflp)
 {
 	WT_BTREE *btree;
 	WT_KV *key;
@@ -4222,13 +4261,12 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	}
 
 	/* Optionally compress the key using the Huffman engine. */
-	if (!is_internal && btree->huffman_key != NULL)
+	if (btree->huffman_key != NULL)
 		WT_RET(__wt_huffman_encode(session, btree->huffman_key,
 		    key->buf.data, key->buf.size, &key->buf));
 
 	/* Create an overflow object if the data won't fit. */
-	if (key->buf.size >
-	    (is_internal ? btree->maxintlitem : btree->maxleafitem)) {
+	if (key->buf.size > btree->maxleafitem) {
 		/*
 		 * Overflow objects aren't prefix compressed -- rebuild any
 		 * object that was prefix compressed.
@@ -4240,13 +4278,11 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			return (__rec_cell_build_ovfl(
 			    session, r, key, WT_CELL_KEY_OVFL, (uint64_t)0));
 		}
-		return (__rec_cell_build_key(
-		    session, r, NULL, 0, is_internal, is_ovflp));
+		return (
+		    __rec_cell_build_leaf_key(session, r, NULL, 0, is_ovflp));
 	}
 
-	key->cell_len = is_internal ?
-	    __wt_cell_pack_int_key(&key->cell, key->buf.size) :
-	    __wt_cell_pack_leaf_key(&key->cell, pfx, key->buf.size);
+	key->cell_len = __wt_cell_pack_leaf_key(&key->cell, pfx, key->buf.size);
 	key->len = key->cell_len + key->buf.size;
 
 	return (0);
