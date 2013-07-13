@@ -26,7 +26,8 @@ env.SConscript(['base/SConscript',
                 'platform/SConscript',
                 's/SConscript',
                 'unittest/SConscript',
-                'util/concurrency/SConscript'])
+                'util/concurrency/SConscript',
+                'util/options_parser/SConscript'])
 
 def add_exe( v ):
     return "${PROGPREFIX}%s${PROGSUFFIX}" % v
