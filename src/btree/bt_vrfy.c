@@ -289,7 +289,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				++recno;
 			else {
-				__wt_cell_unpack(cell, unpack);
+				__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
 				recno += __wt_cell_rle(unpack);
 			}
 		vs->record_total += recno;
@@ -321,7 +321,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 	if (WT_PAGE_IS_ROOT(page))
 		lno = 0;
 	else {
-		__wt_cell_unpack(page->ref->addr, unpack);
+		__wt_cell_unpack(page->ref->addr, page->type, unpack);
 		lno = unpack->raw == WT_CELL_ADDR_LNO ? 1 : 0;
 	}
 	switch (page->type) {
@@ -362,7 +362,8 @@ recno_chk:	if (recno != vs->record_total + 1)
 			 */
 			++entry;
 			if (ref->u.recno != vs->record_total + 1) {
-				__wt_cell_unpack(ref->addr, unpack);
+				__wt_cell_unpack(
+				    ref->addr, WT_PAGE_COL_INT, unpack);
 				WT_RET_MSG(session, WT_ERROR,
 				    "the starting record number in entry %"
 				    PRIu32 " of the column internal page at "
@@ -381,7 +382,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);
 
-			__wt_cell_unpack(ref->addr, unpack);
+			__wt_cell_unpack(ref->addr, WT_PAGE_COL_INT, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
 		}
@@ -409,7 +410,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);
 
-			__wt_cell_unpack(ref->addr, unpack);
+			__wt_cell_unpack(ref->addr, WT_PAGE_ROW_INT, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
 		}
@@ -549,7 +550,7 @@ __verify_overflow_cell(
 	cell_num = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++cell_num;
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, dsk->type, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:

@@ -316,7 +316,7 @@ __debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 	unpack = &_unpack;
 
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, dsk->type, unpack);
 		WT_RET(__debug_cell(ds, dsk, unpack));
 	}
 	return (0);
@@ -644,7 +644,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 			unpack = NULL;
 			rle = 1;
 		} else {
-			__wt_cell_unpack(cell, unpack);
+			__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
 			rle = __wt_cell_rle(unpack);
 		}
 		snprintf(tag, sizeof(tag), "%" PRIu64 " %" PRIu64, recno, rle);
@@ -717,14 +717,14 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 		if (__wt_off_page(page, ripkey))
 			__debug_ikey(ds, ripkey);
 		else {
-			__wt_cell_unpack(ripkey, unpack);
+			__wt_cell_unpack(ripkey, WT_PAGE_ROW_LEAF, unpack);
 			WT_RET(__debug_cell_data(ds, "K", unpack));
 		}
 
 		if ((cell = __wt_row_value(page, rip)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
-			__wt_cell_unpack(cell, unpack);
+			__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
 			WT_RET(__debug_cell_data(ds, "V", unpack));
 		}
 

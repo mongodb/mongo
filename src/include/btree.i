@@ -377,7 +377,7 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 
 	/* If the key isn't compressed or an overflow, take it from the page. */
 	if (btree->huffman_key == NULL)
-		__wt_cell_unpack((WT_CELL *)ikey, &unpack);
+		__wt_cell_unpack((WT_CELL *)ikey, page->type, &unpack);
 	if (btree->huffman_key == NULL &&
 	    unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
 		key->data = unpack.data;
@@ -422,7 +422,7 @@ __wt_get_addr(
 		*addrp = ((WT_ADDR *)(ref->addr))->addr;
 		*sizep = ((WT_ADDR *)(ref->addr))->size;
 	} else {
-		__wt_cell_unpack(ref->addr, unpack);
+		__wt_cell_unpack(ref->addr, page->type, unpack);
 		*addrp = unpack->data;
 		*sizep = unpack->size;
 	}
