@@ -1,0 +1,19 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary('options_parser', ['environment.cpp',
+                                     'value.cpp',
+                                     'constraints.cpp',
+                                     'option_section.cpp',
+                                     'options_parser.cpp',
+                                     ],
+                                    LIBDEPS=['$BUILD_DIR/mongo/bson'])
+
+env.CppUnitTest('options_parser_test',
+                'options_parser_test.cpp',
+                LIBDEPS=['options_parser', '$BUILD_DIR/mongo/unittest/unittest'])
+
+env.CppUnitTest('environment_test',
+                'environment_test.cpp',
+                LIBDEPS=['options_parser', '$BUILD_DIR/mongo/unittest/unittest'])

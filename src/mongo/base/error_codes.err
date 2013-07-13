@@ -44,5 +44,6 @@ error_code("ConflictingUpdateOperators", 40)
 error_code("FileAlreadyOpen", 41)
 error_code("LogWriteFailed", 42)
 error_code("CursorNotFound", 43)
+error_code("KeyNotFound", 44)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
