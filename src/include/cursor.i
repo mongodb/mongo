@@ -259,7 +259,8 @@ slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
 		vb->size = 0;
 	} else {
 		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
-		WT_RET(__wt_cell_unpack_ref(session, unpack, vb));
+		WT_RET(__wt_cell_unpack_ref(
+		    session, WT_PAGE_ROW_LEAF, unpack, vb));
 	}
 
 	return (0);

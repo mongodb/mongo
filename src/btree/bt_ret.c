@@ -105,7 +105,8 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/* The value is an on-page cell, unpack and expand it as necessary. */
 	__wt_cell_unpack(cell, page->type, &unpack);
-	ret = __wt_cell_unpack_ref(session, &unpack, &cursor->value);
+	ret =
+	    __wt_cell_unpack_ref(session, page->type, &unpack, &cursor->value);
 
 	/*
 	 * Restart for a variable-length column-store.  We could catch restart

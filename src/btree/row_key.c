@@ -215,7 +215,7 @@ __wt_row_key_copy(
 			 */
 			if (slot_offset == 0) {
 				WT_ERR(__wt_cell_unpack_copy(
-				    session, unpack, retb));
+				    session, page->type, unpack, retb));
 				break;
 			}
 
@@ -250,7 +250,8 @@ __wt_row_key_copy(
 			 * found this key while rolling backwards and switched
 			 * directions then.
 			 */
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, retb));
+			WT_ERR(__wt_cell_unpack_copy(
+			    session, page->type, unpack, retb));
 			if (slot_offset == 0)
 				break;
 
@@ -275,7 +276,8 @@ __wt_row_key_copy(
 			 */
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, tmp));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, page->type, unpack, tmp));
 			WT_ERR(__wt_buf_initsize(
 			    session, retb, tmp->size + unpack->prefix));
 			memcpy((uint8_t *)

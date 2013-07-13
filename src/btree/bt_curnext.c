@@ -229,8 +229,8 @@ new_page:	/* Find the matching WT_COL slot. */
 			 * the page's reconciliation structures, and that's as
 			 * easy here as higher up the stack.
 			 */
-			if ((ret = __wt_cell_unpack_ref(
-			    session, &unpack, &cbt->tmp)) == WT_RESTART)
+			if ((ret = __wt_cell_unpack_ref(session,
+			    WT_PAGE_COL_VAR, &unpack, &cbt->tmp)) == WT_RESTART)
 				ret = __wt_ovfl_cache_col_restart(
 				    session, cbt->page, &unpack, &cbt->tmp);
 			WT_RET(ret);

@@ -451,7 +451,7 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 
 	/* If the key isn't compressed or an overflow, take it from the page. */
 	if (btree->huffman_key == NULL)
-		__wt_cell_unpack((WT_CELL *)ikey, page->type, &unpack);
+		__wt_cell_unpack((WT_CELL *)ikey, WT_PAGE_ROW_LEAF, &unpack);
 	if (btree->huffman_key == NULL &&
 	    unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
 		key->data = unpack.data;

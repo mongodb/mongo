@@ -1199,7 +1199,7 @@ __rec_split_row_promote_cell(
 	WT_ASSERT(session,
 	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
 
-	WT_RET(__wt_cell_unpack_copy(session, unpack, copy));
+	WT_RET(__wt_cell_unpack_copy(session, dsk->type, unpack, copy));
 	return (0);
 }
 
@@ -2653,7 +2653,8 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * where the new value happens (?) to match a Huffman-
 			 * encoded value in a previous or next record.
 			 */
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, orig));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, WT_PAGE_COL_VAR, unpack, orig));
 		}
 
 record_loop:	/*
@@ -2739,8 +2740,8 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_cell_unpack_ref(
-					    session, unpack, orig));
+					WT_ERR(__wt_cell_unpack_ref(session,
+					    WT_PAGE_COL_VAR, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;
 					/* FALLTHROUGH */
@@ -3524,7 +3525,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 */
 			if (onpage_ovfl) {
 				WT_ERR(__wt_cell_unpack_copy(
-				    session, unpack, r->cur));
+				    session, WT_PAGE_ROW_LEAF, unpack, r->cur));
 				onpage_ovfl = 0;
 			}
 			WT_ERR(__rec_split(session, r));
@@ -4220,8 +4221,8 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    session, &key->buf, (uint8_t *)data + pfx, size - pfx));
 	}
 
-	/* Optionally compress the value using the Huffman engine. */
-	if (btree->huffman_key != NULL)
+	/* Optionally compress the key using the Huffman engine. */
+	if (!is_internal && btree->huffman_key != NULL)
 		WT_RET(__wt_huffman_encode(session, btree->huffman_key,
 		    key->buf.data, key->buf.size, &key->buf));
 

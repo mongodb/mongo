@@ -423,12 +423,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_PAGE_HEADER *dsk;
 	WT_REF *ref;
 	uint32_t i;
-	void *huffman;
 
 	btree = S2BT(session);
 	unpack = &_unpack;
 	dsk = page->dsk;
-	huffman = btree->huffman_key;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
 
@@ -442,24 +440,18 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 		__wt_cell_unpack(cell, WT_PAGE_ROW_INT, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
+			__wt_ref_key_onpage_set(page, ref, unpack);
+			break;
 		case WT_CELL_KEY_OVFL:
-			/*
-			 * If Huffman encoded or an overflow record, build and
-			 * the initialize the key, otherwise use the on-page
-			 * copy.
-			 */
-			if (huffman != NULL || unpack->ovfl) {
-				WT_ERR(__wt_cell_unpack_ref(
-				    session, unpack, current));
+			/* Instantiate any overflow records. */
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, WT_PAGE_ROW_INT, unpack, current));
 
-				WT_ERR(__wt_row_ikey(session,
-				    WT_PAGE_DISK_OFFSET(page, cell),
-				    current->data, current->size,
-				    &ref->key.ikey));
+			WT_ERR(__wt_row_ikey(session,
+			    WT_PAGE_DISK_OFFSET(page, cell),
+			    current->data, current->size, &ref->key.ikey));
 
-				*sizep += sizeof(WT_IKEY) + current->size;
-			} else
-				__wt_ref_key_onpage_set(page, ref, unpack);
+			*sizep += sizeof(WT_IKEY) + current->size;
 			break;
 		case WT_CELL_ADDR:
 			ref->addr = cell;

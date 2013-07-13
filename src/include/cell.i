@@ -661,7 +661,7 @@ __wt_cell_unpack(WT_CELL *cell, int type, WT_CELL_UNPACK *unpack)
  */
 static inline int
 __wt_cell_unpack_ref(
-    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	WT_BTREE *btree;
 	void *huffman;
@@ -673,6 +673,9 @@ __wt_cell_unpack_ref(
 	case WT_CELL_KEY:
 		store->data = unpack->data;
 		store->size = unpack->size;
+		if (type == WT_PAGE_ROW_INT)
+			return (0);
+
 		huffman = btree->huffman_key;
 		break;
 	case WT_CELL_VALUE:
@@ -682,6 +685,9 @@ __wt_cell_unpack_ref(
 		break;
 	case WT_CELL_KEY_OVFL:
 		WT_RET(__wt_ovfl_read(session, unpack, store));
+		if (type == WT_PAGE_ROW_INT)
+			return (0);
+
 		huffman = btree->huffman_key;
 		break;
 	case WT_CELL_VALUE_OVFL:
@@ -702,7 +708,7 @@ __wt_cell_unpack_ref(
  */
 static inline int
 __wt_cell_unpack_copy(
-    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	/*
 	 * We have routines to both copy and reference a cell's information.  In
@@ -713,7 +719,7 @@ __wt_cell_unpack_copy(
 	 * the underlying object.  If that happens, we're done, otherwise make
 	 * a copy.
 	 */
-	WT_RET(__wt_cell_unpack_ref(session, unpack, store));
+	WT_RET(__wt_cell_unpack_ref(session, type, unpack, store));
 	if (store->mem != NULL &&
 	    store->data >= store->mem &&
 	    WT_PTRDIFF(store->data, store->mem) < store->memsize)

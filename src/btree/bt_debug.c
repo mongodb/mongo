@@ -28,7 +28,8 @@ typedef struct {
 static const char *sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 
 static int  __debug_cell(WT_DBG *, WT_PAGE_HEADER *, WT_CELL_UNPACK *);
-static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
+static int  __debug_cell_data(
+	WT_DBG *, int type, const char *, WT_CELL_UNPACK *);
 static void __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_HEADER *);
@@ -648,7 +649,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 			rle = __wt_cell_rle(unpack);
 		}
 		snprintf(tag, sizeof(tag), "%" PRIu64 " %" PRIu64, recno, rle);
-		WT_RET(__debug_cell_data(ds, tag, unpack));
+		WT_RET(__debug_cell_data(ds, WT_PAGE_COL_VAR, tag, unpack));
 
 		if ((update = WT_COL_UPDATE(page, cip)) != NULL)
 			__debug_col_skip(ds, update, "update", 0);
@@ -720,14 +721,16 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			__debug_ikey(ds, ripkey);
 		else {
 			__wt_cell_unpack(ripkey, WT_PAGE_ROW_LEAF, unpack);
-			WT_RET(__debug_cell_data(ds, "K", unpack));
+			WT_RET(__debug_cell_data(
+			    ds, WT_PAGE_ROW_LEAF, "K", unpack));
 		}
 
 		if ((cell = __wt_row_value(page, rip)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
 			__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
-			WT_RET(__debug_cell_data(ds, "V", unpack));
+			WT_RET(__debug_cell_data(
+			    ds, WT_PAGE_ROW_LEAF, "V", unpack));
 		}
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
@@ -908,7 +911,7 @@ addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 	}
 	__dmsg(ds, "\n");
 
-	return (__debug_cell_data(ds, NULL, unpack));
+	return (__debug_cell_data(ds, dsk->type, NULL, unpack));
 }
 
 /*
@@ -916,7 +919,7 @@ addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
  *	Dump a single cell's data in debugging mode.
  */
 static int
-__debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
+__debug_cell_data(WT_DBG *ds, int type, const char *tag, WT_CELL_UNPACK *unpack)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -953,7 +956,8 @@ deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 	case WT_CELL_VALUE_OVFL_RM:
 	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
-		if ((ret = __wt_cell_unpack_ref(session, unpack, buf)) == 0)
+		if ((ret =
+		    __wt_cell_unpack_ref(session, type, unpack, buf)) == 0)
 			__debug_item(ds, tag, buf->data, buf->size);
 		__wt_scr_free(&buf);
 		break;
