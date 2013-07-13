@@ -2936,24 +2936,23 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* For each entry in the in-memory page... */
 	WT_REF_FOREACH(page, ref, i) {
 		/*
-		 * Keys are always instantiated for row-store internal pages,
-		 * set the WT_IKEY reference, and unpack the cell if the key
-		 * references one.
+		 * There are different paths if the key is an overflow item vs.
+		 * a straight-forward on-page value.   If an overflow item, we
+		 * would have instantiated it, and we can use that fact to set
+		 * things up.
+		 *
+		 * Note the cell reference and unpacked key cell are available
+		 * only in the case of an instantiated, off-page key.
 		 */
-		ikey = ref->key.ikey;
-		if (ikey->cell_offset == 0)
+		ikey = __wt_ref_key_instantiated(ref);
+		if (ikey == NULL || ikey->cell_offset == 0) {
 			cell = NULL;
-		else {
+			onpage_ovfl = 0;
+		} else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, WT_PAGE_ROW_INT, kpack);
+			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
 		}
-
-		/*
-		 * We need to know if we're using on-page overflow key cell in
-		 * a few places below, initialize the unpacked cell's overflow
-		 * value so there's an easy test.
-		 */
-		onpage_ovfl = cell != NULL && kpack->ovfl == 1 ? 1 : 0;
 
 		vtype = 0;
 		addr = ref->addr;
@@ -3072,10 +3071,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
-		} else
+		} else {
+			__wt_ref_key(page, ref, &p, &size);
 			WT_RET(__rec_cell_build_key(session, r,
-			    WT_IKEY_DATA(ikey), r->cell_zero ? 1 : ikey->size,
-			    1, &ovfl_key));
+			    p, r->cell_zero ? 1 : size, 1, &ovfl_key));
+		}
 		r->cell_zero = 0;
 
 		/*
@@ -3122,7 +3122,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *vpack, _vpack;
-	WT_IKEY *ikey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_REF *ref;
@@ -3203,9 +3202,9 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Build the key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		ikey = ref->key.ikey;
-		WT_RET(__rec_cell_build_key(session, r, WT_IKEY_DATA(ikey),
-		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
+		__wt_ref_key(page, ref, &p, &size);
+		WT_RET(__rec_cell_build_key(session, r,
+		    p, r->cell_zero ? 1 : size, 1, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
@@ -4042,11 +4041,11 @@ __rec_split_row(
 	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
-	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_REF *ref;
 	size_t size;
-	uint32_t i;
+	uint32_t i, ksize;
+	void *p;
 
 	/* Allocate a split-merge page. */
 	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_ROW_INT));
@@ -4090,9 +4089,8 @@ __rec_split_row(
 	if (WT_PAGE_IS_ROOT(orig))
 		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
-		ikey = orig->ref->key.ikey;
-		WT_ERR(__wt_buf_set(
-		    session, &r->bnd[0].key, WT_IKEY_DATA(ikey), ikey->size));
+		__wt_ref_key(orig->parent, orig->ref, &p, &ksize);
+		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, p, ksize));
 	}
 
 	/* Enter each split child page into the new internal page. */

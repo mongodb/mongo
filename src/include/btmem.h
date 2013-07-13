@@ -423,7 +423,7 @@ struct __wt_ref {
 		void	*ikey;		/* Row-store: instantiated key */
 		struct {		/* Row-store: on-page key */
 			uint32_t offset;
-			uint32_t len;
+			uint32_t size;
 		} page;
 	} key;
 

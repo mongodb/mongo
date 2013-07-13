@@ -370,22 +370,36 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	 * Now the magic: any allocated memory will have a low-order bit of 0.
 	 * We can fit the maximum page size in 31 bits, so we use a low-order
 	 * bit of 1 in the first field of WT_REF.key.page to indicate the other
-	 * 7 bits are a page offset, and it's not a WT_IKEY pointer.  If this
-	 * isn't a little-endian machine or a compiler does something magical,
-	 * this will break.  I think we're safe: C99 requires union elements
-	 * have the same initial address, the only thing the compiler could do
-	 * here is to re-order the WT_REF.key.page.{offset,len} fields, and
-	 * there's no reason to do that (and just in case, we verify it as part
-	 * of the build process).
+	 * 7 bits are a page offset, and it's not a WT_IKEY pointer.  This will
+	 * break if not a little-endian machine or a compiler does something
+	 * magical.  I think we're safe: C99 requires union elements have the
+	 * same initial address, the only thing the compiler can do is re-order
+	 * the WT_REF.key.page.{offset,len} fields, and there's no reason to do
+	 * that (and just in case, we verify it as part of the build process).
 	 */
 	offset = ref->key.page.offset;
 	if (offset & 0x1) {
 		*(void **)keyp = WT_PAGE_REF_OFFSET(page, offset >> 1);
-		*sizep = ref->key.page.len;
+		*sizep = ref->key.page.size;
 	} else {
 		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
 		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
 	}
+}
+
+/*
+ * __wt_ref_key_onpage_set --
+ *	Set a WT_REF to reference an on-page key.
+ */
+static inline void
+__wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK *unpack)
+{
+	/*
+	 * See the comment in __wt_ref_key for an explanation of the magic.
+	 */
+	ref->key.page.offset =
+	    (WT_PAGE_DISK_OFFSET(page, unpack->data) << 1) | 0x01;
+	ref->key.page.size = unpack->size;
 }
 
 /*
