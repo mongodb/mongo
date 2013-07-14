@@ -31,8 +31,8 @@
  * a type guaranteed to be written atomically in a single cycle, without writing
  * an adjacent memory location.
  *
- * WiredTiger doesn't require atomic writes for any 64-bit memory locations and
- * can run on machines with a 32-bit memory bus.
+ * WiredTiger additionally requires atomic writes for 64-bit memory locations,
+ * and so cannot run on machines with a 32-bit memory bus.
  *
  * We don't depend on writes across cache lines being atomic, and to make sure
  * that never happens, we check address alignment: we know of no architectures
