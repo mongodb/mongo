@@ -114,7 +114,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_ROW *rip;
-	uint32_t base, indx, limit;
+	uint32_t base, indx, limit, match, skiphigh, skiplow;
 	int cmp, depth;
 
 	__cursor_search_clear(cbt);
@@ -148,6 +148,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			goto descend;
 
 		/* Binary search of internal pages. */
+		skiphigh = skiplow = 0;
 		for (base = 0, ref = NULL,
 		    limit = page->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -164,13 +165,16 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 				ikey = ref->u.key;
 				item->data = WT_IKEY_DATA(ikey);
 				item->size = ikey->size;
-
-				WT_ERR(WT_BTREE_CMP(
-				    session, btree, srch_key, item, cmp));
+				match = WT_MIN(skiplow, skiphigh);
+				WT_ERR(WT_BTREE_CMP_SKIP(session,
+				    btree, srch_key, item, cmp, &match));
 				if (cmp == 0)
 					break;
-				if (cmp < 0)
+				if (cmp < 0) {
+					skiplow = match;
 					continue;
+				}
+				skiphigh = match;
 			}
 			base = indx + 1;
 			--limit;
