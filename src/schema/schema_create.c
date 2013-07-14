@@ -55,7 +55,7 @@ __create_file(WT_SESSION_IMPL *session,
 	uint32_t allocsize;
 	int is_metadata;
 	const char *fileconf, *filename;
-	const char *filecfg[] =
+	const char **p, *filecfg[] =
 	    { WT_CONFIG_BASE(session, file_meta), config, NULL, NULL };
 
 	fileconf = NULL;
@@ -92,7 +92,9 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_scr_alloc(session, 0, &val));
 		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 		    WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
-		filecfg[2] = val->data;
+		for (p = filecfg; *p != NULL; ++p)
+			;
+		*p = val->data;
 		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
 		WT_ERR(__wt_metadata_insert(session, uri, fileconf));
 	}
