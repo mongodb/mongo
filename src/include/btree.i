@@ -378,7 +378,7 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	 * that (and just in case, we verify it as part of the build process).
 	 */
 	offset = ref->key.page.offset;
-	if (offset & 0x1) {
+	if (offset & 0x01) {
 		*(void **)keyp = WT_PAGE_REF_OFFSET(page, offset >> 1);
 		*sizep = ref->key.page.size;
 	} else {
@@ -412,7 +412,7 @@ __wt_ref_key_instantiated(WT_REF *ref)
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	return (ref->key.page.offset & 0x1 ? NULL : ref->key.ikey);
+	return (ref->key.page.offset & 0x01 ? NULL : ref->key.ikey);
 }
 
 /*

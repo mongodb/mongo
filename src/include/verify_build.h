@@ -50,7 +50,7 @@ __wt_verify_build(void)
 	SIZE_CHECK(WT_REF, WT_REF_SIZE);
 
 	/*
-	 * There's magic in the WT_REF.k field layout, check nothing bad
+	 * There's magic in the WT_REF.key field layout, check nothing bad
 	 * happened.
 	 */
 	STATIC_ASSERT((void *)&ref.key.page.offset == (void *)&ref.key.ikey);
