@@ -468,6 +468,7 @@ def runTest(test):
                      'TestData.testPath = "' + path + '";' + \
                      'TestData.testFile = "' + os.path.basename( path ) + '";' + \
                      'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
+                     'TestData.setParameters = "' + ternary( set_parameters, set_parameters, "" )  + '";' + \
                      'TestData.noJournal = ' + ternary( no_journal )  + ";" + \
                      'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
                      'TestData.auth = ' + ternary( auth ) + ";" + \
