@@ -79,8 +79,13 @@ namespace mongo {
             return status;
         }
 
-        // If a $-positional operator was used, get the index in which it occurred.
-        fieldchecker::isPositional(_fieldRef, &_posDollar);
+        // If a $-positional operator was used, get the index in which it occurred
+        // and ensure only one occurrence.
+        size_t foundCount;
+        bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+        if (foundDollar && foundCount > 1) {
+            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+        }
 
         if (modExpr.type() != mongo::Object)
             return Status(ErrorCodes::BadValue,
