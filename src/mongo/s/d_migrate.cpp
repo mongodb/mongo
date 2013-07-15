@@ -1592,7 +1592,22 @@ namespace mongo {
                             PageFaultRetryableSection pgrs;
                             while ( 1 ) {
                                 try {
-                                    Lock::DBWrite lk( ns );
+                                    Client::WriteContext cx( ns );
+
+                                    BSONObj localDoc;
+                                    if ( willOverrideLocalId( o, &localDoc ) ) {
+                                        string errMsg =
+                                            str::stream() << "cannot migrate chunk, local document "
+                                                          << localDoc
+                                                          << " has same _id as cloned "
+                                                          << "remote document " << o;
+
+                                        warning() << errMsg << endl;
+
+                                        // Exception will abort migration cleanly
+                                        uasserted( 16976, errMsg );
+                                    }
+
                                     Helpers::upsert( ns, o, true );
                                     break;
                                 }
@@ -1812,6 +1827,21 @@ namespace mongo {
 
                     BSONObj it = i.next().Obj();
 
+                    BSONObj localDoc;
+                    if ( willOverrideLocalId( it, &localDoc ) ) {
+                        string errMsg =
+                            str::stream() << "cannot migrate chunk, local document "
+                                          << localDoc
+                                          << " has same _id as reloaded remote document "
+                                          << it;
+
+                        warning() << errMsg << endl;
+
+                        // Exception will abort migration cleanly
+                        uasserted( 16977, errMsg );
+                    }
+
+                    // We are in write lock here, so sure we aren't killing
                     Helpers::upsert( ns , it , true );
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
@@ -1820,6 +1850,22 @@ namespace mongo {
             }
 
             return didAnything;
+        }
+
+        /**
+         * Checks if an upsert of a remote document will override a local document with the same _id
+         * but in a different range on this shard.
+         * Must be in WriteContext to avoid races and DBHelper errors.
+         * TODO: Could optimize this check out if sharding on _id.
+         */
+        bool willOverrideLocalId( BSONObj remoteDoc, BSONObj* localDoc ) {
+
+            *localDoc = BSONObj();
+            if ( Helpers::findById( cc(), ns.c_str(), remoteDoc, *localDoc ) ) {
+                return !isInRange( *localDoc , min , max , shardKeyPattern );
+            }
+
+            return false;
         }
 
         bool opReplicatedEnough( const ReplTime& lastOpApplied ) {
