@@ -434,21 +434,20 @@ jsTest.authenticate = function(conn) {
     }
 
     try {
-        jsTest.attempt({timeout:5000, sleepTime:1000, desc: "Authenticating connection: " + conn},
-                       function() {
-                           // Set authenticated to stop an infinite recursion from getDB calling
-                           // back into authenticate.
-                           conn.authenticated = true;
-                           print ("Authenticating to admin database as " +
-                                  jsTestOptions().adminUser + " with mechanism " +
-                                  DB.prototype._defaultAuthenticationMechanism +
-                                  " on connection: " + conn);
-                           conn.authenticated = conn.getDB('admin').auth({
-                               user: jsTestOptions().adminUser,
-                               pwd: jsTestOptions().adminPassword
-                           });
-                           return conn.authenticated;
-                       });
+        assert.soon(function() {
+            // Set authenticated to stop an infinite recursion from getDB calling
+            // back into authenticate.
+            conn.authenticated = true;
+            print ("Authenticating to admin database as " +
+                   jsTestOptions().adminUser + " with mechanism " +
+                   DB.prototype._defaultAuthenticationMechanism +
+                   " on connection: " + conn);
+            conn.authenticated = conn.getDB('admin').auth({
+                user: jsTestOptions().adminUser,
+                pwd: jsTestOptions().adminPassword
+            });
+            return conn.authenticated;
+        }, "Authenticating connection: " + conn, 5000, 1000);
     } catch (e) {
         print("Caught exception while authenticating connection: " + tojson(e));
         conn.authenticated = false;
@@ -457,7 +456,7 @@ jsTest.authenticate = function(conn) {
 }
 
 jsTest.authenticateNodes = function(nodes) {
-    jsTest.attempt({timeout:30000, desc: "Authenticate to nodes: " + nodes}, function() {
+    assert.soon(function() {
         for (var i = 0; i < nodes.length; i++) {
             // Don't try to authenticate to arbiters
             res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
@@ -469,32 +468,11 @@ jsTest.authenticateNodes = function(nodes) {
             }
         }
         return true;
-    });
+    }, "Authenticate to nodes: " + nodes, 30000);
 }
 
 jsTest.isMongos = function(conn) {
     return conn.getDB('admin').isMaster().msg=='isdbgrid';
-}
-
-// Pass this method a function to call repeatedly until
-// that function returns true. Example:
-//   attempt({timeout: 20000, desc: "get master"}, function() { // return false until success })
-jsTest.attempt = function( opts, func ) {
-    var timeout = opts.timeout || 1000;
-    var tries   = 0;
-    var sleepTime = opts.sleepTime || 2000;
-    var result = null;
-    var context = opts.context || this;
-
-    while((result = func.apply(context)) == false) {
-        tries += 1;
-        sleep(sleepTime);
-        if( tries * sleepTime > timeout) {
-            throw('[' + opts['desc'] + ']' + " timed out after " + timeout + "ms ( " + tries + " tries )");
-        }
-    }
-
-    return result;
 }
 
 replSetMemberStatePrompt = function() {

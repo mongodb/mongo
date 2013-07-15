@@ -44,11 +44,11 @@ var slave = rt.add();
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    jsTest.attempt({context:rt, timeout: timeout, desc: "reinitiate replica set"}, function() {
+    assert.soon(function() {
         var result = admin.runCommand(cmd);
         printjson(result);
         return result['ok'] == 1;
-    });
+    }, "reinitiate replica set", timeout);
 })();
 
 
