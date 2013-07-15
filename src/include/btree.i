@@ -692,6 +692,46 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	    (k1), (k2), &(cmp)))
 
 /*
+ * __wt_btree_lex_compare_skip --
+ *	Lexicographic comparison routine, but skipping leading bytes.
+ *
+ * Returns:
+ *	< 0 if user_item is lexicographically < tree_item
+ *	= 0 if user_item is lexicographically = tree_item
+ *	> 0 if user_item is lexicographically > tree_item
+ *
+ * We use the names "user" and "tree" so it's clear which the application is
+ * looking at when we call its comparison func.
+ */
+static inline int
+__wt_btree_lex_compare_skip(
+    const WT_ITEM *user_item, const WT_ITEM *tree_item, uint32_t *matchp)
+{
+	const uint8_t *userp, *treep;
+	uint32_t len, usz, tsz;
+
+	usz = user_item->size;
+	tsz = tree_item->size;
+	len = WT_MIN(usz, tsz) - *matchp;
+
+	for (userp = (uint8_t *)user_item->data + *matchp,
+	    treep = (uint8_t *)tree_item->data + *matchp;
+	    len > 0;
+	    --len, ++userp, ++treep, ++*matchp)
+		if (*userp != *treep)
+			return (*userp < *treep ? -1 : 1);
+
+	/* Contents are equal up to the smallest length. */
+	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
+}
+
+#define	WT_BTREE_CMP_SKIP(s, bt, k1, k2, cmp, matchp)			\
+	(((bt)->collator == NULL) ?					\
+	(((cmp) = __wt_btree_lex_compare_skip((k1), (k2), matchp)), 0) :\
+	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
+	    (k1), (k2), &(cmp)))
+
+/*
  * __wt_btree_mergeable --
  *      Determines whether the given page is a candidate for merging.
  */
