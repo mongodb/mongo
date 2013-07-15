@@ -155,6 +155,7 @@ clientHeaderDirectories = [
     "db/",
     "db/auth/",
     "db/stats/",
+    "db/storage/",
     "db/repl/",
     "db/ops/",
     "logger/",
