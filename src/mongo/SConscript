@@ -360,7 +360,9 @@ env.StaticLibrary("coredb", [
                            'expressions_geo',
                            'expressions_where',
                            'db/exec/working_set',
-                           '$BUILD_DIR/mongo/foundation'])
+                           '$BUILD_DIR/mongo/foundation',
+                           '$BUILD_DIR/third_party/shim_snappy',
+                           ])
 
 coreServerFiles = [ "db/client_basic.cpp",
                     "util/net/miniwebserver.cpp",
