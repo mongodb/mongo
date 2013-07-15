@@ -367,15 +367,18 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	 * a WT_IKEY structure, otherwise, WT_REF.key.page references an on-page
 	 * key.
 	 *
-	 * Now the magic: any allocated memory will have a low-order bit of 0.
-	 * We can fit the maximum page size in 31 bits, so we use a low-order
-	 * bit of 1 in the first field of WT_REF.key.page to indicate the other
-	 * 7 bits are a page offset, and it's not a WT_IKEY pointer.  This will
-	 * break if not a little-endian machine or a compiler does something
-	 * magical.  I think we're safe: C99 requires union elements have the
-	 * same initial address, the only thing the compiler can do is re-order
-	 * the WT_REF.key.page.{offset,len} fields, and there's no reason to do
-	 * that (and just in case, we verify it as part of the build process).
+	 * Now the magic: Any allocated memory will have a low-order bit of 0
+	 * (the return from malloc must be aligned to store any standard type,
+	 * and there's always going to be a standard type requiring even-byte
+	 * alignment).  We can fit the maximum page size in 31 bits, so we use
+	 * a low-order bit of 1 in the first field of WT_REF.key.page to
+	 * indicate the other 7 bits are a page offset, and it's not a WT_IKEY
+	 * pointer.  This breaks if not a little-endian machine or a compiler
+	 * does something magical.  I think we're safe: C99 requires union
+	 * elements have the same initial address, the only thing the compiler
+	 * can do is re-order the WT_REF.key.page.{offset,len} fields, and there
+	 * 's no reason to do that (and just in case, we verify it as part of
+	 * the build process).
 	 */
 	offset = ref->key.page.offset;
 	if (offset & 0x01) {
