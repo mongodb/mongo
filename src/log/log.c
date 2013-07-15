@@ -602,15 +602,12 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 */
 		if (reclen == 0) {
 			/*
-			 * This LSN is the end.  Truncate.
+			 * This LSN is the end.  Truncate if we're in recovery
+			 * otherwise, just stop.
 			 */
-			if (LF_ISSET(WT_LOGSCAN_RECOVER)) {
+			if (LF_ISSET(WT_LOGSCAN_RECOVER))
 				WT_ERR(__log_truncate(session, &rd_lsn));
-				break;
-			} else {
-				ret = WT_NOTFOUND;
-				goto err;
-			}
+			break;
 		}
 		if (reclen > WT_MAX_LOG_OFFSET) {
 			ret = WT_NOTFOUND;
