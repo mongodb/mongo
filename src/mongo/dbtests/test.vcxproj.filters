@@ -3495,9 +3495,6 @@
     <ClCompile Include="..\util\histogram.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="jsobjhashingtests.cpp">
-      <Filter>dbtests</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\hasher.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>

@@ -42,5 +42,16 @@ env.CppUnitTest(
     source= 'field_parser_test.cpp',
     LIBDEPS=[
         'common',
-   ],
+    ],
+)
+
+env.CppUnitTest(
+    target= 'hasher_test',
+    source= [
+        'hasher_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+        '$BUILD_DIR/mongo/mongohasher',
+    ],
 )
