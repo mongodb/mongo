@@ -176,14 +176,15 @@ struct __wt_dsrc_stats {
 	WT_STATS lsm_generation_max;
 	WT_STATS lsm_lookup_no_bloom;
 	WT_STATS rec_dictionary;
-	WT_STATS rec_ovfl_key;
-	WT_STATS rec_ovfl_value;
+	WT_STATS rec_overflow_key_internal;
+	WT_STATS rec_overflow_key_leaf;
+	WT_STATS rec_overflow_value;
 	WT_STATS rec_page_delete;
 	WT_STATS rec_page_merge;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;
 	WT_STATS rec_skipped_update;
-	WT_STATS rec_split_intl;
+	WT_STATS rec_split_internal;
 	WT_STATS rec_split_leaf;
 	WT_STATS rec_split_max;
 	WT_STATS session_compact;

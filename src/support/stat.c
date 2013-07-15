@@ -92,8 +92,12 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->lsm_lookup_no_bloom.desc =
 	    "queries that could have benefited from a Bloom filter that did not exist";
 	stats->rec_dictionary.desc = "reconciliation dictionary matches";
-	stats->rec_ovfl_key.desc = "reconciliation overflow keys written";
-	stats->rec_ovfl_value.desc = "reconciliation overflow values written";
+	stats->rec_overflow_key_internal.desc =
+	    "reconciliation internal-page overflow keys";
+	stats->rec_overflow_key_leaf.desc =
+	    "reconciliation leaf-page overflow keys";
+	stats->rec_overflow_value.desc =
+	    "reconciliation overflow values written";
 	stats->rec_page_delete.desc = "reconciliation pages deleted";
 	stats->rec_page_merge.desc = "reconciliation pages merged";
 	stats->rec_pages.desc = "page reconciliation calls";
@@ -101,7 +105,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "page reconciliation calls for eviction";
 	stats->rec_skipped_update.desc =
 	    "reconciliation failed because an update could not be included";
-	stats->rec_split_intl.desc = "reconciliation internal pages split";
+	stats->rec_split_internal.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
 	stats->rec_split_max.desc =
 	    "reconciliation maximum number of splits created for a page";
@@ -187,14 +191,15 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->lsm_generation_max.v = 0;
 	stats->lsm_lookup_no_bloom.v = 0;
 	stats->rec_dictionary.v = 0;
-	stats->rec_ovfl_key.v = 0;
-	stats->rec_ovfl_value.v = 0;
+	stats->rec_overflow_key_internal.v = 0;
+	stats->rec_overflow_key_leaf.v = 0;
+	stats->rec_overflow_value.v = 0;
 	stats->rec_page_delete.v = 0;
 	stats->rec_page_merge.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
 	stats->rec_skipped_update.v = 0;
-	stats->rec_split_intl.v = 0;
+	stats->rec_split_internal.v = 0;
 	stats->rec_split_leaf.v = 0;
 	stats->rec_split_max.v = 0;
 	stats->session_compact.v = 0;
@@ -271,14 +276,15 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 	    p->lsm_generation_max.v = c->lsm_generation_max.v;
 	p->lsm_lookup_no_bloom.v += c->lsm_lookup_no_bloom.v;
 	p->rec_dictionary.v += c->rec_dictionary.v;
-	p->rec_ovfl_key.v += c->rec_ovfl_key.v;
-	p->rec_ovfl_value.v += c->rec_ovfl_value.v;
+	p->rec_overflow_key_internal.v += c->rec_overflow_key_internal.v;
+	p->rec_overflow_key_leaf.v += c->rec_overflow_key_leaf.v;
+	p->rec_overflow_value.v += c->rec_overflow_value.v;
 	p->rec_page_delete.v += c->rec_page_delete.v;
 	p->rec_page_merge.v += c->rec_page_merge.v;
 	p->rec_pages.v += c->rec_pages.v;
 	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
 	p->rec_skipped_update.v += c->rec_skipped_update.v;
-	p->rec_split_intl.v += c->rec_split_intl.v;
+	p->rec_split_internal.v += c->rec_split_internal.v;
 	p->rec_split_leaf.v += c->rec_split_leaf.v;
 	if (c->rec_split_max.v > p->rec_split_max.v)
 	    p->rec_split_max.v = c->rec_split_max.v;

@@ -286,16 +286,19 @@ dsrc_stats = [
 	# Reconciliation statistics
 	##########################################
 	Stat('rec_dictionary', 'reconciliation dictionary matches'),
-	Stat('rec_ovfl_key', 'reconciliation overflow keys written'),
-	Stat('rec_ovfl_value', 'reconciliation overflow values written'),
+	Stat('rec_overflow_key_internal',
+	    'reconciliation internal-page overflow keys'),
+	Stat('rec_overflow_key_leaf', 'reconciliation leaf-page overflow keys'),
+	Stat('rec_overflow_value', 'reconciliation overflow values written'),
 	Stat('rec_page_delete', 'reconciliation pages deleted'),
 	Stat('rec_page_merge', 'reconciliation pages merged'),
 	Stat('rec_pages', 'page reconciliation calls'),
 	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
 	Stat('rec_skipped_update',
 	    'reconciliation failed because an update could not be included'),
-	Stat('rec_split_intl', 'reconciliation internal pages split'),
+	Stat('rec_split_internal', 'reconciliation internal pages split'),
 	Stat('rec_split_leaf', 'reconciliation leaf pages split'),
+
 	Stat('rec_split_max',
 	    'reconciliation maximum number of splits created for a page',
 	    'max_aggregate,no_scale'),

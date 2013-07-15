@@ -414,7 +414,7 @@ extern int __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_row_key_copy( WT_SESSION_IMPL *session,
+extern int __wt_row_leaf_key_copy( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
     WT_ITEM *retb);

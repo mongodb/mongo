@@ -36,12 +36,12 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
 		WT_ASSERT(session, ref == NULL ||
-		    ref->u.recno == page->u.intl.recno);
+		    ref->key.recno == page->u.intl.recno);
 
 		/* Fast path appends. */
 		base = page->entries;
 		ref = &page->u.intl.t[base - 1];
-		if (recno >= ref->u.recno)
+		if (recno >= ref->key.recno)
 			goto descend;
 
 		/* Binary search of internal pages. */
@@ -50,9 +50,9 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			indx = base + (limit >> 1);
 			ref = page->u.intl.t + indx;
 
-			if (recno == ref->u.recno)
+			if (recno == ref->key.recno)
 				break;
-			if (recno < ref->u.recno)
+			if (recno < ref->key.recno)
 				continue;
 			base = indx + 1;
 			--limit;
@@ -67,7 +67,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != ref->u.recno) {
+		if (recno != ref->key.recno) {
 			/*
 			 * We don't have to correct for base == 0 because the
 			 * only way for base to be 0 is if recno is the page's

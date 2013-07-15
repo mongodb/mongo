@@ -30,8 +30,8 @@
  *	Keys with optional data cells (a WT_CELL_KEY or WT_CELL_KEY_OVFL cell,
  *	optionally followed by a WT_CELL_{VALUE,VALUE_COPY,VALUE_OVFL} cell).
  *
- * Both WT_PAGE_ROW_INT and WT_PAGE_ROW_LEAF pages prefix compress keys, using
- * a single byte immediately following the cell.
+ *	WT_PAGE_ROW_LEAF pages prefix compress keys, using a single byte count
+ * immediately following the cell.
  *
  * WT_PAGE_COL_INT (Column-store internal page):
  *	Off-page references (a WT_CELL_{ADDR,ADDR_LNO} cell).
@@ -298,11 +298,41 @@ __wt_cell_pack_del(WT_CELL *cell, uint64_t rle)
 }
 
 /*
- * __wt_cell_pack_key --
- *	Set a key's WT_CELL contents.
+ * __wt_cell_pack_int_key --
+ *	Set a row-store internal page key's WT_CELL contents.
  */
 static inline uint32_t
-__wt_cell_pack_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
+__wt_cell_pack_int_key(WT_CELL *cell, uint32_t size)
+{
+	uint8_t byte, *p;
+
+	/*
+	 * Short keys have 6-bits of length in the descriptor byte and no length
+	 * bytes.
+	 *
+	 * Bit 0 is 0, bit 1 is the WT_CELL_KEY_SHORT flag; the other 6 bits are
+	 * the size.
+	 */
+	if (size <= 0x3f) {
+		byte = (uint8_t)size;
+		cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
+		return (1);
+	}
+
+	cell->__chunk[0] = WT_CELL_KEY;		/* Type */
+
+	p = cell->__chunk + 1;			/* Length */
+	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
+
+	return (WT_PTRDIFF32(p, cell));
+}
+
+/*
+ * __wt_cell_pack_leaf_key --
+ *	Set a row-store leaf page key's WT_CELL contents.
+ */
+static inline uint32_t
+__wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 {
 	uint8_t byte, *p;
 
@@ -446,7 +476,8 @@ __wt_cell_type_raw(WT_CELL *cell)
  *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
+__wt_cell_unpack_safe(
+    WT_CELL *cell, int type, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
 	uint64_t v;
 	const uint8_t *p;
@@ -506,14 +537,21 @@ restart:
 	switch (unpack->raw) {
 	case WT_CELL_KEY_SHORT:
 		/*
-		 * Check the prefix byte that follows the cell descriptor byte.
+		 * Check the prefix byte that follows the cell descriptor byte
+		 * on row-store leaf pages.
 		 */
-		WT_CELL_LEN_CHK(cell, 1);
-		unpack->prefix = cell->__chunk[1];
+		if (type == WT_PAGE_ROW_LEAF) {
+			WT_CELL_LEN_CHK(cell, 1);
+			unpack->prefix = cell->__chunk[1];
 
-		unpack->data = cell->__chunk + 2;
-		unpack->size = cell->__chunk[0] >> 2;
-		unpack->__len = 2 + unpack->size;
+			unpack->data = cell->__chunk + 2;
+			unpack->size = cell->__chunk[0] >> 2;
+			unpack->__len = 2 + unpack->size;
+		} else {
+			unpack->data = cell->__chunk + 1;
+			unpack->size = cell->__chunk[0] >> 2;
+			unpack->__len = 1 + unpack->size;
+		}
 		goto done;
 	case WT_CELL_VALUE_SHORT:
 		/*
@@ -532,10 +570,8 @@ restart:
 	 */
 	p = (uint8_t *)cell + 1;			/* skip cell */
 
-	if (unpack->raw == WT_CELL_KEY) {
-		/*
-		 * Check the prefix byte that follows the cell descriptor byte.
-		 */
+	/* Check the prefix byte that follows the cell descriptor byte. */
+	if (unpack->raw == WT_CELL_KEY && type == WT_PAGE_ROW_LEAF) {
 		++p;					/* skip prefix */
 		WT_CELL_LEN_CHK(p, 0);
 		unpack->prefix = cell->__chunk[1];
@@ -614,9 +650,9 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
  *	Unpack a WT_CELL into a structure.
  */
 static inline void
-__wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
+__wt_cell_unpack(WT_CELL *cell, int type, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+	(void)__wt_cell_unpack_safe(cell, type, unpack, NULL);
 }
 
 /*
@@ -625,7 +661,7 @@ __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
  */
 static inline int
 __wt_cell_unpack_ref(
-    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	WT_BTREE *btree;
 	void *huffman;
@@ -637,6 +673,9 @@ __wt_cell_unpack_ref(
 	case WT_CELL_KEY:
 		store->data = unpack->data;
 		store->size = unpack->size;
+		if (type == WT_PAGE_ROW_INT)
+			return (0);
+
 		huffman = btree->huffman_key;
 		break;
 	case WT_CELL_VALUE:
@@ -646,6 +685,9 @@ __wt_cell_unpack_ref(
 		break;
 	case WT_CELL_KEY_OVFL:
 		WT_RET(__wt_ovfl_read(session, unpack, store));
+		if (type == WT_PAGE_ROW_INT)
+			return (0);
+
 		huffman = btree->huffman_key;
 		break;
 	case WT_CELL_VALUE_OVFL:
@@ -666,7 +708,7 @@ __wt_cell_unpack_ref(
  */
 static inline int
 __wt_cell_unpack_copy(
-    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	/*
 	 * We have routines to both copy and reference a cell's information.  In
@@ -677,7 +719,7 @@ __wt_cell_unpack_copy(
 	 * the underlying object.  If that happens, we're done, otherwise make
 	 * a copy.
 	 */
-	WT_RET(__wt_cell_unpack_ref(session, unpack, store));
+	WT_RET(__wt_cell_unpack_ref(session, type, unpack, store));
 	if (store->mem != NULL &&
 	    store->data >= store->mem &&
 	    WT_PTRDIFF(store->data, store->mem) < store->memsize)
