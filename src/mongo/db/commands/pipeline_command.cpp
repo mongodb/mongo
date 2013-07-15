@@ -78,6 +78,8 @@ namespace mongo {
         fassert(16960, !cursor->c()->requiresLock());
 
         try {
+            const string cursorNs = cursor->ns(); // we need this after cursor may have been deleted
+
             // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
             BSONArrayBuilder resultsArray;
             const int byteLimit = MaxBytesToReturnToClientAtOnce;
@@ -96,11 +98,12 @@ namespace mongo {
                 pin.release();
                 ClientCursor::erase(id);
                 id = 0;
+                cursor = NULL; // make it an obvious error to use cursor after this point
             }
 
             BSONObjBuilder cursorObj(result.subobjStart("cursor"));
             cursorObj.append("id", id);
-            cursorObj.append("ns", cursor->ns());
+            cursorObj.append("ns", cursorNs);
             cursorObj.append("firstBatch", resultsArray.arr());
             cursorObj.done();
         }
