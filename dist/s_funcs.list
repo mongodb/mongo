@@ -5,6 +5,7 @@ __bit_nclr
 __wt_bloom_drop
 __wt_bloom_get
 __wt_btree_lex_compare
+__wt_btree_lex_compare_skip
 __wt_cache_dump
 __wt_config_getone
 __wt_debug_addr
