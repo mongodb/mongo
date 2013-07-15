@@ -406,8 +406,9 @@ namespace mongo {
         }
 
         {
-            // NOTE: This lock prevents the ns version from changing while a write operation occurs.
-            Lock::DBRead readLk(ns);
+            // NOTE: This lock prevents the collection metadata changing while other operations hold
+            // a read or write lock.
+            Lock::DBWrite writeLk(ns);
             
             // This lock prevents simultaneous metadata changes using the same map
             scoped_lock lk( _mutex );
@@ -756,8 +757,6 @@ namespace mongo {
             // this is because of a weird segfault I saw and I can't see why this should ever be set
             massert( 13647 , str::stream() << "context should be empty here, is: " << cc().getContext()->ns() , cc().getContext() == 0 ); 
         
-            Lock::GlobalWrite setShardVersionLock; // TODO: can we get rid of this??
-            
             if ( oldVersion.isSet() && ! globalVersion.isSet() ) {
                 // this had been reset
                 info->setVersion( ns , ChunkVersion( 0, OID() ) );
@@ -777,11 +776,17 @@ namespace mongo {
                     errmsg = "dropping needs to be authoritative";
                     return false;
                 }
-                log() << "wiping data for: " << ns << endl;
+                log() << "dropping collection metadata for " << ns << endl;
                 globalVersion.addToBSON( result, "beforeDrop" );
                 // only setting global version on purpose
                 // need clients to re-find meta-data
-                shardingState.resetVersion( ns );
+
+                {
+                    Lock::DBWrite writeLk( ns );
+                    shardingState.resetVersion( ns );
+                }
+
+                log() << "dropped collection metadata for " << ns << endl;
                 info->setVersion( ns , ChunkVersion( 0, OID() ) );
                 return true;
             }
@@ -799,7 +804,6 @@ namespace mongo {
             if ( version < globalVersion && version.hasCompatibleEpoch( globalVersion ) ) {
                 while ( shardingState.inCriticalMigrateSection() ) {
                     log() << "waiting till out of critical section" << endl;
-                    dbtemprelease r;
                     shardingState.waitTillNotInCriticalSection( 10 );
                 }
                 errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
@@ -815,7 +819,6 @@ namespace mongo {
                 // should require a reload.
                 while ( shardingState.inCriticalMigrateSection() ) {
                     log() << "waiting till out of critical section" << endl;
-                    dbtemprelease r;
                     shardingState.waitTillNotInCriticalSection( 10 );
                 }
 
@@ -826,30 +829,22 @@ namespace mongo {
                 return false;
             }
 
-            Timer relockTime;
-            {
-                dbtemprelease unlock;
+            ChunkVersion currVersion = version;
+            if ( ! shardingState.trySetVersion( ns , currVersion, false ) ) {
+                errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
+                result.append( "ns" , ns );
 
-                ChunkVersion currVersion = version;
-                if ( ! shardingState.trySetVersion( ns , currVersion, false ) ) {
-                    errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
-                    result.append( "ns" , ns );
-
-                    // If this was a reset of a collection, inform mongos to do a full reload
-                    if( ! currVersion.isSet()  ){
-                        ChunkVersion( 0, OID() ).addToBSON( result, "version" );
-                        result.appendBool( "reloadConfig", true );
-                    }
-                    else{
-                        version.addToBSON( result, "version" );
-                    }
-
-                    globalVersion.addToBSON( result, "globalVersion" );
-                    return false;
+                // If this was a reset of a collection, inform mongos to do a full reload
+                if( ! currVersion.isSet()  ){
+                    ChunkVersion( 0, OID() ).addToBSON( result, "version" );
+                    result.appendBool( "reloadConfig", true );
                 }
-            }
-            if ( relockTime.millis() >= ( cmdLine.slowMS - 10 ) ) {
-                log() << "setShardVersion - relocking slow: " << relockTime.millis() << endl;
+                else{
+                    version.addToBSON( result, "version" );
+                }
+
+                globalVersion.addToBSON( result, "globalVersion" );
+                return false;
             }
             
             info->setVersion( ns , version );
