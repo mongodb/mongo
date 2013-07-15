@@ -36,6 +36,7 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <snappy.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
@@ -181,14 +182,38 @@ namespace mongo {
             }
 
             void fill() {
-                int32_t blockSize;
-                read(&blockSize, sizeof(blockSize));
+                int32_t rawSize;
+                read(&rawSize, sizeof(rawSize));
                 if (_done) return;
+
+                // negative size means compressed
+                const bool compressed = rawSize < 0;
+                const int32_t blockSize = std::abs(rawSize);
 
                 _buffer.reset(new char[blockSize]);
                 read(_buffer.get(), blockSize);
                 massert(16816, "file too short?", !_done);
-                _reader.reset(new BufReader(_buffer.get(), blockSize));
+
+                if (!compressed) {
+                    _reader.reset(new BufReader(_buffer.get(), blockSize));
+                    return;
+                }
+
+                dassert(snappy::IsValidCompressedBuffer(_buffer.get(), blockSize));
+
+                size_t uncompressedSize;
+                massert(17061, "couldn't get uncompressed length",
+                        snappy::GetUncompressedLength(_buffer.get(), blockSize, &uncompressedSize));
+
+                boost::scoped_array<char> decompressionBuffer(new char[uncompressedSize]);
+                massert(17062, "decompression failed",
+                        snappy::RawUncompress(_buffer.get(),
+                                              blockSize,
+                                              decompressionBuffer.get()));
+
+                // hold on to decompressed data and throw out compressed data at block exit
+                _buffer.swap(decompressionBuffer);
+                _reader.reset(new BufReader(_buffer.get(), uncompressedSize));
             }
 
             // sets _done to true on EOF - asserts on any other error
@@ -666,13 +691,23 @@ namespace mongo {
 
     template <typename Key, typename Value>
     void SortedFileWriter<Key, Value>::spill() {
-        const int32_t size = _buffer.len();
-        if (size == 0)
+        if (_buffer.len() == 0)
             return;
 
+        std::string compressed;
+        snappy::Compress(_buffer.buf(), _buffer.len(), &compressed);
+        verify(compressed.size() <= std::numeric_limits<int32_t>::max());
+
         try {
-            _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
-            _file.write(_buffer.buf(), size);
+            if (compressed.size() < _buffer.len()/9*10) {
+                const int32_t size = -compressed.size(); // negative means compressed
+                _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+                _file.write(compressed.data(), compressed.size());
+            } else {
+                const int32_t size = _buffer.len();
+                _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+                _file.write(_buffer.buf(), _buffer.len());
+            }
         } catch (const std::exception&) {
             msgasserted(16821, str::stream() << "error writing to file \"" << _fileName << "\": "
                                              << sorter::myErrnoWithDescription());
