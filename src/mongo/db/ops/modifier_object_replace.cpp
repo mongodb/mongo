@@ -71,14 +71,15 @@ namespace mongo {
     Status ModifierObjectReplace::prepare(mutablebson::Element root,
                                           const StringData& matchedField,
                                           ExecInfo* execInfo) {
-        BSONObj objOld = root.getDocument().getObject();
+        _preparedState.reset(new PreparedState(&root.getDocument()));
 
         // objectSize checked by binaryEqual (optimization)
+        BSONObj objOld = root.getDocument().getObject();
         if (objOld.binaryEqual(_val)) {
             _preparedState->noOp = true;
             execInfo->noOp = true;
         }
-        _preparedState.reset(new PreparedState(&root.getDocument()));
+
         return Status::OK();
     }
 
