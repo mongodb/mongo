@@ -5,12 +5,21 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_BTREE_MAJOR_VERSION	1	/* Version */
-#define	WT_BTREE_MINOR_VERSION	0
+/*
+ * Supported btree formats: the "current" version is the maximum supported
+ * major/minor versions.
+ */
+#define	WT_BTREE_MAJOR_VERSION_MIN	1	/* Oldest version supported */
+#define	WT_BTREE_MINOR_VERSION_MIN	1
+
+#define	WT_BTREE_MAJOR_VERSION_MAX	1	/* Newest version supported */
+#define	WT_BTREE_MINOR_VERSION_MAX	1
 
 /*
- * The maximum btree leaf and internal page size is 512MB. (The maximum of
- * 512MB is enforced by the software, it could be set as high as 4GB.)
+ * The maximum btree leaf and internal page size is 512MB (2^29).  The maximum
+ * of 512MB is enforced by the software, it could be set as high as 2GB (2^31).
+ * (The limit of 31 bits is because we steal a single bit from page offsets in
+ * the WT_REF structure, see __wt_ref_key.)
  */
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 

@@ -289,7 +289,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				++recno;
 			else {
-				__wt_cell_unpack(cell, unpack);
+				__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
 				recno += __wt_cell_rle(unpack);
 			}
 		vs->record_total += recno;
@@ -321,7 +321,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 	if (WT_PAGE_IS_ROOT(page))
 		lno = 0;
 	else {
-		__wt_cell_unpack(page->ref->addr, unpack);
+		__wt_cell_unpack(page->ref->addr, page->type, unpack);
 		lno = unpack->raw == WT_CELL_ADDR_LNO ? 1 : 0;
 	}
 	switch (page->type) {
@@ -361,8 +361,9 @@ recno_chk:	if (recno != vs->record_total + 1)
 			 * reviewed to this point.
 			 */
 			++entry;
-			if (ref->u.recno != vs->record_total + 1) {
-				__wt_cell_unpack(ref->addr, unpack);
+			if (ref->key.recno != vs->record_total + 1) {
+				__wt_cell_unpack(
+				    ref->addr, WT_PAGE_COL_INT, unpack);
 				WT_RET_MSG(session, WT_ERROR,
 				    "the starting record number in entry %"
 				    PRIu32 " of the column internal page at "
@@ -371,7 +372,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 				    entry,
 				    __wt_page_addr_string(
 				    session, vs->tmp1, page),
-				    ref->u.recno,
+				    ref->key.recno,
 				    vs->record_total + 1);
 			}
 
@@ -381,7 +382,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);
 
-			__wt_cell_unpack(ref->addr, unpack);
+			__wt_cell_unpack(ref->addr, WT_PAGE_COL_INT, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
 		}
@@ -409,7 +410,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);
 
-			__wt_cell_unpack(ref->addr, unpack);
+			__wt_cell_unpack(ref->addr, WT_PAGE_ROW_INT, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
 		}
@@ -428,7 +429,6 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_REF *ref, uint32_t entry, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
-	WT_IKEY *ikey;
 	WT_ITEM item;
 	int cmp;
 
@@ -437,10 +437,8 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr->size != 0);
 
-	/* Set up the key structure. */
-	ikey = ref->u.key;
-	item.data = WT_IKEY_DATA(ikey);
-	item.size = ikey->size;
+	/* Get the current key. */
+	__wt_ref_key(page, ref, &item.data, &item.size);
 
 	/* Compare the key against the largest key we've seen so far. */
 	WT_RET(WT_BTREE_CMP(session, btree, &item, vs->max_key, cmp));
@@ -487,8 +485,8 @@ __verify_row_leaf_key_order(
 	 * are all empty entries).
 	 */
 	if (vs->max_addr->size != 0) {
-		WT_RET(
-		    __wt_row_key_copy(session, page, page->u.row.d, vs->tmp1));
+		WT_RET(__wt_row_leaf_key_copy(
+		    session, page, page->u.row.d, vs->tmp1));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -512,7 +510,7 @@ __verify_row_leaf_key_order(
 	}
 
 	/* Update the largest key we've seen to the last key on this page. */
-	WT_RET(__wt_row_key_copy(session,
+	WT_RET(__wt_row_leaf_key_copy(session,
 	    page, page->u.row.d + (page->entries - 1), vs->max_key));
 	(void)__wt_page_addr_string(session, vs->max_addr, page);
 
@@ -549,7 +547,7 @@ __verify_overflow_cell(
 	cell_num = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++cell_num;
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, dsk->type, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:

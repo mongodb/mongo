@@ -413,14 +413,27 @@ struct __wt_ref {
 
 	void	*addr;			/* On-page cell or off_page WT_ADDR */
 
+	/*
+	 * The child page's key.  Do NOT change this union without reviewing
+	 * __wt_ref_key.
+	 */
 	union {
 		uint64_t recno;		/* Column-store: starting recno */
-		void	*key;		/* Row-store: on-page cell or WT_IKEY */
-	} u;
+		void	*ikey;		/* Row-store: instantiated key */
+		uint64_t page;		/* Row-store: on-page key */
+	} key;
+
 	uint64_t txnid;			/* Transaction ID */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
+
+	uint32_t unused;
 };
+/*
+ * WT_REF_SIZE is the expected structure size -- we verify the build to ensure
+ * the compiler hasn't inserted padding which would break the world.
+ */
+#define	WT_REF_SIZE	40
 
 /*
  * WT_REF_FOREACH --

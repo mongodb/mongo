@@ -158,8 +158,8 @@ __verify_dsk_row(
 
 	btree = S2BT(session);
 	bm = btree->bm;
-	huffman = btree->huffman_key;
 	unpack = &_unpack;
+	huffman = dsk->type == WT_PAGE_ROW_INT ? NULL : btree->huffman_key;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
 	WT_ERR(__wt_scr_alloc(session, 0, &last_pfx));
@@ -174,7 +174,7 @@ __verify_dsk_row(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0) {
+		if (__wt_cell_unpack_safe(cell, dsk->type, unpack, end) != 0) {
 			ret = __err_cell_corrupted(session, cell_num, addr);
 			goto err;
 		}
@@ -254,7 +254,8 @@ __verify_dsk_row(
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_KEY_OVFL:
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, dsk->type, unpack, current));
 			goto key_compare;
 		default:
 			/* Not a key -- continue with the next cell. */
@@ -291,7 +292,8 @@ __verify_dsk_row(
 		 * much.
 		 */
 		if (huffman != NULL) {
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, dsk->type, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
@@ -399,7 +401,8 @@ __verify_dsk_col_int(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
+		if (__wt_cell_unpack_safe(
+		    cell, WT_PAGE_COL_INT, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */
@@ -464,7 +467,8 @@ __verify_dsk_col_var(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
+		if (__wt_cell_unpack_safe(
+		    cell, WT_PAGE_COL_VAR, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */

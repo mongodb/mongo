@@ -232,7 +232,7 @@ file_config = format_meta + [
 		written into the buffer cache''',
 		min=0),
 	Config('prefix_compression', 'true', r'''
-		configure row-store format key prefix compression''',
+		configure prefix compression on row-store leaf pages''',
 		type='boolean'),
 	Config('split_pct', '75', r'''
 		the Btree page split size as a percentage of the maximum Btree

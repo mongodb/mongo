@@ -188,7 +188,7 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * so, free it.
 	 */
 	WT_REF_FOREACH(page, ref, i) {
-		if ((ikey = ref->u.key) != NULL)
+		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
 			__wt_free(session, ikey);
 		if (ref->addr != NULL &&
 		    __wt_off_page(page, ref->addr)) {

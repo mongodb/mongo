@@ -217,7 +217,7 @@ new_page:	/* Find the matching WT_COL slot. */
 		if (cbt->cip_saved != cip) {
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
 				continue;
-			__wt_cell_unpack(cell, &unpack);
+			__wt_cell_unpack(cell, WT_PAGE_COL_VAR, &unpack);
 			if (unpack.type == WT_CELL_DEL)
 				continue;
 
@@ -229,8 +229,8 @@ new_page:	/* Find the matching WT_COL slot. */
 			 * the page's reconciliation structures, and that's as
 			 * easy here as higher up the stack.
 			 */
-			if ((ret = __wt_cell_unpack_ref(
-			    session, &unpack, &cbt->tmp)) == WT_RESTART)
+			if ((ret = __wt_cell_unpack_ref(session,
+			    WT_PAGE_COL_VAR, &unpack, &cbt->tmp)) == WT_RESTART)
 				ret = __wt_ovfl_cache_col_restart(
 				    session, cbt->page, &unpack, &cbt->tmp);
 			WT_RET(ret);

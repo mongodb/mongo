@@ -109,7 +109,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *srch_key;
 	WT_PAGE *page;
 	WT_REF *ref;
@@ -139,10 +138,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			goto descend;
 
 		/* Fast-path appends. */
-		ikey = ref->u.key;
-		item->data = WT_IKEY_DATA(ikey);
-		item->size = ikey->size;
-
+		__wt_ref_key(page, ref, &item->data, &item->size);
 		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
 		if (cmp >= 0)
 			goto descend;
@@ -171,9 +167,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			 * application stores a new, "smallest" key in the tree.
 			 */
 			if (indx != 0) {
-				ikey = ref->u.key;
-				item->data = WT_IKEY_DATA(ikey);
-				item->size = ikey->size;
+				__wt_ref_key(
+				    page, ref, &item->data, &item->size);
 				match = WT_MIN(skiplow, skiphigh);
 				WT_ERR(WT_BTREE_CMP_SKIP(session,
 				    btree, srch_key, item, cmp, &match));
@@ -245,7 +240,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-		WT_ERR(__wt_row_key(session, page, rip, item, 1));
+		WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 		match = WT_MIN(skiplow, skiphigh);
 		WT_ERR(WT_BTREE_CMP_SKIP(
 		    session, btree, srch_key, item, cmp, &match));
