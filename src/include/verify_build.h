@@ -43,17 +43,9 @@
 static inline void
 __wt_verify_build(void)
 {
-	WT_REF ref;
-
 	/* Check specific structures weren't padded. */
 	SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
 	SIZE_CHECK(WT_REF, WT_REF_SIZE);
-
-	/*
-	 * There's magic in the WT_REF.key field layout, check nothing bad
-	 * happened.
-	 */
-	STATIC_ASSERT((void *)&ref.key.page.offset == (void *)&ref.key.ikey);
 
 	/*
 	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because

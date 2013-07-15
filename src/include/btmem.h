@@ -415,16 +415,12 @@ struct __wt_ref {
 
 	/*
 	 * The child page's key.  Do NOT change this union without reviewing
-	 * __wt_ref_key, changing the sizes or ordering of the fields would
-	 * break the world.
+	 * __wt_ref_key.
 	 */
 	union {
 		uint64_t recno;		/* Column-store: starting recno */
 		void	*ikey;		/* Row-store: instantiated key */
-		struct {		/* Row-store: on-page key */
-			uint32_t offset;
-			uint32_t size;
-		} page;
+		uint64_t page;		/* Row-store: on-page key */
 	} key;
 
 	uint64_t txnid;			/* Transaction ID */

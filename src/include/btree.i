@@ -354,13 +354,12 @@ __wt_off_page(WT_PAGE *page, const void *p)
 
 /*
  * __wt_ref_key --
- *	Return a reference to an internal page key as cheaply as possible.
+ *	Return a reference to a row-store internal page key as cheaply as
+ * possible.
  */
 static inline void
 __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 {
-	uint32_t offset;
-
 	/*
 	 * An internal page key is in one of two places: if we instantiated the
 	 * key (for example, when reading the page), WT_REF.key.ikey references
@@ -369,21 +368,19 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	 *
 	 * Now the magic: Any allocated memory will have a low-order bit of 0
 	 * (the return from malloc must be aligned to store any standard type,
-	 * and there's always going to be a standard type requiring even-byte
-	 * alignment).  We can fit the maximum page size in 31 bits, so we use
-	 * a low-order bit of 1 in the first field of WT_REF.key.page to
-	 * indicate the other 7 bits are a page offset, and it's not a WT_IKEY
-	 * pointer.  This breaks if not a little-endian machine or a compiler
-	 * does something magical.  I think we're safe: C99 requires union
-	 * elements have the same initial address, the only thing the compiler
-	 * can do is re-order the WT_REF.key.page.{offset,len} fields and there
-	 * is no reason to do that (and just in case, we verify it as part of
-	 * the build process).
+	 * and we assume there's always going to be a standard type requiring
+	 * even-byte alignment).  An on-page key consists of an offset/length
+	 * pair.  We can fit the maximum page size into 31 bits, so we use the
+	 * low-order bit in the on-page value to flag the next 31 bits as a
+	 * page offset and the other 32 bits as the key's length, not a WT_IKEY
+	 * pointer.  This breaks if allocation chunks aren't even-byte aligned
+	 * or pointers and uint64_t's don't always map their low-order bits to
+	 * the same location.
 	 */
-	offset = ref->key.page.offset;
-	if (offset & 0x01) {
-		*(void **)keyp = WT_PAGE_REF_OFFSET(page, offset >> 1);
-		*sizep = ref->key.page.size;
+	if (ref->key.page & 0x01) {
+		*(void **)keyp =
+		    WT_PAGE_REF_OFFSET(page, (ref->key.page & 0xFFFFFFFF) >> 1);
+		*sizep = (uint32_t)(ref->key.page >> 32);
 	} else {
 		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
 		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
@@ -400,9 +397,10 @@ __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK *unpack)
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	ref->key.page.offset =
-	    (WT_PAGE_DISK_OFFSET(page, unpack->data) << 1) | 0x01;
-	ref->key.page.size = unpack->size;
+	ref->key.page =
+	    (uint64_t)unpack->size << 32 |
+	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 1 |
+	    0x01;
 }
 
 /*
@@ -415,7 +413,7 @@ __wt_ref_key_instantiated(WT_REF *ref)
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	return (ref->key.page.offset & 0x01 ? NULL : ref->key.ikey);
+	return (ref->key.page & 0x01 ? NULL : ref->key.ikey);
 }
 
 /*
@@ -431,7 +429,8 @@ __wt_ref_key_clear(WT_REF *ref)
 
 /*
  * __wt_row_leaf_key --
- *	Set a buffer to reference a leaf page key as cheaply as possible.
+ *	Set a buffer to reference a row-store leaf page key as cheaply as
+ * possible.
  */
 static inline int
 __wt_row_leaf_key(WT_SESSION_IMPL *session,

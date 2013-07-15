@@ -14,9 +14,18 @@ static int
 __system_is_little_endian(void)
 {
 	uint64_t v;
+	int little;
 
 	v = 1;
-	return (*((uint8_t *)&v) == 0 ? 0 : 1);
+	little = *((uint8_t *)&v) == 0 ? 0 : 1;
+
+	if (little)
+		return (0);
+
+	fprintf(stderr,
+	    "This release of the WiredTiger data engine does not support "
+	    "big-endian systems; contact WiredTiger for more information.\n");
+	return (EINVAL);
 }
 
 static void
@@ -43,11 +52,7 @@ __wt_library_init(void)
 	static int first = 1;
 	WT_DECL_RET;
 
-	if (!__system_is_little_endian()) {
-		fprintf(stderr,
-		    "WiredTiger is not supported on big-endian systems\n");
-		return (EINVAL);
-	}
+	WT_RET(__system_is_little_endian());
 
 	/*
 	 * Do per-process initialization once, before anything else, but only
