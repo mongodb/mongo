@@ -431,7 +431,7 @@ struct __wt_ref {
 
 	volatile WT_PAGE_STATE state;	/* Page state */
 
-	int unused;
+	uint32_t unused;
 };
 /*
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure
