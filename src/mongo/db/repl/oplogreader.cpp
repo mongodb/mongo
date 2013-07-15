@@ -140,7 +140,7 @@ namespace mongo {
         if( conn() == 0 ) {
             _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false,
                                                                           0,
-                                                                          30 /* tcp timeout */));
+                                                                          tcp_timeout));
             string errmsg;
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
                  (AuthorizationManager::isAuthEnabled() && !replAuthenticate(_conn.get(), true)) ) {

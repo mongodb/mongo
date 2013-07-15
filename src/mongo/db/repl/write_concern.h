@@ -29,6 +29,8 @@ namespace mongo {
 
     class CurOp;
 
+    void updateSlaveLocations(BSONArray optimes);
+
     void updateSlaveLocation( CurOp& curop, const char * oplog_ns , OpTime lastOp );
 
     /** @return true if op has made it to w servers */

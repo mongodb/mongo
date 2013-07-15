@@ -26,6 +26,7 @@
 #include "mongo/db/repl/rs_exception.h"
 #include "mongo/db/repl/rs_member.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/util/concurrency/list.h"
 #include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -341,6 +342,8 @@ namespace mongo {
 
         StateBox box;
 
+        SyncSourceFeedback syncSourceFeedback;
+
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
         bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
@@ -505,6 +508,7 @@ namespace mongo {
         Member* head() const { return _members.head(); }
     public:
         const Member* findById(unsigned id) const;
+        Member* getMutableMember(unsigned id);
         Member* findByName(const std::string& hostname) const;
     private:
         void _getTargets(list<Target>&, int &configVersion);
