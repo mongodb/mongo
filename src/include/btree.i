@@ -376,8 +376,8 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	 * pointer.  This breaks if not a little-endian machine or a compiler
 	 * does something magical.  I think we're safe: C99 requires union
 	 * elements have the same initial address, the only thing the compiler
-	 * can do is re-order the WT_REF.key.page.{offset,len} fields, and there
-	 * 's no reason to do that (and just in case, we verify it as part of
+	 * can do is re-order the WT_REF.key.page.{offset,len} fields and there
+	 * is no reason to do that (and just in case, we verify it as part of
 	 * the build process).
 	 */
 	offset = ref->key.page.offset;
