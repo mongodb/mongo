@@ -22,7 +22,8 @@ flags = {
         'log_scan' : [
 		'LOGSCAN_FIRST',
 		'LOGSCAN_FROM_CKP',
-		'LOGSCAN_ONE'
+		'LOGSCAN_ONE',
+		'LOGSCAN_RECOVER'
         ],
         'log_write' : [
 		'LOG_CKPT',

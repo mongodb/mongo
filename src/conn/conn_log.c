@@ -48,7 +48,6 @@ static void *
 __log_archive_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(path);
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LSN lsn;
@@ -62,8 +61,6 @@ __log_archive_server(void *arg)
 	log = conn->log;
 	logcount = 0;
 	logfiles = NULL;
-
-	WT_ERR(__wt_scr_alloc(session, 0, &path));
 
 	/*
 	 * The log archive server may be running before the database is
@@ -96,14 +93,8 @@ __log_archive_server(void *arg)
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
-			if (lognum < lsn.file) {
-				WT_ERR(__wt_log_filename(
-				    session, lognum, path));
-				WT_VERBOSE_ERR(session, log,
-				    "log_archive: remove log %s",
-				    (char *)path->data);
-				WT_ERR(__wt_remove(session, path->data));
-			}
+			if (lognum < lsn.file)
+				WT_ERR(__wt_log_remove(session, lognum));
 			__wt_free(session, logfiles[i]);
 			logfiles[i] = NULL;
 		}
@@ -125,7 +116,6 @@ __log_archive_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log archive server error");
 	}
-	__wt_scr_free(&path);
 	if (logfiles != NULL) {
 		for (i = 0; i < logcount; i++)
 			if (logfiles[i] != NULL)

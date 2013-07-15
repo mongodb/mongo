@@ -673,6 +673,7 @@ extern int __wt_log_filename(WT_SESSION_IMPL *session,
 extern int __wt_log_extract_lognum( WT_SESSION_IMPL *session,
     const char *name,
     uint32_t *id);
+extern int __wt_log_remove(WT_SESSION_IMPL *session, uint32_t lognum);
 extern int __wt_log_open(WT_SESSION_IMPL *session);
 extern int __wt_log_close(WT_SESSION_IMPL *session);
 extern int __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create);

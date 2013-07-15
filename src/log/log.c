@@ -50,6 +50,25 @@ __wt_log_extract_lognum(
 }
 
 /*
+ * __wt_log_remove --
+ *	Given a log number, remove that log file.
+ */
+int
+__wt_log_remove(WT_SESSION_IMPL *session, uint32_t lognum)
+{
+	WT_DECL_ITEM(path);
+	WT_DECL_RET;
+
+	WT_ERR(__wt_scr_alloc(session, 0, &path));
+	WT_ERR(__wt_log_filename(session, lognum, path));
+	WT_VERBOSE_ERR(session, log, "log_remove: remove log %s",
+	    (char *)path->data);
+	WT_ERR(__wt_remove(session, path->data));
+err:	__wt_scr_free(&path);
+	return (ret);
+}
+
+/*
  * __log_openfile --
  *	Open a log file with the given log file number and return the WT_FH.
  */
@@ -85,7 +104,6 @@ __wt_log_open(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *log_fh;
 	WT_LOG *log;
 	uint32_t firstlog, lastlog, lognum;
 	u_int i, logcount;
@@ -106,22 +124,13 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	log->fileid = lastlog;
 	WT_VERBOSE_ERR(session, log, "log_open: first log %d last log %d",
 	    firstlog, lastlog);
-	if (lastlog == 0)
-		WT_ERR(__wt_log_newfile(session, 1));
-	else {
-		WT_ERR(__log_openfile(session, 0, &log_fh, lastlog));
-		log->log_fh = log_fh;
-		log->alloc_lsn.file = log->fileid;
-		log->alloc_lsn.offset =
-		    __wt_rduppo2(log->log_fh->size, log->allocsize);
-		log->write_lsn = log->alloc_lsn;
-		log->sync_lsn = log->alloc_lsn;
-		log->first_lsn.file = firstlog;
-		log->first_lsn.offset = 0;
-		WT_VERBOSE_ERR(session, log,
-		    "log_open: open to end of existing log %d,%" PRIu64,
-		    log->alloc_lsn.file, log->alloc_lsn.offset);
-	}
+	log->first_lsn.file = firstlog;
+	log->first_lsn.offset = 0;
+	/*
+	 * Start logging at the beginning of the next log file, no matter
+	 * where the previous log file ends.
+	 */
+	WT_ERR(__wt_log_newfile(session, 1));
 err:
 	__wt_free(session, logfiles);
 	return (ret);
@@ -181,6 +190,10 @@ err:
 	return (ret);
 }
 
+/*
+ * __log_size_fit --
+ *	Return whether or not recsize will fit in the log file.
+ */
 static int
 __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 {
@@ -188,7 +201,40 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 
 	conn = S2C(session);
 	return (lsn->offset + recsize < conn->log_file_max);
+}
 
+/*
+ * __log_truncate --
+ *	Truncate the log to the given LSN.  In addition to setting the
+ *	given LSN as the new end of log file, it will remove any later
+ *	log files that may exist.  This function assumes we are in recovery
+ *	or other dedicated time and not during live running.
+ */
+static int
+__log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	uint32_t lognum;
+	u_int i, logcount;
+	char **logfiles;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	WT_RET(__wt_dirlist(session, conn->log_path,
+	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
+	for (i = 0; i < logcount; i++) {
+		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
+		if (lognum > lsn->file)
+			WT_ERR(__wt_log_remove(session, lognum));
+		__wt_free(session, logfiles[i]);
+		logfiles[i] = NULL;
+	}
+err:
+	__wt_free(session, logfiles);
+	return (0);
 }
 
 /*
@@ -373,11 +419,13 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	WT_ERR(__log_fill(session, &myslot, buf, NULL));
 	/*
 	 * If we're called from connection creation code, we need to update
-	 * the write_lsn since we're the only write in progress.
+	 * the LSNs since we're the only write in progress.
 	 */
-	if (conn_create)
+	if (conn_create) {
+		WT_ERR(__wt_fsync(session, log->log_fh));
+		log->sync_lsn = tmp.slot_end_lsn;
 		log->write_lsn = tmp.slot_end_lsn;
-
+	}
 err:
 	__wt_scr_free(&buf);
 	return (0);
@@ -512,10 +560,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	rd_lsn = start_lsn;
 	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
 	do {
-		/*
-		 * Read in 4 bytes that is the total size of the log record.
-		 * Check for out of bounds values.
-		 */
 		reclen = 0;
 		if (rd_lsn.offset >= log_size) {
 			/*
@@ -543,13 +587,32 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		WT_ERR(__wt_read(
 		    session, log_fh, rd_lsn.offset, log->allocsize, buf.mem));
 		/*
-		 * First 4 bytes is the real record length.  See if we
+		 * First 8 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
 		 * that we rarely will have to read more.  Most log records
 		 * will be fairly small.
 		 */
 		reclen = *(uint64_t *)buf.mem;
-		if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
+		/*
+		 * Log files are pre-allocated.  We never expect a zero length
+		 * unless we've reached the end of the log.  The log can be
+		 * written out of order, so when recovery finds the end of
+		 * the log, truncate the file and remove any later log files
+		 * that may exist.
+		 */
+		if (reclen == 0) {
+			/*
+			 * This LSN is the end.  Truncate.
+			 */
+			if (LF_ISSET(WT_LOGSCAN_RECOVER)) {
+				WT_ERR(__log_truncate(session, &rd_lsn));
+				break;
+			} else {
+				ret = WT_NOTFOUND;
+				goto err;
+			}
+		}
+		if (reclen > WT_MAX_LOG_OFFSET) {
 			ret = WT_NOTFOUND;
 			goto err;
 		}
