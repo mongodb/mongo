@@ -205,6 +205,21 @@ typedef struct __cursor {
 } CURSOR;
 
 /*
+ * cursor_destroy --
+ *	Free a cursor's memory, and optionally the cursor itself.
+ */
+static void
+cursor_destroy(CURSOR *cursor)
+{
+	free(cursor->v);
+	free(cursor->t1.v);
+	free(cursor->t2.v);
+	free(cursor->t3.v);
+	free(cursor->cache);
+	OVERWRITE_AND_FREE(cursor);
+}
+
+/*
  * os_errno --
  *	Limit our use of errno so it's easy to remove.
  */
@@ -765,16 +780,16 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 {
 	CACHE_RECORD *cp;
 	WT_CURSOR *wtcursor;
-	CURSOR *cursor, _cursor;
+	CURSOR *cursor;
 	WT_SOURCE *ws;
 	uint64_t oldest, txnid, txnmin;
 	int ret = 0, wslocked;
 
 	wslocked = 0;
 	txnmin = UINT64_MAX;
-
-	memset(&_cursor, 0, sizeof(_cursor));		/* Fake a cursor. */
-	cursor = &_cursor;
+							/* Fake a cursor. */
+	if ((cursor = calloc(1, sizeof(CURSOR))) == NULL)
+		return (os_errno());
 	cursor->wtext = wtext;
 	cursor->record.key = cursor->key;
 	if ((cursor->v = malloc(128)) == NULL)
@@ -940,7 +955,9 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 
 err:	if (wslocked)
 		ESET(unlock(wtext, NULL, &ws->lock));
-	free(cursor->v);
+
+	cursor_destroy(cursor);
+
 	return (ret);
 }
 
@@ -1650,21 +1667,6 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 }
 
 /*
- * cursor_destroy --
- *	Free a cursor and it's memory.
- */
-static void
-cursor_destroy(CURSOR *cursor)
-{
-	free(cursor->v);
-	free(cursor->t1.v);
-	free(cursor->t2.v);
-	free(cursor->t3.v);
-	free(cursor->cache);
-	OVERWRITE_AND_FREE(cursor);
-}
-
-/*
  * kvs_cursor_close --
  *	WT_CURSOR::close method.
  */
@@ -2210,7 +2212,7 @@ ws_source_name(
 		if ((buf = malloc(len)) == NULL)
 			return (os_errno());
 		(void)snprintf(buf, len, "%s.%s", uri, suffix);
-		*pp = buf;
+		*pp = *bufp = buf;
 	}
 	return (0);
 }
