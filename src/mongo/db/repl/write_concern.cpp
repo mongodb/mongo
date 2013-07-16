@@ -18,6 +18,9 @@
 
 #include "mongo/db/repl/write_concern.h"
 
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/is_master.h"
@@ -66,6 +69,8 @@ namespace mongo {
 
         void run() {
             Client::initThread( "slaveTracking" );
+            cc().getAuthorizationSession()->grantInternalAuthorization(
+                    UserName("_slaveTracking", "local"));
             DBDirectClient db;
             while ( ! inShutdown() ) {
                 sleepsecs( 1 );
@@ -99,7 +104,6 @@ namespace mongo {
                 
                 _currentlyUpdatingCache = true;
                 for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
-                    Client::GodScope gs;
                     db.update( NS , i->first , i->second , true );
                 }
                 _currentlyUpdatingCache = false;
