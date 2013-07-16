@@ -90,14 +90,22 @@ __log_archive_server(void *arg)
 		WT_ERR(__wt_dirlist(session, conn->log_path,
 		    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
 
+		/*
+		 * We can only archive files if a hot backup is not in progress.
+		 */
+		__wt_spin_lock(session, &conn->hot_backup_lock);
 		for (i = 0; i < logcount; i++) {
-			WT_ERR(__wt_log_extract_lognum(
-			    session, logfiles[i], &lognum));
-			if (lognum < lsn.file)
-				WT_ERR(__wt_log_remove(session, lognum));
+			if (conn->hot_backup == 0) {
+				WT_ERR(__wt_log_extract_lognum(
+				    session, logfiles[i], &lognum));
+				if (lognum < lsn.file)
+					WT_ERR(
+					    __wt_log_remove(session, lognum));
+			}
 			__wt_free(session, logfiles[i]);
 			logfiles[i] = NULL;
 		}
+		__wt_spin_unlock(session, &conn->hot_backup_lock);
 		__wt_free(session, logfiles);
 		logfiles = NULL;
 		logcount = 0;

@@ -8,6 +8,20 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_log_getfiles --
+ *	Retrieve the list of all existing log files.
+ */
+int
+__wt_log_getfiles(WT_SESSION_IMPL *session, char ***files, u_int *count)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+	return (__wt_dirlist(session, conn->log_path, WT_LOG_FILENAME,
+	    WT_DIRLIST_INCLUDE, files, count));
+}
+
+/*
  * __wt_log_filename --
  *	Given a log number, return a WT_ITEM of a generated log file name.
  */
@@ -111,8 +125,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	log = conn->log;
 	lastlog = 0;
 	firstlog = UINT32_MAX;
-	WT_RET(__wt_dirlist(session, conn->log_path,
-	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
+	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		lastlog = WT_MAX(lastlog, lognum);
@@ -221,8 +234,7 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn)
 	conn = S2C(session);
 	log = conn->log;
 
-	WT_RET(__wt_dirlist(session, conn->log_path,
-	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
+	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		if (lognum > lsn->file)

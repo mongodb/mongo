@@ -456,6 +456,7 @@ func
 funcs
 gcc
 gdb
+getfiles
 getid
 getline
 getone
