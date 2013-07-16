@@ -11,6 +11,9 @@ setuid mongodb
 pre-start script
     mkdir -p /var/lib/mongodb/
     mkdir -p /var/log/mongodb/
+    ENABLE_MONGODB="yes"
+    if [ -r /etc/default/mongodb ]; then . /etc/default/mongodb; fi
+    if [ ! "$ENABLE_MONGODB" = "yes" ]; then stop; exit 0; fi
 end script
 
 respawn
@@ -21,9 +24,9 @@ limit nofile 20000 20000
 kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
 
 script
-  ENABLE_MONGODB="yes"
-  if [ -r /etc/default/mongodb ]; then . /etc/default/mongodb; fi
-  if [ "x$ENABLE_MONGODB" = "xyes" ]; then 
-    exec /usr/bin/mongod --config /etc/mongodb.conf
+  if [ "$(which numactl)" ]; then
+    exec numactl --interleave=all mongod --config /etc/mongodb.conf
+  else
+    exec mongod --config /etc/mongodb.conf
   fi
 end script
