@@ -19,6 +19,7 @@
 #include "mongo/pch.h"
 
 #include <boost/unordered_map.hpp>
+#include <deque>
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
@@ -439,11 +440,10 @@ namespace mongo {
             CursorId cursorId,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        void findNext();
+        void loadBatch();
 
         bool unstarted;
-        bool hasCurrent;
-        Document pCurrent;
+        std::deque<Document> _currentBatch;
 
         // BSONObj members must outlive _projection and cursor.
         BSONObj _query;

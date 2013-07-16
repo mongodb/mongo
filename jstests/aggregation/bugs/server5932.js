@@ -82,7 +82,7 @@ assert.commandWorked(res);
 assert.throws(function() { makeCursor(res).itcount(); });
 
 // error if collection dropped after first batch
-var cursor = aggCursor([{$unwind:'$bigArray'}]);
+var cursor = aggCursor([{$unwind:'$bigArray'}], 0);
 t.drop();
 assert.throws(function() { cursor.itcount(); });
 // DON'T ADD NEW TEST TO THIS FILE AFTER THIS ONE (unless you reseed the data)

@@ -20,6 +20,7 @@
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/ops/query.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
@@ -33,9 +34,9 @@ namespace mongo {
     bool DocumentSourceCursor::eof() {
         /* if we haven't gotten the first one yet, do so now */
         if (unstarted)
-            findNext();
+            loadBatch();
 
-        return !hasCurrent;
+        return _currentBatch.empty();
     }
 
     bool DocumentSourceCursor::advance() {
@@ -43,15 +44,20 @@ namespace mongo {
 
         /* if we haven't gotten the first one yet, do so now */
         if (unstarted)
-            findNext();
+            loadBatch();
 
-        findNext();
-        return hasCurrent;
+        verify(!_currentBatch.empty());
+        _currentBatch.pop_front();
+
+        if (_currentBatch.empty())
+            loadBatch();
+
+        return !_currentBatch.empty();
     }
 
     Document DocumentSourceCursor::getCurrent() {
-        verify(hasCurrent);
-        return pCurrent;
+        verify(!_currentBatch.empty());
+        return _currentBatch.front();
     }
 
     void DocumentSourceCursor::dispose() {
@@ -61,8 +67,7 @@ namespace mongo {
         }
 
         _collMetadata.reset();
-        hasCurrent = false;
-        pCurrent = Document();
+        _currentBatch.clear();
     }
 
     bool DocumentSourceCursor::canUseCoveredIndex(ClientCursor* cursor) {
@@ -90,7 +95,7 @@ namespace mongo {
         }
     }
 
-    void DocumentSourceCursor::findNext() {
+    void DocumentSourceCursor::loadBatch() {
         unstarted = false;
 
         if (!_cursorId) {
@@ -111,6 +116,7 @@ namespace mongo {
 
         cursor->c()->recoverFromYield();
 
+        int memUsageBytes = 0;
         for( ; cursor->ok(); cursor->advance() ) {
 
             yieldSometimes(cursor);
@@ -126,7 +132,7 @@ namespace mongo {
             if (canUseCoveredIndex(cursor)) {
                 // Can't have collection metadata if we are here
                 BSONObj indexKey = cursor->currKey();
-                pCurrent = Document(cursor->c()->keyFieldsOnly()->hydrate(indexKey));
+                _currentBatch.push_back(Document(cursor->c()->keyFieldsOnly()->hydrate(indexKey)));
             }
             else {
                 BSONObj next = cursor->current();
@@ -138,56 +144,34 @@ namespace mongo {
                     if ( !_collMetadata->keyBelongsToMe( kp.extractSingleKey( next ) ) ) continue;
                 }
 
-                if (!_projection) {
-                    pCurrent = Document(next);
-                }
-                else {
-                    pCurrent = documentFromBsonWithDeps(next, _dependencies);
-
-                    if (debug && !_dependencies.empty()) {
-                        // Make sure we behave the same as Projection.  Projection doesn't have a
-                        // way to specify "no fields needed" so we skip the test in that case.
-
-                        MutableDocument byAggo(pCurrent);
-                        MutableDocument byProj(Document(_projection->transform(next)));
-
-                        if (_dependencies["_id"].getType() == Object) {
-                            // We handle subfields of _id identically to other fields.
-                            // Projection doesn't handle them correctly.
-
-                            byAggo.remove("_id");
-                            byProj.remove("_id");
-                        }
-
-                        if (Document::compare(byAggo.peek(), byProj.peek()) != 0) {
-                            PRINT(next);
-                            PRINT(_dependencies);
-                            PRINT(_projection->getSpec());
-                            PRINT(byAggo.peek());
-                            PRINT(byProj.peek());
-                            verify(false);
-                        }
-                    }
-                }
+                _currentBatch.push_back(_projection
+                                            ? documentFromBsonWithDeps(next, _dependencies)
+                                            : Document(next));
             }
 
-            hasCurrent = true;
-            cursor->advance();
+            memUsageBytes += _currentBatch.back().getApproximateSize();
 
-            if (cursor->c()->supportYields()) {
-                ClientCursor::YieldData data;
-                cursor->prepareToYield(data);
-            } else {
-                cursor->c()->noteLocation();
+            if (memUsageBytes > MaxBytesToReturnToClientAtOnce) {
+                // End this batch and prepare cursor for yielding.
+                cursor->advance();
+
+                if (cursor->c()->supportYields()) {
+                    ClientCursor::YieldData data;
+                    cursor->prepareToYield(data);
+                } else {
+                    cursor->c()->noteLocation();
+                }
+
+                return;
             }
-
-            return;
         }
 
         // If we got here, there aren't any more documents.
         // The Cursor must be released, see SERVER-6123.
         pin.release();
-        dispose(); // sets into eof state
+        ClientCursor::erase(_cursorId);
+        _cursorId = 0;
+        _collMetadata.reset();
     }
 
     void DocumentSourceCursor::setSource(DocumentSource *pSource) {
@@ -237,7 +221,6 @@ namespace mongo {
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
         , unstarted(true)
-        , hasCurrent(false)
         , ns(ns)
         , _cursorId(cursorId)
         , _collMetadata(shardingState.needCollectionMetadata( ns )
