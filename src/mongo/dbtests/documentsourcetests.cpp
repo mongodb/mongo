@@ -206,7 +206,6 @@ namespace DocumentSourceTests {
                 // Disposing of the source releases the lock.
                 ASSERT( !Lock::isReadLocked() );
                 // The source cannot be advanced further.
-                ASSERT( !source()->advance() );
                 ASSERT( source()->eof() );
             }
         };
@@ -916,8 +915,8 @@ namespace DocumentSourceTests {
             void assertExhausted() const {
                 // eof() is true.
                 ASSERT( _project->eof() );
-                // advance() returns false.
-                ASSERT( !_project->advance() );
+                // advance() triggers a verify assertion.
+                //ASSERT( !_project->advance() );
                 // getCurrent() triggers a verify assertion.
                 //ASSERT( !_project->getCurrent() );
             }
