@@ -187,6 +187,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	exact = 0;
 
 	WT_CSTAT_INCR(session, cursor_search_near);
 	WT_DSTAT_INCR(session, cursor_search_near);
