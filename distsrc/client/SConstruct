@@ -21,6 +21,12 @@ AddOption("--prefix",
           default="/usr/local",
           help="installation root")
 
+AddOption("--flags",
+          dest="flags",
+          type="string",
+          nargs=1,
+          action="store",
+          help="additional flags")
 
 # Stub out has_option so that we can use it in SConscript.client
 def has_option(name):
@@ -81,6 +87,9 @@ if nix:
     env.Append(CCFLAGS=["-O3", "-pthread"])
 if linux:
     env.Append(LINKFLAGS=["-pthread"])
+
+if GetOption("flags") is not None:
+    env.MergeFlags(GetOption("flags"))
 
 boostLibs = ["thread", "filesystem", "system"]
 conf = Configure(env)
