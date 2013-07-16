@@ -194,6 +194,7 @@ namespace mongo {
         // Preserve the epoch
         versionMap[shard] = metadata->_shardVersion;
         OID epoch = metadata->getCollVersion().epoch();
+        bool fullReload = true;
 
         // Check to see if we should use the old version or not.
         if ( oldMetadata ) {
@@ -201,8 +202,8 @@ namespace mongo {
             // If our epochs are compatible, it's useful to use the old metadata for diffs
             if ( oldMetadata->getCollVersion().hasCompatibleEpoch( epoch ) ) {
 
-                // Our epoch for coll version and shard version should be the same.
-                verify( oldMetadata->getCollVersion().hasCompatibleEpoch( epoch ) );
+                fullReload = false;
+                dassert( oldMetadata->isValid() );
 
                 versionMap[shard] = oldMetadata->_shardVersion;
                 metadata->_collVersion = oldMetadata->_collVersion;
@@ -264,16 +265,21 @@ namespace mongo {
                 metadata->fillRanges();
                 conn.done();
 
+                dassert( metadata->isValid() );
                 return Status::OK();
             }
             else if ( diffsApplied == 0 ) {
 
-                // No chunks found, something changed or we're confused
+                // No chunks found, the collection is dropping or we're confused
+                // If this is a full reload, assume it is a drop for backwards compatibility
+                // TODO: drop the config.collections entry *before* the chunks and eliminate this
+                // ambiguity
 
-                string errMsg = // br
-                        str::stream() << "no chunks found when reloading " << ns
-                                      << ", previous version was "
-                                      << metadata->_collVersion.toString();
+                string errMsg =
+                    str::stream() << "no chunks found when reloading " << ns
+                                  << ", previous version was "
+                                  << metadata->_collVersion.toString()
+                                  << ( fullReload ? ", this is a drop" : "" );
 
                 warning() << errMsg << endl;
 
@@ -281,7 +287,8 @@ namespace mongo {
                 metadata->_chunksMap.clear();
                 conn.done();
 
-                return Status( ErrorCodes::RemoteChangeDetected, errMsg );
+                return fullReload ? Status( ErrorCodes::NamespaceNotFound, errMsg ) :
+                                    Status( ErrorCodes::RemoteChangeDetected, errMsg );
             }
             else {
 

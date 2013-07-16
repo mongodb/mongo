@@ -80,17 +80,50 @@ namespace mongo {
         void resetVersion( const string& ns );
 
         /**
-         * Requests to access a collection at a certain version. If the collection's metadata is not
-         * at that version it will try to update itself to the newest version. The request is only
-         * granted if the version is the current or the newest one.
+         * If the metadata for 'ns' at this shard is at or above the requested version,
+         * 'reqShardVersion', returns OK and fills in 'latestShardVersion' with the latest shard
+         * version.  The latter is always greater or equal than 'reqShardVersion' if in the same
+         * epoch.
          *
-         * @param ns collection to be accessed
-         * @param version (IN) the client believe this collection is on and (OUT) the version the
-         *  metadata is actually in
-         * @param forceRefresh force contacting the config server to check version
-         * @return true if the access can be allowed at the provided version
+         * Otherwise, falls back to refreshMetadataNow.
+         *
+         * This call blocks if there are more than N threads
+         * currently refreshing metadata. (N is the number of
+         * tickets in ShardingState::_configServerTickets,
+         * currently 3.)
+         *
+         * Locking Note:
+         *   + Must NOT be called with the write lock because this call may go into the network,
+         *     and deadlocks may occur with shard-as-a-config.  Therefore, nothing here guarantees
+         *     that 'latestShardVersion' is indeed the current one on return.
          */
-        bool trySetVersion( const string& ns , ChunkVersion& version, bool forceRefresh );
+        Status refreshMetadataIfNeeded( const string& ns,
+                                        const ChunkVersion& reqShardVersion,
+                                        ChunkVersion* latestShardVersion );
+
+        /**
+         * Refreshes collection metadata by asking the config server for the latest information.
+         * Starts a new config server request.
+         *
+         * Locking Notes:
+         *   + Must NOT be called with the write lock because this call may go into the network,
+         *     and deadlocks may occur with shard-as-a-config.  Therefore, nothing here guarantees
+         *     that 'latestShardVersion' is indeed the current one on return.
+         *
+         *   + Because this call must not be issued with the DBLock held, by the time the config
+         *     server sent us back the collection metadata information, someone else may have
+         *     updated the previously stored collection metadata.  There are cases when one can't
+         *     tell which of updated or loaded metadata are the freshest. There are also cases where
+         *     the data coming from configs do not correspond to a consistent snapshot.
+         *     In these cases, return RemoteChangeDetected. (This usually means this call needs to
+         *     be issued again, at caller discretion)
+         *
+         * @return OK if remote metadata successfully loaded (may or may not have been installed)
+         * @return RemoteChangeDetected if something changed while reloading and we may retry
+         * @return !OK if something else went wrong during reload
+         * @return latestShardVersion the version that is now stored for this collection
+         */
+        Status refreshMetadataNow( const string& ns, ChunkVersion* latestShardVersion );
 
         void appendInfo( BSONObjBuilder& b );
 
@@ -187,6 +220,16 @@ namespace mongo {
         bool waitTillNotInCriticalSection( int maxSecondsToWait );
 
     private:
+
+        /**
+         * Refreshes collection metadata by asking the config server for the latest information.
+         * May or may not be based on a requested version.
+         */
+        Status doRefreshMetadata( const string& ns,
+                                  const ChunkVersion& reqShardVersion,
+                                  bool useRequestedVersion,
+                                  ChunkVersion* latestShardVersion );
+
         bool _enabled;
 
         string _configServer;
