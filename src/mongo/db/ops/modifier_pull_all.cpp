@@ -20,6 +20,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 
 namespace mongo {
@@ -191,41 +192,29 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ModifierPullAll::log(mutablebson::Element logRoot) const {
+    Status ModifierPullAll::log(LogBuilder* logBuilder) const {
         // log document
-        mutablebson::Document& doc = logRoot.getDocument();
+        mutablebson::Document& doc = logBuilder->getDocument();
 
         const bool pathExists = _preparedState->pathFoundElement.ok() &&
-                                (_preparedState->pathFoundIndex ==
-                                    static_cast<int32_t>(_fieldRef.numParts() - 1));
-
-        // element to log, like $set/$unset
-        mutablebson::Element opElement = pathExists ?
-                                            doc.makeElementObject("$set") :
-                                            doc.makeElementObject("$unset");
-        if (!opElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create log entry");
-        }
+            (_preparedState->pathFoundIndex ==
+             static_cast<int32_t>(_fieldRef.numParts() - 1));
 
         // value for the logElement ("field.path.name": <value>)
         mutablebson::Element logElement = pathExists ?
-                                            logRoot.getDocument().makeElementWithNewFieldName(
-                                                    _fieldRef.dottedField(),
-                                                    _preparedState->pathFoundElement
-                                                    ):
-                                            doc.makeElementBool(_fieldRef.dottedField(), true);
+            doc.makeElementWithNewFieldName(
+                _fieldRef.dottedField(),
+                _preparedState->pathFoundElement):
+            doc.makeElementBool(_fieldRef.dottedField(), true);
+
         if (!logElement.ok()) {
             return Status(ErrorCodes::InternalError, "cannot create details");
         }
 
         // Now, we attach the {<fieldname>: <value>} Element under the {$op: ...} one.
-        Status status = opElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // And attach the result under the 'logRoot' Element provided.
-        return logRoot.pushBack(opElement);
+        return pathExists ?
+            logBuilder->addToSets(logElement) :
+            logBuilder->addToUnsets(logElement);
     }
 
 } // namespace mongo

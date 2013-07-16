@@ -18,6 +18,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/ops/log_builder.h"
 
 namespace mongo {
 
@@ -67,6 +68,8 @@ namespace mongo {
     }
 
     Status ModifierObjectReplace::init(const BSONElement& modExpr) {
+
+        // TODO: Check for ok for storage here.
 
         if (modExpr.type() != Object) {
             return Status(ErrorCodes::BadValue, "object replace expects full object");
@@ -134,20 +137,20 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ModifierObjectReplace::log(mutablebson::Element logRoot) const {
+    Status ModifierObjectReplace::log(LogBuilder* logBuilder) const {
 
-        // We'd like to create an entry such as {<object replacement>} under 'logRoot'.
-        mutablebson::Document& doc = logRoot.getDocument();
-        BSONObjIterator it(_val);
-        while (it.more()) {
-            BSONElement elem = it.next();
-            Status status = doc.root().appendElement(elem);
-            if (!status.isOK()) {
-                return status;
-            }
+        mutablebson::Document& doc = logBuilder->getDocument();
+
+        mutablebson::Element replacementObject = doc.end();
+        Status status = logBuilder->getReplacementObject(&replacementObject);
+
+        if (status.isOK()) {
+            BSONObjIterator it(_val);
+            while (status.isOK() && it.more())
+                status = replacementObject.appendElement(it.next());
         }
 
-        return Status::OK();
+        return status;
     }
 
 } // namespace mongo

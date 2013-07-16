@@ -21,6 +21,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/modifier_object_replace.h"
 #include "mongo/db/ops/modifier_table.h"
 #include "mongo/util/embedded_builder.h"
@@ -167,6 +168,13 @@ namespace mongo {
         FieldRefSet targetFields;
         _affectIndices = false;
 
+        // TODO: Should logBuilder own the document? Should we hold it by pointer to avoid
+        // creating it if we are not interested in logging? Or maybe by boost optional? For
+        // now, it is logically harmless to construct this and not use it, but a Document
+        // object isn't cheap, so we should avoid building it if we can.
+        mutablebson::Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+
         // Ask each of the mods to type check whether they can operate over the current document
         // and, if so, to change that document accordingly.
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
@@ -218,24 +226,24 @@ namespace mongo {
             }
 
             if (!execInfo.noOp && validContext) {
-                Status status = (*it)->apply();
+                status = (*it)->apply();
                 if (!status.isOK()) {
                     return status;
                 }
             }
+
+            // If we require a replication oplog entry for this update, go ahead and generate one.
+            if (_logOp && logOpRec) {
+                status = (*it)->log(&logBuilder);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
         }
 
-        // If we require a replication oplog entry for this update, go ahead and generate one.
-        if (_logOp && logOpRec) {
-            mutablebson::Document logDoc;
-            for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
-                Status status = (*it)->log(logDoc.root());
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
+        if (_logOp && logOpRec)
             *logOpRec = logDoc.getObject();
-        }
 
         return Status::OK();
     }

@@ -46,7 +46,7 @@ namespace mongo {
         virtual Status apply() const;
 
         /** Converts the effects of this $pull into one or more equivalent $unset operations. */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
         // Access to each component of fieldName that's the target of this mod.

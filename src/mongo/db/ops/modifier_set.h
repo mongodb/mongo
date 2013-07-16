@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierSet : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierSet);
 
@@ -70,7 +72,7 @@ namespace mongo {
          * Adds a log entry to logRoot corresponding to the operation applied here. Returns OK
          * if successful or a status describing the error.
          */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
 

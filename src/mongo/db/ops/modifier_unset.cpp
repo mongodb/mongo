@@ -19,6 +19,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 
 namespace mongo {
@@ -163,17 +164,13 @@ namespace mongo {
         }
     }
 
-    Status ModifierUnset::log(mutablebson::Element logRoot) const {
+    Status ModifierUnset::log(LogBuilder* logBuilder) const {
 
         // We'd like to create an entry such as {$unset: {<fieldname>: 1}} under 'logRoot'.
         // We start by creating the {$unset: ...} Element.
-        mutablebson::Document& doc = logRoot.getDocument();
-        mutablebson::Element unsetElement = doc.makeElementObject("$unset");
-        if (!unsetElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create log entry for $unset mod");
-        }
+        mutablebson::Document& doc = logBuilder->getDocument();
 
-        // Then we create the {<fieldname>: <value>} Element. Note that <fieldname> must be a
+        // Create the {<fieldname>: <value>} Element. Note that <fieldname> must be a
         // dotted field, and not only the last part of that field. The rationale here is that
         // somoene picking up this log entry -- e.g., a secondary -- must be capable of doing
         // the same path find/creation that was done in the previous calls here.
@@ -182,14 +179,7 @@ namespace mongo {
             return Status(ErrorCodes::InternalError, "cannot create log details for $unset mod");
         }
 
-        // Now, we attach the {<fieldname>: `} Element under the {$unset: ...} one.
-        Status status = unsetElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // And attach the result under the 'logRoot' Element provided.
-        return logRoot.pushBack(unsetElement);
+        return logBuilder->addToUnsets(logElement);
     }
 
 } // namespace mongo

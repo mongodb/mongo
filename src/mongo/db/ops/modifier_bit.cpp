@@ -19,6 +19,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -242,31 +243,17 @@ namespace mongo {
                                          elemToSet);
     }
 
-    Status ModifierBit::log(mutablebson::Element logRoot) const {
+    Status ModifierBit::log(LogBuilder* logBuilder) const {
 
-        // We'd like to create an entry such as {$set: {<fieldname>: <value>}} under 'logRoot'.
-        // We start by creating the {$set: ...} Element.
-        mutablebson::Document& doc = logRoot.getDocument();
-        mutablebson::Element setElement = doc.makeElementObject("$set");
-        if (!setElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot append log entry for $set mod");
-        }
+        mutablebson::Element logElement = logBuilder->getDocument().makeElementSafeNum(
+            _fieldRef.dottedField(),
+            _preparedState->newValue);
 
-        // Then we create the {<fieldname>: <value>} Element.
-        mutablebson::Element logElement = doc.makeElementSafeNum(_fieldRef.dottedField(),
-                                                                 _preparedState->newValue);
-        if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot append details for $set mod");
-        }
+        if (!logElement.ok())
+            return Status(ErrorCodes::InternalError, "cannot append details for $bit mod");
 
-        // Now, we attach the {<fieldname>: <value>} Element under the {$set: ...} one.
-        Status status = setElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
+        return logBuilder->addToSets(logElement);
 
-        // And attach the result under the 'logRoot' Element provided.
-        return logRoot.pushBack(setElement);
     }
 
 } // namespace mongo

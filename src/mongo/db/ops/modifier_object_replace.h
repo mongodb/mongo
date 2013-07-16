@@ -24,6 +24,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierObjectReplace : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierObjectReplace);
 
@@ -65,7 +67,7 @@ namespace mongo {
          * Adds a log entry to logRoot corresponding to full object replacement. Returns OK if
          * successful or a status describing the error.
          */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
 

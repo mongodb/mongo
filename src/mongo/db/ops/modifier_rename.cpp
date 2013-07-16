@@ -19,6 +19,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -238,7 +239,7 @@ namespace mongo {
                                          elemToSet);
     }
 
-    Status ModifierRename::log(mutablebson::Element logRoot) const {
+    Status ModifierRename::log(LogBuilder* logBuilder) const {
 
         // If there was no element found then it was a noop, so return immediately
         if (!_preparedState->fromElemFound.ok())
@@ -254,67 +255,37 @@ namespace mongo {
 
         // We'd like to create an entry such as {$set: {<fieldname>: <value>}} under 'logRoot'.
         // We start by creating the {$set: ...} Element.
-        mutablebson::Document& doc = logRoot.getDocument();
+        mutablebson::Document& doc = logBuilder->getDocument();
 
-        // Create $set
-        mutablebson::Element setElement = doc.makeElementObject("$set");
-        if (!setElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create log entry for $set mod");
-        }
-
-        // Then we create the {<fieldname>: <value>} Element. Note that we log the mod with a
+        // Create the {<fieldname>: <value>} Element. Note that we log the mod with a
         // dotted field, if it was applied over a dotted field. The rationale is that the
         // secondary may be in a different state than the primary and thus make different
         // decisions about creating the intermediate path in _fieldRef or not.
-        mutablebson::Element logElement
-             = doc.makeElementWithNewFieldName( setPath, _preparedState->fromElemFound.getValue());
+        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
+            setPath, _preparedState->fromElemFound.getValue());
+
         if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create details for $set mod");
+            return Status(ErrorCodes::InternalError, "cannot create details for $rename mod");
         }
 
-        // Now, we attach the {<fieldname>: <value>} Element under the {$set: ...} one.
-        Status status = setElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
+        // Now, we attach the {<fieldname>: <value>} Element under the {$set: ...} section.
+        Status status = logBuilder->addToSets(logElement);
 
-        mutablebson::Element unsetElement = doc.end();
-        if (doUnset) {
-            // Create $unset
-            unsetElement = doc.makeElementObject("$unset");
-            if (!setElement.ok()) {
-                return Status(ErrorCodes::InternalError, "cannot create log entry for $unset mod");
-            }
-
-            // Then we create the {<fieldname>: <value>} Element. Note that we log the mod with a
+        if (status.isOK() && doUnset) {
+            // Create the {<fieldname>: <value>} Element. Note that we log the mod with a
             // dotted field, if it was applied over a dotted field. The rationale is that the
             // secondary may be in a different state than the primary and thus make different
             // decisions about creating the intermediate path in _fieldRef or not.
             mutablebson::Element unsetEntry = doc.makeElementBool(unsetPath, true);
             if (!unsetEntry.ok()) {
-                return Status(ErrorCodes::InternalError, "cannot create details for $unset mod");
+                return Status(ErrorCodes::InternalError, "cannot create details for $rename mod");
             }
 
-            // Now, we attach the {<fieldname>: <value>} Element under the {$set: ...} one.
-            status = unsetElement.pushBack(unsetEntry);
-            if (!status.isOK()) {
-                return status;
-            }
-
+            // Now, we attach the Element under the {$unset: ...} section.
+            status = logBuilder->addToUnsets(unsetEntry);
         }
 
-        // And attach the result under the 'logRoot' Element provided.
-        status = logRoot.pushBack(setElement);
-        if (!status.isOK())
-            return status;
-
-        if (doUnset) {
-            status = logRoot.pushBack(unsetElement);
-            if (!status.isOK())
-                return status;
-        }
-
-        return Status::OK();
+        return status;
     }
 
 } // namespace mongo

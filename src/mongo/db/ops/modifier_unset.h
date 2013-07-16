@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierUnset : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierUnset);
 
@@ -65,7 +67,7 @@ namespace mongo {
         /**
          * Adds the exact $unset mod to the log.
          */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
 

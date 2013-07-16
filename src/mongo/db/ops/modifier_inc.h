@@ -26,6 +26,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierInc : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierInc);
 
@@ -53,7 +55,7 @@ namespace mongo {
         virtual Status apply() const;
 
         /** Converts the result of the $inc into an equivalent $set under logRoot */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
 

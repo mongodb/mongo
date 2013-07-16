@@ -20,6 +20,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 
 namespace mongo {
@@ -184,12 +185,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ModifierPull::log(mb::Element logRoot) const {
+    Status ModifierPull::log(LogBuilder* logBuilder) const {
 
-        mb::Document& doc = logRoot.getDocument();
-
-        mb::Element opElement = doc.end();
-        mb::Element logElement = doc.end();
+        mb::Document& doc = logBuilder->getDocument();
 
         if (!_preparedState->elemFound.ok() ||
             _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
@@ -197,12 +195,12 @@ namespace mongo {
             // If we didn't find the element that we wanted to pull from, we log an unset for
             // that element.
 
-            opElement = doc.makeElementObject("$unset");
-            if (!opElement.ok()) {
-                return Status(ErrorCodes::InternalError, "cannot create log entry for $pull mod");
-            }
+            mb::Element logElement = doc.makeElementInt(_fieldRef.dottedField(), 1);
+            if (!logElement.ok())
+                return Status(ErrorCodes::InternalError,
+                              "cannot create log entry for $pull mod");
 
-            logElement = doc.makeElementInt(_fieldRef.dottedField(), 1);
+            return logBuilder->addToUnsets(logElement);
 
         } else {
 
@@ -215,13 +213,8 @@ namespace mongo {
             // We'd like to create an entry such as {$set: {<fieldname>: [<resulting aray>]}} under
             // 'logRoot'.  We start by creating the {$set: ...} Element.
 
-            opElement = doc.makeElementObject("$set");
-            if (!opElement.ok()) {
-                return Status(ErrorCodes::InternalError, "cannot create log entry for $pull mod");
-            }
-
             // Then we create the {<fieldname>:[]} Element, that is, an empty array.
-            logElement = doc.makeElementArray(_fieldRef.dottedField());
+            mb::Element logElement = doc.makeElementArray(_fieldRef.dottedField());
             if (!logElement.ok()) {
                 return Status(ErrorCodes::InternalError, "cannot create details for $pull mod");
             }
@@ -246,16 +239,8 @@ namespace mongo {
                 curr = curr.rightSibling();
             }
 
+            return logBuilder->addToSets(logElement);
         }
-
-        // Now, we attach log element under the op element.
-        Status status = opElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // And attach the result under the 'logRoot' Element provided by the caller.
-        return logRoot.pushBack(opElement);
     }
 
 } // namespace mongo

@@ -24,12 +24,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using mongo::BSONObj;
+    using mongo::LogBuilder;
     using mongo::ModifierPullAll;
     using mongo::ModifierInterface;
     using mongo::NumberInt;
@@ -61,8 +63,8 @@ namespace {
             return _mod.apply();
         }
 
-        Status log(Element logRoot) const {
-            return _mod.log(logRoot);
+        Status log(LogBuilder* logBuilder) const {
+            return _mod.log(logBuilder);
         }
 
         ModifierPullAll& mod() { return _mod; }
@@ -142,7 +144,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
     }
 
@@ -159,7 +162,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
     }
 
@@ -176,7 +180,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
     }
 
@@ -190,7 +195,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [1, 'a', {r:1, b:2}] } }"), logDoc);
     }
 
@@ -204,7 +210,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $unset : { b : true } }"), logDoc);
     }
 

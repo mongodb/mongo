@@ -23,6 +23,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
@@ -30,6 +31,7 @@ namespace {
 
     using mongo::BSONObj;
     using mongo::fromjson;
+    using mongo::LogBuilder;
     using mongo::ModifierInterface;
     using mongo::NumberInt;
     using mongo::ModifierRename;
@@ -59,8 +61,8 @@ namespace {
             return _mod.apply();
         }
 
-        Status log(Element logRoot) const {
-            return _mod.log(logRoot);
+        Status log(LogBuilder* logBuilder) const {
+            return _mod.log(logBuilder);
         }
 
         ModifierRename& mod() { return _mod; }
@@ -98,8 +100,9 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
         BSONObj logObj = fromjson("{}");
-        ASSERT_OK(setMod.log(logDoc.root()));
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(logDoc, logObj);
     }
 
@@ -134,8 +137,9 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{b:2}"));
 
         Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
         BSONObj logObj = fromjson("{$set:{ 'b': 2}, $unset: {'a': true}}");
-        ASSERT_OK(setMod.log(logDoc.root()));
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(logDoc, logObj);
     }
 
@@ -155,8 +159,9 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{b:2}"));
 
         Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
         BSONObj logObj = fromjson("{$set:{ 'b': 2}, $unset: {'a': true}}");
-        ASSERT_OK(setMod.log(logDoc.root()));
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(logDoc, logObj);
     }
 
@@ -176,8 +181,9 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{a: {}, b:{ d: 6}}"));
 
         Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
         BSONObj logObj = fromjson("{$set:{ 'b': {d: 6}}, $unset: {'a.c': true}}");
-        ASSERT_OK(setMod.log(logDoc.root()));
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(logDoc, logObj);
     }
 
@@ -197,8 +203,9 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{b:1, c: { r: { d: 2}}}"));
 
         Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
         BSONObj logObj = fromjson("{$set:{ 'c.r.d': 2}, $unset: {'a': true}}");
-        ASSERT_OK(setMod.log(logDoc.root()));
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(logDoc, logObj);
     }
 
@@ -218,8 +225,9 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{b: {c: {d: 2}}}"));
 
         Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
         BSONObj logObj = fromjson("{$set:{ 'b.c.d': 2}, $unset: {'a': true}}");
-        ASSERT_OK(setMod.log(logDoc.root()));
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(logDoc, logObj);
     }
 
@@ -239,8 +247,9 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{b: {c: {d: [ {a:2, b:1} ]}}}"));
 
         Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
         BSONObj logObj = fromjson("{$set:{ 'b.c.d': [ {a:2, b:1} ]}, $unset: {'a': true}}");
-        ASSERT_OK(setMod.log(logDoc.root()));
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(logDoc, logObj);
     }
 

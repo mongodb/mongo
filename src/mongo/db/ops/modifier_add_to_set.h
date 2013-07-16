@@ -25,6 +25,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierAddToSet : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierAddToSet);
 
@@ -51,7 +53,7 @@ namespace mongo {
         virtual Status apply() const;
 
         /** Converts the effects of this $addToSet into one or more equivalent $set operations. */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
         // Access to each component of fieldName that's the target of this mod.

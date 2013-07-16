@@ -27,6 +27,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
@@ -37,6 +38,7 @@ namespace {
     using mongo::BSONObjBuilder;
     using mongo::BSONArrayBuilder;
     using mongo::fromjson;
+    using mongo::LogBuilder;
     using mongo::ModifierInterface;
     using mongo::ModifierPush;
     using mongo::NumberInt;
@@ -437,8 +439,8 @@ namespace {
             return _mod.apply();
         }
 
-        Status log(Element logRoot) const {
-            return _mod.log(logRoot);
+        Status log(LogBuilder* logBuilder) const {
+            return _mod.log(logBuilder);
         }
 
         ModifierPush& mod() { return _mod; }
@@ -471,7 +473,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
@@ -491,7 +494,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
@@ -511,7 +515,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [0,1]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [0,1]}}"), logDoc);
     }
@@ -543,7 +548,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [{b:1}]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [{b:1}]}}"), logDoc);
     }
@@ -563,7 +569,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [{b:1}]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [{b:1}]}}"), logDoc);
     }
@@ -583,7 +590,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [{b:0},{b:1}]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [{b:0},{b:1}]}}"), logDoc);
     }
@@ -614,7 +622,8 @@ namespace {
                       doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {'choices.first.votes':[1]}}"), logDoc);
     }
@@ -639,7 +648,8 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
     }
@@ -659,7 +669,8 @@ namespace {
         ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [1]}}")));
     }
@@ -679,7 +690,8 @@ namespace {
         ASSERT_TRUE(checkDoc(doc, fromjson("{a: [0,1,2]}")));
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_TRUE(checkDoc(logDoc, fromjson("{$set: {a: [0,1,2]}}")));
     }
@@ -711,7 +723,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
@@ -731,7 +744,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), logDoc);
     }
@@ -751,7 +765,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [1, 2]}}"), logDoc);
     }
@@ -771,7 +786,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [0,1]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [0,1]}}"), logDoc);
     }
@@ -791,7 +807,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: [0,1,2]}"), doc);
 
         Document logDoc;
-        ASSERT_OK(pushMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: [0,1,2]}}"), logDoc);
     }
@@ -997,7 +1014,8 @@ namespace {
                         ASSERT_EQUALS(getObjectUsing(combinedVec), doc);
 
                         Document logDoc;
-                        ASSERT_OK(mod().log(logDoc.root()));
+                        LogBuilder logBuilder(logDoc.root());
+                        ASSERT_OK(mod().log(&logBuilder));
                         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
                         ASSERT_EQUALS(BSON("$set" << getObjectUsing(combinedVec)), logDoc);
 
@@ -1050,7 +1068,8 @@ namespace {
                         ASSERT_EQUALS(getObjectUsing(combinedVec), doc);
 
                         Document logDoc;
-                        ASSERT_OK(mod().log(logDoc.root()));
+                        LogBuilder logBuilder(logDoc.root());
+                        ASSERT_OK(mod().log(&logBuilder));
                         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
                         ASSERT_EQUALS(BSON("$set" << getObjectUsing(combinedVec)), logDoc);
 

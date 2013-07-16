@@ -22,12 +22,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using mongo::BSONObj;
+    using mongo::LogBuilder;
     using mongo::ModifierAddToSet;
     using mongo::ModifierInterface;
     using mongo::Status;
@@ -57,8 +59,8 @@ namespace {
             return _mod.apply();
         }
 
-        Status log(Element logRoot) const {
-            return _mod.log(logRoot);
+        Status log(LogBuilder* logBuilder) const {
+            return _mod.log(logBuilder);
         }
 
         ModifierAddToSet& mod() {
@@ -137,7 +139,8 @@ namespace {
         ASSERT_TRUE(execInfo.noOp);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1 ] } }"), logDoc);
     }
 
@@ -171,7 +174,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 1 ] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1 ] } }"), logDoc);
     }
 
@@ -189,7 +193,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 1 ] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1 ] } }"), logDoc);
     }
 
@@ -207,7 +212,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 1, 2, 3 ] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
@@ -225,7 +231,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 1, 2, 3 ] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
@@ -243,7 +250,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 'x', 1 ] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 'x', 1 ] } }"), logDoc);
     }
 
@@ -261,7 +269,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 'x', 1, 2, 3 ] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 'x', 1, 2, 3 ] } }"), logDoc);
     }
 
@@ -275,7 +284,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
@@ -289,7 +299,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
@@ -303,7 +314,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 2, 3 ] } }"), logDoc);
     }
 
@@ -321,7 +333,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 3] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 3] } }"), logDoc);
     }
 
@@ -339,7 +352,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : [ 1, 1, 2, 1, 2, 2, 4, 3] }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 4, 3] } }"), logDoc);
     }
 

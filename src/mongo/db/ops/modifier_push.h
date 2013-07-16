@@ -28,6 +28,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierPush : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierPush);
 
@@ -83,7 +85,7 @@ namespace mongo {
          *
          * TODO Log a positional $set in the array, whenever possible.
          */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
 

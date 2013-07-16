@@ -22,12 +22,14 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using mongo::BSONObj;
+    using mongo::LogBuilder;
     using mongo::ModifierBit;
     using mongo::ModifierInterface;
     using mongo::Status;
@@ -58,8 +60,8 @@ namespace {
             return _mod.apply();
         }
 
-        Status log(Element logRoot) const {
-            return _mod.log(logRoot);
+        Status log(LogBuilder* logBuilder) const {
+            return _mod.log(logBuilder);
         }
 
         ModifierBit& mod() { return _mod; }
@@ -136,7 +138,8 @@ namespace {
         ASSERT_TRUE(execInfo.noOp);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
     }
 
@@ -178,7 +181,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : 0 }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : 0 } }"), logDoc);
     }
 
@@ -195,7 +199,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
     }
 
@@ -212,7 +217,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : 4 }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : 4 } }"), logDoc);
     }
 
@@ -229,7 +235,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ a : 7 }"), doc);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{ $set : { a : 7 } }"), logDoc);
     }
 
@@ -243,7 +250,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(1))), logDoc);
     }
 
@@ -257,7 +265,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(1))), logDoc);
     }
 
@@ -271,7 +280,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<long long>(1))), logDoc);
     }
 
@@ -285,7 +295,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<long long>(1))), logDoc);
     }
 
@@ -319,7 +330,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(0xABCD1234U))), logDoc);
     }
 
@@ -333,7 +345,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(0xABCD1234U))), logDoc);
     }
 
@@ -347,7 +360,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" <<
                                           static_cast<long long>(0xABCD1234EF981234ULL))), logDoc);
     }
@@ -362,7 +376,8 @@ namespace {
         ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" <<
                                           static_cast<long long>(0xABCD1234EF981234ULL))), logDoc);
     }
@@ -440,7 +455,8 @@ namespace {
         ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(1))), logDoc);
     }
 
@@ -458,7 +474,8 @@ namespace {
         ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
 
         Document logDoc;
-        ASSERT_OK(mod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("b" << static_cast<int>(1))), logDoc);
     }
 

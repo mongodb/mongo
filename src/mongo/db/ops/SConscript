@@ -6,6 +6,7 @@ env.StaticLibrary(
     target='update_common',
     source=[
         'field_checker.cpp',
+        'log_builder.cpp',
         'path_support.cpp',
     ],
     LIBDEPS=[
@@ -21,6 +22,17 @@ env.CppUnitTest(
         'field_checker_test.cpp',
     ],
     LIBDEPS=[
+        'update_common',
+    ],
+)
+
+env.CppUnitTest(
+    target='log_builder_test',
+    source=[
+        'log_builder_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
         'update_common',
     ],
 )

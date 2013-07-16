@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierBit : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierBit);
 
@@ -54,7 +56,7 @@ namespace mongo {
         virtual Status apply() const;
 
         /** Converts the effects of this $bit into an equivalent $set */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
         // Access to each component of fieldName that's the target of this mod.

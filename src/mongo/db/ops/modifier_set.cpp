@@ -19,6 +19,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 
 namespace mongo {
@@ -227,34 +228,24 @@ namespace mongo {
                                          elemToSet);
     }
 
-    Status ModifierSet::log(mutablebson::Element logRoot) const {
+    Status ModifierSet::log(LogBuilder* logBuilder) const {
 
         // We'd like to create an entry such as {$set: {<fieldname>: <value>}} under 'logRoot'.
         // We start by creating the {$set: ...} Element.
-        mutablebson::Document& doc = logRoot.getDocument();
-        mutablebson::Element setElement = doc.makeElementObject("$set");
-        if (!setElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create log entry for $set mod");
-        }
+        mutablebson::Document& doc = logBuilder->getDocument();
 
-        // Then we create the {<fieldname>: <value>} Element. Note that we log the mod with a
+        // Create the {<fieldname>: <value>} Element. Note that we log the mod with a
         // dotted field, if it was applied over a dotted field. The rationale is that the
         // secondary may be in a different state than the primary and thus make different
         // decisions about creating the intermediate path in _fieldRef or not.
-        mutablebson::Element logElement = doc.makeElementWithNewFieldName(_fieldRef.dottedField(),
-                                                                          _val);
+        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
+            _fieldRef.dottedField(), _val);
+
         if (!logElement.ok()) {
             return Status(ErrorCodes::InternalError, "cannot create details for $set mod");
         }
 
-        // Now, we attach the {<fieldname>: <value>} Element under the {$set: ...} one.
-        Status status = setElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // And attach the result under the 'logRoot' Element provided.
-        return logRoot.pushBack(setElement);
+        return logBuilder->addToSets(logElement);
     }
 
 } // namespace mongo

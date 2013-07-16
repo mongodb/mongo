@@ -19,6 +19,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 
 namespace mongo {
@@ -354,7 +355,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ModifierAddToSet::log(mb::Element logRoot) const {
+    Status ModifierAddToSet::log(LogBuilder* logBuilder) const {
 
         // TODO: This is copied more or less identically from $push. As a result, it copies the
         // behavior in $push that relies on 'apply' having been called unless this is a no-op.
@@ -364,11 +365,7 @@ namespace mongo {
 
         // We'd like to create an entry such as {$set: {<fieldname>: [<resulting aray>]}} under
         // 'logRoot'.  We start by creating the {$set: ...} Element.
-        mb::Document& doc = logRoot.getDocument();
-        mb::Element setElement = doc.makeElementObject("$set");
-        if (!setElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create log entry for $addToSet mod");
-        }
+        mb::Document& doc = logBuilder->getDocument();
 
         // Then we create the {<fieldname>:[]} Element, that is, an empty array.
         mb::Element logElement = doc.makeElementArray(_fieldRef.dottedField());
@@ -397,15 +394,7 @@ namespace mongo {
             curr = curr.rightSibling();
         }
 
-        // Now, we attach the {<fieldname>: [<filled array>]} Element under the {$set: ...}
-        // one.
-        Status status = setElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // And attach the result under the 'logRoot' Element provided.
-        return logRoot.pushBack(setElement);
+        return logBuilder->addToSets(logElement);
     }
 
 } // namespace mongo

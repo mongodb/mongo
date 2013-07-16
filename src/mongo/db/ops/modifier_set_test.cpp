@@ -24,6 +24,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
@@ -31,6 +32,7 @@ namespace {
 
     using mongo::BSONObj;
     using mongo::fromjson;
+    using mongo::LogBuilder;
     using mongo::ModifierInterface;
     using mongo::NumberInt;
     using mongo::ModifierSet;
@@ -64,8 +66,8 @@ namespace {
             return _mod.apply();
         }
 
-        Status log(Element logRoot) const {
-            return _mod.log(logRoot);
+        Status log(LogBuilder* logBuilder) const {
+            return _mod.log(logBuilder);
         }
 
         ModifierSet& mod() { return _mod; }
@@ -204,7 +206,8 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &dummy));
 
         Document logDoc;
-        ASSERT_OK(setMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), logDoc);
     }
@@ -514,7 +517,8 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         Document logDoc;
-        ASSERT_OK(setMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
     }
@@ -528,7 +532,8 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         Document logDoc;
-        ASSERT_OK(setMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
     }
@@ -542,7 +547,8 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         Document logDoc;
-        ASSERT_OK(setMod.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(setMod.log(&logBuilder));
         ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
         ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
     }

@@ -24,6 +24,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
@@ -32,6 +33,7 @@ namespace {
     using mongo::Array;
     using mongo::BSONObj;
     using mongo::fromjson;
+    using mongo::LogBuilder;
     using mongo::ModifierInterface;
     using mongo::ModifierUnset;
     using mongo::Status;
@@ -59,8 +61,8 @@ namespace {
             return _mod.apply();
         }
 
-        Status log(Element logRoot) const {
-            return _mod.log(logRoot);
+        Status log(LogBuilder* logBuilder) const {
+            return _mod.log(logBuilder);
         }
 
         ModifierUnset& mod() { return _mod; }
@@ -161,7 +163,8 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         Document logDoc;
-        ASSERT_OK(modUnset.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(modUnset.log(&logBuilder));
         ASSERT_EQUALS(modUnset.modObj(), logDoc);
     }
 
@@ -326,7 +329,8 @@ namespace {
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
 
         Document logDoc;
-        ASSERT_OK(modUnset.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(modUnset.log(&logBuilder));
         ASSERT_EQUALS(modUnset.modObj(), logDoc);
     }
 
@@ -411,7 +415,8 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
 
         Document logDoc;
-        ASSERT_OK(modUnset.log(logDoc.root()));
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(modUnset.log(&logBuilder));
         ASSERT_EQUALS(fromjson("{$unset: {'a.0.b': 1}}"), logDoc);
     }
 

@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     class ModifierPop : public ModifierInterface {
         MONGO_DISALLOW_COPYING(ModifierPop);
 
@@ -52,7 +54,7 @@ namespace mongo {
 
         virtual Status apply() const;
 
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
 

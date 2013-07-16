@@ -21,6 +21,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/ops/field_checker.h"
+#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -515,36 +516,24 @@ namespace mongo {
         return status;
     }
 
-    Status ModifierPush::log(mutablebson::Element logRoot) const {
+    Status ModifierPush::log(LogBuilder* logBuilder) const {
         // TODO We can log just a positional set in several cases. For now, let's just log the
         // full resulting array.
 
         // We'd like to create an entry such as {$set: {<fieldname>: [<resulting aray>]}} under
         // 'logRoot'.  We start by creating the {$set: ...} Element.
-        mutablebson::Document& doc = logRoot.getDocument();
-        mutablebson::Element setElement = doc.makeElementObject("$set");
-        if (!setElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create log entry for $push mod");
-        }
+        mutablebson::Document& doc = logBuilder->getDocument();
 
         // value for the logElement ("field.path.name": <value>)
-        mutablebson::Element logElement = logRoot.getDocument().makeElementWithNewFieldName(
-                                                            _fieldRef.dottedField(),
-                                                            _preparedState->elemFound);
+        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
+            _fieldRef.dottedField(),
+            _preparedState->elemFound);
+
         if (!logElement.ok()) {
             return Status(ErrorCodes::InternalError, "cannot create details for $push mod");
         }
 
-        // Now, we attach the {<fieldname>: [<filled array>]} Element under the {$set: ...}
-        // one.
-        Status status = setElement.pushBack(logElement);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // And attach the result under the 'logRoot' Element provided.
-        return logRoot.pushBack(setElement);
-
+        return logBuilder->addToSets(logElement);
     }
 
 } // namespace mongo

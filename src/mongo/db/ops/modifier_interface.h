@@ -24,6 +24,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     /**
      * Abstract base class for update "modifiers" (a.k.a "$ operators"). To create a new
      * operator, implement a new derived class.
@@ -104,10 +106,9 @@ namespace mongo {
         virtual Status apply() const = 0 ;
 
         /**
-         * Returns OK and registers the result of this mod in 'logRoot', the document that
-         * would eventually become a log entry. The mod must have kept enough state to
-         * be able to produce the log record (see idempotency note below). This call may be
-         * issued even if apply() was not.
+         * Returns OK and records the result of this mod in the provided LogBuilder. The mod
+         * must have kept enough state to be able to produce the log record (see idempotency
+         * note below). This call may be issued even if apply() was not.
          *
          * If the mod could not be logged, returns an error status with a reason description.
          *
@@ -119,8 +120,7 @@ namespace mongo {
          *     for logging purposes.  An array based operator may check the contents of the
          *     array before operating on it.
          */
-        virtual Status log(mutablebson::Element logRoot) const = 0;
-
+        virtual Status log(LogBuilder* logBuilder) const = 0;
     };
 
     struct ModifierInterface::ExecInfo {

@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    class LogBuilder;
+
     /**
     * The $rename modifier moves the field from source to the destination to perform
     * the rename.
@@ -68,7 +70,7 @@ namespace mongo {
          * For the oplog entry we will generate an $unset on the 'from' field, and $set for
          * the 'to' field. If no 'from' element is found then function will return immediately.
          */
-        virtual Status log(mutablebson::Element logRoot) const;
+        virtual Status log(LogBuilder* logBuilder) const;
 
     private:
 
