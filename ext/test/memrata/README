@@ -109,6 +109,12 @@ we change any of them?
     What if the txn namespace isn't found -- we have to open the devices in
 the same order to find it, which we can't guarantee?
 
+    For now, we should limit ourselves to a single KVS device.
+
+* Each open-cursor call has to list the KVS devices for the object (and
+they must be the same as the ones used to create the object).  We need a
+better naming scheme.
+
 * Consider ways to avoid the lookup to see if transaction has aborted (maybe
 avoid the lookup when there are no aborted transactions in the transaction
 store, which should be the case most of the time).
