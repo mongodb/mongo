@@ -363,7 +363,7 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	/*
 	 * An internal page key is in one of two places: if we instantiated the
 	 * key (for example, when reading the page), WT_REF.key.ikey references
-	 * a WT_IKEY structure, otherwise, WT_REF.key.page references an on-page
+	 * a WT_IKEY structure, otherwise, WT_REF.key.pkey references an on-page
 	 * key.
 	 *
 	 * Now the magic: Any allocated memory will have a low-order bit of 0
@@ -377,10 +377,10 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	 * or pointers and uint64_t's don't always map their low-order bits to
 	 * the same location.
 	 */
-	if (ref->key.page & 0x01) {
+	if (ref->key.pkey & 0x01) {
 		*(void **)keyp =
-		    WT_PAGE_REF_OFFSET(page, (ref->key.page & 0xFFFFFFFF) >> 1);
-		*sizep = (uint32_t)(ref->key.page >> 32);
+		    WT_PAGE_REF_OFFSET(page, (ref->key.pkey & 0xFFFFFFFF) >> 1);
+		*sizep = (uint32_t)(ref->key.pkey >> 32);
 	} else {
 		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
 		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
@@ -397,7 +397,7 @@ __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK *unpack)
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	ref->key.page =
+	ref->key.pkey =
 	    (uint64_t)unpack->size << 32 |
 	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 1 |
 	    0x01;
@@ -413,7 +413,7 @@ __wt_ref_key_instantiated(WT_REF *ref)
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	return (ref->key.page & 0x01 ? NULL : ref->key.ikey);
+	return (ref->key.pkey & 0x01 ? NULL : ref->key.ikey);
 }
 
 /*

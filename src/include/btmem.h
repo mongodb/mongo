@@ -420,7 +420,7 @@ struct __wt_ref {
 	union {
 		uint64_t recno;		/* Column-store: starting recno */
 		void	*ikey;		/* Row-store: instantiated key */
-		uint64_t page;		/* Row-store: on-page key */
+		uint64_t pkey;		/* Row-store: on-page key */
 	} key;
 
 	uint64_t txnid;			/* Transaction ID */
