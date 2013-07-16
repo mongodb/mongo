@@ -160,9 +160,10 @@ namespace mongo {
             if ( elt.type() != Object )
                 return false;
             BSONElement e = elt.embeddedObject().firstElement();
-            if ( e.type() != Array )
+            if (strcmp( e.fieldName() , "$each" ) != 0)
                 return false;
-            return strcmp( e.fieldName() , "$each" ) == 0;
+            uassert(16331, "$each requires array", e.type() == Array);
+            return true;
         }
 
         BSONObj getEach() const {
