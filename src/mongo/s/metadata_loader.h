@@ -98,6 +98,9 @@ namespace mongo {
          * If information about the chunks can be accessed or is invalid, returns:
          * @return HostUnreachable if there was an error contacting the config servers
          * @return RemoteChangeDetected if the chunks loaded are unexpectedly different
+         *
+         * For backwards compatibility,
+         * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
          * TODO: @return FailedToParse
          */
         Status initChunks( const string& ns,

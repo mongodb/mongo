@@ -149,7 +149,7 @@ namespace {
         collInfo.setNS( "test.foo");
         collInfo.setUpdatedAt( 0 );
         collInfo.setKeyPattern( BSON("a" << 1) );
-        collInfo.setEpoch( OID() );
+        collInfo.setEpoch( OID::gen() );
 
         string errMsg;
         ASSERT( collInfo.isValid( &errMsg ) );
@@ -158,7 +158,7 @@ namespace {
 
         ChunkType chunkInfo;
         chunkInfo.setNS( "test.foo");
-        chunkInfo.setVersion(ChunkVersion(1, 0, OID()));
+        chunkInfo.setVersion( ChunkVersion( 1, 0, collInfo.getEpoch() ) );
         ASSERT( !chunkInfo.isValid( &errMsg ) );
 
         dummyConfig.insert( ChunkType::ConfigNS, chunkInfo.toBSON() );
@@ -173,8 +173,9 @@ namespace {
                                                        &metadata );
 
         // For now, since the differ doesn't have parsing errors, we get this kind of status
+        // NamespaceNotFound since we aren't refreshing off known metadata
         // TODO: Make the differ do parse errors
-        ASSERT_EQUALS( status.code(), ErrorCodes::RemoteChangeDetected );
+        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
 
         MockConnRegistry::get()->clear();
         ScopedDbConnection::clearPool();
@@ -206,7 +207,7 @@ namespace {
         scoped_ptr<MockRemoteDBServer> _dummyConfig;
     };
 
-    TEST_F(NoChunkFixture, CheckNumChunk) {
+    TEST_F(NoChunkFixture, NoChunksIsDropped) {
 
         MetadataLoader loader( CONFIG_LOC );
 
@@ -216,7 +217,8 @@ namespace {
                                                        NULL, /* no old metadata */
                                                        &metadata );
 
-        ASSERT_EQUALS( status.code(), ErrorCodes::RemoteChangeDetected );
+        // This is interpreted as a dropped ns, since we drop the chunks first
+        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
     }
 
     class NoChunkHereFixture : public mongo::unittest::Test {
@@ -253,6 +255,10 @@ namespace {
             _dummyConfig->insert( ChunkType::ConfigNS, chunkType.toBSON() );
         }
 
+        MockRemoteDBServer* getDummyConfig(){
+            return _dummyConfig.get();
+        }
+
         void tearDown() {
             MockConnRegistry::get()->clear();
             ScopedDbConnection::clearPool();
@@ -279,6 +285,41 @@ namespace {
         ASSERT_EQUALS( 0, metadata.getShardVersion().majorVersion() );
         ASSERT_NOT_EQUALS( OID(), metadata.getCollVersion().epoch() );
         ASSERT_NOT_EQUALS( OID(), metadata.getShardVersion().epoch() );
+    }
+
+    TEST_F(NoChunkHereFixture, BadChunkNotDropped) {
+
+        MetadataLoader loader( CONFIG_LOC );
+
+        CollectionMetadata metadata;
+        Status status = loader.makeCollectionMetadata( "test.foo", // br
+                                                       "shard0000",
+                                                       NULL, /* no old metadata */
+                                                       &metadata );
+
+        ASSERT( status.isOK() );
+
+        ChunkType chunkInfo;
+        chunkInfo.setNS( "test.foo");
+        chunkInfo.setVersion( ChunkVersion( 1, 0, OID() ) );
+        string errMsg;
+        ASSERT( !chunkInfo.isValid( &errMsg ) );
+
+        // Replace the chunk with a bad chunk
+        getDummyConfig()->remove( ChunkType::ConfigNS, BSONObj() );
+        getDummyConfig()->insert( ChunkType::ConfigNS, chunkInfo.toBSON() );
+
+        CollectionMetadata nextMetadata;
+        status = loader.makeCollectionMetadata( "test.foo", // br
+                                                "shard0000",
+                                                &metadata, /* using old metadata */
+                                                &nextMetadata );
+
+        // Remote change error, since there's not an epoch change and we reloaded no chunks
+        ASSERT_EQUALS( status.code(), ErrorCodes::RemoteChangeDetected );
+
+        MockConnRegistry::get()->clear();
+        ScopedDbConnection::clearPool();
     }
 
     class ConfigServerFixture : public mongo::unittest::Test {
@@ -398,7 +439,8 @@ namespace {
                                                        NULL, /* no old metadata */
                                                        &metadata );
 
-        ASSERT_EQUALS( status.code(), ErrorCodes::RemoteChangeDetected );
+        // NSNotFound because we're reloading with no old metadata
+        ASSERT_EQUALS( status.code(), ErrorCodes::NamespaceNotFound );
     }
 
 #if 0

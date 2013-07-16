@@ -928,15 +928,29 @@ namespace mongo {
                 // load the shard's metadata, if we don't have it
                 shardingState.gotShardName( myOldShard );
 
-                // Always refresh against config server here
-                startingVersion = maxVersion;
-                shardingState.trySetVersion( ns , startingVersion, true );
+                // Always refresh our metadata remotely
+                // TODO: The above checks should be removed, we should only have one refresh
+                // mechanism.
+                ChunkVersion startingVersion;
+                Status status = shardingState.refreshMetadataNow( ns, &startingVersion );
+
+                if (!status.isOK()) {
+                    errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
+                                           << "[" << currMin << "," << currMax << ")"
+                                           << causedBy( status.reason() );
+
+                    warning() << errmsg << endl;
+                    return false;
+                }
 
                 if (startingVersion.majorVersion() == 0) {
-                   // It makes no sense to migrate if our version is zero and we have no chunks
-                   errmsg = "moveChunk cannot migrate with zero version";
-                   warning() << errmsg << endl;
-                   return false;
+                    // It makes no sense to migrate if our version is zero and we have no chunks
+                    errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
+                                           << "[" << currMin << "," << currMax << ")"
+                                           << " with zero shard version";
+
+                    warning() << errmsg << endl;
+                    return false;
                 }
 
                 log() << "moveChunk request accepted at version " << startingVersion << migrateLog;
@@ -2019,7 +2033,16 @@ namespace mongo {
             // We force the remote refresh here to make the behavior consistent and predictable,
             // generally we'd refresh anyway, and to be paranoid.
             ChunkVersion currentVersion;
-            shardingState.trySetVersion( ns, currentVersion, true );
+            Status status = shardingState.refreshMetadataNow( ns, &currentVersion );
+
+            if ( !status.isOK() ) {
+                errmsg = str::stream() << "cannot start recv'ing chunk "
+                                       << "[" << min << "," << max << ")"
+                                       << causedBy( status.reason() );
+
+                warning() << errmsg << endl;
+                return false;
+            }
 
             migrateStatus.ns = ns;
             migrateStatus.from = cmdObj["from"].String();

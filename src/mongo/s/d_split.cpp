@@ -664,15 +664,30 @@ namespace mongo {
                 // the shard's metadata
                 shardingState.gotShardName( shard );
 
-                // Always refresh against config server here
+                // Always check our version remotely.
+                // TODO: Make this less expensive by using the incoming request's shard version.
+                // TODO: The above checks should be removed, we should only have one refresh
+                // mechanism.
                 ChunkVersion shardVersion;
-                shardingState.trySetVersion( ns , shardVersion, true );
+                Status status = shardingState.refreshMetadataNow( ns, &shardVersion );
 
-                if (shardVersion.majorVersion() == 0) {
-                   // It makes no sense to split if our version is zero and we have no chunks
-                   errmsg = "splitChunk cannot split with zero version";
-                   warning() << errmsg << endl;
-                   return false;
+                if (!status.isOK()) {
+                    errmsg = str::stream() << "splitChunk cannot split chunk "
+                                           << "[" << currMin << "," << currMax << ")"
+                                           << causedBy( status.reason() );
+
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
+                if ( shardVersion.majorVersion() == 0 ) {
+                    // It makes no sense to split if our version is zero and we have no chunks
+                    errmsg = str::stream() << "splitChunk cannot split chunk "
+                                           << "[" << currMin << "," << currMax << ")"
+                                           << " with zero shard version";
+
+                    warning() << errmsg << endl;
+                    return false;
                 }
 
                 log() << "splitChunk accepted at version " << shardVersion << endl;

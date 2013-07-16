@@ -422,13 +422,9 @@ namespace mongo {
     }
 
     bool CollectionMetadata::isValid() const {
-        if (_shardVersion > _collVersion) {
-            return false;
-        }
-
-        if (_collVersion.majorVersion() == 0)
-            return false;
-
+        if ( _shardVersion > _collVersion ) return false;
+        if ( _collVersion.majorVersion() == 0 ) return false;
+        if ( _collVersion.epoch() != _shardVersion.epoch() ) return false;
         return true;
     }
 
