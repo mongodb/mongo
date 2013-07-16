@@ -240,7 +240,7 @@ extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
+extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
@@ -414,7 +414,7 @@ extern int __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_row_key_copy( WT_SESSION_IMPL *session,
+extern int __wt_row_leaf_key_copy( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
     WT_ITEM *retb);

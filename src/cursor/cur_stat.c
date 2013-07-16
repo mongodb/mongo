@@ -80,6 +80,8 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	size_t size;
+	uint64_t *v;
+	const char **p;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	va_start(ap, cursor);
@@ -99,9 +101,16 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		item->data = cursor->value.data;
 		item->size = cursor->value.size;
 	} else {
-		*va_arg(ap, const char **) = cst->stats_first[cst->key].desc;
-		*va_arg(ap, const char **) = cst->pv.data;
-		*va_arg(ap, uint64_t *) = cst->v;
+		/*
+		 * Don't drop core if the statistics value isn't requested; NULL
+		 * pointer support isn't documented, but it's a cheap test.
+		 */
+		if ((p = va_arg(ap, const char **)) != NULL)
+			*p = cst->stats_first[cst->key].desc;
+		if ((p = va_arg(ap, const char **)) != NULL)
+			*p = cst->pv.data;
+		if ((v = va_arg(ap, uint64_t *)) != NULL)
+			*v = cst->v;
 	}
 
 err:	va_end(ap);

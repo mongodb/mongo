@@ -343,9 +343,9 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, WT_PAGE_COL_INT, unpack);
 		ref->addr = cell;
-		ref->u.recno = unpack->v;
+		ref->key.recno = unpack->v;
 		++ref;
 	}
 }
@@ -383,7 +383,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	indx = 0;
 	cip = page->u.col_var.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
 		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
 
 		/*
@@ -419,21 +419,16 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(current);
-	WT_DECL_ITEM(last);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	WT_REF *ref;
-	uint32_t i, prefix;
-	void *huffman;
+	uint32_t i;
 
 	btree = S2BT(session);
 	unpack = &_unpack;
 	dsk = page->dsk;
-	huffman = btree->huffman_key;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
-	WT_ERR(__wt_scr_alloc(session, 0, &last));
 
 	/*
 	 * Walk the page, instantiating keys: the page contains sorted key and
@@ -442,10 +437,21 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, WT_PAGE_ROW_INT, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
+			__wt_ref_key_onpage_set(page, ref, unpack);
+			break;
 		case WT_CELL_KEY_OVFL:
+			/* Instantiate any overflow records. */
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, WT_PAGE_ROW_INT, unpack, current));
+
+			WT_ERR(__wt_row_ikey(session,
+			    WT_PAGE_DISK_OFFSET(page, cell),
+			    current->data, current->size, &ref->key.ikey));
+
+			*sizep += sizeof(WT_IKEY) + current->size;
 			break;
 		case WT_CELL_ADDR:
 			ref->addr = cell;
@@ -480,79 +486,12 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			}
 
 			++ref;
-			continue;
+			break;
 		WT_ILLEGAL_VALUE_ERR(session);
-		}
-
-		/*
-		 * If Huffman decoding is required or it's an overflow record,
-		 * unpack the cell to build the key, then resolve the prefix.
-		 * Else, we can do it faster internally as we don't have to
-		 * shuffle memory around as much.
-		 */
-		prefix = unpack->prefix;
-		if (huffman != NULL || unpack->ovfl) {
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
-
-			/*
-			 * If there's a prefix, make sure there's enough buffer
-			 * space, then shift the decoded data past the prefix
-			 * and copy the prefix into place.
-			 */
-			if (prefix != 0) {
-				WT_ERR(__wt_buf_grow(
-				    session, current, prefix + current->size));
-				memmove((uint8_t *)current->mem + prefix,
-				    current->data, current->size);
-				memcpy(current->mem, last->data, prefix);
-				current->data = current->mem;
-				current->size += prefix;
-			}
-		} else {
-			/*
-			 * Get the cell's data/length and make sure we have
-			 * enough buffer space.
-			 */
-			WT_ERR(__wt_buf_init(
-			    session, current, prefix + unpack->size));
-
-			/* Copy the prefix then the data into place. */
-			if (prefix != 0)
-				memcpy(current->mem, last->data, prefix);
-			memcpy((uint8_t *)current->mem + prefix, unpack->data,
-			    unpack->size);
-			current->size = prefix + unpack->size;
-		}
-
-		/*
-		 * Allocate and initialize the instantiated key.
-		 *
-		 * Note: all keys on internal pages are instantiated, we assume
-		 * they're more likely to be useful than keys on leaf pages.
-		 * It's possible that's wrong (imagine a cursor reading a table
-		 * that's never randomly searched, the internal page keys are
-		 * unnecessary).  If this policy changes, it has implications
-		 * for reconciliation, the row-store reconciliation function
-		 * depends on keys always be instantiated.
-		 */
-		WT_ERR(__wt_row_ikey(session,
-		    WT_PAGE_DISK_OFFSET(page, cell),
-		    current->data, current->size, &ref->u.key));
-		*sizep += sizeof(WT_IKEY) + current->size;
-
-		/*
-		 * Swap buffers if it's not an overflow key, we have a new
-		 * prefix-compressed key.
-		 */
-		if (!unpack->ovfl) {
-			tmp = last;
-			last = current;
-			current = tmp;
 		}
 	}
 
 err:	__wt_scr_free(&current);
-	__wt_scr_free(&last);
 	return (ret);
 }
 
@@ -585,7 +524,7 @@ __inmem_row_leaf_entries(
 	 */
 	nindx = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
@@ -631,7 +570,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Walk the page, building indices. */
 	rip = page->u.row.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:

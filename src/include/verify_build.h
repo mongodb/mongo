@@ -43,8 +43,9 @@
 static inline void
 __wt_verify_build(void)
 {
-	/* On-disk structures should not be padded. */
+	/* Check specific structures weren't padded. */
 	SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
+	SIZE_CHECK(WT_REF, WT_REF_SIZE);
 
 	/*
 	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because

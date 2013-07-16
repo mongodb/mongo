@@ -10,6 +10,24 @@
 WT_PROCESS __wt_process;			/* Per-process structure */
 static int __wt_pthread_once_failed;		/* If initialization failed */
 
+static int
+__system_is_little_endian(void)
+{
+	uint64_t v;
+	int little;
+
+	v = 1;
+	little = *((uint8_t *)&v) == 0 ? 0 : 1;
+
+	if (little)
+		return (0);
+
+	fprintf(stderr,
+	    "This release of the WiredTiger data engine does not support "
+	    "big-endian systems; contact WiredTiger for more information.\n");
+	return (EINVAL);
+}
+
 static void
 __wt_pthread_once(void)
 {
@@ -33,6 +51,8 @@ __wt_library_init(void)
 	static pthread_once_t once_control = PTHREAD_ONCE_INIT;
 	static int first = 1;
 	WT_DECL_RET;
+
+	WT_RET(__system_is_little_endian());
 
 	/*
 	 * Do per-process initialization once, before anything else, but only

@@ -759,8 +759,8 @@ struct __wt_session {
 	 * If non-zero\, evict object blocks from the system buffer cache after
 	 * that many bytes from this object are read or written into the buffer
 	 * cache., an integer greater than or equal to 0; default \c 0.}
-	 * @config{prefix_compression, configure row-store format key prefix
-	 * compression., a boolean flag; default \c true.}
+	 * @config{prefix_compression, configure prefix compression on row-store
+	 * leaf pages., a boolean flag; default \c true.}
 	 * @config{split_pct, the Btree page split size as a percentage of the
 	 * maximum Btree page size\, that is\, when a Btree page is split\, it
 	 * will be split into smaller pages\, where each page is the specified
@@ -2497,34 +2497,36 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		68
 /*! reconciliation dictionary matches */
 #define	WT_STAT_DSRC_REC_DICTIONARY			69
-/*! reconciliation overflow keys written */
-#define	WT_STAT_DSRC_REC_OVFL_KEY			70
+/*! reconciliation internal-page overflow keys */
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		70
+/*! reconciliation leaf-page overflow keys */
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		71
 /*! reconciliation overflow values written */
-#define	WT_STAT_DSRC_REC_OVFL_VALUE			71
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			72
 /*! reconciliation pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			72
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			73
 /*! reconciliation pages merged */
-#define	WT_STAT_DSRC_REC_PAGE_MERGE			73
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			74
 /*! page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				74
+#define	WT_STAT_DSRC_REC_PAGES				75
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			75
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			76
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			76
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			77
 /*! reconciliation internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTL			77
+#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			78
 /*! reconciliation leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			78
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			79
 /*! reconciliation maximum number of splits created for a page */
-#define	WT_STAT_DSRC_REC_SPLIT_MAX			79
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			80
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			80
+#define	WT_STAT_DSRC_SESSION_COMPACT			81
 /*! open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		81
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		82
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		82
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		83
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			83
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			84
 /*! @} */
 /*
  * Statistics section: END
