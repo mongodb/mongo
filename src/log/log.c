@@ -86,8 +86,6 @@ __log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
 	    (const char *)path->data);
 	WT_ERR(__wt_open(
 	    session, path->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
-	if (ok_create)
-		WT_ERR(__wt_fallocate(session, *fh, 0, conn->log_file_max));
 err:	__wt_scr_free(&path);
 	return (ret);
 }
@@ -307,6 +305,12 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 */
 	slot->slot_start_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.offset;
+	/*
+	 * Pre-allocate on the first real write into the log file.
+	 */
+	if (log->alloc_lsn.offset == LOG_FIRST_RECORD)
+		WT_RET(__wt_fallocate(session,
+		    log->log_fh, LOG_FIRST_RECORD, conn->log_file_max));
 	log->alloc_lsn.offset += recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_error = 0;
@@ -391,6 +395,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	 * Set up the log descriptor record.  Use a scratch buffer to
 	 * get correct alignment for direct I/O.
 	 */
+	WT_ASSERT(session, sizeof(WT_LOG_DESC) < log->allocsize);
 	WT_RET(__wt_scr_alloc(session, log->allocsize, &buf));
 	memset(buf->mem, 0, log->allocsize);
 	logrec = (WT_LOG_RECORD *)buf->mem;

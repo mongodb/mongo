@@ -109,6 +109,8 @@ typedef struct {
 	off_t		 offset;
 } WT_MYSLOT;
 
+#define	LOG_FIRST_RECORD	log->allocsize	/* Offset of first record */
+
 typedef struct {
 	uint32_t	allocsize;	/* Allocation alignment size */
 	/*
