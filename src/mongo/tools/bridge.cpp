@@ -30,6 +30,8 @@ using namespace std;
 
 int port = 0;
 int delay = 0;
+int delayBegin = 0;
+int delayEnd = 0;
 string destUri;
 void cleanup( int sig );
 
@@ -51,7 +53,13 @@ public:
                     mp_.shutdown();
                     break;
                 }
-                sleepmillis( delay );
+
+                if ( delayBegin && delayEnd ) {
+                    sleepmillis( delayBegin + ( rand() % ( delayEnd - delayBegin ) ) );
+                }
+                else if ( delay ) {
+                    sleepmillis( delay );
+                }
 
                 int oldId = m.header()->id;
                 if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
@@ -167,7 +175,14 @@ int toolMain( int argc, char **argv, char** envp ) {
             destUri = argv[ ++i ];
         }
         else if ( strcmp( argv[ i ], "--delay" ) == 0 ) {
-            delay = strtol( argv[ ++i ], 0, 10 );
+            i++;
+            if ( strchr( argv[ i ], '-' ) != NULL ) {
+               delayBegin = strtol( argv[ i ], 0, 10 );
+               delayEnd = strtol( strchr( argv[ i ], '-' ) + 1, 0, 10 );
+            }
+            else {
+               delay = strtol( argv[ i ], 0, 10 );
+            }
         }
         else {
             check( false );
