@@ -176,12 +176,13 @@ err:	if (ret == WT_RESTART)
  *	Search for a record in the tree.
  */
 int
-__wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
+__wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int exact;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -218,26 +219,28 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		cbt->v = 0;
 		cursor->value.data = &cbt->v;
 		cursor->value.size = 1;
-		*exact = 0;
+		exact = 0;
 	} else if (!__cursor_invalid(cbt)) {
-		*exact = cbt->compare;
+		exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt);
 	} else if ((ret = __wt_btcur_next(cbt, 0)) != WT_NOTFOUND)
-		*exact = 1;
+		exact = 1;
 	else {
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __wt_row_search(session, cbt, 0) :
 		    __wt_col_search(session, cbt, 0));
 		if (!__cursor_invalid(cbt)) {
-			*exact = cbt->compare;
+			exact = cbt->compare;
 			ret = __wt_kv_return(session, cbt);
 		} else if ((ret = __wt_btcur_prev(cbt, 0)) != WT_NOTFOUND)
-			*exact = -1;
+			exact = -1;
 	}
 
 err:	if (ret == WT_RESTART)
 		goto retry;
 	WT_TRET(__cursor_func_resolve(cbt, ret));
+	if (exactp != NULL && (ret == 0 || ret == WT_NOTFOUND))
+		*exactp = exact;
 	return (ret);
 }
 
