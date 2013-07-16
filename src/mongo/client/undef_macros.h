@@ -38,8 +38,6 @@
 #pragma pop_macro("massert")
 #undef uassert
 #pragma pop_macro("uassert")
-#undef uassertStatusOK
-#pragma pop_macro("uassertStatusOK")
 #undef verify
 #pragma pop_macro("verify")
 #undef DESTRUCTOR_GUARD

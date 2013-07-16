@@ -201,12 +201,12 @@ namespace mongo {
     /* "user assert".  if asserts, user did something wrong, not our code */
 #define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
 
-#define MONGO_uassertStatusOK(expr) do {                                  \
-        Status status = (expr);                                         \
-        if (!status.isOK())                                             \
-            uasserted(status.location() != 0 ? status.location() : status.code(), \
-                      status.reason());                                 \
-    } while(0)
+    inline void uassertStatusOK(const Status& status) {
+        if (MONGO_unlikely(!status.isOK())) {
+            uasserted((status.location() != 0 ? status.location() : status.code()),
+                      status.reason());
+        }
+    }
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
@@ -243,7 +243,6 @@ namespace mongo {
 # define dassert MONGO_dassert
 # define verify MONGO_verify
 # define uassert MONGO_uassert
-# define uassertStatusOK MONGO_uassertStatusOK
 # define wassert MONGO_wassert
 # define massert MONGO_massert
 #endif
