@@ -24,8 +24,10 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/limit.h"
+#include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/skip.h"
+#include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/simple_plan_runner.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
@@ -59,10 +61,12 @@ namespace mongo {
      * node -> {fetch: {filter: {filter}, args: {node: node}}}
      * node -> {limit: {args: {node: node, num: posint}}}
      * node -> {skip: {args: {node: node, num: posint}}}
+     * node -> {sort: {args: {node: node, pattern: objWithSortCriterion }}}
+     * node -> {mergeSort: {args: {nodes: [node, node], pattern: objWithSortCriterion}}}
+     * node -> {cscan: {filter: {filter}, args: {name: "collectionname" }}}
      *
      * Forthcoming Nodes:
      *
-     * node -> {sort: {filter: {filter}, args: {node: node, pattern: objWithSortCriterion}}}
      * node -> {dedup: {filter: {filter}, args: {node: node, field: field}}}
      * node -> {unwind: {filter: filter}, args: {node: node, field: field}}
      */
@@ -273,6 +277,42 @@ namespace mongo {
                 }
 
                 return new CollectionScan(params, workingSet, matcher.release());
+            }
+            else if ("sort" == nodeName) {
+                uassert(16969, "Node argument must be provided to sort",
+                        nodeArgs["node"].isABSONObj());
+                uassert(16970, "Pattern argument must be provided to sort",
+                        nodeArgs["pattern"].isABSONObj());
+                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet);
+                SortStageParams params;
+                params.pattern = nodeArgs["pattern"].Obj();
+                return new SortStage(params, workingSet, subNode);
+            }
+            else if ("mergeSort" == nodeName) {
+                uassert(16971, "Nodes argument must be provided to sort",
+                        nodeArgs["nodes"].isABSONObj());
+                uassert(16972, "Pattern argument must be provided to sort",
+                        nodeArgs["pattern"].isABSONObj());
+
+                MergeSortStageParams params;
+                params.pattern = nodeArgs["pattern"].Obj();
+                // Dedup is true by default.
+
+                auto_ptr<MergeSortStage> mergeStage(new MergeSortStage(params, workingSet));
+
+                BSONObjIterator it(nodeArgs["nodes"].Obj());
+                while (it.more()) {
+                    BSONElement e = it.next();
+                    uassert(16973, "node of mergeSort isn't an obj?: " + e.toString(),
+                            e.isABSONObj());
+
+                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet);
+                    uassert(16974, "Can't parse sub-node of mergeSort: " + e.Obj().toString(),
+                            NULL != subNode);
+                    // takes ownership
+                    mergeStage->addChild(subNode);
+                }
+                return mergeStage.release();
             }
             else {
                 return NULL;
