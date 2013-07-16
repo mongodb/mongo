@@ -354,7 +354,12 @@ namespace mongo {
                 return false;
 
             if (!theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue())) {
-                errmsg = "primaries can't modify maintenance mode";
+                if (theReplSet->isPrimary()) {
+                    errmsg = "primaries can't modify maintenance mode";
+                }
+                else {
+                    errmsg = "already out of maintenance mode";
+                }
                 return false;
             }
 
