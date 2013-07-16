@@ -175,12 +175,21 @@ namespace mongo {
     Client::~Client() {
         _god = 0;
 
+        // Because both Client object pointers and logging infrastructure are stored in Thread
+        // Specific Pointers and because we do not explicitly control the order in which TSPs are
+        // deleted, it is possible for the logging infrastructure to have been deleted before
+        // this code runs.  This leads to segfaults (access violations) if this code attempts
+        // to log anything.  Therefore, disable logging from this destructor until this is fixed.
+        // TODO(tad) Force the logging infrastructure to be the last TSP to be deleted for each
+        // thread and reenable this code once that is done.
+#if 0
         if ( _context )
             error() << "Client::~Client _context should be null but is not; client:" << _desc << endl;
 
         if ( ! _shutdown ) {
             error() << "Client::shutdown not called: " << _desc << endl;
         }
+#endif
 
         if ( ! inShutdown() ) {
             // we can't clean up safely once we're in shutdown
