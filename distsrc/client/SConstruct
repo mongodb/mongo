@@ -6,6 +6,21 @@ import os
 import sys
 
 # options
+
+AddOption( "--cxx", 
+          dest="cxx", 
+          type="string", 
+          nargs=1, 
+          action="store",
+          default="g++",help="use an alternate C++ compiler" )
+
+AddOption( "--ldflags", 
+          dest="ldflags", 
+          type="string", 
+          nargs=1, 
+          action="store",
+          default="",help="add some ld flags like --ldflags=/usr/lib --> -L/usr/lib" )
+
 AddOption("--extrapath",
           dest="extrapath",
           type="string",
@@ -84,6 +99,15 @@ if linux:
 
 boostLibs = ["thread", "filesystem", "system"]
 conf = Configure(env)
+
+if GetOption( "cxx" ) is not None:
+        conf.env.Replace(CXX = GetOption( "cxx" ) )
+        print(">> Using CXX compiler " + GetOption( "cxx" ))
+
+if GetOption( "ldflags" ) is not None:
+        conf.env.Append(LINKFLAGS = GetOption( "ldflags" ))
+        print(">> Using LDFLAGS = " + GetOption( "ldflags" ))
+
 for lib in boostLibs:
     if not conf.CheckLib(["boost_%s-mt" % lib, "boost_%s" % lib],
                          language="C++"):
