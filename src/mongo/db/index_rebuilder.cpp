@@ -16,6 +16,9 @@
 
 #include "mongo/db/index_rebuilder.h"
 
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/scopeguard.h"
@@ -33,7 +36,8 @@ namespace mongo {
     void IndexRebuilder::run() {
         Client::initThread(name().c_str()); 
         ON_BLOCK_EXIT_OBJ(cc(), &Client::shutdown);
-        Client::GodScope gs;
+        cc().getAuthorizationSession()->grantInternalAuthorization(
+                UserName("_indexRebuilder", "local"));
 
         bool firstTime = true;
         std::vector<std::string> dbNames;
