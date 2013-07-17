@@ -20,6 +20,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/request.h"
@@ -128,14 +129,14 @@ namespace mongo {
             BSONObjBuilder b;
             vector<Shard> shards;
 
-            AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
-
+            ClientBasic* client = ClientBasic::getCurrent();
+            AuthorizationSession* authSession = client->getAuthorizationSession();
             if ( strcmp( ns , "inprog" ) == 0 ) {
-                uassert(16545,
-                        "not authorized to run inprog",
-                        authSession->checkAuthorization(AuthorizationManager::SERVER_RESOURCE_NAME,
-                                                        ActionType::inprog));
+                const bool isAuthorized = authSession->checkAuthorization(
+                        AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::inprog);
+                audit::logInProgAuthzCheck(
+                        client, q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                uassert(ErrorCodes::Unauthorized, "not authorized to run inprog", isAuthorized);
 
                 Shard::getAllShards( shards );
 
@@ -174,10 +175,13 @@ namespace mongo {
                 arr.done();
             }
             else if ( strcmp( ns , "killop" ) == 0 ) {
-                uassert(16546,
-                        "not authorized to run killop",
-                        authSession->checkAuthorization(AuthorizationManager::SERVER_RESOURCE_NAME,
-                                                        ActionType::killop));
+                const bool isAuthorized = authSession->checkAuthorization(
+                        AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::killop);
+                audit::logKillOpAuthzCheck(
+                        client,
+                        q.query,
+                        isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                uassert(ErrorCodes::Unauthorized, "not authorized to run killop", isAuthorized);
 
                 BSONElement e = q.query["op"];
                 if ( e.type() != String ) {

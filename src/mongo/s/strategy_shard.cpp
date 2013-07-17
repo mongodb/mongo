@@ -22,6 +22,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -53,10 +54,11 @@ namespace mongo {
 
             QueryMessage q( r.d() );
 
-            AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
+            ClientBasic* client = ClientBasic::getCurrent();
+            AuthorizationSession* authSession = client->getAuthorizationSession();
             Status status = authSession->checkAuthForQuery(q.ns, q.query);
-            uassert(16549, status.reason(), status.isOK());
+            audit::logQueryAuthzCheck(client, NamespaceString(q.ns), q.query, status.code());
+            uassertStatusOK(status);
 
             LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
@@ -184,10 +186,11 @@ namespace mongo {
 
                 long long id = r.d().getInt64( 4 );
 
-                AuthorizationSession* authSession =
-                        ClientBasic::getCurrent()->getAuthorizationSession();
+                ClientBasic* client = ClientBasic::getCurrent();
+                AuthorizationSession* authSession = client->getAuthorizationSession();
                 Status status = authSession->checkAuthForGetMore(ns, id);
-                uassert(16539, status.reason(), status.isOK());
+                audit::logGetMoreAuthzCheck(client, NamespaceString(ns), id, status.code());
+                uassertStatusOK(status);
 
                 string host = cursorCache.getRef( id );
 
@@ -221,10 +224,11 @@ namespace mongo {
                 int ntoreturn = r.d().pullInt();
                 long long id = r.d().pullInt64();
 
-                AuthorizationSession* authSession =
-                        ClientBasic::getCurrent()->getAuthorizationSession();
+                ClientBasic* client = ClientBasic::getCurrent();
+                AuthorizationSession* authSession = client->getAuthorizationSession();
                 Status status = authSession->checkAuthForGetMore(ns, id);
-                uassert(16939, status.reason(), status.isOK());
+                audit::logGetMoreAuthzCheck(client, NamespaceString(ns), id, status.code());
+                uassertStatusOK(status);
 
                 ShardedClientCursorPtr cursor = cursorCache.get( id );
                 if ( ! cursor ) {
@@ -559,10 +563,11 @@ namespace mongo {
 
                 for (vector<BSONObj>::iterator it = group.inserts.begin();
                         it != group.inserts.end(); ++it) {
-                    AuthorizationSession* authSession =
-                            ClientBasic::getCurrent()->getAuthorizationSession();
+                    ClientBasic* client = ClientBasic::getCurrent();
+                    AuthorizationSession* authSession = client->getAuthorizationSession();
                     Status status = authSession->checkAuthForInsert(ns, *it);
-                    uassert(16540, status.reason(), status.isOK());
+                    audit::logInsertAuthzCheck(client, NamespaceString(ns), *it, status.code());
+                    uassertStatusOK(status);
                 }
 
                 if (group.inserts.size() > 0 && group.hasException()) {
@@ -1012,10 +1017,18 @@ namespace mongo {
 
             const BSONObj toUpdate = d.nextJsObj();
 
-            AuthorizationSession* authzSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
+            ClientBasic* client = ClientBasic::getCurrent();
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
             Status status = authzSession->checkAuthForUpdate(ns, query, toUpdate, upsert);
-            uassert(16537, status.reason(), status.isOK());
+            audit::logUpdateAuthzCheck(
+                    client,
+                    NamespaceString(ns),
+                    query,
+                    toUpdate,
+                    upsert,
+                    flags & UpdateOption_Multi,
+                    status.code());
+            uassertStatusOK(status);
 
             if( d.reservedField() & Reserved_FromWriteback ){
                 flags |= WriteOption_FromWriteback;
@@ -1173,10 +1186,11 @@ namespace mongo {
 
             const BSONObj query = d.nextJsObj();
 
-            AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
+            ClientBasic* client = ClientBasic::getCurrent();
+            AuthorizationSession* authSession = client->getAuthorizationSession();
             Status status = authSession->checkAuthForDelete(ns, query);
-            uassert(16541, status.reason(), status.isOK());
+            audit::logDeleteAuthzCheck(client, NamespaceString(ns), query, status.code());
+            uassertStatusOK(status);
 
             if( d.reservedField() & Reserved_FromWriteback ){
                 flags |= WriteOption_FromWriteback;
@@ -1238,17 +1252,23 @@ namespace mongo {
                 if (op == dbInsert) {
                     // Insert is the only write op allowed on system.indexes, so it's the only one
                     // we check auth for.
-
-                    // TODO(spencer): this auth check shouldn't be necessary.  We could just call
-                    // checkAuthForInsert with the insert object and it would handle checking for
-                    // index builds, but because of the way this file is structured we don't know
-                    // what the insert object looks like until after we've already special cased
-                    // index building.
-                    AuthorizationSession* authSession =
-                            ClientBasic::getCurrent()->getAuthorizationSession();
-                    uassert(16547,
-                            mongoutils::str::stream() << "not authorized to create index on " << ns,
-                            authSession->checkAuthorization(ns, ActionType::ensureIndex));
+                    ClientBasic* client = ClientBasic::getCurrent();
+                    AuthorizationSession* authSession = client->getAuthorizationSession();
+                    DbMessage& d = r.d();
+                    NamespaceString nsAsNs(ns);
+                    while (d.moreJSObjs()) {
+                        BSONObj toInsert = d.nextJsObj();
+                        Status status = authSession->checkAuthForInsert(
+                                ns,
+                                toInsert);
+                        audit::logInsertAuthzCheck(
+                                client,
+                                nsAsNs,
+                                toInsert,
+                                status.code());
+                        uassertStatusOK(status);
+                    }
+                    d.markReset();
                 }
 
                 if ( r.getConfig()->isShardingEnabled() ){

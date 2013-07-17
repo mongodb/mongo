@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -284,8 +285,8 @@ namespace mongo {
         uassert( 13287 , "too many cursors to kill" , n < 30000 );
 
         long long * cursors = (long long *)x;
-        AuthorizationSession* authSession =
-                ClientBasic::getCurrent()->getAuthorizationSession();
+        ClientBasic* client = ClientBasic::getCurrent();
+        AuthorizationSession* authSession = client->getAuthorizationSession();
         for ( int i=0; i<n; i++ ) {
             long long id = cursors[i];
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
@@ -301,8 +302,14 @@ namespace mongo {
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
-                    if (authSession->checkAuthorization(i->second->getNS(),
-                                                        ActionType::killCursors)) {
+                    const bool isAuthorized = authSession->checkAuthorization(
+                            i->second->getNS(), ActionType::killCursors);
+                    audit::logKillCursorsAuthzCheck(
+                            client,
+                            NamespaceString(i->second->getNS()),
+                            id,
+                            isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                    if (isAuthorized) {
                         _cursors.erase( i );
                     }
                     continue;
@@ -315,7 +322,14 @@ namespace mongo {
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());
-                if (!authSession->checkAuthorization(refsNSIt->second, ActionType::killCursors)) {
+                const bool isAuthorized = authSession->checkAuthorization(
+                        refsNSIt->second, ActionType::killCursors);
+                audit::logKillCursorsAuthzCheck(
+                        client,
+                        NamespaceString(refsNSIt->second),
+                        id,
+                        isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                if (!isAuthorized) {
                     continue;
                 }
                 server = refsIt->second;
