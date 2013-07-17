@@ -158,6 +158,9 @@
     <Filter Include="JavaScript source files\Included in shell only">
       <UniqueIdentifier>{0d7ccbd5-b4e4-4e57-ae0b-b4a80a6fa6bb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party\MurmurHash3">
+      <UniqueIdentifier>{5ced80f0-4dce-421a-ba59-1b338973dd97}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\scripting\engine.cpp">
@@ -1016,6 +1019,9 @@
     <ClCompile Include="..\client\sasl_client_authenticate.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
+      <Filter>third_party\MurmurHash3</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\v8\src\apinatives.js">
@@ -1125,6 +1131,9 @@
     </None>
     <None Include="types.js">
       <Filter>JavaScript source files\Included in all executables</Filter>
+    </None>
+    <None Include="..\..\third_party\murmurhash3\SConscript">
+      <Filter>third_party\MurmurHash3</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -2386,6 +2395,9 @@
     </ClInclude>
     <ClInclude Include="..\client\sasl_client_authenticate.h">
       <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
+      <Filter>third_party\MurmurHash3</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
