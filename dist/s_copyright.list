@@ -1,5 +1,4 @@
 skip	bench/tcbench/wttest.c
-skip	build_posix/Test.java
 skip	build_posix/wiredtiger_config.h
 skip	dist/api_config.py
 skip	dist/api_data.py
@@ -14,20 +13,7 @@ skip	dist/serial.py
 skip	dist/stat.py
 skip	dist/stat_data.py
 skip	lang/java/java_doc.i
-skip	lang/java/src/com/wiredtiger/db/Connection.java
-skip	lang/java/src/com/wiredtiger/db/Cursor.java
-skip	lang/java/src/com/wiredtiger/db/SearchStatus.java
-skip	lang/java/src/com/wiredtiger/db/Session.java
-skip	lang/java/src/com/wiredtiger/db/wiredtiger.java
-skip	lang/java/src/com/wiredtiger/db/wiredtigerConstants.java
-skip	lang/java/src/com/wiredtiger/db/wiredtigerJNI.java
-skip	lang/java/wiredtiger_wrap.c
 skip	lang/python/setup.py
-skip	lang/python/src/wiredtiger/service/WiredTiger.py
-skip	lang/python/src/wiredtiger/service/__init__.py
-skip	lang/python/src/wiredtiger/service/constants.py
-skip	lang/python/src/wiredtiger/service/ttypes.py
-skip	lang/python/wiredtiger.py
 skip	lang/python/wiredtiger/__init__.py
 skip	lang/python/wiredtiger_wrap.c
 skip	src/api/api_strerror.c
