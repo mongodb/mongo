@@ -76,6 +76,21 @@ __wt_nlpo2(uint32_t v)
 #endif /* __WIREDTIGER_UNUSED__ */
 
 /*
+ * __wt_log2_int --
+ *	Find the log base 2 of an integer in O(N) operations;
+ *	http://graphics.stanford.edu/~seander/bithacks.html
+ */
+uint32_t
+__wt_log2_int(uint32_t n)
+{
+	uint32_t l = 0;
+
+	while (n >>= 1)
+		l++;
+	return (l);
+}
+
+/*
  * __wt_ispo2 --
  *	Return if a number is a power-of-two.
  */
@@ -90,4 +105,21 @@ __wt_ispo2(uint32_t v)
 	 * that, use: (! (v & (v - 1)) && v)
 	 */
 	return ((v & (v - 1)) == 0);
+}
+
+/*
+ * __wt_rduppo2 --
+ *	Round the given int up to the next multiple of N, where N is power of 2.
+ */
+uint64_t
+__wt_rduppo2(uint64_t n, uint32_t po2)
+{
+	uint64_t bits, res;
+
+	if (__wt_ispo2(po2)) {
+		bits = __wt_log2_int(po2);
+		res = (((n - 1) >> bits) + 1) << bits;
+	} else
+		res = 0;
+	return (res);
 }

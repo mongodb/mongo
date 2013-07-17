@@ -31,7 +31,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
 }
 
 /*
- * __statlog__config --
+ * __statlog_config --
  *	Parse and setup the statistics server options.
  */
 static int
@@ -269,8 +269,10 @@ __statlog_server(void *arg)
 	 * We also need a place to store the current path, because that's
 	 * how we know when to close/re-open the file.
 	 */
-	WT_ERR(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
-	WT_ERR(__wt_buf_init(session, &tmp, strlen(conn->stat_path) + 128));
+	WT_ERR(__wt_buf_init(session, &path,
+	    strlen(conn->stat_path) + ENTRY_SIZE));
+	WT_ERR(__wt_buf_init(session, &tmp,
+	    strlen(conn->stat_path) + ENTRY_SIZE));
 
 	/*
 	 * The statistics log server may be running before the database is
@@ -280,7 +282,7 @@ __statlog_server(void *arg)
 	 * the wiredtiger_open call.
 	 */
 	while (!conn->connection_initialized)
-		__wt_sleep(1, 0);
+		__wt_sleep(0, 1000);
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*

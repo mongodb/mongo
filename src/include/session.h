@@ -75,7 +75,6 @@ struct __wt_session_impl {
 	TAILQ_HEAD(__tables, __wt_table) tables;
 
 	WT_ITEM	logrec_buf;		/* Buffer for log records */
-	WT_ITEM	logprint_buf;		/* Buffer for debug log records */
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */

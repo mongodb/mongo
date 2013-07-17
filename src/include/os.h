@@ -13,6 +13,10 @@
 			break;						\
 		}							\
 		switch ((ret) = __wt_errno()) {				\
+		case 0:							\
+			/* The call failed but didn't set errno. */	\
+			(ret) = WT_ERROR;				\
+			break;						\
 		case EAGAIN:						\
 		case EBUSY:						\
 		case EINTR:						\
