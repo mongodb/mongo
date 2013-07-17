@@ -127,6 +127,18 @@ namespace mongo {
                 }
             }
 
+            if (seenSort) {
+                BSONObjIterator itEach(eachElem->embeddedObject());
+                while (itEach.more()) {
+                    BSONElement eachItem = itEach.next();
+                    if (eachItem.type() != Object) {
+                        return Status(
+                            ErrorCodes::BadValue,
+                            "$push like modifiers using $sort require all elements to be objects");
+                    }
+                }
+            }
+
             return Status::OK();
         }
 
@@ -376,7 +388,7 @@ namespace mongo {
             // If the $sort clause is being used, we require all the items in the array to be
             // objects themselves (as opposed to base types). This is a temporary restriction
             // that can be lifted once we support full sort semantics in $push.
-            if (_sortPresent) {
+            if (_sortPresent && destExists) {
                 mutablebson::Element curr = _preparedState->elemFound.leftChild();
                 while (curr.ok()) {
                     if (curr.getType() != Object) {

@@ -85,3 +85,12 @@ assert.throws( t.update( {_id:100}, { $push: { x: { $each: [{a:2}], $slice:-2, $
 // If a $slice is used, the only other $sort clause that's accepted is $sort. In here, $xxx
 // is not a valid clause.
 assert.throws( t.update( {_id:100}, { $push: { x: { $each: [{a:2}], $slice:-2, $xxx: {s:1} } } } ) )
+
+t.remove({})
+
+// Ensure that existing values are validated in the array as objects during a $sort with $each,
+// not only the elements in the $each array.
+t.save({ _id: 100, x: [ 1, "foo" ] } );
+assert.throws(t.update(
+    {_id: 100},
+    { $push: { x: { $each: [{a:2}], $slice:-2, $sort: {a:1} } } } ) )
