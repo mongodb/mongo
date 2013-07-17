@@ -945,13 +945,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 
-#if 0
-	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
-	if (cval.val != 0)
-		WT_ERR(__wt_open(
-		   session, WT_LOG_FILENAME, 1, 0, 0, &conn->log_fh));
-#endif
-
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
 		conn->buffer_alignment = WT_BUFFER_ALIGNMENT_DEFAULT;

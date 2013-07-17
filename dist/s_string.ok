@@ -532,6 +532,7 @@ lno
 loadtext
 lockdown
 logf
+logmgr
 lognum
 logput
 lookup

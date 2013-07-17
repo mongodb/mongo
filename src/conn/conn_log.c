@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __logger_config --
+ * __logmgr_config --
  *	Parse and setup the logging server options.
  */
 static int
-__logger_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
+__logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -134,11 +134,11 @@ err:		__wt_err(session, ret, "log archive server error");
 }
 
 /*
- * __wt_logger_create --
+ * __wt_logmgr_create --
  *	Start the log subsystem and archive server thread.
  */
 int
-__wt_logger_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 	WT_LOG *log;
@@ -147,7 +147,7 @@ __wt_logger_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 
 	/* Handle configuration. */
-	WT_RET(__logger_config(session, cfg, &run));
+	WT_RET(__logmgr_config(session, cfg, &run));
 
 	/* If logging is not configured, we're done. */
 	if (!run)
@@ -207,11 +207,11 @@ __wt_logger_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 }
 
 /*
- * __wt_logger_destroy --
+ * __wt_logmgr_destroy --
  *	Destroy the log archiving server thread and logging subsystem.
  */
 int
-__wt_logger_destroy(WT_CONNECTION_IMPL *conn)
+__wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
