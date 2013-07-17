@@ -85,11 +85,11 @@ function doQueryOn(p) {
         if (typeof(JSON) != "undefined") {
             err = JSON.parse(e.substring(6));
         }
-        else if (e.indexOf("16550") > 0) {
-            err.code = 16550;
+        else if (e.indexOf("13") > 0) {
+            err.code = 13;
         }
     }
-    assert.eq(err.code, 16550);
+    assert.eq(err.code, 13);
 };
 
 doQueryOn(slave);
