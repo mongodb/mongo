@@ -61,7 +61,7 @@ namespace mongo {
         /**
          * Puts into the *dbnames vector the name of every database in the cluster.
          */
-        virtual void getAllDatabaseNames(std::vector<std::string>* dbnames) const = 0;
+        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) const = 0;
 
         /**
          * Returns a vector of every privilege document from the given database's

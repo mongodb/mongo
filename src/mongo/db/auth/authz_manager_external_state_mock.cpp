@@ -46,12 +46,13 @@ namespace mongo {
         _userDocuments.clear();
     }
 
-    void AuthzManagerExternalStateMock::getAllDatabaseNames(
+    Status AuthzManagerExternalStateMock::getAllDatabaseNames(
             std::vector<std::string>* dbnames) const {
         unordered_map<std::string, std::vector<BSONObj> >::const_iterator it;
         for (it = _userDocuments.begin(); it != _userDocuments.end(); ++it) {
             dbnames->push_back(it->first);
         }
+        return Status::OK();
     }
 
     std::vector<BSONObj> AuthzManagerExternalStateMock::getAllV1PrivilegeDocsForDB(
