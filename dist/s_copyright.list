@@ -28,6 +28,7 @@ skip	lang/python/src/wiredtiger/service/__init__.py
 skip	lang/python/src/wiredtiger/service/constants.py
 skip	lang/python/src/wiredtiger/service/ttypes.py
 skip	lang/python/wiredtiger.py
+skip	lang/python/wiredtiger/__init__.py
 skip	lang/python/wiredtiger_wrap.c
 skip	src/api/api_strerror.c
 skip	src/config/config_def.c
