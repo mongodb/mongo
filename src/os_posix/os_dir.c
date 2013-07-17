@@ -30,9 +30,10 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	WT_RET(__wt_filename(session, dir, &path));
 
 	*countp = 0;
-	dirp = NULL;
 	dirallocsz = 0;
 	*dirlist = NULL;
+	dirp = NULL;
+	dirsz = 0;
 	entries = NULL;
 	if (flags == 0)
 		LF_SET(WT_DIRLIST_INCLUDE);
