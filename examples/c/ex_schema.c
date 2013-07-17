@@ -64,7 +64,6 @@ main(void)
 	POP_RECORD *p;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
-	WT_ITEM value;
 	WT_SESSION *session;
 	const char *country;
 	uint64_t recno, population;
@@ -141,6 +140,8 @@ main(void)
 	ret = session->open_cursor(session,
 	    "table:poptable", NULL, "raw", &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ITEM value;
+
 		ret = cursor->get_key(cursor, &recno);
 		ret = cursor->get_value(cursor, &value);
 		ret = wiredtiger_struct_unpack(session,
@@ -230,6 +231,8 @@ main(void)
 	ret = session->open_cursor(session,
 	    "table:poptable(country,year)", NULL, "raw", &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ITEM value;
+
 		ret = cursor->get_value(cursor, &value);
 		ret = wiredtiger_struct_unpack(
 		    session, value.data, value.size, "5sH", &country, &year);
