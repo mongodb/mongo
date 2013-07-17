@@ -34,7 +34,7 @@ compare_srcfile(tmp_file, f)
 f='../src/log/log_desc.c'
 tfile = open(tmp_file, 'w')
 
-tfile.write('''/* DO NOT EDIT: automatically built by dist/log.py. */''')
+tfile.write('/* DO NOT EDIT: automatically built by dist/log.py. */\n')
 
 tfile.close()
 compare_srcfile(tmp_file, f)
