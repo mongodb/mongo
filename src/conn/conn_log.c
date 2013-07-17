@@ -102,11 +102,9 @@ __log_archive_server(void *arg)
 					WT_ERR(
 					    __wt_log_remove(session, lognum));
 			}
-			__wt_free(session, logfiles[i]);
-			logfiles[i] = NULL;
 		}
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
-		__wt_free(session, logfiles);
+		__wt_log_files_free(session, logfiles, logcount);
 		logfiles = NULL;
 		logcount = 0;
 
@@ -124,12 +122,8 @@ __log_archive_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log archive server error");
 	}
-	if (logfiles != NULL) {
-		for (i = 0; i < logcount; i++)
-			if (logfiles[i] != NULL)
-				__wt_free(session, logfiles[i]);
-		__wt_free(session, logfiles);
-	}
+	if (logfiles != NULL)
+		__wt_log_files_free(session, logfiles, logcount);
 	return (NULL);
 }
 

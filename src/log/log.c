@@ -22,6 +22,20 @@ __wt_log_getfiles(WT_SESSION_IMPL *session, char ***files, u_int *count)
 }
 
 /*
+ * __wt_log_files_free --
+ *	Free memory associated with a log file list.
+ */
+void
+__wt_log_files_free(WT_SESSION_IMPL *session, char **files, u_int count)
+{
+	u_int i;
+
+	for (i = 0; i < count; i++)
+		__wt_free(session, files[i]);
+	__wt_free(session, files);
+}
+
+/*
  * __wt_log_filename --
  *	Given a log number, return a WT_ITEM of a generated log file name.
  */
@@ -128,7 +142,6 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		lastlog = WT_MAX(lastlog, lognum);
 		firstlog = WT_MIN(firstlog, lognum);
-		__wt_free(session, logfiles[i]);
 	}
 	log->fileid = lastlog;
 	WT_VERBOSE_ERR(session, log, "log_open: first log %d last log %d",
@@ -141,7 +154,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 */
 	WT_ERR(__wt_log_newfile(session, 1));
 err:
-	__wt_free(session, logfiles);
+	__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
 }
 
@@ -232,11 +245,9 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn)
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		if (lognum > lsn->file)
 			WT_ERR(__wt_log_remove(session, lognum));
-		__wt_free(session, logfiles[i]);
-		logfiles[i] = NULL;
 	}
 err:
-	__wt_free(session, logfiles);
+	__wt_log_files_free(session, logfiles, logcount);
 	return (0);
 }
 

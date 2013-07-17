@@ -226,10 +226,8 @@ __backup_start(
 	/* Add log files if logging is on. */
 	if (conn->log) {
 		WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
-		for (i = 0; i < logcount; i++) {
+		for (i = 0; i < logcount; i++)
 			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
-			__wt_free(session, logfiles[i]);
-		}
 	}
 
 	/* Close the hot backup file. */
@@ -240,7 +238,7 @@ __backup_start(
 err:	if (cb->bfp != NULL)
 		WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
 	if (logfiles != NULL)
-		__wt_free(session, logfiles);
+		__wt_log_files_free(session, logfiles, logcount);
 
 	if (ret != 0)
 		WT_TRET(__backup_stop(session));

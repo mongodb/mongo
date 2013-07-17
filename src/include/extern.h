@@ -670,6 +670,9 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session,
 extern int __wt_log_getfiles(WT_SESSION_IMPL *session,
     char ***files,
     u_int *count);
+extern void __wt_log_files_free(WT_SESSION_IMPL *session,
+    char **files,
+    u_int count);
 extern int __wt_log_filename(WT_SESSION_IMPL *session,
     uint32_t id,
     WT_ITEM *buf);
