@@ -193,7 +193,7 @@ __log_fill(WT_SESSION_IMPL *session,
 	WT_CSTAT_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
-		lsnp->offset += myslot->offset;
+		lsnp->offset += (off_t)myslot->offset;
 	}
 err:
 	if (ret != 0 && myslot->slot->slot_error == 0)
@@ -211,7 +211,7 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-	return (lsn->offset + recsize < conn->log_file_max);
+	return (lsn->offset + (off_t)recsize < conn->log_file_max);
 }
 
 /*
@@ -226,13 +226,11 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LOG *log;
 	uint32_t lognum;
 	u_int i, logcount;
 	char **logfiles;
 
 	conn = S2C(session);
-	log = conn->log;
 
 	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
@@ -252,19 +250,20 @@ err:
  *	Returns an estimate of the real end of log file.
  */
 static int
-__log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, uint64_t *eof)
+__log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	uint64_t log_size, off, rec;
+	uint64_t rec;
+	off_t log_size, off;
 
 	conn = S2C(session);
 	log = conn->log;
 	if (eof == NULL)
 		return (0);
 	*eof = 0;
-	WT_ERR(__wt_filesize(session, fh, (off_t *)&log_size));
+	WT_ERR(__wt_filesize(session, fh, &log_size));
 	/*
 	 * We know all log records are aligned at log->allocsize.  The first
 	 * item in a log record is always the length.  Look for any non-zero
@@ -272,8 +271,9 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, uint64_t *eof)
 	 * it could be the middle of a large record.  But we know no log record
 	 * starts after it.  Return an estimate of the log file size.
 	 */
-	for (off = (log_size - log->allocsize);
-	    off > 0; off -= log->allocsize) {
+	for (off = log_size - (off_t)log->allocsize;
+	    off > 0;
+	    off -= (off_t)log->allocsize) {
 		WT_ERR(__wt_read(session, fh, off, sizeof(uint64_t), &rec));
 		if (rec != 0)
 			break;
@@ -281,7 +281,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, uint64_t *eof)
 	/*
 	 * Set EOF to the last zero-filled record we saw.
 	 */
-	*eof = off + log->allocsize;
+	*eof = off + (off_t)log->allocsize;
 err:
 	return (ret);
 }
@@ -415,7 +415,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	desc->log_magic = WT_LOG_MAGIC;
 	desc->majorv = WT_LOG_MAJOR_VERSION;
 	desc->minorv = WT_LOG_MINOR_VERSION;
-	desc->log_size = conn->log_file_max;
+	desc->log_size = (uint64_t)conn->log_file_max;
 
 	/*
 	 * Now that the record is set up, initialize the record header.
@@ -535,7 +535,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, rd_lsn, start_lsn;
-	uint64_t log_size, rdup_len, reclen;
+	uint64_t rdup_len, reclen;
+	off_t log_size;
 	uint32_t cksum;
 	int done;
 
@@ -658,7 +659,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
 
 		WT_CSTAT_INCR(session, log_scan_records);
-		rd_lsn.offset += rdup_len;
+		rd_lsn.offset += (off_t)rdup_len;
 	} while (!done);
 
 err:	WT_CSTAT_INCR(session, log_scans);

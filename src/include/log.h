@@ -17,7 +17,7 @@
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
 	uint32_t	unused;
-	uint64_t	offset;		/* Log file offset */
+	off_t		offset;		/* Log file offset */
 };
 
 typedef enum {

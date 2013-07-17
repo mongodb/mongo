@@ -174,7 +174,7 @@ struct __wt_connection_impl {
 	pthread_t	 arch_tid;	/* Log archive thread */
 	int		 arch_tid_set;	/* Log archive thread set */
 	WT_LOG		*log;		/* Logging structure */
-	uint64_t	 log_file_max;	/* Log file max size */
+	off_t		log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 
 					/* Locked: collator list */
