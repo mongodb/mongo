@@ -31,6 +31,10 @@ namespace mongo {
     class Client;
     class Timer;
 
+namespace mutablebson {
+    class Document;
+}  // namespace mutablebson
+
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
         subclass to make a command.  define a singleton object for it.
         */
@@ -118,6 +122,13 @@ namespace mongo {
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj);
+
+        /**
+         * Redacts "cmdObj" in-place to a form suitable for writing to logs.
+         *
+         * The default implementation does nothing.
+         */
+        virtual void redactForLogging(mutablebson::Document* cmdObj);
 
         /* Return true if a replica set secondary should go into "recovering"
            (unreadable) state while running this command.

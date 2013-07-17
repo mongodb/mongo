@@ -18,6 +18,8 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/action_set.h"
@@ -32,12 +34,23 @@
 
 namespace mongo {
 
-    void addStatus(const Status& status, BSONObjBuilder& builder) {
+    static void addStatus(const Status& status, BSONObjBuilder& builder) {
         builder.append("ok", status.isOK() ? 1.0: 0.0);
         if (!status.isOK())
             builder.append("code", status.code());
         if (!status.reason().empty())
             builder.append("errmsg", status.reason());
+    }
+
+    static void redactPasswordData(mutablebson::Element parent) {
+        namespace mmb = mutablebson;
+        const StringData pwdFieldName("pwd", StringData::LiteralTag());
+        for (mmb::Element pwdElement = mmb::findFirstChildNamed(parent, pwdFieldName);
+             pwdElement.ok();
+             pwdElement = mmb::findElementNamed(pwdElement.rightSibling(), pwdFieldName)) {
+
+            pwdElement.setValueString("xxx");
+        }
     }
 
     class CmdCreateUser : public Command {
@@ -145,6 +158,10 @@ namespace mongo {
             }
 
             return true;
+        }
+
+        virtual void redactForLogging(mutablebson::Document* cmdObj) {
+            redactPasswordData(cmdObj->root());
         }
 
     private:
@@ -323,6 +340,10 @@ namespace mongo {
             }
 
             return true;
+        }
+
+        virtual void redactForLogging(mutablebson::Document* cmdObj) {
+            redactPasswordData(cmdObj->root());
         }
 
     private:
