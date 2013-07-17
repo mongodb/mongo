@@ -687,6 +687,7 @@ rwlock
 rwlocks
 rwunlock
 rx
+sH
 sHQ
 savepoints
 sb
