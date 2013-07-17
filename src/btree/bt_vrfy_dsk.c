@@ -603,6 +603,10 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		    dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
+	case WT_CELL_KEY_PREFIX:
+		if (dsk_type == WT_PAGE_ROW_LEAF)
+			return (0);
+		break;
 	case WT_CELL_VALUE:
 	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:

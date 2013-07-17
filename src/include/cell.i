@@ -55,10 +55,9 @@
  *
  * Bits 5-8 are cell "types".
  *
- * The 0x03 bit combination (setting both 0x01 and 0x02) is unused, but would
- * require code changes.  We can use bit 4 as a single bit easily; we can use
- * use bit 4 as a type bit in a backward compatible way by adding bit 4 to the
- * type mask and adding new types that incorporate it.
+ * We could use bit 4 as a single bit easily, or as a type bit in a backward
+ * compatible way by adding bit 4 to the type mask and adding new types that
+ * incorporate it.
  */
 #define	WT_CELL_VALUE_SHORT	0x001		/* Short data */
 #define	WT_CELL_KEY_SHORT	0x002		/* Short key */
@@ -81,16 +80,17 @@
  * value dictionaries: if the two values are the same, we only store them once
  * and have the second and subsequent use reference the original.
  */
-#define	WT_CELL_ADDR		(0 << 4)	/* Block location */
-#define	WT_CELL_ADDR_DEL	(1 << 4)	/* Block location (deleted) */
-#define	WT_CELL_ADDR_LNO	(2 << 4)	/* Block location (lno) */
-#define	WT_CELL_DEL		(3 << 4)	/* Deleted value */
-#define	WT_CELL_KEY		(4 << 4)	/* Key */
-#define	WT_CELL_KEY_OVFL	(5 << 4)	/* Overflow key */
-#define	WT_CELL_VALUE		(6 << 4)	/* Value */
-#define	WT_CELL_VALUE_COPY	(7 << 4)	/* Value copy */
-#define	WT_CELL_VALUE_OVFL	(8 << 4)	/* Removed overflow value */
-#define	WT_CELL_VALUE_OVFL_RM	(9 << 4)	/* Cached overflow value */
+#define	WT_CELL_ADDR		 (0 << 4)	/* Block location */
+#define	WT_CELL_ADDR_DEL	 (1 << 4)	/* Block location (deleted) */
+#define	WT_CELL_ADDR_LNO	 (2 << 4)	/* Block location (lno) */
+#define	WT_CELL_DEL		 (3 << 4)	/* Deleted value */
+#define	WT_CELL_KEY		 (4 << 4)	/* Key */
+#define	WT_CELL_KEY_PREFIX	 (5 << 4)	/* Key with prefix byte */
+#define	WT_CELL_KEY_OVFL	 (6 << 4)	/* Overflow key */
+#define	WT_CELL_VALUE		 (7 << 4)	/* Value */
+#define	WT_CELL_VALUE_COPY	 (8 << 4)	/* Value copy */
+#define	WT_CELL_VALUE_OVFL	 (9 << 4)	/* Removed overflow value */
+#define	WT_CELL_VALUE_OVFL_RM	(10 << 4)	/* Cached overflow value */
 
 #define	WT_CELL_TYPE_MASK	(0x0fU << 4)
 #define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
@@ -350,10 +350,14 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 		return (2);
 	}
 
-	cell->__chunk[0] = WT_CELL_KEY;		/* Type */
-	cell->__chunk[1] = prefix;		/* Prefix */
-
-	p = cell->__chunk + 2;			/* Length */
+	if (prefix == 0) {
+		cell->__chunk[0] = WT_CELL_KEY;		/* Type */
+		p = cell->__chunk + 1;			/* Length */
+	} else {
+		cell->__chunk[0] = WT_CELL_KEY_PREFIX;	/* Type */
+		cell->__chunk[1] = prefix;		/* Prefix */
+		p = cell->__chunk + 2;			/* Length */
+	}
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
 
 	return (WT_PTRDIFF32(p, cell));
@@ -444,13 +448,17 @@ __wt_cell_type(WT_CELL *cell)
 	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
 		return (WT_CELL_KEY);
 
-	type = WT_CELL_TYPE(cell->__chunk[0]);
-
-	if (type == WT_CELL_ADDR_DEL || type == WT_CELL_ADDR_LNO)
+	switch (type = WT_CELL_TYPE(cell->__chunk[0])) {
+	case WT_CELL_ADDR_DEL:
+	case WT_CELL_ADDR_LNO:
 		return (WT_CELL_ADDR);
-	if (type == WT_CELL_VALUE_OVFL_RM)
+	case WT_CELL_KEY_PREFIX:
+		return (WT_CELL_KEY);
+	case WT_CELL_VALUE_OVFL_RM:
 		return (WT_CELL_VALUE_OVFL);
-
+	default:
+		break;
+	}
 	return (type);
 }
 
@@ -512,20 +520,27 @@ restart:
 	 */
 	WT_CELL_LEN_CHK(cell, 0);
 	if (cell->__chunk[0] & WT_CELL_VALUE_SHORT) {
-		unpack->type = WT_CELL_VALUE;
 		unpack->raw = WT_CELL_VALUE_SHORT;
+		unpack->type = WT_CELL_VALUE;
 	} else if (cell->__chunk[0] & WT_CELL_KEY_SHORT) {
-		unpack->type = WT_CELL_KEY;
 		unpack->raw = WT_CELL_KEY_SHORT;
+		unpack->type = WT_CELL_KEY;
 	} else {
-		unpack->raw = WT_CELL_TYPE(cell->__chunk[0]);
-		if (unpack->raw == WT_CELL_ADDR_DEL ||
-		    unpack->raw == WT_CELL_ADDR_LNO)
+		switch (unpack->raw = WT_CELL_TYPE(cell->__chunk[0])) {
+		case WT_CELL_ADDR_DEL:
+		case WT_CELL_ADDR_LNO:
 			unpack->type = WT_CELL_ADDR;
-		else if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
+			break;
+		case WT_CELL_KEY_PREFIX:
+			unpack->type = WT_CELL_KEY;
+			break;
+		case WT_CELL_VALUE_OVFL_RM:
 			unpack->type = WT_CELL_VALUE_OVFL;
-		else
+			break;
+		default:
 			unpack->type = unpack->raw;
+			break;
+		}
 	}
 
 	/*
@@ -570,8 +585,11 @@ restart:
 	 */
 	p = (uint8_t *)cell + 1;			/* skip cell */
 
-	/* Check the prefix byte that follows the cell descriptor byte. */
-	if (unpack->raw == WT_CELL_KEY && type == WT_PAGE_ROW_LEAF) {
+	/*
+	 * Check for the prefix byte that optionally follows the cell
+	 * descriptor byte on row-store leaf pages.
+	 */
+	if (unpack->raw == WT_CELL_KEY_PREFIX && type == WT_PAGE_ROW_LEAF) {
 		++p;					/* skip prefix */
 		WT_CELL_LEN_CHK(p, 0);
 		unpack->prefix = cell->__chunk[1];
@@ -607,7 +625,7 @@ restart:
 	case WT_CELL_VALUE_OVFL:
 	case WT_CELL_VALUE_OVFL_RM:
 		/*
-		 * Set overflow flags.
+		 * Set overflow flag.
 		 */
 		unpack->ovfl = 1;
 		/* FALLTHROUGH */
@@ -616,7 +634,12 @@ restart:
 	case WT_CELL_ADDR_DEL:
 	case WT_CELL_ADDR_LNO:
 	case WT_CELL_KEY:
+	case WT_CELL_KEY_PREFIX:
 	case WT_CELL_VALUE:
+		/*
+		 * The cell is followed by a 64B data length and a chunk of
+		 * data.
+		 */
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		unpack->data = p;
