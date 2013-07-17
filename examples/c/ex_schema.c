@@ -64,6 +64,7 @@ main(void)
 	POP_RECORD *p;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_ITEM value;
 	WT_SESSION *session;
 	const char *country;
 	uint64_t recno, population;
@@ -135,6 +136,23 @@ main(void)
 	}
 	ret = cursor->close(cursor);
 
+	/*! [List the records in the table using raw mode.] */
+	/* List the records in the table using raw mode. */
+	ret = session->open_cursor(session,
+	    "table:poptable", NULL, "raw", &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_key(cursor, &recno);
+		ret = cursor->get_value(cursor, &value);
+		ret = wiredtiger_struct_unpack(session,
+		    value.data, value.size,
+		    "5sHQ", &country, &year, &population);
+		printf("ID %" PRIu64, recno);
+		printf(": country %s, year %u, population %" PRIu64 "\n",
+		    country, year, population);
+	}
+	/*! [List the records in the table using raw mode.] */
+	ret = cursor->close(cursor);
+
 	/*! [Read population from the primary column group] */
 	/*
 	 * Open a cursor on the main column group, and return the information
@@ -204,6 +222,22 @@ main(void)
 	/*! [Return a subset of values from the table] */
 	ret = cursor->close(cursor);
 
+	/*! [Return a subset of values from the table using raw mode] */
+	/*
+	 * Use a projection to return just the table's country and year
+	 * columns, using raw mode.
+	 */
+	ret = session->open_cursor(session,
+	    "table:poptable(country,year)", NULL, "raw", &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_value(cursor, &value);
+		ret = wiredtiger_struct_unpack(
+		    session, value.data, value.size, "5sH", &country, &year);
+		printf("country %s, year %u\n", country, year);
+	}
+	/*! [Return a subset of values from the table using raw mode] */
+	ret = cursor->close(cursor);
+
 	/*! [Return the table's record number key using an index] */
 	/*
 	 * Use a projection to return just the table's record number key
@@ -214,8 +248,7 @@ main(void)
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &country, &year);
 		ret = cursor->get_value(cursor, &recno);
-		printf(
-		    "row ID %" PRIu64 ": country %s, year %u\n",
+		printf("row ID %" PRIu64 ": country %s, year %u\n",
 		    recno, country, year);
 	}
 	/*! [Return the table's record number key using an index] */
@@ -251,7 +284,6 @@ main(void)
 	}
 	/*! [Access only the index] */
 	ret = cursor->close(cursor);
-	/*! [schema complete] */
 
 	ret = conn->close(conn, NULL);
 
