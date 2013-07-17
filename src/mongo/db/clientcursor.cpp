@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -870,13 +871,25 @@ namespace mongo {
             recursive_scoped_lock lock(ccmutex);
             ClientCursor* cursor = find_inlock(id);
             if (!cursor) {
+                audit::logKillCursorsAuthzCheck(
+                        &cc(),
+                        NamespaceString(""),
+                        id,
+                        ErrorCodes::CursorNotFound);
                 return false;
             }
             ns = cursor->ns();
         }
 
         // Can't be in a lock when checking authorization
-        if (!cc().getAuthorizationSession()->checkAuthorization(ns, ActionType::killCursors)) {
+        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
+                ns, ActionType::killCursors);
+        audit::logKillCursorsAuthzCheck(
+                &cc(),
+                NamespaceString(ns),
+                id,
+                isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+        if (!isAuthorized) {
             return false;
         }
 

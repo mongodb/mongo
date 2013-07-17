@@ -29,6 +29,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -128,15 +129,20 @@ namespace mongo {
     }
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
+        DbMessage d(m);
+        QueryMessage q(d);
         BSONObjBuilder b;
 
-        if (!cc().getAuthorizationSession()->checkAuthorization(
-                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::inprog)) {
+        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
+                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::inprog);
+
+        audit::logInProgAuthzCheck(
+                &cc(), q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+
+        if (!isAuthorized) {
             b.append("err", "unauthorized");
         }
         else {
-            DbMessage d(m);
-            QueryMessage q(d);
             bool all = q.query["$all"].trueValue();
             vector<BSONObj> vals;
             {
@@ -183,17 +189,21 @@ namespace mongo {
     }
 
     void killOp( Message &m, DbResponse &dbresponse ) {
+        DbMessage d(m);
+        QueryMessage q(d);
         BSONObj obj;
-        if (!cc().getAuthorizationSession()->checkAuthorization(
-                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::killop)) {
+        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
+                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::killop);
+        audit::logKillOpAuthzCheck(&cc(),
+                                   q.query,
+                                   isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+        if (!isAuthorized) {
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
         /*else if( !dbMutexInfo.isLocked() )
             obj = fromjson("{\"info\":\"no op in progress/not locked\"}");
             */
         else {
-            DbMessage d(m);
-            QueryMessage q(d);
             BSONElement e = q.query.getField("op");
             if( !e.isNumber() ) {
                 obj = fromjson("{\"err\":\"no op number field specified?\"}");
@@ -210,8 +220,11 @@ namespace mongo {
     bool _unlockFsync();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
-        if (!cc().getAuthorizationSession()->checkAuthorization(
-                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::unlock)) {
+        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
+                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::unlock);
+        audit::logFsyncUnlockAuthzCheck(
+                &cc(), isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+        if (!isAuthorized) {
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
         else if (strncmp(ns, "admin.", 6) != 0 ) {
@@ -244,9 +257,12 @@ namespace mongo {
         try {
             if (!NamespaceString(d.getns()).isCommand()) {
                 // Auth checking for Commands happens later.
-                Status status = cc().getAuthorizationSession()->checkAuthForQuery(d.getns(),
-                                                                                  q.query);
-                uassert(16550, status.reason(), status.isOK());
+                Client* client = &cc();
+                Status status = client->getAuthorizationSession()->checkAuthForQuery(d.getns(),
+                                                                                     q.query);
+                audit::logQueryAuthzCheck(
+                        client, NamespaceString(d.getns()), q.query, status.code());
+                uassertStatusOK(status);
             }
             dbresponse.exhaustNS = runQuery(m, q, op, *resp);
             verify( !resp->empty() );
@@ -577,7 +593,9 @@ namespace mongo {
                                                                            query,
                                                                            toupdate,
                                                                            upsert);
-        uassert(16538, status.reason(), status.isOK());
+        audit::logUpdateAuthzCheck(
+                &cc(), NamespaceString(ns), query, toupdate, upsert, multi, status.code());
+        uassertStatusOK(status);
 
         op.debug().query = query;
         op.setQuery(query);
@@ -617,9 +635,10 @@ namespace mongo {
         bool broadcast = flags & RemoveOption_Broadcast;
         verify( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
-        
+
         Status status = cc().getAuthorizationSession()->checkAuthForDelete(ns, pattern);
-        uassert(16542, status.reason(), status.isOK());
+        audit::logDeleteAuthzCheck(&cc(), NamespaceString(ns), pattern, status.code());
+        uassertStatusOK(status);
 
         op.debug().query = pattern;
         op.setQuery(pattern);
@@ -678,7 +697,8 @@ namespace mongo {
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
                 Status status = cc().getAuthorizationSession()->checkAuthForGetMore(ns, cursorid);
-                uassert(16543, status.reason(), status.isOK());
+                audit::logGetMoreAuthzCheck(&cc(), NamespaceString(ns), cursorid, status.code());
+                uassertStatusOK(status);
 
                 if (str::startsWith(ns, "local.oplog.")){
                     while (MONGO_FAIL_POINT(rsStopGetMore)) {
@@ -841,7 +861,8 @@ namespace mongo {
             // Check auth for insert (also handles checking if this is an index build and checks
             // for the proper privileges in that case).
             Status status = cc().getAuthorizationSession()->checkAuthForInsert(ns, obj);
-            uassert(16544, status.reason(), status.isOK());
+            audit::logInsertAuthzCheck(&cc(), NamespaceString(ns), obj, status.code());
+            uassertStatusOK(status);
         }
 
         PageFaultRetryableSection s;
