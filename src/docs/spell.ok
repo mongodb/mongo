@@ -276,6 +276,7 @@ rpc
 rwlock
 rx
 sHQ
+sHq
 scalable
 scanf
 schemas
