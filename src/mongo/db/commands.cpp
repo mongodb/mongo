@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -210,6 +211,8 @@ namespace mongo {
         return client->getAuthorizationSession()->checkAuthForPrivileges(privileges);
     }
 
+    void Command::redactForLogging(mutablebson::Document* cmdObj) {}
+
     void Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) {
         appendCommandStatus(result, status.isOK(), status.reason());
         BSONObj tmp = result.asTempObj();
@@ -230,6 +233,7 @@ namespace mongo {
                                           const std::string& dbname,
                                           const BSONObj& cmdObj,
                                           bool fromRepl) {
+        namespace mmb = mutablebson;
         if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
             return Status(ErrorCodes::Unauthorized, str::stream() << c->name <<
                           " may only be run against the admin database.");
@@ -237,9 +241,11 @@ namespace mongo {
         if (AuthorizationManager::isAuthEnabled()) {
             Status status = c->checkAuthForCommand(client, dbname, cmdObj);
             if (status == ErrorCodes::Unauthorized) {
+                mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
+                c->redactForLogging(&cmdToLog);
                 return Status(ErrorCodes::Unauthorized,
                               str::stream() << "not authorized on " << dbname <<
-                              " to execute command " << cmdObj);
+                              " to execute command " << cmdToLog.toString());
             }
             if (!status.isOK()) {
                 return status;
@@ -260,13 +266,16 @@ namespace mongo {
                                         const std::string& dbname,
                                         const BSONObj& cmdObj,
                                         bool fromRepl) {
+        namespace mmb = mutablebson;
         Status status = _checkAuthorizationImpl(c, client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {
             log() << status << std::endl;
         }
+        mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
+        c->redactForLogging(&cmdToLog);
         audit::logCommandAuthzCheck(client,
                                     NamespaceString(c->parseNs(dbname, cmdObj)),
-                                    cmdObj,
+                                    cmdToLog,
                                     status.code());
         return status;
     }

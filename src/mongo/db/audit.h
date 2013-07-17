@@ -29,6 +29,10 @@ namespace mongo {
     class ClientBasic;
     class NamespaceString;
 
+namespace mutablebson {
+    class Document;
+}  // namespace mutablebson
+
 namespace audit {
 
     //
@@ -44,7 +48,7 @@ namespace audit {
     void logCommandAuthzCheck(
             ClientBasic* client,
             const NamespaceString& ns,
-            const BSONObj& cmdObj,
+            const mutablebson::Document& cmdObj,
             ErrorCodes::Error result);
 
     /**
