@@ -534,7 +534,6 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 auto_ptr<Lock::GlobalWrite> globalWriteLock;
                 while ( cursor->more() ) {
-                    // nonAtomic option isset
                     // we can't use here separate locks between findOne() / upsert() / finalReduce()
                     if ( !_config.outNonAtomic ) {
                         globalWriteLock.reset( new Lock::GlobalWrite ); // TODO(erh) why global?
