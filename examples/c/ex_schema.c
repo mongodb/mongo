@@ -190,8 +190,25 @@ main(void)
 	/*! [Search in a composite index] */
 	ret = cursor->close(cursor);
 
+	/*! [Return a subset of values from the table] */
+	/*
+	 * Use a projection to return just the table's country and year
+	 * columns.
+	 */
+	ret = session->open_cursor(session,
+	    "table:poptable(country,year)", NULL, NULL, &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_value(cursor, &country, &year);
+		printf("country %s, year %u\n", country, year);
+	}
+	/*! [Return a subset of values from the table] */
+	ret = cursor->close(cursor);
+
 	/*! [Return the table's record number key using an index] */
-	/* Return the table's record number key using an index. */
+	/*
+	 * Use a projection to return just the table's record number key
+	 * from an index.
+	 */
 	ret = session->open_cursor(session,
 	    "index:poptable:country_plus_year(id)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -205,7 +222,10 @@ main(void)
 	ret = cursor->close(cursor);
 
 	/*! [Return a subset of the value columns from an index] */
-	/* Return just the population column using an index. */
+	/*
+	 * Use a projection to return just the population column from an
+	 * index.
+	 */
 	ret = session->open_cursor(session,
 	    "index:poptable:country_plus_year(population)",
 	    NULL, NULL, &cursor);
@@ -220,8 +240,8 @@ main(void)
 
 	/*! [Access only the index] */
 	/*
-	 * Avoid accessing any other column groups when using an index: supply
-	 * an empty list of value columns.
+	 * Use a projection to avoid accessing any other column groups when
+	 * using an index: supply an empty list of value columns.
 	 */
 	ret = session->open_cursor(session,
 	    "index:poptable:country_plus_year()", NULL, NULL, &cursor);
