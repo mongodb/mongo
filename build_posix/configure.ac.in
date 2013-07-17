@@ -72,8 +72,10 @@ fi
 
 if test "$wt_cv_enable_python" = "yes"; then
 	AM_PATH_PYTHON([2.6])
-	PYTHON_PREFIX=$with_python_prefix
-	AC_SUBST(PYTHON_PREFIX)
+	if test -n "$with_python_prefix" ; then
+		PYTHON_INSTALL_ARG="-d $with_python_prefix"
+	fi
+	AC_SUBST(PYTHON_INSTALL_ARG)
 fi
 
 AM_TYPES

@@ -19,7 +19,7 @@ _wiredtiger.so: $(top_builddir)/libwiredtiger.la $(PYSRC)/wiredtiger_wrap.c
 install-exec-local:
 	$(PYTHON) $(PYSRC)/setup.py build_py -d build
 	$(PYTHON) $(PYSRC)/setup.py build_ext -b build -t . -f $(PY_SETUP_DEBUG)
-	$(PYTHON) $(PYSRC)/setup.py install_lib -b build --skip-build
+	$(PYTHON) $(PYSRC)/setup.py install_lib -b build --skip-build $(PYTHON_INSTALL_ARG)
 
 clean-local:
 	$(PYTHON) $(PYSRC)/setup.py clean
