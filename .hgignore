@@ -18,7 +18,7 @@
 ^docs/latex
 ^docs/python
 ^docs/swig
-^lang/python/(wiredtiger.py|wiredtiger_wrap.c)
+^lang/python/(wiredtiger/__init__.py|wiredtiger_wrap.c)
 ^releases
 ^src/server
 ^test/bt/(CONFIG|__rand|__wt.bdb|__wt.run|__wt.wt|db|t|vgout\..*)
