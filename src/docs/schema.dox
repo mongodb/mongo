@@ -1,4 +1,4 @@
-/*! @page schema Schemas
+/*! @page schema Schema, Columns, Column Groups, Indices and Projections
 
 While many tables have simple key/value pairs for records, WiredTiger
 also supports more complex data patterns.
