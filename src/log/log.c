@@ -89,11 +89,9 @@ err:	__wt_scr_free(&path);
 static int
 __log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(path);
 	WT_DECL_RET;
 
-	conn = S2C(session);
 	WT_RET(__wt_scr_alloc(session, 0, &path));
 	WT_ERR(__wt_log_filename(session, id, path));
 	WT_VERBOSE_ERR(session, log, "opening log %s",
@@ -224,13 +222,10 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 static int
 __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint32_t lognum;
 	u_int i, logcount;
 	char **logfiles;
-
-	conn = S2C(session);
 
 	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
@@ -323,7 +318,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	if (log->alloc_lsn.offset == LOG_FIRST_RECORD)
 		WT_RET(__wt_fallocate(session,
 		    log->log_fh, LOG_FIRST_RECORD, conn->log_file_max));
-	log->alloc_lsn.offset += recsize;
+	log->alloc_lsn.offset += (off_t)recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_error = 0;
 	slot->slot_fh = log->log_fh;
