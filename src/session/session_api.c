@@ -220,6 +220,8 @@ __session_open_cursor(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	*cursorp = NULL;
+
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
@@ -799,6 +801,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t i;
+
+	*sessionp = NULL;
 
 	session = conn->default_session;
 	session_ret = NULL;

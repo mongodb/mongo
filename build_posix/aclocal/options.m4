@@ -80,6 +80,12 @@ esac
 AC_MSG_RESULT($wt_cv_enable_python)
 AM_CONDITIONAL([PYTHON], [test x$wt_cv_enable_python = xyes])
 
+AC_MSG_CHECKING(if --with-python-prefix option specified)
+AC_ARG_WITH(python-prefix,
+	[AS_HELP_STRING([--with-python-prefix=DIR],
+	    [Installation prefix for Python module.])])
+AC_MSG_RESULT($with_python_prefix)
+
 AC_MSG_CHECKING(if --enable-snappy option specified)
 AC_ARG_ENABLE(snappy,
 	[AS_HELP_STRING([--enable-snappy],

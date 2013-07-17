@@ -200,6 +200,7 @@ int main(void)
 	ret = cursor_forward_scan(cursor);
 	ret = cursor_reset(cursor);
 	ret = cursor_reverse_scan(cursor);
+	ret = cursor_search_near(cursor);
 	ret = cursor_update(cursor);
 	ret = cursor_remove(cursor);
 	ret = cursor->close(cursor);
