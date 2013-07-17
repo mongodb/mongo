@@ -21,6 +21,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/type_database.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -64,6 +65,8 @@ namespace mongo {
         // 30 second timeout for w:majority
         BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
         string errstr = conn->get()->getLastErrorString(res);
+        conn->done();
+
         if (errstr.empty()) {
             return Status::OK();
         }
@@ -87,6 +90,8 @@ namespace mongo {
         // 30 second timeout for w:majority
         BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
         string err = conn->get()->getLastErrorString(res);
+        conn->done();
+
         if (!err.empty()) {
             return Status(ErrorCodes::UserModificationFailed, err);
         }
@@ -102,17 +107,34 @@ namespace mongo {
         return Status::OK();
     }
 
-    void AuthzManagerExternalStateMongos::getAllDatabaseNames(
+    Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
             std::vector<std::string>* dbnames) const {
-        // TODO(spencer): NOT YET IMPLEMENTED
-        fassertFailed(16964);
+        std::vector<BSONObj> dbDocs;
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection("config.databases"));
+        conn->get()->findN(dbDocs, DatabaseType::ConfigNS, Query(), 0);
+        conn->done();
+
+        for (std::vector<BSONObj>::const_iterator it = dbDocs.begin();
+                it != dbDocs.end(); ++it) {
+            DatabaseType dbInfo;
+            std::string errmsg;
+            if (!dbInfo.parseBSON( *it, &errmsg) || !dbInfo.isValid( &errmsg )) {
+                 return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+            dbnames->push_back(dbInfo.getName());
+        }
+        dbnames->push_back("config"); // config db isn't listed in config.databases
+        return Status::OK();
     }
 
     std::vector<BSONObj> AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
             const std::string& dbname) const {
-        // TODO(spencer): NOT YET IMPLEMENTED
-        fassertFailed(16965);
+        std::vector<BSONObj> userDocs;
+        std::string usersNamespace = dbname + ".system.users";
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
+        conn->get()->findN(userDocs, usersNamespace, Query(), 0);
+        conn->done();
+        return userDocs;
     }
-
 
 } // namespace mongo

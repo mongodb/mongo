@@ -50,7 +50,7 @@ namespace mongo {
 
         void clearPrivilegeDocuments();
 
-        virtual void getAllDatabaseNames(std::vector<std::string>* dbnames) const;
+        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) const;
 
         virtual std::vector<BSONObj> getAllV1PrivilegeDocsForDB(const std::string& dbname) const;
 
