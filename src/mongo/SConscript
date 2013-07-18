@@ -74,6 +74,7 @@ env.StaticLibrary('bson', [
         'util/safe_num.cpp',
         'bson/bson_validate.cpp',
         'bson/oid.cpp',
+        "bson/optime.cpp",
         'db/jsobj.cpp',
         'db/json.cpp'
         ], LIBDEPS=[
@@ -457,7 +458,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/repl/master_slave.cpp",
                     "db/repl/finding_start_cursor.cpp",
                     "db/repl/sync.cpp",
-                    "db/repl/optime.cpp",
                     "db/repl/oplogreader.cpp",
                     "db/repl/replication_server_status.cpp",
                     "db/repl/repl_reads_ok.cpp",

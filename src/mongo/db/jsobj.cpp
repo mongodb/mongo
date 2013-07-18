@@ -32,7 +32,7 @@
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
-#include "mongo/db/repl/optime.h"
+#include "mongo/bson/optime.h"
 #include "mongo/platform/float_utils.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/embedded_builder.h"

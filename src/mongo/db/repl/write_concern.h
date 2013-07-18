@@ -18,7 +18,7 @@
 
 #include <vector>
 
-#include "mongo/db/repl/optime.h"
+#include "mongo/bson/optime.h"
 #include "mongo/db/jsobj.h"
 
 /**

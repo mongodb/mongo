@@ -13,7 +13,7 @@
  *    limitations under the License.
  */
 
-#include "mongo/db/repl/optime.h"
+#include "mongo/bson/optime.h"
 
 #include <iostream>
 #include <ctime>

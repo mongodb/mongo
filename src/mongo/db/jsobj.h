@@ -31,7 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/repl/optime.h"
+#include "mongo/bson/optime.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/bsonelement.h"
