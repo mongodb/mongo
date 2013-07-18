@@ -140,7 +140,7 @@ print("elapsed: " + (end.getTime() - start.getTime()));
 // test fsync command on non-admin db
 x = db.runCommand("fsync");
 assert(!x.ok , "fsync on non-admin namespace should fail : " + tojson(x));
-assert(x.errmsg.indexOf("access denied") >= 0,
+assert(x.code == 13,
        "fsync on non-admin succeeded, but should have failed: " + tojson(x));
 
 // test fsync on admin db
