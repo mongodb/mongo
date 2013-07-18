@@ -343,7 +343,7 @@ namespace mongo {
                 return;
             const WriteIntent &i = commitJob.lastWrite();
             size_t ofs;
-            MongoMMF *mmf = privateViews.find(i.start(), ofs);
+            DurableMappedFile *mmf = privateViews.find(i.start(), ofs);
             if( mmf == 0 )
                 return;
             size_t past = ofs + i.length();
@@ -378,8 +378,8 @@ namespace mongo {
         public:
             validateSingleMapMatches(unsigned long long& bytes) :_bytes(bytes)  {}
             void operator () (MongoFile *mf) {
-                if( mf->isMongoMMF() ) {
-                    MongoMMF *mmf = (MongoMMF*) mf;
+                if( mf->isDurableMappedFile() ) {
+                    DurableMappedFile *mmf = (DurableMappedFile*) mf;
                     const unsigned char *p = (const unsigned char *) mmf->getView();
                     const unsigned char *w = (const unsigned char *) mmf->view_write();
 
@@ -515,8 +515,8 @@ namespace mongo {
             Timer t;
             for( unsigned x = 0; x < ntodo; x++ ) {
                 dassert( i != e );
-                if( (*i)->isMongoMMF() ) {
-                    MongoMMF *mmf = (MongoMMF*) *i;
+                if( (*i)->isDurableMappedFile() ) {
+                    DurableMappedFile *mmf = (DurableMappedFile*) *i;
                     verify(mmf);
                     if( mmf->willNeedRemap() ) {
                         mmf->willNeedRemap() = false;
@@ -692,7 +692,7 @@ namespace mongo {
             else {
                 stats.curr->_commitsInWriteLock++;
                 // however, if we are already write locked, we must do it now -- up the call tree someone
-                // may do a write without a new lock acquisition.  this can happen when MongoMMF::close() calls
+                // may do a write without a new lock acquisition.  this can happen when DurableMappedFile::close() calls
                 // this method when a file (and its views) is about to go away.
                 //
                 REMAPPRIVATEVIEW();
@@ -704,7 +704,7 @@ namespace mongo {
             @param lwg set if the durcommitthread *only* -- then we will upgrade the lock 
                    to W so we can remapprivateview. only durcommitthread as more than one 
                    thread upgrading would potentially deadlock
-            @see MongoMMF::close()
+            @see DurableMappedFile::close()
         */
         static void groupCommit(Lock::GlobalWrite *lgw) {
             try {
@@ -751,7 +751,7 @@ namespace mongo {
             groupCommit(&w);
         }
 
-        /** called when a MongoMMF is closing -- we need to go ahead and group commit in that case before its
+        /** called when a DurableMappedFile is closing -- we need to go ahead and group commit in that case before its
             views disappear
         */
         void closingFileNotification() {

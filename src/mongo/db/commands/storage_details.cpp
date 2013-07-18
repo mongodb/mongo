@@ -543,8 +543,11 @@ namespace {
             recordsArrayBuilder.reset(new BSONArrayBuilder(result.subarrayStart("records")));
         }
 
+        Database* db = cc().database();
+        ExtentManager& extentManager = db->getExtentManager();
+
         DiskLoc prevDl = ex->firstRecord;
-        for (DiskLoc dl = ex->firstRecord; ! dl.isNull(); dl = r->nextInExtent(dl)) {
+        for (DiskLoc dl = ex->firstRecord; !dl.isNull(); dl = extentManager.getNextRecordInExtent(dl)) {
             r = dl.rec();
             processRecord(dl, prevDl, r, extentOfs, params, sliceData,
                           recordsArrayBuilder.get());

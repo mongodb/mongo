@@ -23,6 +23,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/curop-inl.h"
+#include "mongo/db/dbmessage.h"
 
 namespace mongo {
 
@@ -53,20 +54,6 @@ namespace mongo {
     };
 
     extern DiagLog _diaglog;
-
-    /* we defer response until we unlock.  don't want a blocked socket to
-       keep things locked.
-    */
-    struct DbResponse {
-        Message *response;
-        MSGID responseTo;
-        string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
-        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt){ }
-        DbResponse() {
-            response = 0;
-        }
-        ~DbResponse() { delete response; }
-    };
 
     void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort &client );
 

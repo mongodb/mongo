@@ -222,7 +222,7 @@ namespace mongo {
                     static int n;
                     if( ++n < 10000 ) {
                         size_t ofs;
-                        MongoMMF *mmf = privateViews._find(w.p, ofs);
+                        DurableMappedFile *mmf = privateViews._find(w.p, ofs);
                         if( mmf ) {
                             log() << "DEBUG note write intent " << w.p << ' ' << mmf->filename() << " ofs:" << hex << ofs << " len:" << w.len << endl;
                         }

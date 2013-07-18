@@ -23,7 +23,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/mongommf.h"
+#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/querypattern.h"
 #include "mongo/db/storage/namespace.h"

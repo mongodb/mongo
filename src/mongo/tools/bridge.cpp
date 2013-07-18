@@ -19,6 +19,7 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/initializer.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"

@@ -47,7 +47,7 @@ namespace mongo {
             uassert( 16154, "namespace does not exist", nsd );
 
             for( DiskLoc L = nsd->firstExtent(); !L.isNull(); L = L.ext()->xnext )  {
-                MongoDataFile* mdf = cc().database()->getFile( L.a() );
+                DataFile* mdf = cc().database()->getFile( L.a() );
                 massert( 16238, "can't fetch extent file structure", mdf );
                 touch_location tl;
                 tl.fd = mdf->getFd();

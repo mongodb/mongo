@@ -22,21 +22,21 @@
    mostly around shard management and checking
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/s/d_logic.h"
+
 #include <map>
 #include <string>
 
-#include "../db/commands.h"
-#include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-
-#include "../client/connpool.h"
-
-#include "../util/queue.h"
-
-#include "shard.h"
-#include "d_logic.h"
-#include "d_writeback.h"
+#include "mongo/client/connpool.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/s/d_writeback.h"
+#include "mongo/s/shard.h"
+#include "mongo/util/queue.h"
 
 using namespace std;
 

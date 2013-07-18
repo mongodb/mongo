@@ -29,6 +29,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
+#include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"

@@ -23,7 +23,7 @@
 
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
-#include "mongo/db/mongommf.h"
+#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"

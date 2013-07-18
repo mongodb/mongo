@@ -24,6 +24,7 @@
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 

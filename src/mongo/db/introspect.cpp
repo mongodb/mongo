@@ -23,7 +23,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/databaseholder.h"
+#include "mongo/db/database_holder.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"

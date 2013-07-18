@@ -19,7 +19,7 @@
 #include "pch.h"
 #include "mongo/base/init.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/databaseholder.h"
+#include "mongo/db/database_holder.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/record.h"

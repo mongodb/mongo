@@ -15,14 +15,15 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "mmap.h"
-#include "text.h"
-#include "../db/mongommf.h"
-#include "../db/d_concurrency.h"
-#include "../db/memconcept.h"
-#include "mongo/util/timer.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/text.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -228,10 +229,10 @@ namespace mongo {
         size_t chunkNext = chunkStart + MemoryMappedFile::ChunkSize;
 
         scoped_lock lk2(privateViews._mutex());
-        map<void*,MongoMMF*>::iterator i = privateViews.finditer_inlock((void*) (chunkNext-1));
+        map<void*,DurableMappedFile*>::iterator i = privateViews.finditer_inlock((void*) (chunkNext-1));
         while( 1 ) {
-            const pair<void*,MongoMMF*> x = *(--i);
-            MongoMMF *mmf = x.second;
+            const pair<void*,DurableMappedFile*> x = *(--i);
+            DurableMappedFile *mmf = x.second;
             if( mmf == 0 )
                 break;
 

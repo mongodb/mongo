@@ -19,7 +19,7 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/mongommf.h"
+#include "mongo/db/storage/durable_mapped_file.h"
 
 namespace mongo {
 
@@ -135,7 +135,7 @@ namespace mongo {
             inline
             T* alreadyDeclared(T *x) {
 #if defined(_TESTINTENT)
-                return (T*) MongoMMF::switchToPrivateView(x);
+                return (T*) DurableMappedFile::switchToPrivateView(x);
 #else
                 return x;
 #endif

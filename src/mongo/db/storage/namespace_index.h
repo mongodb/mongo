@@ -66,7 +66,7 @@ namespace mongo {
         void _init();
         void maybeMkdir() const;
 
-        MongoMMF _f;
+        DurableMappedFile _f;
         HashTable<Namespace,NamespaceDetails> *_ht;
         std::string _dir;
         std::string _database;

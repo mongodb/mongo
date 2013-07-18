@@ -1,4 +1,4 @@
-// @file mongommf.cpp
+// durable_mapped_file.cpp
 
 /**
 *    Copyright (C) 2010 10gen Inc.
@@ -22,12 +22,11 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/mongommf.h"
+#include "mongo/db/storage/durable_mapped_file.h"
 
 #include "mongo/db/cmdline.h"
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/d_globals.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/dur_journalformat.h"
 #include "mongo/db/memconcept.h"
@@ -37,7 +36,7 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    void MongoMMF::remapThePrivateView() {
+    void DurableMappedFile::remapThePrivateView() {
         verify( cmdLine.dur );
 
         // todo 1.9 : it turns out we require that we always remap to the same address.
@@ -50,22 +49,22 @@ namespace mongo {
     }
 
     /** register view. threadsafe */
-    void PointerToMMF::add(void *view, MongoMMF *f) {
+    void PointerToDurableMappedFile::add(void *view, DurableMappedFile *f) {
         verify(view);
         verify(f);
         mutex::scoped_lock lk(_m);
-        _views.insert( pair<void*,MongoMMF*>(view,f) );
+        _views.insert( pair<void*,DurableMappedFile*>(view,f) );
     }
 
     /** de-register view. threadsafe */
-    void PointerToMMF::remove(void *view) {
+    void PointerToDurableMappedFile::remove(void *view) {
         if( view ) {
             mutex::scoped_lock lk(_m);
             _views.erase(view);
         }
     }
 
-    PointerToMMF::PointerToMMF() : _m("PointerToMMF") {
+    PointerToDurableMappedFile::PointerToDurableMappedFile() : _m("PointerToDurableMappedFile") {
 #if defined(SIZE_MAX)
         size_t max = SIZE_MAX;
 #else
@@ -74,15 +73,15 @@ namespace mongo {
         verify( max > (size_t) this ); // just checking that no one redef'd SIZE_MAX and that it is sane
 
         // this way we don't need any boundary checking in _find()
-        _views.insert( pair<void*,MongoMMF*>((void*)0,(MongoMMF*)0) );
-        _views.insert( pair<void*,MongoMMF*>((void*)max,(MongoMMF*)0) );
+        _views.insert( pair<void*,DurableMappedFile*>((void*)0,(DurableMappedFile*)0) );
+        _views.insert( pair<void*,DurableMappedFile*>((void*)max,(DurableMappedFile*)0) );
     }
 
     /** underscore version of find is for when you are already locked
         @param ofs out return our offset in the view
-        @return the MongoMMF to which this pointer belongs
+        @return the DurableMappedFile to which this pointer belongs
     */
-    MongoMMF* PointerToMMF::find_inlock(void *p, /*out*/ size_t& ofs) {
+    DurableMappedFile* PointerToDurableMappedFile::find_inlock(void *p, /*out*/ size_t& ofs) {
         //
         // .................memory..........................
         //    v1       p                      v2
@@ -90,8 +89,8 @@ namespace mongo {
         //
         // e.g., _find(p) == v1
         //
-        const pair<void*,MongoMMF*> x = *(--_views.upper_bound(p));
-        MongoMMF *mmf = x.second;
+        const pair<void*,DurableMappedFile*> x = *(--_views.upper_bound(p));
+        DurableMappedFile *mmf = x.second;
         if( mmf ) {
             size_t o = ((char *)p) - ((char*)x.first);
             if( o < mmf->length() ) {
@@ -105,64 +104,23 @@ namespace mongo {
     /** find associated MMF object for a given pointer.
         threadsafe
         @param ofs out returns offset into the view of the pointer, if found.
-        @return the MongoMMF to which this pointer belongs. null if not found.
+        @return the DurableMappedFile to which this pointer belongs. null if not found.
     */
-    MongoMMF* PointerToMMF::find(void *p, /*out*/ size_t& ofs) {
+    DurableMappedFile* PointerToDurableMappedFile::find(void *p, /*out*/ size_t& ofs) {
         mutex::scoped_lock lk(_m);
         return find_inlock(p, ofs);
     }
 
-    PointerToMMF privateViews;
-
-    /* void* MongoMMF::switchToPrivateView(void *readonly_ptr) {
-        verify( cmdLine.dur );
-        verify( testIntent );
-
-        void *p = readonly_ptr;
-
-        {
-            size_t ofs=0;
-            MongoMMF *mmf = ourReadViews.find(p, ofs);
-            if( mmf ) {
-                void *res = ((char *)mmf->_view_private) + ofs;
-                return res;
-            }
-        }
-
-        {
-            size_t ofs=0;
-            MongoMMF *mmf = privateViews.find(p, ofs);
-            if( mmf ) {
-                log() << "dur: perf warning p=" << p << " is already in the writable view of " << mmf->filename() << endl;
-                return p;
-            }
-        }
-
-        // did you call writing() with a pointer that isn't into a datafile?
-        log() << "dur error switchToPrivateView " << p << endl;
-        return p;
-    }*/
-
-    /* switch to _view_write.  normally, this is a bad idea since your changes will not
-       show up in _view_private if there have been changes there; thus the leading underscore
-       as a tad of a "warning".  but useful when done with some care, such as during
-       initialization.
-    */
-    void* MongoMMF::_switchToWritableView(void *p) {
-        size_t ofs;
-        MongoMMF *f = privateViews.find(p, ofs);
-        verify( f );
-        return (((char *)f->_view_write)+ofs);
-    }
+    PointerToDurableMappedFile privateViews;
 
     extern string dbpath;
 
     // here so that it is precomputed...
-    void MongoMMF::setPath(const std::string& f) {
+    void DurableMappedFile::setPath(const std::string& f) {
         string suffix;
         string prefix;
         bool ok = str::rSplitOn(f, '.', prefix, suffix);
-        uassert(13520, str::stream() << "MongoMMF only supports filenames in a certain format " << f, ok);
+        uassert(13520, str::stream() << "DurableMappedFile only supports filenames in a certain format " << f, ok);
         if( suffix == "ns" )
             _fileSuffixNo = dur::JEntry::DotNsSuffix;
         else
@@ -171,21 +129,21 @@ namespace mongo {
         _p = RelativePath::fromFullPath(prefix);
     }
 
-    bool MongoMMF::open(const std::string& fname, bool sequentialHint) {
+    bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {
         LOG(3) << "mmf open " << fname << endl;
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
-    bool MongoMMF::create(const std::string& fname, unsigned long long& len, bool sequentialHint) {
+    bool DurableMappedFile::create(const std::string& fname, unsigned long long& len, bool sequentialHint) {
         LOG(3) << "mmf create " << fname << endl;
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
-    bool MongoMMF::finishOpening() {
+    bool DurableMappedFile::finishOpening() {
         LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length() << endl;
         if( _view_write ) {
             if( cmdLine.dur ) {
@@ -203,22 +161,22 @@ namespace mongo {
         return false;
     }
 
-    MongoMMF::MongoMMF() : _willNeedRemap(false) {
+    DurableMappedFile::DurableMappedFile() : _willNeedRemap(false) {
         _view_write = _view_private = 0;
     }
 
-    MongoMMF::~MongoMMF() {
+    DurableMappedFile::~DurableMappedFile() {
         try { 
             close();
         }
-        catch(...) { error() << "exception in ~MongoMMF" << endl; }
+        catch(...) { error() << "exception in ~DurableMappedFile" << endl; }
     }
 
     namespace dur {
         void closingFileNotification();
     }
 
-    /*virtual*/ void MongoMMF::close() {
+    /*virtual*/ void DurableMappedFile::close() {
         LOG(3) << "mmf close " << filename() << endl;
 
         if( view_write() /*actually was opened*/ ) {

@@ -2213,7 +2213,7 @@ namespace NamespaceTests {
         //        private:
         //            virtual string spec() const {
         //                // NOTE 256 added to size in _userCreateNS()
-        //                long long big = MongoDataFile::maxSize() - DataFileHeader::HeaderSize;
+        //                long long big = DataFile::maxSize() - DataFileHeader::HeaderSize;
         //                stringstream ss;
         //                ss << "{\"capped\":true,\"size\":" << big << "}";
         //                return ss.str();

@@ -26,7 +26,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/databaseholder.h"
+#include "mongo/db/database_holder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"

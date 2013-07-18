@@ -22,11 +22,12 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/record.h"
+#include "mongo/db/storage/extent_manager.h"
 
 namespace mongo {
 
     class Extent;
-    class MongoDataFile;
+    class DataFile;
 
     /**
      * Database represents a database database
@@ -58,40 +59,38 @@ namespace mongo {
         /**
          * total file size of Database in bytes
          */
-        long long fileSize() const;
+        long long fileSize() const { return _extentManager.fileSize(); }
 
-        int numFiles() const;
-
-        /**
-         * returns file valid for file number n
-         */
-        boost::filesystem::path fileName( int n ) const;
+        int numFiles() const { return _extentManager.numFiles(); }
 
         /**
          * return file n.  if it doesn't exist, create it
          */
-        MongoDataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false );
+        DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
+            _namespaceIndex.init();
+            return _extentManager.getFile( n, sizeNeeded, preallocateOnly );
+        }
 
-        MongoDataFile* addAFile( int sizeNeeded, bool preallocateNextFile );
+        DataFile* addAFile( int sizeNeeded, bool preallocateNextFile ) {
+            return _extentManager.addAFile( sizeNeeded, preallocateNextFile );
+        }
 
         /**
          * makes sure we have an extra file at the end that is empty
          * safe to call this multiple times - the implementation will only preallocate one file
          */
-        void preallocateAFile() { getFile( numFiles() , 0, true ); }
+        void preallocateAFile() { _extentManager.preallocateAFile(); }
 
-        MongoDataFile* suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota );
+        DataFile* suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota );
 
         Extent* allocExtent( const char *ns, int size, bool capped, bool enforceQuota );
-
-        MongoDataFile* newestFile();
 
         /**
          * @return true if success.  false if bad level or error creating profile ns
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
 
-        void flushFiles( bool sync );
+        void flushFiles( bool sync ) { return _extentManager.flushFiles( sync ); }
 
         /**
          * @return true if ns is part of the database
@@ -114,12 +113,17 @@ namespace mongo {
         const NamespaceIndex& namespaceIndex() const { return _namespaceIndex; }
         NamespaceIndex& namespaceIndex() { return _namespaceIndex; }
 
+        // TODO: do not think this method should exist, so should try and encapsulate better
+        ExtentManager& getExtentManager() { return _extentManager; }
+
         /**
          * @return name of an existing database with same text name but different
          * casing, if one exists.  Otherwise the empty string is returned.  If
          * 'duplicates' is specified, it is filled with all duplicate names.
          */
         static string duplicateUncasedName( bool inholderlockalready, const string &name, const string &path, set< string > *duplicates = 0 );
+
+        static Status validateDBName( const StringData& dbname );
 
     private:
 
@@ -131,7 +135,6 @@ namespace mongo {
          */
         void checkDuplicateUncasedNames(bool inholderlockalready) const;
 
-        bool exists(int n) const;
         void openAllFiles();
 
         /**
@@ -144,12 +147,9 @@ namespace mongo {
         const string _name; // "alleyinsider"
         const string _path; // "/data/db"
 
-        // must be in the dbLock when touching this (and write locked when writing to of course)
-        // however during Database object construction we aren't, which is ok as it isn't yet visible
-        //   to others and we are in the dbholder lock then.
-        vector<MongoDataFile*> _files;
-
         NamespaceIndex _namespaceIndex;
+        ExtentManager _extentManager;
+
         const string _profileName; // "alleyinsider.system.profile"
 
         CCByLoc _ccByLoc; // use by ClientCursor

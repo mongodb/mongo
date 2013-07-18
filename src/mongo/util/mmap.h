@@ -97,7 +97,7 @@ namespace mongo {
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
 
-        virtual bool isMongoMMF() { return false; }
+        virtual bool isDurableMappedFile() { return false; }
 
         string filename() const { return _filename; }
         void setFilename(const std::string& fn);
@@ -129,8 +129,8 @@ namespace mongo {
     /** look up a MMF by filename. scoped mutex locking convention.
         example:
           MMFFinderByName finder;
-          MongoMMF *a = finder.find("file_name_a");
-          MongoMMF *b = finder.find("file_name_b");
+          DurableMappedFile *a = finder.find("file_name_a");
+          DurableMappedFile *b = finder.find("file_name_b");
     */
     class MongoFileFinder : boost::noncopyable {
     public:
@@ -222,8 +222,6 @@ namespace mongo {
         /** close the current private view and open a new replacement */
         void* remapPrivateView(void *oldPrivateAddr);
     };
-
-    typedef MemoryMappedFile MMF;
 
     /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
     template < class F >

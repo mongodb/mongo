@@ -31,6 +31,7 @@
 
 namespace mongo {
 
+    class CurOp;
     class ParsedQuery;
     class QueryOptimizerCursor;
     struct QueryPlanSummary;

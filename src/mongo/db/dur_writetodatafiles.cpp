@@ -79,7 +79,7 @@ namespace mongo {
                 - we couldn't do it from the private views then as they may be changing.  would have to then
                   be from the journal alignedbuffer.
                 - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something
-                  with MongoMMF on closes or something to coordinate that.
+                  with DurableMappedFile on closes or something to coordinate that.
 
             concurrency: in mmmutex, not necessarily in dbMutex
 

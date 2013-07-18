@@ -35,7 +35,7 @@
 #include "mongo/db/dur_stats.h"
 #include "mongo/db/durop.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/mongommf.h"
+#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
@@ -221,7 +221,7 @@ namespace mongo {
             LockMongoFilesShared::assertAtLeastReadLocked();
         }
 
-        MongoMMF* RecoveryJob::Last::newEntry(const dur::ParsedJournalEntry& entry, RecoveryJob& rj) {
+        DurableMappedFile* RecoveryJob::Last::newEntry(const dur::ParsedJournalEntry& entry, RecoveryJob& rj) {
             int num = entry.e->getFileNo();
             if( num == fileNo && entry.dbName == dbName )
                 return mmf;
@@ -229,20 +229,20 @@ namespace mongo {
             string fn = fileName(entry.dbName, num);
             MongoFile *file;
             {
-                MongoFileFinder finder; // must release lock before creating new MongoMMF
+                MongoFileFinder finder; // must release lock before creating new DurableMappedFile
                 file = finder.findByPath(fn);
             }
 
             if (file) {
-                verify(file->isMongoMMF());
-                mmf = (MongoMMF*)file;
+                verify(file->isDurableMappedFile());
+                mmf = (DurableMappedFile*)file;
             }
             else {
                 if( !rj._recovering ) {
                     log() << "journal error applying writes, file " << fn << " is not open" << endl;
                     verify(false);
                 }
-                boost::shared_ptr<MongoMMF> sp (new MongoMMF);
+                boost::shared_ptr<DurableMappedFile> sp (new DurableMappedFile);
                 verify(sp->open(fn, false));
                 rj._mmfs.push_back(sp);
                 mmf = sp.get();
@@ -260,7 +260,7 @@ namespace mongo {
             verify(entry.dbName);
             verify((size_t)strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
-            MongoMMF *mmf = last.newEntry(entry, *this);
+            DurableMappedFile *mmf = last.newEntry(entry, *this);
 
             if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
                 verify(mmf->view_write());
@@ -306,28 +306,28 @@ namespace mongo {
             }
         }
 
-        MongoMMF* RecoveryJob::getMongoMMF(const ParsedJournalEntry& entry) {
+        DurableMappedFile* RecoveryJob::getDurableMappedFile(const ParsedJournalEntry& entry) {
             verify(entry.dbName);
             verify((size_t)strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
             const string fn = fileName(entry.dbName, entry.e->getFileNo());
             MongoFile* file;
             {
-                MongoFileFinder finder; // must release lock before creating new MongoMMF
+                MongoFileFinder finder; // must release lock before creating new DurableMappedFile
                 file = finder.findByPath(fn);
             }
 
-            MongoMMF* mmf;
+            DurableMappedFile* mmf;
             if (file) {
-                verify(file->isMongoMMF());
-                mmf = (MongoMMF*)file;
+                verify(file->isDurableMappedFile());
+                mmf = (DurableMappedFile*)file;
             }
             else {
                 if( !_recovering ) {
                     log() << "journal error applying writes, file " << fn << " is not open" << endl;
                     verify(false);
                 }
-                boost::shared_ptr<MongoMMF> sp (new MongoMMF);
+                boost::shared_ptr<DurableMappedFile> sp (new DurableMappedFile);
                 verify(sp->open(fn, false));
                 _mmfs.push_back(sp);
                 mmf = sp.get();
@@ -568,7 +568,7 @@ namespace mongo {
             // at this point in the program so it wouldn't have been a true problem (I think)
             
             // can't lock groupCommitMutex here as 
-            //   MongoMMF::close()->closingFileNotication()->groupCommit() will lock it
+            //   DurableMappedFile::close()->closingFileNotication()->groupCommit() will lock it
             //   and that would be recursive.
             //   
             // SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);

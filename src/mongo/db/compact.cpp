@@ -69,12 +69,14 @@ namespace mongo {
         verify( e->validates(diskloc) );
         unsigned skipped = 0;
 
+        Database* db = cc().database();
+
         {
             // the next/prev pointers within the extent might not be in order so we first page the whole thing in 
             // sequentially
             log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
             Timer t;
-            MongoDataFile* mdf = cc().database()->getFile( diskloc.a() );
+            DataFile* mdf = db->getFile( diskloc.a() );
             HANDLE fd = mdf->getFd();
             int offset = diskloc.getOfs();
             Extent* ext = diskloc.ext();
@@ -94,7 +96,7 @@ namespace mongo {
             if( !L.isNull() ) {
                 while( 1 ) {
                     Record *recOld = L.rec();
-                    L = recOld->nextInExtent(L);
+                    L = db->getExtentManager().getNextRecordInExtent(L);
                     BSONObj objOld = BSONObj::make(recOld);
 
                     if( !validate || objOld.valid() ) {

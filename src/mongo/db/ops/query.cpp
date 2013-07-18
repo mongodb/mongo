@@ -21,6 +21,7 @@
 #include "mongo/db/ops/query.h"
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pagefault.h"

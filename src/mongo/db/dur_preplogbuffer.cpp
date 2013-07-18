@@ -48,8 +48,8 @@ namespace mongo {
 
         RelativePath local = RelativePath::fromRelativePath("local");
 
-        static MongoMMF* findMMF_inlock(void *ptr, size_t &ofs) {
-            MongoMMF *f = privateViews.find_inlock(ptr, ofs);
+        static DurableMappedFile* findMMF_inlock(void *ptr, size_t &ofs) {
+            DurableMappedFile *f = privateViews.find_inlock(ptr, ofs);
             if( f == 0 ) {
                 error() << "findMMF_inlock failed " << privateViews.numberOfViews_inlock() << endl;
                 printStackTrace(); // we want a stack trace and the assert below didn't print a trace once in the real world - not sure why
@@ -63,7 +63,7 @@ namespace mongo {
         /** put the basic write operation into the buffer (bb) to be journaled */
         static void prepBasicWrite_inlock(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
-            MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
+            DurableMappedFile *mmf = findMMF_inlock(i->start(), /*out*/ofs);
 
             if( unlikely(!mmf->willNeedRemap()) ) {
                 // tag this mmf as needed a remap of its private view later.
@@ -73,7 +73,7 @@ namespace mongo {
             }
 
             // since we have already looked up the mmf, we go ahead and remember the write view location
-            // so we don't have to find the MongoMMF again later in WRITETODATAFILES()
+            // so we don't have to find the DurableMappedFile again later in WRITETODATAFILES()
             // 
             // this was for WRITETODATAFILES_Impl2 so commented out now
             //

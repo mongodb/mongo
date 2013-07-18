@@ -20,9 +20,9 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/client/constants.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 
@@ -128,9 +128,6 @@ namespace mongo {
 
         const char * getns() const {
             return data;
-        }
-        void getns(Namespace& ns) const {
-            ns = data;
         }
 
         const char * afterNS() const {
@@ -265,6 +262,20 @@ namespace mongo {
             }
             queryOptions = d.msg().header()->dataAsInt();
         }
+    };
+
+    /**
+     * A response to a DbMessage.
+     */
+    struct DbResponse {
+        Message *response;
+        MSGID responseTo;
+        string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
+        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt){ }
+        DbResponse() {
+            response = 0;
+        }
+        ~DbResponse() { delete response; }
     };
 
     void replyToQuery(int queryResultFlags,

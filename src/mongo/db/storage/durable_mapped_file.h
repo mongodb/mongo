@@ -1,4 +1,6 @@
-/** @file mongommf.h
+// durable_mapped_file.h
+
+/*
 *
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -22,17 +24,17 @@
 
 namespace mongo {
 
-    /** MongoMMF adds some layers atop memory mapped files - specifically our handling of private views & such.
+    /** DurableMappedFile adds some layers atop memory mapped files - specifically our handling of private views & such.
         if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class,
         not this.
     */
-    class MongoMMF : private MemoryMappedFile {
+    class DurableMappedFile : private MemoryMappedFile {
     protected:
         virtual void* viewForFlushing() { return _view_write; }
 
     public:
-        MongoMMF();
-        virtual ~MongoMMF();
+        DurableMappedFile();
+        virtual ~DurableMappedFile();
         virtual void close();
 
         /** @return true if opened ok. */
@@ -62,14 +64,6 @@ namespace mongo {
         */
         void* view_write() const { return _view_write; }
 
-
-        /* switch to _view_write.  normally, this is a bad idea since your changes will not
-           show up in _view_private if there have been changes there; thus the leading underscore
-           as a tad of a "warning".  but useful when done with some care, such as during
-           initialization.
-        */
-        static void* _switchToWritableView(void *private_ptr);
-
         /** for a filename a/b/c.3
             filePath() is "a/b/c"
             fileSuffixNo() is 3
@@ -91,7 +85,7 @@ namespace mongo {
 
         void remapThePrivateView();
 
-        virtual bool isMongoMMF() { return true; }
+        virtual bool isDurableMappedFile() { return true; }
 
     private:
 
@@ -105,16 +99,16 @@ namespace mongo {
         bool finishOpening();
     };
 
-    /** for durability support we want to be able to map pointers to specific MongoMMF objects.
+    /** for durability support we want to be able to map pointers to specific DurableMappedFile objects.
     */
-    class PointerToMMF : boost::noncopyable {
+    class PointerToDurableMappedFile : boost::noncopyable {
     public:
-        PointerToMMF();
+        PointerToDurableMappedFile();
 
         /** register view.
             threadsafe
             */
-        void add(void *view, MongoMMF *f);
+        void add(void *view, DurableMappedFile *f);
 
         /** de-register view.
             threadsafe
@@ -124,23 +118,23 @@ namespace mongo {
         /** find associated MMF object for a given pointer.
             threadsafe
             @param ofs out returns offset into the view of the pointer, if found.
-            @return the MongoMMF to which this pointer belongs. null if not found.
+            @return the DurableMappedFile to which this pointer belongs. null if not found.
         */
-        MongoMMF* find(void *p, /*out*/ size_t& ofs);
+        DurableMappedFile* find(void *p, /*out*/ size_t& ofs);
 
         /** for doing many finds in a row with one lock operation */
         mutex& _mutex() { return _m; }
-        MongoMMF* find_inlock(void *p, /*out*/ size_t& ofs);
+        DurableMappedFile* find_inlock(void *p, /*out*/ size_t& ofs);
 
-        map<void*,MongoMMF*>::iterator finditer_inlock(void *p) { return _views.upper_bound(p); }
+        map<void*,DurableMappedFile*>::iterator finditer_inlock(void *p) { return _views.upper_bound(p); }
 
         unsigned numberOfViews_inlock() const { return _views.size(); }
 
     private:
         mutex _m;
-        map<void*, MongoMMF*> _views;
+        map<void*, DurableMappedFile*> _views;
     };
 
-    // allows a pointer into any private view of a MongoMMF to be resolved to the MongoMMF object
-    extern PointerToMMF privateViews;
+    // allows a pointer into any private view of a DurableMappedFile to be resolved to the DurableMappedFile object
+    extern PointerToDurableMappedFile privateViews;
 }

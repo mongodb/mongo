@@ -31,7 +31,7 @@ namespace mongo {
     class Record;
     class DeletedRecord;
     class Extent;
-    class MongoDataFile;
+    class DataFile;
     class DiskLoc;
 
     template< class Version > class BtreeBucket;
@@ -164,7 +164,7 @@ namespace mongo {
         template< class V >
         BtreeBucket<V> * btreemod() const;
 
-        /*MongoDataFile& pdf() const;*/
+        /*DataFile& pdf() const;*/
 
         /// members for Sorter
         struct SorterDeserializeSettings {}; // unused

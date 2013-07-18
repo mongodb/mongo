@@ -338,7 +338,7 @@ namespace mongo {
             string dbName = *i;
             LOG(1) << "\t" << dbName << endl;
             Client::Context ctx( dbName );
-            MongoDataFile *p = cc().database()->getFile( 0 );
+            DataFile *p = cc().database()->getFile( 0 );
             DataFileHeader *h = p->getHeader();
             if ( !h->isCurrentVersion() || forceRepair ) {
 

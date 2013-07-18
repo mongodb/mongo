@@ -267,7 +267,7 @@ public:
         }
         
 
-        MongoDataFile * mdf = db->getFile( eLoc.a() );
+        DataFile * mdf = db->getFile( eLoc.a() );
 
         Extent * e = mdf->debug_getExtent( eLoc );
         if ( ! e->isOk() ){

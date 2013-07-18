@@ -24,6 +24,7 @@
 
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/s/strategy.h"
+#include "mongo/util/timer.h"
 
 
 namespace mongo {

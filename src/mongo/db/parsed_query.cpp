@@ -17,6 +17,7 @@
 
 #include <cstring> // for strstr
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/query.h"

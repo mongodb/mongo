@@ -370,7 +370,7 @@ namespace PdfileTests {
                 n++;
                 if( n == 5 && sizeof(void*)==4 )
                     break;
-                MongoDataFile * f = d->addAFile( big , false );
+                DataFile * f = d->addAFile( big , false );
                 //cout << f->length() << ' ' << n << endl;
                 if ( f->length() == l )
                     break;

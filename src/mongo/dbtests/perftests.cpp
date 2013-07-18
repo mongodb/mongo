@@ -1213,7 +1213,7 @@ namespace PerfTests {
         for( int i = 0; i < 20; i++ ) {
             sleepmillis(21);
             string fn = "/tmp/t1";
-            MongoMMF f;
+            DurableMappedFile f;
             unsigned long long len = 1 * 1024 * 1024;
             verify( f.create(fn, len, /*sequential*/rand()%2==0) );
             {

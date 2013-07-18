@@ -26,7 +26,7 @@
 #include "mongo/util/file.h"
 
 namespace mongo {
-    class MongoMMF;
+    class DurableMappedFile;
 
     namespace dur {
         struct ParsedJournalEntry;
@@ -37,9 +37,9 @@ namespace mongo {
             static class Last {
             public:
                 Last();
-                MongoMMF* newEntry(const ParsedJournalEntry&, RecoveryJob&);
+                DurableMappedFile* newEntry(const ParsedJournalEntry&, RecoveryJob&);
             private:
-                MongoMMF *mmf;
+                DurableMappedFile *mmf;
                 string dbName;
                 int fileNo;
             } last;        
@@ -62,9 +62,9 @@ namespace mongo {
             bool processFileBuffer(const void *, unsigned len);
             bool processFile(boost::filesystem::path journalfile);
             void _close(); // doesn't lock
-            MongoMMF* getMongoMMF(const ParsedJournalEntry& entry);
+            DurableMappedFile* getDurableMappedFile(const ParsedJournalEntry& entry);
 
-            list<boost::shared_ptr<MongoMMF> > _mmfs;
+            list<boost::shared_ptr<DurableMappedFile> > _mmfs;
 
             unsigned long long _lastDataSyncedFromLastRun;
             unsigned long long _lastSeqMentionedInConsoleLog;
