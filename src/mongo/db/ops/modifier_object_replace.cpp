@@ -21,6 +21,30 @@
 
 namespace mongo {
 
+    namespace {
+        // TODO: Egregiously stolen from jsobjmanipulator.h and instance.cpp to break a link
+        // dependency cycle. We should sort this out, but we don't need to do it right now.
+        void fixupTimestamps( const BSONObj& obj ) {
+            BSONObjIterator i(obj);
+            for(int j = 0; i.moreWithEOO() && j < 2; ++j) {
+                BSONElement e = i.next();
+                if (e.eoo())
+                    break;
+                if (e.type() == Timestamp) {
+                    // performance note, this locks a mutex:
+                    unsigned long long &timestamp =
+                        *(reinterpret_cast<unsigned long long*>(
+                              const_cast<char *>(e.value())));
+                    if (timestamp == 0) {
+                        mutex::scoped_lock lk(OpTime::m);
+                        timestamp = OpTime::now(lk).asDate();
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     struct ModifierObjectReplace::PreparedState {
 
         PreparedState(mutablebson::Document* targetDoc)
@@ -59,11 +83,10 @@ namespace mongo {
             }
         }
 
-        // TODO: update timestamps?
-
         // We make a copy of the object here because the update driver does not guarantees, in
         // the case of object replacement, that the modExpr is going to outlive this mod.
         _val = modExpr.embeddedObject().getOwned();
+        fixupTimestamps(_val);
 
         return Status::OK();
     }
