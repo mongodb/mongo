@@ -10,10 +10,6 @@
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
 
-/*
- * The slot algorithm uses negative values, so we lose a bit.
- */
-#define	WT_MAX_LOG_OFFSET	INT64_MAX
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
 	uint32_t	unused;
@@ -149,9 +145,9 @@ typedef struct {
 } WT_LOG;
 
 typedef struct {
-	uint64_t	len;		/* 00-07: Record length including hdr */
-	uint32_t	checksum;	/* 08-11: Checksum of the record */
-	uint32_t	unused;		/* 12-15: Padding */
+	uint32_t	len;		/* 00-03: Record length including hdr */
+	uint32_t	checksum;	/* 04-07: Checksum of the record */
+	uint8_t		unused[8];	/* 08-15: Padding */
 	uint8_t		record[0];	/* Beginning of actual data */
 } WT_LOG_RECORD;
 

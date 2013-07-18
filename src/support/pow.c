@@ -111,10 +111,10 @@ __wt_ispo2(uint32_t v)
  * __wt_rduppo2 --
  *	Round the given int up to the next multiple of N, where N is power of 2.
  */
-uint64_t
-__wt_rduppo2(uint64_t n, uint32_t po2)
+uint32_t
+__wt_rduppo2(uint32_t n, uint32_t po2)
 {
-	uint64_t bits, res;
+	uint32_t bits, res;
 
 	if (__wt_ispo2(po2)) {
 		bits = __wt_log2_int(po2);
