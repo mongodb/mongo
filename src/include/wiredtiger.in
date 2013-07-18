@@ -540,14 +540,9 @@ struct __wt_session {
 	 *  @row{<tt>config:[\<uri\>]</tt>,
 	 *	object configuration cursor, (key=config string\,
 	 *	value=config value)}
-	 *  @row{<tt>file:\<file name\></tt>,
-	 *	file cursor,
-	 *	file key\, file value(s)}
 	 *  @row{<tt>index:\<table name\>:\<index name\></tt>,
 	 *	index cursor,
 	 *	key=index key\, value=table value(s)}
-	 *  @row{<tt>lsm:\<name\></tt>,
-	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
 	 *  @row{<tt>statistics:[\<data source URI\>]</tt>,
 	 *	database or data source statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
@@ -556,6 +551,16 @@ struct __wt_session {
 	 *  @row{<tt>table:\<table name\></tt>,
 	 *	table cursor,
 	 *	table key\, table value(s)}
+	 *  </table>
+	 *
+	 *  Advanced applications may also want to open the following low-level
+	 *  cursor types:
+	 *  <table>
+	 *  @row{<tt>file:\<file name\></tt>,
+	 *	file cursor,
+	 *	file key\, file value(s)}
+	 *  @row{<tt>lsm:\<name\></tt>,
+	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}

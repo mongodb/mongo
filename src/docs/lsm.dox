@@ -42,7 +42,7 @@ An LSM tree can be created as follows, in much the same way as a
 WiredTiger btree file:
 
 @code
-session->create(session, "lsm:bucket", "key_format=S,value_format=S");
+session->create(session, "table:bucket", "type=lsm,key_format=S,value_format=S");
 @endcode
 
 Once created, the LSM tree can be accessed using the same cursor interface
@@ -51,7 +51,7 @@ as other data sources in WiredTiger:
 @code
 WT_CURSOR *c;
 
-session->open_cursor(session, "lsm:bucket", NULL, NULL, &c);
+session->open_cursor(session, "table:bucket", NULL, NULL, &c);
 for(;;) {
     c->set_key("key");
     c->set_value("data");
