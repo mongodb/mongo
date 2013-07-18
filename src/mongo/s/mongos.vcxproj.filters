@@ -1632,6 +1632,9 @@
     <ClCompile Include="..\client\sasl_client_authenticate.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\strcasestr.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3209,6 +3212,9 @@
     </ClInclude>
     <ClInclude Include="..\client\sasl_client_authenticate.h">
       <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\strcasestr.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
