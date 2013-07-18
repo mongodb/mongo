@@ -64,9 +64,10 @@ int
 __wt_log_extract_lognum(
     WT_SESSION_IMPL *session, const char *name, uint32_t *id)
 {
-	char *p;
+	const char *p;
 
 	WT_UNUSED(session);
+
 	if (id == NULL || name == NULL)
 		return (0);
 	if ((p = strrchr(name, '.')) == NULL)
