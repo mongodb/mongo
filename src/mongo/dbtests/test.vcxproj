@@ -600,6 +600,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\sasl_client_authenticate.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
     <ClInclude Include="..\client\undef_macros.h" />
+    <ClInclude Include="..\db\audit.h" />
     <ClInclude Include="..\db\auth\action_set.h" />
     <ClInclude Include="..\db\auth\action_type.h" />
     <ClInclude Include="..\db\auth\authentication_session.h" />
@@ -663,6 +664,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\exec\and_common-inl.h" />
     <ClInclude Include="..\db\exec\and_hash.h" />
     <ClInclude Include="..\db\exec\and_sorted.h" />
+    <ClInclude Include="..\db\exec\collection_iterator.h" />
+    <ClInclude Include="..\db\exec\collection_scan.h" />
+    <ClInclude Include="..\db\exec\collection_scan_common.h" />
     <ClInclude Include="..\db\exec\fetch.h" />
     <ClInclude Include="..\db\exec\index_scan.h" />
     <ClInclude Include="..\db\exec\limit.h" />
@@ -2371,6 +2375,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="..\client\sasl_client_authenticate.cpp" />
+    <ClCompile Include="..\db\audit.cpp" />
     <ClCompile Include="..\db\auth\action_set.cpp" />
     <ClCompile Include="..\db\auth\action_set_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -2549,6 +2554,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\d_globals.cpp" />
     <ClCompile Include="..\db\exec\and_hash.cpp" />
     <ClCompile Include="..\db\exec\and_sorted.cpp" />
+    <ClCompile Include="..\db\exec\collection_iterator.cpp" />
+    <ClCompile Include="..\db\exec\collection_scan.cpp" />
     <ClCompile Include="..\db\exec\fetch.cpp" />
     <ClCompile Include="..\db\exec\index_scan.cpp" />
     <ClCompile Include="..\db\exec\limit.cpp" />
@@ -3875,6 +3882,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="querytests.cpp" />
     <ClCompile Include="queryutiltests.cpp" />
     <ClCompile Include="query_stage_and.cpp" />
+    <ClCompile Include="query_stage_collscan.cpp" />
     <ClCompile Include="query_stage_fetch.cpp" />
     <ClCompile Include="query_stage_limit_skip.cpp" />
     <ClCompile Include="query_stage_tests.cpp" />

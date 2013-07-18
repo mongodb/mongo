@@ -2405,6 +2405,15 @@
     <ClCompile Include="stats\snapshots_webplugins.cpp">
       <Filter>db\stats</Filter>
     </ClCompile>
+    <ClCompile Include="audit.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="exec\collection_iterator.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="exec\collection_scan.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4832,6 +4841,18 @@
     </ClInclude>
     <ClInclude Include="namespace_string-inl.h">
       <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="audit.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="exec\collection_iterator.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="exec\collection_scan.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="exec\collection_scan_common.h">
+      <Filter>db\exec</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

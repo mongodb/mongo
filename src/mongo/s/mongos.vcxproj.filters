@@ -1941,6 +1941,15 @@
     <ClCompile Include="..\db\field_ref_test.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\exec\collection_iterator.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\collection_scan.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\audit.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3803,6 +3812,18 @@
       <Filter>db\commands\write_commands</Filter>
     </ClInclude>
     <ClInclude Include="..\db\field_ref_set.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\collection_iterator.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\collection_scan.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\collection_scan_common.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\audit.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
