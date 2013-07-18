@@ -51,6 +51,7 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/mmap.h"
