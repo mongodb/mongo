@@ -149,6 +149,13 @@ namespace mongo {
                                             : Document(next));
             }
 
+            if (_limit) {
+                if (++_docsAddedToBatches == _limit->getLimit()) {
+                    break;
+                }
+                verify(_docsAddedToBatches < _limit->getLimit());
+            }
+
             memUsageBytes += _currentBatch.back().getApproximateSize();
 
             if (memUsageBytes > MaxBytesToReturnToClientAtOnce) {
@@ -179,6 +186,26 @@ namespace mongo {
         verify(false);
     }
 
+    long long DocumentSourceCursor::getLimit() const {
+        return _limit ? _limit->getLimit() : -1;
+    }
+
+    bool DocumentSourceCursor::coalesce(const intrusive_ptr<DocumentSource>& nextSource) {
+        // Note: Currently we assume the $limit is logically after any $sort or
+        // $match. If we ever pull in $match or $sort using this method, we
+        // will need to keep track of the order of the sub-stages.
+
+        if (!_limit) {
+            _limit = dynamic_cast<DocumentSourceLimit*>(nextSource.get());
+            return _limit; // false if next is not a $limit
+        }
+        else {
+            return _limit->coalesce(nextSource);
+        }
+
+        return false;
+    }
+
     void DocumentSourceCursor::sourceToBson(
         BSONObjBuilder *pBuilder, bool explain) const {
 
@@ -191,6 +218,10 @@ namespace mongo {
 
             if (!_sort.isEmpty()) {
                 pBuilder->append("sort", _sort);
+            }
+
+            if (_limit) {
+                pBuilder->append("limit", _limit->getLimit());
             }
 
             BSONObj projectionSpec;
@@ -221,6 +252,7 @@ namespace mongo {
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
         , unstarted(true)
+        , _docsAddedToBatches(0)
         , ns(ns)
         , _cursorId(cursorId)
         , _collMetadata(shardingState.needCollectionMetadata( ns )

@@ -237,8 +237,11 @@ namespace mongo {
             pSource->setProjection(projection, dependencies);
         }
 
+        while (!sources.empty() && pSource->coalesce(sources.front())) {
+            sources.pop_front();
+        }
+
         // If we are in an explain, we won't actually use the created cursor so release it.
-        // This is important to avoid double locking when we use DBDirectClient to run explain.
         if (pPipeline->isExplain())
             pSource->dispose();
 
