@@ -20,26 +20,32 @@ mydb.dropDatabase();
 //
 
 // Valid compatibility document; insert should succeed.
-mydb.system.users.insert({ user: "spencer", pwd: hex_md5("spencer:mongo:a"), readOnly: true });
-assertGLEOK(mydb.getLastErrorObj());
+assert.commandWorked(mydb.runCommand({ createUser:1,
+                                       user: "spencer",
+                                       pwd: "spencer",
+                                       readOnly: true }));
 
 // Invalid compatibility document; insert should fail.
-mydb.system.users.insert({ user: "andy", readOnly: true });
-assertGLENotOK(mydb.getLastErrorObj());
+assert.commandFailed(mydb.runCommand({ createUser:1, user: "andy", readOnly: true }));
 
 // Valid extended document; insert should succeed.
-mydb.system.users.insert({ user: "spencer", userSource: "test2", roles: ["dbAdmin"] });
-assertGLEOK(mydb.getLastErrorObj());
+assert.commandWorked(mydb.runCommand({ createUser:1,
+                                       user: "spencer",
+                                       userSource: "test2",
+                                       roles: ["dbAdmin"] }));
 
 // Invalid extended document; insert should fail.
-mydb.system.users.insert({ user: "andy", userSource: "test2", roles: ["dbAdmin", 15] });
-assertGLENotOK(mydb.getLastErrorObj());
+assert.commandFailed(mydb.runCommand({ createUser:1,
+                                       user: "andy",
+                                       userSource: "test2",
+                                       roles: ["dbAdmin", 15] }));
 
 
 //
 // Tests of the update path
 //
 
+/* Disabled per SERVER-10249.
 // Update a document in a legal way, expect success.
 mydb.system.users.update({user: "spencer", userSource: null}, { $set: {readOnly: false} });
 assertGLEOK(mydb.getLastErrorObj());
@@ -48,5 +54,6 @@ assertGLEOK(mydb.getLastErrorObj());
 // Update a document in a way that is illegal, expect failure.
 mydb.system.users.update({user: "spencer", userSource: null}, { $unset: {pwd: 1} });
 assertGLENotOK(mydb.getLastErrorObj());
+*/
 
 mydb.dropDatabase();
