@@ -538,14 +538,9 @@ struct __wt_session {
 	 *  @row{<tt>config:[\<uri\>]</tt>,
 	 *	object configuration cursor, (key=config string\,
 	 *	value=config value)}
-	 *  @row{<tt>file:\<file name\></tt>,
-	 *	file cursor,
-	 *	file key\, file value(s)}
 	 *  @row{<tt>index:\<table name\>:\<index name\></tt>,
 	 *	index cursor,
 	 *	key=index key\, value=table value(s)}
-	 *  @row{<tt>lsm:\<name\></tt>,
-	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
 	 *  @row{<tt>statistics:[\<data source URI\>]</tt>,
 	 *	database or data source statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
@@ -554,6 +549,16 @@ struct __wt_session {
 	 *  @row{<tt>table:\<table name\></tt>,
 	 *	table cursor,
 	 *	table key\, table value(s)}
+	 *  </table>
+	 *
+	 *  Advanced applications may also want to open the following low-level
+	 *  cursor types:
+	 *  <table>
+	 *  @row{<tt>file:\<file name\></tt>,
+	 *	file cursor,
+	 *	file key\, file value(s)}
+	 *  @row{<tt>lsm:\<name\></tt>,
+	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}
@@ -819,6 +824,18 @@ struct __wt_session {
 	 */
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
+
+	/*!
+	 * Print something to the log file
+	 *
+	 * The database must be configured for logging when this
+	 * method is called.
+	 *
+	 * @param session the session handle
+	 * @param fmt a printf format specifier
+	 * @errors
+	 */
+	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
 
 	/*!
 	 * Rename an object.
@@ -1113,9 +1130,9 @@ struct __wt_connection {
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
 	 * chosen from the following options: \c "block"\, \c "shared_cache"\,
 	 * \c "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c
-	 * "hazard"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
-	 * "reconcile"\, \c "salvage"\, \c "verify"\, \c "version"\, \c "write";
-	 * default empty.}
+	 * "hazard"\, \c "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c
+	 * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c
+	 * "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1360,7 +1377,18 @@ struct __wt_connection {
  * following options: \c "data"\, \c "log"; default empty.}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
- * @config{logging, enable logging., a boolean flag; default \c false.}
+ * @config{log = (, enable logging., a set of related configuration options
+ * defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
+ * archive unneeded log files., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a boolean
+ * flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum
+ * size of the log file., an integer between 1MB and 2GB; default \c 100MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
+ * log files are written.  If the value is not an absolute path name\, the files
+ * are created relative to the database home., a string; default \c "".}
+ * @config{ ),,}
  * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
  * \c true.}
  * @config{mmap, Use memory mapping to access files when possible., a boolean
@@ -1427,8 +1455,9 @@ struct __wt_connection {
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
  * values chosen from the following options: \c "block"\, \c "shared_cache"\, \c
  * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
- * "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
- * "salvage"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
+ * "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
+ * "reconcile"\, \c "salvage"\, \c "verify"\, \c "version"\, \c "write"; default
+ * empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file
@@ -2315,40 +2344,70 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_UPDATE			36
 /*! files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				37
+/*! log: total user provided log bytes written */
+#define	WT_STAT_CONN_LOG_BYTES_USER			38
+/*! log: total log bytes written */
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			39
+/*! log: maximum log file size */
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			40
+/*! log: total log read operations */
+#define	WT_STAT_CONN_LOG_READS				41
+/*! log: total records processed by log scan */
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			42
+/*! log: log scan records requiring two reads */
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			43
+/*! log: total log scan operations */
+#define	WT_STAT_CONN_LOG_SCANS				44
+/*! log: total consolidated slot closures */
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			45
+/*! log: total logging bytes consolidated */
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		46
+/*! log: total consolidated slot joins */
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			47
+/*! log: total consolidated slot join races */
+#define	WT_STAT_CONN_LOG_SLOT_RACES			48
+/*! log: record size exceeded maximum */
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			49
+/*! log: total consolidated slot join transitions */
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		50
+/*! log: total log sync operations */
+#define	WT_STAT_CONN_LOG_SYNC				51
+/*! log: total log write operations */
+#define	WT_STAT_CONN_LOG_WRITES				52
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			38
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			53
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			39
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			54
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			40
+#define	WT_STAT_CONN_MEMORY_FREE			55
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			41
+#define	WT_STAT_CONN_MEMORY_GROW			56
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				42
+#define	WT_STAT_CONN_READ_IO				57
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				43
+#define	WT_STAT_CONN_REC_PAGES				58
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			44
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			59
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			45
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			60
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			46
+#define	WT_STAT_CONN_RWLOCK_READ			61
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			47
+#define	WT_STAT_CONN_RWLOCK_WRITE			62
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		48
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		63
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				49
+#define	WT_STAT_CONN_TXN_BEGIN				64
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			50
+#define	WT_STAT_CONN_TXN_CHECKPOINT			65
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				51
+#define	WT_STAT_CONN_TXN_COMMIT				66
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			52
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			67
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			53
+#define	WT_STAT_CONN_TXN_ROLLBACK			68
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				54
+#define	WT_STAT_CONN_WRITE_IO				69
 
 /*!
  * @}

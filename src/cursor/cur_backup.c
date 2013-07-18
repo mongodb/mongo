@@ -175,12 +175,15 @@ __backup_start(
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	u_int i, logcount;
 	int target_list;
+	char **logfiles;
 
 	conn = S2C(session);
 
 	cb->next = 0;
 	cb->list = NULL;
+	logfiles = NULL;
 
 	/*
 	 * Single thread hot backups: we're holding the schema lock, so we
@@ -221,6 +224,13 @@ __backup_start(
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
 	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
 
+	/* Add log files if logging is on. */
+	if (conn->log) {
+		WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
+		for (i = 0; i < logcount; i++)
+			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
+	}
+
 	/* Close the hot backup file. */
 	ret = fclose(cb->bfp);
 	cb->bfp = NULL;
@@ -228,6 +238,8 @@ __backup_start(
 
 err:	if (cb->bfp != NULL)
 		WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
+	if (logfiles != NULL)
+		__wt_log_files_free(session, logfiles, logcount);
 
 	if (ret != 0)
 		WT_TRET(__backup_stop(session));

@@ -522,6 +522,8 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
 
+	*wt_sessionp = NULL;
+
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
 
@@ -853,6 +855,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "evictserver",WT_VERB_evictserver },
 		{ "fileops",	WT_VERB_fileops },
 		{ "hazard",	WT_VERB_hazard },
+		{ "log",	WT_VERB_log },
 		{ "lsm",	WT_VERB_lsm },
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
@@ -920,6 +923,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	const char *cfg[5], **cfgend;
 
 	*wt_connp = NULL;
+
 	session = NULL;
 	cbuf = NULL;
 	WT_CLEAR(expath);
@@ -1009,11 +1013,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 
-	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
-	if (cval.val != 0)
-		WT_ERR(__wt_open(
-		   session, WT_LOG_FILENAME, 1, 0, 0, &conn->log_fh));
-
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
 		conn->buffer_alignment = WT_BUFFER_ALIGNMENT_DEFAULT;
@@ -1078,8 +1077,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_connection_open(conn, cfg));
 
 	/* Open the default session. */
-	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &conn->default_session));
-	session = conn->default_session;
+	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
+	conn->default_session = session;
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary

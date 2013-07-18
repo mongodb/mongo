@@ -1,4 +1,4 @@
-/*! @page schema Schemas
+/*! @page schema Schema, Columns, Column Groups, Indices and Projections
 
 While many tables have simple key/value pairs for records, WiredTiger
 also supports more complex data patterns.
@@ -177,7 +177,8 @@ to \c scanf, and takes a list of pointers to values in the same order:
 @snippet ex_all.c Get the cursor's composite key
 
 Cursors for a table have the same value format as the table, unless a
-projection is specified to WT_SESSION::open_cursor.
+projection is configured with WT_SESSION::open_cursor.  See @ref
+cursor_projections for more information.
 
 WT_CURSOR::set_value is used to set value columns, and
 WT_CURSOR::get_value is used to get value columns, in the same way as
@@ -303,8 +304,8 @@ number, in this case) from the index:
 
 @snippet ex_schema.c Return the table's record number key using an index
 
-Here is an example of a projection that return a subset of columns from the
-index:
+Here is an example of a projection that returns a subset of columns from
+the index:
 
 @snippet ex_schema.c Return a subset of the value columns from an index
 

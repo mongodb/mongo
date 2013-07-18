@@ -346,6 +346,26 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
 	stats->file_open.desc = "files currently open";
+	stats->log_bytes_user.desc =
+	    "log: total user provided log bytes written";
+	stats->log_bytes_written.desc = "log: total log bytes written";
+	stats->log_max_filesize.desc = "log: maximum log file size";
+	stats->log_reads.desc = "log: total log read operations";
+	stats->log_scan_records.desc =
+	    "log: total records processed by log scan";
+	stats->log_scan_rereads.desc =
+	    "log: log scan records requiring two reads";
+	stats->log_scans.desc = "log: total log scan operations";
+	stats->log_slot_closes.desc = "log: total consolidated slot closures";
+	stats->log_slot_consolidated.desc =
+	    "log: total logging bytes consolidated";
+	stats->log_slot_joins.desc = "log: total consolidated slot joins";
+	stats->log_slot_races.desc = "log: total consolidated slot join races";
+	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
+	stats->log_slot_transitions.desc =
+	    "log: total consolidated slot join transitions";
+	stats->log_sync.desc = "log: total log sync operations";
+	stats->log_writes.desc = "log: total log write operations";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
@@ -409,6 +429,20 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->log_bytes_user.v = 0;
+	stats->log_bytes_written.v = 0;
+	stats->log_reads.v = 0;
+	stats->log_scan_records.v = 0;
+	stats->log_scan_rereads.v = 0;
+	stats->log_scans.v = 0;
+	stats->log_slot_closes.v = 0;
+	stats->log_slot_consolidated.v = 0;
+	stats->log_slot_joins.v = 0;
+	stats->log_slot_races.v = 0;
+	stats->log_slot_toobig.v = 0;
+	stats->log_slot_transitions.v = 0;
+	stats->log_sync.v = 0;
+	stats->log_writes.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;

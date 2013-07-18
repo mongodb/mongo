@@ -220,6 +220,8 @@ __session_open_cursor(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	*cursorp = NULL;
+
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
@@ -306,6 +308,27 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	    ret = __wt_schema_create(session, uri, config));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_log_printf --
+ *	WT_SESSION->log_printf method.
+ */
+static int
+__session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
+	va_list ap;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	va_start(ap, fmt);
+	ret =__wt_log_vprintf(session, fmt, ap);
+	va_end(ap);
+
+	return (ret);
 }
 
 /*
@@ -764,6 +787,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_create,
 		__session_compact,
 		__session_drop,
+		__session_log_printf,
 		__session_rename,
 		__session_salvage,
 		__session_truncate,
@@ -777,6 +801,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t i;
+
+	*sessionp = NULL;
 
 	session = conn->default_session;
 	session_ret = NULL;

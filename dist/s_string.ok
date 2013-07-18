@@ -12,8 +12,10 @@ APIs
 ARG
 ARGS
 Addr
+Ailamaki
 Alakuijala
 Alloc
+Athanassoulis
 Athlon
 BBBBB
 BBBBBB
@@ -59,6 +61,7 @@ CustomersPhone
 DATAITEMs
 DESC
 DHANDLE
+DOI
 DSRC
 DUPLICATEV
 DbCursor
@@ -111,6 +114,7 @@ INITIALIZER
 INSERT's
 INUSE
 ISSET
+Ippokratis
 JPEG
 JSON
 Jyrki
@@ -138,6 +142,7 @@ MBUF
 MEM
 MERCHANTABILITY
 MVCC
+Manos
 Marsaglia's
 Memrata
 Metadata
@@ -167,6 +172,7 @@ POSIX
 PSIZE
 PTR
 Pagesize
+Pandis
 Phong
 PlatformSDK
 Pre
@@ -181,6 +187,7 @@ RLE
 RNG
 RPC
 RUNDIR
+Radu
 Recurse
 Redistributions
 Resize
@@ -195,11 +202,13 @@ SSq
 STAILQ
 STRUCT
 SYS
+Scalability
 Sevii
 SiH
 Skiplist
 Solaris
 Split's
+Stoica
 StoreLoad
 Strsep
 Subtree
@@ -223,6 +232,7 @@ UnixLib
 Unmap
 Unmarshall
 VARCHAR
+VLDB
 Vanishingly
 Vc
 Vixie
@@ -237,6 +247,7 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerHome
+WiredTigerLog
 WiredTigerStat
 WithSeeds
 Wmissing
@@ -375,6 +386,7 @@ desc
 dest
 dev
 dhandle
+dirlist
 dlclose
 dlh
 dll
@@ -449,6 +461,7 @@ func
 funcs
 gcc
 gdb
+getfiles
 getid
 getline
 getone
@@ -525,6 +538,8 @@ lno
 loadtext
 lockdown
 logf
+logmgr
+lognum
 logput
 lookup
 lookups
@@ -567,7 +582,9 @@ mnt
 msg
 msgv
 mtx
+multicore
 multiprocess
+multisocket
 multithread
 multithreaded
 munmap
@@ -583,6 +600,7 @@ nbsp
 nclr
 negint
 newbar
+newfile
 newname
 newuri
 nextprev
@@ -612,6 +630,8 @@ oldname
 onint
 onpage
 oo
+opendir
+openfile
 os
 ovfl
 packv
@@ -646,6 +666,7 @@ qsort
 qup
 rS
 rdlock
+rduppo
 readlock
 readnear
 readnext
@@ -655,6 +676,7 @@ readserver
 realloc
 recno
 recnos
+recsize
 req
 rescan
 resize
@@ -673,6 +695,7 @@ rwlock
 rwlocks
 rwunlock
 rx
+sH
 sHQ
 savepoints
 sb
@@ -758,6 +781,7 @@ timestamp
 tinsert
 tlist
 tload
+tmp
 toffpage
 toverflow
 tparent

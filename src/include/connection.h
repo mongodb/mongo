@@ -167,7 +167,15 @@ struct __wt_connection_impl {
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */
 
-	WT_FH	   *log_fh;		/* Logging file handle */
+	int		 logging;	/* Global logging configuration */
+	int		 archive;	/* Global archive configuration */
+	WT_CONDVAR	*arch_cond;	/* Log archive wait mutex */
+	WT_SESSION_IMPL *arch_session;	/* Log archive session */
+	pthread_t	 arch_tid;	/* Log archive thread */
+	int		 arch_tid_set;	/* Log archive thread set */
+	WT_LOG		*log;		/* Logging structure */
+	off_t		log_file_max;	/* Log file max size */
+	const char	*log_path;	/* Logging path format */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

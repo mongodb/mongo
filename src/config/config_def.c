@@ -43,9 +43,9 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "statistics", "boolean", NULL, NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
-	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"version\","
-	    "\"write\"]",
+	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\","
+	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
+	    "\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -211,6 +211,14 @@ static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
+	{ "archive", "boolean", NULL, NULL },
+	{ "enabled", "boolean", NULL, NULL },
+	{ "file_max", "int", "min=1MB,max=2GB", NULL },
+	{ "path", "string", NULL, NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
 	{ "clear", "boolean", NULL, NULL },
 	{ "path", "string", NULL, NULL },
@@ -233,7 +241,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "extensions", "list", NULL, NULL},
 	{ "file_extend", "list", "choices=[\"data\",\"log\"]", NULL},
 	{ "hazard_max", "int", "min=15", NULL},
-	{ "logging", "boolean", NULL, NULL},
+	{ "log", "category", NULL, confchk_log_subconfigs},
 	{ "lsm_merge", "boolean", NULL, NULL},
 	{ "mmap", "boolean", NULL, NULL},
 	{ "multiprocess", "boolean", NULL, NULL},
@@ -247,9 +255,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "use_environment_priv", "boolean", NULL, NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
-	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"version\","
-	    "\"write\"]",
+	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\","
+	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
+	    "\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -396,11 +404,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),create=0,"
 	  "direct_io=,error_prefix=,eviction_dirty_target=80,eviction_target=80"
 	  ",eviction_trigger=95,extensions=,file_extend=,hazard_max=1000,"
-	  "logging=0,lsm_merge=,mmap=,multiprocess=0,session_max=50,"
-	  "shared_cache=(chunk=10MB,enable=0,name=pool,reserve=0,size=500MB),"
-	  "statistics=0,statistics_log=(clear=,path=\"WiredTigerStat.%H\","
-	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),sync=,"
-	  "use_environment_priv=0,verbose=",
+	  "log=(archive=,enabled=,file_max=100MB,path=\"\"),lsm_merge=,mmap=,"
+	  "multiprocess=0,session_max=50,shared_cache=(chunk=10MB,enable=0,"
+	  "name=pool,reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
+	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\","
+	  "wait=0),sync=,use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }
