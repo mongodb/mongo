@@ -370,6 +370,7 @@ namespace mongo {
         virtual bool advance();
         virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
+        virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
 
         /**
          * Release the Cursor and the read lock it requires, but without changing the other data.
@@ -430,6 +431,9 @@ namespace mongo {
         void setSort(const BSONObj& sort) { _sort = sort; }
 
         void setProjection(const BSONObj& projection, const ParsedDeps& deps);
+
+        /// returns -1 for no limit
+        long long getLimit() const;
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
@@ -450,6 +454,8 @@ namespace mongo {
         BSONObj _sort;
         shared_ptr<Projection> _projection; // shared with pClientCursor
         ParsedDeps _dependencies;
+        intrusive_ptr<DocumentSourceLimit> _limit;
+        long long _docsAddedToBatches; // for _limit enforcement
 
         string ns; // namespace
         CursorId _cursorId;

@@ -286,6 +286,44 @@ namespace DocumentSourceTests {
             WriterClientScope _writerScope;
         };
 
+        /** Test coalescing a limit into a cursor */
+        class LimitCoalesce : public Base {
+        public:
+            intrusive_ptr<DocumentSourceLimit> mkLimit(long long limit) {
+                return DocumentSourceLimit::create(ctx(), limit);
+            }
+            void run() {
+                client.insert( ns, BSON( "a" << 1 ) );
+                client.insert( ns, BSON( "a" << 2 ) );
+                client.insert( ns, BSON( "a" << 3 ) );
+                createSource();
+
+                // initial limit becomes limit of cursor
+                ASSERT(source()->coalesce(mkLimit(10)));
+                ASSERT_EQUALS(source()->getLimit(), 10);
+
+                // smaller limit lowers cursor limit
+                ASSERT(source()->coalesce(mkLimit(2)));
+                ASSERT_EQUALS(source()->getLimit(), 2);
+
+                // higher limit doesn't effect cursor limit
+                ASSERT(source()->coalesce(mkLimit(3)));
+                ASSERT_EQUALS(source()->getLimit(), 2);
+
+                // The cursor allows exactly 2 documents through
+                ASSERT( !source()->eof() );
+                ASSERT_EQUALS( 1, source()->getCurrent()->getValue( "a" ).coerceToInt() );
+
+                ASSERT( source()->advance() );
+                ASSERT( !source()->eof() );
+                ASSERT_EQUALS( 2, source()->getCurrent()->getValue( "a" ).coerceToInt() );
+
+                ASSERT( !source()->advance() );
+                ASSERT( source()->eof() );
+            }
+        };
+
+
     } // namespace DocumentSourceCursor
 
     namespace DocumentSourceLimit {
@@ -1764,6 +1802,7 @@ namespace DocumentSourceTests {
             add<DocumentSourceCursor::Dispose>();
             add<DocumentSourceCursor::IterateDispose>();
             add<DocumentSourceCursor::Yield>();
+            add<DocumentSourceCursor::LimitCoalesce>();
 
             add<DocumentSourceLimit::DisposeSource>();
             add<DocumentSourceLimit::DisposeSourceCascade>();
