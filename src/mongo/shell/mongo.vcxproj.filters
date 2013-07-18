@@ -1025,6 +1025,12 @@
     <ClCompile Include="..\platform\strcasestr.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\backtrace.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\posix_fadvise.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\v8\src\apinatives.js">
@@ -2403,6 +2409,12 @@
       <Filter>third_party\MurmurHash3</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\strcasestr.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\backtrace.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\posix_fadvise.h">
       <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
