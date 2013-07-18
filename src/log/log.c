@@ -247,9 +247,9 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn)
 		if (lognum > lsn->file)
 			WT_ERR(__wt_log_remove(session, lognum));
 	}
-err:
-	__wt_log_files_free(session, logfiles, logcount);
-	return (0);
+
+err:	__wt_log_files_free(session, logfiles, logcount);
+	return (ret);
 }
 
 /*
