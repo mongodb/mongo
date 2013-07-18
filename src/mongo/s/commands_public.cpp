@@ -1348,8 +1348,6 @@ namespace mongo {
                 }
             }
 
-            // TODO: implement addRequiredPrivileges
-
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 return run( dbName, cmdObj, errmsg, result, 0 );
             }
