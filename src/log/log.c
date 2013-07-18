@@ -450,9 +450,9 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 		log->sync_lsn = tmp.slot_end_lsn;
 		log->write_lsn = tmp.slot_end_lsn;
 	}
-err:
-	__wt_scr_free(&buf);
-	return (0);
+
+err:	__wt_scr_free(&buf);
+	return (ret);
 }
 
 /*
