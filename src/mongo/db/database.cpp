@@ -20,6 +20,7 @@
 
 #include "mongo/db/database.h"
 
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/auth/auth_index_d.h"
@@ -62,11 +63,12 @@ namespace mongo {
             "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
         };
 
-        string lower = toLowerString( dbname.toString() );
+        string lower( dbname.toString() );
+        std::transform( lower.begin(), lower.end(), lower.begin(), ::tolower );
         for ( size_t i = 0; i < (sizeof(windowsReservedNames) / sizeof(char*)); ++i ) {
             if ( lower == windowsReservedNames[i] ) {
                 stringstream errorString;
-                errorString << "db name \"" << nm << "\" is a reserved name";
+                errorString << "db name \"" << dbname.toString() << "\" is a reserved name";
                 return Status( ErrorCodes::BadValue, errorString.str() );
             }
         }
