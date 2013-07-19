@@ -237,5 +237,23 @@ namespace mongo {
         return e->firstRecord;
     }
 
+    int ExtentManager::quantizeExtentSize( int size ) {
+        verify( size <= Extent::maxSize() );
+
+        // make sizes align with VM page size
+        int newSize = (size + 0xfff) & 0xfffff000;
+
+        if ( newSize > Extent::maxSize() ) {
+            return Extent::maxSize();
+        }
+
+        if ( newSize < Extent::minSize() ) {
+            return Extent::minSize();
+        }
+
+        return newSize;
+    }
+
+
 
 }

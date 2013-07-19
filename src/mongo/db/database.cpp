@@ -277,6 +277,8 @@ namespace mongo {
 
     DataFile* Database::suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota ) {
 
+        sizeNeeded = ExtentManager::quantizeExtentSize( sizeNeeded );
+
         // check existing files
         for ( int i=numFiles()-1; i>=0; i-- ) {
             DataFile* f = getFile( i );

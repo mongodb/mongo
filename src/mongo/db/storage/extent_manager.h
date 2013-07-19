@@ -90,6 +90,10 @@ namespace mongo {
 
         DiskLoc getPrevRecordInExtent( const DiskLoc& loc );
 
+        /**
+         * quantizes extent size to >= min + page boundary
+         */
+        static int quantizeExtentSize( int size );
 
     private:
 

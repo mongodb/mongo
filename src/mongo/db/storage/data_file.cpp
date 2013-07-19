@@ -148,14 +148,8 @@ namespace mongo {
     }
 
     Extent* DataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
-        verify( approxSize <= Extent::maxSize() );
-        {
-            // make sizes align with VM page size
-            int newSize = (approxSize + 0xfff) & 0xfffff000;
-            verify( newSize >= 0 );
-            if( newSize < Extent::maxSize() )
-                approxSize = newSize;
-        }
+        approxSize = ExtentManager::quantizeExtentSize( approxSize );
+
         massert( 10357 ,  "shutdown in progress", ! inShutdown() );
         massert( 10358 ,  "bad new extent size", approxSize >= Extent::minSize() && approxSize <= Extent::maxSize() );
         massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
