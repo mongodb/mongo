@@ -129,7 +129,7 @@ namespace mongo {
         }
 #ifdef MONGO_SSL
         if (mechanism == "MONGODB-X509") {
-            return _authenticateX509(dbname, cmdObj);
+            return _authenticateX509(user, cmdObj);
         }
 #endif
         return Status(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
@@ -240,9 +240,8 @@ namespace mongo {
             // Handle internal cluster member auth, only applies to server-server connections 
             if (srvClusterId == peerClusterId) {
                 if (cmdLine.clusterAuthMode == "keyfile") {
-                    errmsg = "X509 authentication is not allowed for cluster authentication";
-                    result.append(saslCommandCodeFieldName, ErrorCodes::AuthenticationFailed);
-                    return false;
+                    return Status(ErrorCodes::AuthenticationFailed,
+                                  "X509 authentication is not allowed for cluster authentication");
                 }
                 authorizationSession->grantInternalAuthorization(user);
             }
