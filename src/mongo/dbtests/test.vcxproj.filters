@@ -2769,6 +2769,9 @@
     <ClInclude Include="..\db\exec\sort.h">
       <Filter>db\exec</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\ops\log_builder.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -5340,6 +5343,12 @@
     </ClCompile>
     <ClCompile Include="query_stage_sort.cpp">
       <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\log_builder.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\log_builder_test.cpp">
+      <Filter>db\ops</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

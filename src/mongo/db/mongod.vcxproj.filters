@@ -2432,6 +2432,12 @@
     <ClCompile Include="exec\sort.cpp">
       <Filter>db\exec</Filter>
     </ClCompile>
+    <ClCompile Include="ops\log_builder.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\log_builder_test.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4886,6 +4892,9 @@
     </ClInclude>
     <ClInclude Include="exec\sort.h">
       <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\log_builder.h">
+      <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
