@@ -141,7 +141,7 @@ namespace mongo {
             ANY_CONTEXT
         };
 
-        ExecInfo() : inPlace(false), noOp(false), context(ANY_CONTEXT) {
+        ExecInfo() : noOp(false), context(ANY_CONTEXT) {
             for (int i = 0; i < MAX_NUM_FIELDS; i++) {
                 fieldRef[i] = NULL;
             }
@@ -149,7 +149,6 @@ namespace mongo {
 
         // The fields of concern to the driver: no other op may modify the fields listed here.
         FieldRef* fieldRef[MAX_NUM_FIELDS]; // not owned here
-        bool inPlace;
         bool noOp;
         UpdateContext context;
     };

@@ -34,7 +34,6 @@ namespace mongo {
             , idxFound(0)
             , elemFound(doc.end())
             , boundDollar("")
-            , inPlace(false)
             , noOp(false) {
         }
 
@@ -52,9 +51,6 @@ namespace mongo {
 
         // Value to be applied.
         SafeNum newValue;
-
-        // True if this update can be applied in place.
-        bool inPlace;
 
         // True if this update is a no-op
         bool noOp;
@@ -189,17 +185,10 @@ namespace mongo {
             return Status(ErrorCodes::BadValue,
                           "Failed to apply $bit to current value");
 
-        // If the values are identical (same type, same value), then this is a no-op, and
-        // therefore in-place as well.
+        // If the values are identical (same type, same value), then this is a no-op.
         if (_preparedState->newValue.isIdentical(currentValue)) {
             _preparedState->noOp = execInfo->noOp = true;
-            _preparedState->inPlace = execInfo->inPlace = true;
             return Status::OK();
-        }
-
-        // TODO: Cases where the type changes but size is the same.
-        if (currentValue.type() == _preparedState->newValue.type()) {
-            _preparedState->inPlace = execInfo->inPlace = true;
         }
 
         return Status::OK();
@@ -214,8 +203,6 @@ namespace mongo {
             _preparedState->idxFound == (_fieldRef.numParts() - 1)) {
             return _preparedState->elemFound.setValueSafeNum(_preparedState->newValue);
         }
-
-        dassert(_preparedState->inPlace == false);
 
         //
         // Complete document path logic

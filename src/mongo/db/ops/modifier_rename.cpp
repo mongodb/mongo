@@ -130,7 +130,7 @@ namespace mongo {
 
         // If we can't find the full element in the from field then we can't do anything.
         if (!status.isOK()) {
-            execInfo->inPlace = execInfo->noOp = true;
+            execInfo->noOp = true;
             _preparedState->fromElemFound = root.getDocument().end();
 
             // TODO: remove this special case from existing behavior
@@ -183,7 +183,7 @@ namespace mongo {
         execInfo->fieldRef[0] = &_fromFieldRef;
         execInfo->fieldRef[1] = &_toFieldRef;
 
-        execInfo->inPlace = execInfo->noOp = false;
+        execInfo->noOp = false;
 
         return Status::OK();
     }

@@ -35,7 +35,6 @@ namespace mongo {
             , elemFound(doc.end())
             , boundDollar("")
             , newValue()
-            , inPlace(false)
             , noOp(false) {
         }
 
@@ -53,9 +52,6 @@ namespace mongo {
 
         // Value to be applied
         SafeNum newValue;
-
-        // This $inc is in-place?
-        bool inPlace;
 
         // This $inc is a no-op?
         bool noOp;
@@ -177,20 +173,10 @@ namespace mongo {
             return Status(ErrorCodes::BadValue,
                           "Failed to increment current value");
 
-        // If the values are identical (same type, same value), then this is a no-op, and
-        // therefore in-place as well.
+        // If the values are identical (same type, same value), then this is a no-op.
         if (_preparedState->newValue.isIdentical(currentValue)) {
             _preparedState->noOp = execInfo->noOp = true;
-            _preparedState->inPlace = execInfo->inPlace = true;
             return Status::OK();
-        }
-
-        // If the types are the same, this can be done in place.
-        //
-        // TODO: Potentially, cases where $inc results in a mixed type of the same size could
-        // be in-place as well, but we don't currently handle them.
-        if (_preparedState->newValue.type() == currentValue.type()) {
-            _preparedState->inPlace = execInfo->inPlace = true;
         }
 
         return Status::OK();
@@ -205,8 +191,6 @@ namespace mongo {
             _preparedState->idxFound == (_fieldRef.numParts() - 1)) {
             return _preparedState->elemFound.setValueSafeNum(_preparedState->newValue);
         }
-
-        dassert(_preparedState->inPlace == false);
 
         //
         // Complete document path logic

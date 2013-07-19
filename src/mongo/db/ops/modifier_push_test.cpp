@@ -466,10 +466,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
@@ -487,10 +487,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
@@ -508,10 +508,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [0,1]}"), doc);
 
         Document logDoc;
@@ -541,10 +541,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [{b:1}]}"), doc);
 
         Document logDoc;
@@ -562,10 +562,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [{b:1}]}"), doc);
 
         Document logDoc;
@@ -583,10 +583,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [{b:0},{b:1}]}"), doc);
 
         Document logDoc;
@@ -609,10 +609,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "choices.first.votes");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson(   "{ _id : 1 , "
                                   "  question : 'a', "
                                   "  choices : { "
@@ -641,10 +641,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
 
         Document logDoc;
@@ -662,10 +662,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{a: [1]}"));
 
         Document logDoc;
@@ -683,10 +683,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_TRUE(checkDoc(doc, fromjson("{a: [0,1,2]}")));
 
         Document logDoc;
@@ -716,10 +716,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
@@ -737,10 +737,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
 
         Document logDoc;
@@ -758,10 +758,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
 
         Document logDoc;
@@ -779,10 +779,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [0,1]}"), doc);
 
         Document logDoc;
@@ -800,10 +800,10 @@ namespace {
         ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [0,1,2]}"), doc);
 
         Document logDoc;
@@ -927,10 +927,10 @@ namespace {
             ASSERT_OK(mod().prepare(doc.root(), "", &execInfo));
 
             ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-            ASSERT_FALSE(execInfo.inPlace);
             ASSERT_FALSE(execInfo.noOp);
 
             ASSERT_OK(mod().apply());
+            ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
             vector<int> combinedVec;
             combineVec(docArray,   /* a: []  */
@@ -958,10 +958,10 @@ namespace {
             ASSERT_OK(mod().prepare(doc.root(), "", &execInfo));
 
             ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-            ASSERT_FALSE(execInfo.inPlace);
             ASSERT_FALSE(execInfo.noOp);
 
             ASSERT_OK(mod().apply());
+            ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
             vector<int> combinedVec;
             combineVec(docArray,  /* a: [2, 3] */
@@ -1000,10 +1000,10 @@ namespace {
                         ASSERT_OK(mod().prepare(doc.root(), "", &execInfo));
 
                         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-                        ASSERT_FALSE(execInfo.inPlace);
                         ASSERT_FALSE(execInfo.noOp);
 
                         ASSERT_OK(mod().apply());
+                        ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
                         vector<BSONObj> combinedVec;
                         combineAndSortVec(docArray,  /* a: [] */
@@ -1054,10 +1054,10 @@ namespace {
                         ASSERT_OK(mod().prepare(doc.root(), "", &execInfo));
 
                         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-                        ASSERT_FALSE(execInfo.inPlace);
                         ASSERT_FALSE(execInfo.noOp);
 
                         ASSERT_OK(mod().apply());
+                        ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
                         vector<BSONObj> combinedVec;
                         combineAndSortVec(docArray,  /* a: [{a:2,b:3},{a:3,:b1}] */

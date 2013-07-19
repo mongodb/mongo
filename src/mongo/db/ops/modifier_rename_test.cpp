@@ -130,10 +130,10 @@ namespace {
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{b:2}"));
 
         Document logDoc;
@@ -152,10 +152,10 @@ namespace {
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{b:2}"));
 
         Document logDoc;
@@ -174,10 +174,10 @@ namespace {
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.c");
         ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{a: {}, b:{ d: 6}}"));
 
         Document logDoc;
@@ -196,10 +196,10 @@ namespace {
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "c.r.d");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{b:1, c: { r: { d: 2}}}"));
 
         Document logDoc;
@@ -218,10 +218,10 @@ namespace {
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b.c.d");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{b: {c: {d: 2}}}"));
 
         Document logDoc;
@@ -240,10 +240,10 @@ namespace {
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
         ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b.c.d");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(doc, fromjson("{b: {c: {d: [ {a:2, b:1} ]}}}"));
 
         Document logDoc;

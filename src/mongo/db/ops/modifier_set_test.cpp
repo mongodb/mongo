@@ -105,7 +105,6 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
     }
 
@@ -117,7 +116,6 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
         ASSERT_EQUALS(execInfo.context, ModifierInterface::ExecInfo::INSERT_CONTEXT);
     }
@@ -130,10 +128,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: 2}"), doc);
     }
 
@@ -145,10 +143,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: 2}"), doc);
     }
 
@@ -160,10 +158,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: 2}"), doc);
     }
 
@@ -175,10 +173,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: 2}"), doc);
     }
 
@@ -190,10 +188,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{b: 1, a: 2}"), doc);
     }
 
@@ -224,7 +222,6 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
     }
 
@@ -252,10 +249,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
     }
 
@@ -267,10 +264,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
     }
 
@@ -282,10 +279,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
     }
 
@@ -297,10 +294,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {c: 1, b: 2}}"), doc);
     }
 
@@ -312,10 +309,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{c: 1, a: {b: 2}}"), doc);
     }
 
@@ -327,10 +324,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
     }
 
@@ -342,10 +339,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{'a.b':4, a: {b: 2}}"), doc);
     }
 
@@ -361,7 +358,6 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
     }
 
@@ -381,10 +377,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
     }
 
@@ -396,10 +392,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
     }
 
@@ -411,10 +407,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [{b: 0},null,{b: 2}]}"), doc);
     }
 
@@ -426,10 +422,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {b: 0, '2': {b: 2}}}"), doc);
     }
 
@@ -441,10 +437,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
     }
 
@@ -456,10 +452,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {'2': {c: 1, b: 2}}}"), doc);
     }
 
@@ -471,10 +467,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
     }
 
@@ -486,10 +482,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: [null, null, {b: 2}]}"), doc);
     }
 
@@ -501,10 +497,10 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.2.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
     }
 
@@ -565,7 +561,6 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
     }
 
@@ -577,7 +572,6 @@ namespace {
         ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
 
         ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.b");
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
     }
 
