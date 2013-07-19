@@ -401,7 +401,7 @@ namespace mongo {
     static SockAddr getLocalAddrForBoundSocketFd(int fd) {
         SockAddr result;
         int rc = getsockname(fd, result.raw(), &result.addressSize);
-        massert(0, getAddrInfoStrError(socketGetLastError()), 0 == rc);
+        massert(16975, getAddrInfoStrError(socketGetLastError()), 0 == rc);
         return result;
     }
 
