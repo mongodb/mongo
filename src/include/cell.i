@@ -99,6 +99,15 @@
 #define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
 
 /*
+ * When we aren't able to create a short key or value (and, in the case of a
+ * value, there's no associated RLE), the key or value is at least 64B, else
+ * we'd have been able to store it as a short cell.  Decrement/Increment the
+ * size before storing it, in the hopes that relatively small key/value sizes
+ * will pack into a single byte instead of two bytes.
+ */
+#define	WT_CELL_SIZE_ADJUST	64
+
+/*
  * WT_CELL --
  *	Variable-length, on-page cell header.
  */
@@ -190,9 +199,10 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 	}
 
 	p = cell->__chunk + 1;
-	if (rle < 2)
+	if (rle < 2) {
+		size -= WT_CELL_SIZE_ADJUST;
 		cell->__chunk[0] = WT_CELL_VALUE;	/* Type */
-	else {
+	} else {
 		cell->__chunk[0] = WT_CELL_VALUE | WT_CELL_64V;
 		(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
 	}
@@ -315,7 +325,10 @@ __wt_cell_pack_int_key(WT_CELL *cell, uint32_t size)
 
 	cell->__chunk[0] = WT_CELL_KEY;			/* Type */
 	p = cell->__chunk + 1;
+
+	size -= WT_CELL_SIZE_ADJUST;
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
+
 	return (WT_PTRDIFF32(p, cell));
 }
 
@@ -350,7 +363,10 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 		cell->__chunk[1] = prefix;		/* Prefix */
 		p = cell->__chunk + 2;
 	}
+
+	size -= WT_CELL_SIZE_ADJUST;
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
+
 	return (WT_PTRDIFF32(p, cell));
 }
 
@@ -584,6 +600,12 @@ restart:
 		 */
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+
+		if (unpack->raw == WT_CELL_KEY ||
+		    unpack->raw == WT_CELL_KEY_PFX ||
+		    (unpack->raw == WT_CELL_VALUE && unpack->v == 0))
+			v += WT_CELL_SIZE_ADJUST;
+
 		unpack->data = p;
 		unpack->size = WT_STORE_SIZE(v);
 		unpack->__len = WT_PTRDIFF32(p + unpack->size, cell);
