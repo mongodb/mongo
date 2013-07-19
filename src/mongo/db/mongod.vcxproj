@@ -2421,9 +2421,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="exec\fetch.cpp" />
     <ClCompile Include="exec\index_scan.cpp" />
     <ClCompile Include="exec\limit.cpp" />
+    <ClCompile Include="exec\merge_sort.cpp" />
     <ClCompile Include="exec\mock_stage.cpp" />
     <ClCompile Include="exec\or.cpp" />
     <ClCompile Include="exec\skip.cpp" />
+    <ClCompile Include="exec\sort.cpp" />
     <ClCompile Include="exec\stagedebug_cmd.cpp" />
     <ClCompile Include="exec\working_set.cpp" />
     <ClCompile Include="exec\working_set_common.cpp" />
@@ -4260,11 +4262,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="exec\fetch.h" />
     <ClInclude Include="exec\index_scan.h" />
     <ClInclude Include="exec\limit.h" />
+    <ClInclude Include="exec\merge_sort.h" />
     <ClInclude Include="exec\mock_stage.h" />
     <ClInclude Include="exec\or.h" />
     <ClInclude Include="exec\plan_stage.h" />
     <ClInclude Include="exec\simple_plan_runner.h" />
     <ClInclude Include="exec\skip.h" />
+    <ClInclude Include="exec\sort.h" />
     <ClInclude Include="exec\working_set.h" />
     <ClInclude Include="exec\working_set_common.h" />
     <ClInclude Include="field_parser-inl.h" />

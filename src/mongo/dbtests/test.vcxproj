@@ -671,11 +671,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\exec\fetch.h" />
     <ClInclude Include="..\db\exec\index_scan.h" />
     <ClInclude Include="..\db\exec\limit.h" />
+    <ClInclude Include="..\db\exec\merge_sort.h" />
     <ClInclude Include="..\db\exec\mock_stage.h" />
     <ClInclude Include="..\db\exec\or.h" />
     <ClInclude Include="..\db\exec\plan_stage.h" />
     <ClInclude Include="..\db\exec\simple_plan_runner.h" />
     <ClInclude Include="..\db\exec\skip.h" />
+    <ClInclude Include="..\db\exec\sort.h" />
     <ClInclude Include="..\db\exec\working_set.h" />
     <ClInclude Include="..\db\exec\working_set_common.h" />
     <ClInclude Include="..\db\explain.h" />
@@ -2564,9 +2566,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\exec\fetch.cpp" />
     <ClCompile Include="..\db\exec\index_scan.cpp" />
     <ClCompile Include="..\db\exec\limit.cpp" />
+    <ClCompile Include="..\db\exec\merge_sort.cpp" />
     <ClCompile Include="..\db\exec\mock_stage.cpp" />
     <ClCompile Include="..\db\exec\or.cpp" />
     <ClCompile Include="..\db\exec\skip.cpp" />
+    <ClCompile Include="..\db\exec\sort.cpp" />
     <ClCompile Include="..\db\exec\stagedebug_cmd.cpp" />
     <ClCompile Include="..\db\exec\working_set.cpp" />
     <ClCompile Include="..\db\exec\working_set_common.cpp" />
@@ -3892,6 +3896,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="query_stage_collscan.cpp" />
     <ClCompile Include="query_stage_fetch.cpp" />
     <ClCompile Include="query_stage_limit_skip.cpp" />
+    <ClCompile Include="query_stage_merge_sort.cpp" />
+    <ClCompile Include="query_stage_sort.cpp" />
     <ClCompile Include="query_stage_tests.cpp" />
     <ClCompile Include="replica_set_monitor_test.cpp" />
     <ClCompile Include="replsettests.cpp" />

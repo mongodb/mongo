@@ -1953,6 +1953,12 @@
     <ClCompile Include="..\bson\optime.cpp">
       <Filter>bson</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\exec\merge_sort.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\exec\sort.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3831,6 +3837,12 @@
     </ClInclude>
     <ClInclude Include="..\bson\optime.h">
       <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\merge_sort.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\sort.h">
+      <Filter>db\exec</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

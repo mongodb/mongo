@@ -2426,6 +2426,12 @@
     <ClCompile Include="..\bson\optime.cpp">
       <Filter>bson</Filter>
     </ClCompile>
+    <ClCompile Include="exec\merge_sort.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="exec\sort.cpp">
+      <Filter>db\exec</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4874,6 +4880,12 @@
     </ClInclude>
     <ClInclude Include="..\bson\optime.h">
       <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="exec\merge_sort.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="exec\sort.h">
+      <Filter>db\exec</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
