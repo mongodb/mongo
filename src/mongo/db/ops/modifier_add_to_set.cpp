@@ -74,7 +74,7 @@ namespace mongo {
         mb::Document& doc;
 
         // Index in _fieldRef for which an Element exist in the document.
-        int32_t idxFound;
+        size_t idxFound;
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mb::Element elemFound;
@@ -229,7 +229,7 @@ namespace mongo {
         // If the field path is not fully present, then this mod cannot be in place, nor is a
         // noOp.
         if (!_preparedState->elemFound.ok() ||
-            _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
+            _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
             // If no target element exists, we will simply be creating a new array.
             _preparedState->addAll = true;
             return Status::OK();
@@ -279,7 +279,7 @@ namespace mongo {
         // If the array field is not there, create it as an array and attach it to the
         // document.
         if (!_preparedState->elemFound.ok() ||
-            _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
+            _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
 
             // Creates the array element
             mb::Document& doc = _preparedState->doc;

@@ -42,7 +42,7 @@ namespace mongo {
         mb::Document& doc;
 
         // Index in _fieldRef for which an Element exist in the document.
-        int32_t idxFound;
+        size_t idxFound;
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mb::Element elemFound;
@@ -132,7 +132,7 @@ namespace mongo {
         execInfo->fieldRef[0] = &_fieldRef;
 
         if (!_preparedState->elemFound.ok() ||
-            _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
+            _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
             // If no target element exists, then there is nothing to do here.
             _preparedState->noOp = execInfo->noOp = true;
             execInfo->inPlace = true;
@@ -175,7 +175,7 @@ namespace mongo {
         dassert(_preparedState->noOp == false);
 
         dassert(_preparedState->elemFound.ok() &&
-                _preparedState->idxFound == static_cast<int32_t>(_fieldRef.numParts() - 1));
+                _preparedState->idxFound == (_fieldRef.numParts() - 1));
 
         std::vector<mb::Element>::const_iterator where = _preparedState->elementsToRemove.begin();
         const std::vector<mb::Element>::const_iterator end = _preparedState->elementsToRemove.end();
@@ -190,7 +190,7 @@ namespace mongo {
         mb::Document& doc = logBuilder->getDocument();
 
         if (!_preparedState->elemFound.ok() ||
-            _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
+            _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
 
             // If we didn't find the element that we wanted to pull from, we log an unset for
             // that element.

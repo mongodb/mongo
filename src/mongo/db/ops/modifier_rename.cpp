@@ -44,7 +44,7 @@ namespace mongo {
         mutablebson::Element fromElemFound;
 
         // Index in _fieldRef for which an Element exist in the document.
-        int32_t toIdxFound;
+        size_t toIdxFound;
 
         // Element to remove (in the destination position)
         mutablebson::Element toElemFound;
@@ -122,7 +122,7 @@ namespace mongo {
         _preparedState.reset(new PreparedState(root));
 
         // Locate the to field name in 'root', which must exist.
-        int32_t fromIdxFound;
+        size_t fromIdxFound;
         Status status = pathsupport::findLongestPrefix(_fromFieldRef,
                                                        root,
                                                        &fromIdxFound,
@@ -202,8 +202,7 @@ namespace mongo {
         // If there's no need to create any further field part, the op is simply a value
         // assignment.
         const bool destExists = _preparedState->toElemFound.ok() &&
-                                (_preparedState->toIdxFound ==
-                                        static_cast<int32_t>(_toFieldRef.numParts()-1));
+                                (_preparedState->toIdxFound == (_toFieldRef.numParts()-1));
 
         if (destExists) {
             removeStatus = _preparedState->toElemFound.remove();
@@ -225,7 +224,7 @@ namespace mongo {
         // Find the new place to put the "to" element:
         // createPathAt does not use existing prefix elements so we
         // need to get the prefix match position for createPathAt below
-        int32_t tempIdx = 0;
+        size_t tempIdx = 0;
         mutablebson::Element tempElem = doc.end();
         Status status = pathsupport::findLongestPrefix(_toFieldRef,
                                                        doc.root(),

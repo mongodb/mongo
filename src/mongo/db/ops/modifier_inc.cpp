@@ -43,7 +43,7 @@ namespace mongo {
         mutablebson::Document& doc;
 
         // Index in _fieldRef for which an Element exist in the document.
-        int32_t idxFound;
+        size_t idxFound;
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element elemFound;
@@ -157,7 +157,7 @@ namespace mongo {
         // If the field path is not fully present, then this mod cannot be in place, nor is a
         // noOp.
         if (!_preparedState->elemFound.ok() ||
-            _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
+            _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
             return Status::OK();
         }
 
@@ -202,7 +202,7 @@ namespace mongo {
         // If there's no need to create any further field part, the $inc is simply a value
         // assignment.
         if (_preparedState->elemFound.ok() &&
-            _preparedState->idxFound == static_cast<int32_t>(_fieldRef.numParts() - 1)) {
+            _preparedState->idxFound == (_fieldRef.numParts() - 1)) {
             return _preparedState->elemFound.setValueSafeNum(_preparedState->newValue);
         }
 

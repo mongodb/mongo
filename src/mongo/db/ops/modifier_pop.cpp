@@ -42,7 +42,7 @@ namespace mongo {
         mutablebson::Element elementToRemove;
 
         // Index in _fieldRef for which an Element exist in the document.
-        int32_t pathFoundIndex;
+        size_t pathFoundIndex;
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element pathFoundElement;
@@ -158,8 +158,7 @@ namespace mongo {
         // log document
         mutablebson::Document& doc = logBuilder->getDocument();
         const bool pathExists = _preparedState->pathFoundElement.ok() &&
-            (_preparedState->pathFoundIndex ==
-             static_cast<int32_t>(_fieldRef.numParts() - 1));
+            (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
 
         // value for the logElement ("field.path.name": <value>)
         mutablebson::Element logElement = pathExists ?
