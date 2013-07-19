@@ -125,8 +125,10 @@ namespace mongo {
             }
 
             if ( !theReplSet && !e.isNumber() ) {
+                // For master/slave deployments that receive w:"majority" or some other named
+                // write concern mode, treat it like w:1 and include a note.
                 result->append( "wnote", "cannot use non integer w values for non-replica sets" );
-                result->append( "err", "noreplset" );
+                result->appendNull( "err" );
                 return true;
             }
 
