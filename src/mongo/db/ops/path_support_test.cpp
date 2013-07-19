@@ -71,7 +71,7 @@ namespace {
     TEST_F(EmptyDoc, EmptyPath) {
         setField("");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
@@ -80,7 +80,7 @@ namespace {
     TEST_F(EmptyDoc, NewField) {
         setField("a");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
@@ -115,7 +115,7 @@ namespace {
     TEST_F(SimpleDoc, EmptyPath) {
         setField("");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
@@ -124,30 +124,30 @@ namespace {
     TEST_F(SimpleDoc, SimplePath) {
         setField("a");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
     }
 
     TEST_F(SimpleDoc, LongerPath) {
         setField("a.b");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::PathNotViable);
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
     }
 
     TEST_F(SimpleDoc, NotCommonPrefix) {
         setField("b");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status, ErrorCodes::NonExistentPath);
@@ -204,32 +204,32 @@ namespace {
     TEST_F(NestedDoc, SimplePath) {
         setField("a");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
     }
 
     TEST_F(NestedDoc, ShorterPath) {
         setField("a.b");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
-        ASSERT_EQUALS(idxFound, 1);
+        ASSERT_EQUALS(idxFound, 1U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]), 0);
     }
 
     TEST_F(NestedDoc, ExactPath) {
         setField("a.b.c");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 2);
+        ASSERT_EQUALS(idxFound, 2U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
     }
 
@@ -237,12 +237,12 @@ namespace {
         //  This would for 'c' to change from NumberInt to Object, which is invalid.
         setField("a.b.c.d");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 2);
+        ASSERT_EQUALS(idxFound, 2U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
 
     }
@@ -250,10 +250,10 @@ namespace {
     TEST_F(NestedDoc, NewFieldNested) {
         setField("a.b.d");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
-        ASSERT_EQUALS(idxFound, 1);
+        ASSERT_EQUALS(idxFound, 1U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]), 0);
 
         // From this point on, handles the creation of the '.d' part that wasn't found.
@@ -268,10 +268,10 @@ namespace {
     TEST_F(NestedDoc, NotStartingFromRoot) {
         setField("b.c");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root()["a"], &idxFound, &elemFound));
-        ASSERT_EQUALS(idxFound, 1);
+        ASSERT_EQUALS(idxFound, 1U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
     }
 
@@ -311,44 +311,44 @@ namespace {
     TEST_F(ArrayDoc, PathOnEmptyArray) {
         setField("a.0");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
     }
 
     TEST_F(ArrayDoc, PathOnPopulatedArray) {
         setField("b.0");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 1);
+        ASSERT_EQUALS(idxFound, 1U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]), 0);
     }
 
     TEST_F(ArrayDoc, MixedArrayAndObjectPath) {
         setField("b.0.c");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 2);
+        ASSERT_EQUALS(idxFound, 2U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]["c"]), 0);
     }
 
     TEST_F(ArrayDoc, ExtendingExistingObject) {
         setField("b.0.d");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 1);
+        ASSERT_EQUALS(idxFound, 1U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]), 0);
 
         // From this point on, handles the creation of the '.0.d' part that wasn't found.
@@ -363,11 +363,11 @@ namespace {
     TEST_F(ArrayDoc, NewObjectInsideArray) {
         setField("b.1.c");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
 
         // From this point on, handles the creation of the '.1.c' part that wasn't found.
@@ -382,11 +382,11 @@ namespace {
     TEST_F(ArrayDoc, NewNestedObjectInsideArray) {
         setField("b.1.c.d");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
 
         // From this point on, handles the creation of the '.1.c.d' part that wasn't found.
@@ -401,11 +401,11 @@ namespace {
     TEST_F(ArrayDoc, ArrayPaddingNecessary) {
         setField("b.5");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
 
         // From this point on, handles the creation of the '.5' part that wasn't found.
@@ -422,7 +422,7 @@ namespace {
         string paddedField = stream() << "b." << mongo::pathsupport::kMaxPaddingAllowed + 1;;
         setField(paddedField);
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
 
@@ -438,12 +438,12 @@ namespace {
     TEST_F(ArrayDoc, NonNumericPathInArray) {
         setField("b.z");
 
-        int32_t idxFound;
+        size_t idxFound;
         Element elemFound = root();
         Status status = findLongestPrefix(field(), root(), &idxFound, &elemFound);
         ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
         ASSERT_TRUE(elemFound.ok());
-        ASSERT_EQUALS(idxFound, 0);
+        ASSERT_EQUALS(idxFound, 0U);
         ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
     }
 

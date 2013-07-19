@@ -69,7 +69,7 @@ namespace pathsupport {
 
     Status findLongestPrefix(const FieldRef& prefix,
                              mutablebson::Element root,
-                             int32_t* idxFound,
+                             size_t* idxFound,
                              mutablebson::Element* elemFound) {
 
         // If root is empty or the prefix is so, there's no point in looking for a prefix.
@@ -145,18 +145,13 @@ namespace pathsupport {
     }
 
     Status createPathAt(const FieldRef& prefix,
-                        int32_t idxFound,
+                        size_t idxFound,
                         mutablebson::Element elemFound,
                         mutablebson::Element newElem) {
         Status status = Status::OK();
 
-        // idxFound can't be negative
-        if (idxFound < 0) {
-            return Status(ErrorCodes::BadValue, "index must be greater or equal to zero");
-        }
-
         // Sanity check that 'idxField' is an actual part.
-        const int32_t size = prefix.numParts();
+        const size_t size = prefix.numParts();
         if (idxFound >= size) {
             return Status(ErrorCodes::BadValue, "index larger than path size");
         }
@@ -165,7 +160,7 @@ namespace pathsupport {
 
         // If we are creating children under an array and a numeric index is next, then perhaps
         // we need padding.
-        int32_t i = idxFound;
+        size_t i = idxFound;
         bool inArray = false;
         if (elemFound.getType() == mongo::Array) {
             size_t newIdx = 0;

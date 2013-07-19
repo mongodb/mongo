@@ -39,7 +39,7 @@ namespace mongo {
         mutablebson::Document& doc;
 
         // Index in _fieldRef for which an Element exist in the document.
-        int32_t idxFound;
+        size_t idxFound;
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element elemFound;
@@ -118,7 +118,7 @@ namespace mongo {
                                                        &_preparedState->idxFound,
                                                        &_preparedState->elemFound);
         if (!status.isOK() ||
-            _preparedState->idxFound != static_cast<int32_t>(_fieldRef.numParts() -1)) {
+            _preparedState->idxFound != (_fieldRef.numParts() -1)) {
             execInfo->noOp = _preparedState->noOp = true;
             execInfo->inPlace = _preparedState->noOp = true;
             execInfo->fieldRef[0] = &_fieldRef;

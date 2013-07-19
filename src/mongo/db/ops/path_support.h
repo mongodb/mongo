@@ -64,7 +64,7 @@ namespace mongo {
          */
         Status findLongestPrefix(const FieldRef& prefix,
                                  mutablebson::Element root,
-                                 int32_t* idxFound,
+                                 size_t* idxFound,
                                  mutablebson::Element* elemFound);
 
         /**
@@ -77,7 +77,7 @@ namespace mongo {
          * to the element in the doc that is the parent of prefix[idxRoot].
          */
         Status createPathAt(const FieldRef& prefix,
-                            int32_t idxRoot,
+                            size_t idxRoot,
                             mutablebson::Element elemFound,
                             mutablebson::Element newElem);
 

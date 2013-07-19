@@ -158,7 +158,7 @@ namespace mongo {
         mutablebson::Document& doc;
 
         // Index in _fieldRef for which an Element exist in the document.
-        int32_t idxFound;
+        size_t idxFound;
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element elemFound;
@@ -378,8 +378,7 @@ namespace mongo {
         }
         else if (status.isOK()) {
 
-            const bool destExists = (_preparedState->idxFound ==
-                                            static_cast<int32_t>(_fieldRef.numParts()-1));
+            const bool destExists = (_preparedState->idxFound == (_fieldRef.numParts()-1));
             // If the path exists, we require the target field to be already an
             // array.
             if (destExists && _preparedState->elemFound.getType() != Array) {
@@ -430,7 +429,7 @@ namespace mongo {
         // 1. If the array field is not there, create it as an array and attach it to the
         // document.
         if (!_preparedState->elemFound.ok() ||
-            _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts()-1)) {
+            _preparedState->idxFound < (_fieldRef.numParts()-1)) {
 
             // Creates the array element
             mutablebson::Document& doc = _preparedState->doc;
