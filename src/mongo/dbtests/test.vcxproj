@@ -584,6 +584,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="..\bson\oid.h" />
+    <ClInclude Include="..\bson\optime.h" />
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="..\base\string_data.h" />
     <ClInclude Include="..\bson\util\atomic_int.h" />
@@ -650,7 +651,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\commands\write_commands\write_commands.h" />
     <ClInclude Include="..\db\compact.h" />
     <ClInclude Include="..\db\curop-inl.h" />
-    <ClInclude Include="..\db\databaseholder.h" />
+    <ClInclude Include="..\db\database_holder.h" />
     <ClInclude Include="..\db\dur.h" />
     <ClInclude Include="..\db\durop.h" />
     <ClInclude Include="..\db\dur_commitjob.h" />
@@ -756,7 +757,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\matcher_covered.h" />
     <ClInclude Include="..\db\memconcept.h" />
     <ClInclude Include="..\db\module.h" />
-    <ClInclude Include="..\db\mongommf.h" />
     <ClInclude Include="..\db\mongomutex.h" />
     <ClInclude Include="..\db\namespace_details-inl.h" />
     <ClInclude Include="..\db\namespace_details.h" />
@@ -826,7 +826,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\repl\multicmd.h" />
     <ClInclude Include="..\db\repl\oplog.h" />
     <ClInclude Include="..\db\repl\oplogreader.h" />
-    <ClInclude Include="..\db\repl\optime.h" />
     <ClInclude Include="..\db\repl\replication_server_status.h" />
     <ClInclude Include="..\db\repl\repl_reads_ok.h" />
     <ClInclude Include="..\db\repl\repl_start.h" />
@@ -848,6 +847,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\stats\snapshots.h" />
     <ClInclude Include="..\db\stats\timer_stats.h" />
     <ClInclude Include="..\db\stats\top.h" />
+    <ClInclude Include="..\db\storage\data_file.h" />
+    <ClInclude Include="..\db\storage\durable_mapped_file.h" />
+    <ClInclude Include="..\db\storage\extent.h" />
+    <ClInclude Include="..\db\storage\extent_manager.h" />
     <ClInclude Include="..\db\storage\namespace-inl.h" />
     <ClInclude Include="..\db\storage\namespace.h" />
     <ClInclude Include="..\db\storage\namespace_index.h" />
@@ -2367,6 +2370,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\bson\oid.cpp" />
+    <ClCompile Include="..\bson\optime.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
@@ -2541,6 +2545,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\commands\write_commands\write_commands.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
     <ClCompile Include="..\db\curop.cpp" />
+    <ClCompile Include="..\db\database_holder.cpp" />
     <ClCompile Include="..\db\dbcommands_admin.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dur.cpp" />
@@ -3145,7 +3150,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\db\mongommf.cpp" />
     <ClCompile Include="..\db\namespace_details.cpp" />
     <ClCompile Include="..\db\namespace_string_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -3392,7 +3396,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\repl\master_slave.cpp" />
     <ClCompile Include="..\db\repl\oplog.cpp" />
     <ClCompile Include="..\db\repl\oplogreader.cpp" />
-    <ClCompile Include="..\db\repl\optime.cpp" />
     <ClCompile Include="..\db\repl\replication_server_status.cpp" />
     <ClCompile Include="..\db\repl\replset_web_handler.cpp" />
     <ClCompile Include="..\db\repl\repl_reads_ok.cpp" />
@@ -3440,6 +3443,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\stats\service_stats.cpp" />
     <ClCompile Include="..\db\stats\snapshots_webplugins.cpp" />
     <ClCompile Include="..\db\stats\timer_stats.cpp" />
+    <ClCompile Include="..\db\storage\data_file.cpp" />
+    <ClCompile Include="..\db\storage\durable_mapped_file.cpp" />
+    <ClCompile Include="..\db\storage\extent.cpp" />
+    <ClCompile Include="..\db\storage\extent_manager.cpp" />
     <ClCompile Include="..\db\storage\namespace.cpp" />
     <ClCompile Include="..\db\storage\namespace_index.cpp" />
     <ClCompile Include="..\db\storage\namespace_test.cpp">

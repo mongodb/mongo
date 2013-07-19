@@ -2084,6 +2084,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\bson\oid.cpp" />
+    <ClCompile Include="..\bson\optime.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
@@ -2412,6 +2413,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="commands\write_commands\write_commands.cpp" />
+    <ClCompile Include="database_holder.cpp" />
     <ClCompile Include="exec\and_hash.cpp" />
     <ClCompile Include="exec\and_sorted.cpp" />
     <ClCompile Include="exec\collection_iterator.cpp" />
@@ -3618,7 +3620,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="key.cpp" />
     <ClCompile Include="lockstat.cpp" />
     <ClCompile Include="lockstate.cpp" />
-    <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="namespace_details.cpp" />
     <ClCompile Include="ops\count.cpp" />
     <ClCompile Include="ops\delete.cpp" />
@@ -3665,7 +3666,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\master_slave.cpp" />
     <ClCompile Include="repl\oplog.cpp" />
     <ClCompile Include="repl\oplogreader.cpp" />
-    <ClCompile Include="repl\optime.cpp" />
     <ClCompile Include="repl\replication_server_status.cpp" />
     <ClCompile Include="repl\replset_web_handler.cpp" />
     <ClCompile Include="repl\repl_reads_ok.cpp" />
@@ -3705,6 +3705,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="stats\snapshots_webplugins.cpp" />
     <ClCompile Include="stats\timer_stats.cpp" />
+    <ClCompile Include="storage\data_file.cpp" />
+    <ClCompile Include="storage\durable_mapped_file.cpp" />
+    <ClCompile Include="storage\extent.cpp" />
+    <ClCompile Include="storage\extent_manager.cpp" />
     <ClCompile Include="storage\namespace.cpp" />
     <ClCompile Include="storage\namespace_index.cpp" />
     <ClCompile Include="storage\namespace_test.cpp">
@@ -4157,6 +4161,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="..\bson\optime.h" />
     <ClInclude Include="..\bson\util\bson_extract.h" />
     <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\client\constants.h" />
@@ -4245,6 +4250,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="commands\write_commands\batch.h" />
     <ClInclude Include="commands\write_commands\batch_executor.h" />
     <ClInclude Include="commands\write_commands\write_commands.h" />
+    <ClInclude Include="database_holder.h" />
     <ClInclude Include="exec\and_common-inl.h" />
     <ClInclude Include="exec\and_hash.h" />
     <ClInclude Include="exec\and_sorted.h" />
@@ -4578,7 +4584,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="repl\master_slave.h" />
     <ClInclude Include="repl\oplog.h" />
     <ClInclude Include="repl\oplogreader.h" />
-    <ClInclude Include="repl\optime.h" />
     <ClInclude Include="repl\replication_server_status.h" />
     <ClInclude Include="repl\repl_reads_ok.h" />
     <ClInclude Include="repl\repl_start.h" />
@@ -4594,6 +4599,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="sort_phase_one.h" />
     <ClInclude Include="stats\fine_clock.h" />
     <ClInclude Include="stats\timer_stats.h" />
+    <ClInclude Include="storage\data_file.h" />
+    <ClInclude Include="storage\durable_mapped_file.h" />
+    <ClInclude Include="storage\extent.h" />
+    <ClInclude Include="storage\extent_manager.h" />
     <ClInclude Include="storage\namespace-inl.h" />
     <ClInclude Include="storage\namespace.h" />
     <ClInclude Include="storage\namespace_index.h" />
@@ -4766,7 +4775,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\trace.h" />
     <ClInclude Include="pipeline\pipeline.h" />
     <ClInclude Include="pipeline\pipeline_d.h" />
-    <ClInclude Include="databaseholder.h" />
     <ClInclude Include="durop.h" />
     <ClInclude Include="dur_commitjob.h" />
     <ClInclude Include="dur_journal.h" />
@@ -4779,7 +4787,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="instance.h" />
     <ClInclude Include="interrupt_status.h" />
     <ClInclude Include="interrupt_status_mongod.h" />
-    <ClInclude Include="mongommf.h" />
     <ClInclude Include="ops\count.h" />
     <ClInclude Include="ops\delete.h" />
     <ClInclude Include="ops\update.h" />

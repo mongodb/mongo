@@ -1130,6 +1130,9 @@
     <ClCompile Include="..\bson\mutable\mutable_bson_test_utils.cpp">
       <Filter>bson\mutable</Filter>
     </ClCompile>
+    <ClCompile Include="..\bson\optime.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\v8\src\apinatives.js">
@@ -2616,6 +2619,9 @@
     </ClInclude>
     <ClInclude Include="..\bson\mutable\mutable_bson_test_utils.h">
       <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\optime.h">
+      <Filter>bson</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

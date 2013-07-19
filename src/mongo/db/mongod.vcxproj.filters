@@ -632,9 +632,6 @@
     <ClCompile Include="module.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
-    <ClCompile Include="mongommf.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="namespace_details.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -1745,9 +1742,6 @@
     <ClCompile Include="repl\oplogreader.cpp">
       <Filter>db\repl</Filter>
     </ClCompile>
-    <ClCompile Include="repl\optime.cpp">
-      <Filter>db\repl</Filter>
-    </ClCompile>
     <ClCompile Include="repl\repl_reads_ok.cpp">
       <Filter>db\repl</Filter>
     </ClCompile>
@@ -2414,6 +2408,24 @@
     <ClCompile Include="exec\collection_scan.cpp">
       <Filter>db\exec</Filter>
     </ClCompile>
+    <ClCompile Include="database_holder.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\data_file.cpp">
+      <Filter>db\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\durable_mapped_file.cpp">
+      <Filter>db\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\extent.cpp">
+      <Filter>db\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="storage\extent_manager.cpp">
+      <Filter>db\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\optime.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -2786,9 +2798,6 @@
     <ClInclude Include="database.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
-    <ClInclude Include="databaseholder.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
     <ClInclude Include="db.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
@@ -2850,9 +2859,6 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="matcher.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="mongommf.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="namespace_details-inl.h">
@@ -4352,9 +4358,6 @@
     <ClInclude Include="repl\oplogreader.h">
       <Filter>db\repl</Filter>
     </ClInclude>
-    <ClInclude Include="repl\optime.h">
-      <Filter>db\repl</Filter>
-    </ClInclude>
     <ClInclude Include="repl\repl_reads_ok.h">
       <Filter>db\repl</Filter>
     </ClInclude>
@@ -4853,6 +4856,24 @@
     </ClInclude>
     <ClInclude Include="exec\collection_scan_common.h">
       <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="database_holder.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\data_file.h">
+      <Filter>db\storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\durable_mapped_file.h">
+      <Filter>db\storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\extent.h">
+      <Filter>db\storage</Filter>
+    </ClInclude>
+    <ClInclude Include="storage\extent_manager.h">
+      <Filter>db\storage</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\optime.h">
+      <Filter>bson</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
