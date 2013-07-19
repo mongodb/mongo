@@ -1011,9 +1011,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Open the connection. */
 	WT_ERR(__wt_connection_open(conn, cfg));
 
-	/* Open the default session. */
-	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
-	conn->default_session = session;
+	/*
+	 * Reset the local session as the real one was allocated in
+	 * __wt_connection_open.
+	 */
+	session = conn->default_session;
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
