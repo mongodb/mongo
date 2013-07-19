@@ -29,6 +29,7 @@
 
 #include "mongo/platform/backtrace.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/log.h"
 #include "mongo/util/text.h"
 
 using namespace std;
@@ -39,19 +40,25 @@ namespace mongo {
     
         int maxBackTraceFrames = 25;
 
-        bool isNameAConstructorOrDesctructor( string name ) {
+        enum IsCons {
+            YES,
+            NO,
+            EXEMPT
+        };
+
+        IsCons isNameAConstructorOrDestructor( string name ) {
             //cout << "XX : " << name << endl;
             
             size_t x = name.rfind( '(' );
             if ( name[name.size()-1] != ')' || x == string::npos )
-                return false;
+                return NO;
             
             name = name.substr( 0 , x );
             
             vector<string> pieces = StringSplitter::split( name , "::" );
             
             if ( pieces.size() < 2 )
-                return false;
+                return NO;
             
             string method = pieces[pieces.size()-1];
             string clazz = pieces[pieces.size()-2];
@@ -60,25 +67,25 @@ namespace mongo {
                 method = method.substr(1);
             
             if ( name.find( "Geo" ) != string::npos ) 
-                return false;
+                return EXEMPT;
             
             if ( name.find( "Tests" ) != string::npos )
-                return false;
+                return EXEMPT;
             
             if ( name.find( "ScopedDistributedLock" ) != string::npos )
-                return false;
+                return EXEMPT;
 
             if ( name.find( "PooledScope" ) != string::npos ) {
                 // SERVER-8090
-                return false;
+                return EXEMPT;
             }
 
             if ( name.find( "Matcher2" ) != string::npos ) {
                 // SERVER-9778
-                return false;
+                return EXEMPT;
             }
 
-            return method == clazz;
+            return method == clazz ? YES : NO;
         }
         
         class Cache {
@@ -86,22 +93,22 @@ namespace mongo {
             
             Cache() : _mutex( "ObjectLifyCycleCache" ){}
             
-            bool inCache( void* name , bool& val ) const {
+            bool inCache( void* name , IsCons& val ) const {
                 SimpleMutex::scoped_lock lk( _mutex );
-                map<void*,bool>::const_iterator it = _map.find( name );
+                map<void*,IsCons>::const_iterator it = _map.find( name );
                 if ( it == _map.end() )
                     return false;
                 val = it->second;
                 return true;
             }
             
-            void set( void* name , bool val ) {
+            void set( void* name , IsCons val ) {
                 SimpleMutex::scoped_lock lk( _mutex );
                 _map[name] = val;
             }
             
         private:
-            map<void*,bool> _map;
+            map<void*,IsCons> _map;
             mutable SimpleMutex _mutex;
         };
         
@@ -117,11 +124,13 @@ namespace mongo {
         for ( int i = 0; i < size; i++ ) {
             
             {
-                bool temp = false;
-                if ( cache.inCache( b[i] , temp ) ) {
-                    if ( temp )
-                        return true;
-                    continue;
+                IsCons isCons = NO;
+                if ( cache.inCache( b[i] , isCons ) ) {
+                    if (isCons == NO)
+                        continue;
+
+                    if (strings) ::free(strings);
+                    return isCons == YES;
                 }
             }
 
@@ -144,23 +153,27 @@ namespace mongo {
                 continue;
             
             string myNiceCopy = nice;
-            
-            if ( isNameAConstructorOrDesctructor( nice ) ) {
-                if ( printOffending ) 
-                    std::cout << "found a constructor in the call tree: " << nice << "\n" << symbol << std::endl;
-                ::free( strings );
-                ::free( nice );
-                cache.set( b[i] , true );
-                return true;
-            }
-
             ::free( nice );
 
-            cache.set( b[i] , false );
+            IsCons isCons = isNameAConstructorOrDestructor(myNiceCopy);
+            cache.set(b[i], isCons);
 
+            if (isCons == EXEMPT) {
+                ::free( strings );
+                return false;
+            }
+
+            if (isCons == YES) {
+                if ( printOffending )
+                    log() << "found a constructor in the call tree: " << myNiceCopy << "\n"
+                          << symbol << std::endl;
+
+                ::free( strings );
+                return true;
+            }
         }
-        ::free( strings );
 
+        ::free( strings );
         return false;
     }
 
