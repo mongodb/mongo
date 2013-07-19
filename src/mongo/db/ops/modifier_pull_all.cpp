@@ -144,7 +144,7 @@ namespace mongo {
 
             // No children, nothing to do -- not an error state
             if (!_preparedState->pathFoundElement.hasChildren()) {
-                execInfo->inPlace = execInfo->noOp = true;
+                execInfo->noOp = true;
             } else {
                 mutablebson::Element elem = _preparedState->pathFoundElement.leftChild();
                 while (elem.ok()) {
@@ -159,13 +159,12 @@ namespace mongo {
 
                 // Nothing to remove so it is a noOp.
                 if (_preparedState->elementsToRemove.empty())
-                    execInfo->inPlace = execInfo->noOp = true;
+                    execInfo->noOp = true;
             }
 
         } else {
             // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
             execInfo->noOp = true;
-            execInfo->inPlace = true;
 
 
             //okay if path not found

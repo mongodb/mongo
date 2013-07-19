@@ -135,7 +135,6 @@ namespace mongo {
             _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
             // If no target element exists, then there is nothing to do here.
             _preparedState->noOp = execInfo->noOp = true;
-            execInfo->inPlace = true;
             return Status::OK();
         }
 
@@ -148,7 +147,6 @@ namespace mongo {
         // If the array is empty, there is nothing to pull, so this is a noop.
         if (!_preparedState->elemFound.hasChildren()) {
             _preparedState->noOp = execInfo->noOp = true;
-            execInfo->inPlace = true;
             return Status::OK();
         }
 
@@ -165,7 +163,6 @@ namespace mongo {
         // If we didn't find any elements to add, then this is a no-op, and therefore in place.
         if (_preparedState->elementsToRemove.empty()) {
             _preparedState->noOp = execInfo->noOp = true;
-            execInfo->inPlace = true;
         }
 
         return Status::OK();

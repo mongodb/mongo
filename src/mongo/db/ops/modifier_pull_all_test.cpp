@@ -99,9 +99,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : ['a', {r:1, b:2}] }"), doc);
     }
 
@@ -112,9 +112,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : [1, 'a', {r:1, b:2}] }"), doc);
     }
 
@@ -125,9 +125,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : [{r:1, b:2}] }"), doc);
     }
 
@@ -138,9 +138,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
@@ -156,9 +156,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
@@ -174,9 +174,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
 
         Document logDoc;
@@ -192,7 +192,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -207,7 +206,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());

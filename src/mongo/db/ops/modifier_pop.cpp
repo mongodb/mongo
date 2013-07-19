@@ -128,7 +128,7 @@ namespace mongo {
 
             // No children, nothing to do -- not an error state
             if (!_preparedState->pathFoundElement.hasChildren()) {
-                execInfo->noOp = execInfo->inPlace = true;
+                execInfo->noOp = true;
             } else {
                 _preparedState->elementToRemove = _fromTop ?
                                 _preparedState->pathFoundElement.leftChild() :
@@ -136,7 +136,7 @@ namespace mongo {
             }
         } else {
             // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
-            execInfo->noOp = execInfo->inPlace = true;
+            execInfo->noOp = true;
             _preparedState->pathFoundElement = root.getDocument().end();
 
             //okay if path not found

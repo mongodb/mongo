@@ -50,7 +50,7 @@ namespace mongo {
 
         /**
          * Registers the that 'root' is in the document that we want to fully replace.
-         * prepare() returns OK and always fills 'execInfo' with false for inPlace and true for
+         * prepare() returns OK and always fills 'execInfo' with true for
          * noOp.
          */
         virtual Status prepare(mutablebson::Element root,

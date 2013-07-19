@@ -32,7 +32,6 @@ namespace mongo {
             , idxFound(0)
             , elemFound(doc.end())
             , boundDollar("")
-            , inPlace(false)
             , noOp(false) {
         }
 
@@ -47,9 +46,6 @@ namespace mongo {
 
         // Value to bind to a $-positional field, if one is provided.
         std::string boundDollar;
-
-        // Could this mod be applied in place?
-        bool inPlace;
 
         // This $set is a no-op?
         bool noOp;
@@ -167,14 +163,6 @@ namespace mongo {
             return Status::OK();
         }
 
-        // We may allow this $set to be in place if the value being set and the existing one
-        // have the same size.
-        if (_val.isNumber() &&
-            (_preparedState->elemFound != root.getDocument().end()) &&
-            (_val.type() == _preparedState->elemFound.getType())) {
-            execInfo->inPlace = _preparedState->inPlace = true;
-        }
-
         // If the value being $set is the same as the one already in the doc, than this is a
         // noOp.
         if (_preparedState->elemFound.ok() &&
@@ -195,8 +183,6 @@ namespace mongo {
             _preparedState->idxFound == (_fieldRef.numParts()-1)) {
             return _preparedState->elemFound.setValueBSONElement(_val);
         }
-
-        dassert(!_preparedState->inPlace);
 
         //
         // Complete document path logic

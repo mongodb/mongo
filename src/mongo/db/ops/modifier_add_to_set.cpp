@@ -262,10 +262,9 @@ namespace mongo {
             eachIter = eachIter.rightSibling();
         }
 
-        // If we didn't find any elements to add, then this is a no-op, and therefore in place.
+        // If we didn't find any elements to add, then this is a no-op.
         if (_preparedState->elementsToAdd.empty()) {
             _preparedState->noOp = execInfo->noOp = true;
-            execInfo->inPlace = true;
         }
 
         return Status::OK();

@@ -31,7 +31,6 @@ namespace mongo {
             , idxFound(0)
             , elemFound(doc.end())
             , boundDollar("")
-            , inPlace(false)
             , noOp(false) {
         }
 
@@ -46,9 +45,6 @@ namespace mongo {
 
         // Value to bind to a $-positional field, if one is provided.
         std::string boundDollar;
-
-        // Could this mod be applied in place?
-        bool inPlace;
 
         // This $set is a no-op?
         bool noOp;
@@ -120,7 +116,6 @@ namespace mongo {
         if (!status.isOK() ||
             _preparedState->idxFound != (_fieldRef.numParts() -1)) {
             execInfo->noOp = _preparedState->noOp = true;
-            execInfo->inPlace = _preparedState->noOp = true;
             execInfo->fieldRef[0] = &_fieldRef;
 
             return Status::OK();
@@ -137,11 +132,9 @@ namespace mongo {
         // field boundaries must change.
         //
         // TODO:
-        // execInfo->inPlace = true;
         // mutablebson::Element curr = _preparedState->elemFound;
         // while (curr.ok()) {
         //     if (curr.rightSibling().ok()) {
-        //         execInfo->inPlace = false;
         //     }
         //     curr = curr.parent();
         // }

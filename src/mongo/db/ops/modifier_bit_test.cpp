@@ -123,7 +123,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
 
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
     }
 
@@ -134,7 +133,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
 
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_TRUE(execInfo.noOp);
 
         Document logDoc;
@@ -174,10 +172,10 @@ namespace {
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 0 }"), doc);
 
         Document logDoc;
@@ -192,10 +190,10 @@ namespace {
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_FALSE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
 
         Document logDoc;
@@ -210,10 +208,10 @@ namespace {
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 4 }"), doc);
 
         Document logDoc;
@@ -228,10 +226,10 @@ namespace {
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
-        ASSERT_TRUE(execInfo.inPlace);
         ASSERT_FALSE(execInfo.noOp);
 
         ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 7 }"), doc);
 
         Document logDoc;
@@ -247,7 +245,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -262,7 +259,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -277,7 +273,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -292,7 +287,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -307,7 +301,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
     }
 
     TEST(InPlace, IntToLongOrIsNotInPlace) {
@@ -317,7 +310,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
     }
 
     TEST(NoOp, IntAnd) {
@@ -327,7 +319,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -342,7 +333,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -357,7 +347,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -373,7 +362,6 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
@@ -389,9 +377,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
@@ -403,9 +391,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
@@ -417,9 +405,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 0 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
@@ -431,9 +419,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 3 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
@@ -448,9 +436,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_TRUE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(BSON("a" << static_cast<int>(1)), doc);
         ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
 
@@ -467,9 +455,9 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-        ASSERT_FALSE(execInfo.inPlace);
 
         ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(BSON("a" << static_cast<int>(0) << "b" << static_cast<int>(1)), doc);
         ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
 
