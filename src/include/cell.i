@@ -243,7 +243,11 @@ __wt_cell_pack_data_match(
 	if (WT_CELL_SHORT_TYPE(a[0]) == WT_CELL_VALUE_SHORT) {
 		av = a[0] >> 2;
 		++a;
-		++b;
+
+		/*
+		 * We know the lengths match, it's encoded in the cell byte
+		 * which already compared equal.
+		 */
 	} else {
 		rle = a[0] & WT_CELL_64V ? 1 : 0;	/* Value */
 		++a;
