@@ -62,7 +62,7 @@
 #define	WT_CELL_KEY_SHORT	0x01		/* Short key */
 #define	WT_CELL_KEY_SHORT_PFX	0x02		/* Short key with prefix byte */
 #define	WT_CELL_VALUE_SHORT	0x03		/* Short data */
-#define	WT_CELL_SHORT_TYPE(v)	((v) & 0x03)
+#define	WT_CELL_SHORT_TYPE(v)	((v) & 0x03U)
 
 #define	WT_CELL_64V		0x04		/* Associated value */
 
