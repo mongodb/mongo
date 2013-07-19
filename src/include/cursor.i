@@ -209,7 +209,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
-		__wt_cell_unpack((WT_CELL *)ikey, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack((WT_CELL *)ikey, unpack);
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
 			kb->data = cbt->tmp.data = unpack->data;
 			kb->size = cbt->tmp.size = unpack->size;
@@ -259,7 +259,7 @@ slow:			WT_RET(__wt_row_leaf_key_copy(
 		vb->data = "";
 		vb->size = 0;
 	} else {
-		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(cell, unpack);
 		WT_RET(__wt_cell_unpack_ref(
 		    session, WT_PAGE_ROW_LEAF, unpack, vb));
 	}

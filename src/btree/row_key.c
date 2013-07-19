@@ -173,7 +173,7 @@ __wt_row_leaf_key_copy(
 
 			__wt_cell_unpack(
 			    WT_PAGE_REF_OFFSET(page, ikey->cell_offset),
-			    WT_PAGE_ROW_LEAF, unpack);
+			    unpack);
 
 			/*
 			 * If we wanted a different key and this key is an
@@ -206,7 +206,7 @@ __wt_row_leaf_key_copy(
 		}
 
 		/* Unpack the key's cell. */
-		__wt_cell_unpack(key, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(key, unpack);
 
 		/* 2: the test for an on-page reference to an overflow key. */
 		if (unpack->type == WT_CELL_KEY_OVFL) {
@@ -373,7 +373,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * the length of the cell should be the byte immediately after the page
 	 * disk image.
 	 */
-	__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, &unpack);
+	__wt_cell_unpack(cell, &unpack);
 	cell = (WT_CELL *)((uint8_t *)cell + __wt_cell_total_len(&unpack));
 	if (__wt_off_page(page, cell))
 		return (NULL);

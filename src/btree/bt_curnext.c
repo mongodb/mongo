@@ -217,7 +217,7 @@ new_page:	/* Find the matching WT_COL slot. */
 		if (cbt->cip_saved != cip) {
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
 				continue;
-			__wt_cell_unpack(cell, WT_PAGE_COL_VAR, &unpack);
+			__wt_cell_unpack(cell, &unpack);
 			if (unpack.type == WT_CELL_DEL)
 				continue;
 
