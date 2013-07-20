@@ -267,8 +267,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		static int complain = 1;
 		if (complain) {
 			__wt_errx(session,
-			    "unexpected key item memory allocation in row "
-			    "search");
+			    "unexpected key item memory allocation in search");
 			complain = 0;
 		}
 		__wt_buf_free(session, item);
