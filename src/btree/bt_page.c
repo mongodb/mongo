@@ -585,11 +585,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	/*
-	 * If the keys are Huffman encoded, instantiate some set of them.  It
-	 * doesn't matter if we are randomly searching the page or scanning a
-	 * cursor through it, there isn't a fast-path to getting keys off the
-	 * page.
+	 * We do not currently instantiate keys on leaf pages when the page is
+	 * loaded, they're instantiated on demand.
 	 */
-	return (
-	    btree->huffman_key == NULL ? 0 : __wt_row_leaf_keys(session, page));
+	return (0);
 }
