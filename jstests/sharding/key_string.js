@@ -24,7 +24,7 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> joe) , [joe -> sara]
 
-s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : seconday.getMongo().name, _waitForDelete : true, _waitForDelete : true } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "eliot" } , to : seconday.getMongo().name, _waitForDelete : true, _waitForDelete : true } );
 
 s.printChunks();
 
@@ -42,7 +42,7 @@ assert.eq( "sara,mark,joe,eliot,bob,allan" ,  db.foo.find().sort( { name : -1 } 
 // make sure we can't foce a split on an extreme key
 // [allan->joe) 
 assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { name : "allan" } } ) } );
-assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { name : "joe" } } ) } );
+assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { name : "eliot" } } ) } );
 
 s.stop();
 
