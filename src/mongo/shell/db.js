@@ -593,7 +593,10 @@ DB.prototype.printCollectionStats = function(scale) {
 DB.prototype.setProfilingLevel = function(level,slowms) {
     
     if (level < 0 || level > 2) { 
-        throw Error("input level " + level + " is out of range [0..2]");
+        var errorText = "input level " + level + " is out of range [0..2]";
+        var errorObject = new Error(errorText);
+        errorObject['dbSetProfilingException'] = errorText;
+        throw errorObject;
     }
 
     var cmd = { profile: level };
