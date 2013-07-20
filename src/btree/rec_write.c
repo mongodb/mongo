@@ -3385,8 +3385,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl) {
 					if (ikey == NULL)
-						WT_ERR(__wt_row_leaf_key_copy(
-						    session, page, rip, NULL));
+						WT_ERR(__wt_row_leaf_key_work(
+						    session,
+						    page, rip, NULL, 1));
 					WT_ERR(__wt_rec_track_onpage_addr(
 					    session, page,
 					    unpack->data, unpack->size));

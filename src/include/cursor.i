@@ -187,10 +187,10 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 * Key copied.
 	 *
 	 * Get a reference to the key, ideally without doing a copy: we could
-	 * just call __wt_row_leaf_key, but if a cursor is running through the
-	 * tree, we actually have more information here than that function has,
-	 * we may have the prefix-compressed key that comes immediately before
-	 * the one we want.
+	 * call __wt_row_leaf_key, but if a cursor is running through the tree,
+	 * we actually have more information here than that function has, we
+	 * may have the prefix-compressed key that comes immediately before the
+	 * one we want.
 	 *
 	 * If the key has been instantiated (the key points off-page), we don't
 	 * have any work to do.
@@ -203,10 +203,10 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		kb->size = ikey->size;
 	} else {
 		/*
-		 * If the key is simple and on-page and not prefix-compressed
+		 * If the key is simple and on-page and not prefix-compressed,
 		 * or we have the previous expanded key in the cursor buffer,
-		 * simply reference or build it.  Else, call __wt_row_leaf_key
-		 * to do it the hard way.
+		 * reference or build it.  Else, call __wt_row_leaf_key_work to
+		 * do it the hard way.
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
@@ -241,9 +241,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			kb->data = cbt->tmp.data;
 			kb->size = cbt->tmp.size;
 			cbt->rip_saved = rip;
-		} else
-slow:			WT_RET(__wt_row_leaf_key_copy(
-			    session, cbt->page, rip, kb));
+		} else {
+			/*
+			 * __wt_row_leaf_key_work instead of __wt_row_leaf_key:
+			 * we do __wt_row_leaf_key's fast-path checks inline.
+			 */
+slow:			WT_RET(__wt_row_leaf_key_work(
+			    session, cbt->page, rip, kb, 0));
+		}
 	}
 
 	/*
