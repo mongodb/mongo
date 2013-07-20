@@ -121,8 +121,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	srch_key = &cbt->iface.key;
 
 	btree = S2BT(session);
-	item = &_item;
 	rip = NULL;
+
+	item = &_item;
+	WT_CLEAR_ITEM(item);
 
 	/* Search the internal pages of the tree. */
 	cmp = -1;
