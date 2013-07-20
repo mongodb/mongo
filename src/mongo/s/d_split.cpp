@@ -290,14 +290,13 @@ namespace mongo {
                 // 'force'-ing a split is equivalent to having maxChunkSize be the size of the current chunk, i.e., the
                 // logic below will split that chunk in half
                 long long maxChunkSize = 0;
-                bool forceMedianSplit = false;
+                bool force = false;
                 {
                     BSONElement maxSizeElem = jsobj[ "maxChunkSize" ];
                     BSONElement forceElem = jsobj[ "force" ];
                     
                     if ( forceElem.trueValue() ) {
-                        forceMedianSplit = true;
-                        // This chunk size is effectively ignored if force is true
+                        force = true;
                         maxChunkSize = dataSize;
                         
                     }
@@ -367,8 +366,7 @@ namespace mongo {
                     while ( cc->ok() ) {
                         currCount++;
                         
-                        if ( currCount > keyCount && !forceMedianSplit ) {
-
+                        if ( currCount > keyCount ) {
                             BSONObj currKey = bc->prettyKey( c->currKey() ).extractFields(keyPattern);
                             // Do not use this split key if it is the same used in the previous split point.
                             if ( currKey.woCompare( splitKeys.back() ) == 0 ) {
@@ -406,15 +404,10 @@ namespace mongo {
                         }
                     }
                     
-                    if ( ! forceMedianSplit )
+                    if ( splitKeys.size() > 1 || ! force )
                         break;
                     
-                    //
-                    // If we're forcing a split at the halfway point, then the first pass was just
-                    // to count the keys, and we still need a second pass.
-                    //
-
-                    forceMedianSplit = false;
+                    force = false;
                     keyCount = currCount / 2;
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
