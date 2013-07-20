@@ -64,8 +64,7 @@ namespace mongo {
         : ModifierInterface ()
         , _fieldRef()
         , _posDollar(0)
-        , _val()
-        , _op(NULL) {
+        , _ops() {
     }
 
     ModifierBit::~ModifierBit() {
@@ -92,31 +91,36 @@ namespace mongo {
             return Status(ErrorCodes::BadValue,
                           "Value following $bit must be an Object");
 
-        BSONElement payloadElt = modExpr.embeddedObject().firstElement();
-        dassert(!payloadElt.eoo());
+        BSONObjIterator opsIterator(modExpr.embeddedObject());
 
-        const StringData payloadFieldName = payloadElt.fieldName();
+        while (opsIterator.more()) {
+            BSONElement curOp = opsIterator.next();
 
-        // TODO: If this becomes three items, we should consider how to provide "subclasses" of
-        // this mod. This would probably involve makign 'init' a static factory.
-        const bool isAnd = (payloadFieldName == "and");
-        const bool isOr = (payloadFieldName == "or");
+            const StringData payloadFieldName = curOp.fieldName();
 
-        if (!(isAnd || isOr))
-            return Status(
-                ErrorCodes::BadValue,
-                "Only 'and' and 'or' are supported $bit sub-operators");
+            const bool isAnd = (payloadFieldName == "and");
+            const bool isOr = (payloadFieldName == "or");
 
-        if ((payloadElt.type() != mongo::NumberInt) &&
-            (payloadElt.type() != mongo::NumberLong))
-            return Status(
-                ErrorCodes::BadValue,
-                "Argument to $bit operation must be a NumberInt or NumberLong");
+            if (!(isAnd || isOr))
+                return Status(
+                    ErrorCodes::BadValue,
+                    "Only 'and' and 'or' are supported $bit sub-operators");
 
-        _val = SafeNum(payloadElt);
-        _op = isAnd ?
-            &SafeNum::bitAnd :
-            &SafeNum::bitOr;
+            if ((curOp.type() != mongo::NumberInt) &&
+                (curOp.type() != mongo::NumberLong))
+                return Status(
+                    ErrorCodes::BadValue,
+                    "Argument to $bit operation must be a NumberInt or NumberLong");
+
+            const OpEntry entry = {
+                SafeNum(curOp),
+                isAnd ? &SafeNum::bitAnd : &SafeNum::bitOr
+            };
+
+            _ops.push_back(entry);
+        }
+
+        dassert(!_ops.empty());
 
         return Status::OK();
     }
@@ -167,7 +171,7 @@ namespace mongo {
             _preparedState->idxFound < static_cast<int32_t>(_fieldRef.numParts() - 1)) {
             // If no target element exists, the value we will write is the result of applying
             // the operation to a zero-initialized integer element.
-            _preparedState->newValue = (SafeNum(static_cast<int>(0)).*_op)(_val);
+            _preparedState->newValue = apply(SafeNum(static_cast<int>(0)));
             return Status::OK();
         }
 
@@ -179,7 +183,7 @@ namespace mongo {
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
 
         // Apply the op over the existing value and the mod value, and capture the result.
-        _preparedState->newValue = (currentValue.*_op)(_val);
+        _preparedState->newValue = apply(currentValue);
 
         if (!_preparedState->newValue.isValid())
             return Status(ErrorCodes::BadValue,
@@ -254,6 +258,14 @@ namespace mongo {
 
         return logBuilder->addToSets(logElement);
 
+    }
+
+    SafeNum ModifierBit::apply(SafeNum value) const {
+        OpEntries::const_iterator where = _ops.begin();
+        const OpEntries::const_iterator end = _ops.end();
+        for (; where != end; ++where)
+            value = (value.*(where->op))(where->val);
+        return value;
     }
 
 } // namespace mongo

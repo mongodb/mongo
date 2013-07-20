@@ -18,6 +18,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/mutable/element.h"
@@ -59,17 +60,25 @@ namespace mongo {
         virtual Status log(LogBuilder* logBuilder) const;
 
     private:
+        SafeNum apply(SafeNum value) const;
+
         // Access to each component of fieldName that's the target of this mod.
         FieldRef _fieldRef;
 
         // 0 or index for $-positional in _fieldRef.
         size_t _posDollar;
 
-        // Value to be $bit'ed onto target
-        SafeNum _val;
-
         // The operator on SafeNum that we will invoke.
-        SafeNum (SafeNum::* _op)(const SafeNum&) const;
+        typedef SafeNum (SafeNum::* SafeNumOp)(const SafeNum&) const;
+
+        struct OpEntry {
+            SafeNum val;
+            SafeNumOp op;
+        };
+
+        typedef std::vector<OpEntry> OpEntries;
+
+        OpEntries _ops;
 
         struct PreparedState;
         scoped_ptr<PreparedState> _preparedState;
