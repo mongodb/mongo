@@ -259,6 +259,22 @@ descend:	WT_ASSERT(session, ref != NULL);
 	}
 
 	/*
+	 * We don't expect the search item to have any allocated memory (it's a
+	 * performance problem if it does).  Trust, but verify, and complain if
+	 * there's a problem.
+	 */
+	if (item->mem != NULL) {
+		static int complain = 1;
+		if (complain) {
+			__wt_errx(session,
+			    "unexpected key item memory allocation in row "
+			    "search");
+			complain = 0;
+		}
+		__wt_buf_free(session, item);
+	}
+
+	/*
 	 * The best case is finding an exact match in the page's WT_ROW slot
 	 * array, which is probable for any read-mostly workload.  In that
 	 * case, we're not doing any kind of insert, all we can do is update
