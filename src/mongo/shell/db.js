@@ -309,24 +309,23 @@ DB.prototype.auth = function() {
    use this function if you wish to specify special options on creation.
 
    If the collection already exists, no action occurs.
-   
-   <p>Options:</p>
-   <ul>
-   	<li>
-     size: desired initial extent size for the collection.  Must be <= 1000000000.
-           for fixed size (capped) collections, this size is the total/max size of the 
-           collection.
+
+    <p>Options:</p>
+    <ul>
+    <li>
+        size: desired initial extent size for the collection.  Must be <= 1000000000.
+              for fixed size (capped) collections, this size is the total/max size of the 
+              collection.
     </li>
     <li>
-     capped: if true, this is a capped collection (where old data rolls out).
+        capped: if true, this is a capped collection (where old data rolls out).
     </li>
     <li> max: maximum number of objects if capped (optional).</li>
     </ul>
 
-   <p>Example: </p>
-   
-   <code>db.createCollection("movies", { size: 10 * 1024 * 1024, capped:true } );</code>
- 
+    <p>Example:</p>
+    <code>db.createCollection("movies", { size: 10 * 1024 * 1024, capped:true } );</code>
+
  * @param {String} name Name of new collection to create 
  * @param {Object} options Object with options for call.  Options are listed above.
  * @return SOMETHING_FIXME
@@ -374,7 +373,7 @@ DB.prototype.getProfilingStatus  = function() {
   Erase the entire database.  (!)
 
  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
-*/
+ */
 DB.prototype.dropDatabase = function() {
     if ( arguments.length )
         throw "dropDatabase doesn't take arguments";
@@ -391,7 +390,7 @@ DB.prototype.dropDatabase = function() {
  */
 DB.prototype.shutdownServer = function(opts) {
     if( "admin" != this._name ){
-	return "shutdown command only works with the admin database; try 'use admin'";
+        return "shutdown command only works with the admin database; try 'use admin'";
     }
 
     cmd = {"shutdown" : 1};
@@ -402,9 +401,9 @@ DB.prototype.shutdownServer = function(opts) {
 
     try {
         var res = this.runCommand(cmd);
-	if( res )
-	    throw "shutdownServer failed: " + res.errmsg;
-	throw "shutdownServer failed";
+        if( res )
+            throw "shutdownServer failed: " + res.errmsg;
+        throw "shutdownServer failed";
     }
     catch ( e ){
         assert( tojson( e ).indexOf( "error doing query: failed" ) >= 0 , "unexpected error: " + tojson( e ) );
@@ -426,7 +425,7 @@ DB.prototype.shutdownServer = function(opts) {
                    (self) as you cannot clone to yourself.
  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
  * See also: db.copyDatabase()
-*/
+ */
 DB.prototype.cloneDatabase = function(from) { 
     assert( isString(from) && from.length );
     return this._dbCommand( { clone: from } );
@@ -626,13 +625,13 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
 DB.prototype.eval = function(jsfunction) {
     var cmd = { $eval : jsfunction };
     if ( arguments.length > 1 ) {
-	cmd.args = argumentsToArray( arguments ).slice(1);
+        cmd.args = argumentsToArray( arguments ).slice(1);
     }
     
     var res = this._dbCommand( cmd );
     
     if (!res.ok)
-    	throw tojson( res );
+        throw tojson( res );
     
     return res.retval;
 }
@@ -652,16 +651,16 @@ DB.prototype.dbEval = DB.prototype.eval;
  *  </p>
  * 
  *  <code>
-     db.group(
-       {
-         ns: "coll",
-         key: { a:true, b:true },
-	 // keyf: ...,
-	 cond: { active:1 },
-	 reduce: function(obj,prev) { prev.csum += obj.c; } ,
-	 initial: { csum: 0 }
-	 });
-	 </code>
+    db.group(
+        {
+            ns: "coll",
+            key: { a:true, b:true },
+            // keyf: ...,
+            cond: { active:1 },
+            reduce: function(obj,prev) { prev.csum += obj.c; },
+            initial: { csum: 0 }
+        });
+    </code>
  *
  * 
  * <p>
@@ -675,41 +674,41 @@ DB.prototype.dbEval = DB.prototype.eval;
      cond may be null if you want to run against all rows in the collection
      keyf is a function which takes an object and returns the desired key.  set either key or keyf (not both).
  * </p>
-*/
+ */
 DB.prototype.groupeval = function(parmsObj) {
-	
+
     var groupFunction = function() {
-	var parms = args[0];
-    	var c = db[parms.ns].find(parms.cond||{});
-    	var map = new Map();
+        var parms = args[0];
+        var c = db[parms.ns].find(parms.cond||{});
+        var map = new Map();
         var pks = parms.key ? Object.keySet( parms.key ) : null;
         var pkl = pks ? pks.length : 0;
         var key = {};
-        
-    	while( c.hasNext() ) {
-	    var obj = c.next();
-	    if ( pks ) {
-	    	for( var i=0; i<pkl; i++ ){
-                    var k = pks[i];
-		    key[k] = obj[k];
-                }
-	    }
-	    else {
-	    	key = parms.$keyf(obj);
-	    }
 
-	    var aggObj = map.get(key);
-	    if( aggObj == null ) {
-		var newObj = Object.extend({}, key); // clone
-	    	aggObj = Object.extend(newObj, parms.initial)
-                map.put( key , aggObj );
-	    }
-	    parms.$reduce(obj, aggObj);
-	}
-        
-	return map.values();
+        while( c.hasNext() ) {
+            var obj = c.next();
+            if ( pks ) {
+                for ( var i=0; i<pkl; i++ ) {
+                    var k = pks[i];
+                    key[k] = obj[k];
+                }
+            }
+            else {
+                key = parms.$keyf(obj);
+            }
+
+            var aggObj = map.get(key);
+            if( aggObj == null ) {
+                var newObj = Object.extend({}, key); // clone
+                aggObj = Object.extend(newObj, parms.initial);
+                map.put( key, aggObj );
+            }
+            parms.$reduce(obj, aggObj);
+        }
+
+        return map.values();
     }
-    
+
     return this.eval(groupFunction, this._groupFixParms( parmsObj ));
 }
 
@@ -725,17 +724,17 @@ DB.prototype.group = DB.prototype.groupcmd;
 
 DB.prototype._groupFixParms = function( parmsObj ){
     var parms = Object.extend({}, parmsObj);
-    
+
     if( parms.reduce ) {
-	parms.$reduce = parms.reduce; // must have $ to pass to db
-	delete parms.reduce;
+        parms.$reduce = parms.reduce; // must have $ to pass to db
+        delete parms.reduce;
     }
-    
+
     if( parms.keyf ) {
-	parms.$keyf = parms.keyf;
-	delete parms.keyf;
+        parms.$keyf = parms.keyf;
+        delete parms.keyf;
     }
-    
+
     return parms;
 }
 
@@ -865,10 +864,10 @@ DB.prototype.getReplicationInfo = function() {
         result.errmsg = "neither master/slave nor replica set replication detected";
         return result;
     }
-    
+
     var ol_entry = db.system.namespaces.findOne({name:"local."+oplog});
     if( ol_entry && ol_entry.options ) {
-	result.logSizeMB = ol_entry.options.size / ( 1024 * 1024 );
+        result.logSizeMB = ol_entry.options.size / ( 1024 * 1024 );
     } else {
         result.errmsg  = "local."+oplog+", or its options, not found in system.namespaces collection";
         return result;
@@ -877,33 +876,31 @@ DB.prototype.getReplicationInfo = function() {
 
     result.usedMB = ol.stats().size / ( 1024 * 1024 );
     result.usedMB = Math.ceil( result.usedMB * 100 ) / 100;
-    
+
     var firstc = ol.find().sort({$natural:1}).limit(1);
     var lastc = ol.find().sort({$natural:-1}).limit(1);
     if( !firstc.hasNext() || !lastc.hasNext() ) { 
-	result.errmsg = "objects not found in local.oplog.$main -- is this a new and empty db instance?";
-	result.oplogMainRowCount = ol.count();
-	return result;
+        result.errmsg = "objects not found in local.oplog.$main -- is this a new and empty db instance?";
+        result.oplogMainRowCount = ol.count();
+        return result;
     }
 
     var first = firstc.next();
     var last = lastc.next();
-    {
-	var tfirst = first.ts;
-	var tlast = last.ts;
-        
-	if( tfirst && tlast ) { 
-	    tfirst = DB.tsToSeconds( tfirst ); 
-	    tlast = DB.tsToSeconds( tlast );
-	    result.timeDiff = tlast - tfirst;
-	    result.timeDiffHours = Math.round(result.timeDiff / 36)/100;
-	    result.tFirst = (new Date(tfirst*1000)).toString();
-	    result.tLast  = (new Date(tlast*1000)).toString();
-	    result.now = Date();
-	}
-	else { 
-	    result.errmsg = "ts element not found in oplog objects";
-	}
+    var tfirst = first.ts;
+    var tlast = last.ts;
+
+    if( tfirst && tlast ) { 
+        tfirst = DB.tsToSeconds( tfirst ); 
+        tlast = DB.tsToSeconds( tlast );
+        result.timeDiff = tlast - tfirst;
+        result.timeDiffHours = Math.round(result.timeDiff / 36)/100;
+        result.tFirst = (new Date(tfirst*1000)).toString();
+        result.tLast  = (new Date(tlast*1000)).toString();
+        result.now = Date();
+    }
+    else { 
+        result.errmsg = "ts element not found in oplog objects";
     }
 
     return result;
@@ -917,8 +914,8 @@ DB.prototype.printReplicationInfo = function() {
             this.printSlaveReplicationInfo();
             return;
         }
-	print(tojson(result));
-	return;
+        print(tojson(result));
+        return;
     }
     print("configured oplog size:   " + result.logSizeMB + "MB");
     print("log length start to end: " + result.timeDiff + "secs (" + result.timeDiffHours + "hrs)");
