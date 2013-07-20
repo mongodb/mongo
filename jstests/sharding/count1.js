@@ -54,7 +54,9 @@ assert.eq( 6 , db.foo.find().count() , "basic count" );
 // part 2
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -> allan) , * [allan -> ..)
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> joe) , [joe -> sara]
+s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> eliot) , [eliot -> sara]
+
+// MINKEY->allan,bob->eliot,joe,mark->sara,MAXKEY
 
 s.printChunks()
 
@@ -63,7 +65,7 @@ assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "basic count after split sorted " );
 
 // part 4
-s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : secondary.getMongo().name , _waitForDelete : true } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "eliot" } , to : secondary.getMongo().name , _waitForDelete : true } );
 
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , secondary.foo.find().toArray().length , "secondary count" );
