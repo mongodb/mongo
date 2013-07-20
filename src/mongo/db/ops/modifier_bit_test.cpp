@@ -490,6 +490,11 @@ namespace {
             ASSERT_OK(mod.apply());
 
         ASSERT_EQUALS(result, doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("x" << (3 & 2))), logDoc);
     }
 
     TEST(DbUpdateTests, Bit1_2) {
@@ -503,6 +508,11 @@ namespace {
             ASSERT_OK(mod.apply());
 
         ASSERT_EQUALS(result, doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("x" << (1 | 4))), logDoc);
     }
 
     TEST(DbUpdateTests, Bit1_3) {
@@ -524,6 +534,24 @@ namespace {
         ASSERT_EQUALS(result, doc);
     }
 
+    TEST(DbUpdateTests, Bit1_3_Combined) {
+        Document doc(BSON("_id" << 1 << "x" << 3));
+        Mod mod(BSON("$bit" << BSON("x" << BSON("and" << 2 << "or" << 8))));
+        const BSONObj result(BSON("_id" << 1 << "x" << ((3 & 2) | 8)));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        if (!execInfo.noOp)
+            ASSERT_OK(mod.apply());
+
+        ASSERT_EQUALS(result, doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("x" << ((3 & 2) | 8))), logDoc);
+    }
+
     TEST(DbUpdateTests, Bit1_4) {
         Document doc(BSON("_id" << 1 << "x" << 3));
         Mod mod1(BSON("$bit" << BSON("x" << BSON("or" << 2))));
@@ -541,6 +569,24 @@ namespace {
             ASSERT_OK(mod2.apply());
 
         ASSERT_EQUALS(result, doc);
+    }
+
+    TEST(DbUpdateTests, Bit1_4_Combined) {
+        Document doc(BSON("_id" << 1 << "x" << 3));
+        Mod mod(BSON("$bit" << BSON("x" << BSON("or" << 2 << "and" << 8))));
+        const BSONObj result(BSON("_id" << 1 << "x" << ((3 | 2) & 8)));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        if (!execInfo.noOp)
+            ASSERT_OK(mod.apply());
+
+        ASSERT_EQUALS(result, doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("x" << ((3 | 2) & 8))), logDoc);
     }
 
 } // namespace
