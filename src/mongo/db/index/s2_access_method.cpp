@@ -20,16 +20,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/s2_index_cursor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-
-    // Thanks, Wikipedia.
-    const double S2IndexingParams::kRadiusOfEarthInMeters = (6378.1 * 1000);
-
     static int configValueWithDefault(IndexDescriptor *desc, const string& name, int def) {
         BSONElement e = desc->getInfoElement(name);
         if (e.isNumber()) { return e.numberInt(); }
@@ -44,7 +41,7 @@ namespace mongo {
         // This is advisory.
         _params.maxCellsInCovering = 50;
         // Near distances are specified in meters...sometimes.
-        _params.radius = S2IndexingParams::kRadiusOfEarthInMeters;
+        _params.radius = kRadiusOfEarthInMeters;
         // These are not advisory.
         _params.finestIndexedLevel = configValueWithDefault(descriptor, "finestIndexedLevel",
             S2::kAvgEdge.GetClosestLevel(500.0 / _params.radius));

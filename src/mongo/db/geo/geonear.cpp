@@ -38,9 +38,13 @@
 namespace mongo {
 
     GeoNearArguments::GeoNearArguments(const BSONObj &cmdObj) {
-        const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
-        if (cmdObj[limitName].isNumber()) {
-            numWanted = cmdObj[limitName].numberInt();
+        // If 'num' is passed, use it and ignore 'limit'. Otherwise use 'limit'.
+        const char* limitName = !cmdObj["num"].eoo() ? "num" : "limit";
+        BSONElement eNumWanted = cmdObj[limitName];
+        if (!eNumWanted.eoo()) {
+            uassert(17032, str::stream() << limitName << " must be a number",
+                    eNumWanted.isNumber());
+            numWanted = eNumWanted.numberInt();
         } else {
             numWanted = 100;
         }
@@ -61,8 +65,11 @@ namespace mongo {
             query = cmdObj["query"].embeddedObject();
         }
 
-        if (cmdObj["distanceMultiplier"].isNumber()) {
-            distanceMultiplier = cmdObj["distanceMultiplier"].number();
+        BSONElement eDistanceMultiplier = cmdObj["distanceMultiplier"];
+        if (!eDistanceMultiplier.eoo()) {
+            uassert(17033, "distanceMultiplier must be a number", eDistanceMultiplier.isNumber());
+            distanceMultiplier = eDistanceMultiplier.number();
+            uassert(17034, "distanceMultiplier must be non-negative", distanceMultiplier >= 0);
         } else {
             distanceMultiplier = 1.0;
         }

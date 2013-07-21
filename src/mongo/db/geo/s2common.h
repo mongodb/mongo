@@ -16,6 +16,7 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geoconstants.h"
 #include "third_party/s2/s2.h"
 #include "third_party/s2/s2regioncoverer.h"
 #include "third_party/s2/s2cell.h"
@@ -28,8 +29,6 @@
 namespace mongo {
 
     struct S2IndexingParams {
-        static const double kRadiusOfEarthInMeters;
-
         // Since we take the cartesian product when we generate keys for an insert,
         // we need a cap.
         size_t maxKeysPerInsert;

@@ -36,7 +36,7 @@ assert.throws(function() { return db.runCommand({geoNear : t.getName(), near: so
 
 // Do some basic near searches.
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin, $maxDistance: 2000} } }).limit(10)
-resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10, maxDistance: 2000, spherical: true})
+resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10, maxDistance: Math.PI, spherical: true})
 assert.eq(res.itcount(), resNear.results.length, 10)
 
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10)
