@@ -106,8 +106,8 @@ namespace {
     }
 
     TEST( BSONElementHasher, HashMaxKey ) {
-        BSONObj o = BSON( "check" << MaxKey );
-        ASSERT_EQUALS( hashIt( o ), -4056225848687264522LL );
+        BSONObj o = BSON( "check" << MAXKEY );
+        ASSERT_EQUALS( hashIt( o ), 5504842513779440750LL );
     }
 
     TEST( BSONElementHasher, HashUndefined ) {
@@ -151,7 +151,7 @@ namespace {
         o = BSON( "check" << BSONBinData( bytes, 6, bdtCustom ) );
         ASSERT_EQUALS( hashIt( o ), 5736670452907618262LL );
 
-        uint8_t uuidBytes[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+        uint8_t uuidBytes[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
         o = BSON( "check" << BSONBinData( uuidBytes, 16, newUUID ) );
         ASSERT_EQUALS( hashIt( o ), 6084661258071355978LL );
     }
