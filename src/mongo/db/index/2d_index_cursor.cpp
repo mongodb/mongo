@@ -1782,8 +1782,13 @@ namespace mongo {
                 cmdObj["minDistance"].eoo());
 
         double maxDistance = numeric_limits<double>::max();
-        if (cmdObj["maxDistance"].isNumber())
+        BSONElement eMaxDistance = cmdObj["maxDistance"];
+
+        if (!eMaxDistance.eoo()) {
+            uassert(17085, "maxDistance must be a number", eMaxDistance.isNumber());
             maxDistance = cmdObj["maxDistance"].number();
+            uassert(17086, "maxDistance must be non-negative", maxDistance >= 0);
+        }
 
         GeoDistType type = parsedArgs.isSpherical ? GEO_SPHERE : GEO_PLANE;
 
@@ -1875,7 +1880,6 @@ namespace mongo {
                 case BSONObj::opNEAR: {
                     BSONObj n = e.embeddedObject();
                     e = n.firstElement();
-
                     twod_internal::GeoDistType type;
                     if (strcmp(e.fieldName(), "$nearSphere") == 0) {
                         type = twod_internal::GEO_SPHERE;
@@ -1901,8 +1905,14 @@ namespace mongo {
                     }
                     {
                         BSONElement e = n["$maxDistance"];
-                        if (e.isNumber())
+                        if (!e.eoo()) {
+                            uassert(17087, "$maxDistance must be a number", e.isNumber());
                             maxDistance = e.numberDouble();
+                            uassert(16989, "$maxDistance must be non-negative", maxDistance >= 0);
+                            if (twod_internal::GEO_SPHERE == type) {
+                                uassert(17088, "$maxDistance too large", maxDistance <= M_PI);
+                            }
+                        }
                     }
 
                     bool uniqueDocs = false;
