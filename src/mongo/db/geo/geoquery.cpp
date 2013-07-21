@@ -15,6 +15,7 @@
 */
 
 #include "mongo/db/geo/geoquery.h"
+#include "mongo/db/geo/geoconstants.h"
 
 namespace mongo {
 
@@ -29,37 +30,35 @@ namespace mongo {
         fromRadians = (FLAT == centroid.crs);
 
         if (!obj["minDistance"].eoo()) {
-            if (obj["minDistance"].isNumber()) {
-                double distArg = obj["minDistance"].number();
-                uassert(16901, "minDistance must be non-negative", distArg >= 0.0);
-                if (fromRadians) {
-                    minDistance = distArg * radius;
-                } else {
-                    minDistance = distArg;
-                }
+            uassert(17035, "minDistance must be a number", obj["minDistance"].isNumber());
+            double distArg = obj["minDistance"].number();
+            uassert(16901, "minDistance must be non-negative", distArg >= 0.0);
+            if (fromRadians) {
+                minDistance = distArg * radius;
             } else {
-                return false;
+                minDistance = distArg;
             }
         }
 
         if (!obj["maxDistance"].eoo()) {
-            if (obj["maxDistance"].isNumber()) {
-                double distArg = obj["maxDistance"].number();
-                uassert(16902, "maxDistance must be non-negative", distArg >= 0.0);
-                if (fromRadians) {
-                    maxDistance = distArg * radius;
-                } else {
-                    maxDistance = distArg;
-                }
+            uassert(17036, "maxDistance must be a number", obj["maxDistance"].isNumber());
+            double distArg = obj["maxDistance"].number();
+            log() << "parseFromGeoNear got maxDistance " << distArg;
+            uassert(16902, "maxDistance must be non-negative", distArg >= 0.0);
+            if (fromRadians) {
+                maxDistance = distArg * radius;
             } else {
-                return false;
+                maxDistance = distArg;
             }
+
+            uassert(17037, "maxDistance too large", maxDistance <= M_PI * radius);
         }
         return true;
     }
 
     bool NearQuery::parseFrom(const BSONObj &obj) {
         bool hasGeometry = false;
+        bool hasMaxDistance = false;
 
         // First, try legacy near, e.g.:
         // t.find({ loc : { $nearSphere: [0,0], $minDistance: 1, $maxDistance: 3 }})
@@ -95,8 +94,15 @@ namespace mongo {
                 uassert(16895, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
                 uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
+                hasMaxDistance = true;
             }
         }
+
+        double maxValidDistance = fromRadians ? M_PI : kRadiusOfEarthInMeters * M_PI;
+
+        uassert(17038, "$minDistance too large", minDistance < maxValidDistance);
+        uassert(17039, "$maxDistance too large",
+                !hasMaxDistance || maxDistance <= maxValidDistance);
 
         if (hasGeometry) { return true; }
 
@@ -125,10 +131,12 @@ namespace mongo {
                 uassert(16897, "$minDistance must be a number", e.isNumber());
                 minDistance = e.Number();
                 uassert(16898, "$minDistance must be non-negative", minDistance >= 0.0);
+                uassert(17084, "$minDistance too large", minDistance < maxValidDistance);
             } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
                 uassert(16899, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
                 uassert(16900, "$maxDistance must be non-negative", maxDistance >= 0.0);
+                uassert(16992, "$maxDistance too large", maxDistance <= maxValidDistance);
             }
         }
         return hasGeometry;
