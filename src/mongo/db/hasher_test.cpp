@@ -115,6 +115,11 @@ namespace {
         ASSERT_EQUALS( hashIt( o ), 40158834000849533LL );
     }
 
+    TEST( BSONElementHasher, HashNull ) {
+        BSONObj o = BSON( "check" << BSONNULL );
+        ASSERT_EQUALS( hashIt( o ), 2338878944348059895LL );
+    }
+
     TEST( BSONElementHasher, HashString ) {
         BSONObj o = BSON( "check" << "abc" );
         ASSERT_EQUALS( hashIt( o ), 8478485326885698097LL );
