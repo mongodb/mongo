@@ -121,7 +121,7 @@ namespace mongo {
                 return false;
             }
             else {
-                log(1) << "upstream updater is supported";
+                LOG(1) << "upstream updater is supported";
                 _supportsUpdater = true;
             }
         }
