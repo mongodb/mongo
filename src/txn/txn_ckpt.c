@@ -11,43 +11,51 @@ static int __checkpoint_sync(WT_SESSION_IMPL *, const char *[]);
 static int __checkpoint_write_leaves(WT_SESSION_IMPL *, const char *[]);
 
 /*
- * __checkpoint_lsm_check --
- *	Check for an attempt to name a checkpoint that includes an LSM tree.
+ * __checkpoint_name_check --
+ *	Check for an attempt to name a checkpoint that includes anything
+ * other than a file object.
  */
 static int
-__checkpoint_lsm_check(WT_SESSION_IMPL *session, const char *uri)
+__checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int cmp, fail;
+	const char *fail;
 
 	cursor = NULL;
-	fail = 0;
+	fail = NULL;
 
 	/*
-	 * This function exists as a place to hang this comment: LSM trees don't
-	 * support named checkpoints.   If a target list for the checkpoint is
-	 * provided, this function is called with each target list entry; check
-	 * the entry to make sure it's not an LSM tree.  If no target list is
-	 * provided, confirm the metadata file contains no LSM trees.
+	 * This function exists as a place for this comment: named checkpoints
+	 * are only supported on file objects, and not on LSM trees or Memrata
+	 * devices.  If a target list is configured for the checkpoint, this
+	 * function is called with each target list entry; check the entry to
+	 * make sure it's backed by a file.  If no target list is configured,
+	 * confirm the metadata file contains no non-file objects.
 	 */
 	if (uri == NULL) {
 		WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
-		cursor->set_key(cursor, "lsm:");
-		if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
-			ret = cursor->next(cursor);
-		if (ret == 0) {
+		while ((ret = cursor->next(cursor)) == 0) {
 			WT_ERR(cursor->get_key(cursor, &uri));
-			if (WT_PREFIX_MATCH(uri, "lsm:"))
-				fail = 1;
-		} else
-			WT_ERR_NOTFOUND_OK(ret);
-	} else if (WT_PREFIX_MATCH(uri, "lsm:"))
-			fail = 1;
+			if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+			    !WT_PREFIX_MATCH(uri, "file:") &&
+			    !WT_PREFIX_MATCH(uri, "index:") &&
+			    !WT_PREFIX_MATCH(uri, "table:")) {
+				fail = uri;
+				break;
+			}
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+	} else
+		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+		    !WT_PREFIX_MATCH(uri, "file:") &&
+		    !WT_PREFIX_MATCH(uri, "index:") &&
+		    !WT_PREFIX_MATCH(uri, "table:"))
+			fail = uri;
 
-	if (fail)
+	if (fail != NULL)
 		WT_ERR_MSG(session, EINVAL,
-		    "LSM trees do not support named checkpoints");
+		    "%s object does not support named checkpoints", fail);
 
 err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
@@ -89,9 +97,9 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 			    "quoting",
 			    (int)cval.len, (char *)cval.str);
 
-		/* LSM trees don't support named checkpoints. */
+		/* Some objects don't support named checkpoints. */
 		if (named)
-			WT_ERR(__checkpoint_lsm_check(session, k.str));
+			WT_ERR(__checkpoint_name_check(session, k.str));
 
 		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
 		if ((ret = __wt_schema_worker(
@@ -101,9 +109,9 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	WT_ERR_NOTFOUND_OK(ret);
 
 	if (!target_list) {
-		/* LSM trees don't support named checkpoints. */
+		/* Some objects don't support named checkpoints. */
 		if (named)
-			WT_ERR(__checkpoint_lsm_check(session, NULL));
+			WT_ERR(__checkpoint_name_check(session, NULL));
 
 		/*
 		 * If the checkpoint is named or we're dropping checkpoints, we
