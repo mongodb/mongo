@@ -1102,6 +1102,11 @@ namespace {
         ASSERT_EQUALS(mongo::fromjson(outJson), outObj);
     }
 
+    TEST(Document, CantRenameRootElement) {
+        mmb::Document doc;
+        ASSERT_NOT_OK(doc.root().rename("foo"));
+    }
+
     TEST(Document, RemoveElementWithOpaqueRightSibling) {
         // Regression test for a bug where removing an element with an opaque right sibling
         // would access an invalidated rep. Note that this test may or may not fail depending
@@ -2550,6 +2555,38 @@ namespace {
         ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_OK(doc.root().popBack());
         ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    }
+
+    TEST(DocumentInPlace, ReserveDamageEventsIsAlwaysSafeToCall) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        doc.reserveDamageEvents(10);
+        doc.disableInPlaceUpdates();
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        doc.reserveDamageEvents(10);
+    }
+
+    TEST(DocumentInPlace, GettingInPlaceUpdatesWhenDisabledClearsArguments) {
+        mongo::BSONObj obj = mongo::fromjson("{ foo : 'foo' }");
+        mmb::Document doc(obj, mmb::Document::kInPlaceDisabled);
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+
+        mmb::DamageVector damages;
+        const mmb::DamageEvent event = { 0 };
+        damages.push_back(event);
+        const char* source = "foo";
+        ASSERT_FALSE(doc.getInPlaceUpdates(&damages, &source));
+        ASSERT_TRUE(damages.empty());
+        ASSERT_EQUALS(static_cast<const char*>(NULL), source);
+
+        damages.push_back(event);
+        source = "bar";
+        size_t size = 1;
+        ASSERT_FALSE(doc.getInPlaceUpdates(&damages, &source, &size));
+        ASSERT_TRUE(damages.empty());
+        ASSERT_EQUALS(static_cast<const char*>(NULL), source);
+        ASSERT_EQUALS(0U, size);
     }
 
     // This isn't a great test since we aren't testing all possible combinations of compatible
