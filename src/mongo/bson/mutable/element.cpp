@@ -150,22 +150,27 @@ namespace mutablebson {
     }
 
     std::string Element::toString() const {
-        if (hasValue()) {
+        if (hasValue())
             return getValue().toString();
-        } else if (isType(mongo::Object)) {
+
+        const BSONType type = getType();
+
+        // The only types that sometimes don't have a value are Object and Array nodes.
+        dassert((type == mongo::Object) || (type == mongo::Array));
+
+        if (type == mongo::Object) {
             BSONObjBuilder builder;
             writeTo(&builder);
             BSONObj obj = builder.obj();
             return obj.firstElement().toString();
-        } else if (isType(mongo::Array)) {
+        } else {
+            // It must be an array.
             BSONObjBuilder builder;
             BSONArrayBuilder arrayBuilder(builder.subarrayStart(getFieldName()));
             writeArrayTo(&arrayBuilder);
             arrayBuilder.done();
             BSONObj obj = builder.obj();
             return obj.firstElement().toString();
-        } else {
-            return "corrupted element";
         }
     }
 
