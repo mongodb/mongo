@@ -5,7 +5,7 @@ for (var i = 0; i < 1000; i++) {
     p.insert({ x: 1, y: "aaaaaaaaaaaaaaa" });
 }
 
-assert(p.stats().paddingFactor == 1);
+assert.eq(p.stats().paddingFactor, 1, "Padding Not 1");
 
 for (var i = 0; i < 1000; i++) {
     var x = p.findOne();
@@ -16,7 +16,7 @@ for (var i = 0; i < 1000; i++) {
         print(p.stats().paddingFactor);
 }
 
-assert(p.stats().paddingFactor > 1.9);
+assert.gt(p.stats().paddingFactor, 1.9, "Padding not > 1.9");
 
 // this should make it go down
 for (var i = 0; i < 1000; i++) {
@@ -24,7 +24,7 @@ for (var i = 0; i < 1000; i++) {
     if (i % 100 == 0)
         print(p.stats().paddingFactor);
 }
-assert(p.stats().paddingFactor < 1.7);
+assert.lt(p.stats().paddingFactor, 1.7, "Padding not < 1.7");
 
 for (var i = 0; i < 1000; i++) {
     if (i % 2 == 0) {
@@ -39,7 +39,8 @@ for (var i = 0; i < 1000; i++) {
         print(p.stats().paddingFactor);
 }
 var ps = p.stats().paddingFactor;
-assert(ps > 1.7 && ps < 1.9);
+assert.gt(ps, 1.7, "Padding not greater than 1.7");
+assert.lt(ps, 1.9, "Padding not less than 1.9");
 
 // 50/50 inserts and nonfitting updates
 for (var i = 0; i < 1000; i++) {
@@ -55,7 +56,7 @@ for (var i = 0; i < 1000; i++) {
         print(p.stats().paddingFactor);
 }
 
-// should have trended somewhat higher over the above. 
+// should have trended somewhat higher over the above.
 // speed of increase would be higher with more indexes.
-assert(p.stats().paddingFactor > ps + 0.02 , "now: " + p.stats().paddingFactor + " ps: " + ps );
+assert.gt(p.stats().paddingFactor, ps + 0.02 , "padding factor not greater than value (+.02)");
 p.drop();
