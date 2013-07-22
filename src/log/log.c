@@ -418,7 +418,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	WT_RET(__wt_scr_alloc(session, log->allocsize, &buf));
 	memset(buf->mem, 0, log->allocsize);
 	logrec = (WT_LOG_RECORD *)buf->mem;
-	desc = (WT_LOG_DESC *)&logrec->record;
+	desc = (WT_LOG_DESC *)logrec->record;
 	desc->log_magic = WT_LOG_MAGIC;
 	desc->majorv = WT_LOG_MAJOR_VERSION;
 	desc->minorv = WT_LOG_MINOR_VERSION;
@@ -469,8 +469,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
-	uint64_t rdup_len, reclen;
-	uint32_t cksum;
+	uint32_t cksum, rdup_len, reclen;
 
 	WT_UNUSED(flags);
 	/*
@@ -500,8 +499,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * that we rarely will have to read more.  Most log records
 	 * will be fairly small.
 	 */
-	reclen = *(uint64_t *)record->mem;
-	if (reclen > WT_MAX_LOG_OFFSET || reclen == 0) {
+	reclen = *(uint32_t *)record->mem;
+	if (reclen == 0) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}
@@ -542,9 +541,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, rd_lsn, start_lsn;
-	uint64_t rdup_len, reclen;
 	off_t log_size;
-	uint32_t cksum;
+	uint32_t cksum, rdup_len, reclen;
 	int done;
 
 	conn = S2C(session);
@@ -617,7 +615,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * that we rarely will have to read more.  Most log records
 		 * will be fairly small.
 		 */
-		reclen = *(uint64_t *)buf.mem;
+		reclen = *(uint32_t *)buf.mem;
 		/*
 		 * Log files are pre-allocated.  We never expect a zero length
 		 * unless we've reached the end of the log.  The log can be
@@ -633,10 +631,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			if (LF_ISSET(WT_LOGSCAN_RECOVER))
 				WT_ERR(__log_truncate(session, &rd_lsn));
 			break;
-		}
-		if (reclen > WT_MAX_LOG_OFFSET) {
-			ret = WT_NOTFOUND;
-			goto err;
 		}
 		rdup_len = __wt_rduppo2(reclen, log->allocsize);
 		if (reclen > log->allocsize) {
@@ -689,12 +683,15 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOGSLOT tmp;
 	WT_LSN tmp_lsn;
 	WT_MYSLOT myslot;
-	uint64_t rdup_len;
+	uint32_t rdup_len;
 	int locked;
 
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
+	INIT_LSN(&tmp_lsn);
+	myslot.slot = &tmp;
+	myslot.offset = 0;
 	/*
 	 * Assume the WT_ITEM the user passed is a WT_LOG_RECORD, which has
 	 * a header at the beginning for us to fill in.
@@ -730,8 +727,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * the consolidation arrays, so send in the tmp slot.
 		 */
 		locked = 1;
-		myslot.slot = &tmp;
-		myslot.offset = 0;
 		if (LF_ISSET(WT_LOG_SYNC))
 			FLD_SET(tmp.slot_flags, SLOT_SYNC);
 		WT_ERR(__log_acquire(session, rdup_len, &tmp));
@@ -807,10 +802,10 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	WT_RET(__wt_buf_initsize(session, buf, len));
 
 	logrec = (WT_LOG_RECORD *)buf->mem;
-	(void)vsnprintf((char *)&logrec->record, len, fmt, ap);
+	(void)vsnprintf((char *)logrec->record, len, fmt, ap);
 
 	WT_VERBOSE_RET(session, log,
-	    "log_printf: %s", (char *)&logrec->record);
+	    "log_printf: %s", (char *)logrec->record);
 	WT_RET(__wt_log_write(session, buf, NULL, 0));
 	__wt_scr_free(&buf);
 	return (0);

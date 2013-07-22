@@ -442,9 +442,18 @@ __wt_row_leaf_key(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 
+	/*
+	 * A subset of __wt_row_leaf_key_work, that is, calling that function
+	 * should give you the same results as calling this one; this function
+	 * exists to inline fast-path checks for already instantiated keys and
+	 * on-page uncompressed keys.
+	 */
 retry:	ikey = WT_ROW_KEY_COPY(rip);
 
-	/* If the key has been instantiated for any reason, off-page, use it. */
+	/*
+	 * Key copied.
+	 * If the key has been instantiated for any reason, off-page, use it.
+	 */
 	if (__wt_off_page(page, ikey)) {
 		key->data = WT_IKEY_DATA(ikey);
 		key->size = ikey->size;
@@ -452,27 +461,35 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 	}
 
 	/* If the key isn't compressed or an overflow, take it from the page. */
-	if (btree->huffman_key == NULL)
-		__wt_cell_unpack((WT_CELL *)ikey, WT_PAGE_ROW_LEAF, &unpack);
-	if (btree->huffman_key == NULL &&
-	    unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
-		key->data = unpack.data;
-		key->size = unpack.size;
-		return (0);
+	if (btree->huffman_key == NULL) {
+		__wt_cell_unpack((WT_CELL *)ikey, &unpack);
+		if (unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
+			key->data = unpack.data;
+			key->size = unpack.size;
+			return (0);
+		}
 	}
 
 	/*
-	 * We're going to have to build the key (it's never been instantiated,
-	 * and it's compressed or an overflow key).
+	 * We have to build the key (it's never been instantiated, and it's some
+	 * kind of compressed or overflow key).
 	 *
-	 * If we're instantiating the key on the page, do that, and then look
-	 * it up again, else, we have a copy and we can return.
+	 * Magic: the row-store leaf page search loop calls us to instantiate
+	 * keys, and it's not prepared to handle memory being allocated in the
+	 * key's WT_ITEM.  Call __wt_row_leaf_key_work to instantiate the key
+	 * with no buffer reference, then retry to pick up a simple reference
+	 * to the instantiated key.
 	 */
-	WT_RET(__wt_row_leaf_key_copy(
-	    session, page, rip, instantiate ? NULL : key));
-	if (instantiate)
+	if (instantiate) {
+		WT_RET(__wt_row_leaf_key_work(session, page, rip, NULL, 1));
 		goto retry;
-	return (0);
+	}
+
+	/*
+	 * If instantiate wasn't set, our caller is prepared to handle memory
+	 * allocations in the key's WT_ITEM, pass the key.
+	 */
+	return (__wt_row_leaf_key_work(session, page, rip, key, 0));
 }
 
 /*
@@ -499,7 +516,7 @@ __wt_get_addr(
 		*addrp = ((WT_ADDR *)(ref->addr))->addr;
 		*sizep = ((WT_ADDR *)(ref->addr))->size;
 	} else {
-		__wt_cell_unpack(ref->addr, page->type, unpack);
+		__wt_cell_unpack(ref->addr, unpack);
 		*addrp = unpack->data;
 		*sizep = unpack->size;
 	}

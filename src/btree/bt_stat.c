@@ -117,7 +117,7 @@ __stat_page_col_var(
 			WT_STAT_INCR(session, stats, btree_column_deleted);
 		} else {
 			orig_deleted = 0;
-			__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
+			__wt_cell_unpack(cell, unpack);
 			WT_STAT_INCRV(session,
 			    stats, btree_entries, __wt_cell_rle(unpack));
 		}

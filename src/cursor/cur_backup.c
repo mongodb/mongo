@@ -184,6 +184,7 @@ __backup_start(
 	cb->next = 0;
 	cb->list = NULL;
 	logfiles = NULL;
+	logcount = 0;
 
 	/*
 	 * Single thread hot backups: we're holding the schema lock, so we

@@ -121,8 +121,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	srch_key = &cbt->iface.key;
 
 	btree = S2BT(session);
-	item = &_item;
 	rip = NULL;
+
+	item = &_item;
+	WT_CLEAR_ITEM(item);
 
 	/* Search the internal pages of the tree. */
 	cmp = -1;
@@ -254,6 +256,21 @@ descend:	WT_ASSERT(session, ref != NULL);
 		skiphigh = match;
 		base = indx + 1;
 		--limit;
+	}
+
+	/*
+	 * We don't expect the search item to have any allocated memory (it's a
+	 * performance problem if it does).  Trust, but verify, and complain if
+	 * there's a problem.
+	 */
+	if (item->mem != NULL) {
+		static int complain = 1;
+		if (complain) {
+			__wt_errx(session,
+			    "unexpected key item memory allocation in search");
+			complain = 0;
+		}
+		__wt_buf_free(session, item);
 	}
 
 	/*

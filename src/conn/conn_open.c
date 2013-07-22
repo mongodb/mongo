@@ -36,6 +36,14 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_WRITE_BARRIER();
 
+	/*
+	 * Open the default session.  We open this before starting service
+	 * threads because those may allocate and use session resources that
+	 * need to get cleaned up on close.
+	 */
+	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	conn->default_session = session;
+
 	/* Start worker threads. */
 	F_SET(conn, WT_CONN_EVICTION_RUN | WT_CONN_SERVER_RUN);
 
@@ -59,7 +67,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_statlog_create(conn, cfg));
 
-	/* Start the optional checkpoint thread. */
+	/* Start the optional logging/archive thread. */
 	WT_RET(__wt_logmgr_create(conn, cfg));
 
 	/* Start the optional checkpoint thread. */

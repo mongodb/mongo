@@ -186,11 +186,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	/*
 	 * Key copied.
 	 *
-	 * If another thread instantiated the key, we don't have any work to do.
-	 * Figure this out using the key's value:
+	 * Get a reference to the key, ideally without doing a copy: we could
+	 * call __wt_row_leaf_key, but if a cursor is running through the tree,
+	 * we actually have more information here than that function has, we
+	 * may have the prefix-compressed key that comes immediately before the
+	 * one we want.
 	 *
-	 * If the key points off-page, the key has been instantiated, just use
-	 * it.
+	 * If the key has been instantiated (the key points off-page), we don't
+	 * have any work to do.
 	 *
 	 * If the key points on-page, we have a copy of a WT_CELL value that can
 	 * be processed, regardless of what any other thread is doing.
@@ -200,16 +203,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		kb->size = ikey->size;
 	} else {
 		/*
-		 * Get a reference to the key, ideally without doing a copy.  If
-		 * the key is simple and on-page, just reference it; if the key
-		 * is simple, on-page and prefix-compressed, and we have the
-		 * previous expanded key in the cursor buffer, build the key
-		 * here.  Else, call the underlying routines to do it the hard
-		 * way.
+		 * If the key is simple and on-page and not prefix-compressed,
+		 * or we have the previous expanded key in the cursor buffer,
+		 * reference or build it.  Else, call __wt_row_leaf_key_work to
+		 * do it the hard way.
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
-		__wt_cell_unpack((WT_CELL *)ikey, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack((WT_CELL *)ikey, unpack);
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
 			kb->data = cbt->tmp.data = unpack->data;
 			kb->size = cbt->tmp.size = unpack->size;
@@ -240,9 +241,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			kb->data = cbt->tmp.data;
 			kb->size = cbt->tmp.size;
 			cbt->rip_saved = rip;
-		} else
-slow:			WT_RET(__wt_row_leaf_key_copy(
-			    session, cbt->page, rip, kb));
+		} else {
+			/*
+			 * __wt_row_leaf_key_work instead of __wt_row_leaf_key:
+			 * we do __wt_row_leaf_key's fast-path checks inline.
+			 */
+slow:			WT_RET(__wt_row_leaf_key_work(
+			    session, cbt->page, rip, kb, 0));
+		}
 	}
 
 	/*
@@ -259,7 +265,7 @@ slow:			WT_RET(__wt_row_leaf_key_copy(
 		vb->data = "";
 		vb->size = 0;
 	} else {
-		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(cell, unpack);
 		WT_RET(__wt_cell_unpack_ref(
 		    session, WT_PAGE_ROW_LEAF, unpack, vb));
 	}

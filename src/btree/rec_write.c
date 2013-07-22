@@ -1197,7 +1197,7 @@ __rec_split_row_promote_cell(
 	 * the first cell on a page cannot refer an earlier cell on the page.
 	 */
 	cell = WT_PAGE_HEADER_BYTE(btree, dsk);
-	__wt_cell_unpack(cell, dsk->type, unpack);
+	__wt_cell_unpack(cell, unpack);
 	WT_ASSERT(session,
 	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
 
@@ -1507,7 +1507,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * Row-store pages can split at keys, but not at values,
 		 * column-store pages can split at values.
 		 */
-		__wt_cell_unpack(cell, dsk->type, unpack);
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
@@ -2281,7 +2281,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (addr == NULL && __wt_off_page(page, ref->addr))
 			addr = ref->addr;
 		if (addr == NULL) {
-			__wt_cell_unpack(ref->addr, WT_PAGE_COL_INT, unpack);
+			__wt_cell_unpack(ref->addr, unpack);
 			val->buf.data = ref->addr;
 			val->buf.size = __wt_cell_total_len(unpack);
 			val->cell_len = 0;
@@ -2614,7 +2614,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			ins = NULL;
 			orig_deleted = 1;
 		} else {
-			__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
+			__wt_cell_unpack(cell, unpack);
 			nrepeat = __wt_cell_rle(unpack);
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
 
@@ -2953,7 +2953,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			onpage_ovfl = 0;
 		} else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-			__wt_cell_unpack(cell, WT_PAGE_ROW_INT, kpack);
+			__wt_cell_unpack(cell, kpack);
 			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
 		}
 
@@ -3046,7 +3046,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				vtype = addr->leaf_no_overflow ?
 				    WT_CELL_ADDR_LNO : WT_CELL_ADDR;
 		} else {
-			__wt_cell_unpack(ref->addr, WT_PAGE_ROW_INT, vpack);
+			__wt_cell_unpack(ref->addr, vpack);
 			p = vpack->data;
 			size = vpack->size;
 			if (vtype == 0)
@@ -3193,7 +3193,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				vtype = addr->leaf_no_overflow ?
 				    WT_CELL_ADDR_LNO : WT_CELL_ADDR;
 		} else {
-			__wt_cell_unpack(ref->addr, WT_PAGE_ROW_INT, vpack);
+			__wt_cell_unpack(ref->addr, vpack);
 			p = vpack->data;
 			size = vpack->size;
 			if (vtype == 0)
@@ -3311,7 +3311,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		/* Build value cell. */
 		dictionary = 0;
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
-			__wt_cell_unpack(val_cell, WT_PAGE_ROW_LEAF, unpack);
+			__wt_cell_unpack(val_cell, unpack);
 		WT_ERR(
 		    __rec_txn_read(session, r, WT_ROW_UPDATE(page, rip), &upd));
 		if (upd == NULL) {
@@ -3382,12 +3382,12 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 * if an overflow key was never instantiated,
 				 * do it now.
 				 */
-				__wt_cell_unpack(
-				    cell, WT_PAGE_ROW_LEAF, unpack);
+				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl) {
 					if (ikey == NULL)
-						WT_ERR(__wt_row_leaf_key_copy(
-						    session, page, rip, NULL));
+						WT_ERR(__wt_row_leaf_key_work(
+						    session,
+						    page, rip, NULL, 1));
 					WT_ERR(__wt_rec_track_onpage_addr(
 					    session, page,
 					    unpack->data, unpack->size));
@@ -3426,7 +3426,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 * overflow key blocks have been freed, we have to build a new
 		 * key.  If there's no tracking entry, use the original blocks.
 		 */
-		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl &&
 		    __wt_rec_track_onpage_srch(

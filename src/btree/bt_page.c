@@ -343,7 +343,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, WT_PAGE_COL_INT, unpack);
+		__wt_cell_unpack(cell, unpack);
 		ref->addr = cell;
 		ref->key.recno = unpack->v;
 		++ref;
@@ -383,7 +383,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	indx = 0;
 	cip = page->u.col_var.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
+		__wt_cell_unpack(cell, unpack);
 		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
 
 		/*
@@ -437,7 +437,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, WT_PAGE_ROW_INT, unpack);
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 			__wt_ref_key_onpage_set(page, ref, unpack);
@@ -524,7 +524,7 @@ __inmem_row_leaf_entries(
 	 */
 	nindx = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
@@ -570,7 +570,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Walk the page, building indices. */
 	rip = page->u.row.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
@@ -585,11 +585,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	/*
-	 * If the keys are Huffman encoded, instantiate some set of them.  It
-	 * doesn't matter if we are randomly searching the page or scanning a
-	 * cursor through it, there isn't a fast-path to getting keys off the
-	 * page.
+	 * We do not currently instantiate keys on leaf pages when the page is
+	 * loaded, they're instantiated on demand.
 	 */
-	return (
-	    btree->huffman_key == NULL ? 0 : __wt_row_leaf_keys(session, page));
+	return (0);
 }

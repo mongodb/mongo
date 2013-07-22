@@ -507,7 +507,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 */
 		stop_recno = dsk->recno;
 		WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-			__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
+			__wt_cell_unpack(cell, unpack);
 			stop_recno += __wt_cell_rle(unpack);
 		}
 
@@ -616,7 +616,7 @@ __slvg_trk_leaf_ovfl(
 	 */
 	ovfl_cnt = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, dsk->type, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->ovfl)
 			++ovfl_cnt;
 	}
@@ -628,7 +628,7 @@ __slvg_trk_leaf_ovfl(
 
 	ovfl_cnt = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, dsk->type, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->ovfl) {
 			WT_RET(__wt_strndup(session, unpack->data,
 			    unpack->size, &trk->ovfl[ovfl_cnt].addr));
@@ -1252,7 +1252,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 
 	WT_COL_FOREACH(page, cip, i) {
 		cell = WT_COL_PTR(page, cip);
-		__wt_cell_unpack(cell, WT_PAGE_COL_VAR, unpack);
+		__wt_cell_unpack(cell, unpack);
 		recno += __wt_cell_rle(unpack);
 
 		if (unpack->type != WT_CELL_VALUE_OVFL)
@@ -1596,7 +1596,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
+		WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
 		WT_ERR(WT_BTREE_CMP(session, btree, key, stop, cmp));
 		if (cmp > 0) {
 			found = 1;
@@ -1756,7 +1756,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
-			WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
+			WT_ERR(
+			    __wt_row_leaf_key_work(session, page, rip, key, 0));
 
 			/*
 			 * >= is correct: see the comment above.
@@ -1779,7 +1780,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
-			WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
+			WT_ERR(
+			    __wt_row_leaf_key_work(session, page, rip, key, 0));
 
 			/*
 			 * < is correct: see the comment above.
@@ -1812,7 +1814,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * a copy from the page.
 	 */
 	rip = page->u.row.d + skip_start;
-	WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
+	WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
 	WT_ERR(__wt_row_ikey_incr(
 	    session, parent, 0, key->data, key->size, &ref->key.ikey));
 
@@ -1904,7 +1906,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 		else
 			cell = (WT_CELL *)ikey;
-		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_KEY_OVFL) {
 			WT_VERBOSE_RET(session, salvage,
 			    "%s merge discard freed overflow reference %s",
@@ -1919,7 +1921,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 
 		if ((cell = __wt_row_value(page, rip)) == NULL)
 			continue;
-		__wt_cell_unpack(cell, WT_PAGE_ROW_LEAF, unpack);
+		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_VALUE_OVFL) {
 			WT_VERBOSE_RET(session, salvage,
 			    "%s merge discard freed overflow reference %s",
