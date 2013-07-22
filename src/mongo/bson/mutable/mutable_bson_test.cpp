@@ -2778,4 +2778,101 @@ namespace {
         ASSERT_EQUALS(0, doc2.compareWith(doc1));
     }
 
+    TEST(UnorderedEqualityChecker, Identical) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+
+        const mongo::BSONObj b2 = b1.getOwned();
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
+    TEST(UnorderedEqualityChecker, DifferentValuesAreNotEqual) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+        const mongo::BSONObj b2 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 4 } }");
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
+    TEST(UnorderedEqualityChecker, DifferentTypesAreNotEqual) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+        const mongo::BSONObj b2 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : '2', z : 3 } }");
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
+    TEST(UnorderedEqualityChecker, DifferentFieldNamesAreNotEqual) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+        const mongo::BSONObj b2 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, Y : 2, z : 3 } }");
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
+    TEST(UnorderedEqualityChecker, MissingFieldsInObjectAreNotEqual) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+        const mongo::BSONObj b2 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
+    TEST(UnorderedEqualityChecker, ObjectOrderingIsNotConsidered) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+        const mongo::BSONObj b2 = mongo::fromjson(
+            "{ b : { y : 2, z : 3 , x : 1  }, a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ] }");
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
+    TEST(UnorderedEqualityChecker, ArrayOrderingIsConsidered) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+
+        const mongo::BSONObj b2 = mongo::fromjson(
+            "{ a : [ 1, { 'a' : 'b', 'x' : 'y' }, 2 ], b : { x : 1, y : 2, z : 3 } }");
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
+    TEST(UnorderedEqualityChecker, MissingItemsInArrayAreNotEqual) {
+        const mongo::BSONObj b1 = mongo::fromjson(
+            "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 3 } }");
+        const mongo::BSONObj b2 = mongo::fromjson(
+            "{ a : [ 1, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
+
+        const mmb::Document d1(b1);
+        const mmb::Document d2(b2);
+
+        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+    }
+
 } // namespace

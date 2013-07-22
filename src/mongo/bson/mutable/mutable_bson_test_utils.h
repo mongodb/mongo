@@ -54,5 +54,30 @@ namespace mutablebson {
     /** Stream out an element; useful within ASSERT calls */
     std::ostream& operator<<(std::ostream& stream, const ConstElement& elt);
 
+    /** Check that the two provided Documents are equivalent modulo field ordering in Object
+     *  Elements. Leaf values are considered equal via woCompare.
+     */
+    bool checkEqualNoOrdering(const Document& lhs, const Document& rhs);
+
+    struct UnorderedWrapper {
+        inline UnorderedWrapper(const Document& doc)
+            : doc(doc) {}
+        const Document& doc;
+    };
+
+    inline UnorderedWrapper ignoreFieldOrder(const Document& doc) {
+        return UnorderedWrapper(doc);
+    }
+
+    inline bool operator==(const UnorderedWrapper& lhs, const UnorderedWrapper& rhs) {
+        return checkEqualNoOrdering(lhs.doc, rhs.doc);
+    }
+
+    inline bool operator!=(const UnorderedWrapper& lhs, const UnorderedWrapper& rhs) {
+        return !(lhs == rhs);
+    }
+
+    std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper& ucw);
+
 } // namespace mutablebson
 } // namespace mongo
