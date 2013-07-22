@@ -566,6 +566,10 @@ namespace mongo {
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
+        /**
+         * The most up to date electable replica
+         */
+        const OpTime lastOtherElectableOpTime() const;
 
         /**
          * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is

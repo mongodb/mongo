@@ -308,10 +308,12 @@ namespace mongo {
             bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
             // only step down if there is another node synced to within 10
-            // seconds of this node
+            // seconds of this node which can potentially become primary
             if (!force) {
-                long long int lastOp = (long long int)theReplSet->lastOpTimeWritten.getSecs();
-                long long int closest = (long long int)theReplSet->lastOtherOpTime().getSecs();
+                long long int lastOp = static_cast<long long int>(
+                                        theReplSet->lastOpTimeWritten.getSecs());
+                long long int closest = static_cast<long long int>(
+                                        theReplSet->lastOtherElectableOpTime().getSecs());
 
                 long long int diff = lastOp - closest;
                 result.append("closest", closest);

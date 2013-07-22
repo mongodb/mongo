@@ -387,6 +387,24 @@ namespace mongo {
         return closest;
     }
 
+    const OpTime ReplSetImpl::lastOtherElectableOpTime() const {
+        OpTime closest(0,0);
+
+        for( Member *m = _members.head(); m; m=m->next() ) {
+            if (!m->hbinfo().up()) {
+                continue;
+            }
+
+            if (m->hbinfo().opTime > closest && m->config().potentiallyHot()) {
+                log() << m->fullName() << " is now closest at "
+                      <<  m->hbinfo().opTime << endl;
+                closest = m->hbinfo().opTime;
+            }
+        }
+
+        return closest;
+    }
+
     void ReplSetImpl::_summarizeStatus(BSONObjBuilder& b) const {
         vector<BSONObj> v;
 
