@@ -7,12 +7,16 @@ function bad( f ) {
     if (lstError)
         assert( false, "Unexpected error : " + lstError );
 
+    var docsBeforeUpdate = t.find().toArray();
     eval( f );
 
     //Ensure error
-    var lstError = db.getLastError();
-    if (!lstError) {
-        print("Existing docs")
+    var lstError = db.getLastErrorObj();
+    if (!lstError.err) {
+        print("Error:" + tojson(lstError));
+        print("Existing docs (before)")
+        printjson(docsBeforeUpdate);
+        print("Existing docs (after)")
         printjson(t.find().toArray());
         assert( false, "Expected error but didn't get one for: " + f );
     }
@@ -36,6 +40,9 @@ bad( "t.update( {}, {$rename:{'a':'b.'}} )" );
 bad( "t.update( {}, {$rename:{'a.b':'a'}} )" );
 bad( "t.update( {}, {$rename:{'a.$':'b'}} )" );
 bad( "t.update( {}, {$rename:{'a':'b.$'}} )" );
+
+// Only bad if input doc has field resulting in conflict
+t.save( {_id:1, a:1} );
 bad( "t.update( {}, {$set:{b:1},$rename:{'a':'b'}} )" );
 bad( "t.update( {}, {$rename:{'a':'b'},$set:{b:1}} )" );
 bad( "t.update( {}, {$rename:{'a':'b'},$set:{a:1}} )" );
@@ -44,6 +51,8 @@ bad( "t.update( {}, {$set:{b:1},$rename:{'a':'b.c'}} )" );
 bad( "t.update( {}, {$rename:{'a':'b'},$set:{'b.c':1}} )" );
 bad( "t.update( {}, {$rename:{'a':'b.c'},$set:{b:1}} )" );
 
+
+t.remove({});
 t.save( {a:[1],b:{c:[1]},d:[{e:1}],f:1} );
 bad( "t.update( {}, {$rename:{'a.0':'f'}} )" );
 bad( "t.update( {}, {$rename:{'a.0':'g'}} )" );

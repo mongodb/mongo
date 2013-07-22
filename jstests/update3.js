@@ -21,9 +21,3 @@ f.drop();
 f.save( {'_id':0} );
 f.update( {}, {$set:{'_id':5}} );
 assert.eq( 0, f.findOne()._id , "D" );
-
-// Test replacement update of a field with an empty string field name.
-f.drop();
-f.save( {'':0} );
-f.update( {}, {$set:{'':'g'}} );
-assert.eq( 'g', f.findOne()[''] , "E" );
