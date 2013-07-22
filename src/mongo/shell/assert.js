@@ -194,22 +194,23 @@ assert.time = function(f, msg, timeout /*ms*/) {
         return res;
 }
 
-assert.throws = function(func, params, msg){
+assert.throws = function(func, params, msg) {
     if (assert._debug && msg) print("in assert for: " + msg);
-    if (params && typeof(params) == "string")
+    if (params && typeof(params) == "string") {
         throw ("2nd argument to assert.throws has to be an array, not " + params);
+    }
     try {
         func.apply(null, params);
     }
-    catch (e){
+    catch (e) {
         return e;
     }
     doassert("did not throw exception: " + msg);
-}
+};
 
 assert.throws.automsg = function(func, params) {
     assert.throws(func, params, func.toString());
-}
+};
 
 assert.commandWorked = function(res, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
