@@ -79,13 +79,6 @@ namespace mongo {
         }
 #endif
 
-        const unsigned long long fileLength = stats.st_size;
-        if (fileLength < 6 || fileLength > 1024) {
-            log() << " key file " << filename << " has length " << stats.st_size
-                  << ", must be between 6 and 1024 chars" << endl;
-            return false;
-        }
-
         FILE* file = fopen( filename.c_str(), "rb" );
         if (!file) {
             log() << "error opening file: " << filename << ": " << strerror(errno) << endl;
@@ -95,6 +88,7 @@ namespace mongo {
         string str = "";
 
         // strip key file
+        const unsigned long long fileLength = stats.st_size;
         unsigned long long read = 0;
         while (read < fileLength) {
             char buf;
@@ -123,8 +117,10 @@ namespace mongo {
 
         fclose( file );
 
-        if (str.size() < 6) {
-            log() << "security key must be at least 6 characters" << endl;
+        const unsigned long long keyLength = str.size();
+        if (keyLength < 6 || keyLength > 1024) {
+            log() << " security key in " << filename << " has length " << keyLength
+                  << ", must be between 6 and 1024 chars" << endl;
             return false;
         }
 
