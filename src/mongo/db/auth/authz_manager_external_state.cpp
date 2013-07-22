@@ -70,12 +70,17 @@ namespace mongo {
                                 userName.getDB());
         }
 
-        bool found = _findUser(usersNamespace, queryBuilder.obj(), &userBSONObj);
-        if (!found) {
-            return Status(ErrorCodes::UserNotFound,
-                          mongoutils::str::stream() << "auth: couldn't find user " <<
-                          userName.toString() << ", " << usersNamespace,
-                          0);
+        Status found = _findUser(usersNamespace, queryBuilder.obj(), &userBSONObj);
+        if (!found.isOK()) {
+            if (found.code() == ErrorCodes::UserNotFound) {
+                // Return more detailed status that includes user name.
+                return Status(ErrorCodes::UserNotFound,
+                              mongoutils::str::stream() << "auth: couldn't find user " <<
+                                      userName.toString() << ", " << usersNamespace,
+                              0);
+            } else {
+                return found;
+            }
         }
 
         *result = userBSONObj.getOwned();
@@ -87,7 +92,7 @@ namespace mongo {
 
         BSONObj userBSONObj;
         BSONObj query;
-        return _findUser(usersNamespace, query, &userBSONObj);
+        return _findUser(usersNamespace, query, &userBSONObj).isOK();
     }
 
 }  // namespace mongo

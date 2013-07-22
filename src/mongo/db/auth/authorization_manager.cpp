@@ -840,7 +840,11 @@ namespace {
             for (std::vector<std::string>::iterator dbIt = dbNames.begin();
                     dbIt != dbNames.end(); ++dbIt) {
                 std::string dbname = *dbIt;
-                std::vector<BSONObj> privDocs = _externalState->getAllV1PrivilegeDocsForDB(dbname);
+                std::vector<BSONObj> privDocs;
+                Status status = _externalState->getAllV1PrivilegeDocsForDB(dbname, &privDocs);
+                if (!status.isOK()) {
+                    return status;
+                }
 
                 for (std::vector<BSONObj>::iterator docIt = privDocs.begin();
                         docIt != privDocs.end(); ++docIt) {

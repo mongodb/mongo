@@ -28,6 +28,10 @@
 
 namespace mongo {
 
+namespace {
+    static Status userNotFoundStatus(ErrorCodes::UserNotFound, "User not found");
+}
+
     AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() {}
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
 
@@ -46,95 +50,120 @@ namespace mongo {
         }
     }
 
-    bool AuthzManagerExternalStateMongos::_findUser(const string& usersNamespace,
-                                                    const BSONObj& query,
-                                                    BSONObj* result) const {
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
-        *result = conn->get()->findOne(usersNamespace, query).getOwned();
-        conn->done();
-        return !result->isEmpty();
+    Status AuthzManagerExternalStateMongos::_findUser(const string& usersNamespace,
+                                                      const BSONObj& query,
+                                                      BSONObj* result) const {
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
+            *result = conn->get()->findOne(usersNamespace, query).getOwned();
+            conn->done();
+            if (result->isEmpty()) {
+                return userNotFoundStatus;
+            }
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongos::insertPrivilegeDocument(const string& dbname,
                                                                     const BSONObj& userObj) const {
-        string userNS = dbname + ".system.users";
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+        try {
+            string userNS = dbname + ".system.users";
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
 
-        conn->get()->insert(userNS, userObj);
+            conn->get()->insert(userNS, userObj);
 
-        // 30 second timeout for w:majority
-        BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
-        string errstr = conn->get()->getLastErrorString(res);
-        conn->done();
+            // 30 second timeout for w:majority
+            BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+            string errstr = conn->get()->getLastErrorString(res);
+            conn->done();
 
-        if (errstr.empty()) {
-            return Status::OK();
+            if (errstr.empty()) {
+                return Status::OK();
+            }
+            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
+                return Status(ErrorCodes::DuplicateKey,
+                              mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
+                                     "\" already exists on database \"" << dbname << "\"");
+            }
+            return Status(ErrorCodes::UserModificationFailed, errstr);
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
-        if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
-            return Status(ErrorCodes::DuplicateKey,
-                          mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
-                                 "\" already exists on database \"" << dbname << "\"");
-        }
-        return Status(ErrorCodes::UserModificationFailed, errstr);
     }
 
     Status AuthzManagerExternalStateMongos::updatePrivilegeDocument(
             const UserName& user, const BSONObj& updateObj) const {
-        string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+        try {
+            string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
 
-        conn->get()->update(userNS,
-                            QUERY("user" << user.getUser() << "userSource" << BSONNULL),
-                            updateObj);
+            conn->get()->update(userNS,
+                                QUERY("user" << user.getUser() << "userSource" << BSONNULL),
+                                updateObj);
 
-        // 30 second timeout for w:majority
-        BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
-        string err = conn->get()->getLastErrorString(res);
-        conn->done();
+            // 30 second timeout for w:majority
+            BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+            string err = conn->get()->getLastErrorString(res);
+            conn->done();
 
-        if (!err.empty()) {
-            return Status(ErrorCodes::UserModificationFailed, err);
+            if (!err.empty()) {
+                return Status(ErrorCodes::UserModificationFailed, err);
+            }
+
+            int numUpdated = res["n"].numberInt();
+            dassert(numUpdated <= 1 && numUpdated >= 0);
+            if (numUpdated == 0) {
+                return Status(ErrorCodes::UserNotFound,
+                              mongoutils::str::stream() << "User " << user.getFullName() <<
+                                      " not found");
+            }
+
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
-
-        int numUpdated = res["n"].numberInt();
-        dassert(numUpdated <= 1 && numUpdated >= 0);
-        if (numUpdated == 0) {
-            return Status(ErrorCodes::UserNotFound,
-                          mongoutils::str::stream() << "User " << user.getFullName() <<
-                                  " not found");
-        }
-
-        return Status::OK();
     }
 
     Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
             std::vector<std::string>* dbnames) const {
-        std::vector<BSONObj> dbDocs;
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection("config.databases"));
-        conn->get()->findN(dbDocs, DatabaseType::ConfigNS, Query(), 0);
-        conn->done();
+        try {
+            std::vector<BSONObj> dbDocs;
+            scoped_ptr<ScopedDbConnection> conn(
+                    getConnectionForUsersCollection("config.databases"));
+            conn->get()->findN(dbDocs, DatabaseType::ConfigNS, Query(), 0);
+            conn->done();
 
-        for (std::vector<BSONObj>::const_iterator it = dbDocs.begin();
-                it != dbDocs.end(); ++it) {
-            DatabaseType dbInfo;
-            std::string errmsg;
-            if (!dbInfo.parseBSON( *it, &errmsg) || !dbInfo.isValid( &errmsg )) {
-                 return Status(ErrorCodes::FailedToParse, errmsg);
+            for (std::vector<BSONObj>::const_iterator it = dbDocs.begin();
+                    it != dbDocs.end(); ++it) {
+                DatabaseType dbInfo;
+                std::string errmsg;
+                if (!dbInfo.parseBSON( *it, &errmsg) || !dbInfo.isValid( &errmsg )) {
+                     return Status(ErrorCodes::FailedToParse, errmsg);
+                }
+                dbnames->push_back(dbInfo.getName());
             }
-            dbnames->push_back(dbInfo.getName());
+            dbnames->push_back("config"); // config db isn't listed in config.databases
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
-        dbnames->push_back("config"); // config db isn't listed in config.databases
-        return Status::OK();
     }
 
-    std::vector<BSONObj> AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
-            const std::string& dbname) const {
-        std::vector<BSONObj> userDocs;
-        std::string usersNamespace = dbname + ".system.users";
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
-        conn->get()->findN(userDocs, usersNamespace, Query(), 0);
-        conn->done();
-        return userDocs;
+    Status AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
+            const std::string& dbname, std::vector<BSONObj>* privDocs) const {
+        try {
+            std::vector<BSONObj> userDocs;
+            std::string usersNamespace = dbname + ".system.users";
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
+            conn->get()->findN(userDocs, usersNamespace, Query(), 0);
+            conn->done();
+            *privDocs = userDocs;
+        return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
 } // namespace mongo

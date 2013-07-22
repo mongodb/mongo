@@ -64,19 +64,22 @@ namespace mongo {
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) const = 0;
 
         /**
-         * Returns a vector of every privilege document from the given database's
+         * Puts into the *privDocs vector every privilege document from the given database's
          * system.users collection.
          */
-        virtual std::vector<BSONObj> getAllV1PrivilegeDocsForDB(const std::string& dbname) const = 0;
+        virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,
+                                                  std::vector<BSONObj>* privDocs) const = 0;
 
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
 
         // Queries the userNamespace with the given query and returns the privilegeDocument found
-        // in *result.  Returns true if it finds a document matching the query, or false if not.
-        virtual bool _findUser(const std::string& usersNamespace,
-                               const BSONObj& query,
-                               BSONObj* result) const = 0;
+        // in *result.  Returns Status::OK if it finds a document matching the query.  If it doesn't
+        // find a document matching the query, returns a Status with code UserNotFound.  Other
+        // errors may return other Status codes.
+        virtual Status _findUser(const std::string& usersNamespace,
+                                 const BSONObj& query,
+                                 BSONObj* result) const = 0;
 
     };
 
