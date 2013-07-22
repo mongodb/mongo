@@ -100,8 +100,6 @@ namespace mongo {
     }
 
     bool SyncSourceFeedback::replHandshake() {
-        ensureMe();
-
         // handshake for us
         BSONObjBuilder cmd;
         cmd.append("replSetUpdatePosition", 1);
@@ -111,16 +109,19 @@ namespace mongo {
         sub.append("config", theReplSet->myConfig().asBson());
         sub.doneFast();
 
+        LOG(1) << "detecting upstream updater";
         BSONObj res;
         try {
             if (!_connection->runCommand("admin", cmd.obj(), res)) {
                 if (res["errmsg"].str().find("no such cmd") != std::string::npos) {
+                    log() << "upstream updater is unsupported on this version";
                     _supportsUpdater = false;
                 }
                 resetConnection();
                 return false;
             }
             else {
+                log(1) << "upstream updater is supported";
                 _supportsUpdater = true;
             }
         }
@@ -199,7 +200,27 @@ namespace mongo {
     void SyncSourceFeedback::forwardSlaveHandshake() {
         boost::unique_lock<boost::mutex> lock(_mtx);
         _handshakeNeeded = true;
+        _cond.notify_all();
     }
+
+    void SyncSourceFeedback::percolate(const mongo::OID& rid, const OpTime& ot) {
+        // Update our own record of where this node is, and then register an upstream
+        // message about this.
+        // Note that we must keep the map up to date even if we are not actively reporting
+        // upstream via the new command, since our sync source might later change to a node
+        // that does support the command.
+        updateMap(rid, ot);
+        if (!supportsUpdater()) {
+            // this is only necessary if our sync source does not support
+            // the new syncSourceFeedback command
+            theReplSet->ghost->send(boost::bind(&GhostSync::percolate,
+                                                theReplSet->ghost,
+                                                rid,
+                                                ot));
+        }
+    }
+
+
 
     void SyncSourceFeedback::updateMap(const mongo::OID& rid, const OpTime& ot) {
         boost::unique_lock<boost::mutex> lock(_mtx);
@@ -266,8 +287,8 @@ namespace mongo {
                 while (!_positionChanged && !_handshakeNeeded) {
                     _cond.wait(lock);
                 }
-                boost::unique_lock<boost::mutex> conlock(_connmtx);
                 const Member* target = replset::BackgroundSync::get()->getSyncTarget();
+                boost::unique_lock<boost::mutex> connlock(_connmtx);
                 if (_syncTarget != target) {
                     resetConnection();
                     _syncTarget = target;

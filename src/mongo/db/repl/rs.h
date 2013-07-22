@@ -149,7 +149,7 @@ namespace mongo {
          * it to P (_currentSyncTarget). Then it would use this connection to
          * pretend to be S1, replicating off of P.
          */
-        void percolate(const BSONObj& rid, const OpTime& last);
+        void percolate(const mongo::OID& rid, const OpTime& last);
         void associateSlave(const BSONObj& rid, const int memberId);
         void updateSlave(const mongo::OID& id, const OpTime& last);
         void clearCache();

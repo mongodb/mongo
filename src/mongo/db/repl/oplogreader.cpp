@@ -169,7 +169,7 @@ namespace mongo {
         return true;
     }
 
-    bool OplogReader::connect(const BSONObj& rid, const int from, const string& to) {
+    bool OplogReader::connect(const mongo::OID& rid, const int from, const string& to) {
         if (conn() != 0) {
             return true;
         }
@@ -180,9 +180,9 @@ namespace mongo {
         return false;
     }
 
-    bool OplogReader::passthroughHandshake(const BSONObj& rid, const int nextOnChainId) {
+    bool OplogReader::passthroughHandshake(const mongo::OID& rid, const int nextOnChainId) {
         BSONObjBuilder cmd;
-        cmd.appendAs(rid["_id"], "handshake");
+        cmd.append("handshake", rid);
         if (theReplSet) {
             const Member* chainedMember = theReplSet->findById(nextOnChainId);
             if (chainedMember != NULL) {
