@@ -649,6 +649,7 @@ namespace mongo {
             mutablebson::DamageVector damages;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
             if ( inPlace && !driver.modsAffectIndices() ) {
+                d->paddingFits();
 
                 // All updates were in place. Apply them via durability and writing pointer.
                 mutablebson::DamageVector::const_iterator where = damages.begin();
