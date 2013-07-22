@@ -47,6 +47,9 @@ namespace mongo {
     /** Returns true if updates are supposed to be handle by the new update framework */
     bool isNewUpdateFrameworkEnabled();
 
+    /** switches state from enabled/disabled; returns new state */
+    bool toggleNewUpdateFrameworkEnabled();
+
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set
        su - allow access to system namespaces (super user)

@@ -51,6 +51,10 @@ namespace mongo {
         return newUpdateFrameworkEnabled;
     }
 
+    bool toggleNewUpdateFrameworkEnabled() {
+        return newUpdateFrameworkEnabled = !newUpdateFrameworkEnabled;
+    }
+
     void checkNoMods( BSONObj o ) {
         BSONObjIterator i( o );
         while( i.moreWithEOO() ) {
