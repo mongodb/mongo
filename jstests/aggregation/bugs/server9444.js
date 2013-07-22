@@ -37,12 +37,16 @@ function test(pipeline, outOfMemoryCode) {
 
 var groupCode = 16945;
 var sortCode = 16819;
+var sortLimitCode = 16820;
 
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], groupCode);
 
 // sorting with _id would use index which doesn't require extsort
 test([{$sort: {random: 1}}], sortCode);
 test([{$sort: {bigStr: 1}}], sortCode); // big key and value
+
+// make sure sort + large limit won't crash the server (SERVER-10136)
+test([{$sort: {bigStr: 1}}, {$limit:1000*1000*1000}], sortLimitCode);
 
 // test combining two extSorts in both same and different orders
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id:1}}], groupCode);
