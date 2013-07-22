@@ -569,6 +569,7 @@ namespace mutablebson {
             , _fieldNames()
             , _leafBuf()
             , _leafBuilder(_leafBuf)
+            , _fieldNameScratch()
             , _damages() {
             // We always have a BSONObj for the leaves, so reserve one.
             _objects.reserve(1);
@@ -678,6 +679,15 @@ namespace mutablebson {
                 return getSerializedElement(rep).fieldName();
 
             return getFieldName(rep.offset);
+        }
+
+        StringData getFieldNameForNewElement(const ElementRep& rep) {
+            StringData result = getFieldName(rep);
+            if (rep.objIdx == kLeafObjIdx) {
+                _fieldNameScratch.assign(result.rawData(), result.size());
+                result = StringData(_fieldNameScratch);
+            }
+            return result;
         }
 
         // Retrieve the type, given a rep.
@@ -936,6 +946,20 @@ namespace mutablebson {
             }
         }
 
+        // Not all types are currently permitted to be updated in-place.
+        bool canUpdateInPlace(const ElementRep& rep) {
+            const BSONType type = getType(rep);
+            switch(type) {
+            case mongo::NumberDouble:
+            case mongo::Bool:
+            case mongo::NumberInt:
+            case mongo::NumberLong:
+                return true;
+            default:
+                return false;
+            }
+        }
+
     private:
 
         // Insert the given field name into the field name heap, and return an ID for this
@@ -970,6 +994,12 @@ namespace mutablebson {
         // off our offset calculations.
         BufBuilder _leafBuf;
         BSONObjBuilder _leafBuilder;
+
+        // Sometimes, we need a temporary storage area for a fieldName, because the source of
+        // the fieldName is in the same buffer that we want to write to, potentially
+        // reallocating it. In such cases, we temporarily store the value here, rather than
+        // creating and destroying a string and its buffer each time.
+        std::string _fieldNameScratch;
 
         // Queue of damage events if in-place updates are possible.
         boost::scoped_ptr<DamageVector> _damages;
@@ -1183,7 +1213,7 @@ namespace mutablebson {
             // For leaf elements we just create a new Element with the current value and
             // replace. Note that the 'setValue' call below will invalidate thisRep.
             Element replacement = _doc->makeElementWithNewFieldName(newName, *this);
-            setValue(&replacement);
+            setValue(replacement._repIdx);
         } else {
             // The easy case: just update what our field name offset refers to.
             impl.insertFieldName(*thisRep, newName);
@@ -1463,487 +1493,231 @@ namespace mutablebson {
     }
 
     Status Element::setValueDouble(const double value) {
-        // TODO: Template-ize this so we don't need to write this logic everwhere. The only
-        // variation is the 'makeElementX' call and the argument types.
-
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
-
-        // Create a dummy element. If we can do in-place updates, we will use this to sew into
-        // the element graph. Otherwise, we will use a different element, created below.
-        bool inPlace = false;
-        Element newValue = getDocument().end();
-
-        if (impl.isInPlaceModeEnabled()) {
-
-            // In place updates are currently enabled. We can do an in-place update to an
-            // element that is serialized and is not in the leaf heap.
-            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
-            const bool hasValue = impl.hasValue(*thisRep);
-
-            // TODO: In the future, we can replace values in the leaf heap if they are of the
-            // same size as the origin was. For now, we don't support that.
-            if (hasValue && !inLeafHeap) {
-
-                // Create a new double element in the leaf heap. There is no need to copy the
-                // fieldname, since the fieldname and leafheap are in different storage areas.
-                const StringData fieldName = impl.getFieldName(*thisRep);
-                newValue = getDocument().makeElementDouble(fieldName, value);
-
-                // Reacquire thisRep, since it may have been reallocated by makeElement.
-                thisRep = &impl.getElementRep(_repIdx);
-
-                // See if the new Element can be recorded as an in-place update.
-
-                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
-                dassert(impl.hasValue(newRep));
-
-                // Get the BSONElement representations of the existing and new value, so we can
-                // check if they are size compatible.
-                BSONElement thisElt = impl.getSerializedElement(*thisRep);
-                BSONElement newElt = impl.getSerializedElement(newRep);
-
-                if (thisElt.size() == newElt.size()) {
-
-                    inPlace = true;
-
-                    // The old and new elements are size compatible. Compute the base offsets
-                    // of each BSONElement in the object in which it resides. We use these to
-                    // calculate the source and target offsets in the damage entries we are
-                    // going to write.
-
-                    const DamageEvent::OffsetSizeType targetBaseOffset =
-                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
-
-                    const DamageEvent::OffsetSizeType sourceBaseOffset =
-                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
-
-                    // If this is a type change, record a damage event for the new type.
-                    if (thisElt.type() != newElt.type()) {
-                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
-                    }
-
-                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
-                    dassert(thisElt.valuesize() == newElt.valuesize());
-
-                    // Record a damage event for the new value data.
-                    impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize() + 1,
-                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
-                        thisElt.valuesize());
-                }
-            }
-        }
-
-        if (!newValue.ok()) {
-            // If we didn't build a new element yet, do so now.
-            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
-            // TODO: Can we hoist this above so we only call makeElement once in this function?
-            newValue = getDocument().makeElementDouble(fieldNameCopy, value);
-        }
-
-        // Attach the new element into the graph.
-        return setValue(&newValue, inPlace);
+        ElementRep thisRep = impl.getElementRep(_repIdx);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementDouble(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueString(const StringData& value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(value));
 
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementString(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementString(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueObject(const BSONObj& value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(value));
 
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementObject(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementObject(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueArray(const BSONObj& value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(value));
 
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementArray(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementArray(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueBinary(const uint32_t len, mongo::BinDataType binType,
                                    const void* const data) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         // TODO: Alias check for binary data?
+
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
         Element newValue = getDocument().makeElementBinary(
-            fieldNameCopy, len, binType, data);
-        return setValue(&newValue);
+            fieldName, len, binType, data);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueUndefined() {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementUndefined(fieldNameCopy);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementUndefined(fieldName);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueOID(const OID value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementOID(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementOID(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueBool(const bool value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
-
-        // NOTE: See setValueDouble for detailed comments.
-
-        bool inPlace = false;
-        Element newValue = getDocument().end();
-
-        if (impl.isInPlaceModeEnabled()) {
-
-            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
-            const bool hasValue = impl.hasValue(*thisRep);
-
-            if (hasValue && !inLeafHeap) {
-
-                const StringData fieldName = impl.getFieldName(*thisRep);
-                newValue = getDocument().makeElementBool(fieldName, value);
-
-                thisRep = &impl.getElementRep(_repIdx);
-
-                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
-                dassert(impl.hasValue(newRep));
-
-                BSONElement thisElt = impl.getSerializedElement(*thisRep);
-                BSONElement newElt = impl.getSerializedElement(newRep);
-
-                if (thisElt.size() == newElt.size()) {
-
-                    inPlace = true;
-
-                    const DamageEvent::OffsetSizeType targetBaseOffset =
-                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
-
-                    const DamageEvent::OffsetSizeType sourceBaseOffset =
-                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
-
-                    if (thisElt.type() != newElt.type()) {
-                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
-                    }
-
-                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
-                    dassert(thisElt.valuesize() == newElt.valuesize());
-
-                    impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize() + 1,
-                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
-                        thisElt.valuesize());
-                }
-            }
-        }
-
-        if (!newValue.ok()) {
-            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
-            newValue = getDocument().makeElementBool(fieldNameCopy, value);
-        }
-
-        return setValue(&newValue, inPlace);
+        ElementRep thisRep = impl.getElementRep(_repIdx);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementBool(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueDate(const Date_t value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementDate(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementDate(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueNull() {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementNull(fieldNameCopy);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementNull(fieldName);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueRegex(const StringData& re, const StringData& flags) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(re));
         dassert(impl.doesNotAlias(flags));
+
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementRegex(fieldNameCopy, re, flags);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementRegex(fieldName, re, flags);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueDBRef(const StringData& ns, const OID oid) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(ns));
+
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementDBRef(fieldNameCopy, ns, oid);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementDBRef(fieldName, ns, oid);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueCode(const StringData& value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(value));
+
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementCode(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementCode(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueSymbol(const StringData& value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(value));
+
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementSymbol(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementSymbol(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueCodeWithScope(const StringData& code, const BSONObj& scope) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
+
         dassert(impl.doesNotAlias(code));
         dassert(impl.doesNotAlias(scope));
+
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
         Element newValue = getDocument().makeElementCodeWithScope(
-            fieldNameCopy, code, scope);
-        return setValue(&newValue);
+            fieldName, code, scope);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueInt(const int32_t value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
-
-        // NOTE: See setValueDouble for detailed comments.
-
-        bool inPlace = false;
-        Element newValue = getDocument().end();
-
-        if (impl.isInPlaceModeEnabled()) {
-
-            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
-            const bool hasValue = impl.hasValue(*thisRep);
-
-            if (hasValue && !inLeafHeap) {
-
-                const StringData fieldName = impl.getFieldName(*thisRep);
-                newValue = getDocument().makeElementInt(fieldName, value);
-
-                thisRep = &impl.getElementRep(_repIdx);
-
-                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
-                dassert(impl.hasValue(newRep));
-
-                BSONElement thisElt = impl.getSerializedElement(*thisRep);
-                BSONElement newElt = impl.getSerializedElement(newRep);
-
-                if (thisElt.size() == newElt.size()) {
-
-                    inPlace = true;
-
-                    const DamageEvent::OffsetSizeType targetBaseOffset =
-                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
-
-                    const DamageEvent::OffsetSizeType sourceBaseOffset =
-                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
-
-                    if (thisElt.type() != newElt.type()) {
-                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
-                    }
-
-                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
-                    dassert(thisElt.valuesize() == newElt.valuesize());
-
-                    impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize() + 1,
-                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
-                        thisElt.valuesize());
-                }
-            }
-        }
-
-        if (!newValue.ok()) {
-            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
-            newValue = getDocument().makeElementInt(fieldNameCopy, value);
-        }
-
-        return setValue(&newValue, inPlace);
+        ElementRep thisRep = impl.getElementRep(_repIdx);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementInt(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueTimestamp(const OpTime value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementTimestamp(fieldNameCopy, value);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementTimestamp(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueLong(const int64_t value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
-        const ElementRep* thisRep = &impl.getElementRep(_repIdx);
-
-        // NOTE: See setValueDouble for detailed comments.
-
-        bool inPlace = false;
-        Element newValue = getDocument().end();
-
-        if (impl.isInPlaceModeEnabled()) {
-
-            const bool inLeafHeap = (thisRep->objIdx == kLeafObjIdx);
-            const bool hasValue = impl.hasValue(*thisRep);
-
-            if (hasValue && !inLeafHeap) {
-
-                const StringData fieldName = impl.getFieldName(*thisRep);
-                newValue = getDocument().makeElementLong(fieldName, value);
-
-                thisRep = &impl.getElementRep(_repIdx);
-
-                const ElementRep& newRep = impl.getElementRep(newValue._repIdx);
-                dassert(impl.hasValue(newRep));
-
-                BSONElement thisElt = impl.getSerializedElement(*thisRep);
-                BSONElement newElt = impl.getSerializedElement(newRep);
-
-                if (thisElt.size() == newElt.size()) {
-
-                    inPlace = true;
-
-                    const DamageEvent::OffsetSizeType targetBaseOffset =
-                        getElementOffset(impl.getObject(thisRep->objIdx), thisElt);
-
-                    const DamageEvent::OffsetSizeType sourceBaseOffset =
-                        getElementOffset(impl.getObject(newRep.objIdx), newElt);
-
-                    if (thisElt.type() != newElt.type()) {
-                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
-                    }
-
-                    dassert(thisElt.fieldNameSize() == newElt.fieldNameSize());
-                    dassert(thisElt.valuesize() == newElt.valuesize());
-
-                    impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize() + 1,
-                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
-                        thisElt.valuesize());
-                }
-            }
-        }
-
-        if (!newValue.ok()) {
-            const std::string fieldNameCopy = impl.getFieldName(*thisRep).toString();
-            newValue = getDocument().makeElementLong(fieldNameCopy, value);
-        }
-
-        return setValue(&newValue, inPlace);
+        ElementRep thisRep = impl.getElementRep(_repIdx);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementLong(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueMinKey() {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementMinKey(fieldNameCopy);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementMinKey(fieldName);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueMaxKey() {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
-        const std::string fieldNameCopy = impl.getFieldName(thisRep).toString();
-        Element newValue = getDocument().makeElementMaxKey(fieldNameCopy);
-        return setValue(&newValue);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementMaxKey(fieldName);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueBSONElement(const BSONElement& value) {
         verify(ok());
-        dassert(getDocument().getImpl().doesNotAlias(value));
 
-        switch(value.type()) {
-        case EOO:
+        if (value.type() == mongo::EOO)
             return Status(ErrorCodes::IllegalOperation, "Can't set Element value to EOO");
-        case NumberDouble:
-            return setValueDouble(value._numberDouble());
-        case String:
-            return setValueString(StringData(value.valuestr(), value.valuestrsize() - 1));
-        case Object:
-            return setValueObject(value.Obj());
-        case Array:
-            return setValueArray(value.Obj());
-        case BinData: {
-            int len = 0;
-            const char* binData = value.binData(len);
-            return setValueBinary(len, value.binDataType(), binData);
-        }
-        case Undefined:
-            return setValueUndefined();
-        case jstOID:
-            return setValueOID(value.__oid());
-        case Bool:
-            return setValueBool(value.boolean());
-        case Date:
-            return setValueDate(value.date());
-        case jstNULL:
-            return setValueNull();
-        case RegEx:
-            return setValueRegex(value.regex(), value.regexFlags());
-        case DBRef:
-            return setValueDBRef(value.dbrefNS(), value.dbrefOID());
-        case Code:
-            return setValueCode(StringData(value.valuestr(), value.valuestrsize() - 1));
-        case Symbol:
-            return setValueSymbol(StringData(value.valuestr(), value.valuestrsize() - 1));
-        case CodeWScope:
-            return setValueCodeWithScope(value.codeWScopeCode(), value.codeWScopeObject());
-        case NumberInt:
-            return setValueInt(value._numberInt());
-        case Timestamp:
-            return setValueTimestamp(value._opTime());
-        case NumberLong:
-            return setValueLong(value._numberLong());
-        case MinKey:
-            return setValueMinKey();
-        case MaxKey:
-            return setValueMaxKey();
-        default:
-            verify(false);
-        }
+
+        Document::Impl& impl = getDocument().getImpl();
+
+        dassert(impl.doesNotAlias(value));
+
+        ElementRep thisRep = impl.getElementRep(_repIdx);
+        const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+        Element newValue = getDocument().makeElementWithNewFieldName(fieldName, value);
+        return setValue(newValue._repIdx);
     }
 
     Status Element::setValueSafeNum(const SafeNum value) {
@@ -2031,7 +1805,7 @@ namespace mutablebson {
         return Status::OK();
     }
 
-    Status Element::setValue(Element* value, bool inPlace) {
+    Status Element::setValue(const Element::RepIdx newValueIdx) {
         // No need to verify(ok()) since we are only called from methods that have done so.
         dassert(ok());
 
@@ -2040,9 +1814,6 @@ namespace mutablebson {
 
         Document::Impl& impl = getDocument().getImpl();
 
-        if (!inPlace)
-            impl.disableInPlaceUpdates();
-
         // Establish our right sibling in case it is opaque. Otherwise, we would lose the
         // ability to do so after the modifications below. It is important that this occur
         // before we acquire thisRep and valueRep since otherwise we would potentially
@@ -2050,7 +1821,62 @@ namespace mutablebson {
         impl.resolveRightSibling(_repIdx);
 
         ElementRep& thisRep = impl.getElementRep(_repIdx);
-        ElementRep& valueRep = impl.getElementRep(value->_repIdx);
+        ElementRep& valueRep = impl.getElementRep(newValueIdx);
+
+        bool inPlace = false;
+        if (impl.canUpdateInPlace(valueRep) && impl.isInPlaceModeEnabled()) {
+
+            // In place updates are currently enabled. We can do an in-place update to an
+            // element that is serialized and is not in the leaf heap.
+            const bool inLeafHeap = (thisRep.objIdx == kLeafObjIdx);
+            const bool hasValue = impl.hasValue(thisRep);
+
+            // TODO: In the future, we can replace values in the leaf heap if they are of the
+            // same size as the origin was. For now, we don't support that.
+            if (hasValue && !inLeafHeap) {
+
+                // See if the new Element can be recorded as an in-place update.
+                dassert(impl.hasValue(valueRep));
+
+                // Get the BSONElement representations of the existing and new value, so we can
+                // check if they are size compatible.
+                BSONElement thisElt = impl.getSerializedElement(thisRep);
+                BSONElement valueElt = impl.getSerializedElement(valueRep);
+
+                if (thisElt.size() == valueElt.size()) {
+
+                    // The old and new elements are size compatible. Compute the base offsets
+                    // of each BSONElement in the object in which it resides. We use these to
+                    // calculate the source and target offsets in the damage entries we are
+                    // going to write.
+
+                    const DamageEvent::OffsetSizeType targetBaseOffset =
+                        getElementOffset(impl.getObject(thisRep.objIdx), thisElt);
+
+                    const DamageEvent::OffsetSizeType sourceBaseOffset =
+                        getElementOffset(impl.getObject(valueRep.objIdx), valueElt);
+
+                    // If this is a type change, record a damage event for the new type.
+                    if (thisElt.type() != valueElt.type()) {
+                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
+                    }
+
+                    dassert(thisElt.fieldNameSize() == valueElt.fieldNameSize());
+                    dassert(thisElt.valuesize() == valueElt.valuesize());
+
+                    // Record a damage event for the new value data.
+                    impl.recordDamageEvent(
+                        targetBaseOffset + thisElt.fieldNameSize() + 1,
+                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
+                        thisElt.valuesize());
+
+                    inPlace = true;
+                }
+            }
+        }
+
+        if (!inPlace)
+            getDocument().disableInPlaceUpdates();
 
         // If we are not rootish, then wire in the new value among our relations.
         if (thisRep.parent != kInvalidRepIdx) {
@@ -2059,10 +1885,8 @@ namespace mutablebson {
             valueRep.sibling.right = thisRep.sibling.right;
         }
 
-        // Copy the rep for value to our slot so that our repIdx is unmodified and fixup the
-        // passed in Element to alias us since we now own the value.
+        // Copy the rep for value to our slot so that our repIdx is unmodified.
         thisRep = valueRep;
-        value->_repIdx = _repIdx;
 
         // Be nice and clear out the source rep to make debugging easier.
         valueRep = makeRep();
@@ -2451,70 +2275,45 @@ namespace mutablebson {
     }
 
     Element Document::makeElement(const BSONElement& value) {
-        return makeElementWithNewFieldName(value.fieldName(), value);
+        Impl& impl = getImpl();
+        dassert(impl.doesNotAlias(value));
+
+        // Attempts to create an EOO element are translated to returning an invalid
+        // Element. For array and object nodes, we flow through the custom
+        // makeElement{Object|Array} methods, since they have special logic to deal with
+        // opaqueness. Otherwise, we can just insert via appendAs.
+        if (value.type() == mongo::EOO)
+            return end();
+        else if(value.type() == mongo::Object)
+            return makeElementObject(value.fieldName(), value.Obj());
+        else if(value.type() == mongo::Array)
+            return makeElementArray(value.fieldName(), value.Obj());
+        else {
+            BSONObjBuilder& builder = impl.leafBuilder();
+            const int leafRef = builder.len();
+            builder.append(value);
+            return Element(this, impl.insertLeafElement(leafRef));
+        }
     }
 
     Element Document::makeElementWithNewFieldName(const StringData& fieldName,
                                                   const BSONElement& value) {
-
+        Impl& impl = getImpl();
         dassert(getImpl().doesNotAlias(fieldName));
         dassert(getImpl().doesNotAlias(value));
 
-        // These are in the same order as the bsonspec.org specification. Please keep them that
-        // way.
-        switch(value.type()) {
-        case EOO:
-            verify(false);
-        case NumberDouble:
-            return makeElementDouble(fieldName, value._numberDouble());
-        case String:
-            return makeElementString(fieldName,
-                                     StringData(value.valuestr(), value.valuestrsize() - 1));
-        case Object:
+        // See the above makeElement for notes on these cases.
+        if (value.type() == mongo::EOO)
+            return end();
+        else if(value.type() == mongo::Object)
             return makeElementObject(fieldName, value.Obj());
-        case Array:
-            // As above.
+        else if(value.type() == mongo::Array)
             return makeElementArray(fieldName, value.Obj());
-        case BinData: {
-            int len = 0;
-            const char* binData = value.binData(len);
-            return makeElementBinary(fieldName, len, value.binDataType(), binData);
-        }
-        case Undefined:
-            return makeElementUndefined(fieldName);
-        case jstOID:
-            return makeElementOID(fieldName, value.__oid());
-        case Bool:
-            return makeElementBool(fieldName, value.boolean());
-        case Date:
-            return makeElementDate(fieldName, value.date());
-        case jstNULL:
-            return makeElementNull(fieldName);
-        case RegEx:
-            return makeElementRegex(fieldName, value.regex(), value.regexFlags());
-        case DBRef:
-            return makeElementDBRef(fieldName, value.dbrefNS(), value.dbrefOID());
-        case Code:
-            return makeElementCode(fieldName,
-                                   StringData(value.valuestr(), value.valuestrsize() - 1));
-        case Symbol:
-            return makeElementSymbol(fieldName,
-                                     StringData(value.valuestr(), value.valuestrsize() - 1));
-        case CodeWScope:
-            return makeElementCodeWithScope(fieldName,
-                                            value.codeWScopeCode(), value.codeWScopeObject());
-        case NumberInt:
-            return makeElementInt(fieldName, value._numberInt());
-        case Timestamp:
-            return makeElementTimestamp(fieldName, value._opTime());
-        case NumberLong:
-            return makeElementLong(fieldName, value._numberLong());
-        case MinKey:
-            return makeElementMinKey(fieldName);
-        case MaxKey:
-            return makeElementMaxKey(fieldName);
-        default:
-            verify(false);
+        else {
+            BSONObjBuilder& builder = impl.leafBuilder();
+            const int leafRef = builder.len();
+            builder.appendAs(value, fieldName);
+            return Element(this, impl.insertLeafElement(leafRef));
         }
     }
 
