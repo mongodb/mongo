@@ -150,8 +150,17 @@ namespace mongo {
                 userObjBuilder.append("otherDBRoles", args.otherDBRoles);
             }
 
-            status = getGlobalAuthorizationManager()->insertPrivilegeDocument(dbname,
-                                                                              userObjBuilder.obj());
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            status = authzManager->insertPrivilegeDocument(dbname, userObjBuilder.obj());
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            // Rebuild full user cache on every user modification.
+            // TODO(spencer): Remove this once we update user cache on-demand for each user
+            // modification.
+            status = authzManager->initilizeAllV1UserData();
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -331,9 +340,19 @@ namespace mongo {
             }
             BSONObj updateObj = BSON("$set" << setBuilder.obj());
 
-            status = getGlobalAuthorizationManager()->updatePrivilegeDocument(
-                    UserName(args.userName, dbname), updateObj);
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            status = authzManager->updatePrivilegeDocument(UserName(args.userName, dbname),
+                                                           updateObj);
 
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            // Rebuild full user cache on every user modification.
+            // TODO(spencer): Remove this once we update user cache on-demand for each user
+            // modification.
+            status = authzManager->initilizeAllV1UserData();
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
