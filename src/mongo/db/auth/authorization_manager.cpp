@@ -815,6 +815,13 @@ namespace {
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {
             it->second->invalidate();
+            // Need to decrement ref count and manually clean up User object to prevent memory leaks
+            // since we're pinning all User objects by incrementing their ref count when we
+            // initially populate the cache.
+            // TODO(spencer): remove this once we're not pinning User objects.
+            it->second->decrementRefCount();
+            if (it->second->getRefCount() == 0)
+                delete it->second;
         }
         _userCache.clear();
     }
