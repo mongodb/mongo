@@ -283,6 +283,11 @@ namespace mongo {
         {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
+        {"$setDifference", ExpressionSetDifference::create, OpDesc::FIXED_COUNT, 2},
+        {"$setEquals", ExpressionSetEquals::create, 0},
+        {"$setIntersection", ExpressionSetIntersection::create, 0},
+        {"$setIsSubset", ExpressionSetIsSubset::create, OpDesc::FIXED_COUNT, 2},
+        {"$setUnion", ExpressionSetUnion::create, 0},
         {"$strcasecmp", ExpressionStrcasecmp::create, OpDesc::FIXED_COUNT, 2},
         {"$substr", ExpressionSubstr::create, OpDesc::FIXED_COUNT, 3},
         {"$subtract", ExpressionSubtract::create, OpDesc::FIXED_COUNT, 2},
@@ -2313,6 +2318,219 @@ namespace mongo {
 
     const char *ExpressionSecond::getOpName() const {
         return "$second";
+    }
+
+
+
+    namespace {
+        ValueSet arrayToSet(const Value& val) {
+            const vector<Value>& array = val.getArray();
+            return ValueSet(array.begin(), array.end());
+        }
+    }
+
+    /* ----------------------- ExpressionSetDifference ---------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionSetDifference::create() {
+        return new ExpressionSetDifference();
+    }
+
+    void ExpressionSetDifference::addOperand(const intrusive_ptr<Expression> &pExpression) {
+        checkArgLimit(2);
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    Value ExpressionSetDifference::evaluateInternal(const Variables& vars) const {
+        checkArgCount(2);
+        const Value lhs = vpOperand[0]->evaluateInternal(vars);
+        const Value rhs = vpOperand[1]->evaluateInternal(vars);
+
+        if (lhs.nullish() || rhs.nullish()) {
+            return Value(BSONNULL);
+        }
+
+        uassert(16962, str::stream() << "both operands of $setDifference must be arrays. First "
+                                     << "argument is of type: " << lhs.getType(),
+                lhs.getType() == Array);
+        uassert(16963, str::stream() << "both operands of $setDifference must be arrays. Second "
+                                     << "argument is of type: " << rhs.getType(),
+                rhs.getType() == Array);
+
+        const ValueSet rhsSet = arrayToSet(rhs);
+        const vector<Value>& lhsArray = lhs.getArray();
+        vector<Value> returnVec;
+
+        for (vector<Value>::const_iterator it = lhsArray.begin(); it != lhsArray.end(); ++it) {
+            if (!rhsSet.count(*it)) {
+                returnVec.push_back(*it);
+            }
+        }
+        return Value::consume(returnVec);
+    }
+
+    const char *ExpressionSetDifference::getOpName() const {
+        return "$setDifference";
+    }
+
+    /* ----------------------- ExpressionSetEquals ---------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionSetEquals::create() {
+        return new ExpressionSetEquals();
+    }
+
+    Value ExpressionSetEquals::evaluateInternal(const Variables& vars) const {
+        const size_t n = vpOperand.size();
+        uassert(16974, str::stream() << "$setEquals needs at least two arguments had: " << n,
+                n >= 2);
+        std::set<Value> lhs;
+
+        for (size_t i = 0; i < n; i++) {
+            const Value nextEntry = vpOperand[i]->evaluateInternal(vars);
+            uassert(16971, str::stream() << "All operands of $setIntersection must be arrays. One "
+                                         << "argument is of type: " << nextEntry.getType(),
+                    nextEntry.getType() == Array);
+
+            if (i == 0) {
+                lhs.insert(nextEntry.getArray().begin(), nextEntry.getArray().end());
+            }
+            else {
+                const std::set<Value> rhs(nextEntry.getArray().begin(), nextEntry.getArray().end());
+                if (lhs != rhs) {
+                    return Value(false);
+                }
+            }
+        }
+        return Value(true);
+    }
+
+    const char *ExpressionSetEquals::getOpName() const {
+        return "$setEquals";
+    }
+
+    /* ----------------------- ExpressionSetIntersection ---------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionSetIntersection::create() {
+        return new ExpressionSetIntersection();
+    }
+
+    Value ExpressionSetIntersection::evaluateInternal(const Variables& vars) const {
+        const size_t n = vpOperand.size();
+        ValueSet currentIntersection;
+        for (size_t i = 0; i < n; i++) {
+            const Value nextEntry = vpOperand[i]->evaluateInternal(vars);
+            if (nextEntry.nullish()) {
+                return Value(BSONNULL);
+            }
+            uassert(16966, str::stream() << "All operands of $setIntersection must be arrays. One "
+                                         << "argument is of type: " << nextEntry.getType(),
+                    nextEntry.getType() == Array);
+
+            if (i == 0) {
+                currentIntersection.insert(nextEntry.getArray().begin(),
+                                           nextEntry.getArray().end());
+            }
+            else {
+                ValueSet nextSet = arrayToSet(nextEntry);
+                if (currentIntersection.size() > nextSet.size()) {
+                    // to iterate over whichever is the smaller set
+                    nextSet.swap(currentIntersection);
+                }
+
+                for (ValueSet::iterator it = currentIntersection.begin();
+                        it != currentIntersection.end(); ++it) {
+                    if (!nextSet.count(*it)) {
+                        currentIntersection.erase(*it);
+                    }
+                }
+            }
+            if (currentIntersection.empty()) {
+                break;
+            }
+        }
+        vector<Value> result = vector<Value>(currentIntersection.begin(),
+                                             currentIntersection.end());
+        return Value::consume(result);
+    }
+
+    const char *ExpressionSetIntersection::getOpName() const {
+        return "$setIntersection";
+    }
+
+    intrusive_ptr<ExpressionNary> (*ExpressionSetIntersection::getFactory() const)() {
+        return ExpressionSetIntersection::create;
+    }
+
+    /* ----------------------- ExpressionSetIsSubset ---------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionSetIsSubset::create() {
+        return new ExpressionSetIsSubset();
+    }
+
+    void ExpressionSetIsSubset::addOperand(const intrusive_ptr<Expression> &pExpression) {
+        checkArgLimit(2);
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    Value ExpressionSetIsSubset::evaluateInternal(const Variables& vars) const {
+        checkArgCount(2);
+        const Value lhs = vpOperand[0]->evaluateInternal(vars);
+        const Value rhs = vpOperand[1]->evaluateInternal(vars);
+
+        uassert(16968, str::stream() << "both operands of $setIsSubset must be arrays. First "
+                                     << "argument is of type: " << lhs.getType(),
+                lhs.getType() == Array);
+        uassert(16969, str::stream() << "both operands of $setIsSubset must be arrays. Second "
+                                     << "argument is of type: " << rhs.getType(),
+                rhs.getType() == Array);
+
+        const vector<Value>& potentialSubset = lhs.getArray();
+        const ValueSet& fullSet = arrayToSet(rhs);
+
+        // do not shortcircuit when potentialSubset.size() > fullSet.size()
+        // because potentialSubset can have redundant entries
+        for (vector<Value>::const_iterator it = potentialSubset.begin();
+                it != potentialSubset.end(); ++it) {
+            if (!fullSet.count(*it)) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+
+    const char *ExpressionSetIsSubset::getOpName() const {
+        return "$setIsSubset";
+    }
+
+    /* ----------------------- ExpressionSetUnion ---------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionSetUnion::create() {
+        return new ExpressionSetUnion();
+    }
+
+    Value ExpressionSetUnion::evaluateInternal(const Variables& vars) const {
+        ValueSet unionedSet;
+        const size_t n = vpOperand.size();
+        for (size_t i = 0; i < n; i++) {
+            const Value newEntries = vpOperand[i]->evaluateInternal(vars);
+            if (newEntries.nullish()) {
+                return Value(BSONNULL);
+            }
+            uassert(16970, str::stream() << "All operands of $setUnion must be arrays. One argument"
+                                         << " is of type: " << newEntries.getType(),
+                    newEntries.getType() == Array);
+
+            unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
+        }
+        vector<Value> result = vector<Value>(unionedSet.begin(), unionedSet.end());
+        return Value::consume(result);
+    }
+
+    const char *ExpressionSetUnion::getOpName() const {
+        return "$setUnion";
+    }
+
+    intrusive_ptr<ExpressionNary> (*ExpressionSetUnion::getFactory() const)() {
+        return ExpressionSetUnion::create;
     }
 
     /* ----------------------- ExpressionStrcasecmp ---------------------------- */

@@ -921,6 +921,81 @@ namespace mongo {
     };
 
 
+    class ExpressionSetDifference :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionSetDifference() {}
+    };
+
+
+    class ExpressionSetEquals :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionSetEquals() {}
+    };
+
+
+    class ExpressionSetIntersection :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionSetIntersection() {}
+    };
+
+
+    class ExpressionSetIsSubset :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionSetIsSubset() {}
+    };
+
+
+    class ExpressionSetUnion :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        // virtual intrusive_ptr<Expression> optimize();
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionSetUnion() {}
+    };
+
+
     class ExpressionStrcasecmp :
         public ExpressionNary {
     public:

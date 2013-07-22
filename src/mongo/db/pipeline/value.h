@@ -17,6 +17,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/value_internal.h"
+#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
     class BSONElement;
@@ -194,6 +195,14 @@ namespace mongo {
             }
             return (Value::compare(v1, v2) == 0);
         }
+        
+        friend bool operator!=(const Value& v1, const Value& v2) {
+            return !(v1 == v2);
+        }
+
+        friend bool operator<(const Value& lhs, const Value& rhs) {
+            return (Value::compare(lhs, rhs) < 0);
+        }
 
         /// This is for debugging, logging, etc. See getString() for how to extract a string.
         string toString() const;
@@ -253,6 +262,8 @@ namespace mongo {
         friend class MutableValue; // gets and sets _storage.genericRCPtr
     };
     BOOST_STATIC_ASSERT(sizeof(Value) == 16);
+
+    typedef unordered_set<Value, Value::Hash> ValueSet;
 }
 
 namespace std {
