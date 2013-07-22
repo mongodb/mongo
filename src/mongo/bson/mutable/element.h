@@ -550,7 +550,7 @@ namespace mutablebson {
 
         StringData getValueStringOrSymbol() const;
 
-        Status setValue(Element* newValue, bool inPlace = false);
+        Status setValue(Element::RepIdx newValueIdx);
 
         template<typename Builder>
         inline void writeElement(Builder* builder, const StringData* fieldName = NULL) const;
