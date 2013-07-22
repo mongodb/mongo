@@ -241,7 +241,9 @@ public:
         if (jsonArray)
             out << ']' << endl;
 
-        cerr << "exported " << num << " records" << endl;
+        if (!_quiet) {
+            (_usesstdout ? cout : cerr ) << "exported " << num << " records" << endl;
+        }
 
         return 0;
     }
