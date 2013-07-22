@@ -905,6 +905,8 @@ namespace mutablebson {
             if (!_damages) {
                 damages->clear();
                 *source = NULL;
+                if (size)
+                    *size = 0;
                 return false;
             }
 
