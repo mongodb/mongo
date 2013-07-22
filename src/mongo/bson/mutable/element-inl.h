@@ -89,19 +89,6 @@ namespace mutablebson {
         return isType(mongo::MaxKey);
     }
 
-    inline SafeNum Element::getValueSafeNum() const {
-        switch (getType()) {
-        case mongo::NumberInt:
-            return static_cast<int>(getValueInt());
-        case mongo::NumberLong:
-            return static_cast<long long int>(getValueLong());
-        case mongo::NumberDouble:
-            return getValueDouble();
-        default:
-            verify(false);
-        }
-    }
-
     inline Document& Element::getDocument() {
         return *_doc;
     }

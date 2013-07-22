@@ -284,7 +284,7 @@ namespace mutablebson {
         inline bool isValueMaxKey() const;
 
         /** Returns the numeric value as a SafeNum */
-        inline SafeNum getValueSafeNum() const;
+        SafeNum getValueSafeNum() const;
 
 
         //

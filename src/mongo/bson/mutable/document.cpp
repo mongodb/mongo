@@ -579,6 +579,7 @@ namespace mutablebson {
             // 0.
             dassert(_objects.size() == kLeafObjIdx);
             _objects.push_back(_leafBuilder.asTempObj());
+            dassert(_leafBuf.len() != 0);
 
             // TODO: Could use boost optional to reduce pointer chasing.
             if (inPlaceMode == Document::kInPlaceEnabled) {
@@ -870,8 +871,6 @@ namespace mutablebson {
 
         // Returns true if 'data' points within the leaf BufBuilder.
         inline bool inLeafBuilder(const char* data) const {
-            if (_leafBuf.len() == 0)
-                return false;
             // TODO: Write up something documenting that the following is technically UB due
             // to illegality of comparing pointers to different aggregates for ordering. Also,
             // do we need to do anything to prevent the optimizer from compiling this out on
@@ -1314,11 +1313,25 @@ namespace mutablebson {
     }
 
     const BSONElement Element::getValue() const {
+        verify(ok());
         const Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
         if (impl.hasValue(thisRep))
             return impl.getSerializedElement(thisRep);
         return BSONElement();
+    }
+
+    SafeNum Element::getValueSafeNum() const {
+        switch (getType()) {
+        case mongo::NumberInt:
+            return static_cast<int>(getValueInt());
+        case mongo::NumberLong:
+            return static_cast<long long int>(getValueLong());
+        case mongo::NumberDouble:
+            return getValueDouble();
+        default:
+            return SafeNum();
+        }
     }
 
     int Element::compareWithElement(const ConstElement& other, bool considerFieldName) const {
@@ -1732,7 +1745,9 @@ namespace mutablebson {
         case mongo::NumberDouble:
             return setValueDouble(value._value.doubleVal);
         default:
-            verify(false);
+            return Status(
+                ErrorCodes::UnsupportedFormat,
+                "Don't know how to handle unexpected SafeNum type");
         }
     }
 
@@ -1946,17 +1961,18 @@ namespace mutablebson {
             const BSONType type = impl.getType(thisRep);
             const StringData subName = fieldName ? *fieldName : impl.getFieldName(thisRep);
             SubBuilder<Builder> subBuilder(builder, type, subName);
+
+            // Otherwise, this is a 'dirty leaf', which is impossible.
+            dassert((type == mongo::Array) || (type == mongo::Object));
+
             if (type == mongo::Array) {
                 BSONArrayBuilder child_builder(subBuilder.buffer);
                 writeChildren(&child_builder);
                 child_builder.doneFast();
-            } else if (type == mongo::Object) {
+            } else {
                 BSONObjBuilder child_builder(subBuilder.buffer);
                 writeChildren(&child_builder);
                 child_builder.doneFast();
-            } else {
-                // This would only occur on a dirtied leaf, which should never occur.
-                verify(false);
             }
         }
     }
@@ -2331,7 +2347,8 @@ namespace mutablebson {
         case mongo::NumberDouble:
             return makeElementDouble(fieldName, value._value.doubleVal);
         default:
-            verify(false);
+            // Return an invalid element to indicate that we failed.
+            return end();
         }
     }
 
