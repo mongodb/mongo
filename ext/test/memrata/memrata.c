@@ -962,6 +962,19 @@ err:	if (wslocked)
 }
 
 /*
+ * key_max_err --
+ *	Common error when a WiredTiger key is too large.
+ */
+static int
+key_max_err(WT_EXTENSION_API *wtext, WT_SESSION *session, size_t len)
+{
+	ERET(wtext, session, EINVAL,
+	    "key length (%" PRIuMAX " bytes) larger than the maximum Memrata "
+	    "key length of %d bytes",
+	    (uintmax_t)len, KVS_MAX_KEY_LEN);
+}
+
+/*
  * copyin_key --
  *	Copy a WT_CURSOR key to a struct kvs_record key.
  */
@@ -1024,9 +1037,8 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 	} else {
 		/* I'm not sure this test is necessary, but it's cheap. */
 		if (wtcursor->key.size > KVS_MAX_KEY_LEN)
-			ERET(wtext, session, ERANGE,
-			    "key size of %" PRIuMAX " is too large",
-			    (uintmax_t)wtcursor->key.size);
+			return (key_max_err(
+			    wtext, session, (size_t)wtcursor->key.size));
 
 		/*
 		 * XXX
@@ -1124,9 +1136,7 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 	 */
 	if (r->key != cursor->key) {
 		if (r->key_len > sizeof(cursor->key))
-			ERET(wtext, session, ERANGE,
-			    "key too large, maximum is %" PRIuMAX,
-			    (uintmax_t)sizeof(cursor->key));
+			return (key_max_err(wtext, session, r->key_len));
 
 		memcpy(cursor->key, r->key, r->key_len);
 		r->key = cursor->key;
