@@ -30,7 +30,7 @@ namespace mongo {
         SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
                               _syncTarget(NULL),
                               _oplogReader(new OplogReader(true)),
-                              _supportsUpdater(true) {}
+                              _supportsUpdater(false) {}
 
         ~SyncSourceFeedback() {
             delete _oplogReader;
@@ -39,11 +39,13 @@ namespace mongo {
         /// Adds an entry to _member for a secondary that has connected to us.
         void associateMember(const BSONObj& id, const int memberId);
 
+        /// Ensures local.me is populated and populates it if not.
+        void ensureMe();
+
         /// Passes handshake up the replication chain, upon receiving a handshake.
         void forwardSlaveHandshake();
 
         void updateSelfInMap(const OpTime& ot) {
-            ensureMe();
             updateMap(_me["_id"].OID(), ot);
         }
 
@@ -51,6 +53,7 @@ namespace mongo {
         bool connect(const Member* target);
 
         void resetConnection() {
+            LOG(1) << "resetting connection in sync source feedback";
             _connection.reset();
         }
 
@@ -64,6 +67,9 @@ namespace mongo {
             //boost::unique_lock<boost::mutex> lock(_mtx);
             return _supportsUpdater;
         }
+
+        /// Transfers information about a chained node's oplog position from downstream to upstream
+        void percolate(const mongo::OID& rid, const OpTime& ot);
 
         /// Updates the _slaveMap to be forwarded to the sync target.
         void updateMap(const mongo::OID& rid, const OpTime& ot);
@@ -80,7 +86,7 @@ namespace mongo {
             return _oplogReader->connect(hostName);
         }
 
-        bool connect(const BSONObj& rid, const int from, const string& to) {
+        bool connect(const mongo::OID& rid, const int from, const string& to) {
             return _oplogReader->connect(rid, from, to);
         }
 
@@ -113,9 +119,6 @@ namespace mongo {
         }
 
     private:
-        /// Ensures local.me is populated and populates it if not.
-        void ensureMe();
-
         /* Generally replAuthenticate will only be called within system threads to fully
          * authenticate connections to other nodes in the cluster that will be used as part of
          * internal operations. If a user-initiated action results in needing to call

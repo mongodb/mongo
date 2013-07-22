@@ -56,7 +56,7 @@ namespace mongo {
         /* ok to call if already connected */
         bool connect(const std::string& hostname);
 
-        bool connect(const BSONObj& rid, const int from, const string& to);
+        bool connect(const mongo::OID& rid, const int from, const string& to);
 
         void tailCheck() {
             if( cursor.get() && cursor->isDead() ) {
@@ -140,7 +140,7 @@ namespace mongo {
     private:
         /** @return true iff connection was successful */ 
         bool commonConnect(const string& hostName);
-        bool passthroughHandshake(const BSONObj& rid, const int f);
+        bool passthroughHandshake(const mongo::OID& rid, const int f);
     };
 
 }

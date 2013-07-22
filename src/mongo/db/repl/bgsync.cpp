@@ -121,7 +121,14 @@ namespace replset {
 
     void BackgroundSync::notifierThread() {
         Client::initThread("rsSyncNotifier");
+        theReplSet->syncSourceFeedback.ensureMe();
         replLocalAuth();
+
+        // This makes the initial connection to our sync source for oplog position notification.
+        // It also sets the supportsUpdater flag so we know which method to use.
+        // If this function fails, we ignore that situation because it will be taken care of
+        // the first time markOplog() is called in the loop below.
+        connectOplogNotifier();
         theReplSet->syncSourceFeedback.go();
 
         while (!inShutdown()) {
@@ -173,8 +180,8 @@ namespace replset {
                << theReplSet->lastOpTimeWritten << rsLog;
 
         if (theReplSet->syncSourceFeedback.supportsUpdater()) {
-            theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
             _consumedOpTime = theReplSet->lastOpTimeWritten;
+            theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
         }
         else {
             if (!hasCursor()) {
@@ -203,30 +210,35 @@ namespace replset {
         }
     }
 
-    bool BackgroundSync::hasCursor() {
-        {
-            // prevent writers from blocking readers during fsync
-            SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
-            // we don't need the local write lock yet, but it's needed by OplogReader::connect
-            // so we take it preemptively to avoid deadlocking.
-            Lock::DBWrite lk("local");
+    bool BackgroundSync::connectOplogNotifier() {
+        // prevent writers from blocking readers during fsync
+        SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
+        // we don't need the local write lock yet, but it's needed by OplogReader::connect
+        // so we take it preemptively to avoid deadlocking.
+        Lock::DBWrite lk("local");
 
-            boost::unique_lock<boost::mutex> lock(_mutex);
+        boost::unique_lock<boost::mutex> lock(_mutex);
 
-            if (!_oplogMarkerTarget || _currentSyncTarget != _oplogMarkerTarget) {
-                if (!_currentSyncTarget) {
-                    return false;
-                }
-
-                log() << "replset setting oplog notifier to "
-                      << _currentSyncTarget->fullName() << rsLog;
-                _oplogMarkerTarget = _currentSyncTarget;
-
-                if (!theReplSet->syncSourceFeedback.connect(_oplogMarkerTarget)) {
-                    _oplogMarkerTarget = NULL;
-                    return false;
-                }
+        if (!_oplogMarkerTarget || _currentSyncTarget != _oplogMarkerTarget) {
+            if (!_currentSyncTarget) {
+                return false;
             }
+
+            log() << "replset setting oplog notifier to "
+                  << _currentSyncTarget->fullName() << rsLog;
+            _oplogMarkerTarget = _currentSyncTarget;
+
+            if (!theReplSet->syncSourceFeedback.connect(_oplogMarkerTarget)) {
+                _oplogMarkerTarget = NULL;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool BackgroundSync::hasCursor() {
+        if (!connectOplogNotifier()) {
+            return false;
         }
         if (!theReplSet->syncSourceFeedback.haveCursor()) {
             BSONObj fields = BSON("ts" << 1);
@@ -530,8 +542,15 @@ namespace replset {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _currentSyncTarget = target;
             }
+            {
+                // prevent writers from blocking readers during fsync
+                SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
+                // we don't need the local write lock yet, but it's needed by ensureMe()
+                // so we take it preemptively to avoid deadlocking.
+                Lock::DBWrite lk("local");
 
-            theReplSet->syncSourceFeedback.connect(target);
+                theReplSet->syncSourceFeedback.connect(target);
+            }
 
             return;
         }
