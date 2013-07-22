@@ -2892,6 +2892,312 @@ namespace ExpressionTests {
 
     } // namespace Parse
 
+    namespace Set {
+        Value sortSet(Value set) {
+            if (set.nullish()) {
+                return Value(BSONNULL);
+            }
+            vector<Value> sortedSet = set.getArray();
+            std::sort(sortedSet.begin(), sortedSet.end());
+            return Value(sortedSet);
+        }
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {}
+            void run() {
+                const Document spec = getSpec();
+                const Value args = spec["input"];
+                if (!spec["expected"].missing()) {
+                    FieldIterator fields(spec["expected"].getDocument());
+                    while (fields.more()) {
+                        const Document::FieldPair field(fields.next());
+                        const Value expected = field.second;
+                        const BSONObj obj = BSON(field.first << args);
+                        const intrusive_ptr<Expression> expr =
+                                Expression::parseExpression(obj.firstElement());
+                        Value result = expr->evaluate(Document());
+                        if (result.getType() == Array) {
+                            result = sortSet(result);
+                        }
+                        if (result != expected) {
+                            string errMsg = str::stream()
+                                << "for expression " << field.first.toString()
+                                << " with argument " << args.toString()
+                                << " full tree: " << expr->serialize().toString()
+                                << " expected: " << expected.toString()
+                                << " but got: " << result.toString();
+                            FAIL(errMsg);
+                        }
+                        //TODO test optimize here
+                    }
+                }
+                if (!spec["error"].missing()) {
+                    const vector<Value>& asserters = spec["error"].getArray();
+                    size_t n = asserters.size();
+                    for (size_t i = 0; i < n; i++) {
+                        const BSONObj obj = BSON(asserters[i].getString() << args);
+                        ASSERT_THROWS({
+                            // NOTE: parse and evaluatation failures are treated the same
+                            const intrusive_ptr<Expression> expr =
+                                    Expression::parseExpression(obj.firstElement());
+                            expr->evaluate(Document());
+                        }, UserException);
+                    }
+                }
+            }
+        private:
+            virtual Document getSpec() = 0;
+        };
+
+        class Same : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << DOC_ARRAY(1 << 2) )
+                        << "expected" << DOC("$setIsSubset" << true
+                                          << "$setEquals" << true
+                                          << "$setIntersection" << DOC_ARRAY(1 << 2)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setDifference" << vector<Value>() )
+                       );
+
+            }
+        };
+
+        class Redundant : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << DOC_ARRAY(1 << 2 << 2) )
+                        << "expected" << DOC("$setIsSubset" << true
+                                          << "$setEquals" << true
+                                          << "$setIntersection" << DOC_ARRAY(1 << 2)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setDifference" << vector<Value>() )
+                       );
+
+            }
+        };
+
+        class DoubleRedundant : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 1 << 2)
+                                              << DOC_ARRAY(1 << 2 << 2) )
+                        << "expected" << DOC("$setIsSubset" << true
+                                          << "$setEquals" << true
+                                          << "$setIntersection" << DOC_ARRAY(1 << 2)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setDifference" << vector<Value>() )
+                       );
+
+            }
+        };
+
+        class Super : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << DOC_ARRAY(1) )
+                        << "expected" << DOC("$setIsSubset" << false
+                                          << "$setEquals" << false
+                                          << "$setIntersection" << DOC_ARRAY(1)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setDifference" << DOC_ARRAY(2) )
+                       );
+
+            }
+        };
+
+        class Sub : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1)
+                                              << DOC_ARRAY(1 << 2) )
+                        << "expected" << DOC("$setIsSubset" << true
+                                          << "$setEquals" << false
+                                          << "$setIntersection" << DOC_ARRAY(1)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setDifference" << vector<Value>() )
+                       );
+
+            }
+        };
+
+        class SameBackwards : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << DOC_ARRAY(2 << 1) )
+                        << "expected" << DOC("$setIsSubset" << true
+                                          << "$setEquals" << true
+                                          << "$setIntersection" << DOC_ARRAY(1 << 2)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setDifference" << vector<Value>() )
+                       );
+
+            }
+        };
+
+        class NoOverlap : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << DOC_ARRAY(8 << 4) )
+                        << "expected" << DOC("$setIsSubset" << false
+                                          << "$setEquals" << false
+                                          << "$setIntersection" << vector<Value>()
+                                          << "$setUnion" << DOC_ARRAY(1 << 2 << 4 << 8)
+                                          << "$setDifference" << DOC_ARRAY(1 << 2))
+                       );
+
+            }
+        };
+
+        class Overlap : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << DOC_ARRAY(8 << 2 << 4) )
+                        << "expected" << DOC("$setIsSubset" << false
+                                          << "$setEquals" << false
+                                          << "$setIntersection" << DOC_ARRAY(2)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2 << 4 << 8)
+                                          << "$setDifference" << DOC_ARRAY(1))
+                       );
+
+            }
+        };
+
+        class LastNull : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << Value(BSONNULL) )
+                        << "expected" << DOC("$setIntersection" << BSONNULL
+                                          << "$setUnion" << BSONNULL
+                                          << "$setDifference" << BSONNULL )
+                        << "error" << DOC_ARRAY("$setEquals"
+                                             << "$setIsSubset")
+                       );
+
+            }
+        };
+
+        class FirstNull : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( Value(BSONNULL)
+                                              << DOC_ARRAY(1 << 2) )
+                        << "expected" << DOC("$setIntersection" << BSONNULL
+                                          << "$setUnion" << BSONNULL
+                                          << "$setDifference" << BSONNULL )
+                        << "error" << DOC_ARRAY("$setEquals"
+                                             << "$setIsSubset")
+                       );
+
+            }
+        };
+
+        class NoArg : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << vector<Value>()
+                        << "expected" << DOC("$setIntersection" << vector<Value>()
+                                          << "$setUnion" << vector<Value>() )
+                        << "error" << DOC_ARRAY("$setEquals"
+                                             << "$setIsSubset"
+                                             << "$setDifference")
+                       );
+
+            }
+        };
+
+        class OneArg : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2) )
+                        << "expected" << DOC("$setIntersection" << DOC_ARRAY(1 << 2)
+                                          << "$setUnion" << DOC_ARRAY(1 << 2) )
+                        << "error" << DOC_ARRAY("$setEquals"
+                                             << "$setIsSubset"
+                                             << "$setDifference")
+                       );
+
+            }
+        };
+
+        class EmptyArg : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( vector<Value>() )
+                        << "expected" << DOC("$setIntersection" << vector<Value>()
+                                          << "$setUnion" << vector<Value>() )
+                        << "error" << DOC_ARRAY("$setEquals"
+                                             << "$setIsSubset"
+                                             << "$setDifference")
+                       );
+
+            }
+        };
+
+        class LeftArgEmpty : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( vector<Value>()
+                                              << DOC_ARRAY(1 << 2) )
+                        << "expected" << DOC("$setIntersection" << vector<Value>()
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setIsSubset" << true
+                                          << "$setEquals" << false
+                                          << "$setDifference" << vector<Value>() )
+                       );
+
+            }
+        };
+
+        class RightArgEmpty : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2)
+                                              << vector<Value>() )
+                        << "expected" << DOC("$setIntersection" << vector<Value>()
+                                          << "$setUnion" << DOC_ARRAY(1 << 2)
+                                          << "$setIsSubset" << false
+                                          << "$setEquals" << false
+                                          << "$setDifference" << DOC_ARRAY(1 << 2) )
+                       );
+
+            }
+        };
+
+        class ManyArgs : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(8 << 3)
+                                              << DOC_ARRAY("asdf" << "foo")
+                                              << DOC_ARRAY(80.3 << 34)
+                                              << vector<Value>()
+                                              << DOC_ARRAY(80.3 << "foo" << 11 << "yay") )
+                        << "expected" << DOC("$setIntersection" << vector<Value>()
+                                          << "$setEquals" << false
+                                          << "$setUnion" << DOC_ARRAY(3
+                                                                   << 8
+                                                                   << 11
+                                                                   << 34
+                                                                   << 80.3
+                                                                   << "asdf"
+                                                                   << "foo"
+                                                                   << "yay") )
+                        << "error" << DOC_ARRAY("$setIsSubset"
+                                             << "$setDifference")
+                       );
+
+            }
+        };
+
+        class ManyArgsEqual : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1 << 2 << 4)
+                                              << DOC_ARRAY(1 << 2 << 2 << 4)
+                                              << DOC_ARRAY(4 << 1 << 2)
+                                              << DOC_ARRAY(2 << 1 << 1 << 4) )
+                        << "expected" << DOC("$setIntersection" << DOC_ARRAY(1 << 2 << 4)
+                                          << "$setEquals" << true
+                                          << "$setUnion" << DOC_ARRAY(1 << 2 << 4) )
+                        << "error" << DOC_ARRAY("$setIsSubset"
+                                             << "$setDifference")
+                       );
+
+            }
+        };
+    } // namespace Set
+
     namespace Strcasecmp {
 
         class ExpectedResultBase {
@@ -3397,6 +3703,24 @@ namespace ExpressionTests {
             add<ToUpper::NullBegin>();
             add<ToUpper::NullMiddle>();
             add<ToUpper::NullEnd>();
+
+            add<Set::Same>();
+            add<Set::Redundant>();
+            add<Set::DoubleRedundant>();
+            add<Set::Sub>();
+            add<Set::Super>();
+            add<Set::SameBackwards>();
+            add<Set::NoOverlap>();
+            add<Set::Overlap>();
+            add<Set::FirstNull>();
+            add<Set::LastNull>();
+            add<Set::NoArg>();
+            add<Set::OneArg>();
+            add<Set::EmptyArg>();
+            add<Set::LeftArgEmpty>();
+            add<Set::RightArgEmpty>();
+            add<Set::ManyArgs>();
+            add<Set::ManyArgsEqual>();
         }
     } myall;
 
