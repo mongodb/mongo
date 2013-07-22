@@ -28,76 +28,93 @@
 
 namespace mongo {
 
+namespace {
+    static Status userNotFoundStatus(ErrorCodes::UserNotFound, "User not found");
+}
+
     AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
     Status AuthzManagerExternalStateMongod::insertPrivilegeDocument(const string& dbname,
                                                                     const BSONObj& userObj) const {
-        string userNS = dbname + ".system.users";
-        DBDirectClient client;
-        {
-            Client::GodScope gs;
-            // TODO(spencer): Once we're no longer fully rebuilding the user cache on every change
-            // to user data we should remove the global lock and uncomment the WriteContext below
-            Lock::GlobalWrite w;
-            // Client::WriteContext ctx(userNS);
-            client.insert(userNS, userObj);
-        }
+        try {
+            string userNS = dbname + ".system.users";
+            DBDirectClient client;
+            {
+                Client::GodScope gs;
+                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
+                // change to user data we should remove the global lock and uncomment the
+                // WriteContext below
+                Lock::GlobalWrite w;
+                // Client::WriteContext ctx(userNS);
+                client.insert(userNS, userObj);
+            }
 
-        // 30 second timeout for w:majority
-        BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
-        string errstr = client.getLastErrorString(res);
-        if (errstr.empty()) {
-            return Status::OK();
+            // 30 second timeout for w:majority
+            BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
+            string errstr = client.getLastErrorString(res);
+            if (errstr.empty()) {
+                return Status::OK();
+            }
+            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
+                return Status(ErrorCodes::DuplicateKey,
+                              mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
+                                     "\" already exists on database \"" << dbname << "\"");
+            }
+            return Status(ErrorCodes::UserModificationFailed, errstr);
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
-        if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
-            return Status(ErrorCodes::DuplicateKey,
-                          mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
-                                 "\" already exists on database \"" << dbname << "\"");
-        }
-        return Status(ErrorCodes::UserModificationFailed, errstr);
     }
 
     Status AuthzManagerExternalStateMongod::updatePrivilegeDocument(
             const UserName& user, const BSONObj& updateObj) const {
-        string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
-        DBDirectClient client;
-        {
-            Client::GodScope gs;
-            // TODO(spencer): Once we're no longer fully rebuilding the user cache on every change
-            // to user data we should remove the global lock and uncomment the WriteContext below
-            Lock::GlobalWrite w;
-            // Client::WriteContext ctx(userNS);
-            client.update(userNS,
-                          QUERY("user" << user.getUser() << "userSource" << BSONNULL),
-                          updateObj);
-        }
+        try {
+            string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
+            DBDirectClient client;
+            {
+                Client::GodScope gs;
+                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
+                // change to user data we should remove the global lock and uncomment the
+                // WriteContext below
+                Lock::GlobalWrite w;
+                // Client::WriteContext ctx(userNS);
+                client.update(userNS,
+                              QUERY("user" << user.getUser() << "userSource" << BSONNULL),
+                              updateObj);
+            }
 
-        // 30 second timeout for w:majority
-        BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
-        string err = client.getLastErrorString(res);
-        if (!err.empty()) {
-            return Status(ErrorCodes::UserModificationFailed, err);
-        }
+            // 30 second timeout for w:majority
+            BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
+            string err = client.getLastErrorString(res);
+            if (!err.empty()) {
+                return Status(ErrorCodes::UserModificationFailed, err);
+            }
 
-        int numUpdated = res["n"].numberInt();
-        dassert(numUpdated <= 1 && numUpdated >= 0);
-        if (numUpdated == 0) {
-            return Status(ErrorCodes::UserNotFound,
-                          mongoutils::str::stream() << "User " << user.getFullName() <<
-                                  " not found");
-        }
+            int numUpdated = res["n"].numberInt();
+            dassert(numUpdated <= 1 && numUpdated >= 0);
+            if (numUpdated == 0) {
+                return Status(ErrorCodes::UserNotFound,
+                              mongoutils::str::stream() << "User " << user.getFullName() <<
+                                      " not found");
+            }
 
-        return Status::OK();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
-    bool AuthzManagerExternalStateMongod::_findUser(const string& usersNamespace,
-                                                    const BSONObj& query,
-                                                    BSONObj* result) const {
+    Status AuthzManagerExternalStateMongod::_findUser(const string& usersNamespace,
+                                                      const BSONObj& query,
+                                                      BSONObj* result) const {
         Client::GodScope gs;
         Client::ReadContext ctx(usersNamespace);
 
-        return Helpers::findOne(usersNamespace, query, *result);
+        if (!Helpers::findOne(usersNamespace, query, *result)) {
+            return userNotFoundStatus;
+        }
+        return Status::OK();
     }
 
     Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
@@ -106,12 +123,13 @@ namespace mongo {
         return Status::OK();
     }
 
-    std::vector<BSONObj> AuthzManagerExternalStateMongod::getAllV1PrivilegeDocsForDB(
-            const std::string& dbname) const {
+    Status AuthzManagerExternalStateMongod::getAllV1PrivilegeDocsForDB(
+            const std::string& dbname, std::vector<BSONObj>* privDocs) const {
         Client::GodScope gs;
         Client::ReadContext ctx(dbname);
 
-        return Helpers::findAll(dbname, BSONObj());
+        *privDocs = Helpers::findAll(dbname, BSONObj());
+        return Status::OK();
     }
 
 } // namespace mongo

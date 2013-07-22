@@ -43,12 +43,13 @@ namespace mongo {
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) const;
 
-        virtual std::vector<BSONObj> getAllV1PrivilegeDocsForDB(const std::string& dbname) const;
+        virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,
+                                                  std::vector<BSONObj>* privDocs) const;
 
     protected:
-        virtual bool _findUser(const string& usersNamespace,
-                               const BSONObj& query,
-                               BSONObj* result) const;
+        virtual Status _findUser(const string& usersNamespace,
+                                 const BSONObj& query,
+                                 BSONObj* result) const;
     };
 
 } // namespace mongo

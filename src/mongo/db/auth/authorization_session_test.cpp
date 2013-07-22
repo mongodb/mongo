@@ -71,9 +71,9 @@ namespace {
     public:
         AuthManagerExternalStateImplictPriv() : AuthzManagerExternalStateMock() {}
 
-        virtual bool _findUser(const string& usersNamespace,
-                               const BSONObj& query,
-                               BSONObj* result) const {
+        virtual Status _findUser(const string& usersNamespace,
+                                 const BSONObj& query,
+                                 BSONObj* result) const {
 
             NamespaceString nsstring(usersNamespace);
             std::string user = query[AuthorizationManager::USER_NAME_FIELD_NAME].String();
@@ -87,8 +87,10 @@ namespace {
             *result = mapFindWithDefault(_privilegeDocs,
                                          std::make_pair(nsstring.db().toString(),
                                                         UserName(user, userSource)),
-                                                        BSON("invalid" << 1));
-            return  !(*result)["invalid"].trueValue();
+                                         BSON("invalid" << 1));
+            return (*result)["invalid"].trueValue() ?
+                    Status(ErrorCodes::UserNotFound, "User not found") :
+                    Status::OK();
         }
 
         void addPrivilegeDocument(const string& dbname,

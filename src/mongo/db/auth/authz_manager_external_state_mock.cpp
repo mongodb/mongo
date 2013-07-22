@@ -55,24 +55,22 @@ namespace mongo {
         return Status::OK();
     }
 
-    std::vector<BSONObj> AuthzManagerExternalStateMock::getAllV1PrivilegeDocsForDB(
-            const std::string& dbname) const {
-        std::vector<BSONObj> out;
-
+    Status AuthzManagerExternalStateMock::getAllV1PrivilegeDocsForDB(
+            const std::string& dbname, std::vector<BSONObj>* privDocs) const {
         const std::vector<BSONObj>& dbDocs = _userDocuments.find(dbname)->second;
         for (std::vector<BSONObj>::const_iterator it = dbDocs.begin(); it != dbDocs.end(); ++it) {
-            out.push_back(*it);
+            privDocs->push_back(*it);
         }
-        return out;
+        return Status::OK();
     }
 
 
-    bool AuthzManagerExternalStateMock::_findUser(const std::string& usersNamespace,
+    Status AuthzManagerExternalStateMock::_findUser(const std::string& usersNamespace,
                            const BSONObj& query,
                            BSONObj* result) const {
         StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query);
         if (!parseResult.isOK()) {
-            return false;
+            return parseResult.getStatus();
         }
         MatchExpression* matcher = parseResult.getValue();
 
@@ -83,11 +81,11 @@ namespace mongo {
                 if (nsToDatabase(usersNamespace) == mapIt->first &&
                         matcher->matchesBSON(*vecIt)) {
                     *result = *vecIt;
-                    return true;
+                    return Status::OK();
                 }
             }
         }
-        return false;
+        return Status(ErrorCodes::UserNotFound, "User not found");
     }
 
 } // namespace mongo
