@@ -154,7 +154,7 @@ namespace mongo {
          * once we have all the code necessary to upgrade to the V2 user data format, as at that
          * point we'll only be able to user V1 user data as read-only.
          */
-        Status initilizeAllV1UserData();
+        Status initializeAllV1UserData();
 
     private:
 
