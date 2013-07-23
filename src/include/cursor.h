@@ -255,6 +255,9 @@ struct __wt_cursor_table {
 
 	WT_TABLE *table;
 	const char *plan;
+
+	const char *config;		/* Saved configuration string */
+
 	WT_CURSOR **cg_cursors;
 	WT_CURSOR **idx_cursors;
 };

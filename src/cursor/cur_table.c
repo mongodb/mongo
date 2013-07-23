@@ -619,6 +619,7 @@ __curtable_close(WT_CURSOR *cursor)
 
 	if (ctable->plan != ctable->table->plan)
 		__wt_free(session, ctable->plan);
+	__wt_free(session, ctable->config);
 	if (cursor->value_format != ctable->table->value_format)
 		__wt_free(session, cursor->value_format);
 	__wt_free(session, ctable->cg_cursors);
@@ -691,7 +692,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 		    "Bulk load is not supported for tables with indices");
 
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
-	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[0] = ctable->config;
 	cfg[1] = NULL;
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
 		WT_RET(__wt_open_cursor(session, table->indices[i]->source,
@@ -801,6 +802,12 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	 * cursor(s).
 	 */
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
+
+	/*
+	 * We'll need to squirrel away a copy of the cursor configuration
+	 * for when we eventually open indices.
+	 */
+	WT_ERR(__wt_config_collapse(session, cfg, &ctable->config));
 
 	if (0) {
 err:		WT_TRET(__curtable_close(cursor));
