@@ -880,25 +880,51 @@ namespace mongo {
         return b.obj();
     }
 
-    bool BSONObj::okForStorage() const {
+    bool BSONObj::_okForStorage(bool root) const {
         BSONObjIterator i( *this );
+        bool first = true;
         while ( i.more() ) {
             BSONElement e = i.next();
-            const char * name = e.fieldName();
+            const char* name = e.fieldName();
 
-            if ( strchr( name , '.' ) ||
-                    strchr( name , '$' ) ) {
-                return
-                    strcmp( name , "$ref" ) == 0 ||
-                    strcmp( name , "$id" ) == 0
-                    ;
-            }
+            // Cannot start with "$", unless dbref which must start with ($ref, $id)
+            if (mongoutils::str::startsWith(name, '$')) {
+                if ( first &&
+                     // $ref is a collection name and must be a String
+                     mongoutils::str::equals(name, "$ref") && e.type() == String &&
+                     mongoutils::str::equals(i.next().fieldName(), "$id") ) {
 
-            // check no regexp for _id (SERVER-9502)
-            if (mongoutils::str::equals(e.fieldName(), "_id")) {
-                if (e.type() == RegEx) {
+                    first = false;
+                    // keep inspecting fields for optional "$db"
+                    e = i.next();
+                    name = e.fieldName(); // "" if eoo()
+
+                    // optional $db field must be a String
+                    if (mongoutils::str::equals(name, "$db") && e.type() == String) {
+                        continue; //this element is fine, so continue on to siblings (if any more)
+                    }
+
+                    // Can't start with a "$", all other checks are done below (outside if blocks)
+                    if (mongoutils::str::startsWith(name, '$'))  {
+                        return false;
+                    }
+                }
+                else {
+                    // not an okay, $ prefixed field name.
                     return false;
                 }
+            }
+
+            // Do not allow "." in the field name
+            if (strchr(name, '.')) {
+                return false;
+            }
+
+            // (SERVER-9502) Do not allow storing an _id field with a RegEx type or
+            // Array type in a root document
+            if (root && (e.type() == RegEx || e.type() == Array)
+                     && mongoutils::str::equals(name,"_id")) {
+                return false;
             }
 
             if ( e.mayEncapsulate() ) {
@@ -915,8 +941,8 @@ namespace mongo {
                 default:
                     uassert( 12579, "unhandled cases in BSONObj okForStorage" , 0 );
                 }
-
             }
+            first = false;
         }
         return true;
     }
