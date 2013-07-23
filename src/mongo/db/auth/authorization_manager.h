@@ -127,11 +127,12 @@ namespace mongo {
         ActionSet getAllUserActions() const;
 
         /**
-         *  Returns the User object for the given userName in the out param "acquiredUser".
+         *  Returns the User object for the given userName in the out parameter "acquiredUser".
          *  If the user cache already has a user object for this user, it increments the refcount
          *  on that object and gives out a pointer to it.  If no user object for this user name
          *  exists yet in the cache, reads the user's privilege document from disk, builds up
-         *  a User object, sets the refcount to 1, and gives that out.
+         *  a User object, sets the refcount to 1, and gives that out.  The returned user may
+         *  be invalid by the time the caller gets access to it.
          *  The AuthorizationManager retains ownership of the returned User object.
          *  On non-OK Status return values, acquiredUser will not be modified.
          */

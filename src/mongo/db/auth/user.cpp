@@ -37,6 +37,10 @@ namespace mongo {
         return RoleNameIterator(new RoleNameSetIterator(_roles.begin(), _roles.end()));
     }
 
+    const User::CredentialData& User::getCredentials() const {
+        return _credentials;
+    }
+
     bool User::isValid() const {
         return _isValid.loadRelaxed() == 1;
     }
