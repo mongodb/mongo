@@ -62,8 +62,6 @@ namespace {
         logoutDatabase(principal->getName().getDB().toString());  // See SERVER-8144.
 
         _authenticatedPrincipals.add(principal);
-        if (!principal->isImplicitPrivilegeAcquisitionEnabled())
-            return;
 
         if (principal->getName() == internalSecurity.user) {
 
@@ -311,8 +309,6 @@ namespace {
              iter != end; ++iter) {
 
             Principal* principal = *iter;
-            if (!principal->isImplicitPrivilegeAcquisitionEnabled())
-                continue;
             if (principal->isDatabaseProbed(dbname))
                 continue;
             _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());

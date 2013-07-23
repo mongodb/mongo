@@ -51,11 +51,7 @@ namespace mongo {
         // No expiration is represented as boost::posix_time::pos_infin
         const boost::posix_time::ptime& getExpirationTime() const { return _expirationTime; }
 
-        // Returns true if this principal is configured for implicit acquisition of privileges.
-        bool isImplicitPrivilegeAcquisitionEnabled() const { return _enableImplicitPrivileges; }
-
         void setExpirationTime(boost::posix_time::ptime& expiration);
-        void setImplicitPrivilegeAcquisition(bool enabled);
 
         bool isDatabaseProbed(const StringData& dbname) const;
         void markDatabaseAsProbed(const StringData& dbname);
@@ -63,7 +59,6 @@ namespace mongo {
     private:
         UserName _name;
         boost::posix_time::ptime _expirationTime;
-        bool _enableImplicitPrivileges;
         StringMap<bool> _probedDatabases;
     };
 

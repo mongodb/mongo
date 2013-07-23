@@ -211,7 +211,6 @@ namespace mongo {
         AuthorizationSession* authorizationSession =
             ClientBasic::getCurrent()->getAuthorizationSession();
         Principal* principal = new Principal(user);
-        principal->setImplicitPrivilegeAcquisition(true);
         authorizationSession->addAuthorizedPrincipal(principal);
 
         return Status::OK();

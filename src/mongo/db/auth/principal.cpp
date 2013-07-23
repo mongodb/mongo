@@ -24,18 +24,13 @@ namespace mongo {
 
     Principal::Principal(const UserName& name) :
         _name(name),
-        _expirationTime(boost::posix_time::pos_infin),
-        _enableImplicitPrivileges(false) {
+        _expirationTime(boost::posix_time::pos_infin) {
     }
 
     Principal::~Principal() {}
 
     void Principal::setExpirationTime(boost::posix_time::ptime& expiration) {
         _expirationTime = expiration;
-    }
-
-    void Principal::setImplicitPrivilegeAcquisition(bool enabled) {
-        _enableImplicitPrivileges = enabled;
     }
 
     bool Principal::isDatabaseProbed(const StringData& dbname) const {
