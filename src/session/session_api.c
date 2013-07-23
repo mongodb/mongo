@@ -202,7 +202,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->open_cursor == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    __wt_curds_create(session, uri, cfg, dsrc, cursorp);
+		    __wt_curds_create(session, uri, owner, cfg, dsrc, cursorp);
 	else
 		ret = __wt_bad_object_type(session, uri);
 

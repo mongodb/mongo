@@ -364,7 +364,8 @@ err:	API_END(session);
  *	Initialize a data-source cursor.
  */
 int
-__wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
+__wt_curds_create(
+    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
     const char *cfg[], WT_DATA_SOURCE *dsrc, WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
@@ -413,7 +414,7 @@ __wt_curds_create(WT_SESSION_IMPL *session, const char *uri,
 	WT_ERR(
 	    __wt_strndup(session, cval.str, cval.len, &cursor->value_format));
 
-	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
 	WT_ERR(dsrc->open_cursor(dsrc,
 	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &data_source->source));

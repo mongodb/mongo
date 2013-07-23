@@ -603,8 +603,9 @@ extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_curds_create(WT_SESSION_IMPL *session,
+extern int __wt_curds_create( WT_SESSION_IMPL *session,
     const char *uri,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_DATA_SOURCE *dsrc,
     WT_CURSOR **cursorp);
