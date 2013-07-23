@@ -29,9 +29,10 @@ var waitfunc = startParallelShell(command);
 sleep(100) // startParallelShell doesn't block
 
 // check that the old primary is no longer master
-var isMaster = new Mongo(firstPrimary).getDB("a").isMaster();
-printjson(isMaster);
-assert(!(isMaster.ismaster), "is master")
-
+assert.soon( function() {
+    var isMaster = new Mongo(firstPrimary).getDB("a").isMaster();
+    printjson(isMaster);
+    return !(isMaster.ismaster);
+  }, "they shouldn't be master, but are")
 // stop
 replTest.stopSet();
