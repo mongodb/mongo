@@ -85,7 +85,7 @@ namespace mongo {
                     "admin", readOnly);
 
             AuthorizationSession* authorizationSession = cc().getAuthorizationSession();
-            authorizationSession->addAuthorizedPrincipal(principal);
+            authorizationSession->addPrincipal(principal);
             Status status = authorizationSession->acquirePrivilege(
                     Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal->getName());
             verify (status == Status::OK());

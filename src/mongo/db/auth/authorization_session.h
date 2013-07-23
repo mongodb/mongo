@@ -55,8 +55,13 @@ namespace mongo {
         // TODO: try to eliminate the need for this call.
         void startRequest();
 
-        // Adds "principal" to the authorization manager, and takes ownership of it.
-        void addAuthorizedPrincipal(Principal* principal);
+        // Adds "principal" to the authorization session, acquiring privileges for that principal,
+        // and takes ownership of it.
+        void addAndAuthorizePrincipal(Principal* principal);
+
+        // Adds "principal" to the authorization session and takes ownership of it, without
+        // acquiring privileges for it.
+        void addPrincipal(Principal* principal);
 
         // Returns the authenticated principal with the given name.  Returns NULL
         // if no such user is found.
