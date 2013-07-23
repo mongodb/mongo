@@ -118,7 +118,8 @@ namespace mongo {
             cursorCache.gotKillCursors( _m );
         }
         else if ( op == dbQuery ) {
-            iscmd = NamespaceString( getns() ).isCommand();
+            NamespaceString nss(getns());
+            iscmd = nss.isCommand() || nss.isSpecialCommand();
 
             if (iscmd) {
                 int n = _d.getQueryNToReturn();
