@@ -27,21 +27,40 @@ namespace mongo {
 
     void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
 
-    /**
-     * Gets the current time string (in fixed width) in UTC. Sample format:
-     *
-     * Wed Oct 31 13:34:47.996
-     *
-     * @param timeStr pointer to the buffer to set the string - empirically, 64 bytes is enough for
-     * the buffer, 26 is not.
-     */
-    void curTimeString(char* timeStr);
-
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames
     std::string terseCurrentTime(bool colonsOk=true);
 
+    /**
+     * Formats "time" according to the ISO 8601 extended form standard, including date,
+     * and time, in the UTC timezone.
+     *
+     * Sample format: "2013-07-23T18:42:14Z"
+     */
     std::string timeToISOString(time_t time);
+
+    /**
+     * Formats "date" according to the ISO 8601 extended form standard, including date,
+     * and time with milliseconds decimal component, in the UTC timezone.
+     *
+     * Sample format: "2013-07-23T18:42:14.072Z"
+     */
+    std::string dateToISOStringUTC(Date_t date);
+
+    /**
+     * Formats "date" according to the ISO 8601 extended form standard, including date,
+     * and time with milliseconds decimal component, in the local timezone.
+     *
+     * Sample format: "2013-07-23T18:42:14.072-05:00"
+     */
+    std::string dateToISOStringLocal(Date_t date);
+
+    /**
+     * Formats "date" in fixed width in the local time zone.
+     *
+     * Sample format: "Wed Oct 31 13:34:47.996"
+     */
+    std::string dateToCtimeString(Date_t date);
 
     boost::gregorian::date currentDate();
 
