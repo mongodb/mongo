@@ -602,7 +602,7 @@ __curtable_close(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	for (i = 0, cp = (ctable)->cg_cursors;
+	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(ctable->table); i++, cp++)
 		if (*cp != NULL) {
 			WT_TRET((*cp)->close(*cp));
@@ -610,7 +610,7 @@ __curtable_close(WT_CURSOR *cursor)
 		}
 
 	if (ctable->idx_cursors != NULL)
-		for (i = 0, cp = (ctable)->idx_cursors;
+		for (i = 0, cp = ctable->idx_cursors;
 		    i < ctable->table->nindices; i++, cp++)
 			if (*cp != NULL) {
 				WT_TRET((*cp)->close(*cp));
