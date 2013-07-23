@@ -292,6 +292,22 @@ namespace mongo {
         _context = context;
     }
 
+    BSONObj UpdateDriver::makeOplogEntryQuery(const BSONObj doc, bool multi) const {
+        BSONObjBuilder idPattern;
+        BSONElement id;
+        // NOTE: If the matching object lacks an id, we'll log
+        // with the original pattern.  This isn't replay-safe.
+        // It might make sense to suppress the log instead
+        // if there's no id.
+        if ( doc.getObjectID( id ) ) {
+           idPattern.append( id );
+           return idPattern.obj();
+        }
+        else {
+           uassert( 16980, "multi-update requires all modified objects to have an _id" , ! multi );
+           return doc;
+        }
+    }
     void UpdateDriver::clear() {
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             delete *it;

@@ -69,6 +69,26 @@ namespace mongo {
         uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= BSONObjMaxUserSize );
     }
 
+    /**
+     * return a BSONObj with the _id field of the doc passed in. If no _id and multi, error.
+     */
+    BSONObj makeOplogEntryQuery(const BSONObj doc, bool multi) {
+        BSONObjBuilder idPattern;
+        BSONElement id;
+        // NOTE: If the matching object lacks an id, we'll log
+        // with the original pattern.  This isn't replay-safe.
+        // It might make sense to suppress the log instead
+        // if there's no id.
+        if ( doc.getObjectID( id ) ) {
+           idPattern.append( id );
+           return idPattern.obj();
+        }
+        else {
+           uassert( 10157, "multi-update requires all modified objects to have an _id" , ! multi );
+           return doc;
+        }
+    }
+
     /* note: this is only (as-is) called for
 
              - not multi
@@ -297,24 +317,12 @@ namespace mongo {
                     continue;
                 }
 
-                BSONObj js = BSONObj::make(r);
-
                 BSONObj pattern = patternOrig;
 
                 if ( logop ) {
-                    BSONObjBuilder idPattern;
-                    BSONElement id;
-                    // NOTE: If the matching object lacks an id, we'll log
-                    // with the original pattern.  This isn't replay-safe.
-                    // It might make sense to suppress the log instead
-                    // if there's no id.
-                    if ( js.getObjectID( id ) ) {
-                        idPattern.append( id );
-                        pattern = idPattern.obj();
-                    }
-                    else {
-                        uassert( 10157 ,  "multi-update requires all modified objects to have an _id" , ! multi );
-                    }
+                    BSONObj js = BSONObj::make(r);
+                    BSONObj idQuery = makeOplogEntryQuery(js, multi);
+                    pattern = idQuery;
                 }
 
                 /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
@@ -695,8 +703,8 @@ namespace mongo {
             // Log Obj
             if ( logop ) {
                 if ( !logObj.isEmpty() ) {
-                    BSONObj pattern = patternOrig;
-                    logOp("u", ns, logObj , &pattern, 0, fromMigrate, &newObj );
+                    BSONObj idQuery = driver.makeOplogEntryQuery(newObj, multi);
+                    logOp("u", ns, logObj , &idQuery, 0, fromMigrate, &newObj);
                 }
             }
 
