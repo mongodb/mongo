@@ -317,8 +317,10 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->value_format = btree->value_format;
 
 	cbt->btree = btree;
-	if (bulk)
+	if (bulk) {
+		F_SET(cursor, WT_CURSTD_BULK);
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
+	}
 
 	/*
 	 * random_retrieval

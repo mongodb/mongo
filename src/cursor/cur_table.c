@@ -686,11 +686,11 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 
 	/* Check for bulk cursors. */
 	primary = *ctable->cg_cursors;
-	if (F_ISSET(((WT_CURSOR_BTREE *)primary)->btree, WT_BTREE_BULK))
+	if (F_ISSET(primary, WT_CURSTD_BULK))
 		WT_RET_MSG(session, ENOTSUP,
 		    "Bulk load is not supported for tables with indices");
-	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 
+	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	cfg[1] = NULL;
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
