@@ -41,12 +41,17 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        virtual PlanStageStats* getStats();
+
     private:
         WorkingSet* _ws;
         scoped_ptr<PlanStage> _child;
 
         // We only return this many results.
         int _numToReturn;
+
+        // Stats
+        CommonStats _commonStats;
     };
 
 }  // namespace mongo

@@ -49,6 +49,7 @@ namespace mongo {
         virtual void prepareToYield() { }
         virtual void recoverFromYield() { }
         virtual void invalidate(const DiskLoc& dl) { }
+        virtual PlanStageStats* getStats() { return NULL; }
 
         /**
          * Add a result to the back of the queue.  work() goes through the queue.

@@ -52,6 +52,8 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        virtual PlanStageStats* getStats();
+
     private:
         StageState readFirstChild();
         StageState hashOtherChildren();
@@ -79,6 +81,10 @@ namespace mongo {
 
         // Which child are we currently working on?
         size_t _currentChild;
+
+        // Stats
+        CommonStats _commonStats;
+        AndHashStats _specificStats;
     };
 
 }  // namespace mongo

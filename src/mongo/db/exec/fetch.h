@@ -43,6 +43,8 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        PlanStageStats* getStats();
+
     private:
         /**
          * If the member (with id memberID) passes our filter, set *out to memberID and return that
@@ -64,6 +66,10 @@ namespace mongo {
         // If we're fetching a DiskLoc and it points at something that's not in memory, we return a
         // a "please page this in" result and hold on to the WSID until the next call to work(...).
         WorkingSetID _idBeingPagedIn;
+
+        // Stats
+        CommonStats _commonStats;
+        FetchStats _specificStats;
     };
 
 }  // namespace mongo

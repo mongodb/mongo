@@ -20,6 +20,7 @@ env.SConscript(['base/SConscript',
                 'db/exec/SConscript',
                 'db/fts/SConscript',
                 'db/ops/SConscript',
+                'db/query/SConscript',
                 'db/SConscript',
                 'logger/SConscript',
                 'platform/SConscript',
@@ -730,6 +731,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "db/exec/working_set",
                            "writebatch",
                            "db/exec/exec",
+                           "db/query/query",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 

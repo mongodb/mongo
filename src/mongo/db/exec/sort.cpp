@@ -68,6 +68,8 @@ namespace mongo {
     }
 
     PlanStage::StageState SortStage::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         // Still reading in results to sort.
@@ -87,6 +89,7 @@ namespace mongo {
                     _wsidByDiskLoc[member->loc] = id;
                 }
 
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else if (PlanStage::IS_EOF == code) {
@@ -95,9 +98,16 @@ namespace mongo {
                 std::sort(_data.begin(), _data.end(), WorkingSetComparison(_ws, _pattern));
                 _resultIterator = _data.begin();
                 _sorted = true;
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else {
+                if (PlanStage::NEED_FETCH == code) {
+                    ++_commonStats.needFetch;
+                }
+                else if (PlanStage::NEED_TIME == code) {
+                    ++_commonStats.needTime;
+                }
                 return code;
             }
         }
@@ -106,14 +116,22 @@ namespace mongo {
         verify(_resultIterator != _data.end());
         verify(_sorted);
         *out = *_resultIterator++;
+        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
 
-    void SortStage::prepareToYield() { _child->prepareToYield(); }
+    void SortStage::prepareToYield() {
+        ++_commonStats.yields;
+        _child->prepareToYield();
+    }
 
-    void SortStage::recoverFromYield() { _child->recoverFromYield(); }
+    void SortStage::recoverFromYield() {
+        ++_commonStats.unyields;
+        _child->recoverFromYield();
+    }
 
     void SortStage::invalidate(const DiskLoc& dl) {
+        ++_commonStats.invalidates;
         _child->invalidate(dl);
 
         // _data contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
@@ -127,7 +145,17 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(it->second);
             WorkingSetCommon::fetchAndInvalidateLoc(member);
             _wsidByDiskLoc.erase(it);
+            ++_specificStats.forcedFetches;
         }
+    }
+
+    PlanStageStats* SortStage::getStats() {
+        _commonStats.isEOF = isEOF();
+
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
+        ret->setSpecific<SortStats>(_specificStats);
+        ret->children.push_back(_child->getStats());
+        return ret.release();
     }
 
 }  // namespace mongo

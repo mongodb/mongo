@@ -53,6 +53,8 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        virtual PlanStageStats* getStats();
+
     private:
         // Find a node to AND against.
         PlanStage::StageState getTargetLoc();
@@ -69,16 +71,21 @@ namespace mongo {
         vector<PlanStage*> _children;
 
         // The current node we're AND-ing against.
-        PlanStage* _targetNode;
+        size_t _targetNode;
         DiskLoc _targetLoc;
         WorkingSetID _targetId;
 
         // Nodes we're moving forward until they hit the element we're AND-ing.
         // Everything in here has not advanced to _targetLoc yet.
-        std::queue<PlanStage*> _workingTowardRep;
+        // These are indices into _children.
+        std::queue<size_t> _workingTowardRep;
 
         // If any child hits EOF or if we have any errors, we're EOF.
         bool _isEOF;
+
+        // Stats
+        CommonStats _commonStats;
+        AndSortedStats _specificStats;
     };
 
 }  // namespace mongo

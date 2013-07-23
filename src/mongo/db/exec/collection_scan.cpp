@@ -32,6 +32,8 @@ namespace mongo {
                                                        _nsDropped(false) { }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
         if (NULL == _iter) {
             NamespaceDetails* nsd = nsdetails(_params.ns);
 
@@ -48,6 +50,7 @@ namespace mongo {
                 _iter.reset(new FlatIterator(_params.ns, _params.start, _params.direction));
             }
 
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
 
@@ -61,10 +64,12 @@ namespace mongo {
 
         if (NULL == _matcher || _matcher->matches(member)) {
             *out = id;
+            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
         else {
             _workingSet->free(id);
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     }
@@ -75,14 +80,26 @@ namespace mongo {
         return _iter->isEOF();
     }
 
-    void CollectionScan::invalidate(const DiskLoc& dl) { _iter->invalidate(dl); }
+    void CollectionScan::invalidate(const DiskLoc& dl) {
+        ++_commonStats.yields;
+        _iter->invalidate(dl);
+    }
 
-    void CollectionScan::prepareToYield() { _iter->prepareToYield(); }
+    void CollectionScan::prepareToYield() {
+        ++_commonStats.unyields;
+        _iter->prepareToYield();
+    }
 
     void CollectionScan::recoverFromYield() {
+        ++_commonStats.invalidates;
         if (!_iter->recoverFromYield()) {
             _nsDropped = true;
         }
+    }
+
+    PlanStageStats* CollectionScan::getStats() {
+        _commonStats.isEOF = isEOF();
+        return new PlanStageStats(_commonStats);
     }
 
 }  // namespace mongo

@@ -22,8 +22,8 @@
 namespace mongo {
 
     AndSortedStage::AndSortedStage(WorkingSet* ws, Matcher* matcher)
-        : _ws(ws), _matcher(matcher), _targetNode(NULL), _targetId(WorkingSet::INVALID_ID), _isEOF(false)
-          { }
+        : _ws(ws), _matcher(matcher), _targetNode(numeric_limits<size_t>::max()),
+          _targetId(WorkingSet::INVALID_ID), _isEOF(false) { }
 
     AndSortedStage::~AndSortedStage() {
         for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
@@ -36,7 +36,13 @@ namespace mongo {
     bool AndSortedStage::isEOF() { return _isEOF; }
 
     PlanStage::StageState AndSortedStage::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
         if (isEOF()) { return PlanStage::IS_EOF; }
+
+        if (0 == _specificStats.failedAnd.size()) {
+            _specificStats.failedAnd.resize(_children.size());
+        }
 
         // If we don't have any nodes that we're work()-ing until they hit a certain DiskLoc...
         if (0 == _workingTowardRep.size()) {
@@ -51,7 +57,7 @@ namespace mongo {
     }
 
     PlanStage::StageState AndSortedStage::getTargetLoc() {
-        verify(NULL == _targetNode);
+        verify(numeric_limits<size_t>::max() == _targetNode);
         verify(WorkingSet::INVALID_ID == _targetId);
         verify(DiskLoc() == _targetLoc);
 
@@ -67,15 +73,16 @@ namespace mongo {
             verify(member->hasLoc());
 
             // We have a value from one child to AND with.
-            _targetNode = _children[0];
+            _targetNode = 0;
             _targetId = id;
             _targetLoc = member->loc;
 
             // We have to AND with all other children.
             for (size_t i = 1; i < _children.size(); ++i) {
-                _workingTowardRep.push(_children[i]);
+                _workingTowardRep.push(i);
             }
 
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
         else if (PlanStage::IS_EOF == state || PlanStage::FAILURE == state) {
@@ -83,17 +90,25 @@ namespace mongo {
             return state;
         }
         else {
+            if (PlanStage::NEED_FETCH == state) {
+                ++_commonStats.needFetch;
+            }
+            else if (PlanStage::NEED_TIME == state) {
+                ++_commonStats.needTime;
+            }
+
             // NEED_TIME, NEED_YIELD.
             return state;
         }
     }
 
     PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
-        verify(NULL != _targetNode);
+        verify(numeric_limits<size_t>::max() != _targetNode);
         verify(WorkingSet::INVALID_ID != _targetId);
 
         // We have nodes that haven't hit _targetLoc yet.
-        PlanStage* next = _workingTowardRep.front();
+        size_t workingChildNumber = _workingTowardRep.front();
+        PlanStage* next = _children[workingChildNumber];
         WorkingSetID id;
         StageState state = next->work(&id);
 
@@ -103,8 +118,8 @@ namespace mongo {
             verify(member->hasLoc());
 
             if (member->loc == _targetLoc) {
-                // The front element has hit _targetLoc.  Don't move it forward anymore/work on another
-                // element.
+                // The front element has hit _targetLoc.  Don't move it forward anymore/work on
+                // another element.
                 _workingTowardRep.pop();
                 AndCommon::mergeFrom(_ws->get(_targetId), member);
                 _ws->free(id);
@@ -113,44 +128,55 @@ namespace mongo {
                     WorkingSetID toReturn = _targetId;
                     WorkingSetMember* toMatchTest = _ws->get(toReturn);
 
-                    _targetNode = NULL;
+                    _targetNode = numeric_limits<size_t>::max();
                     _targetId = WorkingSet::INVALID_ID;
                     _targetLoc = DiskLoc();
 
                     // Everyone hit it, hooray.  Return it, if it matches.
                     if (NULL == _matcher || _matcher->matches(toMatchTest)) {
+                        if (NULL != _matcher.get()) {
+                            ++_specificStats.matchTested;
+                        }
+
                         *out = toReturn;
+                        ++_commonStats.advanced;
                         return PlanStage::ADVANCED;
                     }
                     else {
                         _ws->free(toReturn);
+                        ++_commonStats.needTime;
                         return PlanStage::NEED_TIME;
                     }
                 }
                 // More children need to be advanced to _targetLoc.
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else if (member->loc < _targetLoc) {
                 // The front element of _workingTowardRep hasn't hit the thing we're AND-ing with
                 // yet.  Try again later.
                 _ws->free(id);
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else {
                 // member->loc > _targetLoc.
-                // _targetLoc wasn't successfully AND-ed with the other sub-plans.  We toss it and try
-                // AND-ing with the next value.
+                // _targetLoc wasn't successfully AND-ed with the other sub-plans.  We toss it and
+                // try AND-ing with the next value.
+                _specificStats.failedAnd[_targetNode]++;
+
                 _ws->free(_targetId);
-                _targetNode = next;
+                _targetNode = workingChildNumber;
                 _targetLoc = member->loc;
                 _targetId = id;
-                _workingTowardRep = queue<PlanStage*>();
+                _workingTowardRep = queue<size_t>();
                 for (size_t i = 0; i < _children.size(); ++i) {
-                    if (next != _children[i]) {
-                        _workingTowardRep.push(_children[i]);
+                    if (workingChildNumber != i) {
+                        _workingTowardRep.push(i);
                     }
                 }
                 // Need time to chase after the new _targetLoc.
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
         }
@@ -160,24 +186,35 @@ namespace mongo {
             return state;
         }
         else {
-            // NEED_TIME, NEED_YIELD.
+            if (PlanStage::NEED_FETCH == state) {
+                ++_commonStats.needFetch;
+            }
+            else if (PlanStage::NEED_TIME == state) {
+                ++_commonStats.needTime;
+            }
             return state;
         }
     }
 
     void AndSortedStage::prepareToYield() {
+        ++_commonStats.yields;
+
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->prepareToYield();
         }
     }
 
     void AndSortedStage::recoverFromYield() {
+        ++_commonStats.unyields;
+
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->recoverFromYield();
         }
     }
 
     void AndSortedStage::invalidate(const DiskLoc& dl) {
+        ++_commonStats.invalidates;
+
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
@@ -187,13 +224,27 @@ namespace mongo {
         if (dl == _targetLoc) {
             // We're in the middle of moving children forward until they hit _targetLoc, which is no
             // longer a valid target.  Fetch it, flag for review, and find another _targetLoc.
+            ++_specificStats.flagged;
+
             WorkingSetCommon::fetchAndInvalidateLoc(_ws->get(_targetId));
             _ws->flagForReview(_targetId);
             _targetId = WorkingSet::INVALID_ID;
-            _targetNode = NULL;
+            _targetNode = numeric_limits<size_t>::max();
             _targetLoc = DiskLoc();
-            _workingTowardRep = queue<PlanStage*>();
+            _workingTowardRep = queue<size_t>();
         }
+    }
+
+    PlanStageStats* AndSortedStage::getStats() {
+        _commonStats.isEOF = isEOF();
+
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
+        ret->setSpecific<AndSortedStats>(_specificStats);
+        for (size_t i = 0; i < _children.size(); ++i) {
+            ret->children.push_back(_children[i]->getStats());
+        }
+
+        return ret.release();
     }
 
 }  // namespace mongo

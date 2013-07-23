@@ -40,12 +40,17 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        virtual PlanStageStats* getStats();
+
     private:
         WorkingSet* _ws;
         scoped_ptr<PlanStage> _child;
 
         // We drop the first _toSkip results that we would have returned.
         int _toSkip;
+
+        // Stats
+        CommonStats _commonStats;
     };
 
 }  // namespace mongo

@@ -26,6 +26,8 @@ namespace mongo {
     bool LimitStage::isEOF() { return (0 == _numToReturn) || _child->isEOF(); }
 
     PlanStage::StageState LimitStage::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
         // If we've returned as many results as we're limited to, isEOF will be true.
         if (isEOF()) { return PlanStage::IS_EOF; }
 
@@ -35,18 +37,40 @@ namespace mongo {
         if (PlanStage::ADVANCED == status) {
             *out = id;
             --_numToReturn;
+            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
         else {
-            // NEED_TIME/YIELD, ERROR, IS_EOF
+            if (PlanStage::NEED_FETCH == status) {
+                ++_commonStats.needFetch;
+            }
+            else if (PlanStage::NEED_TIME == status) {
+                ++_commonStats.needTime;
+            }
             return status;
         }
     }
 
-    void LimitStage::prepareToYield() { _child->prepareToYield(); }
+    void LimitStage::prepareToYield() {
+        ++_commonStats.yields;
+        _child->prepareToYield();
+    }
 
-    void LimitStage::recoverFromYield() { _child->recoverFromYield(); }
+    void LimitStage::recoverFromYield() {
+        ++_commonStats.unyields;
+        _child->recoverFromYield();
+    }
 
-    void LimitStage::invalidate(const DiskLoc& dl) { _child->invalidate(dl); }
+    void LimitStage::invalidate(const DiskLoc& dl) {
+        ++_commonStats.invalidates;
+        _child->invalidate(dl);
+    }
+
+    PlanStageStats* LimitStage::getStats() {
+        _commonStats.isEOF = isEOF();
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
+        ret->children.push_back(_child->getStats());
+        return ret.release();
+    }
 
 }  // namespace mongo
