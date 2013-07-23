@@ -826,7 +826,7 @@ namespace {
         _userCache.clear();
     }
 
-    Status AuthorizationManager::initilizeAllV1UserData() {
+    Status AuthorizationManager::initializeAllV1UserData() {
         boost::lock_guard<boost::mutex> lk(_lock);
         _invalidateUserCache_inlock();
 

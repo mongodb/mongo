@@ -590,7 +590,7 @@ namespace {
         ASSERT_FALSE(actions.contains(ActionType::find));
     }
 
-    TEST_F(AuthorizationManagerTest, initilizeAllV1UserData) {
+    TEST_F(AuthorizationManagerTest, initializeAllV1UserData) {
         externalState->insertPrivilegeDocument("test",
                                                BSON("user" << "readOnly" <<
                                                     "pwd" << "password" <<
@@ -608,7 +608,7 @@ namespace {
                                                     "userSource" << "test" <<
                                                     "roles" << BSON_ARRAY("readWrite")));
 
-        Status status = authzManager->initilizeAllV1UserData();
+        Status status = authzManager->initializeAllV1UserData();
         ASSERT_OK(status);
 
         User* readOnly;
