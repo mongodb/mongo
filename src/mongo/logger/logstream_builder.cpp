@@ -20,6 +20,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
+#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/tee.h"
 #include "mongo/util/assert_util.h"  // TODO: remove apple dep for this in threadlocal.h
 #include "mongo/util/concurrency/threadlocal.h"
@@ -88,9 +89,14 @@ namespace logger {
     LogstreamBuilder::~LogstreamBuilder() {
         if (_os) {
             _baseMessage += _os->str();
-            _domain->append(MessageEventEphemeral(_severity, _contextName, _baseMessage));
-            if (_tee)
-                _tee->write(_baseMessage);
+            MessageEventEphemeral message(_severity, _contextName, _baseMessage);
+            _domain->append(message);
+            if (_tee) {
+                _os->str("");
+                logger::MessageEventDetailsEncoder teeEncoder;
+                teeEncoder.encode(message, *_os);
+                _tee->write(_os->str());
+            }
             _os->str("");
             if (isThreadOstreamCacheInitialized && threadOstreamCache.getMake()->vector().empty()) {
                 threadOstreamCache.get()->mutableVector().push_back(_os);
