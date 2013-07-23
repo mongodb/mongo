@@ -95,7 +95,7 @@ namespace mongo {
                 // We can't ever return documents that don't have geometry so don't bother indexing
                 // them.
                 if (fieldElements.empty()) { return; }
-                getGeoKeys(fieldElements, &keysForThisField);
+                getGeoKeys(obj, fieldElements, &keysForThisField);
             } else {
                 getLiteralKeys(fieldElements, &keysForThisField);
             }
@@ -136,19 +136,20 @@ namespace mongo {
     }
 
     // Get the index keys for elements that are GeoJSON.
-    void S2AccessMethod::getGeoKeys(const BSONElementSet& elements, BSONObjSet* out) const {
+    void S2AccessMethod::getGeoKeys(const BSONObj& document, const BSONElementSet& elements,
+                                    BSONObjSet* out) const {
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
             uassert(16754, "Can't parse geometry from element: " + i->toString(),
                     i->isABSONObj());
-            const BSONObj &obj = i->Obj();
+            const BSONObj &geoObj = i->Obj();
 
             vector<string> cells;
-            bool succeeded = S2SearchUtil::getKeysForObject(obj, _params, &cells);
-            uassert(16755, "Can't extract geo keys from object, malformed geometry?:"
-                           + obj.toString(), succeeded);
+            bool succeeded = S2SearchUtil::getKeysForObject(geoObj, _params, &cells);
+            uassert(16755, "Can't extract geo keys from object, malformed geometry?: "
+                           + document.toString(), succeeded);
 
             uassert(16756, "Unable to generate keys for (likely malformed) geometry: "
-                    + obj.toString(),
+                    + document.toString(),
                     cells.size() > 0);
 
             for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {

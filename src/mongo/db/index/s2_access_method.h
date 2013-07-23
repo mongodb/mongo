@@ -43,7 +43,8 @@ namespace mongo {
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         // getKeys calls the helper methods below.
-        void getGeoKeys(const BSONElementSet& elements, BSONObjSet* out) const;
+        void getGeoKeys(const BSONObj& document, const BSONElementSet& elements,
+                        BSONObjSet* out) const;
         void getLiteralKeys(const BSONElementSet& elements, BSONObjSet* out) const;
         void getLiteralKeysArray(const BSONObj& obj, BSONObjSet* out) const;
         void getOneLiteralKey(const BSONElement& elt, BSONObjSet *out) const;

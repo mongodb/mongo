@@ -23,8 +23,9 @@ namespace mongo {
         if (obj["near"].eoo()) { return false; }
         BSONObj nearObj = obj["near"].embeddedObject();
 
-        if (!GeoParser::isPoint(nearObj)) { return false; }
-        GeoParser::parsePoint(nearObj, &centroid);
+        if (!GeoParser::isPoint(nearObj) || !GeoParser::parsePoint(nearObj, &centroid)) {
+            return false;
+        }
 
         // The CRS for the legacy points dictates that distances are in radians.
         fromRadians = (FLAT == centroid.crs);
@@ -77,7 +78,7 @@ namespace mongo {
                 BSONObj embeddedObj = e.embeddedObject();
 
                 if (!GeoParser::isPoint(embeddedObj)) { continue; }
-                GeoParser::parsePoint(embeddedObj, &centroid);
+                if (!GeoParser::parsePoint(embeddedObj, &centroid)) { return false; }
 
                 if (isNearSphere) {
                     fromRadians = (centroid.crs == FLAT);
@@ -122,7 +123,7 @@ namespace mongo {
                     BSONObj embeddedObj = e.embeddedObject();
                     uassert(16885, "$near requires a point, given " + embeddedObj.toString(),
                             GeoParser::isPoint(embeddedObj));
-                    GeoParser::parsePoint(embeddedObj, &centroid);
+                    if (!GeoParser::parsePoint(embeddedObj, &centroid)) { return false; }
                     uassert(16681, "$near requires geojson point, given " + embeddedObj.toString(),
                             (SPHERE == centroid.crs));
                     hasGeometry = true;
@@ -782,43 +783,45 @@ namespace mongo {
         if (GeoParser::isPolygon(obj)) {
             // We can't really pass these things around willy-nilly except by ptr.
             _polygon.reset(new PolygonWithCRS());
-            GeoParser::parsePolygon(obj, _polygon.get());
+            if (!GeoParser::parsePolygon(obj, _polygon.get())) { return false; }
         } else if (GeoParser::isPoint(obj)) {
             _point.reset(new PointWithCRS());
-            GeoParser::parsePoint(obj, _point.get());
+            if (!GeoParser::parsePoint(obj, _point.get())) { return false; }
         } else if (GeoParser::isLine(obj)) {
             _line.reset(new LineWithCRS());
-            GeoParser::parseLine(obj, _line.get());
+            if (!GeoParser::parseLine(obj, _line.get())) { return false; }
         } else if (GeoParser::isBox(obj)) {
             _box.reset(new BoxWithCRS());
-            GeoParser::parseBox(obj, _box.get());
+            if (!GeoParser::parseBox(obj, _box.get())) { return false; }
         } else if (GeoParser::isCap(obj)) {
             _cap.reset(new CapWithCRS());
-            GeoParser::parseCap(obj, _cap.get());
+            if (!GeoParser::parseCap(obj, _cap.get())) { return false; }
         } else if (GeoParser::isMultiPoint(obj)) {
             _multiPoint.reset(new MultiPointWithCRS());
-            GeoParser::parseMultiPoint(obj, _multiPoint.get());
+            if (!GeoParser::parseMultiPoint(obj, _multiPoint.get())) { return false; }
             _region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
                 _region->Add(&_multiPoint->cells[i]);
             }
         } else if (GeoParser::isMultiLine(obj)) {
             _multiLine.reset(new MultiLineWithCRS());
-            GeoParser::parseMultiLine(obj, _multiLine.get());
+            if (!GeoParser::parseMultiLine(obj, _multiLine.get())) { return false; }
             _region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _multiLine->lines.vector().size(); ++i) {
                 _region->Add(_multiLine->lines.vector()[i]);
             }
         } else if (GeoParser::isMultiPolygon(obj)) {
             _multiPolygon.reset(new MultiPolygonWithCRS());
-            GeoParser::parseMultiPolygon(obj, _multiPolygon.get());
+            if (!GeoParser::parseMultiPolygon(obj, _multiPolygon.get())) { return false; }
             _region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _multiPolygon->polygons.vector().size(); ++i) {
                 _region->Add(_multiPolygon->polygons.vector()[i]);
             }
         } else if (GeoParser::isGeometryCollection(obj)) {
             _geometryCollection.reset(new GeometryCollection());
-            GeoParser::parseGeometryCollection(obj, _geometryCollection.get());
+            if (!GeoParser::parseGeometryCollection(obj, _geometryCollection.get())) {
+                return false;
+            }
             _region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _geometryCollection->points.size(); ++i) {
                 _region->Add(&_geometryCollection->points[i].cell);
