@@ -111,23 +111,21 @@ namespace mongo {
         bool isNull() const { return secs == 0; }
 
         string toStringLong() const {
-            char buf[64];
-            time_t_to_String(secs, buf);
             std::stringstream ss;
             ss << time_t_to_String_short(secs) << ' ';
-            ss << std::hex << secs << ':' << i;
+            ss << std::hex << secs << " (" << i << ')';
             return ss.str();
         }
 
         string toStringPretty() const {
             std::stringstream ss;
-            ss << time_t_to_String_short(secs) << ':' << std::hex << i;
+            ss << time_t_to_String_short(secs) << " (" << std::hex << i << ')';
             return ss.str();
         }
 
         string toString() const {
             std::stringstream ss;
-            ss << std::hex << secs << ':' << i;
+            ss << std::hex << secs << " (" << i << ')';
             return ss.str();
         }
 
