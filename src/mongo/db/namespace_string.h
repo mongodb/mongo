@@ -51,6 +51,7 @@ namespace mongo {
 
         bool isSystem() const { return coll().startsWith( "system." ); }
         bool isCommand() const { return coll() == "$cmd"; }
+        bool isSpecialCommand() const { return coll().startsWith("$cmd.sys"); }
 
         /**
          * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.
