@@ -195,17 +195,16 @@ namespace mongo {
             }
         }
 
-        BSONObj userObj;
-        string pwd;
-        Status status = getGlobalAuthorizationManager()->getPrivilegeDocument(
-                user.getDB().toString(), user, &userObj);
+        User* userObj;
+        Status status = getGlobalAuthorizationManager()->acquireUser(user, &userObj);
         if (!status.isOK()) {
             // Failure to find the privilege document indicates no-such-user, a fact that we do not
             // wish to reveal to the client.  So, we return AuthenticationFailed rather than passing
             // through the returned status.
             return Status(ErrorCodes::AuthenticationFailed, status.toString());
         }
-        pwd = userObj["pwd"].String();
+        string pwd = userObj->getCredentials().password;
+        getGlobalAuthorizationManager()->releaseUser(userObj);
 
         md5digest d;
         {

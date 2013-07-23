@@ -63,6 +63,11 @@ namespace mongo {
         const RoleNameIterator getRoles() const;
 
         /**
+         * Returns the CredentialData for this user.
+         */
+        const CredentialData& getCredentials() const;
+
+        /**
          * Gets the set of actions this user is allowed to perform on the given resource.
          */
         const ActionSet getActionsForResource(const std::string& resource) const;
