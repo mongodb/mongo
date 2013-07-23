@@ -53,7 +53,7 @@ namespace {
 
         ASSERT_EQUALS(ErrorCodes::UserNotFound,
                       authzSession.acquirePrivilege(writePrivilege, principal->getName()));
-        authzSession.addAuthorizedPrincipal(principal);
+        authzSession.addAndAuthorizePrincipal(principal);
         ASSERT_OK(authzSession.acquirePrivilege(writePrivilege, principal->getName()));
         ASSERT_TRUE(authzSession.checkAuthorization("test", ActionType::insert));
 
@@ -168,7 +168,7 @@ namespace {
         ASSERT(!authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
 
         Principal* principal = new Principal(UserName("andy", "test"));
-        authzSession->addAuthorizedPrincipal(principal);
+        authzSession->addAndAuthorizePrincipal(principal);
 
         ASSERT(authzSession->checkAuthorization("test.foo", ActionType::find));
         ASSERT(authzSession->checkAuthorization("test.foo", ActionType::insert));
