@@ -14,7 +14,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
@@ -222,6 +224,49 @@ namespace {
         ASSERT(StringData("abcde").endsWith(StringData("bcdef").substr(0, 4)));
         ASSERT(!StringData("abcde").endsWith(StringData("bcde", 3)));
         ASSERT(!StringData("abcde").substr(0, 3).endsWith("cde"));
+    }
+
+    TEST(ConstIterator, StdCopy) {
+        std::vector<char> chars;
+        const char rawData[] = "This is some raw data.";
+        StringData data(rawData, StringData::LiteralTag());
+
+        chars.resize(data.size());
+        std::copy(data.begin(), data.end(), chars.begin());
+
+        for (size_t i = 0; i < data.size(); ++i) {
+            ASSERT_EQUALS(data[i], chars[i]);
+        }
+    }
+
+    TEST(ConstIterator, StdReverseCopy) {
+        std::vector<char> chars;
+        const char rawData[] = "This is some raw data.";
+        StringData data(rawData, StringData::LiteralTag());
+
+        chars.resize(data.size());
+        std::reverse_copy(data.begin(), data.end(), chars.begin());
+
+        const char rawDataExpected[] = ".atad war emos si sihT";
+
+        for (size_t i = 0; i < data.size(); ++i) {
+            ASSERT_EQUALS(rawDataExpected[i], chars[i]);
+        }
+    }
+
+    TEST(ConstIterator, StdReplaceCopy) {
+        std::vector<char> chars;
+        const char rawData[] = "This is some raw data.";
+        StringData data(rawData, StringData::LiteralTag());
+
+        chars.resize(data.size());
+        std::replace_copy(data.begin(), data.end(), chars.begin(), ' ', '_');
+
+        const char rawDataExpected[] = "This_is_some_raw_data.";
+
+        for (size_t i = 0; i < data.size(); ++i) {
+            ASSERT_EQUALS(rawDataExpected[i], chars[i]);
+        }
     }
 
 } // unnamed namespace
