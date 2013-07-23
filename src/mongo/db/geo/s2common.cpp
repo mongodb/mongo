@@ -97,7 +97,7 @@ namespace mongo {
                                        const S2IndexingParams &params, double *out) {
         if (GeoParser::isGeometryCollection(them)) {
             GeometryCollection c;
-            GeoParser::parseGeometryCollection(them, &c);
+            if (!GeoParser::parseGeometryCollection(them, &c)) { return false; }
             double minDist = numeric_limits<double>::max();
 
             for (size_t i = 0; i < c.points.size(); ++i) {
@@ -140,34 +140,34 @@ namespace mongo {
 
             *out = params.radius * minDist;
             return true;
-        } if (GeoParser::isMultiPoint(them)) {
+        } else if (GeoParser::isMultiPoint(them)) {
             MultiPointWithCRS multiPoint;
-            GeoParser::parseMultiPoint(them, &multiPoint);
+            if (!GeoParser::parseMultiPoint(them, &multiPoint)) { return false; }
             *out = dist(us, multiPoint) * params.radius;
             return true;
         } else if (GeoParser::isMultiLine(them)) {
             MultiLineWithCRS multiLine;
-            GeoParser::parseMultiLine(them, &multiLine);
+            if (!GeoParser::parseMultiLine(them, &multiLine)) { return false; }
             *out = dist(us, multiLine) * params.radius;
             return true;
         } else if (GeoParser::isMultiPolygon(them)) {
             MultiPolygonWithCRS multiPolygon;
-            GeoParser::parseMultiPolygon(them, &multiPolygon);
+            if (!GeoParser::parseMultiPolygon(them, &multiPolygon)) { return false; }
             *out = dist(us, multiPolygon) * params.radius;
             return true;
         } else if (GeoParser::isPolygon(them)) {
             PolygonWithCRS poly;
-            GeoParser::parsePolygon(them, &poly);
+            if (!GeoParser::parsePolygon(them, &poly)) { return false; }
             *out = dist(us, poly.polygon) * params.radius;
             return true;
         } else if (GeoParser::isLine(them)) {
             LineWithCRS line;
-            GeoParser::parseLine(them, &line);
+            if (!GeoParser::parseLine(them, &line)) { return false; }
             *out = dist(us, line.line) * params.radius;
             return true;
         } else if (GeoParser::isPoint(them)) {
             PointWithCRS point;
-            GeoParser::parsePoint(them, &point);
+            if (!GeoParser::parsePoint(them, &point)) { return false; }
             *out = dist(us, point.point) * params.radius;
             return true;
         } else {

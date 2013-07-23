@@ -27,36 +27,37 @@ namespace mongo {
     //
     // This class also parses the ad-hoc geo formats that MongoDB introduced.
     //
-    // We assume that if you're trying to parse something, you know it's valid.
+    // parse* methods may do some more validation than the is* methods; they return false if they
+    // encounter invalid geometry and true if the geometry is parsed successfully.
     class GeoParser {
     public:
         static bool isPoint(const BSONObj &obj);
-        static void parsePoint(const BSONObj &obj, PointWithCRS *out);
+        static bool parsePoint(const BSONObj &obj, PointWithCRS *out);
 
         static bool isLine(const BSONObj &obj);
-        static void parseLine(const BSONObj &obj, LineWithCRS *out);
+        static bool parseLine(const BSONObj &obj, LineWithCRS *out);
 
         static bool isBox(const BSONObj &obj);
-        static void parseBox(const BSONObj &obj, BoxWithCRS *out);
+        static bool parseBox(const BSONObj &obj, BoxWithCRS *out);
 
         static bool isPolygon(const BSONObj &obj);
-        static void parsePolygon(const BSONObj &obj, PolygonWithCRS *out);
+        static bool parsePolygon(const BSONObj &obj, PolygonWithCRS *out);
 
         // AKA $center or $centerSphere
         static bool isCap(const BSONObj &obj);
-        static void parseCap(const BSONObj &obj, CapWithCRS *out);
+        static bool parseCap(const BSONObj &obj, CapWithCRS *out);
 
         static bool isMultiPoint(const BSONObj &obj);
-        static void parseMultiPoint(const BSONObj &obj, MultiPointWithCRS *out);
+        static bool parseMultiPoint(const BSONObj &obj, MultiPointWithCRS *out);
 
         static bool isMultiLine(const BSONObj &obj);
-        static void parseMultiLine(const BSONObj &obj, MultiLineWithCRS *out);
+        static bool parseMultiLine(const BSONObj &obj, MultiLineWithCRS *out);
 
         static bool isMultiPolygon(const BSONObj &obj);
-        static void parseMultiPolygon(const BSONObj &obj, MultiPolygonWithCRS *out);
+        static bool parseMultiPolygon(const BSONObj &obj, MultiPolygonWithCRS *out);
 
         static bool isGeometryCollection(const BSONObj &obj);
-        static void parseGeometryCollection(const BSONObj &obj, GeometryCollection *out);
+        static bool parseGeometryCollection(const BSONObj &obj, GeometryCollection *out);
 
         // Return true if the CRS field is 1. missing, or 2. is well-formed and
         // has a datum we accept.  Otherwise, return false.
