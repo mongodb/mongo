@@ -168,7 +168,6 @@ namespace {
         ASSERT(!authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
 
         Principal* principal = new Principal(UserName("andy", "test"));
-        principal->setImplicitPrivilegeAcquisition(true);
         authzSession->addAuthorizedPrincipal(principal);
 
         ASSERT(authzSession->checkAuthorization("test.foo", ActionType::find));
