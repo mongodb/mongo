@@ -82,7 +82,7 @@ __wt_page_in_func(
 			 * and limit the number of attempts to avoid getting
 			 * stuck if the page doesn't become available.
 			 */
-			if (!F_ISSET(txn, TXN_RUNNING) &&
+			if (!WT_TXN_ACTIVE(txn) &&
 			    txn->force_evict_attempts < 100 &&
 			    __wt_eviction_page_force(session, page)) {
 				++txn->force_evict_attempts;
