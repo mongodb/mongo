@@ -78,13 +78,14 @@ __wt_page_in_func(
 
 			/*
 			 * Make sure the page isn't too big.  Only do this
-			 * check once per transaction: it is not a common case,
-			 * and we don't want to get stuck if it isn't possible
-			 * to evict the page.
+			 * check if the transaction hasn't made any updates
+			 * and limit the number of attempts to avoid getting
+			 * stuck if the page doesn't become available.
 			 */
-			if (!F_ISSET(txn, TXN_FORCE_EVICT) &&
+			if (!F_ISSET(txn, TXN_RUNNING) &&
+			    txn->force_evict_attempts < 100 &&
 			    __wt_eviction_page_force(session, page)) {
-				F_SET(txn, TXN_FORCE_EVICT);
+				++txn->force_evict_attempts;
 				page->read_gen = WT_READ_GEN_OLDEST;
 				WT_RET(__wt_page_release(session, page));
 				break;
