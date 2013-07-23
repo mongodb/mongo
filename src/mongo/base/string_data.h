@@ -139,10 +139,6 @@ namespace mongo {
         // iterators
         //
 
-        /**
-        * Convenience wrapper to create a const_iterator. The notion of of a non-const iterator
-        * doesn't make sense in the context of a StringData instance.
-        */
         typedef const char* const_iterator;
 
         const_iterator begin() const { return rawData(); }
