@@ -145,6 +145,8 @@ namespace mongo {
             // no need to change state, syncTail will try to go live as a secondary soon
 
             log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+        } else {
+            log() << "leaving maintenance mode (no other tasks)" << rsLog;
         }
         else {
             return false;
