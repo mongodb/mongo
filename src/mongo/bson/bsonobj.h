@@ -273,10 +273,25 @@ namespace mongo {
         /** performs a cursory check on the object's size only. */
         bool isValid() const;
 
-        /** @return if the user is a valid user doc
-            criter: isValid() no . or $ field names
+        /** @return ok if it can be stored as a valid embedded doc.
+         *  Not valid if any field name:
+         *      - contains a "."
+         *      - starts with "$"
+         *          -- unless it is a dbref ($ref/$id/[$db]/...)
          */
-        bool okForStorage() const;
+        inline bool okForStorage() const {
+            return _okForStorage(false);
+        }
+
+        /** Same as above with the following extra restrictions
+         *  Not valid if:
+         *      - "_id" field is a
+         *          -- Regex
+         *          -- Array
+         */
+        inline bool okForStorageAsRoot() const {
+            return _okForStorage(true);
+        }
 
         /** @return true if object is empty -- i.e.,  {} */
         bool isEmpty() const { return objsize() <= 5; }
@@ -527,6 +542,8 @@ namespace mongo {
             if ( !isValid() )
                 _assertInvalid();
         }
+
+        bool _okForStorage(bool root) const;
     };
 
     std::ostream& operator<<( std::ostream &s, const BSONObj &o );
