@@ -55,6 +55,8 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        PlanStageStats* getStats();
+
     private:
         // Not owned by us.
         WorkingSet* _ws;
@@ -116,6 +118,10 @@ namespace mongo {
 
         // The data referred to by the _merging queue above.
         list<StageWithValue> _mergingData;
+
+        // Stats
+        CommonStats _commonStats;
+        MergeSortStats _specificStats;
     };
 
     // Parameters that must be provided to a MergeSortStage

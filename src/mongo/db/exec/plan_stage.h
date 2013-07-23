@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 
 namespace mongo {
@@ -171,6 +172,14 @@ namespace mongo {
          * Can only be called after a prepareToYield but before a recoverFromYield.
          */
         virtual void invalidate(const DiskLoc& dl) = 0;
+
+        /**
+         * Returns a tree of stats.  See plan_stats.h for the details of this structure.  If the
+         * stage has any children it must propagate the request for stats to them.
+         *
+         * Caller owns returned pointer.
+         */
+        virtual PlanStageStats* getStats() = 0;
     };
 
 }  // namespace mongo

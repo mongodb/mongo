@@ -43,6 +43,8 @@ namespace mongo {
     }
 
     PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (!_noResultToMerge.empty()) {
@@ -63,17 +65,20 @@ namespace mongo {
                         _noResultToMerge.pop();
                     }
                     else {
+                        ++_specificStats.dupsTested;
                         // ...and there's a diskloc and and we've seen the DiskLoc before
                         if (_seen.end() != _seen.find(member->loc)) {
                             // ...drop it.
                             _ws->free(id);
+                            ++_commonStats.needTime;
+                            ++_specificStats.dupsDropped;
                             return PlanStage::NEED_TIME;
                         }
                         else {
                             // Otherwise, note that we've seen it.
                             _seen.insert(member->loc);
-                            // We're going to use the result from the child, so we remove it from the
-                            // queue of children without a result.
+                            // We're going to use the result from the child, so we remove it from
+                            // the queue of children without a result.
                             _noResultToMerge.pop();
                         }
                     }
@@ -93,16 +98,23 @@ namespace mongo {
                 // Insert the result (indirectly) into our priority queue.
                 _merging.push(_mergingData.begin());
 
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else if (PlanStage::IS_EOF == code) {
                 // There are no more results possible from this child.  Don't bother with it
                 // anymore.
                 _noResultToMerge.pop();
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else {
-                // FAILURE, YIELD, NEED_TIME.
+                if (PlanStage::NEED_FETCH == code) {
+                    ++_commonStats.needFetch;
+                }
+                else if (PlanStage::NEED_TIME == code) {
+                    ++_commonStats.needTime;
+                }
                 return code;
             }
         }
@@ -124,22 +136,26 @@ namespace mongo {
 
         // Return the min.
         *out = idToTest;
+        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
 
     void MergeSortStage::prepareToYield() {
+        ++_commonStats.yields;
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->prepareToYield();
         }
     }
 
     void MergeSortStage::recoverFromYield() {
+        ++_commonStats.unyields;
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->recoverFromYield();
         }
     }
 
     void MergeSortStage::invalidate(const DiskLoc& dl) {
+        ++_commonStats.invalidates;
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->invalidate(dl);
         }
@@ -152,6 +168,7 @@ namespace mongo {
             if (member->hasLoc() && (dl == member->loc)) {
                 // We don't have to flag the member, just force a fetch.
                 WorkingSetCommon::fetchAndInvalidateLoc(member);
+                ++_specificStats.forcedFetches;
             }
         }
 
@@ -186,6 +203,17 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    PlanStageStats* MergeSortStage::getStats() {
+        _commonStats.isEOF = isEOF();
+
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
+        ret->setSpecific<MergeSortStats>(_specificStats);
+        for (size_t i = 0; i < _children.size(); ++i) {
+            ret->children.push_back(_children[i]->getStats());
+        }
+        return ret.release();
     }
 
 }  // namespace mongo

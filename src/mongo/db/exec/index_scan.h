@@ -47,6 +47,8 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        virtual PlanStageStats* getStats();
+
     private:
         /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
         void checkEnd();
@@ -83,6 +85,10 @@ namespace mongo {
 
         // This is IndexScanParams::limit.  See comment there.
         int _numWanted;
+
+        // Stats
+        CommonStats _commonStats;
+        IndexScanStats _specificStats;
     };
 
     struct IndexScanParams {

@@ -48,6 +48,8 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        PlanStageStats* getStats();
+
     private:
         // Not owned by us.
         WorkingSet* _ws;
@@ -70,6 +72,10 @@ namespace mongo {
         // We buffer a lot of data and we want to look it up by DiskLoc quickly upon invalidation.
         typedef unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> DataMap;
         DataMap _wsidByDiskLoc;
+
+        // Stats
+        CommonStats _commonStats;
+        SortStats _specificStats;
     };
 
     // Parameters that must be provided to a SortStage

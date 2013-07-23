@@ -59,6 +59,8 @@ namespace mongo {
     }
 
     PlanStage::StageState IndexScan::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
         if (NULL == _indexCursor.get()) {
             // First call to work().  Perform cursor init.
             CursorOptions cursorOptions;
@@ -94,7 +96,10 @@ namespace mongo {
         DiskLoc loc = _indexCursor->getValue();
 
         if (_shouldDedup) {
+            ++_specificStats.dupsTested;
             if (_returned.end() != _returned.find(loc)) {
+                ++_specificStats.dupsDropped;
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else {
@@ -110,12 +115,16 @@ namespace mongo {
         member->state = WorkingSetMember::LOC_AND_IDX;
 
         if (NULL == _matcher || _matcher->matches(member)) {
+            if (NULL == _matcher) {
+                ++_specificStats.matchTested;
+            }
             *out = id;
+            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
 
         _workingSet->free(id);
-
+        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 
@@ -129,6 +138,8 @@ namespace mongo {
     }
 
     void IndexScan::prepareToYield() {
+        ++_commonStats.yields;
+
         if (isEOF() || (NULL == _indexCursor.get())) { return; }
         _savedKey = _indexCursor->getKey().getOwned();
         _savedLoc = _indexCursor->getValue();
@@ -136,6 +147,8 @@ namespace mongo {
     }
 
     void IndexScan::recoverFromYield() {
+        ++_commonStats.unyields;
+
         if (isEOF() || (NULL == _indexCursor.get())) { return; }
 
         _indexCursor->restorePosition();
@@ -146,19 +159,30 @@ namespace mongo {
             // again we want to return where we currently point, not past it.
             _yieldMovedCursor = true;
 
+            ++_specificStats.yieldMovedCursor;
+
             // Our restored position might be past endKey, see if we've hit the end.
             checkEnd();
         }
     }
 
     void IndexScan::invalidate(const DiskLoc& dl) {
+        ++_commonStats.invalidates;
+
         // If we see this DiskLoc again, it may not be the same doc. it was before, so we want to
         // return it.
-        _returned.erase(dl);
+        unordered_set<DiskLoc, DiskLoc::Hasher>::iterator it = _returned.find(dl);
+        if (it != _returned.end()) {
+            ++_specificStats.seenInvalidated;
+            _returned.erase(it);
+        }
     }
 
     void IndexScan::checkEnd() {
-        if (isEOF()) { return; }
+        if (isEOF()) {
+            _commonStats.isEOF = true;
+            return;
+        }
 
         // If there is an empty endKey we will scan until we run out of index to scan over.
         if (_endKey.isEmpty()) { return; }
@@ -167,7 +191,15 @@ namespace mongo {
 
         if ((cmp != 0 && cmp != _direction) || (cmp == 0 && !_endKeyInclusive)) {
             _hitEnd = true;
+            _commonStats.isEOF = true;
         }
+    }
+
+    PlanStageStats* IndexScan::getStats() {
+        _commonStats.isEOF = isEOF();
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
+        ret->setSpecific<IndexScanStats>(_specificStats);
+        return ret.release();
     }
 
 }  // namespace mongo

@@ -37,6 +37,8 @@ namespace mongo {
     }
 
     PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         // An AND is either reading the first child into the hash table, probing against the hash
@@ -67,11 +69,13 @@ namespace mongo {
         // indices of all our children.
         if (NULL == _matcher || _matcher->matches(member)) {
             *out = idToReturn;
+            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
         else {
             _ws->free(idToReturn);
             // Skip over the non-matching thing we currently point at.
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     }
@@ -89,19 +93,32 @@ namespace mongo {
             verify(_dataMap.end() == _dataMap.find(member->loc));
 
             _dataMap[member->loc] = id;
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
         else if (PlanStage::IS_EOF == childStatus) {
             // Done reading child 0.
             _currentChild = 1;
+
             // If our first child was empty, don't scan any others, no possible results.
             if (_dataMap.empty()) {
                 _shouldScanChildren = false;
                 return PlanStage::IS_EOF;
             }
+
+            ++_commonStats.needTime;
+            _specificStats.mapAfterChild.push_back(_dataMap.size());
+
             return PlanStage::NEED_TIME;
         }
         else {
+            if (PlanStage::NEED_FETCH == childStatus) {
+                ++_commonStats.needFetch;
+            }
+            else if (PlanStage::NEED_TIME == childStatus) {
+                ++_commonStats.needTime;
+            }
+
             return childStatus;
         }
     }
@@ -125,6 +142,7 @@ namespace mongo {
                 AndCommon::mergeFrom(olderMember, member);
             }
             _ws->free(id);
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
         else if (PlanStage::IS_EOF == childStatus) {
@@ -143,6 +161,8 @@ namespace mongo {
                 else { ++it; }
             }
 
+            _specificStats.mapAfterChild.push_back(_dataMap.size());
+
             _seenMap.clear();
 
             // _dataMap is now the intersection of the first _currentChild nodes.
@@ -159,27 +179,40 @@ namespace mongo {
                 _resultIterator = _dataMap.begin();
             }
 
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
         else {
-            // NEED_YIELD or FAILURE.
+            if (PlanStage::NEED_FETCH == childStatus) {
+                ++_commonStats.needFetch;
+            }
+            else if (PlanStage::NEED_TIME == childStatus) {
+                ++_commonStats.needTime;
+            }
+
             return childStatus;
         }
     }
 
     void AndHashStage::prepareToYield() {
+        ++_commonStats.yields;
+
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->prepareToYield();
         }
     }
 
     void AndHashStage::recoverFromYield() {
+        ++_commonStats.unyields;
+
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->recoverFromYield();
         }
     }
 
     void AndHashStage::invalidate(const DiskLoc& dl) {
+        ++_commonStats.invalidates;
+
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
@@ -199,6 +232,13 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(id);
             verify(member->loc == dl);
 
+            if (_shouldScanChildren) {
+                ++_specificStats.flaggedInProgress;
+            }
+            else {
+                ++_specificStats.flaggedButPassed;
+            }
+
             // The loc is about to be invalidated.  Fetch it and clear the loc.
             WorkingSetCommon::fetchAndInvalidateLoc(member);
 
@@ -206,6 +246,18 @@ namespace mongo {
             _ws->flagForReview(id);
             _dataMap.erase(it);
         }
+    }
+
+    PlanStageStats* AndHashStage::getStats() {
+        _commonStats.isEOF = isEOF();
+
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
+        ret->setSpecific<AndHashStats>(_specificStats);
+        for (size_t i = 0; i < _children.size(); ++i) {
+            ret->children.push_back(_children[i]->getStats());
+        }
+
+        return ret.release();
     }
 
 }  // namespace mongo

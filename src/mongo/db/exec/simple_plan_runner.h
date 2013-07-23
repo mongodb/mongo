@@ -31,9 +31,10 @@ namespace mongo {
      */
     class SimplePlanRunner {
     public:
-        SimplePlanRunner() { }
+        SimplePlanRunner() : _workingSet(new WorkingSet()) { }
+        SimplePlanRunner(WorkingSet* ws, PlanStage* rt) : _workingSet(ws), _root(rt) { }
 
-        WorkingSet* getWorkingSet() { return &_workingSet; }
+        WorkingSet* getWorkingSet() { return _workingSet.get(); }
 
         /**
          * Takes ownership of root.
@@ -49,11 +50,11 @@ namespace mongo {
                 PlanStage::StageState code = _root->work(&id);
 
                 if (PlanStage::ADVANCED == code) {
-                    WorkingSetMember* member = _workingSet.get(id);
+                    WorkingSetMember* member = _workingSet->get(id);
                     uassert(16912, "Couldn't fetch obj from query plan",
                             WorkingSetCommon::fetch(member));
                     *objOut = member->obj;
-                    _workingSet.free(id);
+                    _workingSet->free(id);
                     return true;
                 }
                 else if (code == PlanStage::NEED_TIME) {
@@ -61,7 +62,7 @@ namespace mongo {
                 }
                 else if (PlanStage::NEED_FETCH == code) {
                     // id has a loc and refers to an obj we need to fetch.
-                    WorkingSetMember* member = _workingSet.get(id);
+                    WorkingSetMember* member = _workingSet->get(id);
 
                     // This must be true for somebody to request a fetch and can only change when an
                     // invalidation happens, which is when we give up a lock.  Don't give up the
@@ -90,7 +91,7 @@ namespace mongo {
         }
 
     private:
-        WorkingSet _workingSet;
+        scoped_ptr<WorkingSet> _workingSet;
         scoped_ptr<PlanStage> _root;
     };
 

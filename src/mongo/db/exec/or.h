@@ -46,6 +46,8 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
+        virtual PlanStageStats* getStats();
+
     private:
         // Not owned by us.
         WorkingSet* _ws;
@@ -63,6 +65,10 @@ namespace mongo {
 
         // Which DiskLocs have we returned?
         unordered_set<DiskLoc, DiskLoc::Hasher> _seen;
+
+        // Stats
+        CommonStats _commonStats;
+        OrStats _specificStats;
     };
 
 }  // namespace mongo

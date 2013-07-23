@@ -1,0 +1,14 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary(
+    target = 'query',
+    source = [
+        "multi_plan_runner.cpp",
+        "plan_ranker.cpp",
+    ],
+    LIBDEPS = [
+        "$BUILD_DIR/mongo/db/exec/exec"
+    ],
+)

@@ -44,6 +44,8 @@ namespace mongo {
         virtual void prepareToYield();
         virtual void recoverFromYield();
 
+        virtual PlanStageStats* getStats();
+
     private:
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;
@@ -54,6 +56,9 @@ namespace mongo {
 
         // True if nsdetails(_ns) == NULL on our first call to work.
         bool _nsDropped;
+
+        // Stats
+        CommonStats _commonStats;
     };
 
 }  // namespace mongo
