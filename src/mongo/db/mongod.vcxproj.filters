@@ -2438,6 +2438,9 @@
     <ClCompile Include="ops\log_builder_test.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
+    <ClCompile Include="repl\sync_source_feedback.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4895,6 +4898,9 @@
     </ClInclude>
     <ClInclude Include="ops\log_builder.h">
       <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\sync_source_feedback.h">
+      <Filter>db\repl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
