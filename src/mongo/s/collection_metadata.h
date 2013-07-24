@@ -147,11 +147,28 @@ namespace mongo {
          * boundaries.  If the next chunk happens to be the last one, returns true otherwise
          * false.
          *
-         * @param lookupKey passing a doc that does not belong to this metadata is undefined.
-         *     An empty doc is special and the chunk with the lowest range will be set on
+         * @param lookupKey passing a key that does not belong to this metadata is undefined.
+         *     An empty key is special and the chunk with the lowest range will be set on
          *     foundChunk.
          */
         bool getNextChunk( const BSONObj& lookupKey, ChunkType* foundChunk ) const;
+
+        /**
+         * Given a key in the shard key range, get the next range which overlaps or is greater than
+         * this key.
+         *
+         * This allows us to do the following to iterate over all orphan ranges:
+         *
+         * KeyRange range;
+         * BSONObj lookupKey = metadata->getMinKey();
+         * while( metadata->getNextOrphanRange( lookupKey, &orphanRange ) ) {
+         *   // Do stuff with range
+         *   lookupKey = orphanRange.maxKey;
+         * }
+         *
+         * @param lookupKey passing a key that does not belong to this metadata is undefined.
+         */
+        bool getNextOrphanRange( const BSONObj& lookupKey, KeyRange* orphanRange ) const;
 
         //
         // accessors
@@ -168,6 +185,10 @@ namespace mongo {
         BSONObj getKeyPattern() const {
             return _keyPattern;
         }
+
+        BSONObj getMinKey() const;
+
+        BSONObj getMaxKey() const;
 
         std::size_t getNumChunks() const {
             return _chunksMap.size();

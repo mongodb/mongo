@@ -24,6 +24,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/metadata_loader.h"
+#include "mongo/s/range_arithmetic.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/unittest/unittest.h"
@@ -40,6 +41,7 @@ namespace {
     using mongo::CollectionType;
     using mongo::Date_t;
     using mongo::HostAndPort;
+    using mongo::KeyRange;
     using mongo::MAXKEY;
     using mongo::MetadataLoader;
     using mongo::MINKEY;
@@ -47,7 +49,10 @@ namespace {
     using mongo::ChunkVersion;
     using mongo::MockConnRegistry;
     using mongo::MockRemoteDBServer;
+    using mongo::RangeVector;
     using mongo::Status;
+    using std::auto_ptr;
+    using std::make_pair;
     using std::string;
     using std::vector;
 
@@ -380,6 +385,69 @@ namespace {
         ASSERT( cloned == NULL );
     }
 
+    TEST_F(NoChunkFixture, OrphanedDataRangeBegin) {
+
+        const CollectionMetadata& metadata = getCollMetadata();
+
+        KeyRange keyRange;
+        BSONObj lookupKey = metadata.getMinKey();
+        ASSERT( metadata.getNextOrphanRange( lookupKey, &keyRange ) );
+
+        ASSERT( keyRange.minKey.woCompare( metadata.getMinKey() ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( metadata.getMaxKey() ) == 0 );
+
+        // Make sure we don't have any more ranges
+        ASSERT( !metadata.getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+    }
+
+    TEST_F(NoChunkFixture, OrphanedDataRangeMiddle) {
+
+        const CollectionMetadata& metadata = getCollMetadata();
+
+        KeyRange keyRange;
+        BSONObj lookupKey = BSON( "a" << 20 );
+        ASSERT( metadata.getNextOrphanRange( lookupKey, &keyRange ) );
+
+        ASSERT( keyRange.minKey.woCompare( metadata.getMinKey() ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( metadata.getMaxKey() ) == 0 );
+
+        // Make sure we don't have any more ranges
+        ASSERT( !metadata.getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+    }
+
+    TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
+
+        const CollectionMetadata& metadata = getCollMetadata();
+
+        KeyRange keyRange;
+        ASSERT( !metadata.getNextOrphanRange( metadata.getMaxKey(), &keyRange ) );
+    }
+
+    TEST_F(NoChunkFixture, PendingOrphanedDataRanges) {
+
+        string errMsg;
+        ChunkType chunk;
+        scoped_ptr<CollectionMetadata> cloned;
+
+        chunk.setMin( BSON("a" << 10) );
+        chunk.setMax( BSON("a" << 20) );
+
+        cloned.reset( getCollMetadata().clonePlusPending( chunk, &errMsg ) );
+        ASSERT_EQUALS( errMsg, string("") );
+        ASSERT( cloned != NULL );
+
+        KeyRange keyRange;
+        ASSERT( cloned->getNextOrphanRange( cloned->getMinKey(), &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( cloned->getMinKey() ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 ) ) == 0 );
+
+        ASSERT( cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( BSON( "a" << 20 ) ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( cloned->getMaxKey() ) == 0 );
+
+        ASSERT( !cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+    }
+
     /**
      * Fixture with single chunk containing:
      * [10->20)
@@ -604,6 +672,7 @@ namespace {
         ASSERT( !cloned->keyIsPending(BSON( "a" << 35 )) );
     }
 
+
     TEST_F(SingleChunkFixture, MergeChunkSingle) {
 
         string errMsg;
@@ -616,6 +685,20 @@ namespace {
 
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( cloned == NULL );
+    }
+
+    TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
+
+        KeyRange keyRange;
+        ASSERT( getCollMetadata().getNextOrphanRange( getCollMetadata().getMinKey(), &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( getCollMetadata().getMinKey() ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 ) ) == 0 );
+
+        ASSERT( getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( BSON( "a" << 20 ) ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( getCollMetadata().getMaxKey() ) == 0 );
+
+        ASSERT( !getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
     }
 
     /**
@@ -900,6 +983,49 @@ namespace {
         ASSERT_EQUALS( 2u, getCollMetadata().getNumChunks() );
     }
 
+    TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
+
+        KeyRange keyRange;
+        ASSERT( getCollMetadata().getNextOrphanRange( getCollMetadata().getMinKey(), &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( getCollMetadata().getMinKey() ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 << "b" << 0 ) ) == 0 );
+
+        ASSERT( getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( BSON( "a" << 20 << "b" << 0 ) ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 30 << "b" << 0 ) ) == 0 );
+
+        ASSERT( getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( BSON( "a" << 40 << "b" << 0 ) ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( getCollMetadata().getMaxKey() ) == 0 );
+
+        ASSERT( !getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+    }
+
+    TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapAndPendingOrphanedDataRanges) {
+
+        string errMsg;
+        ChunkType chunk;
+        scoped_ptr<CollectionMetadata> cloned;
+
+        chunk.setMin( BSON( "a" << 20 << "b" << 0 ) );
+        chunk.setMax( BSON( "a" << 30 << "b" << 0 ) );
+
+        cloned.reset( getCollMetadata().clonePlusPending( chunk, &errMsg ) );
+        ASSERT_EQUALS( errMsg, string("") );
+        ASSERT( cloned != NULL );
+
+        KeyRange keyRange;
+        ASSERT( cloned->getNextOrphanRange( cloned->getMinKey(), &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( cloned->getMinKey() ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 << "b" << 0 ) ) == 0 );
+
+        ASSERT( cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+        ASSERT( keyRange.minKey.woCompare( BSON( "a" << 40 << "b" << 0 ) ) == 0 );
+        ASSERT( keyRange.maxKey.woCompare( cloned->getMaxKey() ) == 0 );
+
+        ASSERT( !cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
+    }
+
     /**
      * Fixture with chunk containing:
      * [min->10) , [10->20) , <gap> , [30->max)
@@ -1153,7 +1279,5 @@ namespace {
         ASSERT_EQUALS( cloned->getNumChunks(), 3u );
         ASSERT_EQUALS( cloned->getShardVersion().majorVersion(), 6 );
     }
-
-
 
 } // unnamed namespace

@@ -533,6 +533,86 @@ namespace mongo {
         pendingBB.done();
     }
 
+    bool CollectionMetadata::getNextOrphanRange( const BSONObj& origLookupKey,
+                                                 KeyRange* range ) const {
+
+        if ( _keyPattern.isEmpty() ) return false;
+
+        BSONObj lookupKey = origLookupKey;
+        BSONObj maxKey = getMaxKey(); // so we don't keep rebuilding
+        while ( lookupKey.woCompare( maxKey ) < 0 ) {
+
+            RangeMap::const_iterator lowerChunkIt = _chunksMap.end();
+            RangeMap::const_iterator upperChunkIt = _chunksMap.end();
+
+            if ( !_chunksMap.empty() ) {
+                upperChunkIt = _chunksMap.upper_bound( lookupKey );
+                lowerChunkIt = upperChunkIt;
+                if ( upperChunkIt != _chunksMap.begin() ) --lowerChunkIt;
+                else lowerChunkIt = _chunksMap.end();
+            }
+
+            // If we overlap, continue after the overlap
+            // TODO: Could optimize slightly by finding next non-contiguous chunk
+            if ( lowerChunkIt != _chunksMap.end()
+                && lowerChunkIt->second.woCompare( lookupKey ) > 0 ) {
+                lookupKey = lowerChunkIt->second;
+                continue;
+            }
+
+            RangeMap::const_iterator lowerPendingIt = _pendingMap.end();
+            RangeMap::const_iterator upperPendingIt = _pendingMap.end();
+
+            if ( !_pendingMap.empty() ) {
+
+                upperPendingIt = _pendingMap.upper_bound( lookupKey );
+                lowerPendingIt = upperPendingIt;
+                if ( upperPendingIt != _pendingMap.begin() ) --lowerPendingIt;
+                else lowerPendingIt = _pendingMap.end();
+            }
+
+            // If we overlap, continue after the overlap
+            // TODO: Could optimize slightly by finding next non-contiguous chunk
+            if ( lowerPendingIt != _pendingMap.end()
+                && lowerPendingIt->second.woCompare( lookupKey ) > 0 ) {
+                lookupKey = lowerPendingIt->second;
+                continue;
+            }
+
+            //
+            // We know that the lookup key is not covered by a chunk or pending range, and where the
+            // previous chunk and pending chunks are.  Now we fill in the bounds as the closest
+            // bounds of the surrounding ranges in both maps.
+            //
+
+            range->minKey = getMinKey();
+            range->maxKey = maxKey;
+
+            if ( lowerChunkIt != _chunksMap.end()
+                && lowerChunkIt->second.woCompare( range->minKey ) > 0 ) {
+                range->minKey = lowerChunkIt->second;
+            }
+
+            if ( upperChunkIt != _chunksMap.end()
+                && upperChunkIt->first.woCompare( range->maxKey ) < 0 ) {
+                range->maxKey = upperChunkIt->first;
+            }
+
+            if ( lowerPendingIt != _pendingMap.end()
+                && lowerPendingIt->second.woCompare( range->minKey ) > 0 ) {
+                range->minKey = lowerPendingIt->second;
+            }
+
+            if ( upperPendingIt != _pendingMap.end()
+                && upperPendingIt->first.woCompare( range->maxKey ) < 0 ) {
+                range->maxKey = upperPendingIt->first;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
 
     string CollectionMetadata::toString() const {
         StringBuilder ss;
@@ -547,6 +627,20 @@ namespace mongo {
             ss << ", "<< it->first << " -> " << it->second;
         }
         return ss.str();
+    }
+
+    BSONObj CollectionMetadata::getMinKey() const {
+        BSONObjIterator it( _keyPattern );
+        BSONObjBuilder minKeyB;
+        while ( it.more() ) minKeyB << it.next().fieldName() << MINKEY;
+        return minKeyB.obj();
+    }
+
+    BSONObj CollectionMetadata::getMaxKey() const {
+        BSONObjIterator it( _keyPattern );
+        BSONObjBuilder maxKeyB;
+        while ( it.more() ) maxKeyB << it.next().fieldName() << MAXKEY;
+        return maxKeyB.obj();
     }
 
     bool CollectionMetadata::isValid() const {
