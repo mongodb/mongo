@@ -301,6 +301,7 @@ namespace mongo {
         }
 
         bool shouldKill( const ConnectionString& conn, const string& processId ) {
+            scoped_lock lk( _mutex );
             return _kill.count( pingThreadId( conn, processId ) ) > 0;
         }
 
@@ -315,11 +316,11 @@ namespace mongo {
 
         }
 
-        static bool _pingerEnabled;
-
+    private:
+        // Protects all of the members below.
+        mongo::mutex _mutex;
         set<string> _kill;
         set<string> _seen;
-        mongo::mutex _mutex;
         list<OID> _oldLockOIDs;
 
     } distLockPinger;
