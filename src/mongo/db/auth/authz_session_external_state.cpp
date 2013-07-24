@@ -27,7 +27,7 @@ namespace mongo {
         _authzManager(authzManager) {}
     AuthzSessionExternalState::~AuthzSessionExternalState() {}
 
-    const AuthorizationManager& AuthzSessionExternalState::getAuthorizationManager() const {
+    AuthorizationManager& AuthzSessionExternalState::getAuthorizationManager() {
         return *_authzManager;
     }
 

@@ -40,7 +40,7 @@ namespace mongo {
 
         virtual ~AuthzSessionExternalState();
 
-        const AuthorizationManager& getAuthorizationManager() const;
+        AuthorizationManager& getAuthorizationManager();
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be

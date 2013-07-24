@@ -30,6 +30,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/user_set.h"
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ namespace mongo {
         explicit AuthorizationSession(AuthzSessionExternalState* externalState);
         ~AuthorizationSession();
 
-        const AuthorizationManager& getAuthorizationManager() const;
+        AuthorizationManager& getAuthorizationManager();
 
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
@@ -154,6 +155,8 @@ namespace mongo {
         PrivilegeSet _acquiredPrivileges;
         // All principals who have been authenticated on this connection
         PrincipalSet _authenticatedPrincipals;
+        // All Users who have been authenticated on this connection
+        UserSet _authenticatedUsers;
     };
 
 } // namespace mongo
