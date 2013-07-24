@@ -86,11 +86,11 @@ namespace {
 
     int RamLog::repeats(const std::vector<const char *>& v, int i) {
         for( int j = i-1; j >= 0 && j+8 > i; j-- ) {
-            if( strcmp(v[i]+20,v[j]+20) == 0 ) {
+            if( strcmp(v[i]+24,v[j]+24) == 0 ) {
                 for( int x = 1; ; x++ ) {
                     if( j+x == i ) return j;
                     if( i+x>=(int) v.size() ) return -1;
-                    if( strcmp(v[i+x]+20,v[j+x]+20) ) return -1;
+                    if( strcmp(v[i+x]+24,v[j+x]+24) ) return -1;
                 }
                 return -1;
             }
@@ -144,7 +144,7 @@ namespace {
 
         s << "<pre>\n";
         for( int i = 0; i < (int)v.size(); i++ ) {
-            verify( strlen(v[i]) > 20 );
+            verify( strlen(v[i]) > 24 );
             int r = repeats(v, i);
             if( r < 0 ) {
                 s << color( linkify( html::escape( clean(v, i) ).c_str() ) ) << '\n';
