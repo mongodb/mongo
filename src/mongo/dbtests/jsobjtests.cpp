@@ -911,6 +911,19 @@ namespace JsobjTests {
             }
         };
 
+        class StringWithNull {
+        public:
+            void run() {
+                const string input = string("a") + '\0' + 'b';
+                ASSERT_EQUALS(input.size(), 3U);
+
+                BSONObj obj = BSON("str" << input);
+                const string output = obj.firstElement().String();
+                ASSERT_EQUALS(escape(output), escape(input)); // for better failure output
+                ASSERT_EQUALS(output, input);
+            }
+        };
+
         namespace Validation {
 
             class Base {
@@ -2183,6 +2196,7 @@ namespace JsobjTests {
             add< BSONObjTests::ArrayAppendAs >();
             add< BSONObjTests::GetField >();
             add< BSONObjTests::ToStringRecursionDepth >();
+            add< BSONObjTests::StringWithNull >();
 
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
