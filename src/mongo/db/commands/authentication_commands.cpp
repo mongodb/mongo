@@ -247,7 +247,6 @@ namespace mongo {
             // Handle normal client authentication, only applies to client-server connections
             else {
                 Principal* principal = new Principal(user);
-                principal->setImplicitPrivilegeAcquisition(true);
                 authorizationSession->addAndAuthorizePrincipal(principal);
             }
             return Status::OK();
