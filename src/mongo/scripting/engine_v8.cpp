@@ -1575,6 +1575,14 @@ namespace mongo {
     void V8Scope::v8ToMongoElement(BSONObjBuilder & b, const StringData& sname,
                                    v8::Handle<v8::Value> value, int depth,
                                    BSONObj* originalParent) {
+
+        // Null char should be at the end, not in the string
+        uassert(16981,
+                str::stream() << "JavaScript property (name) contains a null char "
+                              << "which is not allowed in BSON. "
+                              << originalParent->jsonString(),
+                (string::npos == sname.find('\0')) );
+
         if (value->IsString()) {
             b.append(sname, V8String(value));
             return;
