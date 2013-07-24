@@ -49,15 +49,24 @@ namespace mongo {
         virtual Status log(LogBuilder* logBuilder) const;
 
     private:
+        bool isMatch(mutablebson::ConstElement element);
+
         // Access to each component of fieldName that's the target of this mod.
         FieldRef _fieldRef;
 
         // 0 or index for $-positional in _fieldRef.
         size_t _posDollar;
 
-        // A matcher built from the modExpr that we use to identify elements to remove.
+        // If we aren't using a matcher, we just keep modExpr as _exprElt and use that to match
+        // with woCompare.
+        BSONElement _exprElt;
+
+        // If we are using a matcher, we need to keep around a BSONObj for it.
         BSONObj _exprObj;
-        scoped_ptr<MatchExpression> _matchExpression;
+
+        // If we are using the matcher, this is the match expression we built around _exprObj.
+        scoped_ptr<MatchExpression> _matchExpr;
+        bool _matcherOnPrimitive;
 
         struct PreparedState;
         scoped_ptr<PreparedState> _preparedState;
