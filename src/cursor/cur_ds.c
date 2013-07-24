@@ -36,38 +36,36 @@ __curds_txn_leave(WT_SESSION_IMPL *session)
 }
 
 /*
- * __curds_key_get -
- *	Get the key from the data-source.
+ * __curds_kv_get -
+ *	Get the key and value from the data-source.
  */
 static inline void
-__curds_key_get(WT_CURSOR *cursor)
+__curds_kv_get(WT_CURSOR *cursor, int key, int value, int ret)
 {
 	WT_CURSOR *source;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	cursor->recno = source->recno;
-	cursor->key.data = source->key.data;
-	cursor->key.size = source->key.size;
-	F_CLR(cursor, WT_CURSTD_KEY_APP);
-	F_SET(cursor, WT_CURSTD_KEY_RET);
-}
-
-/*
- * __curds_value_get -
- *	Get the value from the data-source.
- */
-static inline void
-__curds_value_get(WT_CURSOR *cursor)
-{
-	WT_CURSOR *source;
-
-	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
-
-	cursor->value.data = source->value.data;
-	cursor->value.size = source->value.size;
-	F_CLR(cursor, WT_CURSTD_VALUE_APP);
-	F_SET(cursor, WT_CURSTD_VALUE_RET);
+	/*
+	 * On success, retrieve the key and/or value, on failure, clear
+	 * the cursor's key/value set flags.
+	 */
+	if (ret == 0) {
+		if (key) {
+			cursor->recno = source->recno;
+			cursor->key.data = source->key.data;
+			cursor->key.size = source->key.size;
+			F_CLR(cursor, WT_CURSTD_KEY_APP);
+			F_SET(cursor, WT_CURSTD_KEY_RET);
+		}
+		if (value) {
+			cursor->value.data = source->value.data;
+			cursor->value.size = source->value.size;
+			F_CLR(cursor, WT_CURSTD_VALUE_APP);
+			F_SET(cursor, WT_CURSTD_VALUE_RET);
+		}
+	} else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 }
 
 /*
@@ -169,9 +167,8 @@ __curds_next(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session, 0));
 
-	WT_ERR(source->next(source));
-	__curds_key_get(cursor);
-	__curds_value_get(cursor);
+	ret = source->next(source);
+	__curds_kv_get(cursor, 1, 1, ret);
 
 err:	__curds_txn_leave(session);
 
@@ -196,9 +193,8 @@ __curds_prev(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session, 0));
 
-	WT_ERR(source->prev(source));
-	__curds_key_get(cursor);
-	__curds_value_get(cursor);
+	ret = source->prev(source);
+	__curds_kv_get(cursor, 1, 1, ret);
 
 err:	__curds_txn_leave(session);
 
@@ -247,9 +243,8 @@ __curds_search(WT_CURSOR *cursor)
 	WT_ERR(__curds_txn_enter(session, 0));
 
 	WT_ERR(__curds_key_set(cursor));
-	WT_ERR(source->search(source));
-	__curds_key_get(cursor);
-	__curds_value_get(cursor);
+	ret = source->search(source);
+	__curds_kv_get(cursor, 1, 1, ret);
 
 err:	__curds_txn_leave(session);
 
@@ -275,9 +270,8 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 	WT_ERR(__curds_txn_enter(session, 0));
 
 	WT_ERR(__curds_key_set(cursor));
-	WT_ERR(source->search_near(source, exact));
-	__curds_key_get(cursor);
-	__curds_value_get(cursor);
+	ret = source->search_near(source, exact);
+	__curds_kv_get(cursor, 1, 1, ret);
 
 err:	__curds_txn_leave(session);
 
@@ -295,6 +289,7 @@ __curds_insert(WT_CURSOR *cursor)
 	WT_CURSOR *source;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int append;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
@@ -302,15 +297,16 @@ __curds_insert(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session, 1));
 
+
 	/* If not appending, we require a key. */
-	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
+	append = F_ISSET(cursor, WT_CURSTD_APPEND) ? 1 : 0;
+	if (!append)
 		WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
-	WT_ERR(source->insert(source));
+	ret = source->insert(source);
 
 	/* If appending, we allocated a key. */
-	if (F_ISSET(cursor, WT_CURSTD_APPEND))
-		__curds_key_get(cursor);
+	__curds_kv_get(cursor, append, 0, ret);
 
 err:	__curds_txn_leave(session);
 
