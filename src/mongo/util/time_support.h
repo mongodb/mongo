@@ -21,11 +21,26 @@
 #include <string>
 #include <boost/thread/xtime.hpp>
 
-#include "mongo/bson/util/misc.h"  // Date_t
-
 namespace mongo {
 
     void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
+    std::string time_t_to_String(time_t t);
+    std::string time_t_to_String_short(time_t t);
+
+    struct Date_t {
+        // TODO: make signed (and look for related TODO's)
+        unsigned long long millis;
+        Date_t(): millis(0) {}
+        Date_t(unsigned long long m): millis(m) {}
+        operator unsigned long long&() { return millis; }
+        operator const unsigned long long&() const { return millis; }
+        void toTm (tm *buf);
+        std::string toString() const;
+        time_t toTimeT() const;
+        int64_t asInt64() const {
+            return static_cast<int64_t>(millis);
+        }
+    };
 
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames

@@ -17,9 +17,9 @@
 #include "mongo/pch.h"
 
 #include "mongo/bson/oid.h"
-#include "mongo/bson/util/misc.h" // for Date_t
 #include "mongo/s/type_collection.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
 
 namespace {
 

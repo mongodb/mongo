@@ -25,83 +25,9 @@
 
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
-
-    inline void time_t_to_String(time_t t, char *buf) {
-#if defined(_WIN32)
-        ctime_s(buf, 32, &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        buf[24] = 0; // don't want the \n
-    }
-
-    inline std::string time_t_to_String(time_t t = time(0) ) {
-        char buf[64];
-#if defined(_WIN32)
-        ctime_s(buf, sizeof(buf), &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        buf[24] = 0; // don't want the \n
-        return buf;
-    }
-
-    inline std::string time_t_to_String_no_year(time_t t) {
-        char buf[64];
-#if defined(_WIN32)
-        ctime_s(buf, sizeof(buf), &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        buf[19] = 0;
-        return buf;
-    }
-
-    inline std::string time_t_to_String_short(time_t t) {
-        char buf[64];
-#if defined(_WIN32)
-        ctime_s(buf, sizeof(buf), &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        buf[19] = 0;
-        if( buf[0] && buf[1] && buf[2] && buf[3] )
-            return buf + 4; // skip day of week
-        return buf;
-    }
-
-    struct Date_t {
-        // TODO: make signed (and look for related TODO's)
-        unsigned long long millis;
-        Date_t(): millis(0) {}
-        Date_t(unsigned long long m): millis(m) {}
-        operator unsigned long long&() { return millis; }
-        operator const unsigned long long&() const { return millis; }
-        void toTm (tm *buf) {
-            time_t dtime = toTimeT();
-#if defined(_WIN32)
-            gmtime_s(buf, &dtime);
-#else
-            gmtime_r(&dtime, buf);
-#endif
-        }
-        std::string toString() const {
-            char buf[64];
-            time_t_to_String(toTimeT(), buf);
-            return buf;
-        }
-        time_t toTimeT() const {
-            // cant use uassert from bson/util
-            verify((long long)millis >= 0); // TODO when millis is signed, delete 
-            verify(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
-            return millis / 1000;
-        }
-        int64_t asInt64() {
-            return static_cast<int64_t>(millis);
-        }
-    };
 
     // Like strlen, but only scans up to n bytes.
     // Returns -1 if no '0' found.

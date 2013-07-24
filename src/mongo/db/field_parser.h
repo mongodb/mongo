@@ -19,8 +19,8 @@
 #include <string>
 
 #include "mongo/bson/bson_field.h"
-#include "mongo/bson/util/misc.h" // for Date_t
 #include "mongo/db/jsobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
