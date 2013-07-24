@@ -1748,9 +1748,11 @@ kvs_config_add(WT_CONNECTION *connection, WT_EXTENSION_API *wtext)
 	const KVS_OPTIONS *p;
 	const char *methods[] = {
 	    "session.create",
+	    "session.compact",
 	    "session.drop",
 	    "session.open_cursor",
 	    "session.rename",
+	    "session.salvage",
 	    "session.truncate",
 	    "session.verify",
 	    NULL
