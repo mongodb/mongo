@@ -17,6 +17,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_severity.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 namespace logger {
@@ -29,14 +30,23 @@ namespace logger {
      */
     class MessageEventEphemeral {
     public:
-        MessageEventEphemeral(LogSeverity severity, StringData contextName, StringData message) :
-            _severity(severity), _contextName(contextName), _message(message) {}
+        MessageEventEphemeral(
+                uint64_t curTimeMillis,
+                LogSeverity severity,
+                StringData contextName,
+                StringData message) :
+            _curTimeMillis(curTimeMillis),
+            _severity(severity),
+            _contextName(contextName),
+            _message(message) {}
 
+        uint64_t getCurTimeMillis() const { return _curTimeMillis; }
         LogSeverity getSeverity() const { return _severity; }
         StringData getContextName() const { return _contextName; }
         StringData getMessage() const { return _message; }
 
     private:
+        uint64_t _curTimeMillis;
         LogSeverity _severity;
         StringData _contextName;
         StringData _message;
