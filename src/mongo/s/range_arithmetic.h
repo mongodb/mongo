@@ -50,13 +50,15 @@ namespace mongo {
      */
     struct KeyRange {
 
-        KeyRange( const std::string& ns_,
-                  const BSONObj& minKey_,
-                  const BSONObj& maxKey_,
-                  const BSONObj& keyPattern_ ) :
-                ns( ns_ ), minKey( minKey_ ), maxKey( maxKey_ ), keyPattern( keyPattern_ )
+        KeyRange( const std::string& ns,
+                  const BSONObj& minKey,
+                  const BSONObj& maxKey,
+                  const BSONObj& keyPattern ) :
+                ns( ns ), minKey( minKey ), maxKey( maxKey ), keyPattern( keyPattern )
         {
         }
+
+        KeyRange() {}
 
         std::string ns;
         BSONObj minKey;
