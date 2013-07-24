@@ -230,12 +230,8 @@ namespace {
         ASSERT_EQUALS(fromjson("{ $set : { a : [] } }"), logDoc);
     }
 
-
-// The following two tests are currently not passing.
-#if 0
     TEST(ComplexMod, ApplyAndLogComplexDocAndMatching1) {
 
-        // Fails with 'unknown operator $or'
         const char* const strings[] = {
             // Document:
             "{ a : { b : [ { x : 1 }, { y : 'y' }, { x : 2 }, { z : 'z' } ] } }",
@@ -273,7 +269,6 @@ namespace {
 
     TEST(ComplexMod, ApplyAndLogComplexDocAndMatching2) {
 
-        // Fails, doesn't see value as matching
         const char* const strings[] = {
             // Document:
             "{ a : { b : [ { x : 1 }, { y : 'y' }, { x : 2 }, { z : 'z' } ] } }",
@@ -305,7 +300,6 @@ namespace {
         ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(fromjson(strings[3]), logDoc);
     }
-#endif
 
     TEST(ComplexMod, ApplyAndLogComplexDocAndMatching3) {
 
@@ -389,6 +383,134 @@ namespace {
 
             // Log result:
             "{ $set : { a : [ { x : 1 }, { x : 1 } ] } }"
+        };
+
+        Document doc(fromjson(strings[0]));
+        Mod mod(fromjson(strings[1]));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
+    }
+
+    TEST(DocumentationTests, Example1) {
+        const char* const strings[] = {
+            // Document:
+            "{ flags: ['vme', 'de', 'pse', 'tsc', 'msr', 'pae', 'mce' ] }",
+
+            // Modifier:
+            "{ $pull: { flags: 'msr' } }",
+
+            // Document result:
+            "{ flags: ['vme', 'de', 'pse', 'tsc', 'pae', 'mce' ] }",
+
+            // Log result:
+            "{ $set : { flags: ['vme', 'de', 'pse', 'tsc', 'pae', 'mce' ] } }"
+        };
+
+        Document doc(fromjson(strings[0]));
+        Mod mod(fromjson(strings[1]));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "flags");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
+    }
+
+    TEST(DocumentationTests, Example2a) {
+        const char* const strings[] = {
+            // Document:
+            "{ votes: [ 3, 5, 6, 7, 7, 8 ] }",
+
+            // Modifier:
+            "{ $pull: { votes: 7 } }",
+
+            // Document result:
+            "{ votes: [ 3, 5, 6, 8 ] }",
+
+            // Log result:
+            "{ $set : { votes: [ 3, 5, 6, 8 ] } }"
+        };
+
+        Document doc(fromjson(strings[0]));
+        Mod mod(fromjson(strings[1]));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "votes");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
+    }
+
+    TEST(DocumentationTests, Example2b) {
+        const char* const strings[] = {
+            // Document:
+            "{ votes: [ 3, 5, 6, 7, 7, 8 ] }",
+
+            // Modifier:
+            "{ $pull: { votes: { $gt: 6 } } }",
+
+            // Document result:
+            "{ votes: [ 3, 5, 6 ] }",
+
+            // Log result:
+            "{ $set : { votes: [ 3, 5, 6 ] } }"
+        };
+
+        Document doc(fromjson(strings[0]));
+        Mod mod(fromjson(strings[1]));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "votes");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
+    }
+
+    TEST(MatchingEdgeCases, NonObjectShortCircuit) {
+        const char* const strings[] = {
+            "{ a: [ { x: 1 }, 2 ] }",
+
+            "{ $pull: { a: { x: 1 } } }",
+
+            "{ a: [ 2 ] }",
+
+            "{ $set : { a: [ 2 ] } }",
         };
 
         Document doc(fromjson(strings[0]));

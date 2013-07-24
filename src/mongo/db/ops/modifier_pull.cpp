@@ -61,7 +61,10 @@ namespace mongo {
         : ModifierInterface()
         , _fieldRef()
         , _posDollar(0)
-        , _matchExpression()
+        , _exprElt()
+        , _exprObj()
+        , _matchExpr()
+        , _matcherOnPrimitive(false)
         , _preparedState() {
     }
 
@@ -84,17 +87,22 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
         }
 
-        // The matcher wants this as a BSONObj, not a BSONElement. Ignore the field name (the
-        // matcher does too).
-        BSONObjBuilder builder;
-        builder.appendAs(modExpr, StringData());
-        _exprObj = builder.obj();
+        _exprElt = modExpr;
+        if (_exprElt.type() == Object) {
 
-        // Try to parse this into a match expression.
-        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj);
-        if (parseResult.isOK())
-            _matchExpression.reset(parseResult.getValue());
-        return parseResult.getStatus();
+            _exprObj = _exprElt.embeddedObject();
+            _matcherOnPrimitive = (_exprObj.firstElement().getGtLtOp() != 0);
+            if (_matcherOnPrimitive)
+                _exprObj = BSON( "" << _exprObj );
+
+            StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj);
+            if (!parseResult.isOK())
+                return parseResult.getStatus();
+
+            _matchExpr.reset(parseResult.getValue());
+        }
+
+        return Status::OK();
     }
 
     Status ModifierPull::prepare(mb::Element root,
@@ -153,9 +161,7 @@ namespace mongo {
         // Walk the values in the array
         mb::Element cursor = _preparedState->elemFound.leftChild();
         while (cursor.ok()) {
-            dassert(cursor.hasValue());
-            const BSONElement value = cursor.getValue();
-            if (_matchExpression->matchesSingleElement(value))
+            if (isMatch(cursor))
                 _preparedState->elementsToRemove.push_back(cursor);
             cursor = cursor.rightSibling();
         }
@@ -238,6 +244,29 @@ namespace mongo {
 
             return logBuilder->addToSets(logElement);
         }
+    }
+
+    bool ModifierPull::isMatch(mutablebson::ConstElement element) {
+
+        // TODO: We are assuming that 'element' hasValue is true. That might be OK if the
+        // conflict detection logic will prevent us from ever seeing a deserialized element,
+        // but are we sure about that?
+
+        dassert(element.hasValue());
+
+        if (!_matchExpr)
+            return (element.compareWithBSONElement(_exprElt, false) == 0);
+
+        if (_matcherOnPrimitive) {
+            // TODO: This is kinda slow.
+            BSONObj candidate = element.getValue().wrap("");
+            return _matchExpr->matchesBSON(candidate);
+        }
+
+        if (element.getType() != Object)
+            return false;
+
+        return _matchExpr->matchesBSON(element.getValueObject());
     }
 
 } // namespace mongo
