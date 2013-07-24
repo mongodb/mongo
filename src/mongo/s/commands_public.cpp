@@ -1793,9 +1793,7 @@ namespace mongo {
         void PipelineCommand::addRequiredPrivileges(const std::string& dbname,
                                                     const BSONObj& cmdObj,
                                                     std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            Pipeline::addRequiredPrivileges(dbname, cmdObj, out);
         }
 
         bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,

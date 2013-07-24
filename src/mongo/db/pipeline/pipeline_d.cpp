@@ -38,6 +38,12 @@ namespace mongo {
         Pipeline::SourceContainer& sources = pPipeline->sources;
 
         if (!sources.empty()) {
+            DocumentSource* last = sources.back().get();
+            if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(last)) {
+                out->_conn.reset(new DBDirectClient());
+                out->_db = dbName;
+            }
+
             DocumentSource* first = sources.front().get();
             DocumentSourceGeoNear* geoNear = dynamic_cast<DocumentSourceGeoNear*>(first);
             if (geoNear) {
