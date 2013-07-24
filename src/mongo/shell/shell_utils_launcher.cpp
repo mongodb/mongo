@@ -666,10 +666,7 @@ namespace mongo {
             int i = 0;
             for( ; i < 130; ++i ) {
                 if ( i == 60 ) {
-                    char now[64];
-                    time_t_to_String(time(0), now);
-                    now[ 20 ] = 0;
-                    log() << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
+                    log() << "process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
                     kill_wrapper( pid, SIGKILL, port, opt );
                 }
                 if(wait_for_pid(pid, false, &exitCode))
@@ -677,10 +674,7 @@ namespace mongo {
                 sleepmillis( 1000 );
             }
             if ( i == 130 ) {
-                char now[64];
-                time_t_to_String(time(0), now);
-                now[ 20 ] = 0;
-                log() << now << " failed to terminate process on port " << port << ", with pid " << pid << endl;
+                log() << "failed to terminate process on port " << port << ", with pid " << pid << endl;
                 verify( "Failed to terminate process" == 0 );
             }
 

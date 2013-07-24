@@ -54,6 +54,31 @@ namespace mongo {
 #endif
     }
 
+    std::string time_t_to_String(time_t t) {
+        char buf[64];
+#if defined(_WIN32)
+        ctime_s(buf, sizeof(buf), &t);
+#else
+        ctime_r(&t, buf);
+#endif
+        buf[24] = 0; // don't want the \n
+        return buf;
+    }
+
+    std::string time_t_to_String_short(time_t t) {
+        char buf[64];
+#if defined(_WIN32)
+        ctime_s(buf, sizeof(buf), &t);
+#else
+        ctime_r(&t, buf);
+#endif
+        buf[19] = 0;
+        if( buf[0] && buf[1] && buf[2] && buf[3] )
+            return buf + 4; // skip day of week
+        return buf;
+    }
+
+
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames
     string terseCurrentTime(bool colonsOk) {
@@ -113,9 +138,33 @@ namespace mongo {
 
 #undef MONGO_ISO_DATE_FMT_NO_TZ
 
+    void Date_t::toTm(tm* buf) {
+        time_t dtime = toTimeT();
+#if defined(_WIN32)
+        gmtime_s(buf, &dtime);
+#else
+        gmtime_r(&dtime, buf);
+#endif
+    }
+
+    std::string Date_t::toString() const {
+        return time_t_to_String(toTimeT());
+    }
+
+    time_t Date_t::toTimeT() const {
+        verify((long long)millis >= 0); // TODO when millis is signed, delete 
+        verify(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
+        return millis / 1000;
+    }
+
     std::string dateToCtimeString(Date_t date) {
+        time_t t = date.toTimeT();
         char buf[64];
-        time_t_to_String(date.toTimeT(), buf);
+#if defined(_WIN32)
+        ctime_s(buf, sizeof(buf), &t);
+#else
+        ctime_r(&t, buf);
+#endif
         char* milliSecStr = buf + 19;
         snprintf(milliSecStr, 5, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
         return buf;
