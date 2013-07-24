@@ -26,6 +26,9 @@
 namespace mongo {
 namespace {
 
+    const bool isTimeTSmall =
+        (sizeof(time_t) == sizeof(int32_t)) && std::numeric_limits<time_t>::is_signed;
+
     /**
      * To make this test deterministic, we set the time zone to America/New_York.
      */
@@ -54,8 +57,9 @@ namespace {
                       dateToISOStringUTC(Date_t(0)));
         ASSERT_EQUALS(std::string("1970-06-30T01:06:40.981Z"),
                       dateToISOStringUTC(Date_t(15556000981ULL)));
-        ASSERT_EQUALS(std::string("2058-02-20T18:29:11.100Z"),
-                      dateToISOStringUTC(Date_t(2781455351100ULL)));
+        if (!isTimeTSmall)
+            ASSERT_EQUALS(std::string("2058-02-20T18:29:11.100Z"),
+                          dateToISOStringUTC(Date_t(2781455351100ULL)));
         ASSERT_EQUALS(std::string("2013-02-20T18:29:11.100Z"),
                       dateToISOStringUTC(Date_t(1361384951100ULL)));
     }
@@ -65,8 +69,9 @@ namespace {
                       dateToISOStringLocal(Date_t(0)));
         ASSERT_EQUALS(std::string("1970-06-29T21:06:40.981-0400"),
                       dateToISOStringLocal(Date_t(15556000981ULL)));
-        ASSERT_EQUALS(std::string("2058-02-20T13:29:11.100-0500"),
-                      dateToISOStringLocal(Date_t(2781455351100ULL)));
+        if (!isTimeTSmall)
+            ASSERT_EQUALS(std::string("2058-02-20T13:29:11.100-0500"),
+                          dateToISOStringLocal(Date_t(2781455351100ULL)));
         ASSERT_EQUALS(std::string("2013-02-20T13:29:11.100-0500"),
                       dateToISOStringLocal(Date_t(1361384951100ULL)));
     }
@@ -75,8 +80,9 @@ namespace {
         ASSERT_EQUALS(std::string("Wed Dec 31 19:00:00.000"), dateToCtimeString(Date_t(0)));
         ASSERT_EQUALS(std::string("Mon Jun 29 21:06:40.981"),
                       dateToCtimeString(Date_t(15556000981ULL)));
-        ASSERT_EQUALS(std::string("Wed Feb 20 13:29:11.100"),
-                      dateToCtimeString(Date_t(2781455351100ULL)));
+        if (!isTimeTSmall)
+            ASSERT_EQUALS(std::string("Wed Feb 20 13:29:11.100"),
+                          dateToCtimeString(Date_t(2781455351100ULL)));
         ASSERT_EQUALS(std::string("Wed Feb 20 13:29:11.100"),
                       dateToCtimeString(Date_t(1361384951100ULL)));
     }
