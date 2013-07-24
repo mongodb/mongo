@@ -65,7 +65,7 @@ namespace mongo {
 
             std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
         */
-        std::string String()        const { return chk(mongo::String).valuestr(); }
+        std::string String()        const { return chk(mongo::String).str(); }
         Date_t Date()               const { return chk(mongo::Date).date(); }
         double Number()             const { return chk(isNumber()).number(); }
         double Double()             const { return chk(NumberDouble)._numberDouble(); }
