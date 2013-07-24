@@ -845,6 +845,29 @@ namespace mongo {
 #endif
     };
 
+    class DocumentSourceRedact :
+        public DocumentSource {
+    public:
+        virtual boost::optional<Document> getNext();
+        virtual const char* getSourceName() const;
+        virtual void optimize();
+
+        static const char redactName[];
+
+        static intrusive_ptr<DocumentSource> createFromBson(BSONElement* bsonElement,
+                const intrusive_ptr<ExpressionContext>& expCtx);
+
+    protected:
+        virtual void sourceToBson(BSONObjBuilder* pBuilder, bool explain) const;
+
+    private:
+        DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
+                             const intrusive_ptr<Expression>& previsit);
+        boost::optional<Document> redactObject(const Variables& in);
+        Value redactValue(const Variables& vars, const Value& in);
+
+        intrusive_ptr<Expression> _expression;
+    };
 
     class DocumentSourceSort :
         public SplittableDocumentSource {

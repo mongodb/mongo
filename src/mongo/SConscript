@@ -337,6 +337,7 @@ env.StaticLibrary("coredb", [
         "db/pipeline/document_source_merge_cursors.cpp",
         "db/pipeline/document_source_out.cpp",
         "db/pipeline/document_source_project.cpp",
+        "db/pipeline/document_source_redact.cpp",
         "db/pipeline/document_source_skip.cpp",
         "db/pipeline/document_source_sort.cpp",
         "db/pipeline/document_source_unwind.cpp",
