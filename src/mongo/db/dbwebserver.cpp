@@ -80,15 +80,16 @@ namespace mongo {
         }
 
         void _authorizePrincipal(const std::string& principalName, bool readOnly) {
-            Principal* principal = new Principal(UserName(principalName, "local"));
-            ActionSet actions = getGlobalAuthorizationManager()->getActionsForOldStyleUser(
-                    "admin", readOnly);
-
-            AuthorizationSession* authorizationSession = cc().getAuthorizationSession();
-            authorizationSession->addPrincipal(principal);
-            Status status = authorizationSession->acquirePrivilege(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal->getName());
-            verify (status == Status::OK());
+            // TODO(spencer): Re-enable this using the new way of authorizing users. SERVER-10323
+//            Principal* principal = new Principal(UserName(principalName, "local"));
+//            ActionSet actions = getGlobalAuthorizationManager()->getActionsForOldStyleUser(
+//                    "admin", readOnly);
+//
+//            AuthorizationSession* authorizationSession = cc().getAuthorizationSession();
+//            authorizationSession->addPrincipal(principal);
+//            Status status = authorizationSession->acquirePrivilege(
+//                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal->getName());
+//            verify (status == Status::OK());
         }
 
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
