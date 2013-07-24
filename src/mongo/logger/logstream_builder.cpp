@@ -24,6 +24,7 @@
 #include "mongo/logger/tee.h"
 #include "mongo/util/assert_util.h"  // TODO: remove apple dep for this in threadlocal.h
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -89,7 +90,7 @@ namespace logger {
     LogstreamBuilder::~LogstreamBuilder() {
         if (_os) {
             _baseMessage += _os->str();
-            MessageEventEphemeral message(_severity, _contextName, _baseMessage);
+            MessageEventEphemeral message(curTimeMillis64(), _severity, _contextName, _baseMessage);
             _domain->append(message);
             if (_tee) {
                 _os->str("");

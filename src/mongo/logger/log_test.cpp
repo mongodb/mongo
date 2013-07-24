@@ -104,17 +104,17 @@ namespace {
         MessageLogDomain domain;
 
         // Appending to the domain before attaching the appender does not affect the appender.
-        domain.append(MessageEventEphemeral(LogSeverity::Log(), "", "1"));
+        domain.append(MessageEventEphemeral(0ULL, LogSeverity::Log(), "", "1"));
         ASSERT_EQUALS(0, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
         // Appending to the domain after attaching the appender does affect the appender.
         MessageLogDomain::AppenderHandle handle = domain.attachAppender(countAppender);
-        domain.append(MessageEventEphemeral(LogSeverity::Log(), "", "2"));
+        domain.append(MessageEventEphemeral(0ULL, LogSeverity::Log(), "", "2"));
         countAppender = domain.detachAppender(handle);
         ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
         // Appending to the domain after detaching the appender does not affect the appender.
-        domain.append(MessageEventEphemeral(LogSeverity::Log(), "", "3"));
+        domain.append(MessageEventEphemeral(0ULL, LogSeverity::Log(), "", "3"));
         ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
     }
 
