@@ -1577,7 +1577,7 @@ namespace mongo {
                                    BSONObj* originalParent) {
 
         // Null char should be at the end, not in the string
-        uassert(16981,
+        uassert(16985,
                 str::stream() << "JavaScript property (name) contains a null char "
                               << "which is not allowed in BSON. "
                               << originalParent->jsonString(),
