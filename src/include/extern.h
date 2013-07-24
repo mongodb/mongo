@@ -247,7 +247,8 @@ extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_compare(WT_CURSOR_BTREE *a_arg,
     WT_CURSOR_BTREE *b_arg,
     int *cmpp);
-extern int __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop);
+extern int __wt_btcur_range_truncate(WT_CURSOR_BTREE *start,
+    WT_CURSOR_BTREE *stop);
 extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt);
 extern int __wt_debug_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -615,9 +616,6 @@ extern int __wt_curds_create( WT_SESSION_IMPL *session,
 extern int __wt_curdump_create(WT_CURSOR *child,
     WT_CURSOR *owner,
     WT_CURSOR **cursorp);
-extern int __wt_curfile_truncate( WT_SESSION_IMPL *session,
-    WT_CURSOR *start,
-    WT_CURSOR *stop);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
@@ -655,6 +653,9 @@ extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
+extern int __wt_cursor_range_truncate( WT_SESSION *wt_session,
+    WT_CURSOR *start,
+    WT_CURSOR *stop);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
 extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR *to_dup,
@@ -669,9 +670,6 @@ extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_curtable_set_key(WT_CURSOR *cursor, ...);
 extern void __wt_curtable_set_value(WT_CURSOR *cursor, ...);
-extern int __wt_curtable_truncate( WT_SESSION_IMPL *session,
-    WT_CURSOR *start,
-    WT_CURSOR *stop);
 extern int __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],

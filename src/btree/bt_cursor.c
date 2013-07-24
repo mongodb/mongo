@@ -693,11 +693,11 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_btcur_truncate --
+ * __wt_btcur_range_truncate --
  *	Discard a cursor range from the tree.
  */
 int
-__wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
+__wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;

@@ -462,20 +462,34 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 }
 
 /*
- * __wt_curtable_truncate --
- *	WT_SESSION.truncate support when table cursors are specified.
+ * __curtable_range_truncate --
+ *	WT_SESSION->truncate of a cursor range, table implementation.
  */
-int
-__wt_curtable_truncate(
-    WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
+static int
+__curtable_range_truncate(
+    WT_SESSION *wt_session, WT_CURSOR *start, WT_CURSOR *stop)
 {
-	WT_CURSOR **list_start, **list_stop;
+	WT_CURSOR *cursor, **list_start, **list_stop;
 	WT_CURSOR_TABLE *ctable, *ctable_start, *ctable_stop;
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_ITEM raw;
+	WT_SESSION_IMPL *session;
 	u_int i;
 	int cmp;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	/*
+	 * The underlying column-group data sources must support cursor range
+	 * truncation, check before we do any work.
+	 */
+	ctable = (WT_CURSOR_TABLE *)(start == NULL ? stop : start);
+	for (i = 0; i < WT_COLGROUPS(ctable->table); i++)
+		if (ctable->cg_cursors[i]->range_truncate == NULL) {
+			cursor = start == NULL ? stop : start;
+			WT_RET(__wt_bad_object_type(session, cursor->uri));
+		}
 
 	WT_RET(__wt_scr_alloc(session, 128, &key));
 
@@ -560,16 +574,16 @@ __wt_curtable_truncate(
 		    list_stop = ctable_stop->cg_cursors;
 		    i < WT_COLGROUPS(ctable_stop->table);
 		    i++, ++list_stop)
-			WT_ERR(
-			    __wt_curfile_truncate(session, NULL, *list_stop));
+			WT_ERR((*list_stop)->range_truncate(
+			    wt_session, NULL, *list_stop));
 	else if (stop == NULL)
 		for (i = 0,
 		    ctable_start = (WT_CURSOR_TABLE *)start,
 		    list_start = ctable_start->cg_cursors;
 		    i < WT_COLGROUPS(ctable_start->table);
 		    i++, ++list_start)
-			WT_ERR(
-			    __wt_curfile_truncate(session, *list_start, NULL));
+			WT_ERR((*list_start)->range_truncate(
+			    wt_session, *list_start, NULL));
 	else {
 		for (i = 0,
 		    ctable_start = (WT_CURSOR_TABLE *)start,
@@ -578,8 +592,8 @@ __wt_curtable_truncate(
 		    list_stop = ctable_stop->cg_cursors;
 		    i < WT_COLGROUPS(ctable_start->table);
 		    i++, ++list_start, ++list_stop)
-			WT_ERR(__wt_curfile_truncate(
-			    session, *list_start, *list_stop));
+			WT_ERR((*list_start)->range_truncate(
+			    wt_session, *list_start, *list_stop));
 	}
 
 err:	__wt_scr_free(&key);
@@ -768,6 +782,9 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	ctable->table = table;
 	ctable->plan = table->plan;
+
+	/* Table cursors support truncation. */
+	cursor->range_truncate = __curtable_range_truncate;
 
 	/* Handle projections. */
 	if (columns != NULL) {

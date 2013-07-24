@@ -136,9 +136,10 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_CURSOR_NEEDKEY(b);
 
 	/*
-	 * The assumption is data-sources don't need WT_CURSOR.compare methods,
-	 * instead, we'll copy the key/value out of the underlying data-source
-	 * cursor and so any comparison to be done can be done at this level.
+	 * The assumption is data-sources don't need to provide WiredTiger with
+	 * WT_CURSOR.compare methods, instead, we'll copy the key/value out of
+	 * the underlying data-source cursor and any comparison to be done can
+	 * be done at this level.
 	 */
 	collator = ((WT_CURSOR_DATA_SOURCE *)a)->collator;
 	if (collator == NULL)
@@ -453,6 +454,13 @@ __wt_curds_create(
 	WT_ERR(__wt_config_getones(session, metaconf, "value_format", &cval));
 	WT_ERR(
 	    __wt_strndup(session, cval.str, cval.len, &cursor->value_format));
+
+	/*
+	 * The assumption is data-sources don't need to provide WiredTiger with
+	 * cursor range truncation support, instead, we'll iterate the cursors
+	 * removing key/value pairs one at a time.
+	 */
+	cursor->range_truncate = __wt_cursor_range_truncate;
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 

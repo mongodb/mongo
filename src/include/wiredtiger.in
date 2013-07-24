@@ -415,6 +415,17 @@ struct __wt_cursor {
 		WT_CURSOR **tqe_prev;
 	} q;				/* Linked list of WT_CURSORs. */
 
+	/*
+	 * !!!
+	 * Cursor range truncate is a WT_SESSION method, but it's implemented
+	 * by methods in the underlying cursors.
+	 *
+	 * The method takes a WT_SESSION handle instead of a WT_SESSION_IMPL
+	 * because that's what will compile cleanly in a public header file,
+	 * and the code to make it work isn't complicated.
+	 */
+	int (*range_truncate)(WT_SESSION *, WT_CURSOR *, WT_CURSOR *);
+
 	uint64_t recno;
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
 					/* Holds a recno in raw mode. */

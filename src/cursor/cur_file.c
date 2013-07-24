@@ -220,15 +220,18 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 }
 
 /*
- * __wt_curfile_truncate --
- *	WT_SESSION.truncate support when file cursors are specified.
+ * __curfile_range_truncate --
+ *	WT_SESSION->truncate of a cursor range, file implementation.
  */
-int
-__wt_curfile_truncate(
-    WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
+static int
+__curfile_range_truncate(
+    WT_SESSION *wt_session, WT_CURSOR *start, WT_CURSOR *stop)
 {
+	WT_SESSION_IMPL *session;
 	WT_CURSOR_BTREE *cursor;
 	WT_DECL_RET;
+
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	/*
 	 * !!!
@@ -238,7 +241,7 @@ __wt_curfile_truncate(
 	 */
 	cursor = (WT_CURSOR_BTREE *)(start == NULL ? stop : start);
 	WT_WITH_BTREE(session, cursor->btree,
-	    ret = __wt_btcur_truncate(
+	    ret = __wt_btcur_range_truncate(
 	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
 
 	return (ret);
@@ -315,6 +318,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->uri = btree->dhandle->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
+
+	/* File cursors support truncation. */
+	cursor->range_truncate = __curfile_range_truncate;
 
 	cbt->btree = btree;
 	if (bulk) {

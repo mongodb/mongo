@@ -532,10 +532,12 @@ __session_truncate(WT_SESSION *wt_session,
 		goto done;
 	}
 
-	/* Cursor truncate is only supported for file and table objects. */
+	/*
+	 * Cursor truncate is only supported for some objects, check for the
+	 * supporting methods we need, range_truncate and compare.
+	 */
 	cursor = start == NULL ? stop : start;
-	if (!WT_PREFIX_MATCH(cursor->uri, "file:") &&
-	    !WT_PREFIX_MATCH(cursor->uri, "table:"))
+	if (cursor->range_truncate == NULL || cursor->compare == NULL)
 		WT_ERR(__wt_bad_object_type(session, cursor->uri));
 
 	/*
@@ -585,10 +587,7 @@ __session_truncate(WT_SESSION *wt_session,
 		}
 	}
 
-	if (WT_PREFIX_MATCH(cursor->uri, "file:"))
-		WT_ERR(__wt_curfile_truncate(session, start, stop));
-	else
-		WT_ERR(__wt_curtable_truncate(session, start, stop));
+	WT_ERR(cursor->range_truncate(wt_session, start, stop));
 
 done:
 err:	TXN_API_END_NOTFOUND_MAP(session, ret);
