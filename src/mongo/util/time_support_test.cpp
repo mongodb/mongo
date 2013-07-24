@@ -29,8 +29,13 @@ namespace {
     /**
      * To make this test deterministic, we set the time zone to America/New_York.
      */
+#ifdef _WIN32
+    char tzEnvString[] = "TZ=EST+5EDT";
+#else
+    char tzEnvString[] = "TZ=America/New_York";
+#endif
     MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
-        if (-1 == setenv("TZ", "America/New_York", 1)) {
+        if (-1 == putenv(tzEnvString)) {
             return Status(ErrorCodes::BadValue, errnoWithDescription());
         }
         tzset();

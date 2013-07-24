@@ -14,7 +14,7 @@
  */
 
 #include "mongo/platform/basic.h"
-#include "mongo/platform/cstdint.h"
+
 #include "mongo/util/time_support.h"
 
 #include <cstdio>
@@ -24,12 +24,18 @@
 #include <boost/thread/tss.hpp>
 #include <boost/thread/xtime.hpp>
 
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/assert_util.h"
 
 #ifdef _WIN32
 #include <boost/date_time/filetime_functions.hpp>
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/timer.h"
+
+// NOTE(schwerin): MSVC's _snprintf is not a drop-in replacement for C99's snprintf().  In
+// particular, when the target buffer is too small, behaviors differ.  Consult the documentation
+// from MSDN and form the BSD or Linux man pages before using.
+#define snprintf _snprintf
 #endif
 
 namespace mongo {
@@ -117,7 +123,26 @@ namespace mongo {
         bufRemaining -= pos;
         if (local) {
             fassert(16983, bufRemaining >= 6);
+#ifdef _WIN32
+            // NOTE(schwerin): The value stored by _get_timezone is the value one adds to local time
+            // to get UTC.  This is opposite of the ISO-8601 meaning of the timezone offset.
+            // NOTE(schwerin): Microsoft's timezone code always assumes US rules for daylight
+            // savings time.  We can do no better without completely reimplementing localtime_s and
+            // related time library functions.
+            long msTimeZone;
+            _get_timezone(&msTimeZone);
+            if (t.tm_isdst) msTimeZone -= 3600;
+            const bool tzIsWestOfUTC = msTimeZone > 0;
+            const long tzOffsetSeconds = msTimeZone* (tzIsWestOfUTC ? 1 : -1);
+            const long tzOffsetHoursPart = tzOffsetSeconds / 3600;
+            const long tzOffsetMinutesPart = (tzOffsetSeconds / 60) % 60;
+            snprintf(cur, 6, "%c%02ld%02ld",
+                     tzIsWestOfUTC ? '-' : '+',
+                     tzOffsetHoursPart,
+                     tzOffsetMinutesPart);
+#else
             strftime(cur, bufRemaining, "%z", &t);
+#endif
         }
         else {
             fassert(16984, bufRemaining >= 2);
