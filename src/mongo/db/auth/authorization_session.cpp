@@ -46,9 +46,14 @@ namespace {
         _externalState.reset(externalState);
     }
 
-    AuthorizationSession::~AuthorizationSession(){}
+    AuthorizationSession::~AuthorizationSession() {
+        for (UserSet::iterator it = _authenticatedUsers.begin();
+                it != _authenticatedUsers.end(); ++it) {
+            getAuthorizationManager().releaseUser(*it);
+        }
+    }
 
-    const AuthorizationManager& AuthorizationSession::getAuthorizationManager() const {
+    AuthorizationManager& AuthorizationSession::getAuthorizationManager() {
         return _externalState->getAuthorizationManager();
     }
 

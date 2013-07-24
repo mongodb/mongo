@@ -21,7 +21,8 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'role_graph.cpp',
                                'role_name.cpp',
                                'user.cpp',
-                               'user_name.cpp'],
+                               'user_name.cpp',
+                               'user_set.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson',
                            '$BUILD_DIR/mongo/stringutils'])
@@ -52,6 +53,7 @@ env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('principal_set_test', 'principal_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('privilege_set_test', 'privilege_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('role_graph_test', 'role_graph_test.cpp', LIBDEPS=['authcore'])
+env.CppUnitTest('user_set_test', 'user_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                 LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
