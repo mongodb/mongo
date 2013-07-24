@@ -33,6 +33,7 @@ namespace mongo {
     class ExpressionContext;
     class ExpressionNary;
     struct OpDesc; // local private struct
+    class Privilege;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
         subclass to make a command.  define a singleton object for it.
@@ -52,6 +53,11 @@ namespace mongo {
         static intrusive_ptr<Pipeline> parseCommand(
             string &errmsg, BSONObj &cmdObj,
             const intrusive_ptr<ExpressionContext> &pCtx);
+
+        /// Helper to implement Command::addRequiredPrivileges
+        static void addRequiredPrivileges(const string& inputNs,
+                                          BSONObj cmdObj,
+                                          vector<Privilege>* out);
 
         /**
           Get the collection name from the command.

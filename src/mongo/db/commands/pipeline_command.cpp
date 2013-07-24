@@ -175,9 +175,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            Pipeline::addRequiredPrivileges(dbname, cmdObj, out);
         }
 
         virtual bool run(const string &db, BSONObj &cmdObj, int options, string &errmsg,
@@ -234,6 +232,10 @@ namespace mongo {
             }
             else {
                 pPipeline->run(result);
+            }
+
+            if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pPipeline->output())) {
+                out->alterCommandResult(result);
             }
 
             return true;

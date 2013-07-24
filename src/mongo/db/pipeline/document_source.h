@@ -769,7 +769,7 @@ namespace mongo {
 
 
     class DocumentSourceOut :
-        public DocumentSource {
+        public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceOut();
@@ -777,6 +777,13 @@ namespace mongo {
         virtual bool advance();
         virtual const char *getSourceName() const;
         virtual Document getCurrent();
+
+        // Virtuals for SplittableDocumentSource
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
+        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+
+        /// Gives $out a way to add the outputNs to the command result.
+        void alterCommandResult(BSONObjBuilder& cmdResult);
 
         /**
           Create a document source for output and pass-through.
@@ -788,7 +795,7 @@ namespace mongo {
           @param pExpCtx the expression context for the pipeline
           @returns the newly created document source
         */
-        static intrusive_ptr<DocumentSourceOut> createFromBson(
+        static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
@@ -799,8 +806,23 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
-        DocumentSourceOut(BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
+        DocumentSourceOut(StringData outputCollection,
+                          const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        // Sets _tempsNs and prepares it to receive data.
+        void prepTempCollection(const string& finalNs);
+
+        bool _done;
+
+        NamespaceString _tempNs; // output goes here as it is being processed.
+        const string _outputCollection; // output will go here after all data is processed.
+
+        // These fields are injected by PipelineD. This division of labor allows the
+        // DocumentSourceOut class to be linked into both mongos and mongod while
+        // allowing it to use DBDirectClient when in mongod.
+        string _db;
+        boost::scoped_ptr<DBClientBase> _conn; // either NULL or a DBDirectClient
+        friend class PipelineD;
     };
 
     
