@@ -15,8 +15,11 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/logger/encoder.h"
 #include "mongo/logger/message_event.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace logger {
@@ -26,6 +29,23 @@ namespace logger {
      */
     class MessageEventDetailsEncoder : public Encoder<MessageEventEphemeral> {
     public:
+        typedef std::string (*DateFormatter)(Date_t);
+
+        /**
+         * Sets the date formatter function for all instances of MessageEventDetailsEncoder.
+         *
+         * Only and always safe to call during single-threaded execution, as in during start-up
+         * intiailization.
+         */
+        static void setDateFormatter(DateFormatter dateFormatter);
+
+        /**
+         * Gets the date formatter function in use by instances of MessageEventDetailsEncoder.
+         *
+         * Always safe to call.
+         */
+        static DateFormatter getDateFormatter();
+
         virtual ~MessageEventDetailsEncoder();
         virtual std::ostream& encode(const MessageEventEphemeral& event, std::ostream& os);
     };

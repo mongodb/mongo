@@ -25,6 +25,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h"
@@ -89,6 +90,8 @@ namespace {
         ("maxConns",po::value<int>(), maxConnInfoBuilder.str().c_str())
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
+        ("logTimestampFormat", po::value<string>(), "Desired format for timestamps in log "
+         "messages. One of ctime, iso8601-utc or iso8601-local")
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication")
         ("setParameter", po::value< std::vector<std::string> >()->composing(),
@@ -365,6 +368,24 @@ namespace {
         }
 #endif  // _WIN32
 
+        if (params.count("logTimestampFormat")) {
+            using logger::MessageEventDetailsEncoder;
+            std::string formatterName = params["logTimestampFormat"].as<string>();
+            if (formatterName == "ctime") {
+                MessageEventDetailsEncoder::setDateFormatter(dateToCtimeString);
+            }
+            else if (formatterName == "iso8601-utc") {
+                MessageEventDetailsEncoder::setDateFormatter(dateToISOStringUTC);
+            }
+            else if (formatterName == "iso8601-local") {
+                MessageEventDetailsEncoder::setDateFormatter(dateToISOStringLocal);
+            }
+            else {
+                cout << "Value of logTimestampFormat must be one of ctime, iso8601-utc or "
+                    "iso8601-local; not \"" << formatterName << "\"." << endl;
+                return false;
+            }
+        }
         if (params.count("logpath")) {
             cmdLine.logpath = params["logpath"].as<string>();
             if (cmdLine.logpath.empty()) {
