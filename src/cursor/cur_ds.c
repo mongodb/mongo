@@ -221,6 +221,8 @@ __curds_reset(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
 	WT_ERR(source->reset(source));
 
 err:	API_END(session);
