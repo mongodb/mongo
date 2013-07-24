@@ -112,6 +112,46 @@ err:	return (ret);
 }
 
 /*
+ * __curds_compare --
+ *	WT_CURSOR.compare method for the data-source cursor type.
+ */
+static int
+__curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
+{
+	WT_COLLATOR *collator;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	CURSOR_API_CALL(a, session, compare, NULL);
+
+	/*
+	 * Confirm both cursors refer to the same source and have keys, then
+	 * compare them.
+	 */
+	if (strcmp(a->uri, b->uri) != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "Cursors must reference the same object");
+
+	WT_CURSOR_NEEDKEY(a);
+	WT_CURSOR_NEEDKEY(b);
+
+	/*
+	 * The assumption is data-sources don't need WT_CURSOR.compare methods,
+	 * instead, we'll copy the key/value out of the underlying data-source
+	 * cursor and so any comparison to be done can be done at this level.
+	 */
+	collator = ((WT_CURSOR_DATA_SOURCE *)a)->collator;
+	if (collator == NULL)
+		*cmpp = __wt_btree_lex_compare(&a->key, &b->key);
+	else
+		ret = collator->compare(
+		    collator, &session->iface, &a->key, &b->key, cmpp);
+
+err:	API_END(session);
+	return (ret);
+}
+
+/*
  * __curds_next --
  *	WT_CURSOR.next method for the data-source cursor type.
  */
@@ -373,7 +413,7 @@ __wt_curds_create(
 	    NULL,			/* get-value */
 	    NULL,			/* set-key */
 	    NULL,			/* set-value */
-	    NULL,			/* compare */
+	    __curds_compare,		/* compare */
 	    __curds_next,		/* next */
 	    __curds_prev,		/* prev */
 	    __curds_reset,		/* reset */
@@ -415,6 +455,9 @@ __wt_curds_create(
 	    __wt_strndup(session, cval.str, cval.len, &cursor->value_format));
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
+
+	/* Data-source cursors have a collator reference. */
+	WT_ERR(__wt_collator_config(session, cfg, &data_source->collator));
 
 	WT_ERR(dsrc->open_cursor(dsrc,
 	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &data_source->source));

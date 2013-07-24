@@ -204,6 +204,8 @@ struct __wt_cursor_config {
 struct __wt_cursor_data_source {
 	WT_CURSOR iface;
 
+	WT_COLLATOR *collator;			/* Configured collator */
+
 	WT_CURSOR *source;			/* Application-owned cursor. */
 };
 
