@@ -69,6 +69,8 @@ namespace mongo {
          DocumentSourceOut::createFromBson},
         {DocumentSourceProject::projectName,
          DocumentSourceProject::createFromBson},
+        {DocumentSourceRedact::redactName,
+         DocumentSourceRedact::createFromBson},
         {DocumentSourceSkip::skipName,
          DocumentSourceSkip::createFromBson},
         {DocumentSourceSort::sortName,
