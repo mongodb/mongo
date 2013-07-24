@@ -633,7 +633,9 @@ __curtable_close(WT_CURSOR *cursor)
 
 	if (ctable->plan != ctable->table->plan)
 		__wt_free(session, ctable->plan);
-	__wt_free(session, ctable->config);
+	for (i = 0; ctable->cfg[i] != NULL; ++i)
+		__wt_free(session, ctable->cfg[i]);
+	__wt_free(session, ctable->cfg);
 	if (cursor->value_format != ctable->table->value_format)
 		__wt_free(session, cursor->value_format);
 	__wt_free(session, ctable->cg_cursors);
@@ -689,7 +691,6 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_CURSOR **cp, *primary;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	const char *cfg[2];
 	u_int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
@@ -706,11 +707,9 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 		    "Bulk load is not supported for tables with indices");
 
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
-	cfg[0] = ctable->config;
-	cfg[1] = NULL;
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
 		WT_RET(__wt_open_cursor(session, table->indices[i]->source,
-		    &ctable->iface, cfg, cp));
+		    &ctable->iface, ctable->cfg, cp));
 	return (0);
 }
 
@@ -744,6 +743,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ITEM fmt, plan;
 	WT_TABLE *table;
 	size_t size;
+	int cfg_cnt;
 	const char *tablename, *columns;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
@@ -822,9 +822,18 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * We'll need to squirrel away a copy of the cursor configuration
-	 * for when we eventually open indices.
+	 * for if/when we open indices.
+	 *
+	 * cfg[0] is the baseline configuration for the cursor open and we can
+	 * aquire another copy from the configuration structures, so it would
+	 * be reasonable not to copy it here: but I'd rather be safe than sorry.
 	 */
-	WT_ERR(__wt_config_collapse(session, cfg, &ctable->config));
+	for (cfg_cnt = 0; cfg[cfg_cnt] != NULL; ++cfg_cnt)
+		;
+	WT_ERR(__wt_calloc_def(session, cfg_cnt + 1, &ctable->cfg));
+	for (cfg_cnt = 0; cfg[cfg_cnt] != NULL; ++cfg_cnt)
+		WT_ERR(
+		    __wt_strdup(session, cfg[cfg_cnt], &ctable->cfg[cfg_cnt]));
 
 	if (0) {
 err:		WT_TRET(__curtable_close(cursor));
