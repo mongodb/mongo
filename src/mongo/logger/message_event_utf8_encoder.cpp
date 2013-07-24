@@ -24,13 +24,23 @@
 namespace mongo {
 namespace logger {
 
+    static MessageEventDetailsEncoder::DateFormatter _dateFormatter = dateToCtimeString;
+
+    void MessageEventDetailsEncoder::setDateFormatter(DateFormatter dateFormatter) {
+        _dateFormatter = dateFormatter;
+    }
+
+    MessageEventDetailsEncoder::DateFormatter MessageEventDetailsEncoder::getDateFormatter() {
+        return _dateFormatter;
+    }
+
     MessageEventDetailsEncoder::~MessageEventDetailsEncoder() {}
     std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& event,
                                                      std::ostream &os) {
 
         static const size_t maxLogLine = 10 * 1024;
 
-        os << dateToCtimeString(event.getDate()) << ' ';
+        os << _dateFormatter(event.getDate()) << ' ';
         StringData contextName = event.getContextName();
         if (!contextName.empty()) {
             os << '[' << contextName << "] ";
