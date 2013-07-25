@@ -28,19 +28,26 @@ namespace mongo {
         virtual ~QuerySolutionNode() { }
 
         /**
-         * What stage should this be transcribed to?
-         * See stage_types.h.
+         * What stage should this be transcribed to?  See stage_types.h.
          */
         virtual StageType getType() const = 0;
 
+        /**
+         * Output a human-readable string representing the plan.
+         */
         string toString() {
             stringstream ss;
             appendToString(&ss);
             return ss.str();
         }
 
+        /**
+         * Internal function called by toString()
+         */
         virtual void appendToString(stringstream* ss) const = 0;
     };
+
+    // The root of the tree is the solution.
     typedef QuerySolutionNode QuerySolution;
 
     struct EmptyNode : public QuerySolutionNode {

@@ -17,7 +17,10 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/runner.h"
 #include "mongo/db/pdfile.h"
+
+#pragma once
 
 namespace mongo {
 
@@ -29,7 +32,7 @@ namespace mongo {
      * TODO: Graceful error handling
      * TODO: Stats, diagnostics, instrumentation, etc.
      */
-    class SimplePlanRunner {
+    class SimplePlanRunner : public Runner {
     public:
         SimplePlanRunner() : _workingSet(new WorkingSet()) { }
         SimplePlanRunner(WorkingSet* ws, PlanStage* rt) : _workingSet(ws), _root(rt) { }
@@ -42,6 +45,10 @@ namespace mongo {
         void setRoot(PlanStage* root) {
             verify(root);
             _root.reset(root);
+        }
+
+        PlanStageStats* getStats() {
+            return _root->getStats();
         }
 
         bool getNext(BSONObj* objOut) {

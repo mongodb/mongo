@@ -68,8 +68,12 @@ namespace mongo {
      * and used by the CachedPlanRunner to compare expected performance with actual.
      */
     struct PlanRankingDecision {
+        PlanRankingDecision() : statsOfWinner(NULL), onlyOneSolution(false) { }
+
         // Owned by us.
         PlanStageStats* statsOfWinner;
+
+        bool onlyOneSolution;
 
         // TODO: We can place anything we want here.  What's useful to the cache?  What's useful to
         // planning and optimization?
