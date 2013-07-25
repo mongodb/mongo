@@ -673,7 +673,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
 }
 
 /*
- * __wt_btree_lex_compare --
+ * __wt_lex_compare --
  *	Lexicographic comparison routine.
  *
  * Returns:
@@ -681,11 +681,11 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
  *	= 0 if user_item is lexicographically = tree_item
  *	> 0 if user_item is lexicographically > tree_item
  *
- * We use the names "user" and "tree" so it's clear which the application is
- * looking at when we call its comparison func.
+ * We use the names "user" and "tree" so it's clear in the btree code which
+ * the application is looking at when we call its comparison func.
  */
 static inline int
-__wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
+__wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	const uint8_t *userp, *treep;
 	uint32_t len, usz, tsz;
@@ -704,14 +704,13 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
 }
 
-#define	WT_BTREE_CMP(s, bt, k1, k2, cmp)				\
-	(((bt)->collator == NULL) ?					\
-	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
-	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
-	    (k1), (k2), &(cmp)))
+#define	WT_LEX_CMP(s, collator, k1, k2, cmp)				\
+	((collator) == NULL ?						\
+	(((cmp) = __wt_lex_compare((k1), (k2))), 0) :			\
+	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
 
 /*
- * __wt_btree_lex_compare_skip --
+ * __wt_lex_compare_skip --
  *	Lexicographic comparison routine, but skipping leading bytes.
  *
  * Returns:
@@ -719,11 +718,11 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
  *	= 0 if user_item is lexicographically = tree_item
  *	> 0 if user_item is lexicographically > tree_item
  *
- * We use the names "user" and "tree" so it's clear which the application is
- * looking at when we call its comparison func.
+ * We use the names "user" and "tree" so it's clear in the btree code which
+ * the application is looking at when we call its comparison func.
  */
 static inline int
-__wt_btree_lex_compare_skip(
+__wt_lex_compare_skip(
     const WT_ITEM *user_item, const WT_ITEM *tree_item, uint32_t *matchp)
 {
 	const uint8_t *userp, *treep;
@@ -744,11 +743,10 @@ __wt_btree_lex_compare_skip(
 	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
 }
 
-#define	WT_BTREE_CMP_SKIP(s, bt, k1, k2, cmp, matchp)			\
-	(((bt)->collator == NULL) ?					\
-	(((cmp) = __wt_btree_lex_compare_skip((k1), (k2), matchp)), 0) :\
-	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
-	    (k1), (k2), &(cmp)))
+#define	WT_LEX_CMP_SKIP(s, collator, k1, k2, cmp, matchp)		\
+	((collator) == NULL ?						\
+	(((cmp) = __wt_lex_compare_skip((k1), (k2), matchp)), 0) :	\
+	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
 
 /*
  * __wt_btree_mergeable --

@@ -504,8 +504,8 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 			*cmpp = 1;
 		break;
 	case BTREE_ROW:
-		WT_RET(WT_BTREE_CMP(
-		    session, btree, &a->key, &b->key, *cmpp));
+		WT_RET(WT_LEX_CMP(
+		    session, btree->collator, &a->key, &b->key, *cmpp));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

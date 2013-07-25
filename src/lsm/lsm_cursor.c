@@ -11,14 +11,8 @@
 	for ((i) = (clsm)->nchunks; (i) > 0;)				\
 		if (((c) = (clsm)->cursors[--i]) != NULL)
 
-#define	WT_LSM_CMP(s, lsm_tree, k1, k2, cmp)				\
-	(((lsm_tree)->collator == NULL) ?				\
-	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
-	(lsm_tree)->collator->compare((lsm_tree)->collator,		\
-	    &(s)->iface, (k1), (k2), &(cmp)))
-
 #define	WT_LSM_CURCMP(s, lsm_tree, c1, c2, cmp)				\
-	WT_LSM_CMP(s, lsm_tree, &(c1)->key, &(c2)->key, cmp)
+	WT_LEX_CMP(s, (lsm_tree)->collator, &(c1)->key, &(c2)->key, cmp)
 
 /*
  * LSM API enter: check that the cursor is in sync with the tree.
@@ -380,7 +374,8 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_CURSOR_NEEDKEY(a);
 	WT_CURSOR_NEEDKEY(b);
 
-	WT_ERR(WT_LSM_CMP(session, alsm->lsm_tree, &a->key, &b->key, cmp));
+	WT_ERR(WT_LEX_CMP(
+	    session, alsm->lsm_tree->collator, &a->key, &b->key, cmp));
 	*cmpp = cmp;
 
 err:	API_END(session);

@@ -91,8 +91,8 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 		 * the code.
 		 */
 		if (cbulk->rle != 0) {
-			WT_RET(WT_BTREE_CMP(session, S2BT(session),
-			    &cursor->key, &cbulk->cmp, cmp));
+			WT_RET(WT_LEX_CMP(session,
+			    btree->collator, &cursor->key, &cbulk->cmp, cmp));
 			if (cmp <= 0)
 				return (__bulk_row_keycmp_err(cbulk));
 		}

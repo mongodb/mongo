@@ -4,8 +4,6 @@ __bit_ffs
 __bit_nclr
 __wt_bloom_drop
 __wt_bloom_get
-__wt_btree_lex_compare
-__wt_btree_lex_compare_skip
 __wt_cache_dump
 __wt_config_getone
 __wt_debug_addr
@@ -13,6 +11,8 @@ __wt_debug_offset
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_fsync
+__wt_lex_compare
+__wt_lex_compare_skip
 __wt_log_read
 __wt_log_scan
 __wt_nlpo2

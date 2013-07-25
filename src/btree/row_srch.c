@@ -32,7 +32,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	/* Fast-path appends. */
 	insert_key.data = WT_INSERT_KEY(ret_ins);
 	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-	WT_RET(WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp));
+	WT_RET(
+	    WT_LEX_CMP(session, btree->collator, srch_key, &insert_key, cmp));
 	if (cmp >= 0) {
 		/*
 		 * XXX We may race with another appending thread.
@@ -74,8 +75,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 			last_ins = ret_ins;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-			WT_RET(WT_BTREE_CMP(
-			    session, btree, srch_key, &insert_key, cmp));
+			WT_RET(WT_LEX_CMP(session,
+			    btree->collator, srch_key, &insert_key, cmp));
 		}
 
 		if (cmp > 0)		/* Keep going at this level */
@@ -141,7 +142,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 		/* Fast-path appends. */
 		__wt_ref_key(page, ref, &item->data, &item->size);
-		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
+		WT_ERR(
+		    WT_LEX_CMP(session, btree->collator, srch_key, item, cmp));
 		if (cmp >= 0)
 			goto descend;
 
@@ -172,8 +174,9 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 				__wt_ref_key(
 				    page, ref, &item->data, &item->size);
 				match = WT_MIN(skiplow, skiphigh);
-				WT_ERR(WT_BTREE_CMP_SKIP(session,
-				    btree, srch_key, item, cmp, &match));
+				WT_ERR(WT_LEX_CMP_SKIP(
+				    session, btree->collator,
+				    srch_key, item, cmp, &match));
 				if (cmp == 0)
 					break;
 				if (cmp < 0) {
@@ -244,8 +247,8 @@ descend:	WT_ASSERT(session, ref != NULL);
 
 		WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 		match = WT_MIN(skiplow, skiphigh);
-		WT_ERR(WT_BTREE_CMP_SKIP(
-		    session, btree, srch_key, item, cmp, &match));
+		WT_ERR(WT_LEX_CMP_SKIP(
+		    session, btree->collator, srch_key, item, cmp, &match));
 		if (cmp == 0)
 			break;
 		if (cmp < 0) {

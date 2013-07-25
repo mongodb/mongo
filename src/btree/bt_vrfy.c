@@ -440,7 +440,7 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	__wt_ref_key(page, ref, &item.data, &item.size);
 
 	/* Compare the key against the largest key we've seen so far. */
-	WT_RET(WT_BTREE_CMP(session, btree, &item, vs->max_key, cmp));
+	WT_RET(WT_LEX_CMP(session, btree->collator, &item, vs->max_key, cmp));
 	if (cmp <= 0)
 		WT_RET_MSG(session, WT_ERROR,
 		    "the internal key in entry %" PRIu32 " on the page at %s "
@@ -497,8 +497,8 @@ __verify_row_leaf_key_order(
 		 * we've seen was a key from a previous leaf page, and it's not
 		 * OK to compare equally in that case.
 		 */
-		WT_RET(WT_BTREE_CMP(session,
-		    btree, vs->tmp1, (WT_ITEM *)vs->max_key, cmp));
+		WT_RET(WT_LEX_CMP(session,
+		    btree->collator, vs->tmp1, (WT_ITEM *)vs->max_key, cmp));
 		if (cmp < 0)
 			WT_RET_MSG(session, WT_ERROR,
 			    "the first key on the page at %s sorts equal to or "
