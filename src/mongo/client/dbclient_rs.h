@@ -206,7 +206,7 @@ namespace mongo {
         /**
          * Removes the ReplicaSetMonitor for the given set name from _sets, which will delete it.
          * If clearSeedCache is true, then the cached seed string for this Replica Set will be removed
-         * from _setServers.
+         * from _seedServers.
          */
         static void remove( const string& name, bool clearSeedCache = false );
 
@@ -324,7 +324,7 @@ namespace mongo {
                 bool verbose, int nodesOffset );
 
         /**
-         * Save the seed list for the current set into the _setServers map
+         * Save the seed list for the current set into the _seedServers map
          * Should only be called if you're already holding _setsLock and this
          * monitor's _lock.
          */
@@ -388,9 +388,12 @@ namespace mongo {
         // The number of consecutive times the set has been checked and every member in the set was down.
         int _failedChecks;
 
-        static mongo::mutex _setsLock; // protects _sets and _setServers
-        static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
-        static map<string,vector<HostAndPort> > _seedServers; // set name to seed list. Used to rebuild the monitor if it is cleaned up but then the set is accessed again.
+        static mongo::mutex _setsLock; // protects _seedServers and _sets
+
+        // set name to seed list.
+        // Used to rebuild the monitor if it is cleaned up but then the set is accessed again.
+        static map<string, vector<HostAndPort> > _seedServers;
+        static map<string, ReplicaSetMonitorPtr> _sets; // set name to Monitor
 
         static ConfigChangeHook _hook;
         int _localThresholdMillis; // local ping latency threshold (protected by _lock)
