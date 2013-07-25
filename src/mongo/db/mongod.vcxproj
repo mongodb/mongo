@@ -2845,6 +2845,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="query\multi_plan_runner.cpp" />
+    <ClCompile Include="query\plan_ranker.cpp" />
     <ClCompile Include="range_deleter.cpp" />
     <ClCompile Include="range_deleter_db_env.cpp" />
     <ClCompile Include="range_deleter_mock_env.cpp">
@@ -4278,6 +4280,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="exec\mock_stage.h" />
     <ClInclude Include="exec\or.h" />
     <ClInclude Include="exec\plan_stage.h" />
+    <ClInclude Include="exec\plan_stats.h" />
     <ClInclude Include="exec\simple_plan_runner.h" />
     <ClInclude Include="exec\skip.h" />
     <ClInclude Include="exec\sort.h" />
@@ -4317,6 +4320,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="ops\modifier_table.h" />
     <ClInclude Include="ops\update_driver.h" />
     <ClInclude Include="pdfile_version.h" />
+    <ClInclude Include="query\multi_plan_runner.h" />
+    <ClInclude Include="query\plan_ranker.h" />
+    <ClInclude Include="query\query_solution.h" />
+    <ClInclude Include="query\stage_types.h" />
     <ClInclude Include="range_deleter.h" />
     <ClInclude Include="range_deleter_db_env.h" />
     <ClInclude Include="range_deleter_mock_env.h">
@@ -4745,6 +4752,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="fts\stop_words_turkish.txt" />
     <None Include="mongo.ico" />
     <None Include="ops\SConscript" />
+    <None Include="query\SConscript" />
     <None Include="SConscript" />
   </ItemGroup>
   <ItemGroup>

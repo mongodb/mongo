@@ -675,6 +675,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\exec\mock_stage.h" />
     <ClInclude Include="..\db\exec\or.h" />
     <ClInclude Include="..\db\exec\plan_stage.h" />
+    <ClInclude Include="..\db\exec\plan_stats.h" />
     <ClInclude Include="..\db\exec\simple_plan_runner.h" />
     <ClInclude Include="..\db\exec\skip.h" />
     <ClInclude Include="..\db\exec\sort.h" />
@@ -811,6 +812,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\querypattern.h" />
     <ClInclude Include="..\db\queryutil-inl.h" />
     <ClInclude Include="..\db\queryutil.h" />
+    <ClInclude Include="..\db\query\multi_plan_runner.h" />
+    <ClInclude Include="..\db\query\plan_ranker.h" />
+    <ClInclude Include="..\db\query\query_solution.h" />
+    <ClInclude Include="..\db\query\stage_types.h" />
     <ClInclude Include="..\db\query_optimizer.h" />
     <ClInclude Include="..\db\query_optimizer_internal.h" />
     <ClInclude Include="..\db\query_plan.h" />
@@ -3397,6 +3402,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp" />
     <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
     <ClCompile Include="..\db\querypattern.cpp" />
+    <ClCompile Include="..\db\query\multi_plan_runner.cpp" />
+    <ClCompile Include="..\db\query\plan_ranker.cpp" />
     <ClCompile Include="..\db\query_optimizer.cpp" />
     <ClCompile Include="..\db\query_optimizer_internal.cpp" />
     <ClCompile Include="..\db\query_plan.cpp" />
@@ -3906,6 +3913,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="queryoptimizertests2.cpp" />
     <ClCompile Include="querytests.cpp" />
     <ClCompile Include="queryutiltests.cpp" />
+    <ClCompile Include="query_multi_plan_runner.cpp" />
     <ClCompile Include="query_stage_and.cpp" />
     <ClCompile Include="query_stage_collscan.cpp" />
     <ClCompile Include="query_stage_fetch.cpp" />
@@ -4664,6 +4672,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="..\db\fts\stop_words_swedish.txt" />
     <None Include="..\db\fts\stop_words_turkish.txt" />
     <None Include="..\db\ops\SConscript" />
+    <None Include="..\db\query\SConscript" />
     <None Include="..\db\SConscript" />
     <None Include="..\logger\SConscript" />
     <None Include="..\platform\SConscript" />

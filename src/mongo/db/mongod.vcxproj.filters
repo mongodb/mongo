@@ -2441,6 +2441,12 @@
     <ClCompile Include="repl\sync_source_feedback.cpp">
       <Filter>db\repl</Filter>
     </ClCompile>
+    <ClCompile Include="query\multi_plan_runner.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="query\plan_ranker.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4902,6 +4908,21 @@
     <ClInclude Include="repl\sync_source_feedback.h">
       <Filter>db\repl</Filter>
     </ClInclude>
+    <ClInclude Include="exec\plan_stats.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="query\multi_plan_runner.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\plan_ranker.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\query_solution.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\stage_types.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -5119,6 +5140,9 @@
     </None>
     <None Include="exec\SConscript">
       <Filter>db\exec</Filter>
+    </None>
+    <None Include="query\SConscript">
+      <Filter>db\query</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -5388,6 +5412,9 @@
     </Filter>
     <Filter Include="db\commands\write_commands">
       <UniqueIdentifier>{2e34064a-aa9c-469d-ab06-3e4786e7113d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\query">
+      <UniqueIdentifier>{9d9e9477-2823-4e23-b417-a6f767231cca}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
