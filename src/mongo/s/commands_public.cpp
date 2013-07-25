@@ -1778,7 +1778,23 @@ namespace mongo {
                              BSONObjBuilder &result, bool fromRepl);
 
         private:
-            
+            DocumentSourceMergeCursors::CursorIds parseCursors(
+                const vector<Strategy::CommandResult>& shardResults,
+                const string& fullns);
+
+            void killAllCursors(const vector<Strategy::CommandResult>& shardResults);
+            bool doAnyShardsNotSupportCursors(const vector<Strategy::CommandResult>& shardResults);
+            bool wasMergeCursorsSupported(BSONObj cmdResult);
+            void uassertCanMergeInMongos(intrusive_ptr<Pipeline> mergePipeline, BSONObj cmdObj);
+
+            void noCursorFallback(intrusive_ptr<Pipeline> shardPipeline,
+                                  intrusive_ptr<Pipeline> mergePipeline,
+                                  const string& dbname,
+                                  const string& fullns,
+                                  int options,
+                                  BSONObj cmdObj,
+                                  BSONObjBuilder& result);
+
         };
 
 
@@ -1816,10 +1832,6 @@ namespace mongo {
             if (!pPipeline.get())
                 return false; // there was some parsing error
 
-            // This restriction will be loosened when we move the merge phase to a shard.
-            uassert(16948, "Aggregation in a sharded system doesn't yet support disk usage",
-                    !pExpCtx->getExtSortAllowed());
-
             /*
               If the system isn't running sharded, or the target collection
               isn't sharded, pass this on to a mongod.
@@ -1835,37 +1847,207 @@ namespace mongo {
             /* create the command for the shards */
             BSONObjBuilder commandBuilder;
             pShardPipeline->toBson(&commandBuilder);
+            commandBuilder.append("fromRouter", true); // this means produce output to be merged
 
             if (cmdObj.hasField("$queryOptions")) {
                 commandBuilder.append(cmdObj["$queryOptions"]);
             }
 
+            commandBuilder.append("cursor", BSON("batchSize" << 0));
             BSONObj shardedCommand(commandBuilder.done());
 
             BSONObjBuilder shardQueryBuilder;
-#ifdef NEVER
-            BSONObjBuilder shardSortBuilder;
-            pShardPipeline->getCursorMods(
-                &shardQueryBuilder, &shardSortBuilder);
-            BSONObj shardSort(shardSortBuilder.done());
-#endif /* NEVER */
             pShardPipeline->getInitialQuery(&shardQueryBuilder);
+            BSONObj shardQuery(shardQueryBuilder.done());
+
+            // Run the command on the shards
+            // TODO need to make sure cursors are killed if a retry is needed
+            vector<Strategy::CommandResult> shardResults;
+            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
+
+            if (doAnyShardsNotSupportCursors(shardResults)) {
+                killAllCursors(shardResults);
+                noCursorFallback(
+                        pShardPipeline, pPipeline, dbName, fullns, options, cmdObj, result);
+                return true;
+            }
+
+            DocumentSourceMergeCursors::CursorIds cursorIds = parseCursors(shardResults, fullns);
+            pPipeline->addInitialSource(DocumentSourceMergeCursors::create(cursorIds, pExpCtx));
+
+            BSONObjBuilder mergeCmd;
+            pPipeline->toBson(&mergeCmd);
+
+            if (cmdObj.hasField("cursor"))
+                mergeCmd.append(cmdObj["cursor"]);
+            if (cmdObj.hasField("$queryOptions"))
+                mergeCmd.append(cmdObj["$queryOptions"]);
+
+            // Run merging command on primary shard of database.
+            // Not using ShardConnection because this shouldn't be versioned.
+            const string mergeServer = conf->getPrimary().getConnString();
+            ScopedDbConnection conn(mergeServer);
+            BSONObj mergedResults;
+            bool ok = conn->runCommand(dbName, mergeCmd.obj(), mergedResults);
+            conn.done();
+
+            if (!ok && !wasMergeCursorsSupported(mergedResults)) {
+                // This means that the cursors were constructed on all shards containing data
+                // needed for the pipeline, but the primary shard doesn't support merging them.
+                uassertCanMergeInMongos(pPipeline, cmdObj);
+
+                pPipeline->stitch();
+                pPipeline->run(result);
+                return true;
+            }
+
+            // Copy output from merging (primary) shard to the output object from our command.
+            // Also, propagates errmsg and code if ok == false.
+            result.appendElements(mergedResults);
+
+            return ok;
+        }
+
+        void PipelineCommand::uassertCanMergeInMongos(intrusive_ptr<Pipeline> mergePipeline,
+                                                      BSONObj cmdObj) {
+            uassert(17020, "All shards must support cursors to get a cursor back from aggregation",
+                    !cmdObj.hasField("cursor"));
+
+            uassert(17021, "All shards must support cursors to support new features in aggregation",
+                    mergePipeline->canRunInMongos());
+        }
+
+        void PipelineCommand::noCursorFallback(intrusive_ptr<Pipeline> shardPipeline,
+                                               intrusive_ptr<Pipeline> mergePipeline,
+                                               const string& dbName,
+                                               const string& fullns,
+                                               int options,
+                                               BSONObj cmdObj,
+                                               BSONObjBuilder& result) {
+            uassertCanMergeInMongos(mergePipeline, cmdObj);
+
+            BSONObjBuilder commandBuilder;
+            shardPipeline->toBson(&commandBuilder);
+            commandBuilder.append("fromRouter", true);
+
+            if (cmdObj.hasField("$queryOptions")) {
+                commandBuilder.append(cmdObj["$queryOptions"]);
+            }
+            BSONObj shardedCommand(commandBuilder.done());
+
+            BSONObjBuilder shardQueryBuilder;
+            shardPipeline->getInitialQuery(&shardQueryBuilder);
             BSONObj shardQuery(shardQueryBuilder.done());
 
             // Run the command on the shards
             vector<Strategy::CommandResult> shardResults;
             SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
-            pPipeline->addInitialSource(DocumentSourceCommandShards::create(shardResults, pExpCtx));
+            mergePipeline->addInitialSource(
+                    DocumentSourceCommandShards::create(shardResults, mergePipeline->getContext()));
 
             // Combine the shards' output and finish the pipeline
-            pPipeline->stitch();
-            pPipeline->run(result);
+            mergePipeline->stitch();
+            mergePipeline->run(result);
+        }
 
-            if (errmsg.length() > 0)
-                return false;
+        DocumentSourceMergeCursors::CursorIds PipelineCommand::parseCursors(
+                const vector<Strategy::CommandResult>& shardResults,
+                const string& fullns) {
+            try {
+                DocumentSourceMergeCursors::CursorIds cursors;
+                for (size_t i = 0; i < shardResults.size(); i++) {
+                    BSONObj result = shardResults[i].result;
+                    uassert(17022, str::stream()
+                                    << "sharded pipeline failed on shard "
+                                    << shardResults[i].shardTarget.getName() << ": "
+                                    << result.toString(),
+                            result["ok"].trueValue());
 
-            return true;
+                    BSONObj cursor = result["cursor"].Obj();
+
+                    massert(17023, str::stream()
+                                    << "shard " << shardResults[i].shardTarget.getName()
+                                    << " returned non-empty first batch",
+                            cursor["firstBatch"].Obj().isEmpty());
+                    massert(17024, str::stream()
+                                    << "shard " << shardResults[i].shardTarget.getName()
+                                    << " returned cursorId 0",
+                            cursor["id"].Long() != 0);
+                    massert(17025, str::stream()
+                                    << "shard " << shardResults[i].shardTarget.getName()
+                                    << " returned different ns: " << cursor["ns"],
+                            cursor["ns"].String() == fullns);
+
+                    cursors.push_back(make_pair(shardResults[i].target.toString(),
+                                                cursor["id"].Long()));
+                }
+
+                return cursors;
+            }
+            catch (...) {
+                // Need to clean up any cursors we successfully created on the shards
+                killAllCursors(shardResults);
+                throw;
+            }
+        }
+
+        bool PipelineCommand::doAnyShardsNotSupportCursors(
+                const vector<Strategy::CommandResult>& shardResults) {
+            // Note: all other errors are handled elsewhere
+            for (size_t i = 0; i < shardResults.size(); i++) {
+                // This is the result of requesting a cursor on a mongod <2.6. Yes, the
+                // unbalanced '"' is correct.
+                if (shardResults[i].result["errmsg"].str() == "unrecognized field \"cursor") {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool PipelineCommand::wasMergeCursorsSupported(BSONObj cmdResult) {
+            // Note: all other errors are returned directly
+            // This is the result of using $mergeCursors on a mongod <2.6.
+            const char* errmsg = "exception: Unrecognized pipeline stage name: '$mergeCursors'";
+            return cmdResult["errmsg"].str() != errmsg;
+        }
+
+        void PipelineCommand::killAllCursors(const vector<Strategy::CommandResult>& shardResults) {
+            // This function must ignore and log all errors. Callers expect a best-effort attempt at
+            // cleanup without exceptions. If any cursors aren't cleaned up here, they will be
+            // cleaned up automatically on the shard after 10 minutes anyway.
+
+            for (size_t i = 0; i < shardResults.size(); i++) {
+                try {
+                    BSONObj result = shardResults[i].result;
+                    if (!result["ok"].trueValue())
+                        continue;
+
+                    long long cursor = result["cursor"]["id"].Long();
+                    if (!cursor)
+                        continue;
+
+                    ScopedDbConnection conn(shardResults[i].target);
+                    conn->killCursor(cursor);
+                    conn.done();
+                }
+                catch (const DBException& e) {
+                    log() << "Couldn't kill aggregation cursor on shard: "
+                          << shardResults[i].target
+                          << " due to DBException: " << e.toString();
+                }
+                catch (const std::exception& e) {
+                    log() << "Couldn't kill aggregation cursor on shard: "
+                          << shardResults[i].target
+                          << " due to std::exception: " << e.what();
+                }
+                catch (...) {
+                    log() << "Couldn't kill aggregation cursor on shard: "
+                          << shardResults[i].target
+                          << " due to non-exception";
+                }
+            }
         }
 
     } // namespace pub_grid_cmds

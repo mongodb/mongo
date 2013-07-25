@@ -771,6 +771,64 @@ namespace mongo {
         Matcher matcher;
     };
 
+    class DocumentSourceMergeCursors :
+        public DocumentSource {
+    public:
+        typedef vector<pair<ConnectionString, CursorId> > CursorIds;
+
+        // virtuals from DocumentSource
+        virtual bool eof();
+        virtual bool advance();
+        virtual Document getCurrent();
+        virtual void setSource(DocumentSource *pSource);
+        virtual const char *getSourceName() const;
+        virtual void dispose();
+
+        static intrusive_ptr<DocumentSource> createFromBson(
+            BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        static intrusive_ptr<DocumentSource> create(
+            const CursorIds& cursorIds,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        static const char name[];
+    protected:
+        // virtuals from DocumentSource
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
+
+    private:
+
+        struct CursorAndConnection {
+            CursorAndConnection(ConnectionString host, NamespaceString ns, CursorId id);
+            ScopedDbConnection connection;
+            DBClientCursor cursor;
+        };
+
+        // using list to enable removing arbitrary elements
+        typedef list<boost::shared_ptr<CursorAndConnection> > Cursors;
+
+        DocumentSourceMergeCursors(
+            const CursorIds& cursorIds,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        // sets _current and _hasCurrent by calling getNextDocumentImpl()
+        void getNextDocument();
+
+        // does the work of finding the next document if there is one
+        boost::optional<Document> getNextDocumentImpl();
+
+        // This is the description of cursors to merge.
+        const CursorIds _cursorIds;
+
+        // These are the actual cursors we are merging. Created lazily.
+        Cursors _cursors;
+        Cursors::iterator _currentCursor;
+
+        bool _unstarted;
+        bool _hasCurrent;
+        Document _current;
+    };
 
     class DocumentSourceOut :
         public SplittableDocumentSource {

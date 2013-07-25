@@ -151,6 +151,13 @@ namespace mongo {
                     DOC(accum->getOpName() << vpExpression[i]->serialize()));
         }
 
+        if (_doingMerge) {
+            // This makes the output unparsable (with error) on pre 2.6 shards, but it will never
+            // be sent to old shards when this flag is true since they can't do a merge anyway.
+
+            insides["$doingMerge"] = Value(true);
+        }
+
         *pBuilder << groupName << insides.freeze();
     }
 
@@ -269,6 +276,12 @@ namespace mongo {
                     pGroup->setIdExpression(ExpressionConstant::create(Value(groupField)));
                     idSet = true;
                 }
+            }
+            else if (str::equals(pFieldName, "$doingMerge")) {
+                massert(17030, "$doingMerge should be true if present",
+                        groupField.Bool());
+
+                pGroup->setDoingMerge(true);
             }
             else {
                 /*

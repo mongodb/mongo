@@ -66,6 +66,8 @@ namespace mongo {
         */
         string getCollectionName() const;
 
+        intrusive_ptr<ExpressionContext> getContext() const { return pCtx; }
+
         /**
           Split the current Pipeline into a Pipeline for each shard, and
           a Pipeline that combines the results within mongos.
@@ -137,6 +139,9 @@ namespace mongo {
 
         /// The source that represents the output. Returns a non-owning pointer.
         DocumentSource* output() { return sources.back().get(); }
+
+        /// Returns true if this pipeline only uses features that work in mongos.
+        bool canRunInMongos() const;
 
         /**
           The aggregation command name.

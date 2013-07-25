@@ -70,6 +70,8 @@ namespace mongo {
          DocumentSourceLimit::createFromBson},
         {DocumentSourceMatch::matchName,
          DocumentSourceMatch::createFromBson},
+        {DocumentSourceMergeCursors::name,
+         DocumentSourceMergeCursors::createFromBson},
         {DocumentSourceOut::outName,
          DocumentSourceOut::createFromBson},
         {DocumentSourceProject::projectName,
@@ -151,9 +153,7 @@ namespace mongo {
 
             /* we didn't recognize a field in the command */
             ostringstream sb;
-            sb <<
-               "unrecognized field \"" <<
-               cmdElement.fieldName();
+            sb << "unrecognized field '" << cmdElement.fieldName() << "'";
             errmsg = sb.str();
             return intrusive_ptr<Pipeline>();
         }
@@ -433,10 +433,6 @@ namespace mongo {
         if ((btemp = getSplitMongodPipeline())) {
             pBuilder->append(splitMongodPipelineName, btemp);
         }
-
-        if ((btemp = pCtx->getInRouter())) {
-            pBuilder->append(fromRouterName, btemp);
-        }
     }
 
     void Pipeline::stitch() {
@@ -548,6 +544,16 @@ namespace mongo {
 
     void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
         sources.push_front(source);
+    }
+
+    bool Pipeline::canRunInMongos() const {
+        if (pCtx->getExtSortAllowed())
+            return false;
+
+        if (dynamic_cast<DocumentSourceOut*>(sources.back().get()))
+            return false;
+
+        return true;
     }
 
 } // namespace mongo
