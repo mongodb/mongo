@@ -81,10 +81,10 @@ See @subpage data_sources for the full list.
 
 @section cursor_projections Projections
 
-Cursors on tables, column groups and indices can return a subset of
-columns.  This is done by listing the column names in parenthesis in the
-<code>uri</code> parameter to WT_SESSION::open_cursor.  Only the fields
-from the listed columns are returned by WT_CURSOR::get_value.
+Cursors on tables and indices can return a subset of columns.  This is done by
+listing the column names in parenthesis in the <code>uri</code> parameter to
+WT_SESSION::open_cursor.  Only the fields from the listed columns are returned
+by WT_CURSOR::get_value.
 
 The @ex_ref{ex_schema.c} example creates a table where the value format is
 \c "5sHq", where the initial string is the country, the short is a year,

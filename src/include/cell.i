@@ -64,6 +64,9 @@
 #define	WT_CELL_VALUE_SHORT	0x03		/* Short data */
 #define	WT_CELL_SHORT_TYPE(v)	((v) & 0x03U)
 
+#define	WT_CELL_SHORT_MAX	63		/* Maximum short key/value */
+#define	WT_CELL_SHORT_SHIFT	2		/* Shift for short key/value */
+
 #define	WT_CELL_64V		0x04		/* Associated value */
 
 /*
@@ -88,12 +91,12 @@
 #define	WT_CELL_ADDR_LNO	 (2 << 4)	/* Block location (lno) */
 #define	WT_CELL_DEL		 (3 << 4)	/* Deleted value */
 #define	WT_CELL_KEY		 (4 << 4)	/* Key */
-#define	WT_CELL_KEY_PFX		 (5 << 4)	/* Key with prefix byte */
-#define	WT_CELL_KEY_OVFL	 (6 << 4)	/* Overflow key */
+#define	WT_CELL_KEY_OVFL	 (5 << 4)	/* Overflow key */
+#define	WT_CELL_KEY_PFX		 (6 << 4)	/* Key with prefix byte */
 #define	WT_CELL_VALUE		 (7 << 4)	/* Value */
 #define	WT_CELL_VALUE_COPY	 (8 << 4)	/* Value copy */
-#define	WT_CELL_VALUE_OVFL	 (9 << 4)	/* Removed overflow value */
-#define	WT_CELL_VALUE_OVFL_RM	(10 << 4)	/* Cached overflow value */
+#define	WT_CELL_VALUE_OVFL	 (9 << 4)	/* Overflow value */
+#define	WT_CELL_VALUE_OVFL_RM	(10 << 4)	/* Removed overflow value */
 
 #define	WT_CELL_TYPE_MASK	(0x0fU << 4)
 #define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
@@ -192,9 +195,10 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 	 * Short data cells without run-length encoding have 6 bits of data
 	 * length in the descriptor byte.
 	 */
-	if (rle == 0 && size <= 63) {
+	if (rle == 0 && size <= WT_CELL_SHORT_MAX) {
 		byte = (uint8_t)size;			/* Type + length */
-		cell->__chunk[0] = (byte << 2) | WT_CELL_VALUE_SHORT;
+		cell->__chunk[0] =
+		    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_VALUE_SHORT;
 		return (1);
 	}
 
@@ -241,7 +245,7 @@ __wt_cell_pack_data_match(
 	 * don't get called if the on-page cell is an overflow, for example).
 	 */
 	if (WT_CELL_SHORT_TYPE(a[0]) == WT_CELL_VALUE_SHORT) {
-		av = a[0] >> 2;
+		av = a[0] >> WT_CELL_SHORT_SHIFT;
 		++a;
 
 		/*
@@ -321,9 +325,10 @@ __wt_cell_pack_int_key(WT_CELL *cell, uint32_t size)
 	uint8_t byte, *p;
 
 	/* Short keys have 6 bits of data length in the descriptor byte. */
-	if (size <= 63) {
+	if (size <= WT_CELL_SHORT_MAX) {
 		byte = (uint8_t)size;
-		cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
+		cell->__chunk[0] =
+		    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT;
 		return (1);
 	}
 
@@ -346,14 +351,17 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 	uint8_t byte, *p;
 
 	/* Short keys have 6 bits of data length in the descriptor byte. */
-	if (size <= 63) {
+	if (size <= WT_CELL_SHORT_MAX) {
 		if (prefix == 0) {
 			byte = (uint8_t)size;		/* Type + length */
-			cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT;
+			cell->__chunk[0] =
+			    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT;
 			return (1);
 		} else {
 			byte = (uint8_t)size;		/* Type + length */
-			cell->__chunk[0] = (byte << 2) | WT_CELL_KEY_SHORT_PFX;
+			cell->__chunk[0] =
+			    (byte << WT_CELL_SHORT_SHIFT) |
+			    WT_CELL_KEY_SHORT_PFX;
 			cell->__chunk[1] = prefix;	/* Prefix */
 			return (2);
 		}
@@ -530,13 +538,13 @@ restart:
 		unpack->prefix = cell->__chunk[1];
 
 		unpack->data = cell->__chunk + 2;
-		unpack->size = cell->__chunk[0] >> 2;
+		unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
 		unpack->__len = 2 + unpack->size;
 		goto done;
 	case WT_CELL_KEY_SHORT:
 	case WT_CELL_VALUE_SHORT:
 		unpack->data = cell->__chunk + 1;
-		unpack->size = cell->__chunk[0] >> 2;
+		unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
 		unpack->__len = 1 + unpack->size;
 		goto done;
 	}
@@ -544,8 +552,8 @@ restart:
 	p = (uint8_t *)cell + 1;			/* skip cell */
 
 	/*
-	 * A prefix byte that optionally follows the cell descriptor byte on
-	 * row-store leaf pages.
+	 * Check for a prefix byte that optionally follows the cell descriptor
+	 * byte on row-store leaf pages.
 	 */
 	if (unpack->raw == WT_CELL_KEY_PFX) {
 		++p;					/* skip prefix */
@@ -554,8 +562,8 @@ restart:
 	}
 
 	/*
-	 * An RLE count or record number that optionally follows the cell
-	 * descriptor byte on column-store variable-length pages.
+	 * Check for an RLE count or record number that optionally follows the
+	 * cell descriptor byte on column-store variable-length pages.
 	 */
 	if (cell->__chunk[0] & WT_CELL_64V)		/* skip value */
 		WT_RET(__wt_vunpack_uint(

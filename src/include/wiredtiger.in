@@ -547,24 +547,21 @@ struct __wt_session {
 	 *  @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
-	 *  @row{<tt>config:[\<uri\>]</tt>,
-	 *	object configuration cursor, (key=config string\,
-	 *	value=config value)}
-	 *  @row{<tt>index:\<table name\>:\<index name\></tt>,
+	 *  @row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
 	 *	index cursor,
-	 *	key=index key\, value=table value(s)}
+	 *	key=index key\, value=table value(s) with optional projection
+	 *	of columns}
 	 *  @row{<tt>statistics:[\<data source URI\>]</tt>,
 	 *	database or data source statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
 	 *	string value\, uint64_t value</code>)\,
 	 *	see @ref data_statistics for details}
-	 *  @row{<tt>table:\<table name\></tt>,
+	 *  @row{<tt>table:\<table name\>[\<projection\>]</tt>,
 	 *	table cursor,
-	 *	table key\, table value(s)}
+	 *	table key\, table value(s) with optional projection of columns}
 	 *  </table>
-	 *
-	 *  Advanced applications may also want to open the following low-level
-	 *  cursor types:
+	 *  Advanced applications may also open the following low-level cursor
+	 *  types:
 	 *  <table>
 	 *  @row{<tt>file:\<file name\></tt>,
 	 *	file cursor,
