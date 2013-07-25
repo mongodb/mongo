@@ -230,18 +230,20 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    "should be passed either a URI or a cursor to duplicate, "
 		    "but not both");
 
-	if (to_dup != NULL) {
+	if (to_dup == NULL)
+		ret = __wt_open_cursor(session, uri, NULL, cfg, cursorp);
+	else {
 		uri = to_dup->uri;
 		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
 		    WT_PREFIX_MATCH(uri, "index:") ||
 		    WT_PREFIX_MATCH(uri, "file:") ||
 		    WT_PREFIX_MATCH(uri, "lsm:") ||
-		    WT_PREFIX_MATCH(uri, "table:"))
+		    WT_PREFIX_MATCH(uri, "table:") ||
+		    __wt_schema_get_source(session, uri) != NULL)
 			ret = __wt_cursor_dup(session, to_dup, cfg, cursorp);
 		else
 			ret = __wt_bad_object_type(session, uri);
-	} else
-		ret = __wt_open_cursor(session, uri, NULL, cfg, cursorp);
+	}
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

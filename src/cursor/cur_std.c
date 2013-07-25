@@ -478,6 +478,18 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__wt_cursor_get_raw_key(to_dup, &key));
 	__wt_cursor_set_raw_key(cursor, &key);
+
+	/*
+	 * We now have a reference to the raw key, but we don't know anything
+	 * about the memory in which it's stored: memory allocated in support
+	 * of another cursor could be discarded when that cursor is closed,
+	 * and there's no guarantee the search we are about to do will clarify
+	 * the situation.  Make a copy if it's not a column-store key.
+	 */
+	if (!WT_CURSOR_RECNO(cursor) && cursor->key.data != cursor->key.mem)
+		WT_ERR(__wt_buf_set(
+		    session, &cursor->key, cursor->key.data, cursor->key.size));
+
 	WT_ERR(cursor->search(cursor));
 
 	if (0) {
