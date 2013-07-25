@@ -49,6 +49,9 @@ namespace mongo {
                 geoNear->client.reset(new DBDirectClient);
                 return; // we don't need a DocumentSourceCursor in this case
             }
+
+            if (dynamic_cast<DocumentSourceMergeCursors*>(sources.front().get()))
+                return;
         }
 
         /* look for an initial match */
