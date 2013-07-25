@@ -419,7 +419,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	}
 
 	__wt_free(session, cursor->uri);
-	__wt_free(session, cursor);
+	__wt_overwrite_and_free(session, cursor);
 
 err:	API_END(session);
 	return (ret);
