@@ -272,6 +272,9 @@
     <Filter Include="db\commands\write_commands">
       <UniqueIdentifier>{a0b1d842-53f5-424c-adce-12b7adaf09b4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\query">
+      <UniqueIdentifier>{14071ec9-1e78-4463-bfee-593ddf265829}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -2774,6 +2777,21 @@
     </ClInclude>
     <ClInclude Include="..\db\repl\sync_source_feedback.h">
       <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\plan_stats.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query\multi_plan_runner.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query\plan_ranker.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query\query_solution.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\query\stage_types.h">
+      <Filter>db\query</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -5356,6 +5374,15 @@
     <ClCompile Include="..\db\repl\sync_source_feedback.cpp">
       <Filter>db\repl</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\query\multi_plan_runner.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query\plan_ranker.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="query_multi_plan_runner.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">
@@ -5564,6 +5591,9 @@
     </None>
     <None Include="..\db\SConscript">
       <Filter>db</Filter>
+    </None>
+    <None Include="..\db\query\SConscript">
+      <Filter>db\query</Filter>
     </None>
   </ItemGroup>
 </Project>
