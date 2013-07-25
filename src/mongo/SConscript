@@ -832,6 +832,7 @@ test = testEnv.Install(
     testEnv.Program("test",
                     [ f for f in Glob("dbtests/*.cpp") if not str(f).endswith('framework.cpp') ],
                     LIBDEPS = [
+                       "mutable_bson_test_utils",
                        "mongocommon",
                        "serveronly",
                        "coreserver",

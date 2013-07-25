@@ -19,6 +19,8 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/db.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
@@ -30,6 +32,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/ops/update.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -1031,7 +1034,9 @@ namespace ReplTests {
             using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                check( BSON( "_id" << 0 << "a" << 50 << "b" << 3 ) , one( fromjson( "{'_id':0}" ) ) );
+                ASSERT_EQUALS(
+                    mutablebson::unordered( BSON( "_id" << 0 << "a" << 50 << "b" << 3 ) ),
+                    mutablebson::unordered( one( fromjson( "{'_id':0}" ) ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -1048,7 +1053,9 @@ namespace ReplTests {
             using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                check( BSON( "_id" << 0 << "a" << 50 << "b" << 3 ) , one( fromjson( "{'_id':0}" ) ) );
+                ASSERT_EQUALS(
+                    mutablebson::unordered( BSON( "_id" << 0 << "a" << 50 << "b" << 3 ) ),
+                    mutablebson::unordered( one( fromjson( "{'_id':0}" ) ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -1064,7 +1071,9 @@ namespace ReplTests {
             using ReplTests::Base::check;
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                check( BSON( "_id" << 0 << "b" << 3 << "z" << 1 ) , one( fromjson( "{'_id':0}" ) ) );
+                ASSERT_EQUALS(
+                    mutablebson::unordered( BSON( "_id" << 0 << "b" << 3 << "z" << 1 ) ),
+                    mutablebson::unordered( one( fromjson( "{'_id':0}" ) ) ) );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -1623,7 +1632,12 @@ namespace ReplTests {
             add< Idempotence::EmptyPush >();
             add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
-            add< Idempotence::PushWithDollarSigns >();
+
+            // The new update framework does not allow field names with a leading '$' to be
+            // pushed.
+            if (!isNewUpdateFrameworkEnabled())
+                add< Idempotence::PushWithDollarSigns >();
+
             add< Idempotence::PushSlice >();
             add< Idempotence::PushSliceInitiallyInexistent >();
             add< Idempotence::PushSliceToZero >();
@@ -1643,7 +1657,12 @@ namespace ReplTests {
             add< Idempotence::SingletonNoRename >();
             add< Idempotence::IndexedSingletonNoRename >();
             add< Idempotence::AddToSetEmptyMissing >();
-            add< Idempotence::AddToSetWithDollarSigns >();
+
+            // The new update framework does not allow field names with a leading '$' to be
+            // added to a set.
+            if (!isNewUpdateFrameworkEnabled())
+                add< Idempotence::AddToSetWithDollarSigns >();
+
             add< Idempotence::ReplaySetPreexistingNoOpPull >();
             add< Idempotence::ReplayArrayFieldNotAppended >();
             add< DeleteOpIsIdBased >();

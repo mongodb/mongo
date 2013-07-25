@@ -19,6 +19,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
@@ -335,7 +336,9 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{c:4}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
-            ASSERT_EQUALS( client().findOne( ns(), BSON( "a.b" << "lllll" ) ) , fromjson( "{'_id':0,a:{b:'lllll',c:4}}" ) );
+            ASSERT_EQUALS(
+                mutablebson::unordered( client().findOne( ns(), BSON( "a.b" << "lllll" ) ) ),
+                mutablebson::unordered( fromjson( "{'_id':0,a:{b:'lllll',c:4}}" ) ) );
         }
     };
 
@@ -388,7 +391,9 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "f.g.h" << 3.0 << "f.g.a" << 2.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:2,h:3}}}" ) ) == 0 );
+            ASSERT_EQUALS(
+                mutablebson::unordered( client().findOne( ns(), Query() ) ),
+                mutablebson::unordered( fromjson( "{'_id':0,f:{g:{a:2,h:3}}}" ) ) );
         }
     };
 
@@ -397,7 +402,9 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), BSONObj(), BSON( "$set" << BSON( "f.g.h.b" << 3.0 << "f.g.a.b" << 2.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,f:{g:{a:{b:2},h:{b:3}}}}" ) ) == 0 );
+            ASSERT_EQUALS(
+                mutablebson::unordered( client().findOne( ns(), Query() ) ),
+                mutablebson::unordered( fromjson( "{'_id':0,f:{g:{a:{b:2},h:{b:3}}}}" ) ) );
         }
     };
 
@@ -1706,8 +1713,9 @@ namespace UpdateTests {
             client().insert( ns(), BSON( "_id" << 0 << "x" << 5 ) );
             client().update( ns(), BSONObj(),
                             BSON( "$set" << BSON( "a" << 1 << "b" << 1 << "x" << 10 ) ) );
-            ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 << "b" << 1 << "x" << 10 ),
-                          client().findOne( ns(), BSONObj() ) );
+            ASSERT_EQUALS(
+                mutablebson::unordered( BSON( "_id" << 0 << "a" << 1 << "b" << 1 << "x" << 10 ) ),
+                mutablebson::unordered( client().findOne( ns(), BSONObj() ) ) );
         }
     };
     
