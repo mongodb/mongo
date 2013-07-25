@@ -1,6 +1,6 @@
 // Microsoft Visual C++ generated resource script.
 //
-#include "mongo/db/resource.h"
+#include "resource.h"
 
 /////////////////////////////////////////////////////////////////////////////
 //
