@@ -657,10 +657,9 @@ extern int __wt_cursor_range_truncate( WT_SESSION *wt_session,
     WT_CURSOR *start,
     WT_CURSOR *stop);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
-extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
+extern int __wt_cursor_dup_position( WT_SESSION *wt_session,
     WT_CURSOR *to_dup,
-    const char *cfg[],
-    WT_CURSOR **cursorp);
+    WT_CURSOR *cursor);
 extern int __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri,
     WT_CURSOR *owner,

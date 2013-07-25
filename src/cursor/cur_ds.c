@@ -133,18 +133,27 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_CURSOR_NEEDKEY(a);
 	WT_CURSOR_NEEDKEY(b);
 
-	/*
-	 * The assumption is data-sources don't need to provide WiredTiger with
-	 * WT_CURSOR.compare methods, instead, we'll copy the key/value out of
-	 * the underlying data-source cursor and any comparison to be done can
-	 * be done at this level.
-	 */
-	collator = ((WT_CURSOR_DATA_SOURCE *)a)->collator;
-	if (collator == NULL)
-		*cmpp = __wt_btree_lex_compare(&a->key, &b->key);
-	else
-		ret = collator->compare(
-		    collator, &session->iface, &a->key, &b->key, cmpp);
+	if (WT_CURSOR_RECNO(a)) {
+		if (a->recno < b->recno)
+			*cmpp = -1;
+		else if (a->recno == b->recno)
+			*cmpp = 0;
+		else
+			*cmpp = 1;
+	} else {
+		/*
+		 * The assumption is data-sources don't provide WiredTiger with
+		 * WT_CURSOR.compare methods, instead, we'll copy the key/value
+		 * out of the underlying data-source cursor and any comparison
+		 * to be done can be done at this level.
+		 */
+		collator = ((WT_CURSOR_DATA_SOURCE *)a)->collator;
+		if (collator == NULL)
+			*cmpp = __wt_btree_lex_compare(&a->key, &b->key);
+		else
+			ret = collator->compare(
+			    collator, &session->iface, &a->key, &b->key, cmpp);
+	}
 
 err:	API_END(session);
 	return (ret);

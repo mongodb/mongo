@@ -601,6 +601,62 @@ err:	__wt_scr_free(&key);
 }
 
 /*
+ * __curtable_dup_posiiton --
+ *	Table cursor position duplication.
+ */
+static int
+__curtable_dup_position(
+    WT_SESSION *wt_session, WT_CURSOR *to_dup, WT_CURSOR *cursor)
+{
+	WT_CURSOR **cp, *primary;
+	WT_CURSOR_TABLE *ctable;
+	WT_ITEM key;
+	WT_SESSION_IMPL *session;
+	u_int i;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	/*
+	 * Get a copy of the cursor's raw key, and set it in the new cursor,
+	 * then search for that key to position the cursor.
+	 *
+	 * Don't clear (or allocate memory for) the WT_ITEM structure because
+	 * all that happens underneath is the data and size fields are reset
+	 * to reference the cursor's key.
+	 */
+	WT_RET(__wt_cursor_get_raw_key(to_dup, &key));
+	__wt_cursor_set_raw_key(cursor, &key);
+
+	/*
+	 * We now have a reference to the raw key, but we don't know anything
+	 * about the memory in which it's stored: memory allocated in support
+	 * of another cursor could be discarded when that cursor is closed,
+	 * and there's no guarantee the search we are about to do will clarify
+	 * the situation.  Make a copy if it's not a column-store key.
+	 */
+	ctable = (WT_CURSOR_TABLE *)cursor;
+	cp = ctable->cg_cursors;
+	primary = *cp++;
+
+	if (!WT_CURSOR_RECNO(primary) &&
+	    primary->key.data != primary->key.mem) {
+		WT_RET(__wt_buf_set(session,
+		    &primary->key, primary->key.data, primary->key.size));
+
+		/* Copy the primary key to the other cursors. */
+		for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+			(*cp)->recno = primary->recno;
+			(*cp)->key.data = primary->key.data;
+			(*cp)->key.size = primary->key.size;
+		}
+	}
+
+	WT_RET(cursor->search(cursor));
+
+	return (0);
+}
+
+/*
  * __curtable_close --
  *	WT_CURSOR->close method for the table cursor type.
  */
@@ -782,6 +838,9 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	ctable->table = table;
 	ctable->plan = table->plan;
+
+	/* Table cursors have their own cursor duplicate position code. */
+	cursor->dup_position = __curtable_dup_position;
 
 	/* Table cursors support truncation. */
 	cursor->range_truncate = __curtable_range_truncate;

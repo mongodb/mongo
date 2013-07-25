@@ -417,6 +417,17 @@ struct __wt_cursor {
 
 	/*
 	 * !!!
+	 * Cursor duplicate position supports the WT_SESSION method to duplicate
+	 * a cursor.
+	 *
+	 * The method takes a WT_SESSION handle instead of a WT_SESSION_IMPL
+	 * because that's what will compile cleanly in a public header file,
+	 * and the code to make it work isn't complicated.
+	 */
+	int (*dup_position)(WT_SESSION *, WT_CURSOR *, WT_CURSOR *);
+
+	/*
+	 * !!!
 	 * Cursor range truncate is a WT_SESSION method, but it's implemented
 	 * by methods in the underlying cursors.
 	 *
@@ -426,9 +437,9 @@ struct __wt_cursor {
 	 */
 	int (*range_truncate)(WT_SESSION *, WT_CURSOR *, WT_CURSOR *);
 
-	uint64_t recno;
+	uint64_t recno;			/* Recno, recno in raw mode. */
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
-					/* Holds a recno in raw mode. */
+
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 

@@ -217,10 +217,11 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
+	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	*cursorp = NULL;
+	cursor = *cursorp = NULL;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
@@ -231,7 +232,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    "but not both");
 
 	if (to_dup == NULL)
-		ret = __wt_open_cursor(session, uri, NULL, cfg, cursorp);
+		WT_ERR(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 	else {
 		uri = to_dup->uri;
 		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
@@ -239,13 +240,23 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    WT_PREFIX_MATCH(uri, "file:") ||
 		    WT_PREFIX_MATCH(uri, "lsm:") ||
 		    WT_PREFIX_MATCH(uri, "table:") ||
-		    __wt_schema_get_source(session, uri) != NULL)
-			ret = __wt_cursor_dup(session, to_dup, cfg, cursorp);
-		else
+		    __wt_schema_get_source(session, uri) != NULL) {
+			WT_ERR(
+			    __wt_open_cursor(session, uri, NULL, cfg, &cursor));
+			WT_ERR(
+			    cursor->dup_position(wt_session, to_dup, cursor));
+		} else
 			ret = __wt_bad_object_type(session, uri);
 	}
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	*cursorp = cursor;
+
+	if (0) {
+err:		if (cursor != NULL)
+			WT_TRET(cursor->close(cursor));
+	}
+
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
