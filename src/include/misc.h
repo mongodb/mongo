@@ -162,11 +162,6 @@
 /* Clear a structure. */
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
-#define	WT_CLEAR_ITEM(p) do {						\
-	(p)->flags = 0;							\
-	(p)->data = (p)->mem = NULL;					\
-	(p)->size = (p)->memsize = 0;					\
-} while (0)
 
 /* Check if a string matches a prefix. */
 #define	WT_PREFIX_MATCH(str, pfx)					\

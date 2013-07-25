@@ -124,7 +124,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	rip = NULL;
 
 	item = &_item;
-	WT_CLEAR_ITEM(item);
+	WT_CLEAR(item);
 
 	/* Search the internal pages of the tree. */
 	cmp = -1;
