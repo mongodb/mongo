@@ -148,11 +148,7 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		 * to be done can be done at this level.
 		 */
 		collator = ((WT_CURSOR_DATA_SOURCE *)a)->collator;
-		if (collator == NULL)
-			*cmpp = __wt_btree_lex_compare(&a->key, &b->key);
-		else
-			ret = collator->compare(
-			    collator, &session->iface, &a->key, &b->key, cmpp);
+		WT_ERR(WT_LEX_CMP(session, collator, &a->key, &b->key, *cmpp));
 	}
 
 err:	API_END(session);

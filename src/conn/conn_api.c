@@ -17,12 +17,16 @@ static int
 ext_collate(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session, WT_ITEM *first, WT_ITEM *second, int *cmpp)
 {
-	if (wt_api->collator == NULL) {
-		*cmpp = __wt_btree_lex_compare(first, second);
-		return (0);
-	}
-	return (wt_api->collator->compare(
-	    wt_api->collator, wt_session, first, second, cmpp));
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	WT_RET(WT_LEX_CMP(session, wt_api->collator, first, second, *cmpp));
+
+	return (0);
 }
 
 /*
