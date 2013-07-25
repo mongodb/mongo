@@ -64,10 +64,10 @@ namespace mutablebson {
             const BSONType lhsType = lhs.getType();
             const BSONType rhsType = rhs.getType();
 
-            if (lhsType != rhsType)
-                return false;
-
             if (lhsType == mongo::Object) {
+
+                if (rhsType != mongo::Object)
+                    return false;
 
                 // For objects, sort the children by field name, then compare in that order.
 
@@ -93,9 +93,6 @@ namespace mutablebson {
 
                 for (; lhsWhere != lhsEnd; ++lhsWhere, ++rhsWhere) {
 
-                    if (lhsWhere->getType() != rhsWhere->getType())
-                        return false;
-
                     if (lhsWhere->getFieldName() != rhsWhere->getFieldName())
                         return false;
 
@@ -106,6 +103,9 @@ namespace mutablebson {
                 return true;
 
             } else if (lhsType == mongo::Array) {
+
+                if (rhsType != mongo::Array)
+                    return false;
 
                 // For arrays, since they are ordered, we don't need the sorting step.
                 const size_t lhsChildren = countChildren(lhs);
@@ -133,7 +133,7 @@ namespace mutablebson {
             } else {
                 // This is some leaf type. We've already checked or ignored field names, so
                 // don't recheck it here.
-                return (lhs.compareWithElement(rhs, false) == 0);
+                return lhs.compareWithElement(rhs, false) == 0;
             }
         }
 
@@ -193,8 +193,13 @@ namespace mutablebson {
         return checkDocNoOrderingImpl(lhs.root(), rhs.root());
     }
 
-    std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper& ucw) {
-        return stream << ucw.doc;
+    std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper_Doc& uw_d) {
+        return stream << uw_d.doc;
+    }
+
+    std::ostream& operator<<(std::ostream& stream, const UnorderedWrapper_Obj& uw_o) {
+        const Document d(uw_o.obj);
+        return stream << d;
     }
 
 } // namespace mutablebson

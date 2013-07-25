@@ -2821,10 +2821,7 @@ namespace {
 
         const mongo::BSONObj b2 = b1.getOwned();
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
     TEST(UnorderedEqualityChecker, DifferentValuesAreNotEqual) {
@@ -2833,10 +2830,7 @@ namespace {
         const mongo::BSONObj b2 = mongo::fromjson(
             "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : 2, z : 4 } }");
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
     TEST(UnorderedEqualityChecker, DifferentTypesAreNotEqual) {
@@ -2845,10 +2839,7 @@ namespace {
         const mongo::BSONObj b2 = mongo::fromjson(
             "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, y : '2', z : 3 } }");
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
     TEST(UnorderedEqualityChecker, DifferentFieldNamesAreNotEqual) {
@@ -2857,10 +2848,7 @@ namespace {
         const mongo::BSONObj b2 = mongo::fromjson(
             "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, Y : 2, z : 3 } }");
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
     TEST(UnorderedEqualityChecker, MissingFieldsInObjectAreNotEqual) {
@@ -2869,10 +2857,7 @@ namespace {
         const mongo::BSONObj b2 = mongo::fromjson(
             "{ a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
     TEST(UnorderedEqualityChecker, ObjectOrderingIsNotConsidered) {
@@ -2881,10 +2866,7 @@ namespace {
         const mongo::BSONObj b2 = mongo::fromjson(
             "{ b : { y : 2, z : 3 , x : 1  }, a : [ 1, 2, { 'a' : 'b', 'x' : 'y' } ] }");
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
     TEST(UnorderedEqualityChecker, ArrayOrderingIsConsidered) {
@@ -2894,10 +2876,7 @@ namespace {
         const mongo::BSONObj b2 = mongo::fromjson(
             "{ a : [ 1, { 'a' : 'b', 'x' : 'y' }, 2 ], b : { x : 1, y : 2, z : 3 } }");
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
     TEST(UnorderedEqualityChecker, MissingItemsInArrayAreNotEqual) {
@@ -2906,10 +2885,7 @@ namespace {
         const mongo::BSONObj b2 = mongo::fromjson(
             "{ a : [ 1, { 'a' : 'b', 'x' : 'y' } ], b : { x : 1, z : 3 } }");
 
-        const mmb::Document d1(b1);
-        const mmb::Document d2(b2);
-
-        ASSERT_NOT_EQUALS(mmb::ignoreFieldOrder(d1), mmb::ignoreFieldOrder(d2));
+        ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
     }
 
 } // namespace
