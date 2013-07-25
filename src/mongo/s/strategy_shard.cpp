@@ -148,14 +148,17 @@ namespace mongo {
             }
         }
 
-        virtual void commandOp( const string& db, const BSONObj& command, int options,
-                                const string& versionedNS, const BSONObj& filter,
-                                map<Shard,BSONObj>& results )
+        virtual void commandOp( const string& db,
+                                const BSONObj& command,
+                                int options,
+                                const string& versionedNS,
+                                const BSONObj& targetingQuery,
+                                vector<CommandResult>* results )
         {
 
             QuerySpec qSpec(db + ".$cmd", command, BSONObj(), 0, 1, options);
 
-            ParallelSortClusteredCursor cursor( qSpec, CommandInfo( versionedNS, filter ) );
+            ParallelSortClusteredCursor cursor( qSpec, CommandInfo( versionedNS, targetingQuery ) );
 
             // Initialize the cursor
             cursor.init();
@@ -164,7 +167,14 @@ namespace mongo {
             cursor.getQueryShards( shards );
 
             for( set<Shard>::iterator i = shards.begin(), end = shards.end(); i != end; ++i ){
-                results[ *i ] = cursor.getShardCursor( *i )->peekFirst().getOwned();
+                CommandResult result;
+                result.shardTarget = *i;
+                string errMsg; // ignored, should never be invalid b/c an exception thrown earlier
+                result.target =
+                        ConnectionString::parse( cursor.getShardCursor( *i )->originalHost(),
+                                                 errMsg );
+                result.result = cursor.getShardCursor( *i )->peekFirst().getOwned();
+                results->push_back( result );
             }
 
         }

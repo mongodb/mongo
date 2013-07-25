@@ -644,20 +644,20 @@ namespace mongo {
                     countCmdBuilder.append(cmdObj["$queryOptions"]);
                 }
 
-                map<Shard, BSONObj> countResult;
+                vector<Strategy::CommandResult> countResult;
 
                 SHARDED->commandOp( dbName, countCmdBuilder.done(),
-                            options, fullns, filter, countResult );
+                            options, fullns, filter, &countResult );
 
                 long long total = 0;
                 BSONObjBuilder shardSubTotal( result.subobjStart( "shards" ));
 
-                for( map<Shard, BSONObj>::const_iterator iter = countResult.begin();
+                for( vector<Strategy::CommandResult>::const_iterator iter = countResult.begin();
                         iter != countResult.end(); ++iter ){
-                    const string& shardName = iter->first.getName();
+                    const string& shardName = iter->shardTarget.getName();
 
-                    if( iter->second["ok"].trueValue() ){
-                        long long shardCount = iter->second["n"].numberLong();
+                    if( iter->result["ok"].trueValue() ){
+                        long long shardCount = iter->result["n"].numberLong();
 
                         shardSubTotal.appendNumber( shardName, shardCount );
                         total += shardCount;
@@ -665,7 +665,7 @@ namespace mongo {
                     else {
                         shardSubTotal.doneFast();
                         errmsg = "failed on : " + shardName;
-                        result.append( "cause", iter->second );
+                        result.append( "cause", iter->result );
                         return false;
                     }
                 }
@@ -1088,10 +1088,10 @@ namespace mongo {
                 if(cm->getShardKey().key() == BSON("files_id" << 1)) {
                     BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
-                    map<Shard, BSONObj> resMap;
-                    SHARDED->commandOp(dbName, cmdObj, 0, fullns, finder, resMap);
-                    verify(resMap.size() == 1); // querying on shard key so should only talk to one shard
-                    BSONObj res = resMap.begin()->second;
+                    vector<Strategy::CommandResult> results;
+                    SHARDED->commandOp(dbName, cmdObj, 0, fullns, finder, &results);
+                    verify(results.size() == 1); // querying on shard key so should only talk to one shard
+                    BSONObj res = results.begin()->result;
 
                     result.appendElements(res);
                     return res["ok"].trueValue();
@@ -1120,17 +1120,20 @@ namespace mongo {
 
                         BSONObj finder = BSON("files_id" << cmdObj.firstElement() << "n" << n);
 
-                        map<Shard, BSONObj> resMap;
+                        vector<Strategy::CommandResult> results;
                         try {
-                            SHARDED->commandOp(dbName, shardCmd, 0, fullns, finder, resMap);
+                            SHARDED->commandOp(dbName, shardCmd, 0, fullns, finder, &results);
                         }
                         catch( DBException& e ){
                             //This is handled below and logged
-                            resMap[Shard()] = BSON("errmsg" << e.what() << "ok" << 0);
+                            Strategy::CommandResult result;
+                            result.shardTarget = Shard();
+                            result.result = BSON("errmsg" << e.what() << "ok" << 0 );
+                            results.push_back( result );
                         }
 
-                        verify(resMap.size() == 1); // querying on shard key so should only talk to one shard
-                        BSONObj res = resMap.begin()->second;
+                        verify(results.size() == 1); // querying on shard key so should only talk to one shard
+                        BSONObj res = results.begin()->result;
                         bool ok = res["ok"].trueValue();
 
                         if (!ok) {
@@ -1434,7 +1437,7 @@ namespace mongo {
 
                 set<Shard> shards;
                 set<ServerAndQuery> servers;
-                map<Shard,BSONObj> results;
+                vector<Strategy::CommandResult> results;
 
                 BSONObjBuilder shardResultsB;
                 BSONObjBuilder shardCountsB;
@@ -1472,21 +1475,22 @@ namespace mongo {
                     */
 
                     try {
-                        SHARDED->commandOp( dbName, shardedCommand, 0, fullns, q, results );
+                        SHARDED->commandOp( dbName, shardedCommand, 0, fullns, q, &results );
                     }
                     catch( DBException& e ){
                         e.addContext( str::stream() << "could not run map command on all shards for ns " << fullns << " and query " << q );
                         throw;
                     }
 
-                    for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
+                    for ( vector<Strategy::CommandResult>::iterator i = results.begin();
+                            i != results.end(); ++i ) {
 
                     	// need to gather list of all servers even if an error happened
-                        string server = i->first.getConnString();
+                        string server = i->shardTarget.getConnString();
                         servers.insert( server );
                         if ( !ok ) continue;
 
-                        singleResult = i->second;
+                        singleResult = i->result;
                         ok = singleResult["ok"].trueValue();
                         if ( !ok ) continue;
 
@@ -1612,7 +1616,7 @@ namespace mongo {
                         results.clear();
 
                         try {
-                            SHARDED->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), results );
+                            SHARDED->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), &results );
                             ok = true;
                         }
                         catch( DBException& e ){
@@ -1620,10 +1624,11 @@ namespace mongo {
                             throw;
                         }
 
-                        for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
+                        for ( vector<Strategy::CommandResult>::iterator i = results.begin();
+                                i != results.end(); ++i ) {
 
-                            string server = i->first.getConnString();
-                            singleResult = i->second;
+                            string server = i->shardTarget.getConnString();
+                            singleResult = i->result;
                             ok = singleResult["ok"].trueValue();
                             if ( !ok ) break;
 
@@ -1850,8 +1855,8 @@ namespace mongo {
             BSONObj shardQuery(shardQueryBuilder.done());
 
             // Run the command on the shards
-            map<Shard, BSONObj> shardResults;
-            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, shardResults);
+            vector<Strategy::CommandResult> shardResults;
+            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
             pPipeline->addInitialSource(DocumentSourceCommandShards::create(shardResults, pExpCtx));
 

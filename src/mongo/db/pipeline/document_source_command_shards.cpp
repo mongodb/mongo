@@ -98,17 +98,17 @@ namespace mongo {
                 }
 
                 /* grab the next command result */
-                BSONObj resultObj = iterator->second;
+                BSONObj resultObj = iterator->result;
 
                 uassert(16390, str::stream() << "sharded pipeline failed on shard " <<
-                                            iterator->first.getName() << ": " <<
+                                            iterator->shardTarget.getName() << ": " <<
                                             resultObj.toString(),
                         resultObj["ok"].trueValue());
 
                 /* grab the result array out of the shard server's response */
                 BSONElement resultArray = resultObj["result"];
                 massert(16391, str::stream() << "no result array? shard:" <<
-                                            iterator->first.getName() << ": " <<
+                                            iterator->shardTarget.getName() << ": " <<
                                             resultObj.toString(),
                         resultArray.type() == Array);
 
