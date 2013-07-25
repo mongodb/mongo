@@ -35,6 +35,71 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    /*  Replica Set statics:
+     *      If a program (such as one built with the C++ driver) exits (by either calling exit()
+     *      or by returning from main()), static objects will be destroyed in the reverse order
+     *      of their creation (within each translation unit (source code file)).  This makes it
+     *      vital that the order be explicitly controlled within the source file so that destroyed
+     *      objects never reference objects that have been destroyed earlier.
+     *
+     *      The order chosen below is intended to allow safe destruction in reverse order from
+     *      construction order:
+     *          _setsLock                -- mutex protecting _seedServers and _sets, destroyed last
+     *          _seedServers             -- list (map) of servers
+     *          _sets                    -- list (map) of ReplicaSetMonitors
+     *          replicaSetMonitorWatcher -- background job to check Replica Set members
+     *
+     *      Related to:
+     *          SERVER-8891 -- Simple client fail with segmentation fault in mongoclient library
+     */
+    mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
+    map<string, vector<HostAndPort> > ReplicaSetMonitor::_seedServers;
+    map<string, ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
+
+    // global background job responsible for checking every X amount of time
+    class ReplicaSetMonitorWatcher : public BackgroundJob {
+    public:
+        ReplicaSetMonitorWatcher() : _safego("ReplicaSetMonitorWatcher::_safego") , _started(false) {}
+
+        virtual string name() const { return "ReplicaSetMonitorWatcher"; }
+
+        void safeGo() {
+            // check outside of lock for speed
+            if ( _started )
+                return;
+
+            scoped_lock lk( _safego );
+            if ( _started )
+                return;
+            _started = true;
+
+            go();
+        }
+
+    protected:
+        void run() {
+            log() << "starting" << endl;
+            while ( ! inShutdown() ) {
+                sleepsecs( 10 );
+                try {
+                    ReplicaSetMonitor::checkAll();
+                }
+                catch ( std::exception& e ) {
+                    error() << "check failed: " << e.what() << endl;
+                }
+                catch ( ... ) {
+                    error() << "unknown error" << endl;
+                }
+            }
+        }
+
+        mongo::mutex _safego;
+        bool _started;
+
+    } replicaSetMonitorWatcher;
+
+
     /*
      * Set of commands that can be used with $readPreference
      */
@@ -305,47 +370,6 @@ namespace mongo {
     // --------------------------------
     // ----- ReplicaSetMonitor ---------
     // --------------------------------
-
-    // global background job responsible for checking every X amount of time
-    class ReplicaSetMonitorWatcher : public BackgroundJob {
-    public:
-        ReplicaSetMonitorWatcher() : _safego("ReplicaSetMonitorWatcher::_safego") , _started(false) {}
-
-        virtual string name() const { return "ReplicaSetMonitorWatcher"; }
-        
-        void safeGo() {
-            // check outside of lock for speed
-            if ( _started )
-                return;
-            
-            scoped_lock lk( _safego );
-            if ( _started )
-                return;
-            _started = true;
-
-            go();
-        }
-    protected:
-        void run() {
-            log() << "starting" << endl;
-            while ( ! inShutdown() ) {
-                sleepsecs( 10 );
-                try {
-                    ReplicaSetMonitor::checkAll();
-                }
-                catch ( std::exception& e ) {
-                    error() << "check failed: " << e.what() << endl;
-                }
-                catch ( ... ) {
-                    error() << "unkown error" << endl;
-                }
-            }
-        }
-
-        mongo::mutex _safego;
-        bool _started;
-
-    } replicaSetMonitorWatcher;
 
     string seedString( const vector<HostAndPort>& servers ){
         string seedStr;
@@ -1307,9 +1331,6 @@ namespace mongo {
         return builder.obj();
     }
 
-    mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
-    map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
-    map<string,vector<HostAndPort> > ReplicaSetMonitor::_seedServers;
     ReplicaSetMonitor::ConfigChangeHook ReplicaSetMonitor::_hook;
     int ReplicaSetMonitor::_maxFailedChecks = 30; // At 1 check every 10 seconds, 30 checks takes 5 minutes
 
