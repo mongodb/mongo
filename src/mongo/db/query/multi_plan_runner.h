@@ -20,11 +20,13 @@
 #include <queue>
 #include <vector>
 
-#include "mongo/db/exec/simple_plan_runner.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/runner.h"
+#include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
@@ -33,20 +35,16 @@ namespace mongo {
     using std::size_t;
     using std::vector;
 
-    // Place holder.
-    class CanonicalQuery {
-    };
-
     /**
      * Runs several plans in parallel and picks the best one.  Caches the selection for future use.
      */
-    class MultiPlanRunner {
+    class MultiPlanRunner : public Runner {
     public:
         /**
          * Takes ownership of query.
          */
         MultiPlanRunner(CanonicalQuery* query);
-        ~MultiPlanRunner();
+        virtual ~MultiPlanRunner();
 
         /**
          * Takes ownership of all arguments

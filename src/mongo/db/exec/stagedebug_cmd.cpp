@@ -28,7 +28,7 @@
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/simple_plan_runner.h"
+#include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
