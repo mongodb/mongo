@@ -448,11 +448,12 @@ namespace mongo {
 
             sleepsecs(1);
 
-            int row = 0;
+            int rowCount = getParam( "rowcount" , 0 );
+            int rowNum = 0;
             bool discover = hasParam( "discover" );
             int maxLockedDbWidth = 0;
 
-            while ( 1 ) {
+            while ( rowCount == 0 || rowNum < rowCount ) {
                 sleepsecs( (int)ceil(_statUtil.getSeconds()) );
 
                 // collect data
@@ -532,7 +533,7 @@ namespace mongo {
                 cout << endl;
 
                 //    header
-                if ( row++ % 5 == 0 && ! biggest.isEmpty() ) {
+                if ( rowNum++ % 5 == 0 && ! biggest.isEmpty() ) {
                     cout << setw( longestHost ) << "" << "\t";
                     printHeaders( biggest );
                 }
