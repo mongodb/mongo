@@ -225,6 +225,13 @@ namespace mongo {
         }
     }
 
+    BSONObj Document::toBson() const {
+        BSONObjBuilder bb;
+        toBson(&bb);
+        return bb.obj();
+    }
+
+
     MutableDocument::MutableDocument(size_t expectedFields)
         : _storageHolder(NULL)
         , _storage(_storageHolder)

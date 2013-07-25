@@ -123,6 +123,7 @@ namespace mongo {
 
         /// Add this document to the BSONObj under construction with the given BSONObjBuilder.
         void toBson(BSONObjBuilder *pBsonObjBuilder) const;
+        BSONObj toBson() const;
 
         // Support BSONObjBuilder and BSONArrayBuilder "stream" API
         friend BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Document& d);
