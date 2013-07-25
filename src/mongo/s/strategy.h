@@ -34,9 +34,18 @@ namespace mongo {
 
         void insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags=0 , bool safe=false );
 
-        virtual void commandOp( const string& db, const BSONObj& command, int options,
-                                const string& versionedNS, const BSONObj& filter,
-                                map<Shard,BSONObj>& results )
+        struct CommandResult {
+            Shard shardTarget;
+            ConnectionString target;
+            BSONObj result;
+        };
+
+        virtual void commandOp( const string& db,
+                                const BSONObj& command,
+                                int options,
+                                const string& versionedNS,
+                                const BSONObj& targetingQuery,
+                                vector<CommandResult>* results )
         {
             // Only call this from sharded, for now.
             // TODO:  Refactor all this.

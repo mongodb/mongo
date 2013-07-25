@@ -31,6 +31,7 @@
 #include "mongo/db/projection.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/strategy.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -317,7 +318,7 @@ namespace mongo {
         virtual void setSource(DocumentSource *pSource);
 
         /* convenient shorthand for a commonly used type */
-        typedef map<Shard, BSONObj> ShardOutput;
+        typedef vector<Strategy::CommandResult> ShardOutput;
 
         /**
           Create a DocumentSource that wraps the output of many shards

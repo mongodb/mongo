@@ -60,8 +60,8 @@ namespace mongo {
 
             Timer timer;
 
-            map<Shard, BSONObj> results;
-            SHARDED->commandOp( dbName, cmdObj, cmdOptions, ns, filter, results );
+            vector<Strategy::CommandResult> results;
+            SHARDED->commandOp( dbName, cmdObj, cmdOptions, ns, filter, &results );
 
             vector<Scored> all;
             long long nscanned = 0;
@@ -69,13 +69,14 @@ namespace mongo {
 
             BSONObjBuilder shardStats;
 
-            for ( map<Shard,BSONObj>::const_iterator i = results.begin(); i != results.end(); ++i ) {
-                BSONObj r = i->second;
+            for ( vector<Strategy::CommandResult>::const_iterator i = results.begin();
+                    i != results.end(); ++i ) {
+                BSONObj r = i->result;
 
-                LOG(2) << "fts result for shard: " << i->first << "\n" << r << endl;
+                LOG(2) << "fts result for shard: " << i->shardTarget << "\n" << r << endl;
 
                 if ( !r["ok"].trueValue() ) {
-                    errmsg = str::stream() << "failure on shard: " << i->first.toString()
+                    errmsg = str::stream() << "failure on shard: " << i->shardTarget.toString()
                                            << ": " << r["errmsg"];
                     result.append( "rawresult", r );
                     return false;
@@ -86,7 +87,7 @@ namespace mongo {
                     nscanned += x["nscanned"].numberLong();
                     nscannedObjects += x["nscannedObjects"].numberLong();
 
-                    shardStats.append( i->first.getName(), x );
+                    shardStats.append( i->shardTarget.getName(), x );
                 }
 
                 if ( r["results"].isABSONObj() ) {
