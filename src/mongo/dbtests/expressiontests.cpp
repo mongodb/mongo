@@ -3410,6 +3410,117 @@ namespace ExpressionTests {
         
     } // namespace ToUpper
 
+    namespace AllAnyNone {
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {}
+            void run() {
+                const Document spec = getSpec();
+                const Value args = spec["input"];
+                if (!spec["expected"].missing()) {
+                    FieldIterator fields(spec["expected"].getDocument());
+                    while (fields.more()) {
+                        const Document::FieldPair field(fields.next());
+                        const Value expected = field.second;
+                        const BSONObj obj = BSON(field.first << args);
+                        const intrusive_ptr<Expression> expr =
+                                Expression::parseExpression(obj.firstElement());
+                        const Value result = expr->evaluate(Document());
+                        if (result != expected) {
+                            string errMsg = str::stream()
+                                                << "for expression " << field.first.toString()
+                                                << " with argument " << args.toString()
+                                                << " full tree: " << expr->serialize().toString()
+                                                << " expected: " << expected.toString()
+                                                << " but got: " << result.toString();
+                            FAIL(errMsg);
+                        }
+                        //TODO test optimize here
+                    }
+                }
+                if (!spec["error"].missing()) {
+                    const vector<Value>& asserters = spec["error"].getArray();
+                    size_t n = asserters.size();
+                    for (size_t i = 0; i < n; i++) {
+                        const BSONObj obj = BSON(asserters[i].getString() << args);
+                        ASSERT_THROWS({
+                            // NOTE: parse and evaluatation failures are treated the same
+                            const intrusive_ptr<Expression> expr =
+                                    Expression::parseExpression(obj.firstElement());
+                            expr->evaluate(Document());
+                        }, UserException);
+                    }
+                }
+            }
+        private:
+            virtual Document getSpec() = 0;
+        };
+
+        class JustFalse : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(false) )
+                        << "expected" << DOC("$all" << false
+                                          << "$any" << false
+                                          << "$none" << true) );
+            }
+        };
+
+        class JustTrue : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(true) )
+                        << "expected" << DOC("$all" << true
+                                          << "$any" << true
+                                          << "$none" << false) );
+            }
+        };
+
+        class OneTrueOneFalse : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(true << false) )
+                        << "expected" << DOC("$all" << false
+                                          << "$any" << true
+                                          << "$none" << false) );
+            }
+        };
+
+        class Empty : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( vector<Value>() )
+                        << "expected" << DOC("$all" << true
+                                          << "$any" << false
+                                          << "$none" << true ) );
+            }
+        };
+
+        class TrueViaInt : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(1) )
+                        << "expected" << DOC("$all" << true
+                                          << "$any" << true
+                                          << "$none" << false ) );
+            }
+        };
+
+        class FalseViaInt : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY( DOC_ARRAY(0) )
+                        << "expected" << DOC("$all" << false
+                                          << "$any" << false
+                                          << "$none" << true ) );
+            }
+        };
+
+        class Null : public ExpectedResultBase {
+            Document getSpec() {
+                return DOC("input" << DOC_ARRAY(BSONNULL)
+                        << "error" << DOC_ARRAY("$all"
+                                             << "$any"
+                                             << "$none") );
+            }
+        };
+
+    } // namespace AllAnyNone
+
     class All : public Suite {
     public:
         All() : Suite( "expression" ) {
@@ -3721,6 +3832,14 @@ namespace ExpressionTests {
             add<Set::RightArgEmpty>();
             add<Set::ManyArgs>();
             add<Set::ManyArgsEqual>();
+
+            add<AllAnyNone::JustFalse>();
+            add<AllAnyNone::JustTrue>();
+            add<AllAnyNone::OneTrueOneFalse>();
+            add<AllAnyNone::Empty>();
+            add<AllAnyNone::TrueViaInt>();
+            add<AllAnyNone::FalseViaInt>();
+            add<AllAnyNone::Null>();
         }
     } myall;
 

@@ -283,6 +283,20 @@ namespace mongo {
     };
 
 
+    class ExpressionAll :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionAll() {}
+    };
+
+
     class ExpressionAnd :
         public ExpressionNary {
     public:
@@ -308,6 +322,20 @@ namespace mongo {
 
     private:
         ExpressionAnd() {}
+    };
+
+
+    class ExpressionAny :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionAny() {};
     };
 
 
@@ -751,6 +779,20 @@ namespace mongo {
 
     private:
         ExpressionMonth() {}
+    };
+
+
+    class ExpressionNone :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionNone() {}
     };
 
 

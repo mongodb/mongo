@@ -256,7 +256,9 @@ namespace mongo {
     */
     static const OpDesc OpTable[] = {
         {"$add", ExpressionAdd::create, 0},
+        {"$all", ExpressionAll::create, OpDesc::FIXED_COUNT, 1},
         {"$and", ExpressionAnd::create, 0},
+        {"$any", ExpressionAny::create, OpDesc::FIXED_COUNT, 1},
         {"$cmp", ExpressionCompare::createCmp, OpDesc::FIXED_COUNT, 2},
         {"$concat", ExpressionConcat::create, 0},
         {"$cond", ExpressionCond::create, OpDesc::FIXED_COUNT, 3},
@@ -280,6 +282,7 @@ namespace mongo {
         {"$month", ExpressionMonth::create, OpDesc::FIXED_COUNT, 1},
         {"$multiply", ExpressionMultiply::create, 0},
         {"$ne", ExpressionCompare::createNe, OpDesc::FIXED_COUNT, 2},
+        {"$none", ExpressionNone::create, OpDesc::FIXED_COUNT, 1},
         {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
@@ -467,6 +470,30 @@ namespace mongo {
         return ExpressionAdd::create;
     }
 
+    /* ------------------------- ExpressionAll -------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionAll::create() {
+        return new ExpressionAll();
+    }
+
+    Value ExpressionAll::evaluateInternal(const Variables& vars) const {
+        const Value arr = vpOperand[0]->evaluateInternal(vars);
+        uassert(17040, str::stream() << getOpName() << "'s argument must be an array, but is "
+                                     << typeName(arr.getType()),
+                arr.getType() == Array);
+        const vector<Value>& array = arr.getArray();
+        for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
+            if (!it->coerceToBool()) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+
+    const char *ExpressionAll::getOpName() const {
+        return "$all";
+    }
+
     /* ------------------------- ExpressionAnd ----------------------------- */
 
     intrusive_ptr<ExpressionNary> ExpressionAnd::create() {
@@ -560,6 +587,30 @@ namespace mongo {
 
     intrusive_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
         return ExpressionAnd::create;
+    }
+
+    /* ------------------------- ExpressionAny -------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionAny::create() {
+        return new ExpressionAny();
+    }
+
+    Value ExpressionAny::evaluateInternal(const Variables& vars) const {
+        const Value arr = vpOperand[0]->evaluateInternal(vars);
+        uassert(17041, str::stream() << getOpName() << "'s argument must be an array, but is "
+                                     << typeName(arr.getType()),
+                arr.getType() == Array);
+        const vector<Value>& array = arr.getArray();
+        for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
+            if (it->coerceToBool()) {
+                return Value(true);
+            }
+        }
+        return Value(false);
+    }
+
+    const char *ExpressionAny::getOpName() const {
+        return "$any";
     }
 
     /* -------------------- ExpressionCoerceToBool ------------------------- */
@@ -2196,6 +2247,30 @@ namespace mongo {
         return Value(DOC(getOpName() << array));
     }
 
+    /* ------------------------- ExpressionNone -------------------------- */
+
+    intrusive_ptr<ExpressionNary> ExpressionNone::create() {
+        return new ExpressionNone();
+    }
+
+    Value ExpressionNone::evaluateInternal(const Variables& vars) const {
+        const Value arr = vpOperand[0]->evaluateInternal(vars);
+        uassert(16964, str::stream() << getOpName() << "'s argument must be an array, but is "
+                                     << typeName(arr.getType()),
+                arr.getType() == Array);
+        const vector<Value>& array = arr.getArray();
+        for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
+            if (it->coerceToBool()) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+
+    const char *ExpressionNone::getOpName() const {
+        return "$none";
+    }
+
     /* ------------------------- ExpressionNot ----------------------------- */
 
     intrusive_ptr<ExpressionNary> ExpressionNot::create() {
@@ -2336,12 +2411,10 @@ namespace mongo {
     }
 
     void ExpressionSetDifference::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
     Value ExpressionSetDifference::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
 
@@ -2349,10 +2422,10 @@ namespace mongo {
             return Value(BSONNULL);
         }
 
-        uassert(16962, str::stream() << "both operands of $setDifference must be arrays. First "
+        uassert(17048, str::stream() << "both operands of $setDifference must be arrays. First "
                                      << "argument is of type: " << lhs.getType(),
                 lhs.getType() == Array);
-        uassert(16963, str::stream() << "both operands of $setDifference must be arrays. Second "
+        uassert(17049, str::stream() << "both operands of $setDifference must be arrays. Second "
                                      << "argument is of type: " << rhs.getType(),
                 rhs.getType() == Array);
 
@@ -2380,13 +2453,13 @@ namespace mongo {
 
     Value ExpressionSetEquals::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
-        uassert(16974, str::stream() << "$setEquals needs at least two arguments had: " << n,
+        uassert(17045, str::stream() << "$setEquals needs at least two arguments had: " << n,
                 n >= 2);
         std::set<Value> lhs;
 
         for (size_t i = 0; i < n; i++) {
             const Value nextEntry = vpOperand[i]->evaluateInternal(vars);
-            uassert(16971, str::stream() << "All operands of $setIntersection must be arrays. One "
+            uassert(17044, str::stream() << "All operands of $setIntersection must be arrays. One "
                                          << "argument is of type: " << nextEntry.getType(),
                     nextEntry.getType() == Array);
 
@@ -2421,7 +2494,7 @@ namespace mongo {
             if (nextEntry.nullish()) {
                 return Value(BSONNULL);
             }
-            uassert(16966, str::stream() << "All operands of $setIntersection must be arrays. One "
+            uassert(17047, str::stream() << "All operands of $setIntersection must be arrays. One "
                                          << "argument is of type: " << nextEntry.getType(),
                     nextEntry.getType() == Array);
 
@@ -2467,19 +2540,17 @@ namespace mongo {
     }
 
     void ExpressionSetIsSubset::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
     Value ExpressionSetIsSubset::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
 
-        uassert(16968, str::stream() << "both operands of $setIsSubset must be arrays. First "
+        uassert(17046, str::stream() << "both operands of $setIsSubset must be arrays. First "
                                      << "argument is of type: " << lhs.getType(),
                 lhs.getType() == Array);
-        uassert(16969, str::stream() << "both operands of $setIsSubset must be arrays. Second "
+        uassert(17042, str::stream() << "both operands of $setIsSubset must be arrays. Second "
                                      << "argument is of type: " << rhs.getType(),
                 rhs.getType() == Array);
 
@@ -2515,7 +2586,7 @@ namespace mongo {
             if (newEntries.nullish()) {
                 return Value(BSONNULL);
             }
-            uassert(16970, str::stream() << "All operands of $setUnion must be arrays. One argument"
+            uassert(17043, str::stream() << "All operands of $setUnion must be arrays. One argument"
                                          << " is of type: " << newEntries.getType(),
                     newEntries.getType() == Array);
 
