@@ -297,7 +297,6 @@ __curds_insert(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session, 1));
 
-
 	/* If not appending, we require a key. */
 	append = F_ISSET(cursor, WT_CURSTD_APPEND) ? 1 : 0;
 	if (!append)
