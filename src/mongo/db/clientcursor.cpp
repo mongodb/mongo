@@ -306,7 +306,7 @@ namespace mongo {
         _ns(ns), _db( cc().database() ),
         _c(c), _pos(0),
         _query(query),  _queryOptions(queryOptions),
-        _idleAgeMillis(0), _pinValue(0),
+        _idleAgeMillis(0), _leftoverMaxTimeMicros(0), _pinValue(0),
         _doingDeletes(false), _yieldSometimesTracker(128,10) {
 
         Lock::assertAtLeastReadLocked(ns);
