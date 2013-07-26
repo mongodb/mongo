@@ -979,6 +979,7 @@ namespace mongo {
         curop.debug().ntoreturn = pq.getNumToReturn();
         curop.debug().query = jsobj;
         curop.setQuery(jsobj);
+        curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
 
         const NamespaceString nsString( ns );
         uassert( 16256, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );

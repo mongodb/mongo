@@ -65,6 +65,7 @@ namespace mongo {
         const BSONObj& getOrder() const { return _order; }
         const BSONObj& getHint() const { return _hint; }
         int getMaxScan() const { return _maxScan; }
+        int getMaxTimeMS() const { return _maxTimeMS; }
 
         bool hasIndexSpecifier() const;
         
@@ -107,6 +108,7 @@ namespace mongo {
         BSONObj _max;
         BSONObj _hint;
         int _maxScan;
+        int _maxTimeMS;
     };
 
 } // namespace mongo
