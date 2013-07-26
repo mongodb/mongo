@@ -130,6 +130,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
+	WT_SESSION_IMPL *rec_session;
 	uint32_t firstlog, lastlog, lognum;
 	u_int i, logcount;
 	char **logfiles;
@@ -138,6 +139,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	log = conn->log;
 	lastlog = 0;
 	firstlog = UINT32_MAX;
+	rec_session = NULL;
+
 	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
@@ -149,12 +152,27 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	    firstlog, lastlog);
 	log->first_lsn.file = firstlog;
 	log->first_lsn.offset = 0;
+
+	if (logcount > 0) {
+		/*
+		 * Run recovery.
+		 * XXX belongs at a higher level than this.
+		 */
+		WT_ERR(__wt_open_session(conn, 0, NULL, NULL, &rec_session));
+		F_SET(rec_session, WT_SESSION_NO_LOGGING);
+		WT_ERR(__wt_log_scan(rec_session,
+		    NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
+		    __wt_txn_recover, NULL));
+	}
+
 	/*
 	 * Start logging at the beginning of the next log file, no matter
 	 * where the previous log file ends.
 	 */
 	WT_ERR(__wt_log_newfile(session, 1));
-err:
+
+err:	if (rec_session != NULL)
+		WT_TRET(rec_session->iface.close(&rec_session->iface, NULL));
 	__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
 }

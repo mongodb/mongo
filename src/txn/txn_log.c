@@ -18,10 +18,11 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 
 	/* XXX deal with the distinction between inserts, updates and removes */
 	value.data = WT_UPDATE_DATA(op->upd);
-	value.size = op->upd->size;
+	value.size = WT_UPDATE_DELETED_SET(op->upd) ? 0 : op->upd->size;
 
 	WT_RET(__wt_struct_size(
 	    session, &size, fmt, 0, optype, op->uri, &op->key, &value));
+
 	/* We assumed we were packing zero into the size above, fix that. */
 	size += __wt_vsize_posint(size) - 1;
 	WT_RET(__wt_buf_grow(session, logrec, logrec->size + size));
