@@ -177,6 +177,7 @@ namespace mongo {
     DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx)
         : SplittableDocumentSource(pExpCtx)
         , populated(false)
+        , _doingMerge(false)
         , _spilled(false)
         , _extSortAllowed(pExpCtx->getExtSortAllowed() && !pExpCtx->getInRouter())
         , _maxMemoryUsageBytes(100*1024*1024)
@@ -352,8 +353,6 @@ namespace mongo {
         const size_t numAccumulators = vpAccumulatorFactory.size();
         dassert(numAccumulators == vpExpression.size());
 
-        const bool mergeInputs = pExpCtx->getDoingMerge();
-
         // pushed to on spill()
         vector<shared_ptr<Sorter<Value, Value>::Iterator> > sortedFiles;
         int memoryUsageBytes = 0;
@@ -403,7 +402,7 @@ namespace mongo {
             /* tickle all the accumulators for the group we found */
             dassert(numAccumulators == group.size());
             for (size_t i = 0; i < numAccumulators; i++) {
-                group[i]->process(vpExpression[i]->evaluate(vars), mergeInputs);
+                group[i]->process(vpExpression[i]->evaluate(vars), _doingMerge);
                 memoryUsageBytes += group[i]->memUsageForSorter();
             }
 
@@ -528,9 +527,8 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::getRouterSource() {
-        intrusive_ptr<ExpressionContext> pMergerExpCtx = pExpCtx->clone();
-        pMergerExpCtx->setDoingMerge(true);
-        intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pMergerExpCtx));
+        intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pExpCtx));
+        pMerger->setDoingMerge(true);
 
         /* the merger will use the same grouping key */
         pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id"));

@@ -30,15 +30,13 @@ namespace mongo {
     public:
         virtual ~ExpressionContext();
 
-        void setDoingMerge(bool b);
-        void setInShard(bool b);
-        void setInRouter(bool b);
+        void setInShard(bool b) { inShard = b; }
+        void setInRouter(bool b) { inRouter = b; }
         void setExtSortAllowed(bool b) { extSortAllowed = b; }
         void setNs(NamespaceString ns) { _ns = ns; }
 
-        bool getDoingMerge() const;
-        bool getInShard() const;
-        bool getInRouter() const;
+        bool getInShard() const { return inShard; }
+        bool getInRouter() const { return inRouter; }
         bool getExtSortAllowed() const { return extSortAllowed; }
         const NamespaceString& getNs() const { return _ns; }
 
@@ -56,7 +54,6 @@ namespace mongo {
     private:
         ExpressionContext(InterruptStatus *pStatus, const NamespaceString& ns);
         
-        bool doingMerge;
         bool inShard;
         bool inRouter;
         bool extSortAllowed;
@@ -65,34 +62,3 @@ namespace mongo {
         NamespaceString _ns;
     };
 }
-
-
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
-
-namespace mongo {
-
-    inline void ExpressionContext::setDoingMerge(bool b) {
-        doingMerge = b;
-    }
-
-    inline void ExpressionContext::setInShard(bool b) {
-        inShard = b;
-    }
-    
-    inline void ExpressionContext::setInRouter(bool b) {
-        inRouter = b;
-    }
-
-    inline bool ExpressionContext::getDoingMerge() const {
-        return doingMerge;
-    }
-
-    inline bool ExpressionContext::getInShard() const {
-        return inShard;
-    }
-
-    inline bool ExpressionContext::getInRouter() const {
-        return inRouter;
-    }
-
-};
