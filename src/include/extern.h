@@ -1339,6 +1339,11 @@ extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_printlog( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    WT_LSN *lsnp,
+    void *cookie);
 extern int __wt_ext_transaction_id(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     uint64_t *transaction_idp);

@@ -12,7 +12,6 @@ static int usage(void);
 int
 util_printlog(WT_SESSION *session, int argc, char *argv[])
 {
-	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_ITEM key, value;
 	int ch, printable;
@@ -41,30 +40,11 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	if ((ret = session->open_cursor(session, "log",
-	    NULL, printable ? "printable" : "raw", &cursor)) != 0) {
-		fprintf(stderr, "%s: cursor open(log) failed: %s\n",
-		    progname, wiredtiger_strerror(ret));
-		goto err;
-	}
+	ret = __wt_log_scan((WT_SESSION_IMPL *)session,
+	    NULL, WT_LOGSCAN_FIRST, __wt_txn_printlog, stdout);
 
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			break;
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			break;
-		if (fwrite(key.data, 1, key.size, stdout) != key.size ||
-		    fwrite("\n", 1, 1, stdout) != 1 ||
-		    fwrite(value.data, 1, value.size, stdout) != value.size ||
-		    fwrite("\n", 1, 1, stdout) != 1) {
-			ret = errno;
-			break;
-		}
-	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	else {
-		fprintf(stderr, "%s: cursor get(log) failed: %s\n",
+	if (ret != 0) {
+		fprintf(stderr, "%s: printlog failed: %s\n",
 		    progname, wiredtiger_strerror(ret));
 		goto err;
 	}

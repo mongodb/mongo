@@ -312,7 +312,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	if (S2C(session)->logging &&
-	    (ret = __wt_txn_log_commit(session, cfg)) != 0) {
+	    (ret = __wt_txn_commit_log(session, cfg)) != 0) {
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
 	}

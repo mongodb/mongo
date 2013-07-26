@@ -95,3 +95,8 @@ struct __wt_txn {
 #define	TXN_RUNNING	0x10
 	uint32_t flags;
 };
+
+/*
+ * Transactional logging.
+ */
+#define	TXN_LOG_COMMIT	1
