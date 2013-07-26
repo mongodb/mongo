@@ -30,6 +30,7 @@
 #
 
 import wiredtiger, wttest
+import os, shutil
 from wtscenario import multiply_scenarios, number_scenarios
 
 class test_txn02(wttest.WiredTigerTestCase):
@@ -70,10 +71,12 @@ class test_txn02(wttest.WiredTigerTestCase):
     txn4s = [('t4c', dict(txn4='commit')), ('t4r', dict(txn4='rollback'))]
 
     scenarios = number_scenarios(multiply_scenarios('.', types,
-        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)) # [:1]
+        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s))[:20]
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
+        self.home = dir
+        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
         conn = wiredtiger.wiredtiger_open(dir, 'create,' +
                 ('error_prefix="%s: ",' % self.shortid()))
         self.pr(`conn`)
@@ -89,9 +92,7 @@ class test_txn02(wttest.WiredTigerTestCase):
         actual = dict((k, v) for k, v in c if v != 0)
         # Search for the expected items as well as iterating
         for k, v in expected.iteritems():
-            c.set_key(k)
-            c.search()
-            self.assertEqual(c.get_value(), v)
+            self.assertEqual(c[k], v)
         c.close()
         if txn_config:
             session.commit_transaction()
@@ -107,6 +108,17 @@ class test_txn02(wttest.WiredTigerTestCase):
         self.check(self.session2, "isolation=snapshot", committed)
         self.check(self.session2, "isolation=read-committed", committed)
         self.check(self.session2, "isolation=read-uncommitted", current)
+
+        # Opening a clone of the database home directory should see the
+        # committed results.
+        wttest.removeAll(self.backup_dir)
+        shutil.copytree(self.home, self.backup_dir)
+        backup_conn = wiredtiger.wiredtiger_open(self.backup_dir)
+        try:
+            #self.check(backup_conn.open_session(), None, committed)
+            self.check(backup_conn.open_session(), None, {})
+        finally:
+            backup_conn.close()
 
     def test_ops(self):
         self.session.create(self.uri, self.create_params)
