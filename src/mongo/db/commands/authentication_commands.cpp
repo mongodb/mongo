@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -103,7 +104,9 @@ namespace mongo {
                               BSONObjBuilder& result,
                               bool fromRepl) {
 
-        log() << " authenticate db: " << dbname << " " << cmdObj << endl;
+        mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
+        redactForLogging(&cmdToLog);
+        log() << " authenticate db: " << dbname << " " << cmdToLog << endl;
         UserName user(cmdObj.getStringField("user"), dbname);
         std::string mechanism = cmdObj.getStringField("mechanism");
         if (mechanism.empty()) {
@@ -115,6 +118,8 @@ namespace mongo {
                                  user,
                                  status.code());
         if (!status.isOK()) {
+            log() << "Failed to authenticate " << user << " with mechanism " << mechanism << ": " <<
+                status;
             if (status.code() == ErrorCodes::AuthenticationFailed) {
                 // Statuses with code AuthenticationFailed may contain messages we do not wish to
                 // reveal to the user, so we return a status with the message "auth failed".
