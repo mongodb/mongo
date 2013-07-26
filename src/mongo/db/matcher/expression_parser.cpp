@@ -416,6 +416,7 @@ namespace mongo {
                 }
                 else if ( e.type() == RegEx ) {
                     regex = e.regex();
+                    regexOptions = e.regexFlags();
                 }
                 else {
                     return StatusWithMatchExpression( ErrorCodes::BadValue,
