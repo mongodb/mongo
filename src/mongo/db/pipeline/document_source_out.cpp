@@ -37,22 +37,22 @@ namespace mongo {
     }
 
     void DocumentSourceOut::alterCommandResult(BSONObjBuilder& cmdResult) {
-        cmdResult.append("outputNs", _db + '.' + _outputCollection);
+        cmdResult.append("outputNs",  _outputNs.ns());
     }
 
     static AtomicUInt32 aggOutCounter;
-    void DocumentSourceOut::prepTempCollection(const string& finalNs) {
+    void DocumentSourceOut::prepTempCollection() {
         verify(_conn);
         verify(_tempNs.size() == 0);
 
-        _tempNs = StringData(str::stream() << _db
+        _tempNs = StringData(str::stream() << _outputNs.db()
                                            << ".tmp.agg_out."
                                            << aggOutCounter.addAndFetch(1)
                                            );
 
         {
             BSONObj info;
-            bool ok =_conn->runCommand(_db,
+            bool ok =_conn->runCommand(_outputNs.db().toString(),
                                        BSON("create" << _tempNs.coll() << "temp" << true),
                                        info);
             uassert(16994, str::stream() << "failed to create temporary $out collection '"
@@ -60,8 +60,8 @@ namespace mongo {
                     ok);
         }
 
-        // copy indexes on finalNs to _tempNs
-        scoped_ptr<DBClientCursor> indexes(_conn->getIndexes(finalNs));
+        // copy indexes on _outputNs to _tempNs
+        scoped_ptr<DBClientCursor> indexes(_conn->getIndexes(_outputNs));
         while (indexes->more()) {
             MutableDocument index(Document(indexes->nextSafe()));
             index.remove("_id"); // indexes shouldn't have _ids but some existing ones do
@@ -69,7 +69,7 @@ namespace mongo {
 
             BSONObj indexBson = index.freeze().toBson();
             _conn->insert(_tempNs.getSystemIndexesCollection(), indexBson);
-            BSONObj err = _conn->getLastErrorDetailed(_db);
+            BSONObj err = _conn->getLastErrorDetailed();
             uassert(16995, str::stream() << "copying index for $out failed."
                                          << " index: " << indexBson
                                          << " error: " <<  err,
@@ -86,20 +86,19 @@ namespace mongo {
 
         verify(_conn);
 
-        const string finalNs = _db + '.' + _outputCollection;
-        prepTempCollection(finalNs);
+        prepTempCollection();
         verify(_tempNs.size() != 0);
 
         for (bool haveNext = !pSource->eof(); haveNext; haveNext = pSource->advance()) {
             BSONObj toInsert = pSource->getCurrent().toBson();
             _conn->insert(_tempNs.ns(), toInsert);
-            BSONObj err = _conn->getLastErrorDetailed(_db);
+            BSONObj err = _conn->getLastErrorDetailed();
             uassert(16996, str::stream() << "insert for $out failed: " << err,
                     DBClientWithCommands::getLastErrorString(err).empty());
         }
 
         BSONObj rename = BSON("renameCollection" << _tempNs.ns()
-                           << "to" << finalNs
+                           << "to" << _outputNs.ns()
                            << "dropTarget" << true
                            );
         BSONObj info;
@@ -125,12 +124,12 @@ namespace mongo {
             "DocumentSourceOut::getCurrent should never be called because eof() is always true.");
     }
 
-    DocumentSourceOut::DocumentSourceOut(StringData outputCollection,
+    DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
         : SplittableDocumentSource(pExpCtx)
         , _done(false)
         , _tempNs("") // filled in by prepTempCollection
-        , _outputCollection(outputCollection.toString())
+        , _outputNs(outputNs)
     {}
 
     intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
@@ -139,10 +138,15 @@ namespace mongo {
         uassert(16990, str::stream() << "$out only supports a string argument, not "
                                      << typeName(pBsonElement->type()),
                 pBsonElement->type() == String);
-        return new DocumentSourceOut(pBsonElement->str(), pExpCtx);
+        
+        NamespaceString outputNs(pExpCtx->getNs().db().toString() + '.' + pBsonElement->str());
+        return new DocumentSourceOut(outputNs, pExpCtx);
     }
 
     void DocumentSourceOut::sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
-        pBuilder->append("$out", _outputCollection);
+        massert(17000, "$out shouldn't have different db than input",
+                _outputNs.db() == pExpCtx->getNs().db());
+
+        pBuilder->append("$out", _outputNs.coll());
     }
 }

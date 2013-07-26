@@ -181,15 +181,15 @@ namespace mongo {
         virtual bool run(const string &db, BSONObj &cmdObj, int options, string &errmsg,
                          BSONObjBuilder &result, bool fromRepl) {
 
+            string ns = parseNs(db, cmdObj);
+
             intrusive_ptr<ExpressionContext> pCtx =
-                ExpressionContext::create(&InterruptStatusMongod::status);
+                ExpressionContext::create(&InterruptStatusMongod::status, NamespaceString(ns));
 
             /* try to parse the command; if this fails, then we didn't run */
             intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);
             if (!pPipeline.get())
                 return false;
-
-            string ns = parseNs(db, cmdObj);
 
             if (pPipeline->getSplitMongodPipeline()) {
                 // This is only used in testing
@@ -288,7 +288,7 @@ namespace mongo {
 
             /* on the shard servers, create the local pipeline */
             intrusive_ptr<ExpressionContext> pShardCtx(
-                ExpressionContext::create(&InterruptStatusMongod::status));
+                ExpressionContext::create(&InterruptStatusMongod::status, NamespaceString(ns)));
             intrusive_ptr<Pipeline> pShardPipeline(
                 Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
             if (!pShardPipeline.get()) {

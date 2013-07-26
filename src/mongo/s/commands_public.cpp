@@ -1804,8 +1804,10 @@ namespace mongo {
             uassert(16961, "Aggregation in a sharded system doesn't yet support cursors",
                     !cmdObj.hasField("cursor"));
 
-            intrusive_ptr<ExpressionContext> pExpCtx(
-                ExpressionContext::create(&InterruptStatusMongos::status));
+            string fullns = parseNs(dbName, cmdObj);
+
+            intrusive_ptr<ExpressionContext> pExpCtx =
+                ExpressionContext::create(&InterruptStatusMongos::status, NamespaceString(fullns));
             pExpCtx->setInRouter(true);
 
             /* parse the pipeline specification */
@@ -1817,8 +1819,6 @@ namespace mongo {
             // This restriction will be loosened when we move the merge phase to a shard.
             uassert(16948, "Aggregation in a sharded system doesn't yet support disk usage",
                     !pExpCtx->getExtSortAllowed());
-
-            string fullns(dbName + "." + pPipeline->getCollectionName());
 
             /*
               If the system isn't running sharded, or the target collection

@@ -109,13 +109,13 @@ namespace mongo {
         geoNear.doneFast();
     }
 
-    BSONObj DocumentSourceGeoNear::buildGeoNearCmd(const StringData& collection) const {
+    BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
         // this is very similar to sourceToBson, but slightly different.
         // differences will be noted.
 
         BSONObjBuilder geoNear; // not building a subField
 
-        geoNear.append("geoNear", collection); // not in toBson
+        geoNear.append("geoNear", pExpCtx->getNs().coll()); // not in toBson
 
         if (coordsIsArray) {
             geoNear.appendArray("near", coords);
@@ -145,7 +145,9 @@ namespace mongo {
         massert(16603, "Already ran geoNearCommand",
                 !resultsIterator);
 
-        bool ok = client->runCommand(db, buildGeoNearCmd(collection), cmdOutput);
+        bool ok = client->runCommand(pExpCtx->getNs().db().toString(),
+                                     buildGeoNearCmd(),
+                                     cmdOutput);
         uassert(16604, "geoNear command failed: " + cmdOutput.toString(),
                 ok);
 

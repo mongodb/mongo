@@ -19,6 +19,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -33,11 +34,13 @@ namespace mongo {
         void setInShard(bool b);
         void setInRouter(bool b);
         void setExtSortAllowed(bool b) { extSortAllowed = b; }
+        void setNs(NamespaceString ns) { _ns = ns; }
 
         bool getDoingMerge() const;
         bool getInShard() const;
         bool getInRouter() const;
         bool getExtSortAllowed() const { return extSortAllowed; }
+        const NamespaceString& getNs() const { return _ns; }
 
         /**
            Used by a pipeline to check for interrupts so that killOp() works.
@@ -48,10 +51,10 @@ namespace mongo {
 
         ExpressionContext* clone();
 
-        static ExpressionContext *create(InterruptStatus *pStatus);
+        static ExpressionContext *create(InterruptStatus *pStatus, const NamespaceString& ns);
 
     private:
-        ExpressionContext(InterruptStatus *pStatus);
+        ExpressionContext(InterruptStatus *pStatus, const NamespaceString& ns);
         
         bool doingMerge;
         bool inShard;
@@ -59,6 +62,7 @@ namespace mongo {
         bool extSortAllowed;
         unsigned intCheckCounter; // interrupt check counter
         InterruptStatus *const pStatus;
+        NamespaceString _ns;
     };
 }
 
