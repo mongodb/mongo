@@ -311,12 +311,16 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
+#if 1
 	if (txn->mod_count > 0 && S2C(session)->logging &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING) &&
 	    (ret = __wt_txn_commit_log(session, cfg)) != 0) {
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
 	}
+#else
+	WT_UNUSED(ret);
+#endif
 
 	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the

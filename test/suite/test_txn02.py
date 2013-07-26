@@ -38,28 +38,31 @@ class test_txn02(wttest.WiredTigerTestCase):
     uri = 'table:' + tablename
 
     types = [
-        ('row', dict(tabletype='row', create_params = 'key_format=i,value_format=i')),
-        #('var', dict(tabletype='var', create_params = 'key_format=r,value_format=i')),
-        #('fix', dict(tabletype='fix', create_params = 'key_format=r,value_format=8t')),
+        ('row', dict(tabletype='row',
+                    create_params = 'key_format=i,value_format=i')),
+        ('var', dict(tabletype='var',
+                    create_params = 'key_format=r,value_format=i')),
+        ('fix', dict(tabletype='fix',
+                    create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
         ('i4', dict(op1=('insert', 4))),
-        #('r1', dict(op1=('remove', 1))),
+        ('r1', dict(op1=('remove', 1))),
         ('u10', dict(op1=('update', 10))),
     ]
     op2s = [
         ('i6', dict(op2=('insert', 6))),
-        #('r4', dict(op2=('remove', 4))),
+        ('r4', dict(op2=('remove', 4))),
         ('u4', dict(op2=('update', 4))),
     ]
     op3s = [
         ('i12', dict(op3=('insert', 12))),
-        #('r4', dict(op3=('remove', 4))),
+        ('r4', dict(op3=('remove', 4))),
         ('u4', dict(op3=('update', 4))),
     ]
     op4s = [
         ('i14', dict(op4=('insert', 14))),
-        #('r12', dict(op4=('remove', 12))),
+        ('r12', dict(op4=('remove', 12))),
         ('u12', dict(op4=('update', 12))),
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
@@ -118,6 +121,7 @@ class test_txn02(wttest.WiredTigerTestCase):
             backup_conn.close()
 
     def test_ops(self):
+        # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         self.session.create(self.uri, self.create_params)
         # Set up the table with entries for 1 and 10
         # We use the overwrite config so insert can update as needed.

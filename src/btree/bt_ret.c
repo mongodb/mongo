@@ -12,7 +12,7 @@
  *	Get a reference to the current key.
  */
 int
-__wt_key_get(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t *recnop)
+__wt_row_key_get(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 {
 	WT_PAGE *page;
 	WT_ROW *rip;
@@ -22,10 +22,6 @@ __wt_key_get(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t *recnop)
 	page = cbt->page;
 
 	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-		*recnop = cbt->recno;
-		break;
 	case WT_PAGE_ROW_LEAF:
 		rip = &page->u.row.d[cbt->slot];
 

@@ -52,9 +52,9 @@ enum __wt_txn_isolation {
  *	A transactional operation.
  */
 struct __wt_txn_op {
+	WT_INSERT *ins;
 	WT_UPDATE *upd;
 	WT_ITEM key;
-	uint64_t recno;
 	WT_REF *ref;
 
 	/* XXX temporary: need file IDs. */

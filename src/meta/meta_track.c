@@ -151,7 +151,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_REMOVE:	/* Remove trk.a */
 		if ((tret = __wt_metadata_remove(
 		    session, trk->a)) != 0) {
-			__wt_err(session, ret,
+			__wt_err(session, tret,
 			    "metadata unroll remove: %s",
 			    trk->a);
 			WT_TRET(tret);
@@ -160,7 +160,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_SET:		/* Set trk.a to trk.b */
 		if ((tret = __wt_metadata_update(
 		    session, trk->a, trk->b)) != 0) {
-			__wt_err(session, ret,
+			__wt_err(session, tret,
 			    "metadata unroll update %s to %s",
 			    trk->a, trk->b);
 			WT_TRET(tret);

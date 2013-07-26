@@ -11,25 +11,98 @@
 static int
 __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 {
+	WT_ITEM value;
 	const char *fmt = "IISuu";
 	size_t size;
-	uint32_t optype = 1, recsize;	/* XXX script should generate type IDs. */
-	WT_ITEM value;
+	uint64_t recno;
+	uint32_t optype, recsize;	/* XXX script should generate type IDs. */
 
-	/* XXX deal with the distinction between inserts, updates and removes */
 	value.data = WT_UPDATE_DATA(op->upd);
-	value.size = WT_UPDATE_DELETED_SET(op->upd) ? 0 : op->upd->size;
+	value.size = op->upd->size;
 
-	WT_RET(__wt_struct_size(
-	    session, &size, fmt, 0, optype, op->uri, &op->key, &value));
+	/*
+	 * Cases:
+	 * 1) column store remove;
+	 * 2) column store insert/update;
+	 * 3) row store remove;
+	 * 4) row store insert/update;
+	 *
+	 * We first calculate the size being packed (assuming the size itself
+	 * is zero), then fix the calculation once we know the size.
+	 */
+#define	WT_TXNOP_COL_INSERT	1
+#define	WT_TXNOP_COL_REMOVE	2
+#define	WT_TXNOP_ROW_INSERT	3
+#define	WT_TXNOP_ROW_REMOVE	4
+	if (op->key.data == NULL) {
+		WT_ASSERT(session, op->ins != NULL);
+		recno = op->ins->u.recno;
 
-	/* We assumed we were packing zero into the size above, fix that. */
-	size += __wt_vsize_posint(size) - 1;
-	WT_RET(__wt_buf_grow(session, logrec, logrec->size + size));
-	recsize = (uint32_t)size;
-	WT_RET(__wt_struct_pack(session,
-	    (uint8_t *)logrec->data + logrec->size, size, fmt,
-	    recsize, optype, op->uri, &op->key, &value));
+		if (WT_UPDATE_DELETED_ISSET(op->upd)) {
+			fmt = "IISq";
+			optype = WT_TXNOP_COL_REMOVE;
+	
+			WT_RET(__wt_struct_size(session, &size, fmt,
+			    0, optype, op->uri, recno));
+
+			size += __wt_vsize_uint(size) - 1;
+			WT_RET(__wt_buf_grow(
+			    session, logrec, logrec->size + size));
+			recsize = (uint32_t)size;
+			WT_RET(__wt_struct_pack(session,
+			    (uint8_t *)logrec->data + logrec->size,
+			    size, fmt,
+			    recsize, optype, op->uri, recno));
+		} else {
+			fmt = "IISqu";
+			optype = WT_TXNOP_COL_INSERT;
+	
+			WT_RET(__wt_struct_size(session, &size, fmt,
+			    0, optype, op->uri, recno, &value));
+
+			size += __wt_vsize_uint(size) - 1;
+			WT_RET(__wt_buf_grow(
+			    session, logrec, logrec->size + size));
+			recsize = (uint32_t)size;
+			WT_RET(__wt_struct_pack(session,
+			    (uint8_t *)logrec->data + logrec->size,
+			    size, fmt,
+			    recsize, optype, op->uri, recno, &value));
+		}
+	} else {
+		if (WT_UPDATE_DELETED_ISSET(op->upd)) {
+			fmt = "IISu";
+			optype = WT_TXNOP_ROW_REMOVE;
+
+			WT_RET(__wt_struct_size(session, &size, fmt,
+			    0, optype, op->uri, &op->key));
+
+			size += __wt_vsize_uint(size) - 1;
+			WT_RET(__wt_buf_grow(
+			    session, logrec, logrec->size + size));
+			recsize = (uint32_t)size;
+			WT_RET(__wt_struct_pack(session,
+			    (uint8_t *)logrec->data + logrec->size,
+			    size, fmt,
+			    recsize, optype, op->uri, &op->key));
+		} else {
+			fmt = "IISuu";
+			optype = WT_TXNOP_ROW_INSERT;
+
+			WT_RET(__wt_struct_size(session, &size, fmt,
+			    0, optype, op->uri, &op->key, &value));
+
+			size += __wt_vsize_uint(size) - 1;
+			WT_RET(__wt_buf_grow(
+			    session, logrec, logrec->size + size));
+			recsize = (uint32_t)size;
+			WT_RET(__wt_struct_pack(session,
+			    (uint8_t *)logrec->data + logrec->size,
+			    size, fmt,
+			    recsize, optype, op->uri, &op->key, &value));
+		}
+	}
+
 	logrec->size += size;
 	return (0);
 }
@@ -60,23 +133,61 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_ITEM key, value;
-	const char *fmt = "IISuu", *uri;
+	const char *fmt, *uri;
 	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
-	    "raw,overwrite", NULL };
+	    "overwrite", NULL };
+	uint64_t recno;
 	uint32_t optype, recsize;
 
-	/* Peek at the size. */
-	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), "I",
-	    &recsize));
-	WT_RET(__wt_struct_unpack(session, *pp, recsize, fmt,
-	    &recsize, &optype, &uri, &key, &value));
+	/* Peek at the size and the type. */
+	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), "II",
+	    &recsize, &optype));
+
+	switch(optype) {
+	case WT_TXNOP_COL_INSERT:
+		fmt = "IISqu";
+		WT_RET(__wt_struct_unpack(session, *pp, recsize, fmt,
+		    &recsize, &optype, &uri, &recno, &value));
+		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
+		cursor->set_key(cursor, recno);
+		__wt_cursor_set_raw_value(cursor, &value);
+		WT_ERR(cursor->insert(cursor));
+		break;
+
+	case WT_TXNOP_COL_REMOVE:
+		fmt = "IISq";
+		WT_RET(__wt_struct_unpack(session, *pp, recsize, fmt,
+		    &recsize, &optype, &uri, &recno));
+		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
+		cursor->set_key(cursor, recno);
+		WT_ERR(cursor->remove(cursor));
+		break;
+
+	case WT_TXNOP_ROW_INSERT:
+		fmt = "IISuu";
+		WT_RET(__wt_struct_unpack(session, *pp, recsize, fmt,
+		    &recsize, &optype, &uri, &key, &value));
+		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
+		__wt_cursor_set_raw_key(cursor, &key);
+		__wt_cursor_set_raw_value(cursor, &value);
+		WT_ERR(cursor->insert(cursor));
+		break;
+
+	case WT_TXNOP_ROW_REMOVE:
+		fmt = "IISu";
+		WT_RET(__wt_struct_unpack(session, *pp, recsize, fmt,
+		    &recsize, &optype, &uri, &key));
+		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
+		__wt_cursor_set_raw_key(cursor, &key);
+		WT_ERR(cursor->remove(cursor));
+		break;
+	
+	WT_ILLEGAL_VALUE_ERR(session);
+	}
+
 	*pp += recsize;
 
-	WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
-	cursor->set_key(cursor, &key);
-	cursor->set_value(cursor, &value);
-	WT_TRET(cursor->insert(cursor));
-	WT_TRET(cursor->close(cursor));
+err:	WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 
@@ -126,9 +237,8 @@ __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[])
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
 		if (op->upd != NULL)
 			WT_ERR(__txn_op_log(session, logrec, op));
-
-		/* We can't handle physical truncate yet. */
-		if (op->ref != NULL)
+		else if (op->ref != NULL)
+			/* We can't handle physical truncate yet. */
 			return (ENOTSUP);
 	}
 
