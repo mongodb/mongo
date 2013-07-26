@@ -131,6 +131,10 @@ namespace mongo {
             uassert(16951, "failing getmore due to set failpoint",
                     !MONGO_FAIL_POINT(getMoreError));
 
+            // If the operation that spawned this cursor had a time limit set, apply leftover
+            // time to this getmore.
+            curop.setMaxTimeMicros( cc->getLeftoverMaxTimeMicros() );
+
             if ( pass == 0 )
                 cc->updateSlaveLocation( curop );
 
@@ -233,6 +237,10 @@ namespace mongo {
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
                 exhaust = cc->queryOptions() & QueryOption_Exhaust;
+
+                // If the getmore had a time limit, remaining time is "rolled over" back to the
+                // cursor (for use by future getmore ops).
+                cc->setLeftoverMaxTimeMicros( curop.getRemainingMaxTimeMicros() );
             }
         }
 
@@ -846,6 +854,11 @@ namespace mongo {
             ccPointer->setPos( nReturned );
             ccPointer->pq = pq_shared;
             ccPointer->fields = pq.getFieldPtr();
+
+            // If the query had a time limit, remaining time is "rolled over" to the cursor (for
+            // use by future getmore ops).
+            ccPointer->setLeftoverMaxTimeMicros( curop.getRemainingMaxTimeMicros() );
+
             ccPointer.release();
         }
         
