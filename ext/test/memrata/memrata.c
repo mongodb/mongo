@@ -1032,7 +1032,6 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 		    (ret = wtext->struct_pack(wtext, session, cursor->key,
 		    sizeof(cursor->key), "r", wtcursor->recno)) != 0)
 			return (ret);
-		r->key = cursor->key;
 		r->key_len = size;
 	} else {
 		/* I'm not sure this test is necessary, but it's cheap. */
@@ -1049,7 +1048,6 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 		 * WT_CURSOR key's data.
 		 */
 		memcpy(cursor->key, wtcursor->key.data, wtcursor->key.size);
-		r->key = cursor->key;
 		r->key_len = wtcursor->key.size;
 	}
 	return (0);
@@ -1122,30 +1120,14 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 	WT_ITEM a, b;
 	WT_SESSION *session;
 	WT_SOURCE *ws;
-	int cache_ret, cmp, ret = 0;
+	int cache_ret, cache_rm, cmp, ret = 0;
 	void *p;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
 	ws = cursor->ws;
 	wtext = cursor->wtext;
-
 	r = &cursor->record;
-
-	/*
-	 * If the underlying KVS function is going to return a key, we have to
-	 * be sure the key buffer is large enough into which to copy any key,
-	 * that is, the key can't reference the WT_CURSOR key.  If the previous
-	 * call was set up so the key referenced the WT_CURSOR key, copy it to
-	 * the CURSOR key buffer.
-	 */
-	if (r->key != cursor->key) {
-		if (r->key_len > sizeof(cursor->key))
-			return (key_max_err(wtext, session, r->key_len));
-
-		memcpy(cursor->key, r->key, r->key_len);
-		r->key = cursor->key;
-	}
 
 	/*
 	 * If the cache isn't yet in use, it's a simpler problem, just check
@@ -1157,6 +1139,7 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 		goto cache_clean;
 	}
 
+skip_deleted:
 	/*
 	 * The next/prev key/value pair might be in the cache, which means we
 	 * are making two calls and returning the best choice.  As each call
@@ -1179,24 +1162,28 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 	 * Move through the cache until we either find a record with a visible
 	 * entry, or we reach the end/beginning.
 	 */
-	for (;;) {
+	for (cache_rm = 0;;) {
 		if ((ret = kvs_call(wtcursor, fname, ws->kvscache, f)) != 0)
 			break;
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			return (ret);
 
-		/*
-		 * If there's no visible entry, or the visible entry is a
-		 * deleted item, skip it.
-		 */
+		/* If there's no visible entry, move to the next one. */
 		if (!cache_value_visible(wtcursor, &cp))
-			continue;
-		if (cp->remove)
 			continue;
 
 		/*
-		 * Copy the cache key/value pair, we will need them if we are
-		 * to return the cache's entry.
+		 * If the entry has been deleted, remember that and continue.
+		 * We can't just skip the entry because it might be a delete
+		 * of an entry in the primary store, which means the cache
+		 * entry stops us from returning the primary store's entry.
+		 */
+		if (cp->remove)
+			cache_rm = 1;
+
+		/*
+		 * Copy the cache key.   If the cache's entry wasn't a delete,
+		 * copy the value as well, we may return the cache entry.
 		 */
 		if (cursor->t2.mem_len < r->key_len) {
 			if ((p = realloc(cursor->t2.v, r->key_len)) == NULL)
@@ -1206,6 +1193,9 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 		}
 		memcpy(cursor->t2.v, r->key, r->key_len);
 		cursor->t2.len = r->key_len;
+
+		if (cache_rm)
+			break;
 
 		if (cursor->t3.mem_len < cp->len) {
 			if ((p = realloc(cursor->t3.v, cp->len)) == NULL)
@@ -1241,12 +1231,21 @@ cache_clean:
 	 * better choice and pretend we didn't find the other one.
 	 */
 	if (cache_ret == 0 && ret == 0) {
-		a.data = cursor->key;		/* a is the primary */
-		a.size = cursor->record.key_len;
+		a.data = r->key;		/* a is the primary */
+		a.size = r->key_len;
 		b.data = cursor->t2.v;		/* b is the cache */
 		b.size = (uint32_t)cursor->t2.len;
 		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
 			return (ret);
+
+		/*
+		 * One special case: the two keys compare equal, but the cache
+		 * is a delete.  Move from the key we compared to the next/prev
+		 * item.
+		 */
+		if (cmp == 0 && cache_rm)
+			goto skip_deleted;
+
 		if (f == kvs_next) {
 			if (cmp >= 0)
 				ret = WT_NOTFOUND;
@@ -2610,7 +2609,6 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	cursor->wtcursor.update = kvs_cursor_update;
 
 	cursor->wtext = wtext;
-
 	cursor->record.key = cursor->key;
 	if ((cursor->v = malloc(128)) == NULL)
 		goto err;
