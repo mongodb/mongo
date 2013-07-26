@@ -77,6 +77,7 @@ namespace {
      *  -- No '$' support for positional operator
      *  -- Cannot move immutable field, or parts, of '_id' field
      *  -- No empty field names (ex. .a, b. )
+     *  -- Can't rename to an invalid fieldname.
      */
     TEST(InvalidInit, FromDbTests) {
         ModifierRename mod;
@@ -90,6 +91,7 @@ namespace {
         ASSERT_NOT_OK(mod.init(fromjson("{'b.':'a'}").firstElement()));
         ASSERT_NOT_OK(mod.init(fromjson("{'b':'.a'}").firstElement()));
         ASSERT_NOT_OK(mod.init(fromjson("{'b':'a.'}").firstElement()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'a':'$a'}").firstElement()));
     }
 
     TEST(MissingFrom, InitPrepLog) {
@@ -291,6 +293,28 @@ namespace {
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    }
+
+    TEST(LegacyData, CanRenameFromInvalidFieldName) {
+        Document doc(fromjson("{$a: 2}"));
+        Mod setMod(fromjson("{$rename: {'$a':'a'}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "$a");
+        ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(doc, fromjson("{a:2}"));
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        BSONObj logObj = fromjson("{$set:{ 'a': 2}, $unset: {'$a': true}}");
+        ASSERT_OK(setMod.log(&logBuilder));
+        ASSERT_EQUALS(logDoc, logObj);
     }
 
 } // namespace

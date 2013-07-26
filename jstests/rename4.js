@@ -122,6 +122,14 @@ good( {a:{z:1,b:1,c:1}}, {$rename:{'a.b':'aa.c'}}, {a:{c:1,z:1},aa:{c:1}} );
 // invalid target, but missing source
 good( {a:1,c:4}, {$rename:{b:'c.d'}}, {a:1,c:4} );
 
+// TODO: This should be supported, and it is with the new update framework, but not with the
+// old, and we currently don't have a good way to check which mode we are in. When we do have
+// that, add this test guarded under that condition. Or, when we remove the old update path
+// just enable this test.
+
+// valid to rename away from an invalid name
+// good( {x:1}, {$rename:{'$a.b':'a.b'}}, {x:1} );
+
 // check index
 t.drop();
 t.ensureIndex( {a:1} );
