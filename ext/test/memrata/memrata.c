@@ -1494,28 +1494,6 @@ kvs_cursor_insert(WT_CURSOR *wtcursor)
 	ws->cleaner_bytes += wtcursor->value.size;
 	++ws->cleaner_ops;
 
-#if 0
-	/*
-	 * WT_CURSOR::insert with overwrite set (create the record if it does
-	 * not exist, update the record if it does exist), maps to kvs_set.
-	 *
-	 * WT_CURSOR::insert without overwrite set (create the record if it
-	 * does not exist, fail if it does exist), maps to kvs_add.
-	 */
-	if (cursor->config_overwrite) {
-		if ((ret = kvs_set(ws->kvs, &cursor->record)) != 0)
-			EMSG(wtext, session, WT_ERROR,
-			    "kvs_set: %s", kvs_strerror(ret));
-	} else
-		if ((ret = kvs_add(ws->kvs, &cursor->record)) != 0) {
-			if (ret == KVS_E_KEY_EXISTS)
-				ret = WT_DUPLICATE_KEY;
-			else
-				EMSG(wtext, session, WT_ERROR,
-				    "kvs_add: %s", kvs_strerror(ret));
-		}
-#endif
-
 	/* Discard the lock. */
 err:	ESET(unlock(wtext, session, &ws->lock));
 
