@@ -115,10 +115,10 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * original page, and the value from any related WT_UPDATE item,
 		 * or the page if the key was never updated.
 		 */
-		if (cbt->ins != NULL &&
-		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
+		if (cbt->ins != NULL) {
 			cursor->key.data = WT_INSERT_KEY(cbt->ins);
 			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+			upd = __wt_txn_read(session, cbt->ins->upd);
 		} else {
 			WT_RET(__wt_row_leaf_key(
 			    session, page, rip, &cursor->key, 0));
