@@ -33,8 +33,8 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	WT_TXN_OP *op;
 
 	WT_RET(__txn_next_op(session, &op));
-        if (cbt->btree->type == BTREE_ROW)
-                WT_RET(__wt_row_key_get(cbt, &op->key));
+	if (cbt->btree->type == BTREE_ROW)
+		WT_RET(__wt_row_key_get(cbt, &op->key));
 	op->ins = cbt->ins;
 	op->upd = upd;
 	op->uri = session->dhandle->name;

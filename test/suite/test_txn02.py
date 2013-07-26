@@ -77,7 +77,7 @@ class test_txn02(wttest.WiredTigerTestCase):
     def setUpConnectionOpen(self, dir):
         self.home = dir
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-        conn = wiredtiger.wiredtiger_open(dir, 'create,' +
+        conn = wiredtiger.wiredtiger_open(dir, 'create,log=(file_max=100K),' +
                 ('error_prefix="%s: ",' % self.shortid()))
         self.pr(`conn`)
         self.session2 = conn.open_session()

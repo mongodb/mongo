@@ -15,7 +15,7 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 	const char *fmt = "IISuu";
 	size_t size;
 	uint64_t recno;
-	uint32_t optype, recsize;	/* XXX script should generate type IDs. */
+	uint32_t optype, recsize;
 
 	value.data = WT_UPDATE_DATA(op->upd);
 	value.size = op->upd->size;
@@ -41,7 +41,7 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 		if (WT_UPDATE_DELETED_ISSET(op->upd)) {
 			fmt = "IISq";
 			optype = WT_TXNOP_COL_REMOVE;
-	
+
 			WT_RET(__wt_struct_size(session, &size, fmt,
 			    0, optype, op->uri, recno));
 
@@ -56,7 +56,7 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 		} else {
 			fmt = "IISqu";
 			optype = WT_TXNOP_COL_INSERT;
-	
+
 			WT_RET(__wt_struct_size(session, &size, fmt,
 			    0, optype, op->uri, recno, &value));
 
@@ -143,7 +143,7 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), "II",
 	    &recsize, &optype));
 
-	switch(optype) {
+	switch (optype) {
 	case WT_TXNOP_COL_INSERT:
 		fmt = "IISqu";
 		WT_RET(__wt_struct_unpack(session, *pp, recsize, fmt,
@@ -151,7 +151,8 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		cursor->set_key(cursor, recno);
 		__wt_cursor_set_raw_value(cursor, &value);
-		WT_ERR(cursor->insert(cursor));
+		WT_TRET(cursor->insert(cursor));
+		WT_TRET(cursor->close(cursor));
 		break;
 
 	case WT_TXNOP_COL_REMOVE:
@@ -160,7 +161,8 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 		    &recsize, &optype, &uri, &recno));
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		cursor->set_key(cursor, recno);
-		WT_ERR(cursor->remove(cursor));
+		WT_TRET(cursor->remove(cursor));
+		WT_TRET(cursor->close(cursor));
 		break;
 
 	case WT_TXNOP_ROW_INSERT:
@@ -170,7 +172,8 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		__wt_cursor_set_raw_key(cursor, &key);
 		__wt_cursor_set_raw_value(cursor, &value);
-		WT_ERR(cursor->insert(cursor));
+		WT_TRET(cursor->insert(cursor));
+		WT_TRET(cursor->close(cursor));
 		break;
 
 	case WT_TXNOP_ROW_REMOVE:
@@ -179,15 +182,14 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 		    &recsize, &optype, &uri, &key));
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		__wt_cursor_set_raw_key(cursor, &key);
-		WT_ERR(cursor->remove(cursor));
+		WT_TRET(cursor->remove(cursor));
+		WT_TRET(cursor->close(cursor));
 		break;
-	
-	WT_ILLEGAL_VALUE_ERR(session);
+
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	*pp += recsize;
-
-err:	WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 

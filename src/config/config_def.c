@@ -214,7 +214,7 @@ static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
 static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ "archive", "boolean", NULL, NULL },
 	{ "enabled", "boolean", NULL, NULL },
-	{ "file_max", "int", "min=1MB,max=2GB", NULL },
+	{ "file_max", "int", "min=100KB,max=2GB", NULL },
 	{ "path", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
