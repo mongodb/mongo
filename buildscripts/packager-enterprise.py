@@ -28,7 +28,7 @@
 
 import errno
 import getopt
-import httplib
+from packager import httpget
 import os
 import re
 import stat
@@ -287,33 +287,6 @@ def setupdir(distro, arch, spec):
     # the following format string is unclear, an example setupdir
     # would be dst/x86_64/debian-sysvinit/mongodb-10gen-unstable/
     return "dst/%s/%s/%s%s-%s/" % (arch, distro.name(), distro.pkgbase(), spec.suffix(), spec.pversion(distro))
-
-def httpget(url, filename):
-    """Download the contents of url to filename, return filename."""
-    print "Fetching %s to %s." % (url, filename)
-    conn = None
-    u=urlparse.urlparse(url)
-    assert(u.scheme=='http')
-    try:
-        conn = httplib.HTTPConnection(u.hostname)
-        conn.request("GET", u.path)
-        t=filename+'.TMP'
-        res = conn.getresponse()
-        # FIXME: follow redirects
-        if res.status==200:
-            f = open(t, 'w')
-            try:
-                f.write(res.read())
-            finally:
-                f.close()
-                
-        else:
-            raise Exception("HTTP error %d" % res.status)
-        os.rename(t, filename)
-    finally:
-        if conn:
-            conn.close()
-    return filename
 
 def unpack_binaries_into(distro, arch, spec, where):
     """Unpack the tarfile for (distro, arch, spec) into directory where."""
