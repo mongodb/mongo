@@ -1,14 +1,15 @@
-Source: mongodb
+Source: mongodb-10gen-unstable
 Section: devel
 Priority: optional
 Maintainer: Richard Kreuter <richard@10gen.com>
-Build-Depends: debhelper (>= 7), libpcre3, libpcre3-dev, scons, xulrunner-dev, libboost1.35-dev | libboost1.37-dev | libboost1.38-dev | libboost1.40-dev | libboost1.42-dev, libboost-thread1.35-dev | libboost-thread1.37-dev | libboost-thread1.38-dev | libboost-thread1.40-dev | libboost-thread1.42-dev, libboost-filesystem1.35-dev | libboost-filesystem1.37-dev | libboost-filesystem1.38-dev | libboost-filesystem1.40-dev | libboost-filesystem1.42-dev, libboost-program-options1.35-dev | libboost-program-options1.37-dev | libboost-program-options1.38-dev | libboost-program-options1.40-dev | libboost-program-options1.42-dev, libboost-date-time1.35-dev | libboost-date-time1.37-dev | libboost-date-time1.38-dev | libboost-date-time1.40-dev | libboost-date-time1.42-dev, libpcap-dev, libreadline-dev
+Build-Depends: 
 Standards-Version: 3.8.0
 Homepage: http://www.mongodb.org
 
-Package: mongodb
+Package: mongodb-10gen-unstable
+Conflicts: mongodb, mongodb-stable, mongodb-nightly, mongodb-10gen, mongodb-10gen-unstable
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, xulrunner-dev
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), mongodb-10gen-unstable-shell, mongodb-10gen-unstable-server, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-tools
 Description: An object/document-oriented database
  MongoDB is a high-performance, open source, schema-free 
  document-oriented  data store that's easy to deploy, manage
@@ -22,8 +23,105 @@ Description: An object/document-oriented database
     * Replication and fail-over support
     * Efficient storage of binary data including large 
       objects (e.g. videos)
-    * Auto-sharding for cloud-level scalability
+    * Auto-sharding for cloud-level scalability (Q209)
  .
  High performance, scalability, and reasonable depth of
  functionality are the goals for the project.
 
+
+Package: mongodb-10gen-unstable-shell
+Conflicts: mongodb-10gen-shell, mongodb-10gen-enterprise-shell
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: An object/document-oriented database
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented  data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Auto-sharding for cloud-level scalability (Q209)
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs the mongo shell.
+
+Package: mongodb-10gen-unstable-server
+Conflicts: mongodb-10gen-server, mongodb-10gen-enterprise-server
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: An object/document-oriented database
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented  data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Auto-sharding for cloud-level scalability (Q209)
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs the mongod server. 
+
+Package: mongodb-10gen-unstable-mongos
+Conflicts: mongodb-10gen-mongos, mongodb-10gen-enterprise-mongos
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: An object/document-oriented database
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented  data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Auto-sharding for cloud-level scalability (Q209)
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs the mongos program. 
+
+Package: mongodb-10gen-unstable-tools
+Conflicts: mongodb-10gen-tools, mongodb-10gen-enterprise-tools
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: An object/document-oriented database
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented  data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Auto-sharding for cloud-level scalability (Q209)
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs standard utilities for 
+ interacting with MongoDB.

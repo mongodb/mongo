@@ -7,7 +7,7 @@
 # This special exception was added by Craig Small in version 0.37 of dh-make.
 
 # Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+export DH_VERBOSE=1
 
 
 configure: configure-stamp
@@ -24,9 +24,24 @@ build-stamp: configure-stamp
 	dh_testdir
 
         # Add here commands to compile the package.
-	scons 
+# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
+	# scons 
         #docbook-to-man debian/mongodb.sgml > mongodb.1
-	ls debian/*.1 > debian/mongodb.manpages
+	echo debian/bsondump.1 > debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongodump.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongoexport.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongofiles.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongoimport.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongooplog.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongoperf.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongorestore.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongosniff.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongostat.1 >> debian/mongodb-10gen-unstable-tools.manpages
+	echo debian/mongotop.1 >> debian/mongodb-10gen-unstable-tools.manpages
+
+	echo debian/mongo.1 > debian/mongodb-10gen-unstable-shell.manpages
+	echo debian/mongod.1 > debian/mongodb-10gen-unstable-server.manpages
+	echo debian/mongos.1 > debian/mongodb-10gen-unstable-mongos.manpages
 
 	touch $@
 
@@ -38,7 +53,14 @@ clean:
 	# FIXME: scons freaks out at the presence of target files
 	# under debian/mongodb.
 	#scons -c
-	rm -rf $(CURDIR)/debian/mongodb
+
+	rm -f debian/*.manpages
+
+	rm -rf $(CURDIR)/debian/mongodb-10gen-unstable
+	rm -rf $(CURDIR)/debian/mongodb-10gen-unstable-shell
+	rm -rf $(CURDIR)/debian/mongodb-10gen-unstable-server
+	rm -rf $(CURDIR)/debian/mongodb-10gen-unstable-mongos
+	rm -rf $(CURDIR)/debian/mongodb-10gen-unstable-tools
 	rm -f config.log
 	rm -f mongo
 	rm -f mongod
@@ -64,13 +86,38 @@ install: build
 	dh_prep
 	dh_installdirs
 
-	scons --prefix=$(CURDIR)/debian/mongodb/usr install
-	mkdir -p $(CURDIR)/debian/mongodb/etc
-	cp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/mongodb/etc/mongodb.conf 
+# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
+	# scons --prefix=$(CURDIR)/debian/mongodb/usr install
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-shell/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-server/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-mongos/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongo $(CURDIR)/debian/mongodb-10gen-unstable-shell/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongod $(CURDIR)/debian/mongodb-10gen-unstable-server/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongos $(CURDIR)/debian/mongodb-10gen-unstable-mongos/usr/bin
 
-	mkdir -p $(CURDIR)/debian/mongodb/usr/share/lintian/overrides/
-	install -m 644 $(CURDIR)/debian/lintian-overrides \
-		$(CURDIR)/debian/mongodb/usr/share/lintian/overrides/mongodb
+	cp -v $(CURDIR)/BINARIES/usr/bin/bsondump $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongodump $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongoexport $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongofiles $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongoimport $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongooplog $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongoperf $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongorestore $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongostat $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongotop $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/bin
+
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-server/etc
+	cp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/mongodb-10gen-unstable-server/etc/mongodb.conf 
+
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-shell/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-server/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-mongos/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/share/lintian/overrides/
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-10gen-unstable-shell/usr/share/lintian/overrides/mongodb-10gen-unstable-shell
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-10gen-unstable-server/usr/share/lintian/overrides/mongodb-10gen-unstable-server
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-10gen-unstable-mongos/usr/share/lintian/overrides/mongodb-10gen-unstable-mongos
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-10gen-unstable-tools/usr/share/lintian/overrides/mongodb-10gen-unstable-tools
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -90,11 +137,12 @@ binary-arch: build install
 #	dh_installemacsen
 #	dh_installpam
 #	dh_installmime
-	dh_installinit
+	dh_installinit -pmongodb-10gen-unstable-server --name=mongodb
 #	dh_installinfo
 	dh_installman
 	dh_link
-	dh_strip
+# Appears to be broken on Ubuntu 11.10...?
+#	dh_strip
 	dh_compress
 	dh_fixperms
 	dh_installdeb
