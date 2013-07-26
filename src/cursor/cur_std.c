@@ -455,16 +455,12 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 
 /*
  * __wt_cursor_dup_position --
- *	Default cursor position duplication.
+ *	Set a cursor to another cursor's position.
  */
 int
-__wt_cursor_dup_position(
-    WT_SESSION *wt_session, WT_CURSOR *to_dup, WT_CURSOR *cursor)
+__wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 {
 	WT_ITEM key;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
 
 	/*
 	 * Get a copy of the cursor's raw key, and set it in the new cursor,
@@ -479,15 +475,14 @@ __wt_cursor_dup_position(
 
 	/*
 	 * We now have a reference to the raw key, but we don't know anything
-	 * about the memory in which it's stored: memory allocated in support
-	 * of another cursor could be discarded when that cursor is closed,
-	 * and there's no guarantee the search we are about to do will clarify
-	 * the situation.  Make a copy if it's not a column-store key.
+	 * about the memory in which it's stored, it could be btree/file page
+	 * memory in the cache, application memory or the original cursor's
+	 * key/value WT_ITEMs.  Memory allocated in support of another cursor
+	 * could be discarded when that cursor is closed, so it's a problem.
+	 * However, doing a search to position the cursor will fix the problem:
+	 * cursors cannot reference application memory after cursor operations
+	 * and that requirement will save the day.
 	 */
-	if (!WT_CURSOR_RECNO(cursor) && cursor->key.data != cursor->key.mem)
-		WT_RET(__wt_buf_set(
-		    session, &cursor->key, cursor->key.data, cursor->key.size));
-
 	WT_RET(cursor->search(cursor));
 
 	return (0);
@@ -542,8 +537,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	if (cursor->close == NULL)
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
-	if (cursor->dup_position == NULL)
-		cursor->dup_position = __wt_cursor_dup_position;
 	if (cursor->range_truncate == NULL)
 		cursor->range_truncate = (int (*)
 		    (WT_SESSION *, WT_CURSOR *, WT_CURSOR *))__wt_cursor_notsup;

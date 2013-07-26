@@ -1041,10 +1041,15 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 			    wtext, session, (size_t)wtcursor->key.size));
 
 		/*
-		 * XXX
-		 * The underlying KVS library data fields aren't const.
+		 * A set cursor key might reference application memory, which
+		 * is only OK until the cursor operation has been called (in
+		 * other words, we can only reference application memory from
+		 * the WT_CURSOR.set_key call until the WT_CURSOR.op call).
+		 * For this reason, do a full copy, don't just reference the
+		 * WT_CURSOR key's data.
 		 */
-		r->key = (char *)wtcursor->key.data;
+		memcpy(cursor->key, wtcursor->key.data, wtcursor->key.size);
+		r->key = cursor->key;
 		r->key_len = wtcursor->key.size;
 	}
 	return (0);

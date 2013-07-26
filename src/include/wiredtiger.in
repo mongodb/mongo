@@ -417,17 +417,6 @@ struct __wt_cursor {
 
 	/*
 	 * !!!
-	 * Cursor duplicate position supports the WT_SESSION method to duplicate
-	 * a cursor.
-	 *
-	 * The method takes a WT_SESSION handle instead of a WT_SESSION_IMPL
-	 * because that's what will compile cleanly in a public header file,
-	 * and the code to make it work isn't complicated.
-	 */
-	int (*dup_position)(WT_SESSION *, WT_CURSOR *, WT_CURSOR *);
-
-	/*
-	 * !!!
 	 * Cursor range truncate is a WT_SESSION method, but it's implemented
 	 * by methods in the underlying cursors.
 	 *
