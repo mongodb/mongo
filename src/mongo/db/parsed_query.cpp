@@ -99,6 +99,11 @@ namespace mongo {
 
         _filter = _filter.getOwned();
 
+        //
+        // Parse options that are valid for both queries and commands
+        //
+
+        // $readPreference
         _hasReadPref = q.hasField(Query::ReadPrefField.name());
     }
 

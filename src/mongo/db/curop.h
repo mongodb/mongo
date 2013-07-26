@@ -175,8 +175,6 @@ namespace mongo {
         BSONObj query() const { return _query.get();  }
         void appendQuery( BSONObjBuilder& b , const StringData& name ) const { _query.append( b , name ); }
         
-        void ensureStarted();
-        bool isStarted() const { return _start > 0; }
         void enter( Client::Context * context );
         void leave( Client::Context * context );
         void reset();
@@ -200,6 +198,13 @@ namespace mongo {
 
         bool displayInCurop() const { return _active && ! _suppressFromCurop; }
         int getOp() const { return _op; }
+
+        //
+        // Methods for getting/setting elapsed time.
+        //
+
+        void ensureStarted();
+        bool isStarted() const { return _start > 0; }
         unsigned long long startTime() { // micros
             ensureStarted();
             return _start;
@@ -208,6 +213,7 @@ namespace mongo {
             _active = false;
             _end = curTimeMicros64();
         }
+
         unsigned long long totalTimeMicros() {
             massert( 12601 , "CurOp not marked done yet" , ! _active );
             return _end - startTime();
@@ -218,6 +224,7 @@ namespace mongo {
             return (int) (total / 1000);
         }
         int elapsedSeconds() { return elapsedMillis() / 1000; }
+
         void setQuery(const BSONObj& query) { _query.set( query ); }
         Client * getClient() const { return _client; }
 
