@@ -26,8 +26,7 @@ namespace mongo {
     }
 
     inline ExpressionContext::ExpressionContext(InterruptStatus *pS, const NamespaceString& ns)
-        : doingMerge(false)
-        , inShard(false)
+        : inShard(false)
         , inRouter(false)
         , extSortAllowed(false)
         , intCheckCounter(1)
@@ -47,7 +46,6 @@ namespace mongo {
 
     ExpressionContext* ExpressionContext::clone() {
         ExpressionContext* newContext = create(pStatus, getNs());
-        newContext->setDoingMerge(getDoingMerge());
         newContext->setInShard(getInShard());
         newContext->setInRouter(getInRouter());
         newContext->setExtSortAllowed(getExtSortAllowed());

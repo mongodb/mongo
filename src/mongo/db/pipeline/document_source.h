@@ -636,6 +636,9 @@ namespace mongo {
                             intrusive_ptr<Accumulator> (*pAccumulatorFactory)(),
                             const intrusive_ptr<Expression> &pExpression);
 
+        /// Tell this source if it is doing a merge from shards. Defaults to false.
+        void setDoingMerge(bool doingMerge) { _doingMerge = doingMerge; }
+
         /**
           Create a grouping DocumentSource from BSON.
 
@@ -704,6 +707,7 @@ namespace mongo {
 
         Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
 
+        bool _doingMerge;
         bool _spilled;
         const bool _extSortAllowed;
         const int _maxMemoryUsageBytes;
