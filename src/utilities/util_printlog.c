@@ -13,7 +13,6 @@ int
 util_printlog(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
-	WT_ITEM key, value;
 	int ch, printable;
 
 	printable = 0;
@@ -40,6 +39,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
+	WT_UNUSED(printable);
 	ret = __wt_log_scan((WT_SESSION_IMPL *)session,
 	    NULL, WT_LOGSCAN_FIRST, __wt_txn_printlog, stdout);
 

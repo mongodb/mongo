@@ -485,11 +485,13 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	if (!inuse) {
 		/*
 		 * We should only close the metadata file when closing the
-		 * last session (i.e., the default session for the connection).
+		 * last session (i.e., the default session for the connection)
+		 * or at the end of recovery.
 		 */
 		WT_ASSERT(session,
 		    S2BT(session) != session->metafile ||
-		    session == S2C(session)->default_session);
+		    session == S2C(session)->default_session ||
+		    F_ISSET(session, WT_SESSION_NO_LOGGING));
 
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			WT_TRET(__wt_conn_btree_sync_and_close(session));

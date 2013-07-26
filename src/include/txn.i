@@ -35,6 +35,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	WT_RET(__txn_next_op(session, &op));
 	WT_RET(__wt_key_get(cbt, &op->key, &op->recno));
 	op->upd = upd;
+	op->uri = session->dhandle->name;
 	upd->txnid = session->txn.id;
 	return (0);
 }
