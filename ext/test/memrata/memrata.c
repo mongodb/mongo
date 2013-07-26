@@ -1590,29 +1590,6 @@ update(WT_CURSOR *wtcursor, int remove_op)
 		    "kvs_set: %s", kvs_strerror(ret));
 	ws->kvscache_inuse = 1;
 
-#if 0
-	/*
-	 * WT_CURSOR::update without overwrite set (update the record if it
-	 * does exist, fail if it does not exist), maps to kvs_replace.  We
-	 * only implement the overwrite not-set path here: if overwrite was
-	 * set, we pointed the cursor update function at the insert function
-	 * when it was configured, because they're identical.
-	 */
-	if ((ret = kvs_replace(ws->kvs, &cursor->record)) != 0)
-		ERET(wtext,
-		    session, WT_ERROR, "kvs_replace: %s", kvs_strerror(ret));
-
-	return (0);
-
-	if ((ret = copyin_key(wtcursor, 0)) != 0)
-		return (ret);
-	if ((ret = kvs_del(ws->kvs, &cursor->record)) == 0)
-		return (0);
-	if (ret == KVS_E_KEY_NOT_FOUND)
-		return (cursor->config_overwrite ? 0 : WT_NOTFOUND);
-	ERET(wtext, session, WT_ERROR, "kvs_del: %s", kvs_strerror(ret));
-#endif
-
 	/* Discard the lock. */
 err:	ESET(unlock(wtext, session, &ws->lock));
 
