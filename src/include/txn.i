@@ -8,6 +8,21 @@
 static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
+static inline int
+__txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
+	    txn->mod_count + 1, &txn->mod));
+
+	*opp = &txn->mod[txn->mod_count++];
+	WT_CLEAR(**opp);
+	return (0);
+}
+
 /*
  * __wt_txn_modify --
  *	Mark a WT_UPDATE object modified by the current transaction.
@@ -15,15 +30,11 @@ static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
 {
-	WT_TXN *txn;
+	WT_TXN_OP *op;
 
-	txn = &session->txn;
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
-	WT_RET(__wt_realloc_def(
-	    session, &txn->mod_alloc, txn->mod_count + 1, &txn->mod));
-
-	txn->mod[txn->mod_count++] = id;
-	*id = txn->id;
+        WT_RET(__txn_next_op(session, &op));
+        op->id = id;
+        *id = session->txn.id;
 	return (0);
 }
 
@@ -34,15 +45,11 @@ __wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
 static inline int
 __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_TXN *txn;
+        WT_TXN_OP *op;
 
-	txn = &session->txn;
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
-	WT_RET(__wt_realloc_def(
-	    session, &txn->modref_alloc, txn->modref_count + 1, &txn->modref));
-
-	txn->modref[txn->modref_count++] = ref;
-	ref->txnid = txn->id;
+        WT_RET(__txn_next_op(session, &op));
+        op->ref = ref;
+        ref->txnid = session->txn.id;
 	return (0);
 }
 
@@ -120,7 +127,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 /*
  * __wt_txn_visible_all --
- *	Check if a given transaction ID is "globally visible".  This is, if
+ *	Check if a given transaction ID is "globally visible".	This is, if
  *	all sessions in the system will see the transaction ID.
  */
 static inline int

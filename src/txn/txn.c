@@ -268,7 +268,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn->mod_count = txn->modref_count = 0;
+	txn->mod_count = 0;
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
 
@@ -332,8 +332,7 @@ int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_TXN *txn;
-	WT_REF **rp;
-	uint64_t **m;
+	WT_TXN_OP *op;
 	u_int i;
 
 	WT_UNUSED(cfg);
@@ -343,12 +342,12 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Rollback updates. */
-	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
-		**m = WT_TXN_ABORTED;
-
-	/* Rollback fast deletes. */
-	for (i = 0, rp = txn->modref; i < txn->modref_count; i++, rp++)
-		__wt_tree_walk_delete_rollback(*rp);
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
+		if (op->id != NULL)
+			*op->id = WT_TXN_ABORTED;
+		if (op->ref != NULL)
+			__wt_tree_walk_delete_rollback(op->ref);
+	}
 
 	__wt_txn_release(session);
 	return (0);
@@ -374,7 +373,6 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	 * for eviction.
 	 */
 	txn->mod = NULL;
-	txn->modref = NULL;
 
 	txn->isolation = session->isolation;
 	return (0);
@@ -391,7 +389,6 @@ __wt_txn_destroy(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 	__wt_free(session, txn->mod);
-	__wt_free(session, txn->modref);
 	__wt_free(session, txn->snapshot);
 }
 

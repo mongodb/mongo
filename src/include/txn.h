@@ -47,6 +47,20 @@ enum __wt_txn_isolation {
 	TXN_ISO_SNAPSHOT
 };
 
+/*
+ * WT_TXN_OP --
+ *	A transactional operation.
+ */
+struct __wt_txn_op {
+	uint64_t *id;
+	WT_REF *ref;
+	int src_id;
+};
+
+/*
+ * WT_TXN --
+ *	Per-session transaction context.
+ */
 struct __wt_txn {
 	uint64_t id;
 
@@ -67,17 +81,10 @@ struct __wt_txn {
 	uint32_t last_gen;
 	uint32_t last_scan_gen;
 
-	/*
-	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
-	 * modified by this transaction.
-	 */
-	uint64_t      **mod;
+	/* Array of modifications by this transaction. */
+	WT_TXN_OP      *mod;
 	size_t		mod_alloc;
 	u_int		mod_count;
-
-	WT_REF	      **modref;
-	size_t		modref_alloc;
-	u_int		modref_count;
 
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
