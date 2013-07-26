@@ -48,6 +48,7 @@ namespace mongo {
         _command = false;
         _dbprofile = 0;
         _end = 0;
+        _maxTimeTracker.reset();
         _message = "";
         _progressMeter.finished();
         _killPending.store(0);
@@ -256,6 +257,24 @@ namespace mongo {
         }
     }
 
+    void CurOp::setMaxTimeMicros(uint64_t maxTimeMicros) {
+        if (maxTimeMicros == 0) {
+            // 0 is "allow to run indefinitely".
+            return;
+        }
+
+        // Note that calling startTime() will set CurOp::_start if it hasn't been set yet.
+        _maxTimeTracker.setTimeLimit(startTime(), maxTimeMicros);
+    }
+
+    bool CurOp::maxTimeHasExpired() {
+        return _maxTimeTracker.checkTimeLimit();
+    }
+
+    uint64_t CurOp::getRemainingMaxTimeMicros() const {
+        return _maxTimeTracker.getRemainingMicros();
+    }
+
     AtomicUInt CurOp::_nextOpNum;
 
     static Counter64 returnedCounter;
@@ -297,4 +316,76 @@ namespace mongo {
         if ( fastmod )
             fastmodCounter.increment();
     }
+
+    CurOp::MaxTimeTracker::MaxTimeTracker() {
+        reset();
+    }
+
+    void CurOp::MaxTimeTracker::reset() {
+        _enabled = false;
+        _targetEpochMicros = 0;
+        _approxTargetServerMillis = 0;
+    }
+
+    void CurOp::MaxTimeTracker::setTimeLimit(uint64_t startEpochMicros, uint64_t durationMicros) {
+        dassert(durationMicros != 0);
+
+        _enabled = true;
+
+        _targetEpochMicros = startEpochMicros + durationMicros;
+
+        uint64_t now = curTimeMicros64();
+        // If our accurate time source thinks time is not up yet, calculate the next target for
+        // our approximate time source.
+        if (_targetEpochMicros > now) {
+            _approxTargetServerMillis = Listener::getElapsedTimeMillis() +
+                                        static_cast<int64_t>((_targetEpochMicros - now) / 1000);
+        }
+        // Otherwise, set our approximate time source target such that it thinks time is already
+        // up.
+        else {
+            _approxTargetServerMillis = Listener::getElapsedTimeMillis();
+        }
+    }
+
+    bool CurOp::MaxTimeTracker::checkTimeLimit() {
+        if (!_enabled) {
+            return false;
+        }
+
+        // Does our approximate time source think time is not up yet?  If so, return early.
+        if (_approxTargetServerMillis > Listener::getElapsedTimeMillis()) {
+            return false;
+        }
+
+        uint64_t now = curTimeMicros64();
+        // Does our accurate time source think time is not up yet?  If so, readjust the target for
+        // our approximate time source and return early.
+        if (_targetEpochMicros > now) {
+            _approxTargetServerMillis = Listener::getElapsedTimeMillis() +
+                                        static_cast<int64_t>((_targetEpochMicros - now) / 1000);
+            return false;
+        }
+
+        // Otherwise, time is up.
+        return true;
+    }
+
+    uint64_t CurOp::MaxTimeTracker::getRemainingMicros() const {
+        if (!_enabled) {
+            // 0 is "allow to run indefinitely".
+            return 0;
+        }
+
+        // Does our accurate time source think time is up?  If so, claim there is 1 microsecond
+        // left for this operation.
+        uint64_t now = curTimeMicros64();
+        if (_targetEpochMicros <= now) {
+            return 1;
+        }
+
+        // Otherwise, calculate remaining time.
+        return _targetEpochMicros - now;
+    }
+
 }

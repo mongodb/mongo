@@ -200,6 +200,34 @@ namespace mongo {
         int getOp() const { return _op; }
 
         //
+        // Methods for controlling CurOp "max time".
+        //
+
+        /**
+         * Sets the amount of time operation this should be allowed to run, units of microseconds.
+         * The special value 0 is "allow to run indefinitely".
+         */
+        void setMaxTimeMicros(uint64_t maxTimeMicros);
+
+        /**
+         * Checks whether this operation has been running longer than its time limit.  Returns
+         * false if not, or if the operation has no time limit.
+         *
+         * Note that KillCurrentOp objects are responsible for interrupting CurOp objects that
+         * have exceeded their allotted time; CurOp objects do not interrupt themselves.
+         */
+        bool maxTimeHasExpired();
+
+        /**
+         * Returns the number of microseconds remaining for this operation's time limit, or the
+         * special value 0 if the operation has no time limit.
+         *
+         * Calling this method is more expensive than calling its sibling "maxTimeHasExpired()",
+         * since an accurate measure of remaining time needs to be calculated.
+         */
+        uint64_t getRemainingMaxTimeMicros() const;
+
+        //
         // Methods for getting/setting elapsed time.
         //
 
@@ -299,5 +327,51 @@ namespace mongo {
         // a writebacklisten for example will block for 30s 
         // so this should be 30000 in that case
         long long _expectedLatencyMs; 
+
+        /** Nested class that implements a time limit ($maxTimeMS) for a CurOp object. */
+        class MaxTimeTracker {
+            MONGO_DISALLOW_COPYING(MaxTimeTracker);
+        public:
+            /** Newly-constructed MaxTimeTracker objects have the time limit disabled. */
+            MaxTimeTracker();
+
+            /** Disables the time limit. */
+            void reset();
+
+            /**
+             * Enables the time limit to be "durationMicros" microseconds from "startEpochMicros"
+             * (units of microseconds since the epoch).
+             *
+             * "durationMicros" must be nonzero.
+             */
+            void setTimeLimit(uint64_t startEpochMicros, uint64_t durationMicros);
+
+            /**
+             * Checks whether the time limit has been hit.  Returns false if not, or if the time
+             * limit is disabled.
+             */
+            bool checkTimeLimit();
+
+            /**
+             * Returns the number of microseconds remaining for the time limit, or the special
+             * value 0 if the time limit is disabled.
+             *
+             * Calling this method is more expensive than calling its sibling "checkInterval()",
+             * since an accurate measure of remaining time needs to be calculated.
+             */
+            uint64_t getRemainingMicros() const;
+        private:
+            // Whether or not this operation is subject to a time limit.
+            bool _enabled;
+
+            // Point in time at which the time limit is hit.  Units of microseconds since the
+            // epoch.
+            uint64_t _targetEpochMicros;
+
+            // Approximate point in time at which the time limit is hit.   Units of milliseconds
+            // since the server process was started.
+            int64_t _approxTargetServerMillis;
+        } _maxTimeTracker;
+
     };
 }

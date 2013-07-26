@@ -114,6 +114,11 @@ namespace mongo {
         if (_globalKill) {
             uasserted(11600, "interrupted at shutdown");
         }
+        if (c.curop()->maxTimeHasExpired()) {
+            c.curop()->kill();
+            notifyAllWaiters();
+            uasserted(16986, "operation exceeded time limit");
+        }
         if (c.curop()->killPending()) {
             notifyAllWaiters();
             uasserted(11601, "operation was interrupted");
@@ -125,6 +130,10 @@ namespace mongo {
 
         if (_globalKill) {
             return "interrupted at shutdown";
+        }
+        if (c.curop()->maxTimeHasExpired()) {
+            c.curop()->kill();
+            return "exceeded time limit";
         }
         if (c.curop()->killPending()) {
             return "interrupted";
