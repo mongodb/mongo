@@ -104,24 +104,31 @@ namespace mongo {
         _condvar.notify_all();
     }
 
-    void KillCurrentOp::checkForInterrupt( bool heedMutex ) {
+    void KillCurrentOp::checkForInterrupt(bool heedMutex) {
         Client& c = cc();
-        if ( heedMutex && Lock::somethingWriteLocked() && c.hasWrittenThisPass() )
+
+        if (heedMutex && Lock::somethingWriteLocked() && c.hasWrittenThisPass()) {
             return;
-        if( _globalKill )
-            uasserted(11600,"interrupted at shutdown");
-        if( c.curop()->killPending() ) {
+        }
+
+        if (_globalKill) {
+            uasserted(11600, "interrupted at shutdown");
+        }
+        if (c.curop()->killPending()) {
             notifyAllWaiters();
-            uasserted(11601,"operation was interrupted");
+            uasserted(11601, "operation was interrupted");
         }
     }
     
     const char * KillCurrentOp::checkForInterruptNoAssert() {
         Client& c = cc();
-        if( _globalKill )
+
+        if (_globalKill) {
             return "interrupted at shutdown";
-        if( c.curop()->killPending() )
+        }
+        if (c.curop()->killPending()) {
             return "interrupted";
+        }
         return "";
     }
 

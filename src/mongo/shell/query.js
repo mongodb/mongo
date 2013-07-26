@@ -161,17 +161,19 @@ DBQuery.prototype.toArray = function(){
     return a;
 }
 
-DBQuery.prototype.count = function( applySkipLimit ){
+DBQuery.prototype.count = function( applySkipLimit ) {
     var cmd = { count: this._collection.getName() };
-    if ( this._query ){
-        if ( this._special )
+    if ( this._query ) {
+        if ( this._special ) {
             cmd.query = this._query.query;
-        else 
+        }
+        else {
             cmd.query = this._query;
+        }
     }
     cmd.fields = this._fields || {};
 
-    if ( applySkipLimit ){
+    if ( applySkipLimit ) {
         if ( this._limit )
             cmd.limit = this._limit;
         if ( this._skip )
