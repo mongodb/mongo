@@ -161,7 +161,7 @@ namespace mongo {
                 /* we've determined this "object" is an operator expression */
                 kind = OPERATOR;
 
-                pExpression = parseExpression(pFieldName, &fieldElement);
+                pExpression = parseExpression(fieldElement);
             }
             else {
                 uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at '" <<
@@ -294,33 +294,33 @@ namespace mongo {
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
 
-    intrusive_ptr<Expression> Expression::parseExpression(
-        const char *pOpName, BSONElement *pBsonElement) {
+    intrusive_ptr<Expression> Expression::parseExpression(BSONElement exprElement) {
         /* look for the specified operator */
+        const char* opName = exprElement.fieldName();
 
-        if (str::equals(pOpName, "$const")) {
-            return ExpressionConstant::createFromBsonElement(pBsonElement);
+        if (str::equals(opName, "$const")) {
+            return ExpressionConstant::createFromBsonElement(&exprElement);
         }
-        else if (str::equals(pOpName, "$let")) {
-            return ExpressionLet::parse(*pBsonElement);
+        else if (str::equals(opName, "$let")) {
+            return ExpressionLet::parse(exprElement);
         }
-        else if (str::equals(pOpName, "$map")) {
-            return ExpressionMap::parse(*pBsonElement);
+        else if (str::equals(opName, "$map")) {
+            return ExpressionMap::parse(exprElement);
         }
 
         OpDesc key;
-        key.pName = pOpName;
+        key.pName = opName;
         const OpDesc *pOp = (const OpDesc *)bsearch(
                                 &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
 
         uassert(15999, str::stream() << "invalid operator '" <<
-                pOpName << "'", pOp);
+                opName << "'", pOp);
 
         /* make the expression node */
         intrusive_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
 
         /* add the operands to the expression node */
-        BSONType elementType = pBsonElement->type();
+        BSONType elementType = exprElement.type();
 
         if (pOp->flag & OpDesc::FIXED_COUNT) {
             if (pOp->argCount > 1)
@@ -335,15 +335,13 @@ namespace mongo {
                     " operator does not accept an object as an operand",
                     pOp->flag & OpDesc::OBJECT_ARG);
 
-            BSONObj objOperand(pBsonElement->Obj());
+            BSONObj objOperand(exprElement.Obj());
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            intrusive_ptr<Expression> pOperand(
-                Expression::parseObject(pBsonElement, &oCtx));
-            pExpression->addOperand(pOperand);
+            pExpression->addOperand(Expression::parseObject(&exprElement, &oCtx));
         }
         else if (elementType == Array) {
             /* multiple operands - an n-ary operator */
-            vector<BSONElement> bsonArray(pBsonElement->Array());
+            vector<BSONElement> bsonArray(exprElement.Array());
             const size_t n = bsonArray.size();
 
             if (pOp->flag & OpDesc::FIXED_COUNT) {
@@ -366,9 +364,7 @@ namespace mongo {
                         " operator requires an array of " << pOp->argCount <<
                         " operands", pOp->argCount == 1);
 
-            intrusive_ptr<Expression> pOperand(
-                Expression::parseOperand(pBsonElement));
-            pExpression->addOperand(pOperand);
+            pExpression->addOperand(Expression::parseOperand(&exprElement));
         }
 
         return pExpression;

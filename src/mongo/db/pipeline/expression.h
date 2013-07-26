@@ -161,13 +161,8 @@ namespace mongo {
         /*
           Parse a BSONElement Object which has already been determined to be
           functional expression.
-
-          @param pOpName the name of the (prefix) operator
-          @param pBsonElement the BSONElement to parse
-          @returns the parsed Expression
         */
-        static intrusive_ptr<Expression> parseExpression(
-            const char *pOpName, BSONElement *pBsonElement);
+        static intrusive_ptr<Expression> parseExpression(BSONElement exprElement);
 
 
         /*
