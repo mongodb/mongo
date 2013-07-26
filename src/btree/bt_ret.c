@@ -8,6 +8,46 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_key_get --
+ *	Get a reference to the current key.
+ */
+int
+__wt_key_get(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t *recnop)
+{
+	WT_PAGE *page;
+	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	page = cbt->page;
+
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		*recnop = cbt->recno;
+		break;
+	case WT_PAGE_ROW_LEAF:
+		rip = &page->u.row.d[cbt->slot];
+
+		/*
+		 * If the cursor references a WT_INSERT item, take the key from
+		 * there.  Otherwise, take the key from the original page, and
+		 * the value from any related WT_UPDATE item, or the page if
+		 * the key was never updated.
+		 */
+		if (cbt->ins != NULL) {
+			key->data = WT_INSERT_KEY(cbt->ins);
+			key->size = WT_INSERT_KEY_SIZE(cbt->ins);
+		} else
+			WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	return (0);
+}
+
+/*
  * __wt_kv_return --
  *	Return a page referenced key/value pair to the application.
  */

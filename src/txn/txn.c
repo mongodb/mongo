@@ -300,6 +300,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_TXN *txn;
 
 	WT_UNUSED(cfg);
@@ -309,6 +310,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
+
+	if (S2C(session)->logging &&
+	    (ret = __wt_txn_log_commit(session, cfg)) != 0) {
+		WT_TRET(__wt_txn_rollback(session, cfg));
+		return (ret);
+	}
 
 	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the
@@ -343,8 +350,8 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Rollback updates. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
-		if (op->id != NULL)
-			*op->id = WT_TXN_ABORTED;
+		if (op->upd != NULL)
+			op->upd->txnid = WT_TXN_ABORTED;
 		if (op->ref != NULL)
 			__wt_tree_walk_delete_rollback(op->ref);
 	}

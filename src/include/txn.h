@@ -52,7 +52,9 @@ enum __wt_txn_isolation {
  *	A transactional operation.
  */
 struct __wt_txn_op {
-	uint64_t *id;
+	WT_UPDATE *upd;
+	WT_ITEM key;
+	uint64_t recno;
 	WT_REF *ref;
 	int src_id;
 };

@@ -28,13 +28,14 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
-__wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
+__wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
 	WT_TXN_OP *op;
 
-        WT_RET(__txn_next_op(session, &op));
-        op->id = id;
-        *id = session->txn.id;
+	WT_RET(__txn_next_op(session, &op));
+	WT_RET(__wt_key_get(cbt, &op->key, &op->recno));
+	op->upd = upd;
+	upd->txnid = session->txn.id;
 	return (0);
 }
 
@@ -45,11 +46,11 @@ __wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
 static inline int
 __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-        WT_TXN_OP *op;
+	WT_TXN_OP *op;
 
-        WT_RET(__txn_next_op(session, &op));
-        op->ref = ref;
-        ref->txnid = session->txn.id;
+	WT_RET(__txn_next_op(session, &op));
+	op->ref = ref;
+	ref->txnid = session->txn.id;
 	return (0);
 }
 

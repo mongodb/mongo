@@ -37,6 +37,7 @@ static int __curtable_update(WT_CURSOR *cursor);
 		F_SET(*__cp, WT_CURSTD_KEY_APP |			\
 		    WT_CURSTD_VALUE_APP);				\
 		WT_ERR((*__cp)->f(*__cp));				\
+		WT_ERR((*__cp)->reset(*__cp));				\
 	}								\
 } while (0)
 

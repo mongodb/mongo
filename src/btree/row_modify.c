@@ -71,7 +71,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
-		WT_ERR(__wt_txn_modify(session, &upd->txnid));
+		WT_ERR(__wt_txn_modify(session, cbt, upd));
 		logged = 1;
 
 		/* Serialize the update. */
@@ -138,7 +138,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		WT_ERR(__wt_row_insert_alloc(
 		    session, key, skipdepth, &ins, &ins_size));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
-		WT_ERR(__wt_txn_modify(session, &upd->txnid));
+		WT_ERR(__wt_txn_modify(session, cbt, upd));
 		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
