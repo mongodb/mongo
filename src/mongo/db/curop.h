@@ -219,9 +219,11 @@ namespace mongo {
             return _end - startTime();
         }
         int totalTimeMillis() { return (int) (totalTimeMicros() / 1000); }
+        unsigned long long elapsedMicros() {
+            return curTimeMicros64() - startTime();
+        }
         int elapsedMillis() {
-            unsigned long long total = curTimeMicros64() - startTime();
-            return (int) (total / 1000);
+            return (int) (elapsedMicros() / 1000);
         }
         int elapsedSeconds() { return elapsedMillis() / 1000; }
 
