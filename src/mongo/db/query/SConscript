@@ -13,3 +13,23 @@ env.StaticLibrary(
         "$BUILD_DIR/mongo/db/exec/exec"
     ],
 )
+
+env.StaticLibrary(
+    target = "index_bounds",
+    source = [
+        "index_bounds.cpp",
+    ],
+    LIBDEPS = [
+        "$BUILD_DIR/mongo/bson",
+    ],
+)
+
+env.CppUnitTest(
+    target = "index_bounds_test",
+    source = [
+        "index_bounds_test.cpp"
+    ],
+    LIBDEPS = [
+        "index_bounds",
+    ],
+)
