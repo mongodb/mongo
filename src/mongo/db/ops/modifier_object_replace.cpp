@@ -19,6 +19,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/log_builder.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -69,19 +70,20 @@ namespace mongo {
 
     Status ModifierObjectReplace::init(const BSONElement& modExpr) {
 
-        // TODO: Check for ok for storage here.
-
         if (modExpr.type() != Object) {
-            return Status(ErrorCodes::BadValue, "object replace expects full object");
+            return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                          "object replace expects full object but type was " << modExpr.type());
+        }
+
+        if (!modExpr.embeddedObject().okForStorageAsRoot()) {
+            return Status(ErrorCodes::BadValue, "not okForStorage: "
+                                                " the document has invalid fields");
         }
 
         BSONObjIterator it(modExpr.embeddedObject());
-        while (it.moreWithEOO()) {
+        while (it.more()) {
             BSONElement elem = it.next();
-            if (elem.eoo()) {
-                break;
-            }
-            else if (*elem.fieldName() == '$') {
+            if (*elem.fieldName() == '$') {
                 return Status(ErrorCodes::BadValue, "can't mix modifiers and non-modifiers");
             }
         }
@@ -115,9 +117,17 @@ namespace mongo {
         // Remove the contents of the provided doc.
         mutablebson::Document& doc = _preparedState->doc;
         mutablebson::Element current = doc.root().leftChild();
+        mutablebson::Element srcIdElement = doc.end();
         while (current.ok()) {
             mutablebson::Element toRemove = current;
             current = current.rightSibling();
+
+            // Skip _id field element -- it should not change
+            if (toRemove.getFieldName() == "_id") {
+                srcIdElement = toRemove;
+                continue;
+            }
+
             Status status = toRemove.remove();
             if (!status.isOK()) {
                 return status;
@@ -125,13 +135,30 @@ namespace mongo {
         }
 
         // Insert the provided contents instead.
+        BSONElement dstIdElement;
         BSONObjIterator it(_val);
         while (it.more()) {
             BSONElement elem = it.next();
+            if (elem.fieldNameStringData() == "_id") {
+                dstIdElement = elem;
+
+                // Do not duplicate _id field
+                if (srcIdElement.ok()) {
+                    continue;
+                }
+            }
+
             Status status = doc.root().appendElement(elem);
             if (!status.isOK()) {
                 return status;
             }
+        }
+
+        // Error if the _id changed
+        if (srcIdElement.ok() && !dstIdElement.eoo() &&
+            (srcIdElement.compareWithBSONElement(dstIdElement) != 0)) {
+
+            return Status(ErrorCodes::CannotMutateObject, "The _id field cannot be changed");
         }
 
         return Status::OK();
