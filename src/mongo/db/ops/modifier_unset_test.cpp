@@ -414,5 +414,25 @@ namespace {
         ASSERT_EQUALS(fromjson("{$unset: {'a.0.b': 1}}"), logDoc);
     }
 
+    TEST(LegacyData, CanUnsetInvalidField) {
+        Document doc(fromjson("{b:1, a:[{$b:1}]}"));
+        Mod modUnset(fromjson("{$unset: {'a.$.$b': 1}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(modUnset.prepare(doc.root(), "0", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0.$b");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(modUnset.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{b:1, a:[{}]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(modUnset.log(&logBuilder));
+        ASSERT_EQUALS(fromjson("{$unset: {'a.0.$b': 1}}"), logDoc);
+    }
+
 
 } // unnamed namespace

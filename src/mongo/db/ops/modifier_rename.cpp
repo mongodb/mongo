@@ -69,25 +69,18 @@ namespace mongo {
         }
 
         // Extract the field names from the mod expression
+
         _fromFieldRef.parse(modExpr.fieldName());
+        // The 'from' field is checked with legacy so that we can rename away from malformed values.
+        Status status = fieldchecker::isUpdatableLegacy(_fromFieldRef);
+        if (!status.isOK())
+            return status;
+
         _toFieldRef.parse(modExpr.String());
-
-        for (int i = 0; i < 2; i++) {
-
-            // 0 - to field, 1 - from field
-            const FieldRef& field = i ? _fromFieldRef : _toFieldRef;
-
-            size_t numParts = field.numParts();
-            if (numParts == 0) {
-                return Status(ErrorCodes::BadValue, "empty field name");
-            }
-
-            // Not all well-formed fields can be updated. For instance, '_id' can't be touched.
-            Status status = fieldchecker::isUpdatable(field);
-            if (! status.isOK()) {
-                return status;
-            }
-        }
+        // The 'to' field is checked normally so we can't create new malformed values.
+        status = fieldchecker::isUpdatable(_toFieldRef);
+        if (!status.isOK())
+            return status;
 
         // TODO: Remove this restriction and make a noOp to lift restriction
         // Old restriction is that if the fields are the same then it is not allowed.

@@ -26,44 +26,77 @@ namespace mongo {
 
 namespace fieldchecker {
 
-    Status basicIsUpdatable(const FieldRef& field) {
-        size_t numParts = field.numParts();
-        if (numParts == 0) {
-            return Status(ErrorCodes::BadValue, "cannot update anempty field name");
-        }
+    namespace {
 
-        for (size_t i = 0; i < numParts; i++) {
-            if (field.getPart(i).empty()) {
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() << field.dottedField()
-                                                        << " contains empty fields");
+        Status isUpdatable(const FieldRef& field, bool legacy) {
+            const size_t numParts = field.numParts();
+
+            if (numParts == 0) {
+                return Status(ErrorCodes::BadValue, "cannot update an empty field name");
             }
+
+            for (size_t i = 0; i != numParts; ++i) {
+                const StringData part = field.getPart(i);
+
+                if ((i == 0) && part.compare("_id") == 0) {
+                    return Status(ErrorCodes::BadValue,
+                                  "update cannot affect the _id");
+                }
+
+                if (part.empty()) {
+                    return Status(ErrorCodes::BadValue,
+                                  mongoutils::str::stream() << field.dottedField()
+                                  << " contains empty fields");
+                }
+
+                if (!legacy && (part[0] == '$')) {
+
+                    // A 'bare' dollar sign not in the first position is a positional
+                    // update token, so it is not an error.
+                    //
+                    // TODO: In 'isPositional' below, we redo a very similar walk and check.
+                    // Perhaps we should fuse these operations, and have isUpdatable take a
+                    // 'PositionalContext' object to be populated with information about any
+                    // discovered positional ops.
+                    const bool positional = ((i != 0) && (part.size() == 1));
+
+                    if (!positional) {
+
+                        // We ignore the '$'-prefixed names that are part of a DBRef, because
+                        // we don't have enough context here to validate that we have a proper
+                        // DB ref. Errors with the DBRef will be caught upstream when
+                        // okForStorage is invoked.
+                        //
+                        // TODO: We need to find a way to consolidate this checking with that
+                        // done in okForStorage. There is too much duplication between this
+                        // code and that code.
+                        const bool mightBePartOfDbRef =
+                            part.startsWith("$db") ||
+                            part.startsWith("$id") ||
+                            part.startsWith("$ref");
+
+                        if (!mightBePartOfDbRef)
+                            return Status(ErrorCodes::BadValue,
+                                          mongoutils::str::stream() << field.dottedField()
+                                          << " contains field names with leading '$' character");
+
+                    }
+
+                }
+
+            }
+
+            return Status::OK();
         }
 
-        StringData firstPart = field.getPart(0);
-        if (firstPart.compare("_id") == 0) {
-            return Status(ErrorCodes::BadValue, "updated cannot affect the _id");
-        }
-
-        return Status::OK();
-    }
+    } // namespace
 
     Status isUpdatable(const FieldRef& field) {
-        Status status = basicIsUpdatable(field);
-        if (! status.isOK()) {
-            return status;
-        }
-
-        StringData firstPart = field.getPart(0);
-        if (firstPart[0] == '$') {
-            return Status(ErrorCodes::BadValue, "field name cannot start with $");
-        }
-
-        return Status::OK();
+        return isUpdatable(field, false);
     }
 
     Status isUpdatableLegacy(const FieldRef& field) {
-        return basicIsUpdatable(field);
+        return isUpdatable(field, true);
     }
 
     bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {

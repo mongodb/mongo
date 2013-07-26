@@ -69,7 +69,7 @@ namespace mongo {
         // Break down the field name into its 'dotted' components (aka parts) and check that
         // there are no empty parts.
         _fieldRef.parse(modExpr.fieldName());
-        Status status = fieldchecker::isUpdatable(_fieldRef);
+        Status status = fieldchecker::isUpdatableLegacy(_fieldRef);
         if (! status.isOK()) {
             return status;
         }

@@ -51,6 +51,10 @@ namespace {
         fieldRefDot.parse(".");
         ASSERT_NOT_OK(isUpdatable(fieldRefDot));
 
+        FieldRef fieldRefDollar;
+        fieldRefDollar.parse("$");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDollar));
+
         FieldRef fieldRefADot;
         fieldRefADot.parse("a.");
         ASSERT_NOT_OK(isUpdatable(fieldRefADot));
@@ -101,10 +105,28 @@ namespace {
         ASSERT_NOT_OK(isUpdatable(fieldRefDollar));
     }
 
+    TEST(IsUpdatable, DollarPrefixedDeepFields) {
+        FieldRef fieldRefLateDollar;
+        fieldRefLateDollar.parse("a.$b");
+        ASSERT_NOT_OK(isUpdatable(fieldRefLateDollar));
+    }
+
+    TEST(IsUpdatable, DBRefNamesAreIgnored) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("$id.$ref.$db");
+        ASSERT_OK(isUpdatable(fieldRefDBRef));
+    }
+
     TEST(IsUpdatableLegacy, Basics) {
         FieldRef fieldRefDollar;
         fieldRefDollar.parse("$foo");
         ASSERT_OK(isUpdatableLegacy(fieldRefDollar));
+    }
+
+    TEST(IsUpdatableLegacy, DollarPrefixedDeepFields) {
+        FieldRef fieldRefLateDollar;
+        fieldRefLateDollar.parse("a.$b");
+        ASSERT_OK(isUpdatableLegacy(fieldRefLateDollar));
     }
 
     TEST(isPositional, EntireArrayItem) {
