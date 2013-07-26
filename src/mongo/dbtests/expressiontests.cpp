@@ -2739,8 +2739,7 @@ namespace ExpressionTests {
                 void run() {
                     BSONObj specObject = spec();
                     BSONElement specElement = specObject.firstElement();
-                    intrusive_ptr<Expression> expression =
-                            Expression::parseExpression( specElement.fieldName(), &specElement );
+                    intrusive_ptr<Expression> expression = Expression::parseExpression(specElement);
                     ASSERT_EQUALS( constify( expectedBson() ), expressionToBson( expression ) );
                 }
             protected:
@@ -2754,9 +2753,7 @@ namespace ExpressionTests {
                 void run() {
                     BSONObj specObject = spec();
                     BSONElement specElement = specObject.firstElement();
-                    ASSERT_THROWS( Expression::parseExpression
-                                    ( specElement.fieldName(), &specElement ),
-                                   UserException );
+                    ASSERT_THROWS(Expression::parseExpression(specElement), UserException);
                 }
             protected:
                 virtual BSONObj spec() = 0;
