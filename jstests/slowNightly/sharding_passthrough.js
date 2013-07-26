@@ -90,7 +90,8 @@ files.forEach(function(x) {
         'shellkillop|' +
         'update4|' +
         'update_setOnInsert|' +
-        'profile\\d*' +
+        'profile\\d*|' +
+        'max_time_ms' + // Will be fixed when SERVER-2212 is resolved.
         ')\.js$');
 
     // These aren't supposed to get run under sharding:

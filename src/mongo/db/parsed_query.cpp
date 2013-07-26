@@ -105,6 +105,23 @@ namespace mongo {
 
         // $readPreference
         _hasReadPref = q.hasField(Query::ReadPrefField.name());
+
+        // $maxTimeMS
+        BSONElement maxTimeMSElt = q.getField("$maxTimeMS");
+        if (!maxTimeMSElt.eoo()) {
+            uassert(16987,
+                    mongoutils::str::stream() <<
+                        "$maxTimeMS must be a number type, instead found type: " <<
+                        maxTimeMSElt.type(),
+                    maxTimeMSElt.isNumber());
+        }
+        // If $maxTimeMS was not specified, _maxTimeMS is set to 0 (special value for "allow to
+        // run indefinitely").
+        long long maxTimeMSLongLong = maxTimeMSElt.safeNumberLong();
+        uassert(16988,
+                "$maxTimeMS out of range [0,2147483647]",
+                maxTimeMSLongLong >= 0 && maxTimeMSLongLong <= INT_MAX);
+        _maxTimeMS = static_cast<int>(maxTimeMSLongLong);
     }
 
     void ParsedQuery::_reset() {
