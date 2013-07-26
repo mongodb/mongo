@@ -1228,10 +1228,8 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 
 cache_clean:
 	/* Get the next/prev entry from the store. */
-	if ((ret = kvs_call(wtcursor, fname, ws->kvs, f)) == 0) {
-		if ((ret = copyout_val(wtcursor, NULL)) != 0)
-			return (ret);
-	} else if (ret != WT_NOTFOUND)
+	ret = kvs_call(wtcursor, fname, ws->kvs, f);
+	if (ret != 0 && ret != WT_NOTFOUND)
 		return (ret);
 
 	/* If no entries in either the cache or the primary, we're done. */
