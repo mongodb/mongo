@@ -806,21 +806,20 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
-        DocumentSourceOut(StringData outputCollection,
+        DocumentSourceOut(const NamespaceString& outputNs,
                           const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         // Sets _tempsNs and prepares it to receive data.
-        void prepTempCollection(const string& finalNs);
+        void prepTempCollection();
 
         bool _done;
 
         NamespaceString _tempNs; // output goes here as it is being processed.
-        const string _outputCollection; // output will go here after all data is processed.
+        const NamespaceString _outputNs; // output will go here after all data is processed.
 
-        // These fields are injected by PipelineD. This division of labor allows the
+        // This field is injected by PipelineD. This division of labor allows the
         // DocumentSourceOut class to be linked into both mongos and mongod while
         // allowing it to use DBDirectClient when in mongod.
-        string _db;
         boost::scoped_ptr<DBClientBase> _conn; // either NULL or a DBDirectClient
         friend class PipelineD;
     };
@@ -1217,7 +1216,7 @@ namespace mongo {
         DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         void parseOptions(BSONObj options);
-        BSONObj buildGeoNearCmd(const StringData& collection) const;
+        BSONObj buildGeoNearCmd() const;
         void runCommand();
 
         // These fields describe the command to run.
@@ -1233,11 +1232,9 @@ namespace mongo {
         scoped_ptr<FieldPath> includeLocs;
         bool uniqueDocs;
 
-        // These fields are injected by PipelineD. This division of labor allows the
+        // This field is injected by PipelineD. This division of labor allows the
         // DocumentSourceGeoNear class to be linked into both mongos and mongod while
         // allowing it to run a command using DBDirectClient when in mongod.
-        string db;
-        string collection;
         boost::scoped_ptr<DBClientWithCommands> client; // either NULL or a DBDirectClient
         friend class PipelineD;
 

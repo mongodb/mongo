@@ -25,14 +25,15 @@ namespace mongo {
     ExpressionContext::~ExpressionContext() {
     }
 
-    inline ExpressionContext::ExpressionContext(InterruptStatus *pS):
-        doingMerge(false),
-        inShard(false),
-        inRouter(false),
-        extSortAllowed(false),
-        intCheckCounter(1),
-        pStatus(pS) {
-    }
+    inline ExpressionContext::ExpressionContext(InterruptStatus *pS, const NamespaceString& ns)
+        : doingMerge(false)
+        , inShard(false)
+        , inRouter(false)
+        , extSortAllowed(false)
+        , intCheckCounter(1)
+        , pStatus(pS)
+        , _ns(ns)
+    {}
 
     void ExpressionContext::checkForInterrupt() {
         /*
@@ -45,15 +46,17 @@ namespace mongo {
     }
 
     ExpressionContext* ExpressionContext::clone() {
-        ExpressionContext* newContext = create(pStatus);
+        ExpressionContext* newContext = create(pStatus, getNs());
         newContext->setDoingMerge(getDoingMerge());
         newContext->setInShard(getInShard());
         newContext->setInRouter(getInRouter());
+        newContext->setExtSortAllowed(getExtSortAllowed());
         return newContext;
     }
 
-    ExpressionContext *ExpressionContext::create(InterruptStatus *pStatus) {
-        return new ExpressionContext(pStatus);
+    ExpressionContext *ExpressionContext::create(InterruptStatus *pStatus,
+                                                 const NamespaceString& ns) {
+        return new ExpressionContext(pStatus, ns);
     }
 
 }

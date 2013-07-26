@@ -104,7 +104,8 @@ namespace DocumentSourceTests {
         public:
             Base() :
                 CollectionBase(),
-                _ctx( ExpressionContext::create( &InterruptStatusMongod::status ) ) {
+                _ctx(ExpressionContext::create(&InterruptStatusMongod::status,
+                                               NamespaceString(ns))) {
             }
         protected:
             void createSource() {
@@ -415,7 +416,8 @@ namespace DocumentSourceTests {
                 BSONObj namedSpec = BSON( "$group" << spec );
                 BSONElement specElement = namedSpec.firstElement();
                 intrusive_ptr<ExpressionContext> expressionContext =
-                        ExpressionContext::create( &InterruptStatusMongod::status );
+                        ExpressionContext::create(&InterruptStatusMongod::status,
+                                                  NamespaceString(ns));
                 if ( inShard ) {
                     expressionContext->setInShard( true );
                 }
