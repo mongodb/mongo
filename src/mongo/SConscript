@@ -188,6 +188,11 @@ env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
                 LIBDEPS=['mongocommon'],
                 NO_CRUTCH=True)
 
+env.CppUnitTest('curop_test',
+                ['db/curop_test.cpp'],
+                LIBDEPS=['serveronly', 'coredb', 'coreserver'],
+                NO_CRUTCH=True)
+
 env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
 
 env.StaticLibrary('synchronization', [ 'util/concurrency/synchronization.cpp' ])
