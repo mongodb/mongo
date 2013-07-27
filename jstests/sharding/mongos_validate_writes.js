@@ -4,7 +4,8 @@
 // Note that this is *unsafe* with broadcast removes and updates
 //
 
-var st = new ShardingTest({ shards : 2, mongos : 3, other : { separateConfig : true } })
+var st = new ShardingTest({ shards : 2, mongos : 3, other : { separateConfig : true,
+                                                              shardOptions : { verbose : 2 } } });
 st.stopBalancer()
 
 var mongos = st.s0
