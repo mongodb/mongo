@@ -456,7 +456,7 @@ namespace {
         chunk.setMax( BSON("a" << 20) );
 
         string errMsg;
-        const ChunkVersion zeroVersion( 0, 0, OID() );
+        const ChunkVersion zeroVersion( 0, 0, getCollMetadata().getShardVersion().epoch() );
         scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMinusChunk( chunk,
                                                                                   zeroVersion,
                                                                                   &errMsg ) );
@@ -719,7 +719,7 @@ namespace {
         chunk.setMax( BSON("a" << 50 << "b" << 0) );
 
         string errMsg;
-        ChunkVersion version( 1, 0, OID() );
+        ChunkVersion version( 1, 0, getCollMetadata().getShardVersion().epoch() );
         scoped_ptr<CollectionMetadata> cloned( getCollMetadata().clonePlusChunk( chunk,
                                                                                  version,
                                                                                  &errMsg ) );
