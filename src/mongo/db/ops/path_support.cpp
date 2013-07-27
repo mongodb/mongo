@@ -130,7 +130,10 @@ namespace pathsupport {
             *idxFound = i - 1;
             *elemFound = prev;
             return Status(ErrorCodes::PathNotViable,
-                          "cannot use the part to traverse the document");
+                          mongoutils::str::stream() << "cannot use the part (" <<
+                          prefix.getPart(i-1) << " of " << prefix.dottedField() <<
+                          ") to traverse the element ({" <<
+                          curr.toString() << "})");
         }
         else if (curr.ok()) {
             *idxFound = i - 1;
