@@ -1043,10 +1043,6 @@ int _main( int argc, char* argv[], char **envp ) {
 #ifdef _WIN32
 int wmain( int argc, wchar_t* argvW[] ) {
     static mongo::StaticObserver staticObserver;
-    UINT initialConsoleInputCodePage = GetConsoleCP();
-    UINT initialConsoleOutputCodePage = GetConsoleOutputCP();
-    SetConsoleCP( CP_UTF8 );
-    SetConsoleOutputCP( CP_UTF8 );
     int returnCode;
     try {
         WindowsCommandLine wcl( argc, argvW );
@@ -1056,8 +1052,6 @@ int wmain( int argc, wchar_t* argvW[] ) {
         cerr << "exception: " << e.what() << endl;
         returnCode = 1;
     }
-    SetConsoleCP( initialConsoleInputCodePage );
-    SetConsoleOutputCP( initialConsoleOutputCodePage );
     ::_exit(returnCode);
 }
 #else // #ifdef _WIN32
