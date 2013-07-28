@@ -1248,6 +1248,13 @@ namespace mongo {
         // remove chunk data
         ScopedDbConnection conn(configServer.modelServer());
         conn->remove(ChunkType::ConfigNS, BSON(ChunkType::ns(_ns)));
+        
+        // Make sure we're dropped on the config
+        string error = conn->getLastError();
+        uassert( 17001, str::stream() << "could not drop chunks for " << _ns 
+                                      << causedBy( error ), 
+                 error.size() == 0 );
+        
         conn.done();
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;
 
