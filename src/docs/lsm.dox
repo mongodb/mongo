@@ -59,16 +59,9 @@ for(;;) {
 }
 @endcode
 
-Unlike ordinary file cursors, LSM cursors default to \c overwrite mode, where:
-
-- WT_CURSOR::insert will update existing values without checking;
-- WT_CURSOR::update will insert values regardless of whether they exist; and
-- WT_CURSOR::remove will succeed regardless of whether the specified record
-  exists.
-
-This behavior can be disabled by passing \c "overwrite=false" to
-WT_SESSION::open_cursor, but the result will be a search through the levels
-of the LSM tree before every modification.
+If an LSM cursor is configured with \c "overwrite=false" passed to
+WT_SESSION::open_cursor, the result will be a search through the levels of the
+LSM tree before every modification.
 
 @section lsm_merge Merging
 

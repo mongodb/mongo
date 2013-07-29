@@ -328,6 +328,9 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
+	/* If successful, point the cursor at internal copies of the data. */
+	if (ret == 0)
+		ret = __wt_kv_return(session, cbt);
 	WT_TRET(__cursor_func_resolve(cbt, ret));
 	return (ret);
 }
@@ -399,7 +402,17 @@ err:	if (ret == WT_RESTART)
 	 */
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) && ret == WT_NOTFOUND)
 		ret = 0;
+
 	WT_TRET(__cursor_func_resolve(cbt, ret));
+
+	/*
+	 * After a successful remove, the key and value are not available.
+	 * This has to come after the call to resolve the cursor, it sets
+	 * the same flags we're clearing.
+	 */
+	if (ret == 0)
+		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+
 	return (ret);
 }
 
@@ -468,6 +481,9 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
+	/* If successful, point the cursor at internal copies of the data. */
+	if (ret == 0)
+		ret = __wt_kv_return(session, cbt);
 	WT_TRET(__cursor_func_resolve(cbt, ret));
 	return (ret);
 }

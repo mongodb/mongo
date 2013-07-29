@@ -82,7 +82,8 @@ struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
- * a length (limited to 4GB for items stored in tables).
+ * a length (limited to 4GB for items stored in tables).  WT_ITEM structures do
+ * not need to be cleared before use.
  */
 struct __wt_item {
 	/*!
