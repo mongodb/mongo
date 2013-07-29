@@ -178,7 +178,8 @@ namespace mongo {
 
         /**
          * @param microsToSleep -1 : ask client
-         *                     >=0 : sleep for that amount
+         *                       0 : pthread_yield or equivilant
+         *                      >0 : sleep for that amount
          * @param recordToLoad after yielding lock, load this record with only mmutex
          * do a dbtemprelease
          * note: caller should check matcher.docMatcher().atomic() first and not yield if atomic -
@@ -188,7 +189,7 @@ namespace mongo {
          *         if false is returned, then this ClientCursor should be considered deleted -
          *         in fact, the whole database could be gone.
          */
-        bool yield( int microsToSleep = -1 , Record * recordToLoad = 0 );
+        bool yield( int microsToSleep = -1, Record * recordToLoad = 0 );
 
         enum RecordNeeds {
             DontNeed = -1 , MaybeCovered = 0 , WillNeed = 100
