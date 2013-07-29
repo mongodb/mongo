@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include <string>
 
 namespace mongo {
@@ -26,33 +28,35 @@ namespace mongo {
     class MatchDetails {
     public:
         MatchDetails();
+
         void resetOutput();
+
+        // for debugging only
         std::string toString() const;
+
+        // relating to whether or not we had to load the full record
+
+        void setLoadedRecord( bool loadedRecord ) { _loadedRecord = loadedRecord; }
+
+        bool hasLoadedRecord() const { return _loadedRecord; }
+
+        // this name is wrong
+
+        bool needRecord() const { return _elemMatchKeyRequested; }
+
+        // if we need to store the offset into an array where we found the match
 
         /** Request that an elemMatchKey be recorded. */
         void requestElemMatchKey() { _elemMatchKeyRequested = true; }
 
-        bool needRecord() const { return _elemMatchKeyRequested; }
+        bool hasElemMatchKey() const;
+        std::string elemMatchKey() const;
 
-        bool hasLoadedRecord() const { return _loadedRecord; }
-        bool hasElemMatchKey() const { return _elemMatchKeyFound; }
-        std::string elemMatchKey() const {
-            verify( hasElemMatchKey() );
-            return _elemMatchKey;
-        }
-
-        void setLoadedRecord( bool loadedRecord ) { _loadedRecord = loadedRecord; }
-        void setElemMatchKey( const std::string &elemMatchKey ) {
-            if ( _elemMatchKeyRequested ) {
-                _elemMatchKeyFound = true;
-                _elemMatchKey = elemMatchKey;
-            }
-        }
+        void setElemMatchKey( const std::string &elemMatchKey );
 
     private:
         bool _loadedRecord;
         bool _elemMatchKeyRequested;
-        bool _elemMatchKeyFound;
-        std::string _elemMatchKey;
+        boost::scoped_ptr<std::string> _elemMatchKey;
     };
 }
