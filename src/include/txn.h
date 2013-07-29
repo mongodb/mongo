@@ -79,6 +79,8 @@ struct __wt_txn {
 	size_t		modref_alloc;
 	u_int		modref_count;
 
+	u_int32_t	force_evict_attempts;
+
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
 #define	TXN_FORCE_EVICT	0x04
@@ -86,3 +88,6 @@ struct __wt_txn {
 #define	TXN_RUNNING	0x10
 	uint32_t flags;
 };
+
+#define	WT_TXN_ACTIVE(txn)						\
+	(F_ISSET((txn), TXN_RUNNING) && (txn)->mod_count > 0)
